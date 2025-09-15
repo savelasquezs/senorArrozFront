@@ -1,0 +1,231 @@
+// src/router/index.ts
+import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router'
+import { useAuthStore } from '@/store/auth'
+
+// Import views
+import Login from '@/views/Login.vue'
+// import Dashboard from '@/views/Dashboard.vue'
+
+const routes: RouteRecordRaw[] = [
+    {
+        path: '/',
+        redirect: '/login'
+    },
+    {
+        path: '/login',
+        name: 'Login',
+        component: Login,
+        meta: {
+            requiresAuth: false,
+            title: 'Iniciar Sesión'
+        }
+    },
+    {
+        path: '/dashboard',
+        name: 'Dashboard',
+        component: () => import('@/views/Dashboard.vue'),
+        meta: {
+            requiresAuth: true,
+            title: 'Dashboard'
+        },
+        children: [
+            {
+                path: 'global',
+                name: 'GlobalDashboard',
+                component: () => import('@/views/dashboard/GlobalDashboard.vue'),
+                meta: {
+                    requiresAuth: true,
+                    requiresRole: ['Superadmin'],
+                    title: 'Dashboard Global'
+                }
+            },
+            // {
+            //     path: 'branch',
+            //     name: 'BranchDashboard',
+            //     component: () => import('@/views/dashboard/BranchDashboard.vue'),
+            //     meta: {
+            //         requiresAuth: true,
+            //         requiresRole: ['Admin'],
+            //         title: 'Dashboard Sucursal'
+            //     }
+            // }
+        ]
+    },
+    //   {
+    //     path: '/orders',
+    //     name: 'Orders',
+    //     component: () => import('@/views/Orders.vue'),
+    //     meta: {
+    //       requiresAuth: true,
+    //       requiresRole: ['Superadmin', 'Admin', 'Cashier'],
+    //       title: 'Pedidos'
+    //     }
+    //   },
+    //   {
+    //     path: '/kitchen',
+    //     name: 'Kitchen',
+    //     component: () => import('@/views/Kitchen.vue'),
+    //     meta: {
+    //       requiresAuth: true,
+    //       requiresRole: ['Kitchen'],
+    //       title: 'Cocina'
+    //     }
+    //   },
+    //   {
+    //     path: '/delivery',
+    //     name: 'Delivery',
+    //     component: () => import('@/views/Delivery.vue'),
+    //     meta: {
+    //       requiresAuth: true,
+    //       requiresRole: ['Deliveryman'],
+    //       title: 'Domicilios'
+    //     }
+    //   },
+    //   {
+    //     path: '/customers',
+    //     name: 'Customers',
+    //     component: () => import('@/views/Customers.vue'),
+    //     meta: {
+    //       requiresAuth: true,
+    //       requiresRole: ['Superadmin', 'Admin', 'Cashier'],
+    //       title: 'Clientes'
+    //     }
+    //   },
+    //   {
+    //     path: '/products',
+    //     name: 'Products',
+    //     component: () => import('@/views/Products.vue'),
+    //     meta: {
+    //       requiresAuth: true,
+    //       requiresRole: ['Superadmin', 'Admin'],
+    //       title: 'Productos'
+    //     }
+    //   },
+    //   {
+    //     path: '/expenses',
+    //     name: 'Expenses',
+    //     component: () => import('@/views/Expenses.vue'),
+    //     meta: {
+    //       requiresAuth: true,
+    //       requiresRole: ['Superadmin', 'Admin'],
+    //       title: 'Gastos'
+    //     }
+    //   },
+    //   {
+    //     path: '/users',
+    //     name: 'Users',
+    //     component: () => import('@/views/Users.vue'),
+    //     meta: {
+    //       requiresAuth: true,
+    //       requiresRole: ['Superadmin', 'Admin'],
+    //       title: 'Usuarios'
+    //     }
+    //   },
+    //   {
+    //     path: '/reports',
+    //     name: 'Reports',
+    //     component: () => import('@/views/Reports.vue'),
+    //     meta: {
+    //       requiresAuth: true,
+    //       requiresRole: ['Superadmin', 'Admin', 'Cashier'],
+    //       title: 'Reportes'
+    //     }
+    //   },
+    //   {
+    //     path: '/cash-register',
+    //     name: 'CashRegister',
+    //     component: () => import('@/views/CashRegister.vue'),
+    //     meta: {
+    //       requiresAuth: true,
+    //       requiresRole: ['Superadmin', 'Admin', 'Cashier'],
+    //       title: 'Caja'
+    //     }
+    //   },
+    //   {
+    //     path: '/profile',
+    //     name: 'Profile',
+    //     component: () => import('@/views/Profile.vue'),
+    //     meta: {
+    //       requiresAuth: true,
+    //       title: 'Perfil'
+    //     }
+    //   },
+    //   // 404 page
+    //   {
+    //     path: '/:pathMatch(.*)*',
+    //     name: 'NotFound',
+    //     component: () => import('@/views/NotFound.vue'),
+    //     meta: {
+    //       title: 'Página no encontrada'
+    //     }
+    //   }
+]
+
+const router = createRouter({
+    history: createWebHistory(),
+    routes,
+    scrollBehavior(to, from, savedPosition) {
+        if (savedPosition) {
+            return savedPosition
+        }
+        return { top: 0 }
+    }
+})
+
+// Navigation guards
+router.beforeEach(async (to, from, next) => {
+    const authStore = useAuthStore()
+
+    // Initialize auth state if not already done
+    if (!authStore.isAuthenticated && localStorage.getItem('auth_token')) {
+        authStore.initializeAuth()
+    }
+
+    // Set page title
+    document.title = to.meta.title ? `${to.meta.title} - Señor Arroz` : 'Señor Arroz'
+
+    // Check if route requires authentication
+    if (to.meta.requiresAuth && !authStore.isAuthenticated) {
+        return next('/login')
+    }
+
+    // If authenticated user tries to access login, redirect to dashboard
+    if (to.path === '/login' && authStore.isAuthenticated) {
+        const redirectPath = getRedirectPath(authStore.userRole)
+        return next(redirectPath)
+    }
+
+    // Check role-based access
+    if (to.meta.requiresRole && Array.isArray(to.meta.requiresRole)) {
+        const userRole = authStore.userRole
+        const allowedRoles = to.meta.requiresRole as string[]
+
+        if (!userRole || !allowedRoles.includes(userRole)) {
+            // Redirect to appropriate dashboard based on user role
+            const redirectPath = getRedirectPath(userRole)
+            return next(redirectPath)
+        }
+    }
+
+    next()
+})
+
+// Helper function to get redirect path based on role
+function getRedirectPath(role: string | null): string {
+    switch (role) {
+        case 'superadmin':
+            return '/dashboard/global'
+        case 'admin':
+            return '/dashboard/branch'
+        case 'cashier':
+            return '/orders'
+        case 'kitchen':
+            return '/kitchen'
+        case 'deliveryman':
+            return '/delivery'
+        default:
+            return '/dashboard'
+    }
+}
+
+export default router
