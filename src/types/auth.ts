@@ -43,3 +43,10 @@ export interface ChangePasswordCredentials {
 	newPassword: string;
 	confirmPassword: string;
 }
+
+export interface resetPasswordCredentials {
+	token: string;
+	email: string;
+	newPassword: string;
+	confirmPassword: string;
+}

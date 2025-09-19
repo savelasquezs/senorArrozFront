@@ -99,6 +99,23 @@ class MainApiService {
         }
     }
 
+    async forgotPassword(email: string): Promise<{ message: string }> {
+        try {
+            const response = await this.api.post('/auth/forgot-password', { email })
+            return response.data
+        } catch (error: any) {
+            throw this.handleError(error)
+        }
+    }
+
+    async resetPassword(resetData: { token: string, email: string, newPassword: string, confirmPassword: string }): Promise<void> {
+        try {
+            await this.api.post('/auth/reset-password', resetData)
+        } catch (error: any) {
+            throw this.handleError(error)
+        }
+    }
+
     // Generic request methods
     async get<T>(url: string, config?: AxiosRequestConfig): Promise<T> {
         try {

@@ -21,6 +21,24 @@ const routes: RouteRecordRaw[] = [
         }
     },
     {
+        path: '/forgot-password',
+        name: 'ForgotPassword',
+        component: () => import('@/views/ForgotPassword.vue'),
+        meta: {
+            requiresAuth: false,
+            title: 'Recuperar Contraseña'
+        }
+    },
+    {
+        path: '/reset-password',
+        name: 'ResetPassword',
+        component: () => import('@/views/ResetPassword.vue'),
+        meta: {
+            requiresAuth: false,
+            title: 'Restablecer Contraseña'
+        }
+    },
+    {
         path: '/change-password',
         name: 'ChangePassword',
         component: () => import('@/views/ChangePassword.vue'),

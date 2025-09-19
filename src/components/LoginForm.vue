@@ -67,10 +67,10 @@
             />
             <span class="ml-2 block text-sm text-gray-900">Recordarme</span>
           </label>
-  
-          <a href="#" class="text-sm text-orange-600 hover:text-orange-500">
+
+          <router-link to="/forgot-password" class="text-sm text-orange-600 hover:text-orange-500">
             ¿Olvidaste tu contraseña?
-          </a>
+          </router-link>
         </div>
   
         <BaseButton
