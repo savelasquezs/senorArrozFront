@@ -1,6 +1,6 @@
 // src/services/mainApi.ts
 import axios, { type AxiosInstance, type AxiosRequestConfig } from 'axios'
-import type { LoginCredentials, LoginResponse } from '@/types/auth'
+import type { LoginCredentials, LoginResponse, ChangePasswordCredentials } from '@/types/auth'
 
 class MainApiService {
     private api: AxiosInstance
@@ -86,6 +86,14 @@ class MainApiService {
         try {
             const response = await this.api.post('/auth/refresh', { refreshToken })
             return response.data
+        } catch (error: any) {
+            throw this.handleError(error)
+        }
+    }
+
+    async changePassword( passwordData:ChangePasswordCredentials ): Promise<void> {
+        try {
+            await this.api.post('/auth/change-password', passwordData)
         } catch (error: any) {
             throw this.handleError(error)
         }

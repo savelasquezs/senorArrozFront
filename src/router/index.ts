@@ -21,6 +21,15 @@ const routes: RouteRecordRaw[] = [
         }
     },
     {
+        path: '/change-password',
+        name: 'ChangePassword',
+        component: () => import('@/views/ChangePassword.vue'),
+        meta: {
+            requiresAuth: true,
+            title: 'Cambiar Contraseña'
+        }
+    },
+    {
         path: '/dashboard',
         name: 'Dashboard',
         component: () => import('@/views/Dashboard.vue'),

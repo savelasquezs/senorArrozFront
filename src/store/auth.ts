@@ -97,6 +97,22 @@ export const useAuthStore = defineStore('auth', () => {
     localStorage.removeItem('refresh_token')
     localStorage.removeItem('user_data')
   }
+  
+  const changePassword = async (passwordData: { currentPassword: string, newPassword: string, confirmPassword: string }): Promise<void> => {
+    try {
+      isLoading.value = true
+      error.value = null
+      
+      await mainApi.changePassword(passwordData)
+    } catch (err: any) {
+      error.value = err.message || 'Error al cambiar la contraseña'
+      throw err
+    } finally {
+      isLoading.value = false
+    }
+  }
+  
+ 
 
   const initializeAuth = (): void => {
     const storedToken = localStorage.getItem('auth_token')
@@ -140,6 +156,7 @@ export const useAuthStore = defineStore('auth', () => {
     canManageExpenses,
     canViewAllBranches,
     // Actions
+    changePassword,
     login,
     logout,
     refreshAccessToken,
