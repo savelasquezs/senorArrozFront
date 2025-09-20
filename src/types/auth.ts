@@ -2,11 +2,11 @@
 
 // User roles as const assertion for better type safety
 export const UserRole = {
-	SUPERADMIN: 'superadmin',
-	ADMIN: 'admin',
-	CASHIER: 'cashier',
-	KITCHEN: 'kitchen',
-	DELIVERYMAN: 'deliveryman',
+	SUPERADMIN: 'Superadmin',
+	ADMIN: 'Admin',
+	CASHIER: 'Cashier',
+	KITCHEN: 'Kitchen',
+	DELIVERYMAN: 'Deliveryman',
 } as const;
 
 export type UserRoleType = (typeof UserRole)[keyof typeof UserRole];
