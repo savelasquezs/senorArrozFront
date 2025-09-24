@@ -1,6 +1,7 @@
 // src/router/index.ts
 import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router'
 import { useAuthStore } from '@/store/auth'
+import { UserRole } from '@/types/auth'
 
 // Import views
 import Login from '@/views/Login.vue'
@@ -62,22 +63,36 @@ const routes: RouteRecordRaw[] = [
                 component: () => import('@/views/dashboard/GlobalDashboard.vue'),
                 meta: {
                     requiresAuth: true,
-                    requiresRole: ['Superadmin'],
+                    requiresRole: [UserRole.SUPERADMIN],
                     title: 'Dashboard Global'
                 }
             },
-            // {
-            //     path: 'branch',
-            //     name: 'BranchDashboard',
-            //     component: () => import('@/views/dashboard/BranchDashboard.vue'),
-            //     meta: {
-            //         requiresAuth: true,
-            //         requiresRole: ['Admin'],
-            //         title: 'Dashboard Sucursal'
-            //     }
-            // }
+
+
         ]
     },
+    {
+        path: '/branches',
+        name: 'BranchesList',
+        component: () => import('@/views/BranchesList.vue'),
+        meta: {
+            requiresAuth: true,
+            requiresRole: [UserRole.SUPERADMIN],
+            title: 'Sucursales'
+        }
+    },
+    {
+        path: '/branches/:id',
+        name: 'BranchDetail',
+        component: () => import('@/views/BranchDetail.vue'),
+        meta: {
+            requiresAuth: true,
+            requiresRole: [UserRole.SUPERADMIN, UserRole.ADMIN],
+            title: 'Detalle Sucursal'
+        }
+    },
+
+
     //   {
     //     path: '/orders',
     //     name: 'Orders',

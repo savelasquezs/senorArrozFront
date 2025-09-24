@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
+import { UserRole } from '@/types/auth';
 import type {
 	User,
 	LoginCredentials,
@@ -27,11 +28,11 @@ export const useAuthStore = defineStore('auth', () => {
 	const userName = computed(() => user.value?.name || '');
 
 	// Role checks
-	const isSuperadmin = computed(() => userRole.value === 'superadmin');
-	const isAdmin = computed(() => userRole.value === 'admin');
-	const isCashier = computed(() => userRole.value === 'cashier');
-	const isKitchen = computed(() => userRole.value === 'kitchen');
-	const isDeliveryman = computed(() => userRole.value === 'deliveryman');
+	const isSuperadmin = computed(() => userRole.value === UserRole.SUPERADMIN);
+	const isAdmin = computed(() => userRole.value === UserRole.ADMIN);
+	const isCashier = computed(() => userRole.value === UserRole.CASHIER);
+	const isKitchen = computed(() => userRole.value === UserRole.KITCHEN);
+	const isDeliveryman = computed(() => userRole.value === UserRole.DELIVERYMAN);
 
 	// Permission checks
 	const canManageUsers = computed(() => isSuperadmin.value || isAdmin.value);

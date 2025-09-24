@@ -5,7 +5,7 @@
 		<Sidebar :is-open="sidebarOpen" @close="sidebarOpen = false" />
 
 		<!-- Main content -->
-		<div class="flex-1 flex flex-col overflow-hidden">
+		<div :class="mainContentClasses">
 			<!-- Top navigation -->
 			<TopNavigation @toggle-sidebar="sidebarOpen = !sidebarOpen" />
 
@@ -13,15 +13,11 @@
 			<main class="flex-1 overflow-x-hidden overflow-y-auto bg-gray-50 px-6">
 				<div class="max-w-7xl mx-auto h-full flex flex-col">
 					<!-- Page header -->
-					<div
-						v-if="pageTitle || $slots.header"
-						class="mb-6 border-b border-gray-200 pb-4 flex items-center justify-between"
-					>
+					<div v-if="pageTitle || $slots.header"
+						class="mb-6 border-b border-gray-200 pb-4 flex items-center justify-between">
 						<slot name="header">
 							<div class="flex-1 min-w-0">
-								<h2
-									class="text-2xl font-bold leading-7 text-emerald-600 sm:text-3xl sm:truncate"
-								>
+								<h2 class="text-2xl font-bold leading-7 text-emerald-600 sm:text-3xl sm:truncate">
 									{{ pageTitle }}
 								</h2>
 							</div>
@@ -32,10 +28,7 @@
 					</div>
 
 					<!-- Page content wrapper -->
-					<div
-						v-if="!noCard"
-						class="bg-white shadow-sm rounded-2xl p-6 border border-gray-200 flex-1"
-					>
+					<div v-if="!noCard" class="bg-white shadow-sm rounded-2xl p-6 border border-gray-200 flex-1">
 						<slot />
 					</div>
 
@@ -46,11 +39,7 @@
 		</div>
 
 		<!-- Mobile sidebar overlay -->
-		<div
-			v-if="sidebarOpen"
-			class="fixed inset-0 z-40 lg:hidden"
-			@click="sidebarOpen = false"
-		>
+		<div v-if="sidebarOpen" class="fixed inset-0 z-40 lg:hidden" @click="sidebarOpen = false">
 			<div class="fixed inset-0 bg-gray-600 bg-opacity-75"></div>
 		</div>
 	</div>
@@ -71,6 +60,11 @@ const props = defineProps<Props>();
 const route = useRoute();
 
 const sidebarOpen = ref(false);
+
+const mainContentClasses = computed(() => [
+	'flex flex-col overflow-hidden transition-all duration-300 ease-in-out',
+	sidebarOpen.value ? 'ml-64' : 'ml-0'
+]);
 
 const pageTitle = computed(() => {
 	return props.pageTitle || (route.meta.title as string) || '';

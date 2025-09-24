@@ -1,6 +1,8 @@
 // src/services/mainApi.ts
 import axios, { type AxiosInstance, type AxiosRequestConfig } from 'axios'
 import type { LoginCredentials, LoginResponse, ChangePasswordCredentials } from '@/types/auth'
+import type { ApiResponse, PagedResult, Branch, BranchFilters } from '@/types/common'
+import type { UserRoleType } from '@/types/auth'
 
 class MainApiService {
     private api: AxiosInstance
@@ -91,7 +93,7 @@ class MainApiService {
         }
     }
 
-    async changePassword( passwordData:ChangePasswordCredentials ): Promise<void> {
+    async changePassword(passwordData: ChangePasswordCredentials): Promise<void> {
         try {
             await this.api.post('/auth/change-password', passwordData)
         } catch (error: any) {
@@ -153,18 +155,63 @@ class MainApiService {
         }
     }
 
+    // Branches endpoints
+    async getAllBranches(params?: Partial<BranchFilters>): Promise<ApiResponse<PagedResult<Branch>>> {
+        return this.get<ApiResponse<PagedResult<Branch>>>('/Branches/all', { params })
+    }
+
+    async getBranches(filters?: BranchFilters): Promise<ApiResponse<PagedResult<Branch>>> {
+        return this.get<ApiResponse<PagedResult<Branch>>>('/Branches', { params: filters })
+    }
+
+    async getBranchById(id: number): Promise<ApiResponse<Branch>> {
+        return this.get<ApiResponse<Branch>>(`/Branches/${id}`)
+    }
+
+    async createBranch(payload: Pick<Branch, 'name' | 'address' | 'phone1' | 'phone2'>): Promise<ApiResponse<Branch>> {
+        return this.post<ApiResponse<Branch>>('/Branches', payload)
+    }
+
+    async updateBranch(id: number, payload: Pick<Branch, 'name' | 'address' | 'phone1' | 'phone2'>): Promise<ApiResponse<Branch>> {
+        return this.put<ApiResponse<Branch>>(`/Branches/${id}`, payload)
+    }
+
+    async deleteBranch(id: number): Promise<ApiResponse<string>> {
+        return this.delete<ApiResponse<string>>(`/Branches/${id}`)
+    }
+
+    // Users minimal endpoints (scoped to branches)
+    async createUser(payload: { name: string; email: string; password: string; role: UserRoleType; branchId?: number }): Promise<ApiResponse<any>> {
+        return this.post<ApiResponse<any>>('/Users', payload)
+    }
+
+    async updateUser(id: number, payload: { name?: string; email?: string; role?: UserRoleType; active?: boolean }): Promise<ApiResponse<any>> {
+        return this.put<ApiResponse<any>>(`/Users/${id}`, payload)
+    }
+
     private handleError(error: any): Error {
         if (error.response) {
-            // Server responded with error status
-            const message = error.response.data?.message ||
-                error.response.data?.error ||
-                `Error ${error.response.status}: ${error.response.statusText}`
-            return new Error(message)
+            const data = error.response.data
+
+            // Caso 1: Validaciones (400 con "errors")
+            if (data?.errors) {
+                // Aplanamos los mensajes en un string legible
+                const validationMessages = Object.values(data.errors)
+                    .flat()
+                    .join(' | ')
+                return new Error(validationMessages)
+            }
+
+            // Caso 2: Mensajes custom de backend
+            if (data?.message || data?.error) {
+                return new Error(data.message || data.error)
+            }
+
+            // Caso 3: Genérico
+            return new Error(`Error ${error.response.status}: ${error.response.statusText}`)
         } else if (error.request) {
-            // Request was made but no response received
             return new Error('No se pudo conectar con el servidor. Verifica tu conexión.')
         } else {
-            // Something else happened
             return new Error(error.message || 'Error inesperado')
         }
     }

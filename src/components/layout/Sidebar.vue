@@ -3,9 +3,7 @@
 		<div class="flex flex-col h-full">
 			<div class="p-4">
 				<div class="flex items-center gap-3 mb-6">
-					<div
-						class="w-10 h-10 bg-emerald-100 rounded-full flex items-center justify-center"
-					>
+					<div class="w-10 h-10 bg-emerald-100 rounded-full flex items-center justify-center">
 						<component :is="roleIcon" class="h-5 w-5 text-emerald-700" />
 					</div>
 					<div>
@@ -29,17 +27,12 @@
 			<!-- Navigation -->
 			<nav class="flex-1 px-2 space-y-1">
 				<template v-for="item in navigationItems" :key="item.name">
-					<router-link
-						v-if="hasPermission(item.roles)"
-						:to="item.to"
-						:class="[
-							$route.path === item.to || $route.path.startsWith(item.to + '/')
-								? 'bg-emerald-600 text-white hover:bg-emerald-700'
-								: 'text-gray-600 hover:text-gray-900 hover:bg-gray-100',
-							'group flex items-center px-3 py-2 text-sm font-medium rounded-xl transition-colors gap-3',
-						]"
-						@click="$emit('close')"
-					>
+					<router-link v-if="hasPermission(item.roles)" :to="item.to" :class="[
+						$route.path === item.to || $route.path.startsWith(item.to + '/')
+							? 'bg-emerald-600 text-white hover:bg-emerald-700'
+							: 'text-gray-600 hover:text-gray-900 hover:bg-gray-100',
+						'group flex items-center px-3 py-2 text-sm font-medium rounded-xl transition-colors gap-3',
+					]" @click="$emit('close')">
 						<component :is="item.icon" class="h-4 w-4 flex-shrink-0" />
 						<span class="text-sm">{{ item.name }}</span>
 					</router-link>
@@ -77,7 +70,7 @@ const authStore = useAuthStore();
 
 const sidebarClasses = computed(() => [
 	'fixed inset-y-0 left-0 z-50 w-64 h-screen bg-white border-r shadow-lg overflow-y-auto',
-	'transform transition-transform duration-300 ease-in-out lg:translate-x-0',
+	'transform transition-transform duration-300 ease-in-out',
 	props.isOpen ? 'translate-x-0' : '-translate-x-full',
 ]);
 
@@ -105,6 +98,12 @@ const navigationItems = computed(() => [
 		to: '/dashboard',
 		icon: HomeIcon,
 		roles: ['Superadmin', 'Admin'],
+	},
+	{
+		name: 'Sucursales',
+		to: '/branches',
+		icon: BriefcaseIcon,
+		roles: ['Superadmin'],
 	},
 	{
 		name: 'Pedidos',
