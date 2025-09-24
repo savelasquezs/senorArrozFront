@@ -1,3 +1,5 @@
+import type { UserRole } from "./user";
+
 export interface SelectOption {
   value: string | number;
   label: string;
@@ -51,14 +53,34 @@ export interface PagedResult<T> {
 }
 
 // Branch domain
+
+
 export interface BranchUserSummary {
-  id: number;
-  name: string;
-  email: string;
-  role: string;
-  active: boolean;
-  createdAt: string;
-  lastLogin: string;
+  id: number
+  name: string
+  email: string
+  role: UserRole
+  phone?: string
+  branchId: number
+  active: boolean
+  lastLogin?: string
+}
+
+// Datos para crear/actualizar usuarios desde el resumen
+export interface CreateBranchUserRequest {
+  branchId: number
+  name: string
+  email: string
+  role: UserRole
+  password: string
+  phone?: string
+}
+
+export interface UpdateBranchUserRequest {
+  name?: string
+  email?: string
+  role?: UserRole
+  phone?: string
 }
 
 export interface NeighborhoodSummary {

@@ -1,272 +1,365 @@
-<script setup lang="ts">
-import { onMounted, computed, ref } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
-import { useBranchesStore } from '@/store/branches'
-import { useAuthStore } from '@/store/auth'
-import MainLayout from '@/components/layout/MainLayout.vue'
-import BaseCard from '@/components/ui/BaseCard.vue'
-import BaseLoading from '@/components/ui/BaseLoading.vue'
-import BaseAlert from '@/components/ui/BaseAlert.vue'
-import BaseButton from '@/components/ui/BaseButton.vue'
-import BaseDialog from '@/components/ui/BaseDialog.vue'
-import BaseInput from '@/components/ui/BaseInput.vue'
-import BaseSelect from '@/components/ui/BaseSelect.vue'
-import BaseToast from '@/components/ui/BaseToast.vue'
-import { UserRole } from '@/types/auth'
-
-const route = useRoute()
-const router = useRouter()
-const branches = useBranchesStore()
-const auth = useAuthStore()
-
-const id = Number(route.params.id)
-
-const canManageBranch = computed(() => {
-    if (!branches.current) return false
-    if (auth.isSuperadmin) return true
-    return auth.isAdmin && auth.branchId === branches.current.id
-})
-
-onMounted(async () => {
-    const authorized = auth.isSuperadmin || (auth.isAdmin && auth.branchId === id)
-    if (!authorized) {
-        router.replace('/dashboard')
-        return
-    }
-    try {
-        await branches.fetchById(id)
-    } catch (e) {
-        toast('error', branches.error || 'Error al cargar sucursal')
-    }
-})
-
-const remove = async () => {
-    if (!auth.isSuperadmin) return
-    await branches.remove(id)
-    window.history.back()
-}
-
-// Edit branch dialog (Superadmin)
-const showEdit = ref(false)
-const editName = ref('')
-const editAddress = ref('')
-const editPhone1 = ref('')
-const editPhone2 = ref('')
-const saving = ref(false)
-
-const openEdit = () => {
-    if (!branches.current) return
-    editName.value = branches.current.name
-    editAddress.value = branches.current.address
-    editPhone1.value = branches.current.phone1
-    editPhone2.value = branches.current.phone2
-    showEdit.value = true
-}
-
-const submitEdit = async () => {
-    try {
-        saving.value = true
-        await branches.update(id, { name: editName.value, address: editAddress.value, phone1: editPhone1.value, phone2: editPhone2.value })
-        showEdit.value = false
-        toast('success', 'Sucursal actualizada')
-    } finally {
-        saving.value = false
-    }
-}
-
-// Create user dialog with constraints
-const showCreateUser = ref(false)
-const userName = ref('')
-const userEmail = ref('')
-const userPassword = ref('')
-const userRole = ref<string>('')
-const creatingUser = ref(false)
-
-const roleOptions = [
-    { value: UserRole.SUPERADMIN, label: 'Superadmin' },
-    { value: UserRole.ADMIN, label: 'Admin' },
-    { value: UserRole.CASHIER, label: 'Cashier' },
-    { value: UserRole.KITCHEN, label: 'Kitchen' },
-    { value: UserRole.DELIVERYMAN, label: 'Deliveryman' }
-]
-
-const filteredRoleOptions = computed(() => {
-    if (auth.isSuperadmin) return roleOptions
-    if (auth.isAdmin) return roleOptions.filter(r => [UserRole.CASHIER, UserRole.KITCHEN, UserRole.DELIVERYMAN].includes(r.value as any))
-    return []
-})
-
-const uniqueRoleViolation = computed(() => {
-    if (!branches.current) return null
-    const users = branches.current.users
-    if (userRole.value === UserRole.ADMIN) {
-        const hasAdmin = users.some(u => u.role === UserRole.ADMIN)
-        return hasAdmin ? 'Ya existe un Admin en esta sucursal' : null
-    }
-    if (userRole.value === UserRole.KITCHEN) {
-        const hasKitchen = users.some(u => u.role === UserRole.KITCHEN)
-        return hasKitchen ? 'Ya existe un usuario de Kitchen en esta sucursal' : null
-    }
-    if (userRole.value === UserRole.SUPERADMIN) {
-        // Only one Superadmin in the entire app (client-side hint; server should enforce)
-        const hasSuperadminAnywhere = false
-        return hasSuperadminAnywhere ? 'Ya existe un Superadmin en la aplicación' : null
-    }
-    return null
-})
-
-const openCreateUser = () => {
-    userName.value = ''
-    userEmail.value = ''
-    userPassword.value = ''
-    userRole.value = ''
-    showCreateUser.value = true
-}
-
-const submitCreateUser = async () => {
-    if (!branches.current) return
-    if (uniqueRoleViolation.value) return
-    try {
-        creatingUser.value = true
-        await (await import('@/services/mainApi')).mainApi.createUser({
-            name: userName.value,
-            email: userEmail.value,
-            password: userPassword.value,
-            role: userRole.value as any,
-            branchId: auth.isSuperadmin ? (userRole.value === UserRole.SUPERADMIN ? undefined : branches.current.id) : branches.current.id
-        })
-        showCreateUser.value = false
-        await branches.fetchById(id)
-        toast('success', 'Usuario creado')
-    } finally {
-        creatingUser.value = false
-    }
-}
-
-// toast helpers
-const showToast = ref(false)
-const toastMsg = ref('')
-const toastType = ref<'error' | 'success' | 'info' | 'warning'>('info')
-const toast = (type: 'error' | 'success' | 'info' | 'warning', msg: string) => {
-    toastType.value = type
-    toastMsg.value = msg
-    showToast.value = true
-}
-</script>
-
+<!-- src/views/BranchDetail.vue -->
 <template>
     <MainLayout>
-        <div class="p-4">
-            <BaseLoading v-if="branches.isLoading" />
-            <template v-else>
-                <template v-if="canManageBranch">
-                    <div class="flex items-start gap-4">
-                        <BaseCard class="flex-1">
-                            <div class="flex items-center justify-between">
+        <div class="p-6">
+            <!-- Loading State -->
+            <BaseLoading v-if="branchesStore.isLoading" text="Cargando sucursal..." />
+
+            <!-- Access Denied -->
+            <BaseAlert v-else-if="!canAccessBranch" variant="danger" class="max-w-2xl">
+                <ExclamationTriangleIcon class="w-5 h-5" />
+                <div>
+                    <h3 class="font-medium">Acceso Denegado</h3>
+                    <p class="mt-1">No tienes permisos para ver esta sucursal.</p>
+                </div>
+            </BaseAlert>
+
+            <!-- Branch Content -->
+            <div v-else-if="branch" class="space-y-6">
+                <!-- Branch Header -->
+                <div class="bg-white shadow rounded-lg">
+                    <div class="px-6 py-4 border-b border-gray-200">
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center space-x-3">
+                                <div class="flex-shrink-0">
+                                    <div class="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
+                                        <BuildingOffice2Icon class="w-6 h-6 text-green-600" />
+                                    </div>
+                                </div>
                                 <div>
-                                    <h2 class="text-lg font-semibold">{{ branches.current?.name }}</h2>
-                                    <div class="text-sm text-gray-600">{{ branches.current?.address }}</div>
-                                    <div class="text-sm text-gray-600">Tel: {{ branches.current?.phone1 }} {{
-                                        branches.current?.phone2 }}</div>
-                                </div>
-                                <div class="flex gap-2" v-if="auth.isSuperadmin">
-                                    <BaseButton color="secondary" @click="openEdit">Editar</BaseButton>
-                                    <BaseButton color="danger" @click="remove">Eliminar</BaseButton>
+                                    <h1 class="text-2xl font-bold text-gray-900">{{ branch.name }}</h1>
+                                    <p class="text-sm text-gray-500">Sucursal ID: {{ branch.id }}</p>
                                 </div>
                             </div>
-                        </BaseCard>
+
+                            <!-- Actions (Only for Superadmin) -->
+                            <div v-if="authStore.user?.role === 'Superadmin'" class="flex space-x-2">
+                                <BaseButton @click="openEditDialog" variant="secondary" :icon="PencilIcon">
+                                    Editar
+                                </BaseButton>
+                                <BaseButton @click="confirmDelete" variant="danger" :icon="TrashIcon">
+                                    Eliminar
+                                </BaseButton>
+                            </div>
+                        </div>
                     </div>
 
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-                        <BaseCard>
-                            <h3 class="font-semibold mb-2">Usuarios</h3>
-                            <table class="min-w-full text-sm">
-                                <thead>
-                                    <tr class="text-left border-b">
-                                        <th class="py-2 pr-4">Nombre</th>
-                                        <th class="py-2 pr-4">Email</th>
-                                        <th class="py-2 pr-4">Rol</th>
-                                        <th class="py-2 pr-4">Activo</th>
-                                        <th class="py-2 pr-4">Último ingreso</th>
+                    <!-- Branch Info -->
+                    <div class="px-6 py-4">
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                            <div class="flex items-center">
+                                <MapPinIcon class="w-5 h-5 text-gray-400 mr-3" />
+                                <div>
+                                    <p class="text-sm font-medium text-gray-900">Dirección</p>
+                                    <p class="text-sm text-gray-600">{{ branch.address }}</p>
+                                </div>
+                            </div>
+
+                            <div class="flex items-center">
+                                <PhoneIcon class="w-5 h-5 text-gray-400 mr-3" />
+                                <div>
+                                    <p class="text-sm font-medium text-gray-900">Teléfono Principal</p>
+                                    <p class="text-sm text-gray-600">{{ branch.phone1 }}</p>
+                                </div>
+                            </div>
+
+                            <div v-if="branch.phone2" class="flex items-center">
+                                <PhoneIcon class="w-5 h-5 text-gray-400 mr-3" />
+                                <div>
+                                    <p class="text-sm font-medium text-gray-900">Teléfono Secundario</p>
+                                    <p class="text-sm text-gray-600">{{ branch.phone2 }}</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Stats Cards -->
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    <BaseCard>
+                        <div class="flex items-center">
+                            <div class="flex-shrink-0">
+                                <UserGroupIcon class="w-8 h-8 text-blue-600" />
+                            </div>
+                            <div class="ml-4">
+                                <p class="text-sm font-medium text-gray-500">Usuarios</p>
+                                <p class="text-2xl font-semibold text-gray-900">{{ branch.users.length }}</p>
+                            </div>
+                        </div>
+                    </BaseCard>
+
+                    <BaseCard>
+                        <div class="flex items-center">
+                            <div class="flex-shrink-0">
+                                <MapIcon class="w-8 h-8 text-green-600" />
+                            </div>
+                            <div class="ml-4">
+                                <p class="text-sm font-medium text-gray-500">Barrios</p>
+                                <p class="text-2xl font-semibold text-gray-900">{{ branch.neighborhoods?.length || 0 }}
+                                </p>
+                            </div>
+                        </div>
+                    </BaseCard>
+
+                    <BaseCard>
+                        <div class="flex items-center">
+                            <div class="flex-shrink-0">
+                                <UsersIcon class="w-8 h-8 text-purple-600" />
+                            </div>
+                            <div class="ml-4">
+                                <p class="text-sm font-medium text-gray-500">Clientes</p>
+                                <p class="text-2xl font-semibold text-gray-900">{{ totalCustomers }}</p>
+                            </div>
+                        </div>
+                    </BaseCard>
+
+                    <BaseCard>
+                        <div class="flex items-center">
+                            <div class="flex-shrink-0">
+                                <CalendarIcon class="w-8 h-8 text-orange-600" />
+                            </div>
+                            <div class="ml-4">
+                                <p class="text-sm font-medium text-gray-500">Creada</p>
+                                <p class="text-sm font-semibold text-gray-900">{{ formatDate(branch.createdAt) }}</p>
+                            </div>
+                        </div>
+                    </BaseCard>
+                </div>
+
+                <!-- Users Section -->
+                <BaseCard>
+                    <BranchUsersTable :users="branch.users" :branch-id="branch.id" @user-created="handleUserCreated"
+                        @user-updated="handleUserUpdated" @user-status-toggled="handleUserStatusToggled" />
+                </BaseCard>
+
+                <!-- Neighborhoods Section -->
+                <BaseCard v-if="branch.neighborhoods && branch.neighborhoods.length > 0">
+                    <div class="space-y-4">
+                        <h3 class="text-lg font-semibold text-gray-900">
+                            Barrios de Cobertura
+                            <span class="text-sm font-normal text-gray-500">({{ branch.neighborhoods.length }})</span>
+                        </h3>
+
+                        <div class="overflow-hidden shadow ring-1 ring-black ring-opacity-5 rounded-lg">
+                            <table class="min-w-full divide-y divide-gray-200">
+                                <thead class="bg-gray-50">
+                                    <tr>
+                                        <th
+                                            class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                            Barrio
+                                        </th>
+                                        <th
+                                            class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                            Tarifa Domicilio
+                                        </th>
+                                        <th
+                                            class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                            Clientes
+                                        </th>
+                                        <th
+                                            class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                            Direcciones
+                                        </th>
                                     </tr>
                                 </thead>
-                                <tbody>
-                                    <tr v-for="u in branches.current?.users || []" :key="u.id" class="border-b">
-                                        <td class="py-2 pr-4">{{ u.name }}</td>
-                                        <td class="py-2 pr-4">{{ u.email }}</td>
-                                        <td class="py-2 pr-4">{{ u.role }}</td>
-                                        <td class="py-2 pr-4">{{ u.active ? 'Sí' : 'No' }}</td>
-                                        <td class="py-2 pr-4">{{ new Date(u.lastLogin).toLocaleString() }}</td>
+                                <tbody class="bg-white divide-y divide-gray-200">
+                                    <tr v-for="neighborhood in branch.neighborhoods" :key="neighborhood.id"
+                                        class="hover:bg-gray-50">
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                                            {{ neighborhood.name }}
+                                        </td>
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                            ${{ neighborhood.deliveryFee?.toLocaleString() }}
+                                        </td>
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                            {{ neighborhood.totalCustomers || 0 }}
+                                        </td>
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                            {{ neighborhood.totalAddresses || 0 }}
+                                        </td>
                                     </tr>
                                 </tbody>
                             </table>
-                            <div class="mt-2 text-xs text-gray-500">
-                                Controles de creación/rol se implementarán aquí respetando reglas: Superadmin puede
-                                todos;
-                                Admin
-                                de sucursal solo Cashier/Deliveryman/Kitchen y unicidad de Admin y Kitchen por sucursal.
-                            </div>
-                        </BaseCard>
-
-                        <BaseCard>
-                            <h3 class="font-semibold mb-2">Barrios</h3>
-                            <table class="min-w-full text-sm">
-                                <thead>
-                                    <tr class="text-left border-b">
-                                        <th class="py-2 pr-4">Nombre</th>
-                                        <th class="py-2 pr-4">Domicilio</th>
-                                        <th class="py-2 pr-4">Clientes</th>
-                                        <th class="py-2 pr-4">Direcciones</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <tr v-for="n in branches.current?.neighborhoods || []" :key="n.id" class="border-b">
-                                        <td class="py-2 pr-4">{{ n.name }}</td>
-                                        <td class="py-2 pr-4">{{ n.deliveryFee }}</td>
-                                        <td class="py-2 pr-4">{{ n.totalCustomers }}</td>
-                                        <td class="py-2 pr-4">{{ n.totalAddresses }}</td>
-                                    </tr>
-                                </tbody>
-                            </table>
-                        </BaseCard>
-                    </div>
-                    <div class="mt-4" v-if="canManageBranch">
-                        <BaseButton color="primary" @click="openCreateUser">Crear usuario</BaseButton>
-                    </div>
-
-                    <BaseDialog v-model="showEdit" title="Editar Sucursal">
-                        <div class="grid grid-cols-1 gap-3">
-                            <BaseInput v-model="editName" label="Nombre" />
-                            <BaseInput v-model="editAddress" label="Dirección" />
-                            <BaseInput v-model="editPhone1" label="Teléfono 1" />
-                            <BaseInput v-model="editPhone2" label="Teléfono 2" />
-                            <div class="flex justify-end gap-2 mt-2">
-                                <BaseButton color="secondary" @click="showEdit = false">Cancelar</BaseButton>
-                                <BaseButton :disabled="!editName || !editAddress" :loading="saving" color="primary"
-                                    @click="submitEdit">Guardar</BaseButton>
-                            </div>
                         </div>
-                    </BaseDialog>
+                    </div>
+                </BaseCard>
+            </div>
 
-                    <BaseDialog v-model="showCreateUser" title="Crear Usuario">
-                        <div class="grid grid-cols-1 gap-3">
-                            <BaseInput v-model="userName" label="Nombre" />
-                            <BaseInput v-model="userEmail" label="Email" />
-                            <BaseInput v-model="userPassword" type="password" label="Contraseña" />
-                            <BaseSelect v-model="userRole" :options="filteredRoleOptions" label="Rol" />
-                            <BaseAlert v-if="uniqueRoleViolation" type="warning">{{ uniqueRoleViolation }}</BaseAlert>
-                            <div class="flex justify-end gap-2 mt-2">
-                                <BaseButton color="secondary" @click="showCreateUser = false">Cancelar</BaseButton>
-                                <BaseButton
-                                    :disabled="!userName || !userEmail || !userPassword || !userRole || !!uniqueRoleViolation"
-                                    :loading="creatingUser" color="primary" @click="submitCreateUser">Crear</BaseButton>
-                            </div>
+            <!-- Edit Branch Dialog -->
+            <BaseDialog v-model="showEditDialog" title="Editar Sucursal" :icon="PencilIcon" size="lg">
+                <BranchForm :branch="branch" @submit="handleEditSubmit" @cancel="showEditDialog = false"
+                    :loading="branchesStore.isLoading" />
+            </BaseDialog>
+
+            <!-- Delete Confirmation Dialog -->
+            <BaseDialog v-model="showDeleteDialog" title="Confirmar Eliminación" :icon="ExclamationTriangleIcon"
+                icon-variant="danger" size="md">
+                <div class="text-center">
+                    <ExclamationTriangleIcon class="mx-auto h-12 w-12 text-red-600" />
+                    <div class="mt-3">
+                        <h3 class="text-lg font-medium text-gray-900">Eliminar Sucursal</h3>
+                        <div class="mt-2">
+                            <p class="text-sm text-gray-500">
+                                ¿Estás seguro de que deseas eliminar la sucursal
+                                <strong>{{ branch?.name }}</strong>?
+                            </p>
+                            <p class="text-sm text-red-600 mt-2">
+                                Esta acción no se puede deshacer y eliminará todos los datos asociados.
+                            </p>
                         </div>
-                    </BaseDialog>
+                    </div>
+                </div>
+
+                <template #footer>
+                    <BaseButton @click="showDeleteDialog = false" variant="secondary">
+                        Cancelar
+                    </BaseButton>
+                    <BaseButton @click="handleDelete" variant="danger" :loading="branchesStore.isLoading">
+                        Eliminar Sucursal
+                    </BaseButton>
                 </template>
-                <BaseAlert v-else type="warning">No tienes permiso para ver esta sucursal.</BaseAlert>
-            </template>
-            <BaseToast v-model="showToast" :message="toastMsg" :type="toastType" />
+            </BaseDialog>
         </div>
     </MainLayout>
 </template>
+
+<script setup lang="ts">
+import { ref, computed, onMounted } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import { useBranchesStore } from '@/store/branches'
+
+import { useAuthStore } from '@/store/auth'
+import type { BranchUserSummary } from '@/types/common'
+import MainLayout from '@/components/layout/MainLayout.vue'
+import BaseCard from '@/components/ui/BaseCard.vue'
+import BaseButton from '@/components/ui/BaseButton.vue'
+import BaseDialog from '@/components/ui/BaseDialog.vue'
+import BaseAlert from '@/components/ui/BaseAlert.vue'
+import BaseLoading from '@/components/ui/BaseLoading.vue'
+import BranchUsersTable from '@/components/BranchUsersTable.vue'
+import BranchForm from '@/components/BranchForm.vue'
+import {
+    BuildingOffice2Icon,
+    PencilIcon,
+    TrashIcon,
+    MapPinIcon,
+    PhoneIcon,
+    UserGroupIcon,
+    MapIcon,
+    UsersIcon,
+    CalendarIcon,
+    ExclamationTriangleIcon
+} from '@heroicons/vue/24/outline'
+
+const route = useRoute()
+const router = useRouter()
+const branchesStore = useBranchesStore()
+
+const authStore = useAuthStore()
+
+// Reactive state
+const showEditDialog = ref(false)
+const showDeleteDialog = ref(false)
+
+const branchId = computed(() => Number(route.params.id))
+
+const branch = computed(() => branchesStore.current)
+
+const canAccessBranch = computed(() => {
+    if (!branch.value) return false
+
+    const userRole = authStore.user?.role
+    const userBranchId = authStore.user?.branchId
+
+    // Superadmin can access all branches
+    if (userRole === 'Superadmin') return true
+
+    // Admin can only access their own branch
+    if (userRole === 'Admin') return userBranchId === branch.value.id
+
+    return false
+})
+
+
+
+const totalCustomers = computed(() => {
+    return branch.value?.neighborhoods?.reduce((total, n) => total + (n.totalCustomers || 0), 0) || 0
+})
+
+const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('es-CO', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+    })
+}
+
+// Actions
+const openEditDialog = () => {
+    showEditDialog.value = true
+}
+
+const confirmDelete = () => {
+    showDeleteDialog.value = true
+}
+
+const handleEditSubmit = async (formData: any) => {
+    try {
+        await branchesStore.update(branchId.value, formData)
+        showEditDialog.value = false
+        // Could add toast notification here
+    } catch (error) {
+        console.error('Error updating branch:', error)
+    }
+}
+
+const handleDelete = async () => {
+    try {
+        await branchesStore.remove(branchId.value)
+        showDeleteDialog.value = false
+        router.push('/branches')
+        // Could add toast notification here
+    } catch (error) {
+        console.error('Error deleting branch:', error)
+    }
+}
+
+const handleUserCreated = (user: BranchUserSummary) => {
+    // User is already added to the store by the users table component
+    // Could add toast notification here
+}
+
+const handleUserUpdated = (user: BranchUserSummary) => {
+    // User is already updated in the store by the users table component
+    // Could add toast notification here
+}
+
+const handleUserStatusToggled = (user: BranchUserSummary) => {
+    // User status is already toggled in the store by the users table component
+    // Could add toast notification here
+}
+
+// Lifecycle
+onMounted(async () => {
+    try {
+        // Check if user has access before making API calls
+        const userRole = authStore.user?.role
+        const userBranchId = authStore.user?.branchId
+
+        const hasAccess = userRole === 'Superadmin' || (userRole === 'Admin' && userBranchId === branchId.value)
+
+        if (!hasAccess) {
+            return
+        }
+
+        // Fetch branch details
+        await branchesStore.fetchById(branchId.value)
+
+        // Fetch users for this branch
+
+    } catch (error) {
+        console.error('Error loading branch data:', error)
+        // Could redirect to branches list or show error
+    }
+})
+</script>

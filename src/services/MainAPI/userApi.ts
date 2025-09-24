@@ -1,29 +1,47 @@
 // src/services/userApi.ts
 import { BaseApi } from './baseApi';
-import type { ApiResponse } from '@/types/common';
-import type { UserRoleType } from '@/types/auth';
+import type { ApiResponse, PagedResult } from '@/types/common';
+import type { User, CreateUserRequest, UpdateUserRequest, UserFilters } from '@/types/user';
 
 class UserApi extends BaseApi {
-	async createUser(payload: {
-		name: string;
-		email: string;
-		password: string;
-		role: UserRoleType;
-		branchId?: number;
-	}): Promise<ApiResponse<any>> {
-		return this.post<ApiResponse<any>>('/Users', payload);
+	// Get all users with optional filters
+	async getUsers(filters?: UserFilters): Promise<ApiResponse<PagedResult<User>>> {
+		return this.get<ApiResponse<PagedResult<User>>>('/Users', { params: filters });
 	}
 
-	async updateUser(
-		id: number,
-		payload: {
-			name?: string;
-			email?: string;
-			role?: UserRoleType;
-			active?: boolean;
-		}
-	): Promise<ApiResponse<any>> {
-		return this.put<ApiResponse<any>>(`/Users/${id}`, payload);
+	// Get users by branch
+	async getUsersByBranch(branchId: number): Promise<ApiResponse<User[]>> {
+		return this.get<ApiResponse<User[]>>(`/Users/branch/${branchId}`);
+	}
+
+	// Get single user by ID
+	async getUserById(id: number): Promise<ApiResponse<User>> {
+		return this.get<ApiResponse<User>>(`/Users/${id}`);
+	}
+
+	// Create new user
+	async createUser(payload: CreateUserRequest): Promise<ApiResponse<User>> {
+		return this.post<ApiResponse<User>>('/Users', payload);
+	}
+
+	// Update user
+	async updateUser(id: number, payload: UpdateUserRequest): Promise<ApiResponse<User>> {
+		return this.put<ApiResponse<User>>(`/Users/${id}`, payload);
+	}
+
+	// Toggle user active status
+	async toggleUserStatus(id: number): Promise<ApiResponse<User>> {
+		return this.put<ApiResponse<User>>(`/Users/${id}/toggle-status`);
+	}
+
+	// Reset user password (admin action)
+	async resetUserPassword(id: number): Promise<ApiResponse<{ temporaryPassword: string }>> {
+		return this.post<ApiResponse<{ temporaryPassword: string }>>(`/Users/${id}/reset-password`);
+	}
+
+	// Delete user (soft delete)
+	async deleteUser(id: number): Promise<ApiResponse<string>> {
+		return this.delete<ApiResponse<string>>(`/Users/${id}`);
 	}
 }
 

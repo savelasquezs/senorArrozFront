@@ -93,6 +93,7 @@ const routes: RouteRecordRaw[] = [
     },
 
 
+
     //   {
     //     path: '/orders',
     //     name: 'Orders',
@@ -255,15 +256,15 @@ router.beforeEach(async (to, from, next) => {
 // Helper function to get redirect path based on role
 function getRedirectPath(role: string | null): string {
     switch (role) {
-        case 'superadmin':
+        case 'Superadmin':
             return '/dashboard/global'
-        case 'admin':
+        case 'Admin':
             return '/dashboard/branch'
-        case 'cashier':
+        case 'Cashier':
             return '/orders'
-        case 'kitchen':
+        case 'Kitchen':
             return '/kitchen'
-        case 'deliveryman':
+        case 'Deliveryman':
             return '/delivery'
         default:
             return '/dashboard'
