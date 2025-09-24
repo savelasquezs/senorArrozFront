@@ -8,7 +8,7 @@ import type {
 	ChangePasswordCredentials,
 	resetPasswordCredentials,
 } from '@/types/auth';
-import { mainApi } from '@/services/mainApi';
+import { authApi } from '@/services/MainAPI/authApi';
 
 export const useAuthStore = defineStore('auth', () => {
 	// State
@@ -47,7 +47,7 @@ export const useAuthStore = defineStore('auth', () => {
 			isLoading.value = true;
 			error.value = null;
 
-			const response = await mainApi.login(credentials);
+			const response = await authApi.login(credentials);
 
 			setAuthData(response);
 		} catch (err: any) {
@@ -61,7 +61,7 @@ export const useAuthStore = defineStore('auth', () => {
 	const logout = async (): Promise<void> => {
 		try {
 			if (refreshToken.value) {
-				await mainApi.logout(refreshToken.value);
+				await authApi.logout(refreshToken.value);
 			}
 		} catch (err) {
 			console.error('Error during logout:', err);
@@ -76,7 +76,7 @@ export const useAuthStore = defineStore('auth', () => {
 				throw new Error('No refresh token available');
 			}
 
-			const response = await mainApi.refreshToken(refreshToken.value);
+			const response = await authApi.refreshToken(refreshToken.value);
 			setAuthData(response);
 			return true;
 		} catch (err) {
@@ -114,7 +114,7 @@ export const useAuthStore = defineStore('auth', () => {
 			isLoading.value = true;
 			error.value = null;
 
-			await mainApi.changePassword(passwordData);
+			await authApi.changePassword(passwordData);
 		} catch (err: any) {
 			error.value = err.message || 'Error al cambiar la contraseña';
 			throw err;
@@ -129,7 +129,7 @@ export const useAuthStore = defineStore('auth', () => {
 		try {
 			isLoading.value = true;
 			error.value = null;
-			const response = await mainApi.forgotPassword(email);
+			const response = await authApi.forgotPassword(email);
 			return response;
 		} catch (err: any) {
 			error.value = err.message || 'Error al procesar la solicitud';
@@ -145,7 +145,7 @@ export const useAuthStore = defineStore('auth', () => {
 		try {
 			isLoading.value = true;
 			error.value = null;
-			await mainApi.resetPassword(resetData);
+			await authApi.resetPassword(resetData);
 		} catch (err: any) {
 			error.value = err.message || 'Error al restablecer la contraseña';
 			throw err;
