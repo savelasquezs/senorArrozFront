@@ -20,13 +20,13 @@ class UserApi extends BaseApi {
 	}
 
 	// Create new user
-	async createUser(payload: CreateUserRequest): Promise<ApiResponse<User>> {
-		return this.post<ApiResponse<User>>('/Users', payload);
+	async createUser(payload: CreateUserRequest): Promise<User> {
+		return this.post<User>('/Users', payload);
 	}
 
 	// Update user
-	async updateUser(id: number, payload: UpdateUserRequest): Promise<ApiResponse<User>> {
-		return this.put<ApiResponse<User>>(`/Users/${id}`, payload);
+	async updateUser(id: number, payload: UpdateUserRequest): Promise<User> {
+		return this.put<User>(`/Users/${id}`, payload);
 	}
 
 	// Toggle user active status

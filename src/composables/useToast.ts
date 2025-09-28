@@ -60,8 +60,8 @@ export const useToast = () => {
     return addToast({ title, message, variant: 'warning', duration: duration ?? 6000 })
   }
 
-  const info = (title: string, duration: number, message?: string,) => {
-    return addToast({ title, message, variant: 'info', duration })
+  const info = (title: string, message?: string, duration?: number) => {
+    return addToast({ title, message, variant: 'info', duration: duration ?? 5000 })
   }
 
   return {

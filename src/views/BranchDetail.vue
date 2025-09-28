@@ -227,9 +227,8 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useBranchesStore } from '@/store/branches'
-
 import { useAuthStore } from '@/store/auth'
-import type { BranchUserSummary } from '@/types/common'
+import { useToast } from '@/composables/useToast'
 import MainLayout from '@/components/layout/MainLayout.vue'
 import BaseCard from '@/components/ui/BaseCard.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
@@ -250,12 +249,13 @@ import {
     CalendarIcon,
     ExclamationTriangleIcon
 } from '@heroicons/vue/24/outline'
+import type { User } from '@/types/user'
 
 const route = useRoute()
 const router = useRouter()
 const branchesStore = useBranchesStore()
-
 const authStore = useAuthStore()
+const { success, error: showError } = useToast()
 
 // Reactive state
 const showEditDialog = ref(false)
@@ -307,9 +307,10 @@ const handleEditSubmit = async (formData: any) => {
     try {
         await branchesStore.update(branchId.value, formData)
         showEditDialog.value = false
-        // Could add toast notification here
-    } catch (error) {
+        success('Sucursal actualizada', 3000, 'La sucursal se ha actualizado correctamente')
+    } catch (error: any) {
         console.error('Error updating branch:', error)
+        showError('Error al actualizar', error.message || 'No se pudo actualizar la sucursal')
     }
 }
 
@@ -317,26 +318,28 @@ const handleDelete = async () => {
     try {
         await branchesStore.remove(branchId.value)
         showDeleteDialog.value = false
+        success('Sucursal eliminada', 3000, 'La sucursal se ha eliminado correctamente')
         router.push('/branches')
-        // Could add toast notification here
-    } catch (error) {
+    } catch (error: any) {
         console.error('Error deleting branch:', error)
+        showError('Error al eliminar', error.message || 'No se pudo eliminar la sucursal')
     }
 }
 
-const handleUserCreated = (user: BranchUserSummary) => {
+const handleUserCreated = (user: User) => {
     // User is already added to the store by the users table component
-    // Could add toast notification here
+    success('Usuario creado', 3000, `El usuario ${user.name} se ha creado correctamente`)
 }
 
-const handleUserUpdated = (user: BranchUserSummary) => {
+const handleUserUpdated = (user: User) => {
     // User is already updated in the store by the users table component
-    // Could add toast notification here
+    success('Usuario actualizado', 3000, `El usuario ${user.name} se ha actualizado correctamente`)
 }
 
-const handleUserStatusToggled = (user: BranchUserSummary) => {
+const handleUserStatusToggled = (user: User) => {
     // User status is already toggled in the store by the users table component
-    // Could add toast notification here
+    const status = user.active ? 'activado' : 'desactivado'
+    success('Estado actualizado', 3000, `El usuario ${user.name} ha sido ${status}`)
 }
 
 // Lifecycle

@@ -30,7 +30,7 @@
                 </template>
             </BaseInput>
 
-            <BaseInput v-model="form.phone2" label="Teléfono Secundario (Opcional)" type="tel" placeholder="3007654321"
+            <BaseInput v-model="form.phone2" label="Teléfono Secundario " type="tel" placeholder="3007654321"
                 :error="errors.phone2" maxlength="10" @input="validatePhone('phone2')">
                 <template #icon>
                     <PhoneIcon class="w-4 h-4" />
@@ -66,7 +66,7 @@
 
 <script setup lang="ts">
 import { ref, reactive, computed, watch } from 'vue'
-import type { Branch } from '@/types/branch'
+import type { Branch } from '@/types/common'
 import BaseInput from '@/components/ui/BaseInput.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseAlert from '@/components/ui/BaseAlert.vue'
@@ -134,8 +134,8 @@ const validatePhone = (field: 'phone1' | 'phone2') => {
     }
 
     // If phone exists, validate format
-    if (phone && !/^3\d{9}$/.test(phone)) {
-        errors[field] = 'Debe ser un número celular válido (10 dígitos, iniciando con 3)'
+    if (phone && !/\d{10}$/.test(phone)) {
+        errors[field] = 'Debe ser un número celular válido (10 dígitos)'
         return
     }
 

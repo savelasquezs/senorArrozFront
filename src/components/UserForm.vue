@@ -1,7 +1,9 @@
 <template>
     <form @submit.prevent="handleSubmit" class="space-y-6">
+        {{ user }}
         <!-- Personal Information -->
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+
             <BaseInput v-model="form.name" label="Nombre Completo" placeholder="Ej: Juan Pérez González" required
                 :error="errors.name" maxlength="150">
                 <template #icon>
@@ -27,7 +29,7 @@
             </BaseInput>
 
             <BaseSelect v-model="form.role" :options="roleOptions" label="Rol" placeholder="Seleccionar rol..." required
-                :error="errors.role" @change="validateRole">
+                :error="errors.role" @change="validateRole" value-key="value" display-key="label">
                 <template #icon>
                     <ShieldCheckIcon class="w-4 h-4" />
                 </template>
@@ -120,7 +122,7 @@
 <script setup lang="ts">
 import { reactive, computed, watch } from 'vue'
 import { useUsersStore } from '@/store/users'
-import type {  UserRole } from '@/types/user'
+import type { UserRole } from '@/types/user'
 import BaseInput from '@/components/ui/BaseInput.vue'
 import BaseSelect from '@/components/ui/BaseSelect.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
@@ -200,12 +202,7 @@ const selectedRoleDescription = computed(() => {
 const roleConstraintMessage = computed(() => {
     if (!form.role || !props.branchId) return ''
 
-    if (!usersStore.canCreateRole(form.role as UserRole, props.branchId)) {
-        if (form.role === 'Admin') {
-            return 'Ya existe un administrador en esta sucursal'
-        }
-        return 'No tienes permisos para crear este tipo de usuario'
-    }
+
 
     return ''
 })

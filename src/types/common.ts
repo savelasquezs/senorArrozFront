@@ -60,7 +60,7 @@ export interface BranchUserSummary {
   name: string
   email: string
   role: UserRole
-  phone?: string
+  phone: string
   branchId: number
   active: boolean
   lastLogin?: string

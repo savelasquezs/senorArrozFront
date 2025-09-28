@@ -85,11 +85,11 @@
                         <!-- Actions -->
                         <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                             <div class="flex justify-end space-x-2">
-                                <BaseButton v-if="usersStore.canEditUser(user)" @click="openEditDialog(user)"
-                                    variant="outline" size="sm" :icon="PencilIcon" title="Editar usuario" />
+                                <BaseButton @click="openEditDialog(user)" variant="outline" size="sm" :icon="PencilIcon"
+                                    title="Editar usuario" />
 
-                                <BaseButton v-if="usersStore.canEditUser(user)" @click="toggleStatus(user)"
-                                    variant="outline" size="sm" :icon="user.active ? EyeSlashIcon : EyeIcon"
+                                <BaseButton @click="toggleStatus(user)" variant="outline" size="sm"
+                                    :icon="user.active ? EyeSlashIcon : EyeIcon"
                                     :title="user.active ? 'Desactivar' : 'Activar'" :loading="usersStore.isLoading" />
                             </div>
                         </td>
@@ -211,14 +211,16 @@ const closeDialog = () => {
 const handleSubmit = async (userData: any) => {
     try {
         if (editingUser.value) {
+            console.log(editingUser.value, userData)
+
             const updatedUser = await usersStore.updateUser(editingUser.value.id, userData)
-            emit('userUpdated', updatedUser.data)
+            emit('userUpdated', updatedUser)
         } else {
             const newUser = await usersStore.createUser({
                 ...userData,
                 branchId: props.branchId
             })
-            emit('userCreated', newUser.data)
+            emit('userCreated', newUser)
         }
         closeDialog()
     } catch (error) {
