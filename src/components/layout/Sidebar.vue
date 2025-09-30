@@ -106,6 +106,12 @@ const navigationItems = computed(() => [
 		roles: ['Superadmin'],
 	},
 	{
+		name: 'Mi sucursal',
+		to: `/branches/${authStore.user?.branchId}`,
+		icon: BriefcaseIcon,
+		roles: ['Admin'],
+	},
+	{
 		name: 'Pedidos',
 		to: '/orders',
 		icon: ClipboardDocumentListIcon,

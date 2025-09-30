@@ -129,7 +129,8 @@
                 <!-- Users Section -->
                 <BaseCard>
                     <BranchUsersTable :users="branch.users" :branch-id="branch.id" @user-created="handleUserCreated"
-                        @user-updated="handleUserUpdated" @user-status-toggled="handleUserStatusToggled" />
+                        @user-updated="handleUserUpdated" @user-status-toggled="handleUserStatusToggled"
+                        @error="handleUserError" />
                 </BaseCard>
 
                 <!-- Neighborhoods Section -->
@@ -280,7 +281,9 @@ const canAccessBranch = computed(() => {
     return false
 })
 
-
+const handleUserError = (message: string) => {
+    showError('Error manejando usuario', message)
+}
 
 const totalCustomers = computed(() => {
     return branch.value?.neighborhoods?.reduce((total, n) => total + (n.totalCustomers || 0), 0) || 0
@@ -307,7 +310,7 @@ const handleEditSubmit = async (formData: any) => {
     try {
         await branchesStore.update(branchId.value, formData)
         showEditDialog.value = false
-        success('Sucursal actualizada', 3000, 'La sucursal se ha actualizado correctamente')
+        success('Sucursal actualizada', 5000, 'La sucursal se ha actualizado correctamente')
     } catch (error: any) {
         console.error('Error updating branch:', error)
         showError('Error al actualizar', error.message || 'No se pudo actualizar la sucursal')
@@ -318,7 +321,7 @@ const handleDelete = async () => {
     try {
         await branchesStore.remove(branchId.value)
         showDeleteDialog.value = false
-        success('Sucursal eliminada', 3000, 'La sucursal se ha eliminado correctamente')
+        success('Sucursal eliminada', 5000, 'La sucursal se ha eliminado correctamente')
         router.push('/branches')
     } catch (error: any) {
         console.error('Error deleting branch:', error)
@@ -328,18 +331,19 @@ const handleDelete = async () => {
 
 const handleUserCreated = (user: User) => {
     // User is already added to the store by the users table component
-    success('Usuario creado', 3000, `El usuario ${user.name} se ha creado correctamente`)
+    success('Usuario creado', 5000, `El usuario ${user.name} se ha creado correctamente`)
 }
 
 const handleUserUpdated = (user: User) => {
     // User is already updated in the store by the users table component
-    success('Usuario actualizado', 3000, `El usuario ${user.name} se ha actualizado correctamente`)
+    success('Usuario actualizado', 5000, `El usuario ${user.name} se ha actualizado correctamente`)
 }
 
 const handleUserStatusToggled = (user: User) => {
+    console.log(user)
     // User status is already toggled in the store by the users table component
     const status = user.active ? 'activado' : 'desactivado'
-    success('Estado actualizado', 3000, `El usuario ${user.name} ha sido ${status}`)
+    success('Estado actualizado', 5000, `El usuario ${user.name} ha sido ${status}`)
 }
 
 // Lifecycle
@@ -360,8 +364,9 @@ onMounted(async () => {
 
         // Fetch users for this branch
 
-    } catch (error) {
+    } catch (error: any) {
         console.error('Error loading branch data:', error)
+        showError("Error al  cargar datos", error.message || "Error al cargas las sucursales")
         // Could redirect to branches list or show error
     }
 })

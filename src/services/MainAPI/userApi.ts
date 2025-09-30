@@ -30,8 +30,8 @@ class UserApi extends BaseApi {
 	}
 
 	// Toggle user active status
-	async toggleUserStatus(id: number): Promise<ApiResponse<User>> {
-		return this.put<ApiResponse<User>>(`/Users/${id}/toggle-status`);
+	async toggleUserStatus(id: number): Promise<User> {
+		return this.put<User>(`/Users/${id}/toggle-status`);
 	}
 
 	// Reset user password (admin action)

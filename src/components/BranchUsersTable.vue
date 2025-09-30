@@ -137,6 +137,7 @@ const emit = defineEmits<{
     userCreated: [user: User]
     userUpdated: [user: User]
     userStatusToggled: [user: User]
+    error: [message: string]
 }>()
 
 const usersStore = useUsersStore()
@@ -211,7 +212,7 @@ const closeDialog = () => {
 const handleSubmit = async (userData: any) => {
     try {
         if (editingUser.value) {
-            console.log(editingUser.value, userData)
+
 
             const updatedUser = await usersStore.updateUser(editingUser.value.id, userData)
             emit('userUpdated', updatedUser)
@@ -223,19 +224,23 @@ const handleSubmit = async (userData: any) => {
             emit('userCreated', newUser)
         }
         closeDialog()
-    } catch (error) {
+    } catch (error: any) {
         // Error is handled in the store
         console.error('Error submitting user form:', error)
+        emit('error', error.message || 'error al crear usuario')
+
+
     }
 }
 
 const toggleStatus = async (user: BranchUserSummary) => {
     try {
         const updatedUser = await usersStore.toggleUserStatus(user.id)
-        emit('userStatusToggled', updatedUser.data)
-    } catch (error) {
+        emit('userStatusToggled', updatedUser)
+    } catch (error: any) {
         // Error is handled in the store
         console.error('Error toggling user status:', error)
+        emit('error', error.message || 'error al crear usuario')
     }
 }
 </script>
