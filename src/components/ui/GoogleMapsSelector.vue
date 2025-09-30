@@ -103,7 +103,6 @@ const isDestroyed = ref(false)
 let map: any = null
 let marker: any = null
 let geocoder: any = null
-let placesService: any = null
 let searchTimeout: any = null
 
 // Load Google Maps script
@@ -193,9 +192,8 @@ const initializeMap = async () => {
             }
             return
         }
-        // Initialize geocoder and places service
+        // Initialize geocoder
         geocoder = new googleMaps.Geocoder()
-        placesService = new googleMaps.places.PlacesService(map)
 
         // Import Advanced Marker library
         const { AdvancedMarkerElement } = await (window as any).google.maps.importLibrary("marker")
@@ -279,28 +277,42 @@ const handleSearch = () => {
 }
 
 const searchAddress = async () => {
-    if (!placesService || !searchQuery.value.trim() || isDestroyed.value) return
+    if (!searchQuery.value.trim() || isDestroyed.value) return
 
     try {
+        // Use the new Places API
+        const { Place } = await (window as any).google.maps.importLibrary("places")
+
         const request = {
             query: searchQuery.value,
-            fields: ['formatted_address', 'geometry']
+            fields: ['formattedAddress', 'location']
         }
 
-        placesService.textSearch(request, (results: any, status: any) => {
-            if (!isDestroyed.value) {
-                if (status === 'OK' && results) {
-                    searchResults.value = results.map((result: any) => ({
-                        formatted_address: result.formatted_address || '',
-                        geometry: result.geometry
-                    }))
-                    console.log('Search results:', searchResults.value)
-                } else {
-                    searchResults.value = []
-                    if (status !== 'ZERO_RESULTS') {
-                        console.warn('Search failed:', status)
+        const service = new Place(request)
+
+        service.fetchFields({
+            fields: ['formattedAddress', 'location']
+        }).then((place: any) => {
+            if (!isDestroyed.value && place) {
+                const results = [{
+                    formatted_address: place.formattedAddress || '',
+                    geometry: {
+                        location: {
+                            lat: () => place.location.lat,
+                            lng: () => place.location.lng
+                        }
                     }
-                }
+                }]
+                searchResults.value = results
+                console.log('Search results:', searchResults.value)
+            } else {
+                searchResults.value = []
+                console.log('No results found')
+            }
+        }).catch((error: any) => {
+            if (!isDestroyed.value) {
+                console.warn('Search failed:', error)
+                searchResults.value = []
             }
         })
     } catch (err) {
@@ -401,7 +413,6 @@ onUnmounted(() => {
     }
 
     geocoder = null
-    placesService = null
 
     // Reset reactive state
     isMapLoaded.value = false
