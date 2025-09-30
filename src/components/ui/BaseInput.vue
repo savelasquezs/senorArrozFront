@@ -1,35 +1,17 @@
 <template>
 	<div class="space-y-1">
 		<!-- Label -->
-		<label
-			v-if="label"
-			:for="inputId"
-			class="block text-sm font-medium text-gray-700"
-		>
+		<label v-if="label" :for="inputId" class="block text-sm font-medium text-gray-700">
 			{{ label }}
 			<span v-if="required" class="text-red-500 ml-1">*</span>
 		</label>
 
 		<!-- Input wrapper -->
 		<div class="relative">
-			<input
-				:id="inputId"
-				:type="type"
-				:value="modelValue"
-				:placeholder="placeholder"
-				:required="required"
-				:disabled="disabled"
-				:class="inputClasses"
-				@input="
-					$emit('update:modelValue', ($event.target as HTMLInputElement).value)
-				"
-				@blur="$emit('blur', $event)"
-				@focus="$emit('focus', $event)"
-			/>
-			<div
-				v-if="$slots.icon"
-				class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400"
-			>
+			<input :id="inputId" :type="type" v-model="inputValue" :placeholder="placeholder" :required="required"
+				:disabled="disabled" :class="inputClasses" @blur="onBlur" @focus="onFocus" />
+			<div v-if="$slots.icon"
+				class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
 				<slot name="icon" />
 			</div>
 		</div>
@@ -41,10 +23,11 @@
 </template>
 
 <script setup lang="ts">
-import { computed, useId, useSlots } from 'vue';
+import { computed, useSlots, useId } from 'vue';
 
 interface Props {
-	modelValue: string;
+	// Aceptamos string | number | null para modelValue
+	modelValue: string | number | null;
 	type?: string;
 	label?: string;
 	placeholder?: string;
@@ -60,18 +43,37 @@ const props = withDefaults(defineProps<Props>(), {
 	disabled: false,
 });
 
-defineEmits<{
-	'update:modelValue': [value: string];
-	blur: [event: FocusEvent];
-	focus: [event: FocusEvent];
+const emit = defineEmits<{
+	(e: 'update:modelValue', value: string | number | null): void;
+	(e: 'blur', event: FocusEvent): void;
+	(e: 'focus', event: FocusEvent): void;
 }>();
 
 const inputId = useId();
+const slots = useSlots();
+
+/**
+ * inputValue es siempre string para el input HTML, pero en su setter
+ * convertimos y emitimos string | number | null según props.type.
+ */
+const inputValue = computed({
+	get: () => (props.modelValue === undefined || props.modelValue === null) ? '' : String(props.modelValue),
+	set: (val: string) => {
+		if (props.type === 'number') {
+			// '' => null, otherwise Number(...)
+			const parsed = val === '' ? null : Number(val);
+			// Si Number(...) es NaN lo enviamos como null
+			emit('update:modelValue', typeof parsed === 'number' && Number.isNaN(parsed) ? null : parsed);
+		} else {
+			emit('update:modelValue', val);
+		}
+	}
+});
 
 const inputClasses = computed(() => {
 	const base =
 		'block w-full px-3 py-2 border rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-1 sm:text-sm transition-colors';
-	const hasIcon = !!useSlots().icon ? 'pl-10' : '';
+	const hasIcon = !!slots.icon ? 'pl-10' : '';
 
 	if (props.error) {
 		return `${base} ${hasIcon} border-red-300 text-red-900 placeholder-red-300 focus:ring-red-500 focus:border-red-500`;
@@ -79,4 +81,11 @@ const inputClasses = computed(() => {
 
 	return `${base} ${hasIcon} border-gray-300 focus:ring-[#009966] focus:border-[#009966]`;
 });
+
+function onBlur(e: FocusEvent) {
+	emit('blur', e);
+}
+function onFocus(e: FocusEvent) {
+	emit('focus', e);
+}
 </script>

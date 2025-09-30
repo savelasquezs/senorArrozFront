@@ -91,6 +91,26 @@ const routes: RouteRecordRaw[] = [
             title: 'Detalle Sucursal'
         }
     },
+    {
+        path: '/customers',
+        name: 'CustomersList',
+        component: () => import('@/views/CustomersList.vue'),
+        meta: {
+            requiresAuth: true,
+            requiresRole: [UserRole.SUPERADMIN, UserRole.ADMIN, UserRole.CASHIER],
+            title: 'Clientes'
+        }
+    },
+    {
+        path: '/customers/:id',
+        name: 'CustomerDetail',
+        component: () => import('@/views/CustomerDetail.vue'),
+        meta: {
+            requiresAuth: true,
+            requiresRole: [UserRole.SUPERADMIN, UserRole.ADMIN, UserRole.CASHIER],
+            title: 'Detalle Cliente'
+        }
+    },
 
 
 
