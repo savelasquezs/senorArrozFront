@@ -7,7 +7,7 @@ export interface User {
     role: UserRole
     name: string
     email: string
-    phone?: string
+    phone: string
     active: boolean
     lastLogin?: string
     createdAt: string

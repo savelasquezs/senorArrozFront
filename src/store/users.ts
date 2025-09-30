@@ -3,17 +3,20 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { userApi } from '@/services/MainAPI/userApi'
 import { useAuthStore } from './auth'
-import type { User, CreateUserRequest, UpdateUserRequest } from '@/types/user'
+import type { CreateUserRequest, UpdateUserRequest } from '@/types/user'
+import { useBranchesStore } from './branches'
 
 
 
 
 export const useUsersStore = defineStore('users', () => {
     const authStore = useAuthStore()
+    const branchStore = useBranchesStore()
 
+    const users = computed(() => branchStore.current?.users)
 
     // State
-    const users = ref<User[]>([])
+
     const currentUser = authStore.user
     const isLoading = ref(false)
     const error = ref<string | null>(null)
@@ -57,7 +60,7 @@ export const useUsersStore = defineStore('users', () => {
 
 
             const newUser = await userApi.createUser(userData)
-            users.value.push(newUser)
+            users.value?.push(newUser)
 
             return newUser
         } catch (err: any) {
@@ -73,6 +76,11 @@ export const useUsersStore = defineStore('users', () => {
             isLoading.value = true
             error.value = null
             const updatedUser = await userApi.updateUser(id, userData)
+            const index = users.value?.findIndex((u) => u.id == id)
+            if (index != undefined && index != -1 && users.value) {
+
+                users.value[index] = updatedUser
+            }
             return updatedUser
         } catch (err: any) {
             error.value = err.message || 'Error al actualizar usuario'
@@ -90,7 +98,11 @@ export const useUsersStore = defineStore('users', () => {
 
 
             const updatedUser = await userApi.toggleUserStatus(id)
+            const index = users.value?.findIndex((u) => u.id == id)
+            if (index != undefined && index != -1 && users.value) {
 
+                users.value[index] = updatedUser
+            }
 
 
             return updatedUser
@@ -108,10 +120,7 @@ export const useUsersStore = defineStore('users', () => {
 
 
 
-    const clearUsers = () => {
-        users.value = []
 
-    }
 
     return {
         // State
@@ -132,6 +141,6 @@ export const useUsersStore = defineStore('users', () => {
         toggleUserStatus,
         clearError,
 
-        clearUsers
+
     }
 })

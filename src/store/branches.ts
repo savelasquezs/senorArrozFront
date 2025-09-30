@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia';
-import { ref } from 'vue';
+import { computed, ref } from 'vue';
 import { branchApi } from '@/services/MainAPI/branchApi';
 import type { Branch, BranchFilters, PagedResult } from '@/types/common';
 
@@ -22,6 +22,8 @@ export const useBranchesStore = defineStore('branches', () => {
 			isLoading.value = false;
 		}
 	};
+
+	const currentUsers = computed(() => current.value?.users)
 
 	const fetch = async (filters?: BranchFilters) => {
 		try {
@@ -59,6 +61,7 @@ export const useBranchesStore = defineStore('branches', () => {
 			error.value = null;
 			const res = await branchApi.createBranch(payload);
 			return res.data;
+			
 		} catch (err: any) {
 			error.value = err.message || 'Error al crear la sucursal';
 			throw err;
@@ -115,5 +118,6 @@ export const useBranchesStore = defineStore('branches', () => {
 		update,
 		remove,
 		clear,
+		currentUsers
 	};
 });
