@@ -4,14 +4,14 @@
         <!-- Customer Information -->
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
             <BaseInput v-model="form.name" label="Nombre Completo" placeholder="Ej: Juan Pérez González" required
-                :error="errors.name" maxlength="150">
+                :error="errors.name" :maxlength="150" :minlength="5">
                 <template #icon>
                     <UserIcon class="w-4 h-4" />
                 </template>
             </BaseInput>
 
             <BaseInput v-model="form.phone1" label="Teléfono Principal" type="tel" placeholder="3001234567" required
-                :error="errors.phone1" maxlength="10" @input="validatePhone('phone1')">
+                :error="errors.phone1" :maxlength="10" @input="validatePhone('phone1')">
                 <template #icon>
                     <PhoneIcon class="w-4 h-4" />
                 </template>
@@ -21,7 +21,7 @@
         <!-- Secondary Phone -->
         <div>
             <BaseInput v-model="form.phone2" label="Teléfono Secundario" type="tel" placeholder="3007654321"
-                :error="errors.phone2" maxlength="10" @input="validatePhone('phone2')">
+                :error="errors.phone2" :maxlength="10" @input="validatePhone('phone2')">
                 <template #icon>
                     <PhoneIcon class="w-4 h-4" />
                 </template>
@@ -45,17 +45,13 @@
 
             <div class="space-y-4">
                 <!-- Neighborhood Selection -->
-                <BaseSelect v-model="form.initialAddress.neighborhoodId" :options="neighborhoodOptions" label="Barrio"
-                    placeholder="Seleccionar barrio..." required :error="errors.initialAddress?.neighborhoodId"
-                    @change="validateNeighborhood" value-key="value" display-key="label">
-                    <template #icon>
-                        <MapPinIcon class="w-4 h-4" />
-                    </template>
-                </BaseSelect>
+                <NeighborhoodSearch v-model="form.initialAddress.neighborhoodId" label="Barrio"
+                    placeholder="Buscar barrio..." :required="true" :error="errors.initialAddress?.neighborhoodId"
+                    :branch-id="form.branchId" @update:model-value="validateNeighborhood" />
 
                 <!-- Address -->
                 <BaseInput v-model="form.initialAddress.address" label="Dirección" placeholder="Ej: Calle 10 #20-30"
-                    required :error="errors.initialAddress?.address" maxlength="200">
+                    required :error="errors.initialAddress?.address" :maxlength="200">
                     <template #icon>
                         <HomeIcon class="w-4 h-4" />
                     </template>
@@ -63,27 +59,29 @@
 
                 <!-- Additional Info -->
                 <BaseInput v-model="form.initialAddress.additionalInfo" label="Información Adicional"
-                    placeholder="Ej: Apto 202, Torre A" :error="errors.initialAddress?.additionalInfo" maxlength="100">
+                    placeholder="Ej: Apto 202, Torre A" :error="errors.initialAddress?.additionalInfo" :maxlength="100">
                     <template #icon>
                         <InformationCircleIcon class="w-4 h-4" />
                     </template>
                 </BaseInput>
 
-                <!-- Coordinates -->
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <BaseInput v-model.number="form.initialAddress.latitude" label="Latitud" type="number"
-                        placeholder="6.25184" :error="errors.initialAddress?.latitude || ''">
-                        <template #icon>
-                            <MapIcon class="w-4 h-4" />
-                        </template>
-                    </BaseInput>
+                <!-- Delivery Fee -->
+                <BaseInput v-model.number="form.initialAddress.deliveryFee" label="Tarifa de Domicilio" type="number"
+                    min="0" step="100" placeholder="5000" required :error="errors.initialAddress?.deliveryFee">
+                    <template #icon>
+                        <CurrencyDollarIcon class="w-4 h-4" />
+                    </template>
+                </BaseInput>
 
-                    <BaseInput v-model.number="form.initialAddress.longitude" label="Longitud" type="number"
-                        placeholder="-75.56359" :error="errors.initialAddress?.longitude || ''">
-                        <template #icon>
-                            <MapIcon class="w-4 h-4" />
-                        </template>
-                    </BaseInput>
+                <!-- Google Maps Selector -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">
+                        Seleccionar ubicación
+                    </label>
+                    <GoogleMapsSelector v-model="selectedLocation"
+                        :error="errors.initialAddress?.latitude || errors.initialAddress?.longitude"
+                        @location-confirmed="handleLocationConfirmed"
+                        :key="`maps-customer-${props.customer?.id || 'new'}`" />
                 </div>
 
                 <!-- Primary Address Checkbox -->
@@ -141,14 +139,15 @@ import BaseInput from '@/components/ui/BaseInput.vue'
 import BaseSelect from '@/components/ui/BaseSelect.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseAlert from '@/components/ui/BaseAlert.vue'
+import GoogleMapsSelector from '@/components/ui/GoogleMapsSelector.vue'
+import NeighborhoodSearch from '@/components/ui/NeighborhoodSearch.vue'
 import {
     UserIcon,
     PhoneIcon,
     BuildingOffice2Icon,
-    MapPinIcon,
     HomeIcon,
     InformationCircleIcon,
-    MapIcon
+    CurrencyDollarIcon
 } from '@heroicons/vue/24/outline'
 
 interface Props {
@@ -210,10 +209,12 @@ const errors = reactive({
         additionalInfo: string;
         latitude: string;
         longitude: string;
+        deliveryFee: string;
     };
 })
 
 const showValidationInfo = ref(false)
+const selectedLocation = ref<{ lat: number; lng: number } | null>(null)
 
 // Computed properties
 const branchOptions = computed(() => {
@@ -224,15 +225,6 @@ const branchOptions = computed(() => {
     }))
 })
 
-const neighborhoodOptions = computed(() => {
-    if (!customersStore.availableNeighborhoods) return []
-    return customersStore.availableNeighborhoods
-        .filter(neighborhood => neighborhood.branchId === form.branchId)
-        .map(neighborhood => ({
-            value: neighborhood.id,
-            label: `${neighborhood.name} - $${neighborhood.deliveryFee.toLocaleString()}`
-        }))
-})
 
 const isFormValid = computed(() => {
     const basicValidation = form.name.trim() &&
@@ -340,6 +332,12 @@ const validateForm = () => {
         } else {
             errors.initialAddress.longitude = ''
         }
+
+        if (form.initialAddress.deliveryFee <= 0) {
+            errors.initialAddress.deliveryFee = 'La tarifa de domicilio es requerida'
+        } else {
+            errors.initialAddress.deliveryFee = ''
+        }
     }
 }
 
@@ -407,12 +405,39 @@ watch(() => props.customer, (newCustomer) => {
     errors.initialAddress.additionalInfo = ''
     errors.initialAddress.latitude = ''
     errors.initialAddress.longitude = ''
+    errors.initialAddress.deliveryFee = ''
 }, { immediate: true })
 
 // Watch for branch changes to reset neighborhood
 watch(() => form.branchId, () => {
     form.initialAddress.neighborhoodId = 0
+    form.initialAddress.deliveryFee = 0
 })
+
+// Watch for neighborhood changes to update delivery fee
+watch(() => form.initialAddress.neighborhoodId, (newNeighborhoodId) => {
+    if (newNeighborhoodId > 0) {
+        const neighborhood = customersStore.availableNeighborhoods.find(n => n.id === newNeighborhoodId)
+        if (neighborhood) {
+            form.initialAddress.deliveryFee = neighborhood.deliveryFee
+        }
+    }
+})
+
+// Watch for location changes to update coordinates
+watch(selectedLocation, (newLocation) => {
+    if (newLocation) {
+        form.initialAddress.latitude = newLocation.lat
+        form.initialAddress.longitude = newLocation.lng
+    }
+})
+
+// Handle location confirmation
+const handleLocationConfirmed = () => {
+    // Clear any coordinate errors when location is confirmed
+    errors.initialAddress.latitude = ''
+    errors.initialAddress.longitude = ''
+}
 
 // Load data on mount
 onMounted(async () => {

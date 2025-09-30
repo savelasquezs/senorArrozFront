@@ -2,17 +2,12 @@
 <template>
     <form @submit.prevent="handleSubmit" class="space-y-6">
         <!-- Neighborhood Selection -->
-        <BaseSelect v-model="form.neighborhoodId" :options="neighborhoodOptions" label="Barrio"
-            placeholder="Seleccionar barrio..." required :error="errors.neighborhoodId" @change="validateNeighborhood"
-            value-key="value" display-key="label">
-            <template #icon>
-                <MapPinIcon class="w-4 h-4" />
-            </template>
-        </BaseSelect>
+        <NeighborhoodSearch v-model="form.neighborhoodId" label="Barrio" placeholder="Buscar barrio..." :required="true"
+            :error="errors.neighborhoodId" @update:model-value="validateNeighborhood" />
 
         <!-- Address -->
         <BaseInput v-model="form.address" label="Dirección" placeholder="Ej: Calle 10 #20-30" required
-            :error="errors.address" maxlength="200">
+            :error="errors.address" :maxlength="200" :minlength="10" @blur="handleAddressBlur">
             <template #icon>
                 <HomeIcon class="w-4 h-4" />
             </template>
@@ -20,28 +15,29 @@
 
         <!-- Additional Info -->
         <BaseInput v-model="form.additionalInfo" label="Información Adicional"
-            placeholder="Ej: Apto 202, Torre A, Frente al parque" :error="errors.additionalInfo" maxlength="100">
+            placeholder="Ej: Apto 202, Torre A, Frente al parque" :error="errors.additionalInfo" :maxlength="100">
             <template #icon>
                 <InformationCircleIcon class="w-4 h-4" />
             </template>
         </BaseInput>
 
-        <!-- Coordinates -->
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <BaseInput v-model.number="form.latitude" label="Latitud" type="number" step="any" placeholder="6.25184"
-                required :error="errors.latitude">
-                <template #icon>
-                    <MapIcon class="w-4 h-4" />
-                </template>
-            </BaseInput>
-
-            <BaseInput v-model.number="form.longitude" label="Longitud" type="number" step="any" placeholder="-75.56359"
-                required :error="errors.longitude">
-                <template #icon>
-                    <MapIcon class="w-4 h-4" />
-                </template>
-            </BaseInput>
+        <!-- Google Maps Selector -->
+        <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">
+                Seleccionar ubicación
+            </label>
+            <GoogleMapsSelector v-model="selectedLocation" :error="errors.latitude || errors.longitude"
+                :initial-address="form.address" @location-confirmed="handleLocationConfirmed"
+                :key="`maps-${address?.id || 'new'}`" />
         </div>
+
+        <!-- Delivery Fee -->
+        <BaseInput v-model.number="form.deliveryFee" label="Tarifa de Domicilio" type="number" min="0" step="100"
+            placeholder="5000" required :error="errors.deliveryFee">
+            <template #icon>
+                <CurrencyDollarIcon class="w-4 h-4" />
+            </template>
+        </BaseInput>
 
         <!-- Primary Address Checkbox -->
         <div class="flex items-center">
@@ -81,16 +77,17 @@
 <script setup lang="ts">
 import { ref, reactive, computed, watch, onMounted } from 'vue'
 import { useCustomersStore } from '@/store/customers'
+import { useToast } from '@/composables/useToast'
 import type { CustomerAddress, CustomerAddressFormData } from '@/types/customer'
 import BaseInput from '@/components/ui/BaseInput.vue'
-import BaseSelect from '@/components/ui/BaseSelect.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseAlert from '@/components/ui/BaseAlert.vue'
+import GoogleMapsSelector from '@/components/ui/GoogleMapsSelector.vue'
+import NeighborhoodSearch from '@/components/ui/NeighborhoodSearch.vue'
 import {
-    MapPinIcon,
     HomeIcon,
     InformationCircleIcon,
-    MapIcon
+    CurrencyDollarIcon
 } from '@heroicons/vue/24/outline'
 
 interface Props {
@@ -109,6 +106,7 @@ const emit = defineEmits<{
 }>()
 
 const customersStore = useCustomersStore()
+const { success, error: showError } = useToast()
 
 const form = reactive({
     neighborhoodId: 0,
@@ -125,29 +123,26 @@ const errors = reactive({
     address: '',
     additionalInfo: '',
     latitude: '',
-    longitude: ''
+    longitude: '',
+    deliveryFee: ''
 })
 
 const showValidationInfo = ref(false)
+const selectedLocation = ref<{ lat: number; lng: number } | null>(null)
 
-// Computed properties
-const neighborhoodOptions = computed(() => {
-    if (!customersStore.availableNeighborhoods) return []
-    return customersStore.availableNeighborhoods.map(neighborhood => ({
-        value: neighborhood.id,
-        label: `${neighborhood.name} - $${neighborhood.deliveryFee.toLocaleString()}`
-    }))
-})
+// Computed properties - removed neighborhoodOptions since we're using NeighborhoodSearch
 
 const isFormValid = computed(() => {
     return form.neighborhoodId > 0 &&
         form.address.trim() &&
         form.latitude !== 0 &&
         form.longitude !== 0 &&
+        form.deliveryFee > 0 &&
         !errors.neighborhoodId &&
         !errors.address &&
         !errors.latitude &&
-        !errors.longitude
+        !errors.longitude &&
+        !errors.deliveryFee
 })
 
 // Validation methods
@@ -193,6 +188,12 @@ const validateForm = () => {
     } else {
         errors.longitude = ''
     }
+
+    if (form.deliveryFee <= 0) {
+        errors.deliveryFee = 'La tarifa de domicilio es requerida'
+    } else {
+        errors.deliveryFee = ''
+    }
 }
 
 const handleSubmit = () => {
@@ -225,6 +226,10 @@ watch(() => props.address, (newAddress) => {
         form.longitude = newAddress.longitude || 0
         form.isPrimary = newAddress.isPrimary
         form.deliveryFee = newAddress.deliveryFee
+        selectedLocation.value = {
+            lat: newAddress.latitude || 0,
+            lng: newAddress.longitude || 0
+        }
         showValidationInfo.value = false
     } else {
         // Reset form for new address
@@ -234,6 +239,8 @@ watch(() => props.address, (newAddress) => {
         form.latitude = 0
         form.longitude = 0
         form.isPrimary = false
+        form.deliveryFee = 0
+        selectedLocation.value = null
         showValidationInfo.value = true
     }
 
@@ -243,12 +250,45 @@ watch(() => props.address, (newAddress) => {
     })
 }, { immediate: true })
 
+// Watch for location changes to update coordinates
+watch(selectedLocation, (newLocation) => {
+    if (newLocation) {
+        form.latitude = newLocation.lat
+        form.longitude = newLocation.lng
+    }
+})
+
+// Watch for neighborhood changes to update delivery fee
+watch(() => form.neighborhoodId, (newNeighborhoodId) => {
+    if (newNeighborhoodId > 0) {
+        const neighborhood = customersStore.availableNeighborhoods.find(n => n.id === newNeighborhoodId)
+        if (neighborhood) {
+            form.deliveryFee = neighborhood.deliveryFee
+        }
+    }
+})
+
+// Handle location confirmation
+const handleLocationConfirmed = () => {
+    // Clear any coordinate errors when location is confirmed
+    errors.latitude = ''
+    errors.longitude = ''
+}
+
+// Handle address blur - trigger search in GoogleMapsSelector
+const handleAddressBlur = () => {
+    // The GoogleMapsSelector will automatically search for the address
+    // when the initialAddress prop changes
+}
+
 // Load neighborhoods on mount
 onMounted(async () => {
     try {
         await customersStore.fetchNeighborhoods()
+        success('Barrios Cargados', 2000, 'Los barrios disponibles han sido cargados correctamente.')
     } catch (error) {
         console.error('Error loading neighborhoods:', error)
+        showError('Error de Carga', 'No se pudieron cargar los barrios disponibles.')
     }
 })
 

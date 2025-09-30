@@ -76,6 +76,11 @@ export const useCustomersStore = defineStore('customers', () => {
             isLoading.value = true;
             error.value = null;
             const res = await customerApi.createCustomer(payload);
+            // Add to local list if it exists
+            if (list.value) {
+                list.value.items.unshift(res.data);
+                list.value.totalCount += 1;
+            }
             return res.data;
         } catch (err: any) {
             error.value = err.message || 'Error al crear el cliente';
@@ -92,6 +97,15 @@ export const useCustomersStore = defineStore('customers', () => {
             error.value = null;
             const res = await customerApi.updateCustomer(id, payload);
             current.value = res.data;
+
+            // Update in local list if it exists
+            if (list.value) {
+                const index = list.value.items.findIndex(customer => customer.id === id);
+                if (index !== -1) {
+                    list.value.items[index] = res.data;
+                }
+            }
+
             return res.data;
         } catch (err: any) {
             error.value = err.message || 'Error al actualizar el cliente';
@@ -107,6 +121,17 @@ export const useCustomersStore = defineStore('customers', () => {
             isLoading.value = true;
             error.value = null;
             await customerApi.deleteCustomer(id);
+
+            // Remove from local list if it exists
+            if (list.value) {
+                list.value.items = list.value.items.filter(customer => customer.id !== id);
+                list.value.totalCount -= 1;
+            }
+
+            // Clear current if it's the deleted customer
+            if (current.value && current.value.id === id) {
+                current.value = null;
+            }
         } catch (err: any) {
             error.value = err.message || 'Error al eliminar el cliente';
             throw err;
@@ -136,8 +161,8 @@ export const useCustomersStore = defineStore('customers', () => {
             isLoading.value = true;
             error.value = null;
             const res = await customerApi.createCustomerAddress(customerId, payload);
-            // Refresh addresses list
-            await fetchAddresses(customerId);
+            // Add to local addresses list
+            addresses.value.push(res.data);
             return res.data;
         } catch (err: any) {
             error.value = err.message || 'Error al crear la dirección';
@@ -153,8 +178,11 @@ export const useCustomersStore = defineStore('customers', () => {
             isLoading.value = true;
             error.value = null;
             const res = await customerApi.updateCustomerAddress(customerId, addressId, payload);
-            // Refresh addresses list
-            await fetchAddresses(customerId);
+            // Update in local addresses list
+            const index = addresses.value.findIndex(addr => addr.id === addressId);
+            if (index !== -1) {
+                addresses.value[index] = res.data;
+            }
             return res.data;
         } catch (err: any) {
             error.value = err.message || 'Error al actualizar la dirección';
@@ -170,8 +198,8 @@ export const useCustomersStore = defineStore('customers', () => {
             isLoading.value = true;
             error.value = null;
             await customerApi.deleteCustomerAddress(customerId, addressId);
-            // Refresh addresses list
-            await fetchAddresses(customerId);
+            // Remove from local addresses list
+            addresses.value = addresses.value.filter(addr => addr.id !== addressId);
         } catch (err: any) {
             error.value = err.message || 'Error al eliminar la dirección';
             throw err;
@@ -189,6 +217,23 @@ export const useCustomersStore = defineStore('customers', () => {
             neighborhoods.value = res.data;
         } catch (err: any) {
             error.value = err.message || 'Error al cargar barrios';
+            throw err;
+        } finally {
+            isLoading.value = false;
+        }
+    };
+
+    // Create neighborhood
+    const createNeighborhood = async (payload: { name: string; deliveryFee: number; branchId: number }) => {
+        try {
+            isLoading.value = true;
+            error.value = null;
+            const res = await customerApi.createNeighborhood(payload);
+            // Add to local state
+            neighborhoods.value.push(res.data);
+            return res.data;
+        } catch (err: any) {
+            error.value = err.message || 'Error al crear barrio';
             throw err;
         } finally {
             isLoading.value = false;
@@ -232,6 +277,7 @@ export const useCustomersStore = defineStore('customers', () => {
         updateAddress,
         removeAddress,
         fetchNeighborhoods,
+        createNeighborhood,
         clear,
         clearList
     };

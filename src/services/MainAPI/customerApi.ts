@@ -91,6 +91,11 @@ class CustomerApi extends BaseApi {
     async getNeighborhoods(): Promise<ApiResponse<Neighborhood[]>> {
         return this.get<ApiResponse<Neighborhood[]>>('/customers/neighborhoods');
     }
+
+    // 12. Crear barrio
+    async createNeighborhood(payload: { name: string; deliveryFee: number; branchId: number }): Promise<ApiResponse<Neighborhood>> {
+        return this.post<ApiResponse<Neighborhood>>(`/branches/${payload.branchId}/neighborhoods`, payload);
+    }
 }
 
 export const customerApi = new CustomerApi();

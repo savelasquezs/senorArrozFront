@@ -9,7 +9,8 @@
 		<!-- Input wrapper -->
 		<div class="relative">
 			<input :id="inputId" :type="type" v-model="inputValue" :placeholder="placeholder" :required="required"
-				:disabled="disabled" :class="inputClasses" @blur="onBlur" @focus="onFocus" />
+				:disabled="disabled" :class="inputClasses" @blur="onBlur" @focus="onFocus" :minlength="minlength"
+				:maxlength="maxlength" />
 			<div v-if="$slots.icon"
 				class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
 				<slot name="icon" />
@@ -35,12 +36,16 @@ interface Props {
 	disabled?: boolean;
 	error?: string;
 	hint?: string;
+	minlength?: number;
+	maxlength?: number;
 }
 
 const props = withDefaults(defineProps<Props>(), {
 	type: 'text',
 	required: false,
 	disabled: false,
+	minlength: 0,
+	maxlength: 100,
 });
 
 const emit = defineEmits<{
