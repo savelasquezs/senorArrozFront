@@ -3,7 +3,7 @@
     <form @submit.prevent="handleSubmit" class="space-y-6">
         <!-- Neighborhood Name -->
         <BaseInput v-model="form.name" label="Nombre del Barrio" placeholder="Ej: El Poblado, Laureles, Centro" required
-            :error="errors.name" maxlength="100">
+            :error="errors.name" :maxlength="100">
             <template #icon>
                 <MapPinIcon class="w-4 h-4" />
             </template>
@@ -37,7 +37,7 @@
             </BaseButton>
 
             <BaseButton type="submit" variant="primary" :loading="loading" :disabled="!isFormValid">
-                {{ neighborhood ? 'Actualizar' : 'Crear' }} Barrio
+                {{ neighborhood && 'id' in neighborhood ? 'Actualizar' : 'Crear' }} Barrio
             </BaseButton>
         </div>
     </form>
@@ -56,8 +56,9 @@ import {
 } from '@heroicons/vue/24/outline'
 
 interface Props {
-    neighborhood?: Neighborhood | null
+    neighborhood?: Neighborhood | NeighborhoodFormData | null
     loading?: boolean
+    neigborhoodNameToCreate?: string
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -150,6 +151,12 @@ watch(() => props.neighborhood, (newNeighborhood) => {
         setTimeout(() => {
             showValidationInfo.value = true
         }, 1000)
+    }
+})
+
+watch(() => props.neigborhoodNameToCreate, (newNeighborhoodNameToCreate) => {
+    if (newNeighborhoodNameToCreate) {
+        form.name = newNeighborhoodNameToCreate
     }
 })
 </script>

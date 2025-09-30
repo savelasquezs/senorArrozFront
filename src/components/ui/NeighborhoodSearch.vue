@@ -1,41 +1,14 @@
 <!-- src/components/ui/NeighborhoodSearch.vue -->
 <template>
     <div class="space-y-2">
-        <label class="block text-sm font-medium text-gray-700">
-            {{ label }}
-            <span v-if="required" class="text-red-500 ml-1">*</span>
-        </label>
-
-        <div class="relative">
-            <BaseInput v-model="searchQuery" :placeholder="placeholder" :error="error" @input="handleSearch"
-                @focus="showDropdown = true" @blur="handleBlur">
-                <template #icon>
-                    <MapPinIcon class="w-4 h-4" />
-                </template>
-            </BaseInput>
-
-            <!-- Dropdown with search results -->
-            <div v-if="showDropdown && (searchResults.length > 0 || showCreateOption)"
-                class="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-y-auto">
-                <!-- Search Results -->
-                <div v-for="neighborhood in searchResults" :key="neighborhood.id"
-                    @click="selectNeighborhood(neighborhood)"
-                    class="px-4 py-2 hover:bg-gray-100 cursor-pointer border-b border-gray-100 last:border-b-0">
-                    <div class="text-sm font-medium text-gray-900">{{ neighborhood.name }}</div>
-                    <div class="text-xs text-gray-500">${{ neighborhood.deliveryFee.toLocaleString() }}</div>
-                </div>
-
-                <!-- Create New Option -->
-                <div v-if="showCreateOption" @click="openCreateDialog"
-                    class="px-4 py-2 hover:bg-blue-50 cursor-pointer border-b border-gray-100 last:border-b-0 bg-blue-25">
-                    <div class="text-sm font-medium text-blue-600 flex items-center">
-                        <PlusIcon class="w-4 h-4 mr-2" />
-                        Crear barrio "{{ searchQuery }}"
-                    </div>
-                    <div class="text-xs text-blue-500">Haz clic para crear un nuevo barrio</div>
-                </div>
-            </div>
-        </div>
+        <BaseSelect v-model="selectedNeighborhoodId" :options="neighborhoodOptions" :label="label"
+            :placeholder="placeholder" :required="required" :error="error" :searchable="true" :allow-create="true"
+            create-label="Crear barrio" value-key="id" display-key="name" @update:model-value="handleSelection"
+            @create="handleCreateRequest">
+            <template #icon>
+                <MapPinIcon class="w-4 h-4" />
+            </template>
+        </BaseSelect>
 
         <!-- Selected Neighborhood Info -->
         <div v-if="selectedNeighborhood" class="text-sm text-gray-600 bg-gray-50 p-2 rounded">
@@ -45,21 +18,21 @@
 
         <!-- Create Neighborhood Dialog -->
         <BaseDialog v-model="showCreateForm" title="Crear Nuevo Barrio" :icon="PlusIcon" size="md">
-            <NeighborhoodForm :neighborhood="null" :loading="createLoading" @submit="handleCreateNeighborhood"
+            <NeighborhoodForm :neighborhood="createFormData" :loading="createLoading" @submit="handleCreateNeighborhood"
                 @cancel="showCreateForm = false" />
         </BaseDialog>
     </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onMounted } from 'vue'
-import BaseInput from './BaseInput.vue'
+import { ref, computed, watch } from 'vue'
+import BaseSelect from './BaseSelect.vue'
 import BaseDialog from './BaseDialog.vue'
 import NeighborhoodForm from '@/components/NeighborhoodForm.vue'
-import { useCustomersStore } from '@/store/customers'
+import { useBranchesStore } from '@/store/branches'
 import { useToast } from '@/composables/useToast'
 import { MapPinIcon, PlusIcon } from '@heroicons/vue/24/outline'
-import type { Neighborhood, NeighborhoodFormData } from '@/types/customer'
+import type { NeighborhoodFormData } from '@/types/customer'
 
 interface Props {
     modelValue?: number | null
@@ -80,66 +53,50 @@ const emit = defineEmits<{
     'update:modelValue': [value: number | null]
 }>()
 
-const customersStore = useCustomersStore()
-const { success, error: showError, warning } = useToast()
+const branchesStore = useBranchesStore()
+const { success, error: showError } = useToast()
 
 // Reactive state
-const searchQuery = ref('')
-const showDropdown = ref(false)
+const selectedNeighborhoodId = ref<number | null>(null)
 const showCreateForm = ref(false)
 const createLoading = ref(false)
-const selectedNeighborhood = ref<Neighborhood | null>(null)
+const createFormData = ref<NeighborhoodFormData | null>(null)
 
 // Computed
-const searchResults = computed(() => {
-    if (!searchQuery.value.trim() || !customersStore.availableNeighborhoods) return []
+const neighborhoodOptions = computed(() => {
+    if (!branchesStore.currentNeighborhoods) return []
 
-    const query = searchQuery.value.toLowerCase()
-    return customersStore.availableNeighborhoods
+    return branchesStore.currentNeighborhoods
         .filter(neighborhood => {
             // Filter by branch if provided
             if (props.branchId && neighborhood.branchId !== props.branchId) return false
-
-            // Filter by search query
-            return neighborhood.name.toLowerCase().includes(query)
+            return true
         })
-        .slice(0, 10) // Limit results
+        .map(neighborhood => ({
+            id: neighborhood.id,
+            name: neighborhood.name,
+            description: `Tarifa: $${neighborhood.deliveryFee.toLocaleString()}`
+        }))
 })
 
-const showCreateOption = computed(() => {
-    if (!searchQuery.value.trim() || searchResults.value.length > 0) return false
-
-    // Show create option if no exact match found
-    const exactMatch = customersStore.availableNeighborhoods?.find(neighborhood =>
-        neighborhood.name.toLowerCase() === searchQuery.value.toLowerCase() &&
-        (!props.branchId || neighborhood.branchId === props.branchId)
-    )
-
-    return !exactMatch && searchQuery.value.length >= 2
+const selectedNeighborhood = computed(() => {
+    if (!selectedNeighborhoodId.value || !branchesStore.currentNeighborhoods) return null
+    return branchesStore.currentNeighborhoods.find(n => n.id === selectedNeighborhoodId.value) || null
 })
 
 // Methods
-const handleSearch = () => {
-    showDropdown.value = true
+const handleSelection = (value: number | null) => {
+    selectedNeighborhoodId.value = value
+    emit('update:modelValue', value)
 }
 
-const handleBlur = () => {
-    // Delay hiding dropdown to allow clicks
-    setTimeout(() => {
-        showDropdown.value = false
-    }, 200)
-}
-
-const selectNeighborhood = (neighborhood: Neighborhood) => {
-    selectedNeighborhood.value = neighborhood
-    searchQuery.value = neighborhood.name
-    showDropdown.value = false
-    emit('update:modelValue', neighborhood.id)
-}
-
-const openCreateDialog = () => {
+const handleCreateRequest = (searchValue: string) => {
+    // Store the search value to pre-fill the form
+    createFormData.value = {
+        name: searchValue,
+        deliveryFee: 0
+    }
     showCreateForm.value = true
-    showDropdown.value = false
 }
 
 const handleCreateNeighborhood = async (data: NeighborhoodFormData) => {
@@ -147,14 +104,13 @@ const handleCreateNeighborhood = async (data: NeighborhoodFormData) => {
         createLoading.value = true
 
         // Create neighborhood with current branch
-        const newNeighborhood = await customersStore.createNeighborhood({
+        const newNeighborhood = await branchesStore.createNeighborhood({
             ...data,
             branchId: props.branchId || 0
         })
 
         // Select the newly created neighborhood
-        selectedNeighborhood.value = newNeighborhood
-        searchQuery.value = newNeighborhood.name
+        selectedNeighborhoodId.value = newNeighborhood.id
         showCreateForm.value = false
 
         emit('update:modelValue', newNeighborhood.id)
@@ -170,26 +126,18 @@ const handleCreateNeighborhood = async (data: NeighborhoodFormData) => {
 
 // Watch for prop changes
 watch(() => props.modelValue, (newValue) => {
-    if (newValue && customersStore.availableNeighborhoods) {
-        const neighborhood = customersStore.availableNeighborhoods.find(n => n.id === newValue)
-        if (neighborhood) {
-            selectedNeighborhood.value = neighborhood
-            searchQuery.value = neighborhood.name
-        }
-    } else if (!newValue) {
-        selectedNeighborhood.value = null
-        searchQuery.value = ''
-    }
+    selectedNeighborhoodId.value = newValue || null
 }, { immediate: true })
 
-// Load neighborhoods on mount
-onMounted(async () => {
-    try {
-        await customersStore.fetchNeighborhoods()
-        success('Barrios Cargados', 2000, 'Los barrios disponibles han sido cargados correctamente.')
-    } catch (error) {
-        console.error('Error loading neighborhoods:', error)
-        showError('Error de Carga', 'No se pudieron cargar los barrios disponibles.')
+// Watch for branch changes to load neighborhoods
+watch(() => props.branchId, async (newBranchId) => {
+    if (newBranchId) {
+        try {
+            await branchesStore.fetchById(newBranchId)
+        } catch (error) {
+            console.error('Error loading branch neighborhoods:', error)
+            showError('Error de Carga', 'No se pudieron cargar los barrios de la sucursal.')
+        }
     }
-})
+}, { immediate: true })
 </script>

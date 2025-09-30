@@ -35,9 +35,9 @@
 
         <!-- Selected Coordinates Display -->
         <div v-if="selectedLocation" class="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <BaseInput v-model.number="selectedLocation.lat" label="Latitud" type="number" step="any" readonly
+            <BaseInput :model-value="selectedLocation.lat.toFixed(6)" label="Latitud" type="text" readonly
                 class="bg-gray-50" />
-            <BaseInput v-model.number="selectedLocation.lng" label="Longitud" type="number" step="any" readonly
+            <BaseInput :model-value="selectedLocation.lng.toFixed(6)" label="Longitud" type="text" readonly
                 class="bg-gray-50" />
         </div>
 
@@ -280,39 +280,56 @@ const searchAddress = async () => {
     if (!searchQuery.value.trim() || isDestroyed.value) return
 
     try {
-        // Use the new Places API
-        const { Place } = await (window as any).google.maps.importLibrary("places")
-
-        const request = {
-            query: searchQuery.value,
-            fields: ['formattedAddress', 'location']
+        // Use AutocompleteService for text search
+        const googleMaps = (window as any).google?.maps
+        if (!googleMaps || !googleMaps.places) {
+            throw new Error('Google Maps Places API not available')
         }
 
-        const service = new Place(request)
+        const autocompleteService = new googleMaps.places.AutocompleteService()
 
-        service.fetchFields({
-            fields: ['formattedAddress', 'location']
-        }).then((place: any) => {
-            if (!isDestroyed.value && place) {
-                const results = [{
-                    formatted_address: place.formattedAddress || '',
-                    geometry: {
-                        location: {
-                            lat: () => place.location.lat,
-                            lng: () => place.location.lng
-                        }
-                    }
-                }]
-                searchResults.value = results
-                console.log('Search results:', searchResults.value)
-            } else {
-                searchResults.value = []
-                console.log('No results found')
-            }
-        }).catch((error: any) => {
+        const request = {
+            input: searchQuery.value,
+            types: ['address'],
+            componentRestrictions: { country: 'co' } // Restrict to Colombia
+        }
+
+        autocompleteService.getPlacePredictions(request, (predictions: any, status: any) => {
             if (!isDestroyed.value) {
-                console.warn('Search failed:', error)
-                searchResults.value = []
+                if (status === googleMaps.places.PlacesServiceStatus.OK && predictions) {
+                    // Get place details for each prediction
+                    const placesService = new googleMaps.places.PlacesService(map)
+
+                    const promises = predictions.slice(0, 5).map((prediction: any) => {
+                        return new Promise((resolve) => {
+                            placesService.getDetails({
+                                placeId: prediction.place_id,
+                                fields: ['formatted_address', 'geometry']
+                            }, (place: any, placeStatus: any) => {
+                                if (placeStatus === googleMaps.places.PlacesServiceStatus.OK && place) {
+                                    resolve({
+                                        formatted_address: place.formatted_address || prediction.description,
+                                        geometry: place.geometry
+                                    })
+                                } else {
+                                    resolve(null)
+                                }
+                            })
+                        })
+                    })
+
+                    Promise.all(promises).then((results: any[]) => {
+                        if (!isDestroyed.value) {
+                            searchResults.value = results.filter(result => result !== null)
+                            console.log('Search results:', searchResults.value)
+                        }
+                    })
+                } else {
+                    searchResults.value = []
+                    if (status !== googleMaps.places.PlacesServiceStatus.ZERO_RESULTS) {
+                        console.warn('Search failed:', status)
+                    }
+                }
             }
         })
     } catch (err) {

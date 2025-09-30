@@ -5,7 +5,9 @@ import type {
 	PagedResult,
 	Branch,
 	BranchFilters,
+	NeighborhoodSummary,
 } from '@/types/common';
+import type { NeighborhoodFormData } from '@/types/customer';
 
 class BranchApi extends BaseApi {
 	async getAllBranches(
@@ -43,6 +45,24 @@ class BranchApi extends BaseApi {
 
 	async deleteBranch(id: number): Promise<ApiResponse<string>> {
 		return this.delete<ApiResponse<string>>(`/Branches/${id}`);
+	}
+
+	// Neighborhood management
+	async createNeighborhood(
+		payload: NeighborhoodFormData & { branchId: number }
+	): Promise<ApiResponse<NeighborhoodSummary>> {
+		return this.post<ApiResponse<NeighborhoodSummary>>(`/Branches/${payload.branchId}/neighborhoods`, payload);
+	}
+
+	async updateNeighborhood(
+		id: number,
+		payload: NeighborhoodFormData
+	): Promise<ApiResponse<NeighborhoodSummary>> {
+		return this.put<ApiResponse<NeighborhoodSummary>>(`/Branches/${id}/neighborhoods`, payload);
+	}
+
+	async deleteNeighborhood(id: number): Promise<ApiResponse<string>> {
+		return this.delete<ApiResponse<string>>(`/Branches/${id}/neighborhoods`);
 	}
 }
 

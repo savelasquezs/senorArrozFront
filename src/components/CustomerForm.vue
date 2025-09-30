@@ -28,8 +28,8 @@
             </BaseInput>
         </div>
 
-        <!-- Branch Selection (only for new customers or superadmin) -->
-        <div v-if="!customer || canSelectBranch">
+        <!-- Branch Selection (only for superadmin) -->
+        <div v-if="authStore.isSuperadmin">
             <BaseSelect v-model="form.branchId" :options="branchOptions" label="Sucursal"
                 placeholder="Seleccionar sucursal..." required :error="errors.branchId" @change="validateBranch"
                 value-key="value" display-key="label">
@@ -47,7 +47,7 @@
                 <!-- Neighborhood Selection -->
                 <NeighborhoodSearch v-model="form.initialAddress.neighborhoodId" label="Barrio"
                     placeholder="Buscar barrio..." :required="true" :error="errors.initialAddress?.neighborhoodId"
-                    :branch-id="form.branchId" @update:model-value="validateNeighborhood" />
+                    :branch-id="currentBranchId" @update:model-value="validateNeighborhood" />
 
                 <!-- Address -->
                 <BaseInput v-model="form.initialAddress.address" label="Dirección" placeholder="Ej: Calle 10 #20-30"
@@ -134,6 +134,7 @@
 import { ref, reactive, computed, watch, onMounted } from 'vue'
 import { useBranchesStore } from '@/store/branches'
 import { useCustomersStore } from '@/store/customers'
+import { useAuthStore } from '@/store/auth'
 import type { Customer, CustomerFormData } from '@/types/customer'
 import BaseInput from '@/components/ui/BaseInput.vue'
 import BaseSelect from '@/components/ui/BaseSelect.vue'
@@ -168,6 +169,7 @@ const emit = defineEmits<{
 
 const branchesStore = useBranchesStore()
 const customersStore = useCustomersStore()
+const authStore = useAuthStore()
 
 const form = reactive({
     name: '',
@@ -225,11 +227,20 @@ const branchOptions = computed(() => {
     }))
 })
 
+// Current branch ID based on user role
+const currentBranchId = computed(() => {
+    if (authStore.isSuperadmin) {
+        return form.branchId
+    } else {
+        return authStore.branchId || 0
+    }
+})
+
 
 const isFormValid = computed(() => {
     const basicValidation = form.name.trim() &&
         form.phone1.trim() &&
-        form.branchId > 0 &&
+        (authStore.isSuperadmin ? form.branchId > 0 : true) &&
         !errors.name &&
         !errors.phone1 &&
         !errors.phone2 &&
@@ -271,7 +282,8 @@ const validatePhone = (field: 'phone1' | 'phone2') => {
 }
 
 const validateBranch = () => {
-    if (!form.branchId) {
+    // Only validate branch for superadmin users
+    if (authStore.isSuperadmin && !form.branchId) {
         errors.branchId = 'Selecciona una sucursal'
         return
     }
@@ -444,6 +456,11 @@ onMounted(async () => {
     try {
         await branchesStore.fetchAll()
         await customersStore.fetchNeighborhoods()
+
+        // Initialize branch ID based on user role
+        if (!authStore.isSuperadmin && authStore.branchId) {
+            form.branchId = authStore.branchId
+        }
     } catch (error) {
         console.error('Error loading form data:', error)
     }
