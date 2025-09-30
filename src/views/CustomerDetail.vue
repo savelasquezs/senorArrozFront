@@ -15,31 +15,31 @@
             </BaseAlert>
 
             <!-- Customer Content -->
-            <div v-else-if="customer" class="space-y-6">
+            <div v-else-if="customer" class="space-y-4">
                 <!-- Customer Header -->
                 <div class="bg-white shadow rounded-lg">
-                    <div class="px-6 py-4 border-b border-gray-200">
+                    <div class="px-4 py-3 border-b border-gray-200">
                         <div class="flex items-center justify-between">
-                            <div class="flex items-center space-x-3">
+                            <div class="flex items-center space-x-2">
                                 <div class="flex-shrink-0">
-                                    <div class="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
-                                        <UserIcon class="w-6 h-6 text-blue-600" />
+                                    <div class="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
+                                        <UserIcon class="w-4 h-4 text-blue-600" />
                                     </div>
                                 </div>
                                 <div>
-                                    <h1 class="text-2xl font-bold text-gray-900">{{ customer.name }}</h1>
-                                    <p class="text-sm text-gray-500">Cliente ID: {{ customer.id }}</p>
+                                    <h1 class="text-lg font-semibold text-gray-900">{{ customer.name }}</h1>
+                                    <p class="text-xs text-gray-500">ID: {{ customer.id }}</p>
                                 </div>
                             </div>
 
                             <!-- Actions -->
-                            <div class="flex space-x-2">
-                                <BaseButton @click="openEditDialog" variant="secondary" :icon="PencilIcon">
+                            <div class="flex space-x-1">
+                                <BaseButton @click="openEditDialog" variant="secondary" size="sm" :icon="PencilIcon">
                                     Editar
                                 </BaseButton>
                                 <BaseButton
                                     v-if="authStore.user?.role === 'Superadmin' || authStore.user?.role === 'Admin'"
-                                    @click="confirmDelete" variant="danger" :icon="TrashIcon">
+                                    @click="confirmDelete" variant="danger" size="sm" :icon="TrashIcon">
                                     Eliminar
                                 </BaseButton>
                             </div>
@@ -47,46 +47,72 @@
                     </div>
 
                     <!-- Customer Info -->
-                    <div class="px-6 py-4">
-                        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div class="px-4 py-3">
+                        <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
                             <div class="flex items-center">
-                                <PhoneIcon class="w-5 h-5 text-gray-400 mr-3" />
+                                <PhoneIcon class="w-4 h-4 text-gray-400 mr-2" />
                                 <div>
-                                    <p class="text-sm font-medium text-gray-900">Teléfono Principal</p>
-                                    <p class="text-sm text-gray-600">{{ customer.phone1 }}</p>
+                                    <p class="text-xs font-medium text-gray-900">Teléfono Principal</p>
+                                    <p class="text-xs text-gray-600">{{ customer.phone1 }}</p>
                                 </div>
                             </div>
 
                             <div v-if="customer.phone2" class="flex items-center">
-                                <PhoneIcon class="w-5 h-5 text-gray-400 mr-3" />
+                                <PhoneIcon class="w-4 h-4 text-gray-400 mr-2" />
                                 <div>
-                                    <p class="text-sm font-medium text-gray-900">Teléfono Secundario</p>
-                                    <p class="text-sm text-gray-600">{{ customer.phone2 }}</p>
+                                    <p class="text-xs font-medium text-gray-900">Teléfono Secundario</p>
+                                    <p class="text-xs text-gray-600">{{ customer.phone2 }}</p>
                                 </div>
                             </div>
 
                             <div class="flex items-center">
-                                <BuildingOffice2Icon class="w-5 h-5 text-gray-400 mr-3" />
+                                <BuildingOffice2Icon class="w-4 h-4 text-gray-400 mr-2" />
                                 <div>
-                                    <p class="text-sm font-medium text-gray-900">Sucursal</p>
-                                    <p class="text-sm text-gray-600">{{ getBranchName(customer.branchId) }}</p>
+                                    <p class="text-xs font-medium text-gray-900">Sucursal</p>
+                                    <p class="text-xs text-gray-600">{{ customer.branchName ||
+                                        getBranchName(customer.branchId) }}</p>
                                 </div>
                             </div>
+                            <BaseCard>
+                                <div class="flex items-center">
+                                    <div class="flex-shrink-0">
+                                        <CalendarIcon class="w-5 h-5 text-indigo-600" />
+                                    </div>
+                                    <div class="ml-2">
+                                        <p class="text-xs font-medium text-gray-500">Fecha de Registro</p>
+                                        <p class="text-xs font-semibold text-gray-900">{{ formatDate(customer.createdAt)
+                                            }}</p>
+                                    </div>
+                                </div>
+                            </BaseCard>
+
+                            <BaseCard>
+                                <div class="flex items-center">
+                                    <div class="flex-shrink-0">
+                                        <CalendarIcon class="w-5 h-5 text-teal-600" />
+                                    </div>
+                                    <div class="ml-2">
+                                        <p class="text-xs font-medium text-gray-500">Último Pedido</p>
+                                        <p class="text-xs font-semibold text-gray-900">
+                                            {{ customer.lastOrderDate ? formatDate(customer.lastOrderDate) : 'Nunca' }}
+                                        </p>
+                                    </div>
+                                </div>
+                            </BaseCard>
                         </div>
                     </div>
                 </div>
 
                 <!-- Stats Cards -->
-                <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
                     <BaseCard>
                         <div class="flex items-center">
                             <div class="flex-shrink-0">
-                                <MapPinIcon class="w-8 h-8 text-green-600" />
+                                <MapPinIcon class="w-5 h-5 text-green-600" />
                             </div>
-                            <div class="ml-4">
-                                <p class="text-sm font-medium text-gray-500">Direcciones</p>
-                                <p class="text-2xl font-semibold text-gray-900">{{ customer.addresses?.length || 0 }}
-                                </p>
+                            <div class="ml-2">
+                                <p class="text-xs font-medium text-gray-500">Direcciones</p>
+                                <p class="text-lg font-semibold text-gray-900">{{ customer.addresses?.length || 0 }}</p>
                             </div>
                         </div>
                     </BaseCard>
@@ -94,11 +120,11 @@
                     <BaseCard>
                         <div class="flex items-center">
                             <div class="flex-shrink-0">
-                                <HomeIcon class="w-8 h-8 text-blue-600" />
+                                <HomeIcon class="w-5 h-5 text-blue-600" />
                             </div>
-                            <div class="ml-4">
-                                <p class="text-sm font-medium text-gray-500">Dirección Principal</p>
-                                <p class="text-sm font-semibold text-gray-900">
+                            <div class="ml-2">
+                                <p class="text-xs font-medium text-gray-500">Principal</p>
+                                <p class="text-xs font-semibold text-gray-900">
                                     {{ primaryAddress ? 'Sí' : 'No' }}
                                 </p>
                             </div>
@@ -108,11 +134,11 @@
                     <BaseCard>
                         <div class="flex items-center">
                             <div class="flex-shrink-0">
-                                <CalendarIcon class="w-8 h-8 text-purple-600" />
+                                <CalendarIcon class="w-5 h-5 text-purple-600" />
                             </div>
-                            <div class="ml-4">
-                                <p class="text-sm font-medium text-gray-500">Registrado</p>
-                                <p class="text-sm font-semibold text-gray-900">{{ formatDate(customer.createdAt) }}</p>
+                            <div class="ml-2">
+                                <p class="text-xs font-medium text-gray-500">Pedidos</p>
+                                <p class="text-lg font-semibold text-gray-900">{{ customer.totalOrders || 0 }}</p>
                             </div>
                         </div>
                     </BaseCard>
@@ -120,11 +146,11 @@
                     <BaseCard>
                         <div class="flex items-center">
                             <div class="flex-shrink-0">
-                                <CheckCircleIcon class="w-8 h-8 text-orange-600" />
+                                <CheckCircleIcon class="w-5 h-5 text-orange-600" />
                             </div>
-                            <div class="ml-4">
-                                <p class="text-sm font-medium text-gray-500">Estado</p>
-                                <BaseBadge :variant="customer.active ? 'success' : 'danger'">
+                            <div class="ml-2">
+                                <p class="text-xs font-medium text-gray-500">Estado</p>
+                                <BaseBadge :variant="customer.active ? 'success' : 'danger'" size="sm">
                                     {{ customer.active ? 'Activo' : 'Inactivo' }}
                                 </BaseBadge>
                             </div>
@@ -132,13 +158,18 @@
                     </BaseCard>
                 </div>
 
+                <!-- Additional Info Cards -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+
+                </div>
+
                 <!-- Addresses Section -->
                 <BaseCard>
                     <div class="space-y-4">
                         <div class="flex items-center justify-between">
-                            <h3 class="text-lg font-semibold text-gray-900">
+                            <h3 class="text-base font-semibold text-gray-900">
                                 Direcciones
-                                <span class="text-sm font-normal text-gray-500">
+                                <span class="text-xs font-normal text-gray-500">
                                     ({{ customer.addresses?.length || 0 }})
                                 </span>
                             </h3>
@@ -147,10 +178,10 @@
                             </BaseButton>
                         </div>
 
-                        <div v-if="!customer.addresses || customer.addresses.length === 0" class="text-center py-8">
-                            <MapPinIcon class="mx-auto h-12 w-12 text-gray-400" />
-                            <p class="mt-2 text-lg font-medium text-gray-900">No hay direcciones</p>
-                            <p class="text-sm text-gray-500">Este cliente no tiene direcciones registradas</p>
+                        <div v-if="!customer.addresses || customer.addresses.length === 0" class="text-center py-6">
+                            <MapPinIcon class="mx-auto h-8 w-8 text-gray-400" />
+                            <p class="mt-2 text-sm font-medium text-gray-900">No hay direcciones</p>
+                            <p class="text-xs text-gray-500">Este cliente no tiene direcciones registradas</p>
                         </div>
 
                         <div v-else class="overflow-hidden shadow ring-1 ring-black ring-opacity-5 rounded-lg">
@@ -168,6 +199,10 @@
                                         <th
                                             class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                             Coordenadas
+                                        </th>
+                                        <th
+                                            class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                            Tarifa
                                         </th>
                                         <th
                                             class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -189,10 +224,14 @@
                                             </div>
                                         </td>
                                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                            {{ getNeighborhoodName(address.neighborhoodId) }}
+                                            {{ address.neighborhoodName || getNeighborhoodName(address.neighborhoodId)
+                                            }}
                                         </td>
                                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                                             {{ address?.latitude?.toFixed(6) }}, {{ address?.longitude?.toFixed(6) }}
+                                        </td>
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                            ${{ address.deliveryFee?.toLocaleString() || '0' }}
                                         </td>
                                         <td class="px-6 py-4 whitespace-nowrap">
                                             <BaseBadge v-if="address.isPrimary" variant="success">
@@ -296,7 +335,7 @@ import {
     PlusIcon,
     ExclamationTriangleIcon
 } from '@heroicons/vue/24/outline'
-import type {  CustomerAddress, CustomerFormData, CustomerAddressFormData } from '@/types/customer'
+import type { CustomerAddress, CustomerFormData, CustomerAddressFormData } from '@/types/customer'
 
 const route = useRoute()
 const router = useRouter()
@@ -432,7 +471,7 @@ const handleDelete = async () => {
 onMounted(async () => {
     try {
         // Check if user has access before making API calls
-       
+
 
         // Fetch customer details first to check access
         await store.fetchById(customerId.value)

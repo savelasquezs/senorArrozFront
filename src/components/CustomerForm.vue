@@ -43,56 +43,8 @@
         <div v-if="!customer" class="border-t border-gray-200 pt-6">
             <h4 class="text-sm font-medium text-gray-900 mb-4">Dirección Inicial</h4>
 
-            <div class="space-y-4">
-                <!-- Neighborhood Selection -->
-                <NeighborhoodSearch v-model="form.initialAddress.neighborhoodId" label="Barrio"
-                    placeholder="Buscar barrio..." :required="true" :error="errors.initialAddress?.neighborhoodId"
-                    :branch-id="currentBranchId" @update:model-value="validateNeighborhood" />
-
-                <!-- Address -->
-                <BaseInput v-model="form.initialAddress.address" label="Dirección" placeholder="Ej: Calle 10 #20-30"
-                    required :error="errors.initialAddress?.address" :maxlength="200">
-                    <template #icon>
-                        <HomeIcon class="w-4 h-4" />
-                    </template>
-                </BaseInput>
-
-                <!-- Additional Info -->
-                <BaseInput v-model="form.initialAddress.additionalInfo" label="Información Adicional"
-                    placeholder="Ej: Apto 202, Torre A" :error="errors.initialAddress?.additionalInfo" :maxlength="100">
-                    <template #icon>
-                        <InformationCircleIcon class="w-4 h-4" />
-                    </template>
-                </BaseInput>
-
-                <!-- Delivery Fee -->
-                <BaseInput v-model.number="form.initialAddress.deliveryFee" label="Tarifa de Domicilio" type="number"
-                    min="0" step="100" placeholder="5000" required :error="errors.initialAddress?.deliveryFee">
-                    <template #icon>
-                        <CurrencyDollarIcon class="w-4 h-4" />
-                    </template>
-                </BaseInput>
-
-                <!-- Google Maps Selector -->
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-2">
-                        Seleccionar ubicación
-                    </label>
-                    <GoogleMapsSelector v-model="selectedLocation"
-                        :error="errors.initialAddress?.latitude || errors.initialAddress?.longitude"
-                        @location-confirmed="handleLocationConfirmed"
-                        :key="`maps-customer-${props.customer?.id || 'new'}`" />
-                </div>
-
-                <!-- Primary Address Checkbox -->
-                <div class="flex items-center">
-                    <input id="isPrimary" v-model="form.initialAddress.isPrimary" type="checkbox"
-                        class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
-                    <label for="isPrimary" class="ml-2 block text-sm text-gray-900">
-                        Marcar como dirección principal
-                    </label>
-                </div>
-            </div>
+            <CustomerAddressForm :address="null" :customer-id="0" :loading="loading" @submit="handleAddressSubmit"
+                @cancel="handleAddressCancel" />
         </div>
 
         <!-- Active Status (only for existing customers) -->
@@ -133,22 +85,18 @@
 <script setup lang="ts">
 import { ref, reactive, computed, watch, onMounted } from 'vue'
 import { useBranchesStore } from '@/store/branches'
-import { useCustomersStore } from '@/store/customers'
 import { useAuthStore } from '@/store/auth'
 import type { Customer, CustomerFormData } from '@/types/customer'
 import BaseInput from '@/components/ui/BaseInput.vue'
 import BaseSelect from '@/components/ui/BaseSelect.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseAlert from '@/components/ui/BaseAlert.vue'
-import GoogleMapsSelector from '@/components/ui/GoogleMapsSelector.vue'
-import NeighborhoodSearch from '@/components/ui/NeighborhoodSearch.vue'
+import CustomerAddressForm from '@/components/CustomerAddressForm.vue'
 import {
     UserIcon,
     PhoneIcon,
     BuildingOffice2Icon,
-    HomeIcon,
-    InformationCircleIcon,
-    CurrencyDollarIcon
+    InformationCircleIcon
 } from '@heroicons/vue/24/outline'
 
 interface Props {
@@ -168,7 +116,6 @@ const emit = defineEmits<{
 }>()
 
 const branchesStore = useBranchesStore()
-const customersStore = useCustomersStore()
 const authStore = useAuthStore()
 
 const form = reactive({
@@ -187,6 +134,8 @@ const form = reactive({
         deliveryFee: 0
     }
 })
+
+const addressFormData = ref<any>(null)
 
 const errors = reactive({
     name: '',
@@ -216,7 +165,6 @@ const errors = reactive({
 })
 
 const showValidationInfo = ref(false)
-const selectedLocation = ref<{ lat: number; lng: number } | null>(null)
 
 // Computed properties
 const branchOptions = computed(() => {
@@ -227,14 +175,7 @@ const branchOptions = computed(() => {
     }))
 })
 
-// Current branch ID based on user role
-const currentBranchId = computed(() => {
-    if (authStore.isSuperadmin) {
-        return form.branchId
-    } else {
-        return authStore.branchId || 0
-    }
-})
+// Branch ID is handled by CustomerAddressForm
 
 
 const isFormValid = computed(() => {
@@ -247,16 +188,8 @@ const isFormValid = computed(() => {
         !errors.branchId
 
     if (!props.customer) {
-        // For new customers, validate initial address
-        return basicValidation &&
-            form.initialAddress.neighborhoodId > 0 &&
-            form.initialAddress.address.trim() &&
-            form.initialAddress.latitude !== 0 &&
-            form.initialAddress.longitude !== 0 &&
-            !errors.initialAddress.neighborhoodId &&
-            !errors.initialAddress.address &&
-            !errors.initialAddress.latitude &&
-            !errors.initialAddress.longitude
+        // For new customers, validate that address form data is available
+        return basicValidation && addressFormData.value !== null
     }
 
     return basicValidation
@@ -290,12 +223,23 @@ const validateBranch = () => {
     errors.branchId = ''
 }
 
-const validateNeighborhood = () => {
-    if (!form.initialAddress.neighborhoodId) {
-        errors.initialAddress.neighborhoodId = 'Selecciona un barrio'
-        return
+// Address form handlers
+const handleAddressSubmit = (data: any) => {
+    addressFormData.value = data
+    // Update the form with address data
+    form.initialAddress = {
+        neighborhoodId: data.neighborhoodId,
+        address: data.address,
+        additionalInfo: data.additionalInfo || '',
+        latitude: data.latitude,
+        longitude: data.longitude,
+        isPrimary: data.isPrimary,
+        deliveryFee: data.deliveryFee
     }
-    errors.initialAddress.neighborhoodId = ''
+}
+
+const handleAddressCancel = () => {
+    addressFormData.value = null
 }
 
 const validateForm = () => {
@@ -321,36 +265,7 @@ const validateForm = () => {
     // Validate branch
     validateBranch()
 
-    // Validate initial address for new customers
-    if (!props.customer) {
-        validateNeighborhood()
-
-        if (!form.initialAddress.address.trim()) {
-            errors.initialAddress.address = 'La dirección es requerida'
-        } else if (form.initialAddress.address.length < 10) {
-            errors.initialAddress.address = 'La dirección debe ser más específica (mínimo 10 caracteres)'
-        } else {
-            errors.initialAddress.address = ''
-        }
-
-        if (form.initialAddress.latitude === 0) {
-            errors.initialAddress.latitude = 'La latitud es requerida'
-        } else {
-            errors.initialAddress.latitude = ''
-        }
-
-        if (form.initialAddress.longitude === 0) {
-            errors.initialAddress.longitude = 'La longitud es requerida'
-        } else {
-            errors.initialAddress.longitude = ''
-        }
-
-        if (form.initialAddress.deliveryFee <= 0) {
-            errors.initialAddress.deliveryFee = 'La tarifa de domicilio es requerida'
-        } else {
-            errors.initialAddress.deliveryFee = ''
-        }
-    }
+    // Address validation is handled by CustomerAddressForm
 }
 
 const handleSubmit = () => {
@@ -365,14 +280,14 @@ const handleSubmit = () => {
         phone1: form.phone1.trim(),
         phone2: form.phone2.trim() || undefined,
         branchId: form.branchId,
-        initialAddress: {
-            neighborhoodId: form.initialAddress.neighborhoodId,
-            address: form.initialAddress.address.trim(),
-            additionalInfo: form.initialAddress.additionalInfo.trim() || undefined,
-            latitude: form.initialAddress.latitude,
-            longitude: form.initialAddress.longitude,
-            isPrimary: form.initialAddress.isPrimary,
-            deliveryFee: form.initialAddress.deliveryFee
+        initialAddress: addressFormData.value || {
+            neighborhoodId: 0,
+            address: '',
+            additionalInfo: '',
+            latitude: 0,
+            longitude: 0,
+            isPrimary: true,
+            deliveryFee: 0
         }
     }
 
@@ -395,15 +310,7 @@ watch(() => props.customer, (newCustomer) => {
         form.phone2 = ''
         form.branchId = 0
         form.active = true
-        form.initialAddress = {
-            neighborhoodId: 0,
-            address: '',
-            additionalInfo: '',
-            latitude: 0,
-            longitude: 0,
-            isPrimary: true,
-            deliveryFee: 0
-        }
+        addressFormData.value = null
         showValidationInfo.value = true
     }
 
@@ -412,50 +319,16 @@ watch(() => props.customer, (newCustomer) => {
     errors.phone1 = ''
     errors.phone2 = ''
     errors.branchId = ''
-    errors.initialAddress.neighborhoodId = ''
-    errors.initialAddress.address = ''
-    errors.initialAddress.additionalInfo = ''
-    errors.initialAddress.latitude = ''
-    errors.initialAddress.longitude = ''
-    errors.initialAddress.deliveryFee = ''
+    // Address errors are handled by CustomerAddressForm
 }, { immediate: true })
 
-// Watch for branch changes to reset neighborhood
-watch(() => form.branchId, () => {
-    form.initialAddress.neighborhoodId = 0
-    form.initialAddress.deliveryFee = 0
-})
-
-// Watch for neighborhood changes to update delivery fee
-watch(() => form.initialAddress.neighborhoodId, (newNeighborhoodId) => {
-    if (newNeighborhoodId > 0) {
-        const neighborhood = customersStore.availableNeighborhoods.find(n => n.id === newNeighborhoodId)
-        if (neighborhood) {
-            form.initialAddress.deliveryFee = neighborhood.deliveryFee
-        }
-    }
-})
-
-// Watch for location changes to update coordinates
-watch(selectedLocation, (newLocation) => {
-    if (newLocation) {
-        form.initialAddress.latitude = newLocation.lat
-        form.initialAddress.longitude = newLocation.lng
-    }
-})
-
-// Handle location confirmation
-const handleLocationConfirmed = () => {
-    // Clear any coordinate errors when location is confirmed
-    errors.initialAddress.latitude = ''
-    errors.initialAddress.longitude = ''
-}
+// Address form handles its own state management
 
 // Load data on mount
 onMounted(async () => {
     try {
         await branchesStore.fetchAll()
-        await customersStore.fetchNeighborhoods()
+        // Neighborhoods are loaded by CustomerAddressForm
 
         // Initialize branch ID based on user role
         if (!authStore.isSuperadmin && authStore.branchId) {

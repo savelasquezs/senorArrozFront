@@ -6,9 +6,12 @@ export interface Customer {
     phone1: string;
     phone2?: string;
     branchId: number;
+    branchName?: string;
     active: boolean;
     createdAt: string;
     updatedAt: string;
+    totalOrders?: number;
+    lastOrderDate?: string;
     addresses?: CustomerAddress[];
 }
 
@@ -16,6 +19,7 @@ export interface CustomerAddress {
     id: number;
     customerId: number;
     neighborhoodId: number;
+    neighborhoodName?: string;
     address: string;
     additionalInfo?: string;
     latitude?: number;

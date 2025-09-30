@@ -1,28 +1,22 @@
 <!-- src/components/CustomerAddressForm.vue -->
 <template>
     <form @submit.prevent="handleSubmit" class="space-y-6">
-        <!-- Neighborhood Selection -->
+        <!-- Step 1: Neighborhood Selection (always visible) -->
         <NeighborhoodSearch v-model="form.neighborhoodId" label="Barrio" placeholder="Buscar barrio..." :required="true"
             :error="errors.neighborhoodId" @update:model-value="validateNeighborhood" />
 
-        <!-- Address -->
-        <BaseInput v-model="form.address" label="Dirección" placeholder="Ej: Calle 10 #20-30" required
-            :error="errors.address" :maxlength="200" :minlength="10" @blur="handleAddressBlur">
-            <template #icon>
-                <HomeIcon class="w-4 h-4" />
-            </template>
-        </BaseInput>
+        <!-- Step 2: Address Input (visible when neighborhood is selected) -->
+        <div v-if="form.neighborhoodId > 0">
+            <BaseInput v-model="form.address" label="Dirección" placeholder="Ej: Calle 10 #20-30" required
+                :error="errors.address" :maxlength="200" :minlength="10" @blur="handleAddressBlur">
+                <template #icon>
+                    <HomeIcon class="w-4 h-4" />
+                </template>
+            </BaseInput>
+        </div>
 
-        <!-- Additional Info -->
-        <BaseInput v-model="form.additionalInfo" label="Información Adicional"
-            placeholder="Ej: Apto 202, Torre A, Frente al parque" :error="errors.additionalInfo" :maxlength="100">
-            <template #icon>
-                <InformationCircleIcon class="w-4 h-4" />
-            </template>
-        </BaseInput>
-
-        <!-- Google Maps Selector -->
-        <div>
+        <!-- Step 3: Google Maps Selector (visible when address has value and blur occurred) -->
+        <div v-if="form.address.trim() && showMapsSelector">
             <label class="block text-sm font-medium text-gray-700 mb-2">
                 Seleccionar ubicación
             </label>
@@ -31,21 +25,31 @@
                 :key="`maps-${address?.id || 'new'}`" />
         </div>
 
-        <!-- Delivery Fee -->
-        <BaseInput v-model.number="form.deliveryFee" label="Tarifa de Domicilio" type="number" min="0" step="100"
-            placeholder="5000" required :error="errors.deliveryFee">
-            <template #icon>
-                <CurrencyDollarIcon class="w-4 h-4" />
-            </template>
-        </BaseInput>
+        <!-- Step 4: Additional Info (visible when location is confirmed) -->
+        <div v-if="isLocationConfirmed">
+            <BaseInput v-model="form.additionalInfo" label="Información Adicional"
+                placeholder="Ej: Apto 202, Torre A, Frente al parque" :error="errors.additionalInfo" :maxlength="100">
+                <template #icon>
+                    <InformationCircleIcon class="w-4 h-4" />
+                </template>
+            </BaseInput>
 
-        <!-- Primary Address Checkbox -->
-        <div class="flex items-center">
-            <input id="isPrimary" v-model="form.isPrimary" type="checkbox"
-                class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
-            <label for="isPrimary" class="ml-2 block text-sm text-gray-900">
-                Marcar como dirección principal
-            </label>
+            <!-- Delivery Fee -->
+            <BaseInput v-model.number="form.deliveryFee" label="Tarifa de Domicilio" type="number" min="0" step="100"
+                placeholder="5000" required :error="errors.deliveryFee">
+                <template #icon>
+                    <CurrencyDollarIcon class="w-4 h-4" />
+                </template>
+            </BaseInput>
+
+            <!-- Primary Address Checkbox -->
+            <div class="flex items-center">
+                <input id="isPrimary" v-model="form.isPrimary" type="checkbox"
+                    class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
+                <label for="isPrimary" class="ml-2 block text-sm text-gray-900">
+                    Marcar como dirección principal
+                </label>
+            </div>
         </div>
 
         <!-- Validation Info -->
@@ -129,6 +133,8 @@ const errors = reactive({
 
 const showValidationInfo = ref(false)
 const selectedLocation = ref<{ lat: number; lng: number } | null>(null)
+const showMapsSelector = ref(false)
+const isLocationConfirmed = ref(false)
 
 // Computed properties - removed neighborhoodOptions since we're using NeighborhoodSearch
 
@@ -230,6 +236,8 @@ watch(() => props.address, (newAddress) => {
             lat: newAddress.latitude || 0,
             lng: newAddress.longitude || 0
         }
+        showMapsSelector.value = true
+        isLocationConfirmed.value = true
         showValidationInfo.value = false
     } else {
         // Reset form for new address
@@ -241,6 +249,8 @@ watch(() => props.address, (newAddress) => {
         form.isPrimary = false
         form.deliveryFee = 0
         selectedLocation.value = null
+        showMapsSelector.value = false
+        isLocationConfirmed.value = false
         showValidationInfo.value = true
     }
 
@@ -270,6 +280,7 @@ watch(() => form.neighborhoodId, (newNeighborhoodId) => {
 
 // Handle location confirmation
 const handleLocationConfirmed = () => {
+    isLocationConfirmed.value = true
     // Clear any coordinate errors when location is confirmed
     errors.latitude = ''
     errors.longitude = ''
@@ -277,8 +288,9 @@ const handleLocationConfirmed = () => {
 
 // Handle address blur - trigger search in GoogleMapsSelector
 const handleAddressBlur = () => {
-    // The GoogleMapsSelector will automatically search for the address
-    // when the initialAddress prop changes
+    if (form.address.trim()) {
+        showMapsSelector.value = true
+    }
 }
 
 // Load neighborhoods on mount
