@@ -12,8 +12,8 @@
 
         <!-- Selected Neighborhood Info -->
         <div v-if="selectedNeighborhood" class="text-sm text-gray-600 bg-gray-50 p-2 rounded">
-            <div class="font-medium">{{ selectedNeighborhood.name }}</div>
-            <div>Tarifa: ${{ selectedNeighborhood.deliveryFee.toLocaleString() }}</div>
+            <div class="font-medium">{{ selectedNeighborhood.name.toLocaleUpperCase() }} :${{
+                selectedNeighborhood.deliveryFee.toLocaleString() }} </div>
         </div>
 
         <!-- Create Neighborhood Dialog -->
@@ -33,6 +33,8 @@ import { useBranchesStore } from '@/store/branches'
 import { useToast } from '@/composables/useToast'
 import { MapPinIcon, PlusIcon } from '@heroicons/vue/24/outline'
 import type { NeighborhoodFormData } from '@/types/customer'
+import { onMounted } from 'vue'
+import { useAuthStore } from '@/store/auth'
 
 interface Props {
     modelValue?: number | null
@@ -140,4 +142,15 @@ watch(() => props.branchId, async (newBranchId) => {
         }
     }
 }, { immediate: true })
+
+onMounted(async () => {
+    if (!props.branchId) {
+        const branchId = useAuthStore().branchId
+        if (!branchId) return
+        await branchesStore.fetchById(branchId)
+    }
+    else {
+        await branchesStore.fetchById(props.branchId)
+    }
+})
 </script>

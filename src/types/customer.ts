@@ -102,13 +102,14 @@ export interface CustomerFormData {
     phone1: string;
     phone2?: string;
     branchId: number;
-    initialAddress: {
+    active: boolean;
+    initialAddress?: {
         neighborhoodId: number;
         address: string;
         additionalInfo?: string;
-        latitude: number;
-        longitude: number;
-        isPrimary: boolean;
+        latitude?: number;
+        longitude?: number;
+        isPrimary?: boolean;
         deliveryFee: number;
     };
 }

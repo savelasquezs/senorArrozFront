@@ -252,6 +252,7 @@ watch(isOpen, (newValue) => {
 
 onMounted(() => {
 	document.addEventListener('click', handleClickOutside);
+	
 });
 
 onUnmounted(() => {

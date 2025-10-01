@@ -4,14 +4,14 @@
         <!-- Customer Information -->
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
             <BaseInput v-model="form.name" label="Nombre Completo" placeholder="Ej: Juan Pérez González" required
-                :error="errors.name" :maxlength="150" :minlength="5">
+                :error="errors.name" :maxlength="150" :minlength="5" @input="validateForm">
                 <template #icon>
                     <UserIcon class="w-4 h-4" />
                 </template>
             </BaseInput>
 
             <BaseInput v-model="form.phone1" label="Teléfono Principal" type="tel" placeholder="3001234567" required
-                :error="errors.phone1" :maxlength="10" @input="validatePhone('phone1')">
+                :error="errors.phone1" :maxlength="10" @input="validatePhone('phone1'); validateForm()">
                 <template #icon>
                     <PhoneIcon class="w-4 h-4" />
                 </template>
@@ -21,7 +21,7 @@
         <!-- Secondary Phone -->
         <div>
             <BaseInput v-model="form.phone2" label="Teléfono Secundario" type="tel" placeholder="3007654321"
-                :error="errors.phone2" :maxlength="10" @input="validatePhone('phone2')">
+                :error="errors.phone2" :maxlength="10" @input="validatePhone('phone2'); validateForm()">
                 <template #icon>
                     <PhoneIcon class="w-4 h-4" />
                 </template>
@@ -31,8 +31,8 @@
         <!-- Branch Selection (only for superadmin) -->
         <div v-if="authStore.isSuperadmin">
             <BaseSelect v-model="form.branchId" :options="branchOptions" label="Sucursal"
-                placeholder="Seleccionar sucursal..." required :error="errors.branchId" @change="validateBranch"
-                value-key="value" display-key="label">
+                placeholder="Seleccionar sucursal..." required :error="errors.branchId"
+                @update:model-value="validateBranch(); validateForm()" value-key="value" display-key="label">
                 <template #icon>
                     <BuildingOffice2Icon class="w-4 h-4" />
                 </template>
@@ -40,11 +40,10 @@
         </div>
 
         <!-- Initial Address Section (only for new customers) -->
-        <div v-if="!customer" class="border-t border-gray-200 pt-6">
-            <h4 class="text-sm font-medium text-gray-900 mb-4">Dirección Inicial</h4>
-
+        <div v-if="!customer && form.branchId > 0" class="border-t border-gray-200 pt-6">
             <CustomerAddressForm :address="null" :customer-id="0" :loading="loading" @submit="handleAddressSubmit"
-                @cancel="handleAddressCancel" />
+                @cancel="handleAddressCancel" :branch-id="form.branchId" v-model="form.initialAddress"
+                @update:model-value="handleAddressUpdate" />
         </div>
 
         <!-- Active Status (only for existing customers) -->
@@ -56,18 +55,15 @@
             </label>
         </div>
 
-        <!-- Validation Info -->
-        <BaseAlert v-if="showValidationInfo" variant="info">
-            <InformationCircleIcon class="w-5 h-5" />
-            <div>
-                <h4 class="font-medium">Información sobre los datos</h4>
-                <ul class="mt-1 text-sm list-disc list-inside space-y-1">
-                    <li>El teléfono principal debe ser único en el sistema</li>
-                    <li>Los teléfonos deben ser números celulares válidos (10 dígitos, iniciando con 3)</li>
-                    <li>Las coordenadas se usan para calcular rutas de entrega</li>
-                </ul>
-            </div>
-        </BaseAlert>
+        <!-- Debug info (remove in production) -->
+        <div class="text-xs text-gray-500 bg-gray-100 p-2 rounded" v-if="true">
+            <div>Form Valid: {{ isFormValid }}</div>
+            <div>Name: "{{ form.name }}" ({{ form.name.trim().length }})</div>
+            <div>Phone1: "{{ form.phone1 }}" ({{ form.phone1.trim().length }})</div>
+            <div>BranchId: {{ form.branchId }} (Superadmin: {{ authStore.isSuperadmin }})</div>
+            <div>Errors: {{ JSON.stringify(errors) }}</div>
+            <div v-if="!customer">Address: {{ JSON.stringify(form.initialAddress) }}</div>
+        </div>
 
         <!-- Form Actions -->
         <div class="flex justify-end space-x-3 pt-6 border-t border-gray-200">
@@ -90,13 +86,11 @@ import type { Customer, CustomerFormData } from '@/types/customer'
 import BaseInput from '@/components/ui/BaseInput.vue'
 import BaseSelect from '@/components/ui/BaseSelect.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
-import BaseAlert from '@/components/ui/BaseAlert.vue'
 import CustomerAddressForm from '@/components/CustomerAddressForm.vue'
 import {
     UserIcon,
     PhoneIcon,
     BuildingOffice2Icon,
-    InformationCircleIcon
 } from '@heroicons/vue/24/outline'
 
 interface Props {
@@ -122,7 +116,7 @@ const form = reactive({
     name: '',
     phone1: '',
     phone2: '',
-    branchId: 0,
+    branchId: authStore.branchId ?? 0,
     active: true,
     initialAddress: {
         neighborhoodId: 0,
@@ -164,7 +158,6 @@ const errors = reactive({
     };
 })
 
-const showValidationInfo = ref(false)
 
 // Computed properties
 const branchOptions = computed(() => {
@@ -179,7 +172,8 @@ const branchOptions = computed(() => {
 
 
 const isFormValid = computed(() => {
-    const basicValidation = form.name.trim() &&
+    const basicValidation =
+        form.name.trim() &&
         form.phone1.trim() &&
         (authStore.isSuperadmin ? form.branchId > 0 : true) &&
         !errors.name &&
@@ -188,8 +182,16 @@ const isFormValid = computed(() => {
         !errors.branchId
 
     if (!props.customer) {
-        // For new customers, validate that address form data is available
-        return basicValidation && addressFormData.value !== null
+        // Para nuevos clientes, validar initialAddress completo
+        const addr = form.initialAddress
+        const addressValid =
+            addr.neighborhoodId > 0 &&
+            addr.address.trim().length >= 10 &&
+            addr.latitude !== 0 &&
+            addr.longitude !== 0 &&
+            addr.deliveryFee > 0
+
+        return basicValidation && addressValid
     }
 
     return basicValidation
@@ -216,7 +218,7 @@ const validatePhone = (field: 'phone1' | 'phone2') => {
 
 const validateBranch = () => {
     // Only validate branch for superadmin users
-    if (authStore.isSuperadmin && !form.branchId) {
+    if (authStore.isSuperadmin && form.branchId <= 0) {
         errors.branchId = 'Selecciona una sucursal'
         return
     }
@@ -240,6 +242,19 @@ const handleAddressSubmit = (data: any) => {
 
 const handleAddressCancel = () => {
     addressFormData.value = null
+}
+
+const handleAddressUpdate = (data: any) => {
+    // Update the form with address data from CustomerAddressForm
+    form.initialAddress = {
+        neighborhoodId: data.neighborhoodId,
+        address: data.address,
+        additionalInfo: data.additionalInfo || '',
+        latitude: data.latitude,
+        longitude: data.longitude,
+        isPrimary: data.isPrimary,
+        deliveryFee: data.deliveryFee
+    }
 }
 
 const validateForm = () => {
@@ -280,15 +295,8 @@ const handleSubmit = () => {
         phone1: form.phone1.trim(),
         phone2: form.phone2.trim() || undefined,
         branchId: form.branchId,
-        initialAddress: addressFormData.value || {
-            neighborhoodId: 0,
-            address: '',
-            additionalInfo: '',
-            latitude: 0,
-            longitude: 0,
-            isPrimary: true,
-            deliveryFee: 0
-        }
+        active: form.active,
+        initialAddress: !props.customer ? form.initialAddress : undefined
     }
 
     emit('submit', formData)
@@ -302,7 +310,6 @@ watch(() => props.customer, (newCustomer) => {
         form.phone2 = newCustomer.phone2 || ''
         form.branchId = newCustomer.branchId
         form.active = newCustomer.active
-        showValidationInfo.value = false
     } else {
         // Reset form for new customer
         form.name = ''
@@ -311,7 +318,6 @@ watch(() => props.customer, (newCustomer) => {
         form.branchId = 0
         form.active = true
         addressFormData.value = null
-        showValidationInfo.value = true
     }
 
     // Clear errors
@@ -334,17 +340,13 @@ onMounted(async () => {
         if (!authStore.isSuperadmin && authStore.branchId) {
             form.branchId = authStore.branchId
         }
+
+        // Validate form after initialization
+        validateForm()
     } catch (error) {
         console.error('Error loading form data:', error)
     }
 })
 
-// Show validation info for new customers after a short delay
-watch(() => props.customer, (newCustomer) => {
-    if (!newCustomer) {
-        setTimeout(() => {
-            showValidationInfo.value = true
-        }, 1000)
-    }
-})
+
 </script>

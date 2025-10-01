@@ -10,7 +10,7 @@
 		<div class="relative">
 			<input :id="inputId" :type="type" v-model="inputValue" :placeholder="placeholder" :required="required"
 				:disabled="disabled" :class="inputClasses" @blur="onBlur" @focus="onFocus" :minlength="minlength"
-				:maxlength="maxlength" />
+				:maxlength="maxlength" @keyup.enter="onEnter" />
 			<div v-if="$slots.icon"
 				class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
 				<slot name="icon" />
@@ -52,6 +52,7 @@ const emit = defineEmits<{
 	(e: 'update:modelValue', value: string | number | null): void;
 	(e: 'blur', event: FocusEvent): void;
 	(e: 'focus', event: FocusEvent): void;
+	(e: 'enter', event: KeyboardEvent): void;
 }>();
 
 const inputId = useId();
@@ -92,5 +93,8 @@ function onBlur(e: FocusEvent) {
 }
 function onFocus(e: FocusEvent) {
 	emit('focus', e);
+}
+function onEnter(e: KeyboardEvent) {
+	emit('enter', e);
 }
 </script>

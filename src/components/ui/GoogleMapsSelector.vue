@@ -374,16 +374,17 @@ const confirmLocation = () => {
 // Lifecycle
 onMounted(async () => {
     try {
-        console.log('Loading Google Maps...')
+
         await loadGoogleMaps()
-        console.log('Google Maps loaded, waiting for full initialization...')
+
 
         // Wait a bit more to ensure everything is ready
         await new Promise(resolve => setTimeout(resolve, 500))
 
-        console.log('Initializing map...')
+
         await initializeMap()
-        console.log('GoogleMapsSelector mounted successfully')
+        searchQuery.value = props.initialAddress || ''
+        searchAddress()
     } catch (err: any) {
         if (!isDestroyed.value) {
             console.error('Error loading Google Maps:', err)
