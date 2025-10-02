@@ -32,10 +32,11 @@ export const useBankPaymentsStore = defineStore('bankPayments', {
             this.error = null
             try {
                 const response = await bankPaymentApi.getBankPayments(filters)
-                if (response.isSuccess && response.data) {
-                    this.list = response.data
+                // Backend returns data directly, not wrapped in ApiResponse
+                if (response && response.items) {
+                    this.list = response as PagedResult<BankPayment>
                 } else {
-                    this.error = response.message || 'Error al obtener pagos bancarios'
+                    this.error = 'Error al obtener pagos bancarios'
                 }
             } catch (error: any) {
                 this.error = error.message || 'Error de conexión'
@@ -49,11 +50,7 @@ export const useBankPaymentsStore = defineStore('bankPayments', {
             this.error = null
             try {
                 const response = await bankPaymentApi.getBankPaymentById(id)
-                if (response.isSuccess && response.data) {
-                    this.current = response.data
-                } else {
-                    this.error = response.message || 'Pago bancario no encontrado'
-                }
+                this.current = response
             } catch (error: any) {
                 this.error = error.message || 'Error de conexión'
             } finally {
@@ -66,11 +63,7 @@ export const useBankPaymentsStore = defineStore('bankPayments', {
             this.error = null
             try {
                 const response = await bankPaymentApi.getUnverifiedBankPayments()
-                if (response.isSuccess && response.data) {
-                    this.unverified = response.data
-                } else {
-                    this.error = response.message || 'Error al obtener pagos no verificados'
-                }
+                this.unverified = response
             } catch (error: any) {
                 this.error = error.message || 'Error de conexión'
             } finally {
@@ -83,22 +76,17 @@ export const useBankPaymentsStore = defineStore('bankPayments', {
             this.error = null
             try {
                 const response = await bankPaymentApi.createBankPayment(payload)
-                if (response.isSuccess && response.data) {
-                    // Add to list if it exists
-                    if (this.list) {
-                        this.list.items.unshift(response.data)
-                        this.list.totalCount++
-                    }
-                    // Add to unverified if it exists
-                    if (this.unverified) {
-                        this.unverified.unshift(response.data)
-                    }
-                    this.current = response.data
-                    return response.data
-                } else {
-                    this.error = response.message || 'Error al crear pago bancario'
-                    throw new Error(this.error)
+                // Add to list if it exists
+                if (this.list) {
+                    this.list.items.unshift(response)
+                    this.list.totalCount++
                 }
+                // Add to unverified if it exists
+                if (this.unverified) {
+                    this.unverified.unshift(response)
+                }
+                this.current = response
+                return response
             } catch (error: any) {
                 this.error = error.message || 'Error de conexión'
                 throw error
@@ -111,28 +99,23 @@ export const useBankPaymentsStore = defineStore('bankPayments', {
             this.isLoading = true
             this.error = null
             try {
-                const response = await bankPaymentApi.verifyBankPayment(id, payload)
-                if (response.isSuccess) {
-                    // Update item in list
-                    if (this.list) {
-                        const index = this.list.items.findIndex(item => item.id === id)
-                        if (index !== -1) {
-                            this.list.items[index].isVerified = true
-                            this.list.items[index].verifiedAt = new Date().toISOString()
-                        }
+                await bankPaymentApi.verifyBankPayment(id, payload)
+                // Update item in list
+                if (this.list) {
+                    const index = this.list.items.findIndex(item => item.id === id)
+                    if (index !== -1) {
+                        this.list.items[index].isVerified = true
+                        this.list.items[index].verifiedAt = new Date().toISOString()
                     }
-                    // Remove from unverified
-                    if (this.unverified) {
-                        this.unverified = this.unverified.filter(item => item.id !== id)
-                    }
-                    // Update current if it's the same payment
-                    if (this.current?.id === id) {
-                        this.current.isVerified = true
-                        this.current.verifiedAt = new Date().toISOString()
-                    }
-                } else {
-                    this.error = response.message || 'Error al verificar pago bancario'
-                    throw new Error(this.error)
+                }
+                // Remove from unverified
+                if (this.unverified) {
+                    this.unverified = this.unverified.filter(item => item.id !== id)
+                }
+                // Update current if it's the same payment
+                if (this.current?.id === id) {
+                    this.current.isVerified = true
+                    this.current.verifiedAt = new Date().toISOString()
                 }
             } catch (error: any) {
                 this.error = error.message || 'Error de conexión'
@@ -146,28 +129,23 @@ export const useBankPaymentsStore = defineStore('bankPayments', {
             this.isLoading = true
             this.error = null
             try {
-                const response = await bankPaymentApi.unverifyBankPayment(id)
-                if (response.isSuccess) {
-                    // Update item in list
-                    if (this.list) {
-                        const index = this.list.items.findIndex(item => item.id === id)
-                        if (index !== -1) {
-                            this.list.items[index].isVerified = false
-                            this.list.items[index].verifiedAt = undefined
-                        }
+                await bankPaymentApi.unverifyBankPayment(id)
+                // Update item in list
+                if (this.list) {
+                    const index = this.list.items.findIndex(item => item.id === id)
+                    if (index !== -1) {
+                        this.list.items[index].isVerified = false
+                        this.list.items[index].verifiedAt = undefined
                     }
-                    // Add to unverified if it exists
-                    if (this.unverified && this.current?.id === id) {
-                        this.unverified.unshift(this.current)
-                    }
-                    // Update current if it's the same payment
-                    if (this.current?.id === id) {
-                        this.current.isVerified = false
-                        this.current.verifiedAt = undefined
-                    }
-                } else {
-                    this.error = response.message || 'Error al desverificar pago bancario'
-                    throw new Error(this.error)
+                }
+                // Add to unverified if it exists
+                if (this.unverified && this.current?.id === id) {
+                    this.unverified.unshift(this.current)
+                }
+                // Update current if it's the same payment
+                if (this.current?.id === id) {
+                    this.current.isVerified = false
+                    this.current.verifiedAt = undefined
                 }
             } catch (error: any) {
                 this.error = error.message || 'Error de conexión'
@@ -181,24 +159,19 @@ export const useBankPaymentsStore = defineStore('bankPayments', {
             this.isLoading = true
             this.error = null
             try {
-                const response = await bankPaymentApi.deleteBankPayment(id)
-                if (response.isSuccess) {
-                    // Remove from list
-                    if (this.list) {
-                        this.list.items = this.list.items.filter(item => item.id !== id)
-                        this.list.totalCount--
-                    }
-                    // Remove from unverified
-                    if (this.unverified) {
-                        this.unverified = this.unverified.filter(item => item.id !== id)
-                    }
-                    // Clear current if it was the deleted payment
-                    if (this.current?.id === id) {
-                        this.current = null
-                    }
-                } else {
-                    this.error = response.message || 'Error al eliminar pago bancario'
-                    throw new Error(this.error)
+                await bankPaymentApi.deleteBankPayment(id)
+                // Remove from list
+                if (this.list) {
+                    this.list.items = this.list.items.filter(item => item.id !== id)
+                    this.list.totalCount--
+                }
+                // Remove from unverified
+                if (this.unverified) {
+                    this.unverified = this.unverified.filter(item => item.id !== id)
+                }
+                // Clear current if it was the deleted payment
+                if (this.current?.id === id) {
+                    this.current = null
                 }
             } catch (error: any) {
                 this.error = error.message || 'Error de conexión'

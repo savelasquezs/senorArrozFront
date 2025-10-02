@@ -1,7 +1,6 @@
 // src/services/MainAPI/bankPaymentApi.ts
 import { BaseApi } from './baseApi';
 import type {
-    ApiResponse,
     PagedResult,
 } from '@/types/common';
 import type {
@@ -15,7 +14,7 @@ class BankPaymentApi extends BaseApi {
     // 1. Obtener pagos bancarios con filtros y paginación
     async getBankPayments(
         filters?: BankPaymentFilters
-    ): Promise<ApiResponse<PagedResult<BankPayment>>> {
+    ): Promise<PagedResult<BankPayment>> {
         // Mapear parámetros de frontend (camelCase) a backend (PascalCase)
         const params: any = {};
         if (filters) {
@@ -31,44 +30,44 @@ class BankPaymentApi extends BaseApi {
             if (filters.sortOrder) params.SortOrder = filters.sortOrder;
         }
 
-        return this.get<ApiResponse<PagedResult<BankPayment>>>('/bankpayments', {
+        return this.get<PagedResult<BankPayment>>('/bankpayments', {
             params,
         });
     }
 
     // 2. Obtener pago bancario por ID
-    async getBankPaymentById(id: number): Promise<ApiResponse<BankPayment>> {
-        return this.get<ApiResponse<BankPayment>>(`/bankpayments/${id}`);
+    async getBankPaymentById(id: number): Promise<BankPayment> {
+        return this.get<BankPayment>(`/bankpayments/${id}`);
     }
 
     // 3. Obtener pagos no verificados
-    async getUnverifiedBankPayments(): Promise<ApiResponse<BankPayment[]>> {
-        return this.get<ApiResponse<BankPayment[]>>('/bankpayments/unverified');
+    async getUnverifiedBankPayments(): Promise<BankPayment[]> {
+        return this.get<BankPayment[]>('/bankpayments/unverified');
     }
 
     // 4. Crear pago bancario
     async createBankPayment(
         payload: CreateBankPaymentDto
-    ): Promise<ApiResponse<BankPayment>> {
-        return this.post<ApiResponse<BankPayment>>('/bankpayments', payload);
+    ): Promise<BankPayment> {
+        return this.post<BankPayment>('/bankpayments', payload);
     }
 
     // 5. Verificar pago bancario
     async verifyBankPayment(
         id: number,
         payload?: VerifyBankPaymentDto
-    ): Promise<ApiResponse<string>> {
-        return this.post<ApiResponse<string>>(`/bankpayments/${id}/verify`, payload);
+    ): Promise<string> {
+        return this.post<string>(`/bankpayments/${id}/verify`, payload);
     }
 
     // 6. Desverificar pago bancario
-    async unverifyBankPayment(id: number): Promise<ApiResponse<string>> {
-        return this.post<ApiResponse<string>>(`/bankpayments/${id}/unverify`);
+    async unverifyBankPayment(id: number): Promise<string> {
+        return this.post<string>(`/bankpayments/${id}/unverify`);
     }
 
     // 7. Eliminar pago bancario
-    async deleteBankPayment(id: number): Promise<ApiResponse<string>> {
-        return this.delete<ApiResponse<string>>(`/bankpayments/${id}`);
+    async deleteBankPayment(id: number): Promise<string> {
+        return this.delete<string>(`/bankpayments/${id}`);
     }
 }
 

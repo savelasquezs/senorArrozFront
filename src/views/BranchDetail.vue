@@ -192,7 +192,7 @@
                             <h3 class="text-lg font-semibold text-gray-900">
                                 Bancos
                                 <span class="text-sm font-normal text-gray-500">({{ banksStore.list?.totalCount || 0
-                                }})</span>
+                                    }})</span>
                             </h3>
                             <BaseButton v-if="canManageBanks" @click="openCreateBank" variant="primary" size="sm"
                                 :icon="PlusIcon">
@@ -252,7 +252,10 @@
                                                     </div>
                                                 </div>
                                                 <div class="ml-4">
-                                                    <div class="text-sm font-medium text-gray-900">{{ bank.name }}</div>
+                                                    <button @click="$router.push(`/banks/${bank.id}`)"
+                                                        class="text-sm font-medium text-indigo-600 hover:text-indigo-900">
+                                                        {{ bank.name }}
+                                                    </button>
                                                     <div class="text-sm text-gray-500">ID: {{ bank.id }}</div>
                                                 </div>
                                             </div>
@@ -299,7 +302,7 @@
                             <h3 class="text-lg font-semibold text-gray-900">
                                 Apps de Pago
                                 <span class="text-sm font-normal text-gray-500">({{ appsStore.list?.totalCount || 0
-                                }})</span>
+                                    }})</span>
                             </h3>
                             <BaseButton v-if="canManageApps" @click="openCreateApp" variant="primary" size="sm"
                                 :icon="PlusIcon">
@@ -363,7 +366,10 @@
                                                     </div>
                                                 </div>
                                                 <div class="ml-4">
-                                                    <div class="text-sm font-medium text-gray-900">{{ app.name }}</div>
+                                                    <button @click="$router.push(`/apps/${app.id}`)"
+                                                        class="text-sm font-medium text-indigo-600 hover:text-indigo-900">
+                                                        {{ app.name }}
+                                                    </button>
                                                     <div class="text-sm text-gray-500">ID: {{ app.id }}</div>
                                                 </div>
                                             </div>

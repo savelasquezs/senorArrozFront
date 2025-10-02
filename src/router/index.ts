@@ -141,6 +141,26 @@ const routes: RouteRecordRaw[] = [
             title: 'Categorías de Productos'
         }
     },
+    {
+        path: '/banks/:id',
+        name: 'BankDetail',
+        component: () => import('@/views/BankDetail.vue'),
+        meta: {
+            requiresAuth: true,
+            requiresRole: [UserRole.SUPERADMIN, UserRole.ADMIN],
+            title: 'Detalle Banco'
+        }
+    },
+    {
+        path: '/apps/:id',
+        name: 'AppDetail',
+        component: () => import('@/views/AppDetail.vue'),
+        meta: {
+            requiresAuth: true,
+            requiresRole: [UserRole.SUPERADMIN, UserRole.ADMIN],
+            title: 'Detalle App'
+        }
+    },
 
 
     //   {

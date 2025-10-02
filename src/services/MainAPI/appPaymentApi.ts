@@ -1,7 +1,6 @@
 // src/services/MainAPI/appPaymentApi.ts
 import { BaseApi } from './baseApi';
 import type {
-    ApiResponse,
     PagedResult,
 } from '@/types/common';
 import type {
@@ -15,7 +14,7 @@ class AppPaymentApi extends BaseApi {
     // 1. Obtener pagos de apps con filtros y paginación
     async getAppPayments(
         filters?: AppPaymentFilters
-    ): Promise<ApiResponse<PagedResult<AppPayment>>> {
+    ): Promise<PagedResult<AppPayment>> {
         // Mapear parámetros de frontend (camelCase) a backend (PascalCase)
         const params: any = {};
         if (filters) {
@@ -32,14 +31,14 @@ class AppPaymentApi extends BaseApi {
             if (filters.sortOrder) params.SortOrder = filters.sortOrder;
         }
 
-        return this.get<ApiResponse<PagedResult<AppPayment>>>('/apppayments', {
+        return this.get<PagedResult<AppPayment>>('/apppayments', {
             params,
         });
     }
 
     // 2. Obtener pago de app por ID
-    async getAppPaymentById(id: number): Promise<ApiResponse<AppPayment>> {
-        return this.get<ApiResponse<AppPayment>>(`/apppayments/${id}`);
+    async getAppPaymentById(id: number): Promise<AppPayment> {
+        return this.get<AppPayment>(`/apppayments/${id}`);
     }
 
     // 3. Obtener pagos no liquidados
@@ -51,7 +50,7 @@ class AppPaymentApi extends BaseApi {
             page?: number
             pageSize?: number
         }
-    ): Promise<ApiResponse<AppPayment[]>> {
+    ): Promise<AppPayment[]> {
         const params: any = {};
         if (filters) {
             if (filters.appId !== undefined) params.AppId = filters.appId;
@@ -61,7 +60,7 @@ class AppPaymentApi extends BaseApi {
             if (filters.pageSize) params.PageSize = filters.pageSize;
         }
 
-        return this.get<ApiResponse<AppPayment[]>>('/apppayments/unsettled', {
+        return this.get<AppPayment[]>('/apppayments/unsettled', {
             params,
         });
     }
@@ -69,30 +68,30 @@ class AppPaymentApi extends BaseApi {
     // 4. Crear pago de app (SOLO desde toma de pedidos)
     async createAppPayment(
         payload: CreateAppPaymentDto
-    ): Promise<ApiResponse<AppPayment>> {
-        return this.post<ApiResponse<AppPayment>>('/apppayments', payload);
+    ): Promise<AppPayment> {
+        return this.post<AppPayment>('/apppayments', payload);
     }
 
     // 5. Liquidar pago individual
-    async settleAppPayment(id: number): Promise<ApiResponse<string>> {
-        return this.post<ApiResponse<string>>(`/apppayments/${id}/settle`);
+    async settleAppPayment(id: number): Promise<string> {
+        return this.post<string>(`/apppayments/${id}/settle`);
     }
 
     // 6. Liquidar múltiples pagos
     async settleMultipleAppPayments(
         payload: SettleMultipleAppPaymentsDto
-    ): Promise<ApiResponse<string>> {
-        return this.post<ApiResponse<string>>('/apppayments/settle-multiple', payload);
+    ): Promise<string> {
+        return this.post<string>('/apppayments/settle-multiple', payload);
     }
 
     // 7. Desliquidar pago
-    async unsettleAppPayment(id: number): Promise<ApiResponse<string>> {
-        return this.post<ApiResponse<string>>(`/apppayments/${id}/unsettle`);
+    async unsettleAppPayment(id: number): Promise<string> {
+        return this.post<string>(`/apppayments/${id}/unsettle`);
     }
 
     // 8. Eliminar pago de app
-    async deleteAppPayment(id: number): Promise<ApiResponse<string>> {
-        return this.delete<ApiResponse<string>>(`/apppayments/${id}`);
+    async deleteAppPayment(id: number): Promise<string> {
+        return this.delete<string>(`/apppayments/${id}`);
     }
 }
 
