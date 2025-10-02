@@ -112,6 +112,19 @@ export class BaseApi {
 		}
 	}
 
+	async patch<T>(
+		url: string,
+		data?: any,
+		config?: AxiosRequestConfig
+	): Promise<T> {
+		try {
+			const response = await this.api.patch(url, data, config);
+			return response.data;
+		} catch (error: any) {
+			throw this.handleError(error);
+		}
+	}
+
 	async delete<T>(url: string, config?: AxiosRequestConfig): Promise<T> {
 		try {
 			const response = await this.api.delete(url, config);

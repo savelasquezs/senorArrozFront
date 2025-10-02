@@ -111,7 +111,36 @@ const routes: RouteRecordRaw[] = [
             title: 'Detalle Cliente'
         }
     },
-
+    {
+        path: '/products',
+        name: 'ProductsList',
+        component: () => import('@/views/ProductsList.vue'),
+        meta: {
+            requiresAuth: true,
+            requiresRole: [UserRole.SUPERADMIN, UserRole.ADMIN],
+            title: 'Productos'
+        }
+    },
+    {
+        path: '/products/:id',
+        name: 'ProductDetail',
+        component: () => import('@/views/ProductDetail.vue'),
+        meta: {
+            requiresAuth: true,
+            requiresRole: [UserRole.SUPERADMIN, UserRole.ADMIN],
+            title: 'Detalle Producto'
+        }
+    },
+    {
+        path: '/product-categories',
+        name: 'ProductCategoriesList',
+        component: () => import('@/views/ProductCategoriesList.vue'),
+        meta: {
+            requiresAuth: true,
+            requiresRole: [UserRole.SUPERADMIN, UserRole.ADMIN],
+            title: 'Categorías de Productos'
+        }
+    },
 
 
     //   {
@@ -281,7 +310,7 @@ function getRedirectPath(role: string | null): string {
         case 'Admin':
             return '/dashboard/branch'
         case 'Cashier':
-            return '/orders'
+            return '/customers'
         case 'Kitchen':
             return '/kitchen'
         case 'Deliveryman':
