@@ -184,6 +184,231 @@
                         </div>
                     </div>
                 </BaseCard>
+
+                <!-- Banks Section -->
+                <BaseCard>
+                    <div class="space-y-4">
+                        <div class="flex items-center justify-between">
+                            <h3 class="text-lg font-semibold text-gray-900">
+                                Bancos
+                                <span class="text-sm font-normal text-gray-500">({{ banksStore.list?.totalCount || 0
+                                    }})</span>
+                            </h3>
+                            <BaseButton v-if="canManageBanks" @click="openCreateBank" variant="primary" size="sm"
+                                :icon="PlusIcon">
+                                Nuevo Banco
+                            </BaseButton>
+                        </div>
+
+                        <!-- Banks Table -->
+                        <div class="overflow-hidden shadow ring-1 ring-black ring-opacity-5 rounded-lg">
+                            <table class="min-w-full divide-y divide-gray-200">
+                                <thead class="bg-gray-50">
+                                    <tr>
+                                        <th
+                                            class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                            Banco
+                                        </th>
+                                        <th
+                                            class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                            Apps
+                                        </th>
+                                        <th
+                                            class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                            Balance
+                                        </th>
+                                        <th
+                                            class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                            Estado
+                                        </th>
+                                        <th v-if="canManageBanks"
+                                            class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                            Acciones
+                                        </th>
+                                    </tr>
+                                </thead>
+                                <tbody class="bg-white divide-y divide-gray-200">
+                                    <tr v-if="banksStore.isLoading">
+                                        <td :colspan="canManageBanks ? 5 : 4" class="px-6 py-12 text-center">
+                                            <BaseLoading text="Cargando bancos..." />
+                                        </td>
+                                    </tr>
+                                    <tr v-else-if="!banksStore.list?.items?.length">
+                                        <td :colspan="canManageBanks ? 5 : 4"
+                                            class="px-6 py-12 text-center text-gray-500">
+                                            <BuildingLibraryIcon class="mx-auto h-12 w-12 text-gray-400" />
+                                            <p class="mt-2 text-lg font-medium">No hay bancos</p>
+                                            <p class="text-sm">No se encontraron bancos para esta sucursal</p>
+                                        </td>
+                                    </tr>
+                                    <tr v-for="bank in banksStore.list?.items || []" :key="bank.id"
+                                        class="hover:bg-gray-50">
+                                        <td class="px-6 py-4 whitespace-nowrap">
+                                            <div class="flex items-center">
+                                                <div class="flex-shrink-0 h-10 w-10">
+                                                    <div
+                                                        class="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center">
+                                                        <BuildingLibraryIcon class="h-5 w-5 text-blue-600" />
+                                                    </div>
+                                                </div>
+                                                <div class="ml-4">
+                                                    <div class="text-sm font-medium text-gray-900">{{ bank.name }}</div>
+                                                    <div class="text-sm text-gray-500">ID: {{ bank.id }}</div>
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td class="px-6 py-4 whitespace-nowrap">
+                                            <div class="text-sm text-gray-900">
+                                                {{ bank.activeApps }} / {{ bank.totalApps }} activas
+                                            </div>
+                                        </td>
+                                        <td class="px-6 py-4 whitespace-nowrap">
+                                            <div class="text-sm font-medium text-gray-900">
+                                                {{ formatCurrency(bank.currentBalance) }}
+                                            </div>
+                                        </td>
+                                        <td class="px-6 py-4 whitespace-nowrap">
+                                            <BaseBadge :variant="bank.active ? 'success' : 'danger'">
+                                                {{ bank.active ? 'Activo' : 'Inactivo' }}
+                                            </BaseBadge>
+                                        </td>
+                                        <td v-if="canManageBanks"
+                                            class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                            <div class="flex justify-end space-x-2">
+                                                <BaseButton @click="openEditBank(bank)" variant="outline" size="sm"
+                                                    :icon="PencilIcon">
+                                                    Editar
+                                                </BaseButton>
+                                                <BaseButton @click="deleteBank(bank)" variant="outline" size="sm"
+                                                    :icon="TrashIcon" class="text-red-600 hover:text-red-700">
+                                                    Eliminar
+                                                </BaseButton>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </BaseCard>
+
+                <!-- Apps Section -->
+                <BaseCard>
+                    <div class="space-y-4">
+                        <div class="flex items-center justify-between">
+                            <h3 class="text-lg font-semibold text-gray-900">
+                                Apps de Pago
+                                <span class="text-sm font-normal text-gray-500">({{ appsStore.list?.totalCount || 0
+                                    }})</span>
+                            </h3>
+                            <BaseButton v-if="canManageApps" @click="openCreateApp" variant="primary" size="sm"
+                                :icon="PlusIcon">
+                                Nueva App
+                            </BaseButton>
+                        </div>
+
+                        <!-- Apps Table -->
+                        <div class="overflow-hidden shadow ring-1 ring-black ring-opacity-5 rounded-lg">
+                            <table class="min-w-full divide-y divide-gray-200">
+                                <thead class="bg-gray-50">
+                                    <tr>
+                                        <th
+                                            class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                            App
+                                        </th>
+                                        <th
+                                            class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                            Banco
+                                        </th>
+                                        <th
+                                            class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                            Pagos
+                                        </th>
+                                        <th
+                                            class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                            Pendientes
+                                        </th>
+                                        <th
+                                            class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                            Estado
+                                        </th>
+                                        <th v-if="canManageApps"
+                                            class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                            Acciones
+                                        </th>
+                                    </tr>
+                                </thead>
+                                <tbody class="bg-white divide-y divide-gray-200">
+                                    <tr v-if="appsStore.isLoading">
+                                        <td :colspan="canManageApps ? 6 : 5" class="px-6 py-12 text-center">
+                                            <BaseLoading text="Cargando apps..." />
+                                        </td>
+                                    </tr>
+                                    <tr v-else-if="!appsStore.list?.items?.length">
+                                        <td :colspan="canManageApps ? 6 : 5"
+                                            class="px-6 py-12 text-center text-gray-500">
+                                            <DevicePhoneMobileIcon class="mx-auto h-12 w-12 text-gray-400" />
+                                            <p class="mt-2 text-lg font-medium">No hay apps</p>
+                                            <p class="text-sm">No se encontraron apps para esta sucursal</p>
+                                        </td>
+                                    </tr>
+                                    <tr v-for="app in appsStore.list?.items || []" :key="app.id"
+                                        class="hover:bg-gray-50">
+                                        <td class="px-6 py-4 whitespace-nowrap">
+                                            <div class="flex items-center">
+                                                <div class="flex-shrink-0 h-10 w-10">
+                                                    <div
+                                                        class="h-10 w-10 rounded-full bg-green-100 flex items-center justify-center">
+                                                        <DevicePhoneMobileIcon class="h-5 w-5 text-green-600" />
+                                                    </div>
+                                                </div>
+                                                <div class="ml-4">
+                                                    <div class="text-sm font-medium text-gray-900">{{ app.name }}</div>
+                                                    <div class="text-sm text-gray-500">ID: {{ app.id }}</div>
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td class="px-6 py-4 whitespace-nowrap">
+                                            <div class="text-sm text-gray-900">{{ app.bankName }}</div>
+                                        </td>
+                                        <td class="px-6 py-4 whitespace-nowrap">
+                                            <div class="text-sm text-gray-900">
+                                                {{ formatCurrency(app.totalPayments) }}
+                                                <div class="text-xs text-gray-500">{{ app.totalPaymentsCount }} pagos
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td class="px-6 py-4 whitespace-nowrap">
+                                            <div class="text-sm text-gray-900">
+                                                {{ formatCurrency(app.unsettledPayments) }}
+                                                <div class="text-xs text-gray-500">{{ app.unsettledPaymentsCount }}
+                                                    pendientes</div>
+                                            </div>
+                                        </td>
+                                        <td class="px-6 py-4 whitespace-nowrap">
+                                            <BaseBadge :variant="app.active ? 'success' : 'danger'">
+                                                {{ app.active ? 'Activa' : 'Inactiva' }}
+                                            </BaseBadge>
+                                        </td>
+                                        <td v-if="canManageApps"
+                                            class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                            <div class="flex justify-end space-x-2">
+                                                <BaseButton @click="openEditApp(app)" variant="outline" size="sm"
+                                                    :icon="PencilIcon">
+                                                    Editar
+                                                </BaseButton>
+                                                <BaseButton @click="deleteApp(app)" variant="outline" size="sm"
+                                                    :icon="TrashIcon" class="text-red-600 hover:text-red-700">
+                                                    Eliminar
+                                                </BaseButton>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </BaseCard>
             </div>
 
             <!-- Edit Branch Dialog -->
@@ -220,6 +445,20 @@
                     </BaseButton>
                 </template>
             </BaseDialog>
+
+            <!-- Bank Form Dialog -->
+            <BaseDialog v-model="showBankForm" :title="editingBank ? 'Editar Banco' : 'Nuevo Banco'"
+                :icon="BuildingLibraryIcon" size="lg">
+                <BankForm :bank="editingBank" :loading="banksStore.isLoading" @submit="handleBankSubmit"
+                    @cancel="showBankForm = false" />
+            </BaseDialog>
+
+            <!-- App Form Dialog -->
+            <BaseDialog v-model="showAppForm" :title="editingApp ? 'Editar App' : 'Nueva App'"
+                :icon="DevicePhoneMobileIcon" size="lg">
+                <AppForm :app="editingApp" :loading="appsStore.isLoading" @submit="handleAppSubmit"
+                    @cancel="showAppForm = false" />
+            </BaseDialog>
         </div>
     </MainLayout>
 </template>
@@ -228,6 +467,8 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useBranchesStore } from '@/store/branches'
+import { useBanksStore } from '@/store/banks'
+import { useAppsStore } from '@/store/apps'
 import { useAuthStore } from '@/store/auth'
 import { useToast } from '@/composables/useToast'
 import MainLayout from '@/components/layout/MainLayout.vue'
@@ -236,8 +477,11 @@ import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseDialog from '@/components/ui/BaseDialog.vue'
 import BaseAlert from '@/components/ui/BaseAlert.vue'
 import BaseLoading from '@/components/ui/BaseLoading.vue'
+import BaseBadge from '@/components/ui/BaseBadge.vue'
 import BranchUsersTable from '@/components/BranchUsersTable.vue'
 import BranchForm from '@/components/BranchForm.vue'
+import BankForm from '@/components/BankForm.vue'
+import AppForm from '@/components/AppForm.vue'
 import {
     BuildingOffice2Icon,
     PencilIcon,
@@ -248,19 +492,30 @@ import {
     MapIcon,
     UsersIcon,
     CalendarIcon,
-    ExclamationTriangleIcon
+    ExclamationTriangleIcon,
+    PlusIcon,
+    BuildingLibraryIcon,
+    DevicePhoneMobileIcon
 } from '@heroicons/vue/24/outline'
 import type { User } from '@/types/user'
+import type { Bank, BankFormData } from '@/types/bank'
+import type { App, AppFormData } from '@/types/bank'
 
 const route = useRoute()
 const router = useRouter()
 const branchesStore = useBranchesStore()
+const banksStore = useBanksStore()
+const appsStore = useAppsStore()
 const authStore = useAuthStore()
 const { success, error: showError } = useToast()
 
 // Reactive state
 const showEditDialog = ref(false)
 const showDeleteDialog = ref(false)
+const showBankForm = ref(false)
+const showAppForm = ref(false)
+const editingBank = ref<Bank | null>(null)
+const editingApp = ref<App | null>(null)
 
 const branchId = computed(() => Number(route.params.id))
 
@@ -281,6 +536,16 @@ const canAccessBranch = computed(() => {
     return false
 })
 
+const canManageBanks = computed(() => {
+    const userRole = authStore.user?.role
+    return userRole === 'Superadmin' || userRole === 'Admin'
+})
+
+const canManageApps = computed(() => {
+    const userRole = authStore.user?.role
+    return userRole === 'Superadmin' || userRole === 'Admin'
+})
+
 const handleUserError = (message: string) => {
     showError('Error manejando usuario', message)
 }
@@ -295,6 +560,15 @@ const formatDate = (dateString: string) => {
         month: 'long',
         day: 'numeric'
     })
+}
+
+const formatCurrency = (value: number) => {
+    return new Intl.NumberFormat('es-CO', {
+        style: 'currency',
+        currency: 'COP',
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 0
+    }).format(value)
 }
 
 // Actions
@@ -346,6 +620,87 @@ const handleUserStatusToggled = (user: User) => {
     success('Estado actualizado', 5000, `El usuario ${user.name} ha sido ${status}`)
 }
 
+// Bank actions
+const openCreateBank = () => {
+    editingBank.value = null
+    showBankForm.value = true
+}
+
+const openEditBank = (bank: Bank) => {
+    editingBank.value = bank
+    showBankForm.value = true
+}
+
+const handleBankSubmit = async (formData: BankFormData) => {
+    try {
+        if (editingBank.value) {
+            await banksStore.update(editingBank.value.id, formData)
+            success('Banco actualizado', 3000, `El banco "${formData.name}" se ha actualizado correctamente`)
+        } else {
+            // For new banks, use branchId from form if provided (superadmin), otherwise use current branch
+            const createData = {
+                ...formData,
+                branchId: formData.branchId || (authStore.isSuperadmin ? undefined : (authStore.branchId || undefined))
+            }
+            await banksStore.create(createData)
+            success('Banco creado', 3000, `El banco "${formData.name}" se ha creado correctamente`)
+        }
+        showBankForm.value = false
+        editingBank.value = null
+    } catch (error: any) {
+        showError('Error al guardar banco', error.message || 'No se pudo guardar el banco')
+    }
+}
+
+const deleteBank = async (bank: Bank) => {
+    if (confirm(`¿Estás seguro de que deseas eliminar el banco "${bank.name}"?`)) {
+        try {
+            await banksStore.remove(bank.id)
+            success('Banco eliminado', 3000, `El banco "${bank.name}" se ha eliminado correctamente`)
+        } catch (error: any) {
+            showError('Error al eliminar banco', error.message || 'No se pudo eliminar el banco')
+        }
+    }
+}
+
+// App actions
+const openCreateApp = () => {
+    editingApp.value = null
+    showAppForm.value = true
+}
+
+const openEditApp = (app: App) => {
+    editingApp.value = app
+    showAppForm.value = true
+}
+
+const handleAppSubmit = async (formData: AppFormData) => {
+    try {
+        if (editingApp.value) {
+            await appsStore.update(editingApp.value.id, formData)
+            success('App actualizada', 3000, `La app "${formData.name}" se ha actualizado correctamente`)
+        } else {
+            await appsStore.create(formData)
+            success('App creada', 3000, `La app "${formData.name}" se ha creado correctamente`)
+        }
+        showAppForm.value = false
+        editingApp.value = null
+    } catch (error: any) {
+        showError('Error al guardar app', error.message || 'No se pudo guardar la app')
+    }
+}
+
+const deleteApp = async (app: App) => {
+    if (confirm(`¿Estás seguro de que deseas eliminar la app "${app.name}"?`)) {
+        try {
+            await appsStore.remove(app.id)
+            success('App eliminada', 3000, `La app "${app.name}" se ha eliminado correctamente`)
+        } catch (error: any) {
+            showError('Error al eliminar app', error.message || 'No se pudo eliminar la app')
+        }
+    }
+}
+
 // Lifecycle
 onMounted(async () => {
     try {
@@ -362,7 +717,19 @@ onMounted(async () => {
         // Fetch branch details
         await branchesStore.fetchById(branchId.value)
 
-        // Fetch users for this branch
+        // Fetch banks for this branch
+        await banksStore.fetch({
+            page: 1,
+            pageSize: 100,
+            branchId: branchId.value
+        })
+
+        // Fetch apps for this branch
+        await appsStore.fetch({
+            page: 1,
+            pageSize: 100,
+            branchId: branchId.value
+        })
 
     } catch (error: any) {
         console.error('Error loading branch data:', error)
