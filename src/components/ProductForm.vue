@@ -12,7 +12,7 @@
 
             <BaseSelect v-model="form.categoryId" :options="categoryOptions" label="Categoría" required
                 placeholder="Seleccionar categoría..." :error="errors.categoryId" @update:model-value="validateForm"
-                value-key="value" display-key="label">
+                @create="handleCreateCategory" value-key="value" display-key="label" :allow-create="true">
                 <template #icon>
                     <TagIcon class="w-4 h-4" />
                 </template>
@@ -68,9 +68,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, watch, onMounted } from 'vue'
+import { reactive, computed, watch, onMounted } from 'vue'
 import { useProductCategoriesStore } from '@/store/productCategories'
 import { useAuthStore } from '@/store/auth'
+import { useToast } from '@/composables/useToast'
 import type { Product, ProductFormData } from '@/types/product'
 import BaseInput from '@/components/ui/BaseInput.vue'
 import BaseSelect from '@/components/ui/BaseSelect.vue'
@@ -98,6 +99,7 @@ const emit = defineEmits<{
 
 const productCategoriesStore = useProductCategoriesStore()
 const authStore = useAuthStore()
+const { success, error: showError } = useToast()
 
 const form = reactive({
     categoryId: 0,
@@ -191,6 +193,25 @@ const handleSubmit = () => {
     emit('submit', formData)
 }
 
+// Handle category creation
+const handleCreateCategory = async (categoryName: string) => {
+    try {
+        const newCategory = await productCategoriesStore.create({
+            name: categoryName.trim(),
+            branchId: authStore.isSuperadmin ? undefined : (authStore.branchId || undefined)
+        })
+
+        if (newCategory) {
+            // Set the newly created category as selected
+            form.categoryId = newCategory.id
+            validateForm()
+            success('Categoría creada', 3000, `La categoría "${categoryName}" se ha creado correctamente`)
+        }
+    } catch (error: any) {
+        showError('Error al crear categoría', error.message || 'No se pudo crear la categoría')
+    }
+}
+
 // Watch for product prop changes to populate form
 watch(() => props.product, (newProduct) => {
     if (newProduct) {
@@ -221,7 +242,7 @@ onMounted(async () => {
         await productCategoriesStore.fetch({
             page: 1,
             pageSize: 100, // Load all categories for the dropdown
-            branchId: authStore.isSuperadmin ? undefined : authStore.branchId
+            branchId: authStore.isSuperadmin ? undefined : (authStore.branchId || undefined)
         })
     } catch (error) {
         console.error('Error loading categories:', error)
