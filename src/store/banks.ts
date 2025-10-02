@@ -33,10 +33,11 @@ export const useBanksStore = defineStore('banks', {
             this.error = null
             try {
                 const response = await bankApi.getBanks(filters)
-                if (response.isSuccess && response.data) {
-                    this.list = response.data
+                // Backend returns data directly, not wrapped in ApiResponse
+                if (response && response.items) {
+                    this.list = response as PagedResult<Bank>
                 } else {
-                    this.error = response.message || 'Error al obtener bancos'
+                    this.error = 'Error al obtener bancos'
                 }
             } catch (error: any) {
                 this.error = error.message || 'Error de conexión'
@@ -50,11 +51,7 @@ export const useBanksStore = defineStore('banks', {
             this.error = null
             try {
                 const response = await bankApi.getBankById(id)
-                if (response.isSuccess && response.data) {
-                    this.current = response.data
-                } else {
-                    this.error = response.message || 'Banco no encontrado'
-                }
+                this.current = response
             } catch (error: any) {
                 this.error = error.message || 'Error de conexión'
             } finally {
@@ -67,11 +64,7 @@ export const useBanksStore = defineStore('banks', {
             this.error = null
             try {
                 const response = await bankApi.getBankDetail(id)
-                if (response.isSuccess && response.data) {
-                    this.currentDetail = response.data
-                } else {
-                    this.error = response.message || 'Detalle de banco no encontrado'
-                }
+                this.currentDetail = response
             } catch (error: any) {
                 this.error = error.message || 'Error de conexión'
             } finally {
@@ -84,18 +77,13 @@ export const useBanksStore = defineStore('banks', {
             this.error = null
             try {
                 const response = await bankApi.createBank(payload)
-                if (response.isSuccess && response.data) {
-                    // Add to list if it exists
-                    if (this.list) {
-                        this.list.items.unshift(response.data)
-                        this.list.totalCount++
-                    }
-                    this.current = response.data
-                    return response.data
-                } else {
-                    this.error = response.message || 'Error al crear banco'
-                    throw new Error(this.error)
+                // Add to list if it exists
+                if (this.list) {
+                    this.list.items.unshift(response)
+                    this.list.totalCount++
                 }
+                this.current = response
+                return response
             } catch (error: any) {
                 this.error = error.message || 'Error de conexión'
                 throw error
@@ -109,26 +97,21 @@ export const useBanksStore = defineStore('banks', {
             this.error = null
             try {
                 const response = await bankApi.updateBank(id, payload)
-                if (response.isSuccess && response.data) {
-                    // Update item in list
-                    if (this.list) {
-                        const index = this.list.items.findIndex(item => item.id === id)
-                        if (index !== -1) {
-                            this.list.items[index] = response.data
-                        }
+                // Update item in list
+                if (this.list) {
+                    const index = this.list.items.findIndex(item => item.id === id)
+                    if (index !== -1) {
+                        this.list.items[index] = response
                     }
-                    // Update current if it's the same bank
-                    if (this.current?.id === id) {
-                        this.current = response.data
-                    }
-                    if (this.currentDetail?.id === id) {
-                        this.currentDetail = { ...this.currentDetail, ...response.data }
-                    }
-                    return response.data
-                } else {
-                    this.error = response.message || 'Error al actualizar banco'
-                    throw new Error(this.error)
                 }
+                // Update current if it's the same bank
+                if (this.current?.id === id) {
+                    this.current = response
+                }
+                if (this.currentDetail?.id === id) {
+                    this.currentDetail = { ...this.currentDetail, ...response }
+                }
+                return response
             } catch (error: any) {
                 this.error = error.message || 'Error de conexión'
                 throw error
@@ -141,23 +124,18 @@ export const useBanksStore = defineStore('banks', {
             this.isLoading = true
             this.error = null
             try {
-                const response = await bankApi.deleteBank(id)
-                if (response.isSuccess) {
-                    // Remove from list
-                    if (this.list) {
-                        this.list.items = this.list.items.filter(item => item.id !== id)
-                        this.list.totalCount--
-                    }
-                    // Clear current if it was the deleted bank
-                    if (this.current?.id === id) {
-                        this.current = null
-                    }
-                    if (this.currentDetail?.id === id) {
-                        this.currentDetail = null
-                    }
-                } else {
-                    this.error = response.message || 'Error al eliminar banco'
-                    throw new Error(this.error)
+                await bankApi.deleteBank(id)
+                // Remove from list
+                if (this.list) {
+                    this.list.items = this.list.items.filter(item => item.id !== id)
+                    this.list.totalCount--
+                }
+                // Clear current if it was the deleted bank
+                if (this.current?.id === id) {
+                    this.current = null
+                }
+                if (this.currentDetail?.id === id) {
+                    this.currentDetail = null
                 }
             } catch (error: any) {
                 this.error = error.message || 'Error de conexión'

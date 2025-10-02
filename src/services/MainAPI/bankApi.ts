@@ -1,7 +1,6 @@
 // src/services/MainAPI/bankApi.ts
 import { BaseApi } from './baseApi';
 import type {
-    ApiResponse,
     PagedResult,
 } from '@/types/common';
 import type {
@@ -16,7 +15,7 @@ class BankApi extends BaseApi {
     // 1. Obtener bancos con filtros y paginación
     async getBanks(
         filters?: BankFilters
-    ): Promise<ApiResponse<PagedResult<Bank>>> {
+    ): Promise<PagedResult<Bank>> {
         // Mapear parámetros de frontend (camelCase) a backend (PascalCase)
         const params: any = {};
         if (filters) {
@@ -29,39 +28,39 @@ class BankApi extends BaseApi {
             if (filters.sortOrder) params.SortOrder = filters.sortOrder;
         }
 
-        return this.get<ApiResponse<PagedResult<Bank>>>('/banks', {
+        return this.get<PagedResult<Bank>>('/banks', {
             params,
         });
     }
 
     // 2. Obtener banco por ID
-    async getBankById(id: number): Promise<ApiResponse<Bank>> {
-        return this.get<ApiResponse<Bank>>(`/banks/${id}`);
+    async getBankById(id: number): Promise<Bank> {
+        return this.get<Bank>(`/banks/${id}`);
     }
 
     // 3. Obtener detalles del banco con estadísticas
-    async getBankDetail(id: number): Promise<ApiResponse<BankDetail>> {
-        return this.get<ApiResponse<BankDetail>>(`/banks/${id}/detail`);
+    async getBankDetail(id: number): Promise<BankDetail> {
+        return this.get<BankDetail>(`/banks/${id}/detail`);
     }
 
     // 4. Crear banco
     async createBank(
         payload: CreateBankDto
-    ): Promise<ApiResponse<Bank>> {
-        return this.post<ApiResponse<Bank>>('/banks', payload);
+    ): Promise<Bank> {
+        return this.post<Bank>('/banks', payload);
     }
 
     // 5. Actualizar banco
     async updateBank(
         id: number,
         payload: UpdateBankDto
-    ): Promise<ApiResponse<Bank>> {
-        return this.put<ApiResponse<Bank>>(`/banks/${id}`, payload);
+    ): Promise<Bank> {
+        return this.put<Bank>(`/banks/${id}`, payload);
     }
 
     // 6. Eliminar banco
-    async deleteBank(id: number): Promise<ApiResponse<string>> {
-        return this.delete<ApiResponse<string>>(`/banks/${id}`);
+    async deleteBank(id: number): Promise<string> {
+        return this.delete<string>(`/banks/${id}`);
     }
 }
 

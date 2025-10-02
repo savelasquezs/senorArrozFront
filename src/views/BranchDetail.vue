@@ -192,7 +192,7 @@
                             <h3 class="text-lg font-semibold text-gray-900">
                                 Bancos
                                 <span class="text-sm font-normal text-gray-500">({{ banksStore.list?.totalCount || 0
-                                    }})</span>
+                                }})</span>
                             </h3>
                             <BaseButton v-if="canManageBanks" @click="openCreateBank" variant="primary" size="sm"
                                 :icon="PlusIcon">
@@ -299,7 +299,7 @@
                             <h3 class="text-lg font-semibold text-gray-900">
                                 Apps de Pago
                                 <span class="text-sm font-normal text-gray-500">({{ appsStore.list?.totalCount || 0
-                                    }})</span>
+                                }})</span>
                             </h3>
                             <BaseButton v-if="canManageApps" @click="openCreateApp" variant="primary" size="sm"
                                 :icon="PlusIcon">
