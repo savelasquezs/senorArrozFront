@@ -3,6 +3,8 @@
     <form @submit.prevent="handleSubmit" class="space-y-6">
         <!-- Customer Information -->
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+
+
             <BaseInput v-model="form.name" label="Nombre Completo" placeholder="Ej: Juan Pérez González" required
                 :error="errors.name" :maxlength="150" :minlength="5" @input="validateForm">
                 <template #icon>
@@ -56,7 +58,7 @@
         </div>
 
         <!-- Debug info (remove in production) -->
-        <div class="text-xs text-gray-500 bg-gray-100 p-2 rounded" v-if="true">
+        <div class="text-xs text-gray-500 bg-gray-100 p-2 rounded" v-if="false">
             <div>Form Valid: {{ isFormValid }}</div>
             <div>Name: "{{ form.name }}" ({{ form.name.trim().length }})</div>
             <div>Phone1: "{{ form.phone1 }}" ({{ form.phone1.trim().length }})</div>
@@ -333,11 +335,13 @@ watch(() => props.customer, (newCustomer) => {
 // Load data on mount
 onMounted(async () => {
     try {
-        await branchesStore.fetchAll()
-        // Neighborhoods are loaded by CustomerAddressForm
+        if (authStore.isSuperadmin) {
+            await branchesStore.fetchAll()
+            // Neighborhoods are loaded by CustomerAddressForm
 
-        // Initialize branch ID based on user role
-        if (!authStore.isSuperadmin && authStore.branchId) {
+            // Initialize branch ID based on user role
+        }
+        else if (authStore.branchId) {
             form.branchId = authStore.branchId
         }
 

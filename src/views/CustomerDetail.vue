@@ -81,7 +81,7 @@
                                     <div class="ml-2">
                                         <p class="text-xs font-medium text-gray-500">Fecha de Registro</p>
                                         <p class="text-xs font-semibold text-gray-900">{{ formatDate(customer.createdAt)
-                                            }}</p>
+                                        }}</p>
                                     </div>
                                 </div>
                             </BaseCard>
@@ -271,7 +271,8 @@
             <BaseDialog v-model="showAddressDialog" :title="editingAddress ? 'Editar Dirección' : 'Nueva Dirección'"
                 :icon="MapPinIcon" size="lg">
                 <CustomerAddressForm :address="editingAddress" :customer-id="customerId" :loading="store.isLoading"
-                    @submit="handleAddressSubmit" @cancel="showAddressDialog = false" />
+                    :branch-id="customer?.branchId" v-model="addressFormData" @submit="handleAddressSubmit"
+                    @cancel="showAddressDialog = false" />
             </BaseDialog>
 
             <!-- Delete Confirmation Dialog -->
@@ -349,6 +350,15 @@ const showEditDialog = ref(false)
 const showAddressDialog = ref(false)
 const showDeleteDialog = ref(false)
 const editingAddress = ref<CustomerAddress | null>(null)
+const addressFormData = ref<CustomerAddressFormData>({
+    neighborhoodId: 0,
+    address: '',
+    additionalInfo: '',
+    latitude: 0,
+    longitude: 0,
+    isPrimary: true,
+    deliveryFee: 0
+})
 
 const customerId = computed(() => Number(route.params.id))
 const customer = computed(() => store.current)
@@ -397,11 +407,31 @@ const openEditDialog = () => {
 
 const openAddressDialog = () => {
     editingAddress.value = null
+    // Reset form data for new address
+    addressFormData.value = {
+        neighborhoodId: 0,
+        address: '',
+        additionalInfo: '',
+        latitude: 0,
+        longitude: 0,
+        isPrimary: true,
+        deliveryFee: 0
+    }
     showAddressDialog.value = true
 }
 
 const openEditAddressDialog = (address: CustomerAddress) => {
     editingAddress.value = address
+    // Populate form data for editing
+    addressFormData.value = {
+        neighborhoodId: address.neighborhoodId,
+        address: address.address,
+        additionalInfo: address.additionalInfo || '',
+        latitude: address.latitude || 0,
+        longitude: address.longitude || 0,
+        isPrimary: address.isPrimary,
+        deliveryFee: address.deliveryFee
+    }
     showAddressDialog.value = true
 }
 
@@ -427,10 +457,28 @@ const handleEditSubmit = async (formData: CustomerFormData) => {
 const handleAddressSubmit = async (formData: CustomerAddressFormData) => {
     try {
         if (editingAddress.value) {
+            // Update existing address
             await store.updateAddress(customerId.value, editingAddress.value.id, formData)
+            // Update the address in the customer's addresses array
+            if (customer.value?.addresses) {
+                const index = customer.value.addresses.findIndex(addr => addr.id === editingAddress.value!.id)
+                if (index !== -1) {
+                    customer.value.addresses[index] = {
+                        ...customer.value.addresses[index],
+                        ...formData
+                    }
+                }
+            }
             success('Dirección actualizada', 5000, 'La dirección se ha actualizado correctamente')
         } else {
-            await store.createAddress(customerId.value, formData)
+            // Create new address
+            const newAddress = await store.createAddress(customerId.value, formData)
+            // Add to customer's addresses array
+            if (customer.value?.addresses) {
+                customer.value.addresses.push(newAddress)
+            } else if (customer.value) {
+                customer.value.addresses = [newAddress]
+            }
             success('Dirección creada', 5000, 'La dirección se ha creado correctamente')
         }
         showAddressDialog.value = false
@@ -448,6 +496,10 @@ const deleteAddress = async (address: CustomerAddress) => {
 
     try {
         await store.removeAddress(customerId.value, address.id)
+        // Remove from customer's addresses array
+        if (customer.value?.addresses) {
+            customer.value.addresses = customer.value.addresses.filter(addr => addr.id !== address.id)
+        }
         success('Dirección eliminada', 5000, 'La dirección se ha eliminado correctamente')
     } catch (error: any) {
         console.error('Error deleting address:', error)
@@ -480,11 +532,7 @@ onMounted(async () => {
             return
         }
 
-        // Load additional data
-        await Promise.all([
-            branchesStore.fetchAll(),
-            store.fetchNeighborhoods()
-        ])
+
 
     } catch (error: any) {
         console.error('Error loading customer data:', error)

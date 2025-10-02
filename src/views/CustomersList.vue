@@ -77,6 +77,10 @@
                                 </th>
                                 <th
                                     class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    Pedidos
+                                </th>
+                                <th
+                                    class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                     Estado
                                 </th>
                                 <th
@@ -87,7 +91,7 @@
                         </thead>
                         <tbody class="bg-white divide-y divide-gray-200">
                             <tr v-if="(store.list?.items?.length || 0) === 0">
-                                <td colspan="6" class="px-6 py-12 text-center text-gray-500">
+                                <td colspan="7" class="px-6 py-12 text-center text-gray-500">
                                     <UserGroupIcon class="mx-auto h-12 w-12 text-gray-400" />
                                     <p class="mt-2 text-lg font-medium">No hay clientes</p>
                                     <p class="text-sm">No se encontraron clientes con los filtros aplicados</p>
@@ -134,7 +138,7 @@
                                     <div class="text-sm text-gray-900">
                                         <div class="flex items-center">
                                             <BuildingOffice2Icon class="h-4 w-4 text-gray-400 mr-1" />
-                                            {{ getBranchName(customer.branchId) }}
+                                            {{ customer.branchName || getBranchName(customer.branchId) }}
                                         </div>
                                     </div>
                                 </td>
@@ -144,9 +148,19 @@
                                     <div class="text-sm text-gray-900">
                                         <div class="flex items-center">
                                             <MapPinIcon class="h-4 w-4 text-gray-400 mr-1" />
-                                            {{ customer.addresses?.length || 0 }} dirección{{
-                                                (customer.addresses?.length || 0) !== 1 ? 'es' : '' }}
+                                            {{ customer.addresses?.length || 0 }}
                                         </div>
+                                    </div>
+                                </td>
+
+                                <!-- Orders Count -->
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <div class="text-sm text-gray-900">
+                                        {{ customer.totalOrders || 0 }} pedido{{ (customer.totalOrders || 0) !== 1 ? 's'
+                                            : '' }}
+                                    </div>
+                                    <div v-if="customer.lastOrderDate" class="text-xs text-gray-500">
+                                        Último: {{ formatDate(customer.lastOrderDate) }}
                                     </div>
                                 </td>
 
@@ -168,12 +182,7 @@
                                             :icon="PencilIcon" title="Editar cliente">
                                             Editar
                                         </BaseButton>
-                                        <BaseButton v-if="auth.isSuperadmin || auth.isAdmin"
-                                            @click="deleteCustomer(customer)" variant="outline" size="sm"
-                                            :icon="TrashIcon" title="Eliminar cliente"
-                                            class="text-red-600 hover:text-red-700">
-                                            Eliminar
-                                        </BaseButton>
+
                                     </div>
                                 </td>
                             </tr>
@@ -303,8 +312,36 @@ const customersWithAddresses = computed(() => {
 
 // Methods
 const getBranchName = (branchId: number) => {
-    const branch = branchesStore.list?.items?.find(b => b.id === branchId)
-    return branch?.name || 'Sucursal no encontrada'
+    // Para superadmin: buscar en la lista de sucursales
+    if (auth.isSuperadmin) {
+        const branch = branchesStore.list?.items?.find(b => b.id === branchId)
+        return branch?.name || 'Sucursal no encontrada'
+    }
+
+    // Para usuarios no superadmin: usar la sucursal actual
+    if (branchesStore.current && branchesStore.current.id === branchId) {
+        return branchesStore.current.name
+    }
+
+    return 'Sucursal no encontrada'
+}
+
+const formatDate = (dateString: string) => {
+    const date = new Date(dateString)
+    const now = new Date()
+    const diff = now.getTime() - date.getTime()
+    const days = Math.floor(diff / (1000 * 60 * 60 * 24))
+
+    if (days === 0) return 'Hoy'
+    if (days === 1) return 'Ayer'
+    if (days < 7) return `Hace ${days} días`
+    if (days < 30) return `Hace ${Math.floor(days / 7)} semanas`
+
+    return date.toLocaleDateString('es-CO', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric'
+    })
 }
 
 const load = async () => {
@@ -356,11 +393,32 @@ const handleFormSubmit = async (data: CustomerFormData) => {
             await store.update(editingCustomer.value.id, {
                 name: data.name,
                 phone1: data.phone1,
-                phone2: data.phone2
+                phone2: data.phone2,
+                active: data.active
             })
             success('Cliente actualizado', 3000, `El cliente "${data.name}" se ha actualizado correctamente`)
         } else {
-            await store.create(data)
+            // Para crear, necesitamos asegurarnos de que initialAddress existe
+            if (!data.initialAddress) {
+                showError('Error de validación', 'Se requiere una dirección inicial para crear el cliente')
+                return
+            }
+
+            await store.create({
+                name: data.name,
+                phone1: data.phone1,
+                phone2: data.phone2,
+                branchId: data.branchId,
+                initialAddress: {
+                    neighborhoodId: data.initialAddress.neighborhoodId,
+                    address: data.initialAddress.address,
+                    additionalInfo: data.initialAddress.additionalInfo,
+                    latitude: data.initialAddress.latitude ?? 0,
+                    longitude: data.initialAddress.longitude ?? 0,
+                    isPrimary: data.initialAddress.isPrimary ?? true,
+                    deliveryFee: data.initialAddress.deliveryFee
+                }
+            })
             success('Cliente creado', 3000, `El cliente "${data.name}" se ha creado correctamente`)
         }
 
@@ -403,13 +461,13 @@ const nextPage = async () => {
 
 onMounted(async () => {
     try {
-        await branchesStore.fetchAll()
 
         // Initialize branch filter based on user role
         if (!auth.isSuperadmin && auth.branchId) {
             filters.value.branchId = auth.branchId
         }
 
+        // Llamar directamente a getCustomers
         await load()
     } catch (e) {
         showError('Error al cargar', 'No se pudieron cargar los datos iniciales')

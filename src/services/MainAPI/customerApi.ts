@@ -20,8 +20,21 @@ class CustomerApi extends BaseApi {
     async getCustomers(
         filters?: CustomerFilters
     ): Promise<ApiResponse<PagedResult<Customer>>> {
+        // Mapear parámetros de frontend (camelCase) a backend (PascalCase)
+        const params: any = {};
+        if (filters) {
+            if (filters.branchId !== undefined) params.BranchId = filters.branchId;
+            if (filters.name) params.Name = filters.name;
+            if (filters.phone) params.Phone = filters.phone;
+            if (filters.active !== undefined) params.Active = filters.active;
+            params.Page = filters.page || 1;
+            params.PageSize = filters.pageSize || 10;
+            if (filters.sortBy) params.SortBy = filters.sortBy;
+            if (filters.sortOrder) params.SortOrder = filters.sortOrder;
+        }
+
         return this.get<ApiResponse<PagedResult<Customer>>>('/customers', {
-            params: filters,
+            params,
         });
     }
 

@@ -13,19 +13,7 @@
 			<main class="flex-1 overflow-x-hidden overflow-y-auto bg-gray-50 px-6">
 				<div class="max-w-7xl mx-auto h-full flex flex-col">
 					<!-- Page header -->
-					<div v-if="pageTitle || $slots.header"
-						class="mb-6 border-b border-gray-200 pb-4 flex items-center justify-between">
-						<slot name="header">
-							<div class="flex-1 min-w-0">
-								<h2 class="text-2xl font-bold leading-7 text-emerald-600 sm:text-3xl sm:truncate">
-									{{ pageTitle }}
-								</h2>
-							</div>
-							<div v-if="$slots.actions" class="mt-4 flex md:mt-0 md:ml-4">
-								<slot name="actions" />
-							</div>
-						</slot>
-					</div>
+
 
 					<!-- Page content wrapper -->
 					<div v-if="!noCard" class="bg-white shadow-sm rounded-2xl p-6 border border-gray-200 flex-1">
