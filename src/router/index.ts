@@ -161,6 +161,26 @@ const routes: RouteRecordRaw[] = [
             title: 'Detalle App'
         }
     },
+    {
+        path: '/orders',
+        name: 'Orders',
+        component: () => import('@/views/Orders.vue'),
+        meta: {
+            requiresAuth: true,
+            requiresRole: [UserRole.SUPERADMIN, UserRole.ADMIN, UserRole.CASHIER],
+            title: 'Gestión de Pedidos'
+        }
+    },
+    {
+        path: '/delivery',
+        name: 'Delivery',
+        component: () => import('@/views/DeliveryView.vue'),
+        meta: {
+            requiresAuth: true,
+            requiresRole: [UserRole.SUPERADMIN, UserRole.ADMIN, UserRole.DELIVERYMAN],
+            title: 'Módulo de Domicilios'
+        }
+    },
 
 
     //   {

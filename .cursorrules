@@ -1,0 +1,144 @@
+# Señor Arroz - Cursor Rules
+
+## Contexto del Proyecto
+Este es un sistema de gestión de restaurante desarrollado en Vue 3 + TypeScript + Tailwind CSS. El proyecto maneja pedidos, clientes, productos, pagos y múltiples roles de usuario.
+
+## Documentación Principal
+- **agents.md** - Documentación completa del proyecto
+- **docs/README.md** - Overview y navegación
+- **docs/architecture.md** - Arquitectura técnica detallada
+- **docs/components.md** - Guía de componentes UI
+- **docs/business-rules.md** - Reglas de negocio del sistema
+- **docs/api-reference.md** - Referencia completa de APIs
+- **docs/development.md** - Guías de desarrollo y convenciones
+
+## Stack Tecnológico
+- **Frontend**: Vue 3.5.18 + Composition API + TypeScript 5.8.3
+- **Styling**: Tailwind CSS 4.1.13
+- **Estado**: Pinia 3.0.3 (stores modulares)
+- **Routing**: Vue Router 4.5.1
+- **HTTP**: Axios 1.12.1 con interceptores JWT
+- **Icons**: Heroicons 2.2.0
+- **Build**: Vite 7.1.2
+- **Testing**: Vitest 3.2.4
+
+## Sistema de Colores
+- **Primario**: Emerald (Verde) - `#009966`, `emerald-600`, `emerald-700`
+- **Secundario**: Gray - `gray-50`, `gray-100`, `gray-300`, `gray-500`, `gray-700`, `gray-900`
+- **Éxito**: Green - `green-600`, `green-700`
+- **Peligro**: Red - `red-600`, `red-700`
+- **Advertencia**: Yellow/Orange
+- **Info**: Blue
+
+## Roles del Sistema
+- **SUPERADMIN**: Acceso total al sistema
+- **ADMIN**: Administrador de sucursal
+- **CASHIER**: Cajero
+- **KITCHEN**: Cocina
+- **DELIVERYMAN**: Domiciliario
+
+## Reglas de Desarrollo
+
+### Naming Conventions
+- **Componentes**: PascalCase (`BaseButton.vue`, `OrderSidebar.vue`)
+- **Archivos**: camelCase para servicios (`authApi.ts`), PascalCase para componentes
+- **Variables**: camelCase (`isLoading`, `userRole`)
+- **Constantes**: UPPER_SNAKE_CASE (`API_BASE_URL`)
+- **Types/Interfaces**: PascalCase (`User`, `Order`)
+- **Events**: kebab-case (`@user-selected`, `@order-updated`)
+
+### Estructura de Archivos
+```
+src/
+├── components/           # Componentes Vue
+│   ├── layout/          # Layout components (Sidebar, TopNav, etc.)
+│   ├── ui/              # Base UI components (BaseButton, BaseInput, etc.)
+│   └── [feature].vue    # Feature-specific components
+├── views/               # Page components
+├── store/               # Pinia stores
+├── services/            # API services
+│   └── MainAPI/         # APIs específicas por dominio
+├── types/               # TypeScript definitions
+├── composables/         # Vue composables
+├── router/              # Vue Router config
+└── assets/              # Static assets
+```
+
+### Patrones de Componentes
+- Usar Composition API con `<script setup lang="ts">`
+- Props tipadas con TypeScript
+- Events tipados con `defineEmits`
+- Usar Tailwind CSS para estilos
+- Seguir estructura: Imports → Props/Emits → Composables → State → Computed → Methods → Lifecycle
+
+### Stores de Pinia
+- Usar Composition API style (`defineStore` con función)
+- Separar state (ref), getters (computed) y actions
+- Manejar loading y error states
+- Usar tipos TypeScript estrictos
+
+### APIs
+- Extender de `BaseApi` class
+- Manejar errores con try/catch
+- Usar interceptores para JWT
+- Tipar responses con TypeScript
+
+## Reglas de Negocio Importantes
+
+### Pedidos
+- **Delivery**: Cliente + dirección obligatorios
+- **Reservation**: Fecha/hora de entrega obligatoria
+- **App Payments**: Máximo 1 por pedido
+- **Bank Payments**: Múltiples permitidos
+- **Cancelación**: Requiere motivo
+
+### Usuarios
+- Solo 1 superadmin en el sistema
+- 1 admin/cocina por sucursal
+- Usuarios solo ven datos de su sucursal (excepto superadmin)
+
+### Pagos
+- Apps se liquidan creando bank_payment
+- Si no hay expense_bank_payment → 100% efectivo
+- Múltiples app_payments pueden liquidarse juntos
+
+## Componentes UI Base Disponibles
+- `BaseButton`: Botón con variantes (primary, secondary, danger, success, outline, ghost)
+- `BaseInput`: Input con validación y estados
+- `BaseCard`: Tarjeta contenedora
+- `BaseDialog`: Modal/Dialog
+- `BaseLoading`: Spinner de carga
+- `BaseAlert`: Alertas y notificaciones
+- `BaseToast`: Sistema de toasts
+- `BaseSelect`: Select con búsqueda dinámica y opción de creación
+
+## Comandos de Desarrollo
+```bash
+npm run dev          # Desarrollo
+npm run build        # Build producción
+npm run test         # Tests
+npm run test:ui      # UI de testing
+```
+
+## Variables de Entorno
+```bash
+VITE_API_URL=https://localhost:7049/api  # URL del backend
+```
+
+## Para Nuevos Desarrolladores
+1. Leer `agents.md` para contexto general
+2. Revisar `docs/README.md` para overview
+3. Estudiar `docs/architecture.md` para setup técnico
+4. Consultar `docs/components.md` para patrones UI
+5. Entender `docs/business-rules.md` para reglas del negocio
+6. Usar `docs/api-reference.md` para integración backend
+7. Seguir `docs/development.md` para convenciones
+
+## Para Agentes IA
+- Usar este archivo como contexto principal
+- Consultar `agents.md` para información completa
+- Seguir patrones establecidos en `docs/components.md`
+- Respetar reglas de negocio en `docs/business-rules.md`
+- Mantener consistencia con el sistema de diseño
+- Usar tipos TypeScript estrictos
+- Preferir componentes base reutilizables

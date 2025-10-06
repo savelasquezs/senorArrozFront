@@ -1,0 +1,588 @@
+# Guía de Componentes - Señor Arroz
+
+## 🎯 Filosofía de Componentes
+
+Los componentes siguen una arquitectura modular y reutilizable, con separación clara entre componentes base (UI), de layout y de funcionalidad específica.
+
+## 🧱 Componentes Base (UI)
+
+### BaseButton
+Botón reutilizable con múltiples variantes y estados.
+
+```vue
+<BaseButton 
+  variant="primary" 
+  size="md" 
+  :loading="isLoading"
+  @click="handleClick"
+>
+  Guardar Pedido
+</BaseButton>
+```
+
+**Props:**
+- `variant`: `'primary' | 'secondary' | 'danger' | 'success' | 'outline' | 'ghost'`
+- `size`: `'sm' | 'md' | 'lg'`
+- `loading`: `boolean`
+- `disabled`: `boolean`
+- `fullWidth`: `boolean`
+- `icon`: Componente de icono
+- `rightIcon`: Componente de icono derecho
+
+**Variantes de Color:**
+- `primary`: Emerald (verde principal)
+- `secondary`: Gray con borde
+- `danger`: Red para acciones destructivas
+- `success`: Green para confirmaciones
+- `outline`: Borde emerald, fondo transparente
+- `ghost`: Sin borde, solo hover
+
+### BaseInput
+Input con validación y estados visuales.
+
+```vue
+<BaseInput
+  v-model="email"
+  type="email"
+  label="Correo Electrónico"
+  placeholder="usuario@ejemplo.com"
+  :required="true"
+  :error="emailError"
+  hint="Ingresa tu correo electrónico"
+/>
+```
+
+**Props:**
+- `modelValue`: `string | number | null`
+- `type`: `string` (text, email, password, number, etc.)
+- `label`: `string`
+- `placeholder`: `string`
+- `required`: `boolean`
+- `disabled`: `boolean`
+- `error`: `string`
+- `hint`: `string`
+- `minlength` / `maxlength`: `number`
+
+**Slots:**
+- `icon`: Icono izquierdo
+- `prepend`: Contenido antes del input
+- `append`: Contenido después del input
+
+### BaseCard
+Contenedor con sombra y bordes redondeados.
+
+```vue
+<BaseCard class="p-6">
+  <h3 class="text-lg font-semibold mb-4">Título</h3>
+  <p>Contenido de la tarjeta</p>
+</BaseCard>
+```
+
+**Variantes:**
+- Por defecto: Fondo blanco, sombra sutil
+- `elevated`: Sombra más pronunciada
+- `bordered`: Borde visible
+
+### BaseDialog
+Modal/Dialog con overlay y animaciones.
+
+```vue
+<BaseDialog 
+  :open="showDialog"
+  @close="showDialog = false"
+  title="Confirmar Acción"
+>
+  <p>¿Estás seguro de que quieres continuar?</p>
+  <template #footer>
+    <BaseButton variant="outline" @click="showDialog = false">Cancelar</BaseButton>
+    <BaseButton variant="danger" @click="confirmAction">Confirmar</BaseButton>
+  </template>
+</BaseDialog>
+```
+
+**Props:**
+- `open`: `boolean`
+- `title`: `string`
+- `size`: `'sm' | 'md' | 'lg' | 'xl'`
+
+**Slots:**
+- `default`: Contenido principal
+- `footer`: Botones de acción
+
+### BaseLoading
+Spinner de carga con mensaje opcional.
+
+```vue
+<BaseLoading text="Cargando productos..." />
+```
+
+**Props:**
+- `text`: `string`
+- `size`: `'sm' | 'md' | 'lg'`
+
+### BaseAlert
+Alertas y notificaciones.
+
+```vue
+<BaseAlert 
+  type="error" 
+  title="Error de Validación"
+  message="Por favor revisa los campos marcados"
+  :dismissible="true"
+/>
+```
+
+**Props:**
+- `type`: `'success' | 'error' | 'warning' | 'info'`
+- `title`: `string`
+- `message`: `string`
+- `dismissible`: `boolean`
+
+### BaseToast
+Sistema de toasts globales.
+
+```typescript
+// Uso programático
+const { success, error, warning, info } = useToast()
+
+success('Pedido creado', 3000, 'El pedido se ha guardado correctamente')
+error('Error de conexión', 'No se pudo conectar con el servidor')
+```
+
+**Variantes:**
+- `success`: Verde con icono de check
+- `error`: Rojo con icono de error
+- `warning`: Amarillo con icono de advertencia
+- `info`: Azul con icono de información
+
+### BaseSelect
+Select con búsqueda dinámica y opción de creación.
+
+```vue
+<BaseSelect
+  v-model="selectedProduct"
+  :options="productOptions"
+  label="Seleccionar Producto"
+  placeholder="Buscar producto..."
+  :searchable="true"
+  :creatable="true"
+  @create="handleCreateProduct"
+/>
+```
+
+**Props:**
+- `modelValue`: `any`
+- `options`: `Array<{value, label, disabled?}>`
+- `searchable`: `boolean`
+- `creatable`: `boolean`
+- `multiple`: `boolean`
+- `clearable`: `boolean`
+
+## 🏗️ Componentes de Layout
+
+### MainLayout
+Layout principal con sidebar y top navigation.
+
+```vue
+<MainLayout :no-card="true">
+  <Orders />
+</MainLayout>
+```
+
+**Props:**
+- `no-card`: `boolean` - Remueve el wrapper de card blanco
+- `page-title`: `string` - Título de la página
+
+### Sidebar
+Navegación lateral con menús por rol.
+
+**Características:**
+- Colapsible en mobile
+- Menús dinámicos según rol de usuario
+- Indicadores de página activa
+- Iconos consistentes con Heroicons
+
+### TopNavigation
+Barra superior con información del usuario.
+
+**Elementos:**
+- Toggle del sidebar (mobile)
+- Breadcrumbs de navegación
+- Menú de usuario (perfil, logout)
+- Indicadores de estado
+
+### Breadcrumbs
+Navegación de rutas jerárquica.
+
+```vue
+<Breadcrumbs :items="breadcrumbItems" />
+```
+
+## 🍽️ Componentes de Funcionalidad
+
+### ProductsGrid
+Grid de productos con filtros y búsqueda.
+
+```vue
+<ProductsGrid 
+  :products="filteredProducts"
+  @product-click="addToOrder"
+/>
+```
+
+**Características:**
+- Grid responsive (1-4 columnas según pantalla)
+- Cards de producto con imagen, nombre, precio
+- Indicador de stock
+- Animación de hover
+- Click para agregar al pedido
+
+### CategoriesBar
+Barra de categorías clickeables.
+
+```vue
+<CategoriesBar 
+  :categories="categories"
+  :products-count="products.length"
+  @category-selected="onCategorySelected"
+/>
+```
+
+**Características:**
+- Chips clickeables
+- Indicación visual de categoría activa
+- Contador de productos por categoría
+- Filtrado automático
+
+### OrderSidebar
+Sidebar de pedidos activos con tabs.
+
+```vue
+<OrderSidebar @order-updated="refreshTotals" />
+```
+
+**Características:**
+- Tabs horizontales para múltiples pedidos
+- Botón "+" para crear nuevo pedido
+- Indicadores de estado (dirty, saved)
+- Scroll automático para muchos tabs
+
+### OrderTab
+Contenido de cada pedido activo.
+
+**Secciones:**
+1. **CustomerSelector**: Búsqueda por teléfono
+2. **AddressSelector**: Direcciones del cliente (delivery)
+3. **OrderLines**: Lista de productos del pedido
+4. **PaymentSelector**: Métodos de pago
+5. **TotalsPanel**: Totales y descuentos
+6. **Actions**: Botones Save/Send
+
+### CustomerSelector
+Selector de clientes por teléfono.
+
+```vue
+<CustomerSelector 
+  v-model="selectedCustomer"
+  :required="orderType === 'delivery'"
+  @customer-selected="onCustomerSelected"
+  @create-customer="showCreateCustomerDialog"
+/>
+```
+
+**Características:**
+- Búsqueda por teléfono
+- Modal para crear cliente nuevo
+- Validación de campos requeridos
+- Auto-completado
+
+### AddressSelector
+Selector de direcciones del cliente.
+
+```vue
+<AddressSelector 
+  v-model="selectedAddress"
+  :customer-id="selectedCustomer?.id"
+  :required="orderType === 'delivery'"
+  @address-selected="onAddressSelected"
+  @create-address="showCreateAddressDialog"
+/>
+```
+
+**Características:**
+- Lista de direcciones del cliente
+- Indicador de dirección principal
+- Modal para crear dirección nueva
+- Integración con Google Maps
+
+### PaymentSelector
+Selector de métodos de pago.
+
+```vue
+<PaymentSelector 
+  :order-total="orderTotal"
+  :bank-payments="bankPayments"
+  :app-payments="appPayments"
+  @add-bank-payment="addBankPayment"
+  @add-app-payment="addAppPayment"
+  @remove-payment="removePayment"
+/>
+```
+
+**Características:**
+- App payments (máximo 1)
+- Bank payments (múltiples)
+- Validación de totales
+- Indicador de efectivo restante
+
+### TotalsPanel
+Panel de totales y descuentos.
+
+```vue
+<TotalsPanel 
+  :subtotal="subtotal"
+  :delivery-fee="deliveryFee"
+  :discount="discount"
+  :total="total"
+/>
+```
+
+**Elementos:**
+- Subtotal de productos
+- Delivery fee (si aplica)
+- Descuentos aplicados
+- Total final
+- Desglose de pagos
+
+## 🗺️ Componentes de Geolocalización
+
+### DeliveryMap
+Mapa de Google Maps para domiciliarios con pedidos en ruta.
+
+```vue
+<DeliveryMap 
+  :orders="onTheWayOrders"
+  :user-location="userLocation"
+  :is-tracking="isTracking"
+  @location-update="onLocationUpdate"
+  @order-deliver="onOrderDeliver"
+  @start-navigation="onStartNavigation"
+/>
+```
+
+**Props:**
+- `orders`: Array de pedidos en estado "OnTheWay"
+- `userLocation`: Ubicación actual del domiciliario
+- `isTracking`: Estado del tracking de ubicación
+- `deliveryRadius`: Radio en metros para mostrar botón de entrega (default: 20)
+
+**Events:**
+- `location-update`: Nueva ubicación del domiciliario
+- `order-deliver`: Confirmar entrega de pedido
+- `start-navigation`: Iniciar navegación a destino
+
+**Características:**
+- Marcadores para pedidos en ruta
+- Marcador de ubicación del domiciliario
+- Cálculo de distancia en tiempo real
+- Botón de entrega automática a 20m o menos
+- Integración con navegación GPS
+
+### LocationTracker
+Componente para manejar geolocalización del domiciliario.
+
+```vue
+<LocationTracker 
+  :enabled="isTracking"
+  :update-interval="5000"
+  @location-update="onLocationUpdate"
+  @permission-denied="onPermissionDenied"
+  @location-error="onLocationError"
+/>
+```
+
+**Props:**
+- `enabled`: Habilitar/deshabilitar tracking
+- `updateInterval`: Intervalo de actualización en ms (default: 5000)
+- `highAccuracy`: Usar GPS de alta precisión (default: true)
+
+**Events:**
+- `location-update`: Nueva ubicación detectada
+- `permission-denied`: Permisos de ubicación denegados
+- `location-error`: Error en obtención de ubicación
+
+### DeliveryOrderCard
+Tarjeta de pedido en ruta para el mapa.
+
+```vue
+<DeliveryOrderCard 
+  :order="order"
+  :distance="distance"
+  :can-deliver="canDeliver"
+  @deliver="onDeliver"
+  @navigate="onNavigate"
+  @call-customer="onCallCustomer"
+/>
+```
+
+**Props:**
+- `order`: Pedido en estado "OnTheWay"
+- `distance`: Distancia en metros al destino
+- `canDeliver`: Si está dentro del radio de entrega
+
+**Características:**
+- Información del pedido (cliente, dirección, total)
+- Indicador de distancia
+- Botón de entrega (cuando está cerca)
+- Botón de navegación GPS
+- Botón de llamada al cliente
+
+## 🎨 Patrones de Diseño
+
+### Estructura de Componentes
+```vue
+<template>
+  <!-- HTML semántico con clases Tailwind -->
+  <div class="component-wrapper">
+    <!-- Contenido -->
+  </div>
+</template>
+
+<script setup lang="ts">
+// 1. Imports
+import { ref, computed, onMounted } from 'vue'
+import { useStore } from '@/store/storeName'
+
+// 2. Props y Emits
+interface Props {
+  // Props tipadas
+}
+const props = defineProps<Props>()
+
+const emit = defineEmits<{
+  // Events tipados
+}>()
+
+// 3. Composables y Stores
+const store = useStore()
+
+// 4. Estado reactivo
+const isLoading = ref(false)
+const error = ref<string | null>(null)
+
+// 5. Computed properties
+const computedValue = computed(() => {
+  // Lógica computada
+})
+
+// 6. Métodos
+const handleAction = async () => {
+  // Lógica del componente
+}
+
+// 7. Lifecycle
+onMounted(() => {
+  // Inicialización
+})
+</script>
+
+<style scoped>
+/* Estilos adicionales si es necesario */
+.component-wrapper {
+  /* Custom styles */
+}
+</style>
+```
+
+### Convenciones de Naming
+- **Componentes**: PascalCase (`BaseButton.vue`)
+- **Props**: camelCase (`isLoading`, `userRole`)
+- **Events**: kebab-case (`@user-selected`)
+- **CSS Classes**: Tailwind utilities
+- **CSS Variables**: kebab-case (`--primary-color`)
+
+### Props y Events
+```typescript
+// Props con defaults y validación
+interface Props {
+  variant: 'primary' | 'secondary' | 'danger'
+  size: 'sm' | 'md' | 'lg'
+  disabled: boolean
+  loading: boolean
+}
+
+const props = withDefaults(defineProps<Props>(), {
+  variant: 'primary',
+  size: 'md',
+  disabled: false,
+  loading: false
+})
+
+// Events tipados
+const emit = defineEmits<{
+  click: [event: MouseEvent]
+  change: [value: string]
+  submit: [data: FormData]
+}>()
+```
+
+## 🔧 Composición y Reutilización
+
+### Composables
+```typescript
+// useToast.ts
+export const useToast = () => {
+  const addToast = (toast: Toast) => { /* ... */ }
+  const success = (title: string, message?: string) => { /* ... */ }
+  const error = (title: string, message?: string) => { /* ... */ }
+  
+  return { addToast, success, error }
+}
+```
+
+### Slots y Render Props
+```vue
+<!-- Componente con slots flexibles -->
+<BaseCard>
+  <template #header>
+    <h3>Título Personalizado</h3>
+  </template>
+  
+  <template #content>
+    <p>Contenido personalizado</p>
+  </template>
+  
+  <template #footer>
+    <BaseButton>Acción</BaseButton>
+  </template>
+</BaseCard>
+```
+
+## 📱 Responsive Design
+
+### Breakpoints en Componentes
+```vue
+<template>
+  <!-- Grid responsive -->
+  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+    <!-- Productos -->
+  </div>
+  
+  <!-- Sidebar responsive -->
+  <div class="hidden lg:block w-64">
+    <!-- Sidebar desktop -->
+  </div>
+  <div class="lg:hidden fixed inset-0 z-50">
+    <!-- Sidebar mobile -->
+  </div>
+</template>
+```
+
+### Adaptaciones por Dispositivo
+- **Mobile**: Stack vertical, botones grandes, navegación simplificada
+- **Tablet**: Layout híbrido, grid adaptativo
+- **Desktop**: Layout completo, múltiples columnas
+
+---
+
+**Próximos pasos**: Ver [Business Rules](./business-rules.md) para entender la lógica de negocio de los componentes.
