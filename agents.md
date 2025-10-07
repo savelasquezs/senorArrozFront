@@ -47,14 +47,37 @@ src/
 ├── components/           # Componentes Vue
 │   ├── layout/          # Componentes de layout (Sidebar, TopNav, etc.)
 │   ├── ui/              # Componentes base reutilizables
-│   └── [feature].vue    # Componentes específicos de funcionalidad
+│   ├── orders/          # Componentes específicos de pedidos
+│   │   ├── ProductCard.vue
+│   │   ├── ProductGrid.vue
+│   │   ├── ProductStock.vue
+│   │   ├── ProductCardSkeleton.vue
+│   │   ├── ProductSearch.vue
+│   │   ├── ProductSearch/      # Sub-componentes de búsqueda
+│   │   │   ├── SearchInput.vue
+│   │   │   ├── FilterToggle.vue
+│   │   │   ├── ActiveFilters.vue
+│   │   │   ├── FilterPanel.vue
+│   │   │   └── SearchHistory.vue
+│   │   └── __tests__/          # Tests de componentes de pedidos
+│   └── [feature].vue    # Otros componentes específicos
 ├── views/               # Páginas/Vistas principales
 ├── store/               # Stores de Pinia
+│   ├── auth.ts
+│   ├── orders.ts
+│   ├── productSearch.ts
+│   └── __tests__/       # Tests de stores
 ├── services/            # APIs y servicios HTTP
 │   └── MainAPI/         # APIs específicas por dominio
 ├── types/               # Definiciones de TypeScript
+│   ├── order.ts
+│   └── product.ts
 ├── composables/         # Composables Vue reutilizables
+│   ├── useFormatting.ts
+│   └── __tests__/       # Tests de composables
 ├── router/              # Configuración de rutas
+├── test/                # Configuración de tests
+│   └── setup.ts
 └── assets/              # Recursos estáticos
 ```
 
@@ -137,7 +160,12 @@ enum UserRole {
 - `Breadcrumbs`: Navegación de rutas
 
 ### Componentes de Funcionalidad
-- `ProductsGrid`: Grid de productos con filtros
+- `ProductsGrid`: Grid de productos con filtros (legacy - usar ProductGrid)
+- `ProductGrid`: Grid responsive optimizado con ProductCard
+- `ProductCard`: Componente base para mostrar productos individuales
+- `ProductStock`: Sub-componente para estado de stock
+- `ProductCardSkeleton`: Skeleton loading para ProductCard
+- `ProductSearch`: Sistema completo de búsqueda y filtros
 - `CategoriesBar`: Barra de categorías clickeables
 - `OrderSidebar`: Sidebar de pedidos activos con tabs
 - `OrderTab`: Contenido de cada pedido activo
@@ -184,6 +212,36 @@ addAppPayment(appId, amount)
 submitActiveOrder()
 ```
 
+### ProductSearch Store (`productSearch.ts`)
+```typescript
+// Estado de búsqueda
+searchState: {
+  query: string
+  suggestions: Product[]
+  history: string[]
+  showSuggestions: boolean
+}
+
+// Estado de filtros
+filterState: {
+  category: number | null
+  minPrice: number | null
+  maxPrice: number | null
+  stockFilter: 'all' | 'available' | 'out_of_stock'
+  expanded: boolean
+}
+
+// Acciones principales
+setSearchQuery(query)
+searchWithDebounce(callback, debounceMs)
+setCategoryFilter(categoryId)
+setPriceRange(min, max)
+setStockFilter(filter)
+clearFilters()
+loadSearchHistory()
+saveSearchHistory()
+```
+
 ## 🌐 APIs y Servicios
 
 ### Base API (`baseApi.ts`)
@@ -205,11 +263,11 @@ submitActiveOrder()
 ### Pantalla Principal de Pedidos
 ```
 ┌─────────────────────────────────────────────────────────┐
-│ Header: Búsqueda de productos                          │
+│ ProductSearch: Búsqueda avanzada con filtros           │
 ├─────────────────────────────────────────────────────────┤
-│ CategoriesBar: Chips de categorías                     │
+│ CategoriesBar: Chips de categorías con iconos alineados│
 ├─────────────────────────────────────────────────────────┤
-│ ProductsGrid: Grid de productos                        │
+│ ProductGrid: Grid responsive de ProductCard            │
 │ ┌─────┐ ┌─────┐ ┌─────┐ ┌─────┐                       │
 │ │Prod1│ │Prod2│ │Prod3│ │Prod4│                       │
 │ └─────┘ └─────┘ └─────┘ └─────┘                       │
@@ -424,11 +482,17 @@ npm run test:coverage
 - ✅ Componentes UI base
 - ✅ Stores de Pinia
 - ✅ APIs de servicios
+- ✅ **ProductCard**: Componente base para productos
+- ✅ **ProductGrid**: Grid responsive optimizado
+- ✅ **ProductSearch**: Sistema completo de búsqueda y filtros
+- ✅ **ProductStock**: Indicador de estado de stock
+- ✅ **ProductCardSkeleton**: Estados de carga
+- ✅ **ProductSearch Store**: Estado centralizado para búsqueda
+- ✅ **useFormatting**: Composable para formateo
+- ✅ **Tests unitarios**: Cobertura completa de componentes
 
 ### En Desarrollo
-- 🚧 Pantalla completa de pedidos
 - 🚧 Sistema de pagos integrado
-- 🚧 Gestión de productos completa
 - 🚧 Dashboard y reportes
 
 ### Pendiente
@@ -438,9 +502,67 @@ npm run test:coverage
 - ⏳ Caja y cuadres
 - ⏳ Reportes avanzados
 
+## 🔄 Flujo de Trabajo para Desarrollo de Issues
+
+### Proceso Estándar de Desarrollo
+
+1. **📋 Verificar Issue en Linear**
+   - Revisar el issue del backlog en Linear
+   - Leer especificaciones técnicas y criterios de aceptación
+   - Entender el contexto y dependencias
+
+2. **🚀 Poner en Progreso**
+   - Actualizar estado del issue a "In Progress" en Linear
+   - Asignar el issue si es necesario
+   - Crear branch de desarrollo si se requiere
+
+3. **💻 Desarrollo Completo**
+   - Implementar todos los criterios de aceptación
+   - Crear/actualizar componentes según especificaciones
+   - Escribir tests unitarios completos
+   - Asegurar integración con sistema existente
+   - Verificar responsive design y accesibilidad
+
+4. **✅ Marcar como Completado**
+   - Actualizar estado del issue a "Done" en Linear
+   - Documentar trabajo realizado en la descripción del issue
+   - Incluir archivos creados/modificados
+   - Listar funcionalidades implementadas
+   - Confirmar que todos los tests pasan
+
+5. **📚 Actualizar Documentación**
+   - Actualizar `agents.md` con nuevos componentes/stores
+   - Documentar nuevas funcionalidades
+   - Actualizar estado de desarrollo
+   - Registrar archivos creados en estructura del proyecto
+
+### Componentes Recientemente Completados
+
+#### SEN-6: ProductCard ✅
+- **Archivos**: `ProductCard.vue`, `ProductStock.vue`
+- **Tests**: `ProductCard.test.ts`, `ProductStock.test.ts`
+- **Funcionalidades**: Variantes (default, compact), estados de stock, integración con orders
+
+#### SEN-7: ProductGrid ✅
+- **Archivos**: `ProductGrid.vue`, `ProductCardSkeleton.vue`
+- **Tests**: `ProductGrid.test.ts`, `ProductCardSkeleton.test.ts`
+- **Funcionalidades**: Grid responsive, skeleton loading, estados de carga
+
+#### SEN-8: ProductSearch ✅
+- **Archivos**: `ProductSearch.vue` + 5 sub-componentes, `productSearch.ts`, `useFormatting.ts`
+- **Tests**: `ProductSearch.test.ts`, `productSearch.test.ts`, `useFormatting.test.ts`
+- **Funcionalidades**: Búsqueda en tiempo real, filtros avanzados, historial, autocompletado
+
+### Próximos Issues Sugeridos
+
+Basado en el backlog de Linear, los siguientes issues recomendados son:
+
+1. **SEN-11**: OrderHeader - Header del pedido
+2. **SEN-12**: CustomerSection - Selección de cliente
+3. **SEN-13**: OrderItems - Lista de productos del pedido
+4. **SEN-17**: OrderSummary - Resumen compacto
+
 ## 🤝 Colaboración
-
-
 
 ### Para Otros Agentes IA
 - Usar este documento como contexto principal
@@ -448,8 +570,33 @@ npm run test:coverage
 - Seguir patrones establecidos en componentes existentes
 - Mantener consistencia con el sistema de diseño
 - Respetar las reglas de negocio definidas
+- **Seguir el flujo de trabajo estándar para issues**
+- **Actualizar documentación después de completar cada issue**
+
+### Patrones de Componentes Establecidos
+
+#### Estructura de Botones con Iconos
+```vue
+<BaseButton class="whitespace-nowrap">
+    <span class="flex items-center">
+        <Icon class="w-4 h-4 mr-2" />
+        Texto
+    </span>
+</BaseButton>
+```
+
+#### Componentes con Variantes
+- Usar props `variant` para diferentes estilos
+- Implementar `default`, `compact`, `featured` cuando aplique
+- Mantener consistencia en nombres de variantes
+
+#### Stores de Pinia
+- Usar Composition API style (`defineStore` con función)
+- Separar estado, getters y actions claramente
+- Implementar manejo de loading y error states
 
 ---
 
-**Última actualización**: Diciembre 2024
-**Versión del proyecto**: 0.0.0 (desarrollo)
+**Última actualización**: Enero 2025
+**Versión del proyecto**: 0.1.0 (desarrollo)
+**Issues completados**: SEN-6, SEN-7, SEN-8

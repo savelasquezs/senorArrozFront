@@ -82,11 +82,17 @@ Esta documentación está organizada de manera modular para facilitar la navegac
 - Componentes UI base reutilizables
 - Stores de Pinia modulares
 - APIs de servicios completas
+- **ProductCard**: Componente base para productos
+- **ProductGrid**: Grid responsive optimizado
+- **ProductSearch**: Sistema completo de búsqueda y filtros
+- **ProductStock**: Indicador de estado de stock
+- **ProductCardSkeleton**: Estados de carga
+- **ProductSearch Store**: Estado centralizado para búsqueda
+- **useFormatting**: Composable para formateo
+- **Tests unitarios**: Cobertura completa de componentes
 
 ### 🚧 En Desarrollo
-- Pantalla completa de pedidos
 - Sistema de pagos integrado
-- Gestión de productos completa
 - Dashboard y reportes
 
 ### ⏳ Pendiente
@@ -114,6 +120,7 @@ Esta documentación está organizada de manera modular para facilitar la navegac
 
 ---
 
-**Última actualización**: Diciembre 2024  
-**Versión**: 0.0.0 (desarrollo)  
-**Stack**: Vue 3 + TypeScript + Tailwind + Pinia
+**Última actualización**: Enero 2025  
+**Versión**: 0.1.0 (desarrollo)  
+**Stack**: Vue 3 + TypeScript + Tailwind + Pinia  
+**Issues completados**: SEN-6, SEN-7, SEN-8

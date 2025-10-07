@@ -220,8 +220,123 @@ Navegación de rutas jerárquica.
 
 ## 🍽️ Componentes de Funcionalidad
 
-### ProductsGrid
-Grid de productos con filtros y búsqueda.
+### ProductCard
+Componente base para mostrar productos individuales.
+
+```vue
+<ProductCard 
+  :product="product"
+  :show-stock="true"
+  variant="default"
+  @product-click="onProductClick"
+  @product-add="onProductAdd"
+/>
+```
+
+**Props:**
+- `product`: `Product` - Datos del producto
+- `showStock`: `boolean` - Mostrar indicador de stock
+- `variant`: `'default' | 'compact' | 'featured'` - Estilo del card
+- `disabled`: `boolean` - Deshabilitar interacciones
+
+**Características:**
+- Diseño atractivo con sombras y hover effects
+- Variantes responsive (default, compact, featured)
+- Indicador de stock visual
+- Botón de agregar con loading state
+- Integración con store de orders
+
+### ProductStock
+Sub-componente para mostrar estado de stock.
+
+```vue
+<ProductStock 
+  :stock="product.stock"
+  variant="badge"
+  size="sm"
+/>
+```
+
+**Props:**
+- `stock`: `number` - Cantidad en stock
+- `variant`: `'badge' | 'text'` - Forma de mostrar
+- `size`: `'sm' | 'md' | 'lg'` - Tamaño del indicador
+
+**Estados:**
+- **Disponible**: Verde con check
+- **Bajo stock**: Amarillo con advertencia
+- **Sin stock**: Rojo con X
+
+### ProductGrid
+Grid responsive optimizado que utiliza ProductCard.
+
+```vue
+<ProductGrid 
+  :products="products"
+  :loading="isLoading"
+  @product-click="onProductClick"
+  @product-add="onProductAdd"
+/>
+```
+
+**Props:**
+- `products`: `Product[]` - Lista de productos
+- `loading`: `boolean` - Estado de carga
+- `columns`: `number` - Número de columnas (opcional)
+
+**Características:**
+- Grid responsive (2-5 columnas según pantalla)
+- Skeleton loading durante carga
+- Empty state cuando no hay productos
+- Integración perfecta con ProductCard
+
+### ProductCardSkeleton
+Skeleton loading para ProductCard.
+
+```vue
+<ProductCardSkeleton />
+```
+
+**Características:**
+- Animación de shimmer
+- Mismo tamaño que ProductCard
+- Usado durante estados de carga
+
+### ProductSearch
+Sistema completo de búsqueda y filtros.
+
+```vue
+<ProductSearch 
+  :products="products"
+  :categories="categories"
+  @search="onSearch"
+  @filter="onFilter"
+/>
+```
+
+**Props:**
+- `products`: `Product[]` - Lista de productos para búsqueda
+- `categories`: `ProductCategory[]` - Categorías disponibles
+- `placeholder`: `string` - Placeholder del input
+- `showFilters`: `boolean` - Mostrar panel de filtros
+
+**Funcionalidades:**
+- Búsqueda en tiempo real con debounce
+- Filtros por categoría, precio y stock
+- Autocompletado con sugerencias
+- Historial de búsquedas persistente
+- Filtros activos con chips removibles
+
+#### Sub-componentes de ProductSearch:
+
+**SearchInput**: Input de búsqueda con autocompletado
+**FilterToggle**: Botón para mostrar/ocultar filtros
+**ActiveFilters**: Chips de filtros activos
+**FilterPanel**: Panel expandible de filtros
+**SearchHistory**: Historial de búsquedas
+
+### ProductsGrid (Legacy)
+Grid de productos con filtros y búsqueda (legacy - usar ProductGrid).
 
 ```vue
 <ProductsGrid 
@@ -230,12 +345,7 @@ Grid de productos con filtros y búsqueda.
 />
 ```
 
-**Características:**
-- Grid responsive (1-4 columnas según pantalla)
-- Cards de producto con imagen, nombre, precio
-- Indicador de stock
-- Animación de hover
-- Click para agregar al pedido
+**Nota**: Este componente está marcado como legacy. Usar `ProductGrid` + `ProductSearch` para nuevas implementaciones.
 
 ### CategoriesBar
 Barra de categorías clickeables.
@@ -582,6 +692,143 @@ export const useToast = () => {
 - **Mobile**: Stack vertical, botones grandes, navegación simplificada
 - **Tablet**: Layout híbrido, grid adaptativo
 - **Desktop**: Layout completo, múltiples columnas
+
+## 🗄️ Stores y Composables Relacionados
+
+### ProductSearch Store
+Store de Pinia para manejar estado de búsqueda y filtros.
+
+```typescript
+// src/store/productSearch.ts
+export const useProductSearchStore = defineStore('productSearch', () => {
+  // Estado de búsqueda
+  const searchState = ref({
+    query: '',
+    suggestions: [] as Product[],
+    history: [] as string[],
+    showSuggestions: false
+  })
+
+  // Estado de filtros
+  const filterState = ref({
+    category: null as number | null,
+    minPrice: null as number | null,
+    maxPrice: null as number | null,
+    stockFilter: 'all' as 'all' | 'available' | 'out_of_stock',
+    expanded: false
+  })
+
+  // Acciones principales
+  const setSearchQuery = (query: string) => {
+    searchState.value.query = query
+  }
+
+  const searchWithDebounce = (callback: Function, debounceMs: number = 300) => {
+    // Implementación de debounce
+  }
+
+  const clearFilters = () => {
+    filterState.value = {
+      category: null,
+      minPrice: null,
+      maxPrice: null,
+      stockFilter: 'all',
+      expanded: false
+    }
+  }
+
+  return {
+    searchState,
+    filterState,
+    setSearchQuery,
+    searchWithDebounce,
+    clearFilters
+  }
+})
+```
+
+### useFormatting Composable
+Composable para funciones de formateo reutilizables.
+
+```typescript
+// src/composables/useFormatting.ts
+export const useFormatting = () => {
+  const formatCurrency = (amount: number): string => {
+    return new Intl.NumberFormat('es-CO', {
+      style: 'currency',
+      currency: 'COP',
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0
+    }).format(amount)
+  }
+
+  const formatNumber = (num: number): string => {
+    return new Intl.NumberFormat('es-CO').format(num)
+  }
+
+  const formatDate = (date: string | Date): string => {
+    return new Intl.DateTimeFormat('es-CO', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric'
+    }).format(new Date(date))
+  }
+
+  const truncateText = (text: string, maxLength: number): string => {
+    return text.length > maxLength 
+      ? text.substring(0, maxLength) + '...' 
+      : text
+  }
+
+  return {
+    formatCurrency,
+    formatNumber,
+    formatDate,
+    truncateText
+  }
+}
+```
+
+## 🧪 Testing de Componentes
+
+### Estructura de Tests
+```typescript
+// src/components/orders/__tests__/ProductCard.test.ts
+import { describe, it, expect, beforeEach } from 'vitest'
+import { mount } from '@vue/test-utils'
+import ProductCard from '../ProductCard.vue'
+
+describe('ProductCard', () => {
+  let wrapper: VueWrapper<any>
+
+  beforeEach(() => {
+    wrapper = mount(ProductCard, {
+      props: {
+        product: mockProduct,
+        showStock: true,
+        variant: 'default'
+      }
+    })
+  })
+
+  it('renders product information correctly', () => {
+    expect(wrapper.text()).toContain(mockProduct.name)
+    expect(wrapper.text()).toContain(mockProduct.price)
+  })
+
+  it('emits product-click event when clicked', async () => {
+    await wrapper.trigger('click')
+    expect(wrapper.emitted('product-click')).toBeTruthy()
+  })
+})
+```
+
+### Patrones de Testing
+- **Props**: Verificar que se renderizan correctamente
+- **Events**: Confirmar que se emiten con datos correctos
+- **States**: Probar diferentes estados visuales
+- **Interactions**: Simular clicks, hover, etc.
+- **Accessibility**: Verificar ARIA labels y roles
 
 ---
 
