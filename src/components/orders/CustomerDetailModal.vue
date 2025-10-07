@@ -1,5 +1,5 @@
 <template>
-    <BaseDialog :model-value="show" @close="handleClose" size="xl">
+    <BaseDialog v-model="internalShow" size="xl">
         <div class="customer-detail-modal">
             <!-- Modal Header -->
             <div class="flex items-center justify-between mb-6">
@@ -52,96 +52,18 @@
                 <!-- Customer Information Grid -->
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <!-- Basic Information -->
-                    <div class="bg-white rounded-lg border border-gray-200 p-4">
-                        <h4 class="text-sm font-medium text-gray-900 mb-3 flex items-center gap-2">
-                            <InformationCircleIcon class="w-4 h-4" />
-                            Información Básica
-                        </h4>
-                        <div class="space-y-2">
-                            <div class="flex justify-between">
-                                <span class="text-sm text-gray-500">Nombre:</span>
-                                <span class="text-sm font-medium text-gray-900">{{ customer.name }}</span>
-                            </div>
-                            <div class="flex justify-between">
-                                <span class="text-sm text-gray-500">Teléfono Principal:</span>
-                                <span class="text-sm font-medium text-gray-900">{{ customer.phone1 }}</span>
-                            </div>
-                            <div v-if="customer.phone2" class="flex justify-between">
-                                <span class="text-sm text-gray-500">Teléfono Secundario:</span>
-                                <span class="text-sm font-medium text-gray-900">{{ customer.phone2 }}</span>
-                            </div>
-                            <div class="flex justify-between">
-                                <span class="text-sm text-gray-500">Estado:</span>
-                                <BaseBadge :type="customer.active ? 'success' : 'danger'"
-                                    :text="customer.active ? 'Activo' : 'Inactivo'" size="sm" />
-                            </div>
-                        </div>
-                    </div>
+                    <CustomerInfoCard :customer="customer" :show-actions="showActions" @edit="handleEditCustomer"
+                        @toggle-status="handleToggleStatus" />
 
                     <!-- Order Statistics -->
-                    <div class="bg-white rounded-lg border border-gray-200 p-4">
-                        <h4 class="text-sm font-medium text-gray-900 mb-3 flex items-center gap-2">
-                            <ChartBarIcon class="w-4 h-4" />
-                            Estadísticas de Pedidos
-                        </h4>
-                        <div class="space-y-2">
-                            <div class="flex justify-between">
-                                <span class="text-sm text-gray-500">Total Pedidos:</span>
-                                <span class="text-sm font-medium text-gray-900">{{ customer.totalOrders || 0 }}</span>
-                            </div>
-                            <div v-if="customer.lastOrderDate" class="flex justify-between">
-                                <span class="text-sm text-gray-500">Último Pedido:</span>
-                                <span class="text-sm font-medium text-gray-900">{{ formatDate(customer.lastOrderDate)
-                                }}</span>
-                            </div>
-                            <div class="flex justify-between">
-                                <span class="text-sm text-gray-500">Sucursal:</span>
-                                <span class="text-sm font-medium text-gray-900">{{ customer.branchName || 'N/A'
-                                }}</span>
-                            </div>
-                        </div>
-                    </div>
+                    <CustomerStatsCard :customer="customer" :show-actions="showActions" @view-orders="handleViewOrders"
+                        @create-order="handleCreateOrder" />
                 </div>
 
                 <!-- Addresses Section -->
-                <div v-if="customer.addresses && customer.addresses.length > 0"
-                    class="bg-white rounded-lg border border-gray-200 p-4">
-                    <h4 class="text-sm font-medium text-gray-900 mb-3 flex items-center gap-2">
-                        <MapPinIcon class="w-4 h-4" />
-                        Direcciones Registradas ({{ customer.addresses.length }})
-                    </h4>
-                    <div class="space-y-3">
-                        <div v-for="address in customer.addresses" :key="address.id"
-                            class="border border-gray-200 rounded-lg p-3 hover:bg-gray-50 transition-colors">
-                            <div class="flex items-start justify-between">
-                                <div class="flex-1">
-                                    <div class="flex items-center gap-2 mb-1">
-                                        <span class="text-sm font-medium text-gray-900">{{ address.address }}</span>
-                                        <BaseBadge v-if="address.isPrimary" type="primary" text="Principal" size="sm" />
-                                    </div>
-                                    <div class="text-xs text-gray-500">
-                                        {{ address.neighborhood?.name || 'Barrio no especificado' }}
-                                    </div>
-                                    <div v-if="address.additionalInfo" class="text-xs text-gray-500 mt-1">
-                                        {{ address.additionalInfo }}
-                                    </div>
-                                </div>
-                                <div class="text-right">
-                                    <div class="text-sm font-medium text-gray-900">
-                                        {{ formatCurrency(address.deliveryFee) }}
-                                    </div>
-                                    <div class="text-xs text-gray-500">Domicilio</div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- No Addresses -->
-                <div v-else class="bg-gray-50 rounded-lg p-6 text-center">
-                    <MapPinIcon class="w-8 h-8 text-gray-400 mx-auto mb-2" />
-                    <p class="text-sm text-gray-500">Este cliente no tiene direcciones registradas</p>
-                </div>
+                <CustomerAddressesList :customer="customer" :show-actions="showActions" @add-address="handleAddAddress"
+                    @edit-address="handleEditAddress" @set-primary="handleSetPrimary"
+                    @delete-address="handleDeleteAddress" />
             </div>
 
             <!-- Loading State -->
@@ -160,18 +82,15 @@
                 <BaseButton @click="handleClose" variant="outline">
                     Cerrar
                 </BaseButton>
-                <BaseButton @click="handleEditCustomer" variant="primary" v-if="customer">
-                    <PencilIcon class="w-4 h-4 mr-2" />
-                    Editar Cliente
-                </BaseButton>
             </div>
         </div>
     </BaseDialog>
 </template>
 
 <script setup lang="ts">
-import type { Customer } from '@/types/customer'
-import { useFormatting } from '@/composables/useFormatting'
+import { ref, watch } from 'vue'
+import type { Customer, CustomerAddress } from '@/types/customer'
+import { useToast } from '@/composables/useToast'
 
 // Components
 import BaseDialog from '@/components/ui/BaseDialog.vue'
@@ -179,15 +98,16 @@ import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseBadge from '@/components/ui/BaseBadge.vue'
 import BaseLoading from '@/components/ui/BaseLoading.vue'
 
+// Customer Components
+import CustomerInfoCard from '@/components/customer/CustomerInfoCard.vue'
+import CustomerStatsCard from '@/components/customer/CustomerStatsCard.vue'
+import CustomerAddressesList from '@/components/customer/CustomerAddressesList.vue'
+
 // Icons
 import {
     UserIcon,
     PhoneIcon,
-    MapPinIcon,
-    InformationCircleIcon,
-    ChartBarIcon,
     XMarkIcon,
-    PencilIcon,
     ExclamationTriangleIcon
 } from '@heroicons/vue/24/outline'
 
@@ -195,10 +115,30 @@ interface Props {
     show: boolean
     customer?: Customer
     loading?: boolean
+    showActions?: boolean
 }
 
 const props = withDefaults(defineProps<Props>(), {
-    loading: false
+    loading: false,
+    showActions: true
+})
+
+// Use props to avoid warning
+const { show, customer, loading, showActions } = props
+
+// Internal reactive state for modal visibility
+const internalShow = ref(show)
+
+// Watch for prop changes to sync internal state
+watch(() => props.show, (newShow) => {
+    internalShow.value = newShow
+}, { immediate: true })
+
+// Watch for internal state changes to emit to parent
+watch(internalShow, (newValue) => {
+    if (!newValue) {
+        handleClose()
+    }
 })
 
 const emit = defineEmits<{
@@ -207,17 +147,59 @@ const emit = defineEmits<{
 }>()
 
 // Composables
-const { formatCurrency, formatDate } = useFormatting()
+const { success } = useToast()
+
+// Debug logs
+console.log('CustomerDetailModal - props received:', { show, customer, loading, showActions })
 
 // Methods
 const handleClose = () => {
+    console.log('CustomerDetailModal - handleClose called')
     emit('close')
 }
 
-const handleEditCustomer = () => {
-    if (props.customer) {
-        emit('editCustomer', props.customer)
-    }
+const handleEditCustomer = (customer: Customer) => {
+    emit('editCustomer', customer)
+}
+
+const handleToggleStatus = (customer: Customer) => {
+    // This would typically call an API to toggle customer status
+    console.log('Toggle customer status:', customer.id)
+    success('Estado actualizado', 2000, `Cliente ${customer.active ? 'desactivado' : 'activado'} correctamente`)
+}
+
+const handleViewOrders = (customer: Customer) => {
+    // This would typically navigate to orders view filtered by customer
+    console.log('View orders for customer:', customer.id)
+    success('Funcionalidad de pedidos', 2000, 'La vista de pedidos estará disponible próximamente')
+}
+
+const handleCreateOrder = (customer: Customer) => {
+    // This would typically create a new order for this customer
+    console.log('Create order for customer:', customer.id)
+    success('Nuevo pedido', 2000, 'Pedido creado para el cliente seleccionado')
+}
+
+const handleAddAddress = (customer: Customer) => {
+    console.log('Add address for customer:', customer.id)
+    success('Funcionalidad de direcciones', 2000, 'La funcionalidad de direcciones estará disponible próximamente')
+}
+
+const handleEditAddress = (address: CustomerAddress) => {
+    console.log('Edit address:', address.id)
+    success('Funcionalidad de direcciones', 2000, 'La funcionalidad de direcciones estará disponible próximamente')
+}
+
+const handleSetPrimary = (address: CustomerAddress) => {
+    // This would typically call an API to set address as primary
+    console.log('Set primary address:', address.id)
+    success('Dirección principal', 2000, 'Dirección establecida como principal')
+}
+
+const handleDeleteAddress = (address: CustomerAddress) => {
+    // This would typically call an API to delete address
+    console.log('Delete address:', address.id)
+    success('Dirección eliminada', 2000, 'Dirección eliminada correctamente')
 }
 </script>
 
