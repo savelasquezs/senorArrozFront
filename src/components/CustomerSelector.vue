@@ -110,7 +110,7 @@
         </div>
 
         <!-- Customer Detail Modal -->
-        <CustomerDetailModal :show="showCustomerDetail" :customer="selectedCustomer || undefined"
+        <CustomerDetailModal v-if="selectedCustomer" :show="showCustomerDetail" :customer="selectedCustomer"
             @close="closeCustomerDetail" @edit-customer="handleEditCustomer" />
     </div>
 </template>
@@ -295,8 +295,12 @@ const closeCreateModal = () => {
 }
 
 const viewCustomer = () => {
+    console.log('CustomerSelector - viewCustomer clicked')
+    console.log('CustomerSelector - selectedCustomer:', selectedCustomer.value)
+
     if (selectedCustomer.value) {
         showCustomerDetail.value = true
+        console.log('CustomerSelector - Modal opened with customer:', selectedCustomer.value)
     }
 }
 

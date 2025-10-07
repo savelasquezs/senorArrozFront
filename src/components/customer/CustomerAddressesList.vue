@@ -3,7 +3,7 @@
         <div class="flex items-center justify-between mb-3">
             <h4 class="text-sm font-medium text-gray-900 flex items-center gap-2">
                 <MapPinIcon class="w-4 h-4" />
-                Direcciones Registradas ({{ customer.addresses?.length || 0 }})
+                Direcciones Registradas ({{ customerAddresses.length }})
             </h4>
             <BaseButton @click="handleAddAddress" variant="primary" size="sm">
                 <span class="flex items-center">
@@ -14,8 +14,8 @@
         </div>
 
         <!-- Addresses List -->
-        <div v-if="customer.addresses && customer.addresses.length > 0" class="space-y-3">
-            <div v-for="address in customer.addresses" :key="address.id"
+        <div v-if="customerAddresses.length > 0" class="space-y-3">
+            <div v-for="address in customerAddresses" :key="address.id"
                 class="border border-gray-200 rounded-lg p-3 hover:bg-gray-50 transition-colors">
                 <div class="flex items-start justify-between">
                     <div class="flex-1">
@@ -78,8 +78,10 @@
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue'
 import type { Customer, CustomerAddress } from '@/types/customer'
 import { useFormatting } from '@/composables/useFormatting'
+import { useCustomersStore } from '@/store/customers'
 
 // Components
 import BaseButton from '@/components/ui/BaseButton.vue'
@@ -112,6 +114,13 @@ const emit = defineEmits<{
 
 // Composables
 const { formatCurrency } = useFormatting()
+const customersStore = useCustomersStore()
+
+// Computed
+const customerAddresses = computed(() => {
+    // Use addresses from store if available, otherwise fallback to customer.addresses
+    return customersStore.addresses || props.customer.addresses || []
+})
 
 // Methods
 const handleAddAddress = () => {
