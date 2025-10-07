@@ -29,6 +29,11 @@
         <div class="flex h-[calc(100vh-140px)]">
             <!-- Left Panel - Products and Categories -->
             <div class="flex-1 bg-white border-r border-gray-200 overflow-hidden flex flex-col">
+                <!-- Categories Bar -->
+                <div class="px-4 border-b border-gray-200 bg-gray-50">
+                    <CategoriesBar :categories="ordersStore.categories"
+                        :products-count="ordersStore.filteredProducts.length" @category-selected="onCategorySelected" />
+                </div>
                 <!-- Search Bar -->
                 <div class="p-4 border-b border-gray-200">
                     <BaseInput v-model="ordersStore.searchQuery" placeholder="Buscar productos..."
@@ -39,11 +44,6 @@
                     </BaseInput>
                 </div>
 
-                <!-- Categories Bar -->
-                <div class="p-4 border-b border-gray-200 bg-gray-50">
-                    <CategoriesBar :categories="ordersStore.categories"
-                        :products-count="ordersStore.filteredProducts.length" @category-selected="onCategorySelected" />
-                </div>
 
                 <!-- Products Grid -->
                 <div class="flex-1 overflow-y-auto p-4">

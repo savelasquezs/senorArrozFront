@@ -5,10 +5,10 @@
         <!-- Product Image -->
         <div class="aspect-square bg-gray-100 rounded-t-lg flex items-center justify-center relative overflow-hidden">
             <!-- Placeholder Image -->
-            <ShoppingBagIcon class="h-12 w-12 text-gray-400" />
+            <ShoppingBagIcon class="h-8 w-8 text-gray-400" />
 
             <!-- Stock Overlay -->
-            <div v-if="showStock && product.stock !== undefined" class="absolute top-2 right-2">
+            <div v-if="showStock && product.stock !== undefined" class="absolute top-1 right-1">
                 <ProductStock :stock="product.stock" variant="badge" size="sm" />
             </div>
 
@@ -19,19 +19,19 @@
         </div>
 
         <!-- Product Info -->
-        <div class="p-4">
+        <div class="p-3">
             <!-- Product Name -->
             <h3 class="text-sm font-medium text-gray-900 mb-1 line-clamp-2">
                 {{ product.name }}
             </h3>
 
             <!-- Category Badge (only in default variant) -->
-            <div v-if="variant === 'default'" class="mb-2">
-                <BaseBadge type="neutral" :text="product.categoryName || 'Sin categoría'" size="sm" />
+            <div v-if="variant === 'default'" class="mb-1">
+                <BaseBadge type="secondary" :text="product.categoryName || 'Sin categoría'" size="sm" />
             </div>
 
             <!-- Price -->
-            <div class="text-lg font-semibold text-gray-900 mb-2">
+            <div class="text-base font-semibold text-gray-900 mb-1">
                 {{ formatCurrency(product.price) }}
             </div>
 
@@ -47,14 +47,14 @@
             <!-- Add Button -->
             <BaseButton @click.stop="handleAddToOrder" variant="primary" :size="buttonSize" :loading="isLoading"
                 :disabled="isDisabled" class="w-full">
-                <PlusIcon class="w-4 h-4 mr-1" />
-                {{ buttonText }}
+                <span class="flex items-center">
+
+                    <PlusIcon class="w-4 h-4 mr-1" />
+                    {{ buttonText }}
+
+                </span>
             </BaseButton>
         </div>
-
-        <!-- Hover Overlay -->
-        <div
-            class="absolute inset-0 bg-emerald-500 bg-opacity-0 group-hover:bg-opacity-10 rounded-lg transition-all duration-200 pointer-events-none" />
     </div>
 </template>
 
@@ -114,13 +114,13 @@ const cardClasses = computed(() => {
     // Variant-specific classes
     switch (props.variant) {
         case 'compact':
-            classes.push('p-2')
+            classes.push('p-1')
             break
         case 'featured':
             classes.push('ring-2 ring-emerald-500 ring-opacity-50')
             break
         default:
-            classes.push('p-4')
+            classes.push('p-2')
     }
 
     // State classes
@@ -140,7 +140,7 @@ const buttonSize = computed(() => {
         case 'compact':
             return 'sm'
         case 'featured':
-            return 'lg'
+            return 'md'
         default:
             return 'sm'
     }
