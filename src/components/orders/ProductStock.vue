@@ -1,21 +1,21 @@
 <template>
     <div :class="containerClasses">
         <!-- Badge Variant -->
-        <BaseBadge v-if="variant === 'badge'" :type="statusType" :text="statusText" :size="size" />
+        <BaseBadge v-if="variant === 'badge'" :type="statusType" :text="statusText" :size="size" :title="tooltipText" />
 
         <!-- Icon Variant -->
-        <div v-else-if="variant === 'icon'" :class="iconClasses" :title="statusText">
+        <div v-else-if="variant === 'icon'" :class="iconClasses" :title="tooltipText">
             <component :is="statusIcon" class="w-4 h-4" />
         </div>
 
         <!-- Bar Variant -->
-        <div v-else-if="variant === 'bar'" class="w-full bg-gray-200 rounded-full h-2">
+        <div v-else-if="variant === 'bar'" class="w-full bg-gray-200 rounded-full h-2" :title="tooltipText">
             <div :class="barClasses" :style="{ width: `${stockPercentage}%` }"
                 class="h-2 rounded-full transition-all duration-300" />
         </div>
 
         <!-- Text Variant -->
-        <span v-else :class="textClasses">
+        <span v-else :class="textClasses" :title="tooltipText">
             {{ statusText }}
         </span>
     </div>
@@ -32,7 +32,7 @@ import {
 
 // Props
 interface Props {
-    stock: number
+    stock: number | undefined | null
     lowStockThreshold?: number
     variant?: 'badge' | 'bar' | 'icon' | 'text'
     showNumber?: boolean
@@ -48,6 +48,17 @@ const props = withDefaults(defineProps<Props>(), {
 
 // Computed
 const stockStatus = computed(() => {
+    // Handle undefined/null stock
+    if (props.stock === undefined || props.stock === null) {
+        return {
+            type: 'secondary' as const,
+            text: 'Sin información',
+            icon: ExclamationTriangleIcon,
+            color: 'text-gray-500',
+            bgColor: 'bg-gray-500'
+        }
+    }
+
     if (props.stock <= 0) {
         return {
             type: 'danger' as const,
@@ -79,8 +90,21 @@ const statusType = computed(() => stockStatus.value.type)
 const statusText = computed(() => stockStatus.value.text)
 const statusIcon = computed(() => stockStatus.value.icon)
 
+const tooltipText = computed(() => {
+    if (props.stock === undefined || props.stock === null) {
+        return 'Información de stock no disponible'
+    }
+    if (props.stock <= 0) {
+        return 'Producto agotado - No disponible para venta'
+    }
+    if (props.stock <= props.lowStockThreshold) {
+        return `Stock bajo: ${props.stock} unidades restantes`
+    }
+    return `Stock disponible: ${props.stock} unidades`
+})
+
 const stockPercentage = computed(() => {
-    if (props.stock <= 0) return 0
+    if (props.stock === undefined || props.stock === null || props.stock <= 0) return 0
     if (props.stock <= props.lowStockThreshold) return (props.stock / props.lowStockThreshold) * 50
     return Math.min(100, (props.stock / 20) * 100) // Assume 20+ is full
 })
