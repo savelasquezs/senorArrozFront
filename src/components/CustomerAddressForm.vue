@@ -24,8 +24,8 @@
                 </template>
             </BaseInput>
 
-            <BaseInput v-model.number="localForm.deliveryFee" label="Tarifa de Domicilio" type="number" min="0"
-                step="100" placeholder="5000" required :error="errors.deliveryFee">
+            <BaseInput v-model="localForm.deliveryFee" label="Tarifa de Domicilio" type="number" min="0" step="100"
+                placeholder="5000" required :error="errors.deliveryFee">
                 <template #icon>
                     <CurrencyDollarIcon class="w-4 h-4" />
                 </template>
@@ -105,7 +105,9 @@ const localForm = reactive({ ...props.modelValue })
 watch(
     () => props.modelValue,
     (newVal) => {
+        console.log('CustomerAddressForm - modelValue changed:', newVal)
         Object.assign(localForm, newVal)
+        console.log('CustomerAddressForm - localForm after assign:', localForm)
     },
     { deep: true }
 )
@@ -137,7 +139,7 @@ const isFormValid = computed(() => {
         localForm.address.trim() &&
         localForm.latitude !== 0 &&
         localForm.longitude !== 0 &&
-        localForm.deliveryFee > 0 &&
+        Number(localForm.deliveryFee) > 0 &&
         !errors.neighborhoodId &&
         !errors.address &&
         !errors.latitude &&
@@ -195,9 +197,11 @@ const validateForm = () => {
         errors.longitude = ""
     }
 
-    if (localForm.deliveryFee <= 0) {
+    if (Number(localForm.deliveryFee) <= 0) {
+        console.log('CustomerAddressForm - deliveryFee validation failed:', localForm.deliveryFee, typeof localForm.deliveryFee)
         errors.deliveryFee = "La tarifa de domicilio es requerida"
     } else {
+        console.log('CustomerAddressForm - deliveryFee validation passed:', localForm.deliveryFee, typeof localForm.deliveryFee)
         errors.deliveryFee = ""
     }
 }
