@@ -108,6 +108,10 @@
         <div v-if="error && !selectedCustomer" class="mt-2 text-sm text-red-600">
             {{ error }}
         </div>
+
+        <!-- Customer Detail Modal -->
+        <CustomerDetailModal :show="showCustomerDetail" :customer="selectedCustomer || undefined"
+            @close="closeCustomerDetail" @edit-customer="handleEditCustomer" />
     </div>
 </template>
 
@@ -124,6 +128,7 @@ import BaseInput from '@/components/ui/BaseInput.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseDialog from '@/components/ui/BaseDialog.vue'
 import CustomerForm from '@/components/CustomerForm.vue'
+import CustomerDetailModal from '@/components/orders/CustomerDetailModal.vue'
 
 // Icons
 import {
@@ -161,6 +166,7 @@ const { success, error: showError } = useToast()
 const searchQuery = ref('')
 const searchResults = ref<Customer[]>([])
 const showCreateModal = ref(false)
+const showCustomerDetail = ref(false)
 const isCreating = ref(false)
 const createdCustomer = ref<Customer | null>(null)
 const error = ref('')
@@ -290,11 +296,21 @@ const closeCreateModal = () => {
 
 const viewCustomer = () => {
     if (selectedCustomer.value) {
-        // Navigate to customer detail view
-        // const router = useRouter()
-        // router.push(`/customers/${selectedCustomer.value.id}`)
-        console.log('Navigate to customer:', selectedCustomer.value.id)
+        showCustomerDetail.value = true
     }
+}
+
+const closeCustomerDetail = () => {
+    showCustomerDetail.value = false
+}
+
+const handleEditCustomer = (customer: Customer) => {
+    // Close detail modal
+    showCustomerDetail.value = false
+    // Here you could open an edit modal or navigate to edit page
+    console.log('Edit customer:', customer.id)
+    // For now, just show a toast
+    success('Funcionalidad de edición', 3000, 'La funcionalidad de edición estará disponible próximamente')
 }
 
 // Watch for search query changes

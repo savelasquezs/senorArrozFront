@@ -16,7 +16,7 @@
         <!-- Customer Selection -->
         <div class="space-y-4">
             <!-- Customer Selector -->
-            <CustomerSelector :selected-customer="selectedCustomer" :required="isCustomerRequired"
+            <CustomerSelector :selected-customer="selectedCustomer?.id" :required="isCustomerRequired"
                 @customer-selected="handleCustomerSelect" />
 
             <!-- Address Selector (only for delivery) -->

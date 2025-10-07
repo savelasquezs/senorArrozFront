@@ -1,6 +1,19 @@
 <template>
     <BaseCard class="order-header" :class="headerClasses">
         <!-- Header Content -->
+        <div class="flex items-center gap-2">
+            <!-- Order Type Selector -->
+            <BaseSelect :model-value="internalOrderType" @update:model-value="handleTypeChange"
+                :options="orderTypeOptions" placeholder="Tipo de pedido" size="sm" class="min-w-32" value-key="value"
+                display-key="label" />
+
+            <!-- Clear Button -->
+            <BaseButton v-if="showClearButton" @click="handleClear" variant="ghost" size="sm"
+                :disabled="totalItems === 0" class="text-gray-500 hover:text-red-600">
+                <TrashIcon class="w-4 h-4 mr-1" />
+                Limpiar
+            </BaseButton>
+        </div>
         <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
             <!-- Left Section: Order Info -->
             <div class="flex flex-col sm:flex-row sm:items-center gap-4">
@@ -45,25 +58,14 @@
                 </div>
 
                 <!-- Actions -->
-                <div class="flex items-center gap-2">
-                    <!-- Order Type Selector -->
-                    <BaseSelect :model-value="orderType" @update:model-value="handleTypeChange"
-                        :options="orderTypeOptions" placeholder="Tipo de pedido" size="sm" class="min-w-32" />
 
-                    <!-- Clear Button -->
-                    <BaseButton v-if="showClearButton" @click="handleClear" variant="ghost" size="sm"
-                        :disabled="totalItems === 0" class="text-gray-500 hover:text-red-600">
-                        <TrashIcon class="w-4 h-4 mr-1" />
-                        Limpiar
-                    </BaseButton>
-                </div>
             </div>
         </div>
 
         <!-- Customer Section -->
         <div v-if="showCustomerSection" class="mt-4 border-t border-gray-200 pt-4">
             <CustomerSection :selected-customer="internalSelectedCustomer" :selected-address="internalSelectedAddress"
-                :order-type="orderType" :loading="loading" @customer-selected="handleCustomerSelect"
+                :order-type="internalOrderType" :loading="loading" @customer-selected="handleCustomerSelect"
                 @address-selected="handleAddressSelect" />
         </div>
 
@@ -130,6 +132,7 @@ const { formatCurrency } = useFormatting()
 // Internal state for customer and address
 const internalSelectedCustomer = ref<Customer | undefined>(props.selectedCustomer)
 const internalSelectedAddress = ref<CustomerAddress | undefined>(props.selectedAddress)
+const internalOrderType = ref<OrderType>(props.orderType)
 
 // Watch for prop changes to sync internal state
 watch(() => props.selectedCustomer, (newCustomer) => {
@@ -140,6 +143,10 @@ watch(() => props.selectedAddress, (newAddress) => {
     internalSelectedAddress.value = newAddress
 }, { immediate: true })
 
+watch(() => props.orderType, (newType) => {
+    internalOrderType.value = newType
+}, { immediate: true })
+
 // Computed
 const orderTypeOptions = computed(() => [
     { value: 'onsite', label: 'En el local' },
@@ -148,12 +155,12 @@ const orderTypeOptions = computed(() => [
 ])
 
 const orderTypeLabel = computed(() => {
-    const option = orderTypeOptions.value.find(opt => opt.value === props.orderType)
-    return option?.label || props.orderType
+    const option = orderTypeOptions.value.find(opt => opt.value === internalOrderType.value)
+    return option?.label || internalOrderType.value
 })
 
 const orderTypeColor = computed(() => {
-    switch (props.orderType) {
+    switch (internalOrderType.value) {
         case 'onsite':
             return 'success'
         case 'delivery':
@@ -168,15 +175,16 @@ const orderTypeColor = computed(() => {
 const headerClasses = computed(() => [
     'relative transition-all duration-200',
     {
-        'border-emerald-200 bg-emerald-50': props.orderType === 'onsite',
-        'border-blue-200 bg-blue-50': props.orderType === 'delivery',
-        'border-yellow-200 bg-yellow-50': props.orderType === 'reservation',
-        'border-gray-200 bg-white': !props.orderType
+        'border-emerald-200 bg-emerald-50': internalOrderType.value === 'onsite',
+        'border-blue-200 bg-blue-50': internalOrderType.value === 'delivery',
+        'border-yellow-200 bg-yellow-50': internalOrderType.value === 'reservation',
+        'border-gray-200 bg-white': !internalOrderType.value
     }
 ])
 
 // Methods
 const handleTypeChange = (newType: OrderType) => {
+    internalOrderType.value = newType
     emit('typeChange', newType)
 }
 
