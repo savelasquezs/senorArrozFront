@@ -1,12 +1,22 @@
 <template>
     <div class="order-sidebar bg-white border-l border-gray-200 h-full flex flex-col">
         <!-- Header -->
-        <div class="flex items-center justify-between p-4 border-b border-gray-200">
-            <h2 class="text-lg font-semibold text-gray-900">Pedidos Activos</h2>
-            <BaseButton @click="() => createNewOrder()" variant="primary" size="sm">
-                <PlusIcon class="w-4 h-4 mr-1" />
-                Nuevo
-            </BaseButton>
+        <div class="p-4 border-b border-gray-200">
+            <OrderHeader :order-type="activeOrder?.type || 'delivery'" :order-number="activeOrder?.id?.slice(-4)"
+                :customer-name="getCustomerName(activeOrder?.customerId)"
+                :selected-customer="getCustomer(activeOrder?.customerId)"
+                :selected-address="getAddress(activeOrder?.addressId)"
+                :total-items="activeOrder?.orderDetails?.length || 0" :total-amount="activeOrder?.total || 0"
+                :loading="false" @type-change="handleOrderTypeChange" @clear="clearActiveOrder"
+                @customer-selected="handleCustomerSelect" @address-selected="handleAddressSelect" />
+
+            <!-- Create New Order Button -->
+            <div class="mt-4 flex justify-center">
+                <BaseButton @click="() => createNewOrder()" variant="primary" size="sm" class="w-full">
+                    <PlusIcon class="w-4 h-4 mr-1" />
+                    Nuevo Pedido
+                </BaseButton>
+            </div>
         </div>
 
         <!-- Tabs -->
@@ -133,6 +143,7 @@ import type { ActiveOrder, OrderType } from '@/types/order'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseDialog from '@/components/ui/BaseDialog.vue'
 import OrderTab from '@/components/OrderTab.vue'
+import OrderHeader from '@/components/orders/OrderHeader.vue'
 
 // Icons
 import {
@@ -262,6 +273,53 @@ const formatReservationDate = (date: string): string => {
         hour: '2-digit',
         minute: '2-digit'
     })
+}
+
+// Helper methods for OrderHeader
+const getCustomerName = (customerId?: number): string => {
+    if (!customerId) return ''
+    const customer = ordersStore.customers.find(c => c.id === customerId)
+    return customer?.name || ''
+}
+
+const getCustomer = (customerId?: number) => {
+    if (!customerId) return undefined
+    return ordersStore.customers.find(c => c.id === customerId)
+}
+
+const getAddress = (addressId?: number) => {
+    if (!addressId) return undefined
+    // This would need to be implemented in the store to fetch addresses
+    // For now, returning undefined
+    return undefined
+}
+
+// OrderHeader event handlers
+const handleOrderTypeChange = (newType: OrderType) => {
+    if (activeOrder.value) {
+        activeOrder.value.type = newType
+        activeOrder.value.isDirty = true
+    }
+}
+
+const clearActiveOrder = () => {
+    if (activeOrderId.value) {
+        closeOrder(activeOrderId.value)
+    }
+}
+
+const handleCustomerSelect = (customer: any) => {
+    if (activeOrder.value) {
+        activeOrder.value.customerId = customer?.id || null
+        activeOrder.value.isDirty = true
+    }
+}
+
+const handleAddressSelect = (address: any) => {
+    if (activeOrder.value) {
+        activeOrder.value.addressId = address?.id || null
+        activeOrder.value.isDirty = true
+    }
 }
 </script>
 
