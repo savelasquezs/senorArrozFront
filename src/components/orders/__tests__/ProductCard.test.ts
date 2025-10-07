@@ -70,14 +70,24 @@ describe('ProductCard', () => {
         expect(wrapper.classes()).toContain('cursor-not-allowed')
     })
 
-    it('shows disabled state when product is out of stock', () => {
-        const outOfStockProduct = { ...mockProduct, stock: 0 }
+    it('shows disabled state when product has negative stock', () => {
+        const negativeStockProduct = { ...mockProduct, stock: -1 }
         const wrapper = mount(ProductCard, {
-            props: { product: outOfStockProduct }
+            props: { product: negativeStockProduct }
         })
 
         expect(wrapper.classes()).toContain('opacity-50')
         expect(wrapper.classes()).toContain('cursor-not-allowed')
+    })
+
+    it('shows enabled state when product has zero stock', () => {
+        const zeroStockProduct = { ...mockProduct, stock: 0 }
+        const wrapper = mount(ProductCard, {
+            props: { product: zeroStockProduct }
+        })
+
+        expect(wrapper.classes()).not.toContain('opacity-50')
+        expect(wrapper.classes()).not.toContain('cursor-not-allowed')
     })
 
     it('emits product-click event when clicked', async () => {

@@ -5,6 +5,7 @@
             <ProductCardSkeleton v-for="n in skeletonCount" :key="`skeleton-${n}`" :variant="cardVariant" />
         </div>
 
+
         <!-- Empty State -->
         <div v-else-if="products.length === 0" class="empty-state">
             <div class="text-center py-12">
@@ -23,6 +24,7 @@
             <ProductCard v-for="product in products" :key="product.id" :product="product" :variant="cardVariant"
                 :show-stock="showStock" :is-selected="isProductSelected(product)" @product-click="handleProductClick"
                 @product-add="handleProductAdd" />
+
         </div>
     </div>
 </template>

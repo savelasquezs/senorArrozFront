@@ -1,6 +1,7 @@
 <template>
     <div class="product-card group cursor-pointer bg-white rounded-lg shadow-sm border border-gray-200 hover:shadow-md hover:border-emerald-300 transition-all duration-200"
         :class="cardClasses" @click="handleClick">
+
         <!-- Product Image -->
         <div class="aspect-square bg-gray-100 rounded-t-lg flex items-center justify-center relative overflow-hidden">
             <!-- Placeholder Image -->
@@ -104,7 +105,7 @@ const { success } = useToast()
 const isDisabled = computed(() => {
     return props.disabled ||
         !props.product.active ||
-        (props.product.stock !== undefined && props.product.stock <= 0)
+        (props.product.stock !== undefined && props.product.stock < 0) // Solo deshabilitar si stock es negativo
 })
 
 const cardClasses = computed(() => {

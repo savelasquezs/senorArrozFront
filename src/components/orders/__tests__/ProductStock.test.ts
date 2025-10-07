@@ -5,7 +5,7 @@ import ProductStock from '@/components/orders/ProductStock.vue'
 describe('ProductStock', () => {
     it('shows correct status for available stock', () => {
         const wrapper = mount(ProductStock, {
-            props: { stock: 10 }
+            props: { stock: 10, variant: 'text' }
         })
 
         expect(wrapper.text()).toContain('Disponible (10)')
@@ -13,7 +13,7 @@ describe('ProductStock', () => {
 
     it('shows correct status for low stock', () => {
         const wrapper = mount(ProductStock, {
-            props: { stock: 3 }
+            props: { stock: 3, variant: 'text' }
         })
 
         expect(wrapper.text()).toContain('Bajo stock (3)')
@@ -21,7 +21,7 @@ describe('ProductStock', () => {
 
     it('shows correct status for out of stock', () => {
         const wrapper = mount(ProductStock, {
-            props: { stock: 0 }
+            props: { stock: 0, variant: 'text' }
         })
 
         expect(wrapper.text()).toContain('Sin stock')
@@ -75,7 +75,8 @@ describe('ProductStock', () => {
         const wrapper = mount(ProductStock, {
             props: {
                 stock: 10,
-                showNumber: false
+                showNumber: false,
+                variant: 'text'
             }
         })
 
@@ -87,7 +88,8 @@ describe('ProductStock', () => {
         const wrapper = mount(ProductStock, {
             props: {
                 stock: 8,
-                lowStockThreshold: 10
+                lowStockThreshold: 10,
+                variant: 'text'
             }
         })
 

@@ -171,16 +171,16 @@ const routes: RouteRecordRaw[] = [
             title: 'Gestión de Pedidos'
         }
     },
-    {
-        path: '/delivery',
-        name: 'Delivery',
-        component: () => import('@/views/DeliveryView.vue'),
-        meta: {
-            requiresAuth: true,
-            requiresRole: [UserRole.SUPERADMIN, UserRole.ADMIN, UserRole.DELIVERYMAN],
-            title: 'Módulo de Domicilios'
-        }
-    },
+    // {
+    //     path: '/delivery',
+    //     name: 'Delivery',
+    //     component: () => import('@/views/DeliveryView.vue'),
+    //     meta: {
+    //         requiresAuth: true,
+    //         requiresRole: [UserRole.SUPERADMIN, UserRole.ADMIN, UserRole.DELIVERYMAN],
+    //         title: 'Módulo de Domicilios'
+    //     }
+    // },
 
 
     //   {
