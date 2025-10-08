@@ -208,6 +208,31 @@ export const useCustomersStore = defineStore('customers', () => {
         }
     };
 
+    // Set primary address
+    const setPrimaryAddress = async (customerId: number, addressId: number) => {
+        try {
+            isLoading.value = true;
+            error.value = null;
+            const res = await customerApi.setPrimaryAddress(customerId, addressId);
+
+            // Update the address in local state
+            const addressIndex = addresses.value.findIndex(addr => addr.id === addressId);
+            if (addressIndex !== -1) {
+                // Set all addresses as non-primary first
+                addresses.value.forEach(addr => addr.isPrimary = false);
+                // Set the selected address as primary
+                addresses.value[addressIndex] = res.data;
+            }
+
+            return res.data;
+        } catch (err: any) {
+            error.value = err.message || 'Error al establecer dirección como principal';
+            throw err;
+        } finally {
+            isLoading.value = false;
+        }
+    };
+
     // Fetch neighborhoods
     const fetchNeighborhoods = async () => {
         try {
@@ -276,6 +301,7 @@ export const useCustomersStore = defineStore('customers', () => {
         createAddress,
         updateAddress,
         removeAddress,
+        setPrimaryAddress,
         fetchNeighborhoods,
         createNeighborhood,
         clear,

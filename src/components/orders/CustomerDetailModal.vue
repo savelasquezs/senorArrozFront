@@ -259,10 +259,15 @@ const handleEditAddress = (address: CustomerAddress) => {
 }
 
 const handleSetPrimary = async (address: CustomerAddress) => {
-    // This would typically call an API to set address as primary
-    console.log('Set primary address:', address.id)
+    if (!customer) return
 
-    success('Dirección principal', 2000, 'Dirección establecida como principal')
+    try {
+        console.log("algo")
+        await customersStore.setPrimaryAddress(customer.id, address.id)
+        success('Dirección principal', 2000, 'Dirección establecida como principal')
+    } catch (error: any) {
+        showError('Error al establecer dirección principal', error.message || 'No se pudo establecer la dirección como principal')
+    }
 }
 
 const handleDeleteAddress = (address: CustomerAddress) => {

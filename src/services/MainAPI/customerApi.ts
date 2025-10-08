@@ -100,12 +100,17 @@ class CustomerApi extends BaseApi {
         return this.delete<ApiResponse<string>>(`/customers/${customerId}/addresses/${addressId}`);
     }
 
-    // 11. Obtener barrios por sucursal
+    // 11. Establecer dirección como principal
+    async setPrimaryAddress(customerId: number, addressId: number): Promise<ApiResponse<CustomerAddress>> {
+        return this.put<ApiResponse<CustomerAddress>>(`/customers/${customerId}/addresses/${addressId}/set-primary`);
+    }
+
+    // 12. Obtener barrios por sucursal
     async getNeighborhoods(): Promise<ApiResponse<Neighborhood[]>> {
         return this.get<ApiResponse<Neighborhood[]>>('/customers/neighborhoods');
     }
 
-    // 12. Crear barrio
+    // 13. Crear barrio
     async createNeighborhood(payload: { name: string; deliveryFee: number; branchId: number }): Promise<ApiResponse<Neighborhood>> {
         return this.post<ApiResponse<Neighborhood>>(`/branches/${payload.branchId}/neighborhoods`, payload);
     }
