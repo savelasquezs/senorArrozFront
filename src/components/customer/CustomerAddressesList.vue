@@ -15,52 +15,8 @@
 
         <!-- Addresses List -->
         <div v-if="customerAddresses.length > 0" class="space-y-3">
-            <div v-for="address in customerAddresses" :key="address.id"
-                class="border border-gray-200 rounded-lg p-3 hover:bg-gray-50 transition-colors">
-                <div class="flex items-start justify-between">
-                    <div class="flex-1">
-                        <div class="flex items-center gap-2 mb-1">
-                            <span class="text-sm font-medium text-gray-900">{{ address.address }}</span>
-                            <BaseBadge v-if="address.isPrimary" type="primary" text="Principal" size="sm" />
-                        </div>
-                        <div class="text-xs text-gray-500">
-                            {{ address.neighborhoodName || 'Barrio no especificado' }}
-                        </div>
-                        <div v-if="address.additionalInfo" class="text-xs text-gray-500 mt-1">
-                            {{ address.additionalInfo }}
-                        </div>
-                    </div>
-                    <div class="text-right">
-                        <div class="text-sm font-medium text-gray-900">
-                            {{ formatCurrency(address.deliveryFee) }}
-                        </div>
-                        <div class="text-xs text-gray-500">Domicilio</div>
-                    </div>
-                </div>
-
-                <!-- Address Actions -->
-                <div v-if="showActions" class="flex gap-2 mt-3 pt-2 border-t border-gray-100">
-                    <BaseButton @click="handleEditAddress(address)" variant="outline" size="sm" class="flex-1">
-                        <span class="flex items-center justify-center">
-                            <PencilIcon class="w-4 h-4 mr-2" />
-                            Editar
-                        </span>
-                    </BaseButton>
-                    <BaseButton @click="handleSetPrimary(address)" variant="outline" size="sm"
-                        :disabled="address.isPrimary" class="flex-1">
-                        <span class="flex items-center justify-center">
-                            <StarIcon class="w-4 h-4 mr-2" />
-                            {{ address.isPrimary ? 'Principal' : 'Hacer Principal' }}
-                        </span>
-                    </BaseButton>
-                    <BaseButton @click="handleDeleteAddress(address)" variant="danger" size="sm">
-                        <span class="flex items-center justify-center">
-                            <TrashIcon class="w-4 h-4 mr-2" />
-                            Eliminar
-                        </span>
-                    </BaseButton>
-                </div>
-            </div>
+            <CustomerAddressItem v-for="address in customerAddresses" :key="address.id" :address="address"
+                :customer="customer" :show-actions="showActions" />
         </div>
 
         <!-- No Addresses -->
@@ -75,25 +31,55 @@
             </BaseButton>
         </div>
     </div>
+
+    <!-- Address Creation Modal -->
+    <BaseDialog v-model="showCreateModal" size="lg">
+        <div class="address-create-modal">
+            <!-- Modal Header -->
+            <div class="flex items-center justify-between mb-6">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
+                        <MapPinIcon class="w-5 h-5 text-blue-600" />
+                    </div>
+                    <div>
+                        <h2 class="text-xl font-semibold text-gray-900">
+                            Nueva Dirección
+                        </h2>
+                        <p class="text-sm text-gray-500">
+                            Agrega una nueva dirección para este cliente
+                        </p>
+                    </div>
+                </div>
+                <BaseButton @click="closeCreateModal" variant="ghost" size="sm">
+                    <XMarkIcon class="w-5 h-5" />
+                </BaseButton>
+            </div>
+
+            <!-- Address Form -->
+            <CustomerAddressForm v-if="customer" :customer-id="customer.id" :model-value="addressFormData"
+                :loading="createLoading" :branch-id="customer.branchId" @submit="handleAddressSubmit"
+                @cancel="closeCreateModal" @update:model-value="updateAddressFormData" />
+        </div>
+    </BaseDialog>
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
-import type { Customer, CustomerAddress } from '@/types/customer'
-import { useFormatting } from '@/composables/useFormatting'
+import { computed, ref, reactive } from 'vue'
+import type { Customer, CustomerAddressFormData, CreateCustomerAddressDto } from '@/types/customer'
 import { useCustomersStore } from '@/store/customers'
+import { useToast } from '@/composables/useToast'
 
 // Components
 import BaseButton from '@/components/ui/BaseButton.vue'
-import BaseBadge from '@/components/ui/BaseBadge.vue'
+import BaseDialog from '@/components/ui/BaseDialog.vue'
+import CustomerAddressItem from '@/components/customer/CustomerAddressItem.vue'
+import CustomerAddressForm from '@/components/customer/CustomerAddressForm.vue'
 
 // Icons
 import {
     MapPinIcon,
     PlusIcon,
-    PencilIcon,
-    StarIcon,
-    TrashIcon
+    XMarkIcon
 } from '@heroicons/vue/24/outline'
 
 interface Props {
@@ -105,15 +91,21 @@ const props = withDefaults(defineProps<Props>(), {
     showActions: true
 })
 
-const emit = defineEmits<{
-    (e: 'addAddress', customer: Customer): void
-    (e: 'editAddress', address: CustomerAddress): void
-    (e: 'setPrimary', address: CustomerAddress): void
-    (e: 'deleteAddress', address: CustomerAddress): void
-}>()
+// State for create modal
+const showCreateModal = ref(false)
+const createLoading = ref(false)
+const addressFormData = reactive<CustomerAddressFormData>({
+    neighborhoodId: 0,
+    address: '',
+    additionalInfo: '',
+    latitude: undefined,
+    longitude: undefined,
+    isPrimary: false,
+    deliveryFee: 0
+})
 
 // Composables
-const { formatCurrency } = useFormatting()
+const { success, error: showError } = useToast()
 const customersStore = useCustomersStore()
 
 // Computed
@@ -124,18 +116,63 @@ const customerAddresses = computed(() => {
 
 // Methods
 const handleAddAddress = () => {
-    emit('addAddress', props.customer)
+    resetAddressFormData()
+    showCreateModal.value = true
 }
 
-const handleEditAddress = (address: CustomerAddress) => {
-    emit('editAddress', address)
+const closeCreateModal = () => {
+    showCreateModal.value = false
+    resetAddressFormData()
 }
 
-const handleSetPrimary = (address: CustomerAddress) => {
-    emit('setPrimary', address)
+const resetAddressFormData = () => {
+    Object.assign(addressFormData, {
+        neighborhoodId: 0,
+        address: '',
+        additionalInfo: '',
+        latitude: undefined,
+        longitude: undefined,
+        isPrimary: false,
+        deliveryFee: 0
+    })
 }
 
-const handleDeleteAddress = (address: CustomerAddress) => {
-    emit('deleteAddress', address)
+const updateAddressFormData = (data: CustomerAddressFormData) => {
+    Object.assign(addressFormData, data)
+}
+
+const handleAddressSubmit = async (data: CustomerAddressFormData) => {
+    createLoading.value = true
+
+    try {
+        const createData: CreateCustomerAddressDto = {
+            neighborhoodId: data.neighborhoodId,
+            address: data.address,
+            additionalInfo: data.additionalInfo,
+            latitude: data.latitude,
+            longitude: data.longitude,
+            isPrimary: data.isPrimary,
+            deliveryFee: data.deliveryFee
+        }
+
+        await customersStore.createAddress(props.customer.id, createData)
+
+        // Refresh addresses to update local store
+        await customersStore.fetchAddresses(props.customer.id)
+
+        success('Dirección creada', 2000, 'La nueva dirección ha sido creada correctamente')
+        closeCreateModal()
+    } catch (error: any) {
+        showError('Error al crear dirección', error.message || 'No se pudo crear la dirección')
+    } finally {
+        createLoading.value = false
+    }
 }
 </script>
+
+<style scoped>
+.address-create-modal {
+    max-height: 90vh;
+    overflow-y: auto;
+}
+</style>

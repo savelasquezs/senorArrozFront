@@ -61,9 +61,7 @@
                 </div>
 
                 <!-- Addresses Section -->
-                <CustomerAddressesList :customer="customer" :show-actions="showActions" @add-address="handleAddAddress"
-                    @edit-address="handleEditAddress" @set-primary="handleSetPrimary"
-                    @delete-address="handleDeleteAddress" />
+                <CustomerAddressesList :customer="customer" :show-actions="showActions" />
             </div>
 
             <!-- Loading State -->
@@ -85,42 +83,12 @@
             </div>
         </div>
 
-        <!-- Address Form Modal -->
-        <BaseDialog v-model="showAddressForm" size="lg">
-            <div class="address-form-modal">
-                <!-- Modal Header -->
-                <div class="flex items-center justify-between mb-6">
-                    <div class="flex items-center gap-3">
-                        <div class="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
-                            <MapPinIcon class="w-5 h-5 text-blue-600" />
-                        </div>
-                        <div>
-                            <h2 class="text-xl font-semibold text-gray-900">
-                                {{ editingAddress ? 'Editar Dirección' : 'Nueva Dirección' }}
-                            </h2>
-                            <p class="text-sm text-gray-500">
-                                {{ editingAddress ? 'Modifica dirección' : 'Agrega dirección' }}
-                            </p>
-                        </div>
-                    </div>
-                    <BaseButton @click="closeAddressForm" variant="ghost" size="sm">
-                        <XMarkIcon class="w-5 h-5" />
-                    </BaseButton>
-                </div>
-
-                <!-- Address Form -->
-                <CustomerAddressForm v-if="customer" :customer-id="customer.id" :address="editingAddress"
-                    :model-value="addressFormData" :loading="addressFormLoading" :branch-id="customer.branchId"
-                    @submit="handleAddressSubmit" @cancel="closeAddressForm"
-                    @update:model-value="updateAddressFormData" />
-            </div>
-        </BaseDialog>
     </BaseDialog>
 </template>
 
 <script setup lang="ts">
-import { ref, watch, reactive } from 'vue'
-import type { Customer, CustomerAddress, CustomerAddressFormData, CreateCustomerAddressDto, UpdateCustomerAddressDto } from '@/types/customer'
+import { ref, watch } from 'vue'
+import type { Customer } from '@/types/customer'
 import { useToast } from '@/composables/useToast'
 import { useCustomersStore } from '@/store/customers'
 
@@ -134,15 +102,13 @@ import BaseLoading from '@/components/ui/BaseLoading.vue'
 import CustomerInfoCard from '@/components/customer/CustomerInfoCard.vue'
 import CustomerStatsCard from '@/components/customer/CustomerStatsCard.vue'
 import CustomerAddressesList from '@/components/customer/CustomerAddressesList.vue'
-import CustomerAddressForm from '@/components/customer/CustomerAddressForm.vue'
 
 // Icons
 import {
     UserIcon,
     PhoneIcon,
     XMarkIcon,
-    ExclamationTriangleIcon,
-    MapPinIcon
+    ExclamationTriangleIcon
 } from '@heroicons/vue/24/outline'
 
 interface Props {
@@ -179,19 +145,6 @@ watch(internalShow, (newValue) => {
     }
 })
 
-// State for address form modal
-const showAddressForm = ref(false)
-const editingAddress = ref<CustomerAddress | undefined>(undefined)
-const addressFormLoading = ref(false)
-const addressFormData = reactive<CustomerAddressFormData>({
-    neighborhoodId: 0,
-    address: '',
-    additionalInfo: '',
-    latitude: undefined,
-    longitude: undefined,
-    isPrimary: false,
-    deliveryFee: 0
-})
 
 const emit = defineEmits<{
     (e: 'close'): void
@@ -199,7 +152,7 @@ const emit = defineEmits<{
 }>()
 
 // Composables
-const { success, error: showError } = useToast()
+const { success } = useToast()
 const customersStore = useCustomersStore()
 
 // Debug logs
@@ -244,134 +197,14 @@ const handleCreateOrder = (customer: Customer) => {
     success('Nuevo pedido', 2000, 'Pedido creado para el cliente seleccionado')
 }
 
-const handleAddAddress = (customer: Customer) => {
-    editingAddress.value = undefined
-    resetAddressFormData()
-    showAddressForm.value = true
-    console.log('Add address for customer:', customer.id)
-}
 
-const handleEditAddress = (address: CustomerAddress) => {
-    editingAddress.value = address
-    populateAddressFormData(address)
-    showAddressForm.value = true
-    console.log('Edit address:', address.id)
-}
 
-const handleSetPrimary = async (address: CustomerAddress) => {
-    if (!customer) return
 
-    try {
-        console.log("algo")
-        await customersStore.setPrimaryAddress(customer.id, address.id)
-        success('Dirección principal', 2000, 'Dirección establecida como principal')
-    } catch (error: any) {
-        showError('Error al establecer dirección principal', error.message || 'No se pudo establecer la dirección como principal')
-    }
-}
-
-const handleDeleteAddress = (address: CustomerAddress) => {
-    // This would typically call an API to delete address
-    console.log('Delete address:', address.id)
-    success('Dirección eliminada', 2000, 'Dirección eliminada correctamente')
-}
-
-// Address form methods
-const closeAddressForm = () => {
-    showAddressForm.value = false
-    editingAddress.value = undefined
-    resetAddressFormData()
-}
-
-const resetAddressFormData = () => {
-    Object.assign(addressFormData, {
-        neighborhoodId: 0,
-        address: '',
-        additionalInfo: '',
-        latitude: undefined,
-        longitude: undefined,
-        isPrimary: false,
-        deliveryFee: 0
-    })
-}
-
-const populateAddressFormData = (address: CustomerAddress) => {
-    Object.assign(addressFormData, {
-        neighborhoodId: address.neighborhoodId,
-        address: address.address,
-        additionalInfo: address.additionalInfo || '',
-        latitude: address.latitude,
-        longitude: address.longitude,
-        isPrimary: address.isPrimary,
-        deliveryFee: address.deliveryFee || 0
-    })
-}
-
-const updateAddressFormData = (data: CustomerAddressFormData) => {
-    Object.assign(addressFormData, data)
-}
-
-const handleAddressSubmit = async (data: CustomerAddressFormData) => {
-    if (!customer) return
-
-    addressFormLoading.value = true
-
-    try {
-        if (editingAddress.value) {
-            // Update existing address
-            const updateData: UpdateCustomerAddressDto = {
-                neighborhoodId: data.neighborhoodId,
-                address: data.address,
-                additionalInfo: data.additionalInfo,
-                latitude: data.latitude,
-                longitude: data.longitude,
-                isPrimary: data.isPrimary,
-                deliveryFee: data.deliveryFee
-            }
-
-            await customersStore.updateAddress(customer.id, editingAddress.value.id, updateData)
-
-            // Refresh addresses to update local store
-            await customersStore.fetchAddresses(customer.id)
-
-            success('Dirección actualizada', 2000, 'La dirección ha sido actualizada correctamente')
-        } else {
-            // Create new address
-            const createData: CreateCustomerAddressDto = {
-                neighborhoodId: data.neighborhoodId,
-                address: data.address,
-                additionalInfo: data.additionalInfo,
-                latitude: data.latitude,
-                longitude: data.longitude,
-                isPrimary: data.isPrimary,
-                deliveryFee: data.deliveryFee
-            }
-
-            await customersStore.createAddress(customer.id, createData)
-
-            // Refresh addresses to update local store
-            await customersStore.fetchAddresses(customer.id)
-
-            success('Dirección creada', 2000, 'La nueva dirección ha sido creada correctamente')
-        }
-
-        closeAddressForm()
-    } catch (error: any) {
-        showError('Error al guardar dirección', error.message || 'No se pudo guardar la dirección')
-    } finally {
-        addressFormLoading.value = false
-    }
-}
 </script>
 
 <style scoped>
 .customer-detail-modal {
     max-height: 80vh;
-    overflow-y: auto;
-}
-
-.address-form-modal {
-    max-height: 90vh;
     overflow-y: auto;
 }
 </style>
