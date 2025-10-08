@@ -24,7 +24,7 @@
                             <BaseBadge v-if="address.isPrimary" type="primary" text="Principal" size="sm" />
                         </div>
                         <div class="text-xs text-gray-500">
-                            {{ address.neighborhood?.name || 'Barrio no especificado' }}
+                            {{ address.neighborhoodName || 'Barrio no especificado' }}
                         </div>
                         <div v-if="address.additionalInfo" class="text-xs text-gray-500 mt-1">
                             {{ address.additionalInfo }}

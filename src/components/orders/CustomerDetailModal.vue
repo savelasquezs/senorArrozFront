@@ -258,9 +258,10 @@ const handleEditAddress = (address: CustomerAddress) => {
     console.log('Edit address:', address.id)
 }
 
-const handleSetPrimary = (address: CustomerAddress) => {
+const handleSetPrimary = async (address: CustomerAddress) => {
     // This would typically call an API to set address as primary
     console.log('Set primary address:', address.id)
+
     success('Dirección principal', 2000, 'Dirección establecida como principal')
 }
 
