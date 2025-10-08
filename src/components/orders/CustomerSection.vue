@@ -37,14 +37,11 @@
                     </div>
 
                     <!-- Customer Phones -->
-
-                    <div v-if="selectedCustomer.phone1" class="flex items-center gap-3">
-                        <PhoneIcon class="w-4 h-4 text-green-600" />
-                        <span class="text-sm text-green-800">{{ selectedCustomer.phone1 }}</span>
+                    <div v-if="selectedCustomer.phone1" class="mt-2">
+                        <PhoneNumberItem :phone-number="selectedCustomer.phone1" />
                     </div>
-                    <div v-if="selectedCustomer.phone2" class="flex items-center gap-3">
-                        <PhoneIcon class="w-4 h-4 text-green-600" />
-                        <span class="text-sm text-green-800">{{ selectedCustomer.phone2 }}</span>
+                    <div v-if="selectedCustomer.phone2" class="mt-2">
+                        <PhoneNumberItem :phone-number="selectedCustomer.phone2" />
                     </div>
 
 
@@ -102,12 +99,11 @@ import BaseAlert from '@/components/ui/BaseAlert.vue'
 import BaseLoading from '@/components/ui/BaseLoading.vue'
 import CustomerSelector from '@/components/CustomerSelector.vue'
 import AddressSelector from '@/components/AddressSelector.vue'
+import PhoneNumberItem from '@/components/ui/PhoneNumberItem.vue'
 
 // Icons
 import {
     UserIcon,
-    UserCircleIcon,
-    PhoneIcon,
     CalendarIcon,
     ClockIcon,
     ArrowsRightLeftIcon
