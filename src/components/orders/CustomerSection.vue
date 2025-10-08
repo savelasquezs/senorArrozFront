@@ -20,57 +20,56 @@
                 <CustomerSelector :required="isCustomerRequired" @customer-selected="handleCustomerSelect" />
             </div>
 
-            <!-- Address Selector (only for delivery) -->
-            <div v-if="orderType === 'delivery' && selectedCustomer" class="address-section">
-                <AddressSelector :customer-id="selectedCustomer.id" :selected-address="selectedAddress?.id"
-                    @address-selected="handleAddressSelect" />
-            </div>
-
             <!-- Customer Information Display -->
-            <div v-if="selectedCustomer" class="customer-info">
-                <!-- Customer Header with Change Button -->
-                <div class="flex items-center justify-between mb-4">
-                    <h4 class="text-sm font-medium text-gray-700">Cliente Seleccionado</h4>
-                    <BaseButton @click="handleChangeCustomer" variant="outline" size="sm">
-                        <ArrowsRightLeftIcon class="w-3 h-3 mr-1" />
-                        Cambiar Cliente
-                    </BaseButton>
-                </div>
+            <div v-if="selectedCustomer" class="customer-info space-y-4">
+                <!-- Customer Details Card -->
+                <div class="bg-green-50 border border-green-200 rounded-lg p-4">
+                    <!-- Customer Name -->
+                    <div class="flex items-center gap-3">
+                        <UserIcon class="w-4 h-4 text-green-600" />
+                        <span class="text-sm font-medium text-green-900">{{ selectedCustomer.name }}</span>
 
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <!-- Customer Details -->
-                    <div class="bg-gray-50 rounded-lg p-4">
-                        <h4 class="text-sm font-medium text-gray-700 mb-2">Datos del Cliente</h4>
-                        <div class="space-y-2">
-                            <div class="flex items-center gap-2">
-                                <UserIcon class="w-4 h-4 text-gray-500" />
-                                <span class="text-sm text-gray-900">{{ selectedCustomer.name }}</span>
-                            </div>
-                            <div v-if="selectedCustomer.phone1" class="flex items-center gap-2">
-                                <PhoneIcon class="w-4 h-4 text-gray-500" />
-                                <span class="text-sm text-gray-900">{{ selectedCustomer.phone1 }}</span>
-                            </div>
-                            <div v-if="selectedCustomer.phone2" class="flex items-center gap-2">
-                                <PhoneIcon class="w-4 h-4 text-gray-500" />
-                                <span class="text-sm text-gray-900">{{ selectedCustomer.phone2 }}</span>
-                            </div>
-                        </div>
+                        <BaseButton @click="handleChangeCustomer" variant="outline" size="sm"
+                            class="text-green-700 border-green-300 hover:bg-green-100">
+                            <ArrowsRightLeftIcon class="w-3 h-3 mr-1" />
+
+                        </BaseButton>
+                    </div>
+
+                    <!-- Customer Phones -->
+
+                    <div v-if="selectedCustomer.phone1" class="flex items-center gap-3">
+                        <PhoneIcon class="w-4 h-4 text-green-600" />
+                        <span class="text-sm text-green-800">{{ selectedCustomer.phone1 }}</span>
+                    </div>
+                    <div v-if="selectedCustomer.phone2" class="flex items-center gap-3">
+                        <PhoneIcon class="w-4 h-4 text-green-600" />
+                        <span class="text-sm text-green-800">{{ selectedCustomer.phone2 }}</span>
                     </div>
 
 
+                </div>
 
-                    <!-- Reservation Information (only for reservation) -->
-                    <div v-if="orderType === 'reservation'" class="bg-yellow-50 rounded-lg p-4">
-                        <h4 class="text-sm font-medium text-gray-700 mb-2">Información de Reservación</h4>
-                        <div class="space-y-2">
-                            <div class="flex items-center gap-2">
-                                <CalendarIcon class="w-4 h-4 text-gray-500" />
-                                <span class="text-sm text-gray-900">Fecha: Por definir</span>
-                            </div>
-                            <div class="flex items-center gap-2">
-                                <ClockIcon class="w-4 h-4 text-gray-500" />
-                                <span class="text-sm text-gray-900">Hora: Por definir</span>
-                            </div>
+                <!-- Address Selector (only for delivery) -->
+                <div v-if="orderType === 'delivery'" class="address-section">
+                    <AddressSelector :customer-id="selectedCustomer.id" :selected-address="selectedAddress?.id"
+                        @address-selected="handleAddressSelect" />
+                </div>
+
+                <!-- Reservation Information (only for reservation) -->
+                <div v-if="orderType === 'reservation'" class="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                    <h4 class="text-sm font-medium text-yellow-900 mb-3 flex items-center gap-2">
+                        <CalendarIcon class="w-4 h-4" />
+                        Información de Reservación
+                    </h4>
+                    <div class="space-y-2">
+                        <div class="flex items-center gap-3">
+                            <CalendarIcon class="w-4 h-4 text-yellow-600" />
+                            <span class="text-sm text-yellow-800">Fecha: Por definir</span>
+                        </div>
+                        <div class="flex items-center gap-3">
+                            <ClockIcon class="w-4 h-4 text-yellow-600" />
+                            <span class="text-sm text-yellow-800">Hora: Por definir</span>
                         </div>
                     </div>
                 </div>
@@ -93,7 +92,6 @@
 import { computed } from 'vue'
 import type { OrderType } from '@/types/order'
 import type { Customer, CustomerAddress } from '@/types/customer'
-import { useFormatting } from '@/composables/useFormatting'
 import { useOrdersStore } from '@/store/orders'
 import { useCustomersStore } from '@/store/customers'
 
@@ -108,10 +106,8 @@ import AddressSelector from '@/components/AddressSelector.vue'
 // Icons
 import {
     UserIcon,
+    UserCircleIcon,
     PhoneIcon,
-    MapPinIcon,
-    InformationCircleIcon,
-    CurrencyDollarIcon,
     CalendarIcon,
     ClockIcon,
     ArrowsRightLeftIcon
@@ -140,7 +136,6 @@ const emit = defineEmits<{
 }>()
 
 // Composables
-const { formatCurrency } = useFormatting()
 const ordersStore = useOrdersStore()
 const customersStore = useCustomersStore()
 
