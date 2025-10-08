@@ -1,10 +1,5 @@
 <template>
     <div class="address-selector">
-        <label class="block text-sm font-medium text-gray-700 mb-2">
-            Dirección de Entrega
-            <span class="text-red-500">*</span>
-        </label>
-
         <div class="space-y-3">
             <!-- Loading State -->
             <div v-if="isLoading" class="text-center py-4">
@@ -38,16 +33,14 @@
                             <div>
                                 <div class="text-sm font-medium flex items-center">
                                     {{ selectedAddress.address }}
-                                    <BaseBadge v-if="selectedAddress.isPrimary" type="success" size="sm" class="ml-2">
-                                        Principal
-                                    </BaseBadge>
+                                </div>
+                                <div class="text-xs text-green-600">
+                                    {{ selectedAddress.additionalInfo }}
                                 </div>
                                 <div class="text-xs text-green-600">
                                     {{ selectedAddress.neighborhoodName }}
                                 </div>
-                                <div class="text-xs text-green-600">
-                                    Tel: {{ customer?.phone1 }}
-                                </div>
+
                                 <div class="text-xs text-green-600">
                                     Costo envío: {{ formatCurrency(selectedAddress.deliveryFee) }}
                                 </div>

@@ -104,6 +104,7 @@ import type { OrderType } from '@/types/order'
 import type { Customer, CustomerAddress } from '@/types/customer'
 import { useFormatting } from '@/composables/useFormatting'
 import { useOrdersStore } from '@/store/orders'
+import { useCustomersStore } from '@/store/customers'
 
 // Components
 import BaseCard from '@/components/ui/BaseCard.vue'
@@ -149,6 +150,7 @@ const emit = defineEmits<{
 // Composables
 const { formatCurrency } = useFormatting()
 const ordersStore = useOrdersStore()
+const customersStore = useCustomersStore()
 
 // Computed
 const isCustomerRequired = computed(() => {
@@ -178,15 +180,61 @@ const sectionClasses = computed(() => [
 ])
 
 // Methods
-const handleCustomerSelect = (customerId: number | undefined) => {
+const handleCustomerSelect = async (customerId: number | undefined) => {
     // Find customer by ID from the available customers in the store
     const customer = customerId ? ordersStore.customers.find(c => c.id === customerId) : undefined
     emit('customerSelected', customer)
 
-    // Clear address when customer changes
-    if (!customer) {
+    if (customer) {
+        // Auto-select address when customer is selected
+        await autoSelectAddress(customer)
+    } else {
+        // Clear address when customer changes
         emit('addressSelected', undefined)
     }
+}
+
+const autoSelectAddress = async (customer: Customer) => {
+    // First, try to get addresses from the customer object
+    let addresses = customer.addresses || []
+
+    // If no addresses in customer object, try to load from store
+    if (!addresses || addresses.length === 0) {
+        try {
+            console.log('Loading addresses from store for customer:', customer.id)
+            await customersStore.fetchAddresses(customer.id)
+            addresses = customersStore.addresses || []
+        } catch (error) {
+            console.error('Error loading addresses:', error)
+            emit('addressSelected', undefined)
+            return
+        }
+    }
+
+    // If still no addresses, don't auto-select
+    if (!addresses || addresses.length === 0) {
+        console.log('No addresses found for customer')
+        emit('addressSelected', undefined)
+        return
+    }
+
+    // Find primary address first
+    let selectedAddress = addresses.find(addr => addr.isPrimary)
+
+    // If no primary address, select the first one (if only one exists)
+    if (!selectedAddress && addresses.length === 1) {
+        selectedAddress = addresses[0]
+    }
+
+    // If still no address selected and multiple addresses exist, don't auto-select
+    if (!selectedAddress) {
+        console.log('Multiple addresses found, no auto-selection')
+        emit('addressSelected', undefined)
+        return
+    }
+
+    console.log('Auto-selected address:', selectedAddress)
+    emit('addressSelected', selectedAddress)
 }
 
 const handleAddressSelect = (addressId: number | undefined) => {
