@@ -25,69 +25,99 @@
 
             <!-- Address List -->
             <div v-else class="space-y-2">
-                <!-- Selected Address -->
-                <div v-if="selectedAddress" class="p-3 bg-green-50 border border-green-200 rounded-lg">
+                <!-- Selected Address (when one is selected) -->
+                <div v-if="selectedAddress && !showAddressSelection"
+                    class="p-3 bg-green-50 border border-green-200 rounded-lg">
                     <div class="flex items-center justify-between">
                         <div class="flex items-center">
                             <MapPinIcon class="w-6 h-6 text-green-600 mr-3" />
                             <div>
                                 <div class="text-sm font-medium flex items-center">
                                     {{ selectedAddress.address }}
+
                                 </div>
-                                <div class="text-xs text-green-600">
+                                <div v-if="selectedAddress.additionalInfo" class="text-xs text-green-600">
                                     {{ selectedAddress.additionalInfo }}
                                 </div>
                                 <div class="text-xs text-green-600">
                                     {{ selectedAddress.neighborhoodName }}
                                 </div>
-
                                 <div class="text-xs text-green-600">
                                     Costo envío: {{ formatCurrency(selectedAddress.deliveryFee) }}
                                 </div>
                             </div>
                         </div>
+                    </div>
+                    <div class="flex justify-center items-center gap-2">
+                        <!-- Change Address Button -->
+                        <BaseButton @click="showAddressSelection = true" variant="outline" size="sm"
+                            class="text-blue-600 hover:text-blue-700" v-if="customerAddresses.length > 1">
+                            <span class="flex items-center">
+                                <ArrowsRightLeftIcon class="w-4 h-4 mr-1" />
+
+                            </span>
+                        </BaseButton>
+                        <!-- Edit Address Button -->
+                        <BaseButton @click="editAddress(selectedAddress)" variant="outline" size="sm"
+                            class="text-orange-600 hover:text-orange-700">
+                            <span class="flex items-center">
+                                <PencilIcon class="w-4 h-4 mr-1" />
+
+                            </span>
+                        </BaseButton>
+                        <!-- Clear Address Button -->
                         <BaseButton @click="clearAddress" variant="outline" size="sm"
                             class="text-red-600 hover:text-red-700">
-                            <XMarkIcon class="w-3 h-3" />
+                            <XMarkIcon class="w-4 h-4" />
                         </BaseButton>
                     </div>
                 </div>
 
-                <!-- Address Selection Grid -->
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
-                    <div v-for="address in customerAddresses" :key="address.id" @click="selectAddress(address)" :class="[
-                        'p-3 border rounded-lg cursor-pointer transition-colors',
-                        selectedAddress?.id === address.id
-                            ? 'border-green-500 bg-green-50'
-                            : 'border-gray-200 hover:border-indigo-300 hover:bg-indigo-50'
-                    ]">
-                        <div class="flex items-start">
-                            <MapPinIcon class="w-5 h-5 text-gray-400 mr-2 mt-0.5 flex-shrink-0" />
-                            <div class="flex-1 min-w-0">
-                                <div class="text-sm font-medium flex items-center">
-                                    {{ address.address }}
-                                    <BaseBadge v-if="address.isPrimary" type="success" size="sm"
-                                        class="ml-2 flex-shrink-0">
-                                        Principal
-                                    </BaseBadge>
-                                </div>
-                                <div class="text-xs text-gray-500 mt-1">
-                                    {{ address.neighborhoodName }}
-                                </div>
-                                <div class="text-xs text-gray-500">
-                                    {{ formatCurrency(address.deliveryFee) }}
+                <!-- Address Selection Grid (when showing selection) -->
+                <div v-if="showAddressSelection || !selectedAddress" class="space-y-3">
+                    <div v-if="showAddressSelection && selectedAddress" class="flex items-center justify-between mb-2">
+                        <h4 class="text-sm font-medium text-gray-700">Selecciona una dirección:</h4>
+                        <BaseButton @click="showAddressSelection = false" variant="ghost" size="sm">
+                            Cancelar
+                        </BaseButton>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
+                        <div v-for="address in customerAddresses" :key="address.id" @click="selectAddress(address)"
+                            :class="[
+                                'p-3 border rounded-lg cursor-pointer transition-colors',
+                                selectedAddress?.id === address.id
+                                    ? 'border-green-500 bg-green-50'
+                                    : 'border-gray-200 hover:border-indigo-300 hover:bg-indigo-50'
+                            ]">
+                            <div class="flex items-start">
+                                <MapPinIcon class="w-5 h-5 text-gray-400 mr-2 mt-0.5 flex-shrink-0" />
+                                <div class="flex-1 min-w-0">
+                                    <div class="text-sm font-medium flex items-center">
+                                        {{ address.address }}
+                                        <BaseBadge v-if="address.isPrimary" type="success" size="sm"
+                                            class="ml-2 flex-shrink-0">
+                                            Principal
+                                        </BaseBadge>
+                                    </div>
+                                    <div class="text-xs text-gray-500 mt-1">
+                                        {{ address.neighborhoodName }}
+                                    </div>
+                                    <div class="text-xs text-gray-500">
+                                        {{ formatCurrency(address.deliveryFee) }}
+                                    </div>
                                 </div>
                             </div>
                         </div>
                     </div>
-                </div>
 
-                <!-- Create New Address Button -->
-                <div class="pt-2 border-t border-gray-200">
-                    <BaseButton @click="showCreateAddress" variant="outline" size="sm" class="w-full">
-                        <PlusIcon class="w-4 h-4 mr-2" />
-                        Nueva Dirección
-                    </BaseButton>
+                    <!-- Create New Address Button -->
+                    <div class="pt-2 border-t border-gray-200">
+                        <BaseButton @click="showCreateAddress" variant="outline" size="sm" class="w-full">
+                            <PlusIcon class="w-4 h-4 mr-2" />
+                            Nueva Dirección
+                        </BaseButton>
+                    </div>
                 </div>
             </div>
         </div>
@@ -97,15 +127,21 @@
             <CustomerAddressForm :model-value="addressFormData" :customer-id="customerId" @submit="createAddress"
                 @cancel="closeCreateModal" :loading="isCreating" submit-button-text="Crear Dirección" />
         </BaseDialog>
+
+        <!-- Edit Address Modal -->
+        <BaseDialog v-model="showEditModal" title="Editar Dirección" size="lg">
+            <CustomerAddressForm v-if="editingAddress" :model-value="editFormData" :customer-id="customerId"
+                :address="editingAddress" @submit="updateAddress" @cancel="closeEditModal" :loading="isEditing"
+                submit-button-text="Actualizar Dirección" />
+        </BaseDialog>
     </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
-import { useOrdersStore } from '@/store/orders'
 import { useCustomersStore } from '@/store/customers'
 import { useToast } from '@/composables/useToast'
-import type { CustomerAddress, CreateCustomerAddressDto, CustomerAddressFormData } from '@/types/customer'
+import type { CustomerAddress, CreateCustomerAddressDto, CustomerAddressFormData, UpdateCustomerAddressDto } from '@/types/customer'
 
 // Components
 import BaseButton from '@/components/ui/BaseButton.vue'
@@ -119,6 +155,8 @@ import {
     MapPinIcon,
     PlusIcon,
     XMarkIcon,
+    PencilIcon,
+    ArrowsRightLeftIcon
 } from '@heroicons/vue/24/outline'
 
 // Props
@@ -138,7 +176,6 @@ const emit = defineEmits<{
 }>()
 
 // Composables
-const ordersStore = useOrdersStore()
 const customersStore = useCustomersStore()
 const { success, error: showError } = useToast()
 
@@ -147,6 +184,10 @@ const customerAddresses = ref<CustomerAddress[]>([])
 const isLoading = ref(false)
 const showCreateModal = ref(false)
 const isCreating = ref(false)
+const showEditModal = ref(false)
+const isEditing = ref(false)
+const showAddressSelection = ref(false)
+const editingAddress = ref<CustomerAddress | null>(null)
 
 const addressFormData = ref<CustomerAddressFormData>({
     neighborhoodId: 0,
@@ -158,11 +199,16 @@ const addressFormData = ref<CustomerAddressFormData>({
     deliveryFee: 0
 })
 
-// Computed
-const customer = computed(() => {
-    if (!props.customerId) return null
-    return ordersStore.customers.find(c => c.id === props.customerId) || null
+const editFormData = ref<CustomerAddressFormData>({
+    neighborhoodId: 0,
+    address: '',
+    additionalInfo: '',
+    latitude: undefined,
+    longitude: undefined,
+    isPrimary: false,
+    deliveryFee: 0
 })
+
 
 const selectedAddress = computed(() => {
     if (!props.selectedAddress || !customerAddresses.value) return null
@@ -198,6 +244,7 @@ const loadCustomerAddresses = async () => {
 
 const selectAddress = (address: CustomerAddress) => {
     emit('addressSelected', address.id)
+    showAddressSelection.value = false // Close selection after choosing
 }
 
 const clearAddress = () => {
@@ -244,6 +291,65 @@ const closeCreateModal = () => {
     showCreateModal.value = false
 }
 
+const editAddress = (address: CustomerAddress) => {
+    editingAddress.value = address
+    // Populate edit form with current address data
+    editFormData.value = {
+        neighborhoodId: address.neighborhoodId,
+        address: address.address,
+        additionalInfo: address.additionalInfo || '',
+        latitude: address.latitude,
+        longitude: address.longitude,
+        isPrimary: address.isPrimary,
+        deliveryFee: address.deliveryFee || 0
+    }
+    showEditModal.value = true
+}
+
+const updateAddress = async (addressData: CustomerAddressFormData) => {
+    if (!props.customerId || !editingAddress.value) return
+
+    isEditing.value = true
+    try {
+        const updateData: UpdateCustomerAddressDto = {
+            neighborhoodId: addressData.neighborhoodId,
+            address: addressData.address,
+            additionalInfo: addressData.additionalInfo,
+            latitude: addressData.latitude,
+            longitude: addressData.longitude,
+            isPrimary: addressData.isPrimary,
+            deliveryFee: addressData.deliveryFee
+        }
+
+        await customersStore.updateAddress(props.customerId, editingAddress.value.id, updateData)
+
+        // Refresh addresses list
+        await loadCustomerAddresses()
+
+        // Update selected address if it was the one being edited
+        if (selectedAddress.value?.id === editingAddress.value.id) {
+            // The address is still selected, but now updated
+            const updatedAddress = customerAddresses.value.find(a => a.id === editingAddress.value!.id)
+            if (updatedAddress) {
+                emit('addressSelected', updatedAddress.id)
+            }
+        }
+
+        success('Dirección actualizada', 3000, 'La dirección ha sido actualizada correctamente')
+    } catch (error: any) {
+        showError('Error al actualizar dirección', error.message || 'No se pudo actualizar la dirección')
+    } finally {
+        isEditing.value = false
+        showEditModal.value = false
+        editingAddress.value = null
+    }
+}
+
+const closeEditModal = () => {
+    showEditModal.value = false
+    editingAddress.value = null
+}
+
 // Watch for customer changes
 watch(() => props.customerId, (newCustomerId) => {
     if (newCustomerId) {
@@ -252,6 +358,8 @@ watch(() => props.customerId, (newCustomerId) => {
         customerAddresses.value = []
         emit('addressSelected', undefined)
     }
+    // Reset selection state when customer changes
+    showAddressSelection.value = false
 }, { immediate: true })
 </script>
 
