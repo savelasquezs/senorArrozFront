@@ -15,49 +15,14 @@
                 </template>
             </BaseInput>
 
-            <!-- Selected Customer -->
-            <div v-if="selectedCustomer" class="p-3 bg-green-50 border border-green-200 rounded-lg">
-                <div class="flex items-center justify-between">
-                    <div class="flex items-center">
-                        <UserCircleIcon class="w-8 h-8 text-green-600 mr-3" />
-                        <div>
-                            <div class="text-sm font-medium text-green-900">
-                                {{ selectedCustomer.name }}
-                            </div>
-                            <div class="text-xs text-green-600">
-                                {{ selectedCustomer.phone1 }}
-                            </div>
-                        </div>
-                    </div>
-                    <div class="flex items-center space-x-2">
-                        <!-- View Customer Button -->
-                        <BaseButton @click="viewCustomer" variant="outline" size="sm">
-                            Ver
-                        </BaseButton>
-
-                        <!-- Clear Customer Button -->
-                        <BaseButton @click="clearCustomer" variant="outline" size="sm"
-                            class="text-red-600 hover:text-red-700">
-                            <XMarkIcon class="w-3 h-3" />
-                        </BaseButton>
-                    </div>
-                </div>
-
-                <!-- Customer Addresses Preview -->
-                <div v-if="selectedCustomerAddresses.length > 0" class="mt-2 pt-2 border-t border-green-200">
-                    <div class="text-xs text-green-600 mb-1">{{ selectedCustomerAddresses.length }} direcciones
-                        disponibles</div>
-                </div>
-            </div>
-
             <!-- Customer Creation Options -->
-            <div v-else-if="searchResults.length === 0 && searchQuery.trim()">
+            <div v-if="searchResults.length === 0 && searchQuery.trim()">
                 <div class="text-center py-4 border-2 border-dashed border-gray-300 rounded-lg">
                     <UserPlusIcon class="mx-auto h-8 w-8 text-gray-400 mb-2" />
                     <p class="text-sm text-gray-500 mb-3">No se encontró cliente</p>
                     <BaseButton @click="showCreateCustomer" variant="primary" size="sm">
                         <PlusIcon class="w-4 h-4 mr-2" />
-                        Crearf Cliente
+                        Crear Cliente
                     </BaseButton>
                 </div>
             </div>
@@ -105,18 +70,14 @@
         </BaseDialog>
 
         <!-- Error/Validation Message -->
-        <div v-if="error && !selectedCustomer" class="mt-2 text-sm text-red-600">
+        <div v-if="error" class="mt-2 text-sm text-red-600">
             {{ error }}
         </div>
-
-        <!-- Customer Detail Modal -->
-        <CustomerDetailModal v-if="selectedCustomer" :show="showCustomerDetail" :customer="selectedCustomer"
-            @close="closeCustomerDetail" @edit-customer="handleEditCustomer" />
     </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue'
+import { ref, watch } from 'vue'
 import { useOrdersStore } from '@/store/orders'
 import { useCustomersStore } from '@/store/customers'
 import { useToast } from '@/composables/useToast'
@@ -128,7 +89,6 @@ import BaseInput from '@/components/ui/BaseInput.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseDialog from '@/components/ui/BaseDialog.vue'
 import CustomerForm from '@/components/CustomerForm.vue'
-import CustomerDetailModal from '@/components/orders/CustomerDetailModal.vue'
 
 // Icons
 import {
@@ -136,19 +96,16 @@ import {
     UserCircleIcon,
     UserPlusIcon,
     PlusIcon,
-    XMarkIcon,
     ChevronRightIcon,
     CheckCircleIcon,
 } from '@heroicons/vue/24/outline'
 
 // Props
 interface Props {
-    selectedCustomer?: number
     required?: boolean
 }
 
-const props = withDefaults(defineProps<Props>(), {
-    selectedCustomer: undefined,
+withDefaults(defineProps<Props>(), {
     required: false
 })
 
@@ -166,7 +123,6 @@ const { success, error: showError } = useToast()
 const searchQuery = ref('')
 const searchResults = ref<Customer[]>([])
 const showCreateModal = ref(false)
-const showCustomerDetail = ref(false)
 const isCreating = ref(false)
 const createdCustomer = ref<Customer | null>(null)
 const error = ref('')
@@ -187,17 +143,6 @@ const createCustomerData = ref<CreateCustomerDto>({
     }
 })
 
-// Computed
-const selectedCustomer = computed(() => {
-    if (!props.selectedCustomer) return null
-    return ordersStore.customers.find(c => c.id === props.selectedCustomer) || null
-})
-
-const selectedCustomerAddresses = computed(() => {
-    // This would typically come from a customer detail API call
-    // For now, returning empty array
-    return []
-})
 
 // Methods
 const handleSearch = () => {
@@ -220,11 +165,6 @@ const selectCustomer = (customer: Customer) => {
     searchResults.value = []
 }
 
-const clearCustomer = () => {
-    emit('customerSelected', undefined)
-    searchQuery.value = ''
-    searchResults.value = []
-}
 
 const showCreateCustomer = () => {
     // Pre-populate form with search query if it looks like a name
@@ -294,28 +234,6 @@ const closeCreateModal = () => {
     }
 }
 
-const viewCustomer = () => {
-    console.log('CustomerSelector - viewCustomer clicked')
-    console.log('CustomerSelector - selectedCustomer:', selectedCustomer.value)
-
-    if (selectedCustomer.value) {
-        showCustomerDetail.value = true
-        console.log('CustomerSelector - Modal opened with customer:', selectedCustomer.value)
-    }
-}
-
-const closeCustomerDetail = () => {
-    showCustomerDetail.value = false
-}
-
-const handleEditCustomer = (customer: Customer) => {
-    // Close detail modal
-    showCustomerDetail.value = false
-    // Here you could open an edit modal or navigate to edit page
-    console.log('Edit customer:', customer.id)
-    // For now, just show a toast
-    success('Funcionalidad de edición', 3000, 'La funcionalidad de edición estará disponible próximamente')
-}
 
 // Watch for search query changes
 watch(searchQuery, () => {
@@ -324,13 +242,6 @@ watch(searchQuery, () => {
     }
 })
 
-// Watch for prop changes
-watch(() => props.selectedCustomer, (newValue) => {
-    if (!newValue) {
-        searchQuery.value = ''
-        searchResults.value = []
-    }
-})
 </script>
 
 <style scoped>

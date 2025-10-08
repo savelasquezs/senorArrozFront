@@ -27,13 +27,8 @@
                     </span>
                 </div>
 
-                <!-- Customer Info (simplified) -->
-                <div class="flex items-center gap-2">
-                    <UserIcon class="w-4 h-4 text-gray-500" />
-                    <span class="text-sm text-gray-700">
-                        {{ customerName || 'Cliente no seleccionado' }}
-                    </span>
-                </div>
+
+
             </div>
 
             <!-- Right Section: Totals and Actions -->

@@ -15,9 +15,10 @@
 
         <!-- Customer Selection -->
         <div class="space-y-4">
-            <!-- Customer Selector -->
-            <CustomerSelector :selected-customer="selectedCustomer?.id" :required="isCustomerRequired"
-                @customer-selected="handleCustomerSelect" />
+            <!-- Customer Selector (only when no customer selected) -->
+            <div v-if="!selectedCustomer">
+                <CustomerSelector :required="isCustomerRequired" @customer-selected="handleCustomerSelect" />
+            </div>
 
             <!-- Address Selector (only for delivery) -->
             <div v-if="orderType === 'delivery' && selectedCustomer" class="address-section">
@@ -27,6 +28,15 @@
 
             <!-- Customer Information Display -->
             <div v-if="selectedCustomer" class="customer-info">
+                <!-- Customer Header with Change Button -->
+                <div class="flex items-center justify-between mb-4">
+                    <h4 class="text-sm font-medium text-gray-700">Cliente Seleccionado</h4>
+                    <BaseButton @click="handleChangeCustomer" variant="outline" size="sm">
+                        <ArrowsRightLeftIcon class="w-3 h-3 mr-1" />
+                        Cambiar Cliente
+                    </BaseButton>
+                </div>
+
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <!-- Customer Details -->
                     <div class="bg-gray-50 rounded-lg p-4">
@@ -47,26 +57,7 @@
                         </div>
                     </div>
 
-                    <!-- Delivery Information (only for delivery) -->
-                    <div v-if="orderType === 'delivery' && selectedAddress" class="bg-blue-50 rounded-lg p-4">
-                        <h4 class="text-sm font-medium text-gray-700 mb-2">Información de Entrega</h4>
-                        <div class="space-y-2">
-                            <div class="flex items-center gap-2">
-                                <MapPinIcon class="w-4 h-4 text-gray-500" />
-                                <span class="text-sm text-gray-900">{{ selectedAddress.address }}</span>
-                            </div>
-                            <div v-if="selectedAddress.additionalInfo" class="flex items-center gap-2">
-                                <InformationCircleIcon class="w-4 h-4 text-gray-500" />
-                                <span class="text-sm text-gray-900">{{ selectedAddress.additionalInfo }}</span>
-                            </div>
-                            <div class="flex items-center gap-2">
-                                <CurrencyDollarIcon class="w-4 h-4 text-gray-500" />
-                                <span class="text-sm font-medium text-gray-900">
-                                    Domicilio: {{ formatCurrency(selectedAddress.deliveryFee) }}
-                                </span>
-                            </div>
-                        </div>
-                    </div>
+
 
                     <!-- Reservation Information (only for reservation) -->
                     <div v-if="orderType === 'reservation'" class="bg-yellow-50 rounded-lg p-4">
@@ -122,7 +113,8 @@ import {
     InformationCircleIcon,
     CurrencyDollarIcon,
     CalendarIcon,
-    ClockIcon
+    ClockIcon,
+    ArrowsRightLeftIcon
 } from '@heroicons/vue/24/outline'
 
 // Props
@@ -242,6 +234,12 @@ const handleAddressSelect = (addressId: number | undefined) => {
     // This would typically come from a store or prop
     const address = addressId ? { id: addressId } as CustomerAddress : undefined
     emit('addressSelected', address)
+}
+
+const handleChangeCustomer = () => {
+    // Clear the selected customer to show the customer selector again
+    emit('customerSelected', undefined)
+    emit('addressSelected', undefined)
 }
 </script>
 

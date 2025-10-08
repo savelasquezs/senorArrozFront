@@ -76,15 +76,7 @@
 
                     <!-- Order Info -->
                     <div class="text-xs text-gray-600 space-y-1">
-                        <div v-if="order.customerId" class="flex items-center">
-                            <UserIcon class="w-3 h-3 mr-1" />
-                            Cliente seleccionado
-                        </div>
 
-                        <div v-if="order.addressId" class="flex items-center">
-                            <HomeIcon class="w-3 h-3 mr-1" />
-                            Dirección seleccionada
-                        </div>
 
                         <div v-if="order.type === 'reservation' && order.reservedFor" class="flex items-center">
                             <ClockIcon class="w-3 h-3 mr-1" />
@@ -101,11 +93,13 @@
                     </div>
                 </div>
             </div>
-        </div>
 
-        <!-- Selected Order Content -->
-        <div v-if="activeOrder" class="border-t border-gray-200">
-            <OrderTab :order="activeOrder" />
+            <!-- Selected Order Content -->
+            <div v-if="activeOrder" class="border-t border-gray-200 mt-4">
+                <div class="overflow-y-auto max-h-96">
+                    <OrderTab :order="activeOrder" />
+                </div>
+            </div>
         </div>
 
         <!-- Confirmation Dialog -->
