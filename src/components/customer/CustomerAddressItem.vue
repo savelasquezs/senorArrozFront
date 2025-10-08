@@ -67,12 +67,16 @@ interface Props {
     address: CustomerAddress
     customer: Customer
     showActions?: boolean
-    onEdit?: (address: CustomerAddress) => void
 }
 
 const props = withDefaults(defineProps<Props>(), {
     showActions: true
 })
+
+// Emits
+const emit = defineEmits<{
+    editAddress: [address: CustomerAddress]
+}>()
 
 // Composables
 const { formatCurrency } = useFormatting()
@@ -81,9 +85,7 @@ const customersStore = useCustomersStore()
 
 // Methods
 const handleEditAddress = () => {
-    if (props.onEdit) {
-        props.onEdit(props.address)
-    }
+    emit('editAddress', props.address)
 }
 
 const handleSetPrimary = async () => {

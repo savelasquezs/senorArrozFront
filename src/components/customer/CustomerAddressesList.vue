@@ -16,7 +16,7 @@
         <!-- Addresses List -->
         <div v-if="customerAddresses.length > 0" class="space-y-3">
             <CustomerAddressItem v-for="address in customerAddresses" :key="address.id" :address="address"
-                :customer="customer" :show-actions="showActions" />
+                :customer="customer" :show-actions="showActions" @edit-address="handleEditAddress" />
         </div>
 
         <!-- No Addresses -->
@@ -61,11 +61,42 @@
                 @cancel="closeCreateModal" @update:model-value="updateAddressFormData" />
         </div>
     </BaseDialog>
+
+    <!-- Address Edit Modal -->
+    <BaseDialog v-model="showEditModal" size="lg">
+        <div class="address-edit-modal">
+            <!-- Modal Header -->
+            <div class="flex items-center justify-between mb-6">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
+                        <MapPinIcon class="w-5 h-5 text-green-600" />
+                    </div>
+                    <div>
+                        <h2 class="text-xl font-semibold text-gray-900">
+                            Editar Dirección
+                        </h2>
+                        <p class="text-sm text-gray-500">
+                            Modifica la información de esta dirección
+                        </p>
+                    </div>
+                </div>
+                <BaseButton @click="closeEditModal" variant="ghost" size="sm">
+                    <XMarkIcon class="w-5 h-5" />
+                </BaseButton>
+            </div>
+
+            <!-- Address Form -->
+            <CustomerAddressForm v-if="customer && editingAddress" :customer-id="customer.id"
+                :model-value="editAddressFormData" :loading="editLoading" :branch-id="customer.branchId"
+                @submit="handleEditAddressSubmit" @cancel="closeEditModal"
+                @update:model-value="updateEditAddressFormData" />
+        </div>
+    </BaseDialog>
 </template>
 
 <script setup lang="ts">
 import { computed, ref, reactive } from 'vue'
-import type { Customer, CustomerAddressFormData, CreateCustomerAddressDto } from '@/types/customer'
+import type { Customer, CustomerAddress, CustomerAddressFormData, CreateCustomerAddressDto } from '@/types/customer'
 import { useCustomersStore } from '@/store/customers'
 import { useToast } from '@/composables/useToast'
 
@@ -95,6 +126,20 @@ const props = withDefaults(defineProps<Props>(), {
 const showCreateModal = ref(false)
 const createLoading = ref(false)
 const addressFormData = reactive<CustomerAddressFormData>({
+    neighborhoodId: 0,
+    address: '',
+    additionalInfo: '',
+    latitude: undefined,
+    longitude: undefined,
+    isPrimary: false,
+    deliveryFee: 0
+})
+
+// State for edit modal
+const showEditModal = ref(false)
+const editLoading = ref(false)
+const editingAddress = ref<CustomerAddress | null>(null)
+const editAddressFormData = reactive<CustomerAddressFormData>({
     neighborhoodId: 0,
     address: '',
     additionalInfo: '',
@@ -168,10 +213,82 @@ const handleAddressSubmit = async (data: CustomerAddressFormData) => {
         createLoading.value = false
     }
 }
+
+// Edit address methods
+const handleEditAddress = (address: CustomerAddress) => {
+    editingAddress.value = address
+    populateEditFormData(address)
+    showEditModal.value = true
+}
+
+const closeEditModal = () => {
+    showEditModal.value = false
+    editingAddress.value = null
+    resetEditAddressFormData()
+}
+
+const resetEditAddressFormData = () => {
+    Object.assign(editAddressFormData, {
+        neighborhoodId: 0,
+        address: '',
+        additionalInfo: '',
+        latitude: undefined,
+        longitude: undefined,
+        isPrimary: false,
+        deliveryFee: 0
+    })
+}
+
+const populateEditFormData = (address: CustomerAddress) => {
+    Object.assign(editAddressFormData, {
+        neighborhoodId: address.neighborhoodId,
+        address: address.address,
+        additionalInfo: address.additionalInfo || '',
+        latitude: address.latitude,
+        longitude: address.longitude,
+        isPrimary: address.isPrimary,
+        deliveryFee: address.deliveryFee
+    })
+}
+
+const updateEditAddressFormData = (data: CustomerAddressFormData) => {
+    Object.assign(editAddressFormData, data)
+}
+
+const handleEditAddressSubmit = async (data: CustomerAddressFormData) => {
+    if (!editingAddress.value) return
+
+    editLoading.value = true
+
+    try {
+        const updateData = {
+            neighborhoodId: data.neighborhoodId,
+            address: data.address,
+            additionalInfo: data.additionalInfo,
+            latitude: data.latitude,
+            longitude: data.longitude,
+            isPrimary: data.isPrimary,
+            deliveryFee: data.deliveryFee
+        }
+
+        await customersStore.updateAddress(props.customer.id, editingAddress.value.id, updateData)
+
+        // Refresh addresses to update local store
+        await customersStore.fetchAddresses(props.customer.id)
+
+        success('Dirección actualizada', 2000, 'La dirección ha sido actualizada correctamente')
+        closeEditModal()
+    } catch (error: any) {
+        showError('Error al actualizar dirección', error.message || 'No se pudo actualizar la dirección')
+    } finally {
+        editLoading.value = false
+    }
+}
 </script>
 
 <style scoped>
-.address-create-modal {
+.address-create-modal,
+.address-edit-modal {
     max-height: 90vh;
     overflow-y: auto;
 }

@@ -29,11 +29,19 @@
                         <UserIcon class="w-4 h-4 text-green-600" />
                         <span class="text-sm font-medium text-green-900">{{ selectedCustomer.name }}</span>
 
-                        <BaseButton @click="handleChangeCustomer" variant="outline" size="sm"
-                            class="text-green-700 border-green-300 hover:bg-green-100">
-                            <ArrowsRightLeftIcon class="w-3 h-3 mr-1" />
+                        <div class="flex items-center gap-2">
+                            <BaseButton @click="viewCustomer" variant="outline" size="sm"
+                                class="text-green-700 border-green-300 hover:bg-green-100" title="Ver detalles">
+                                <EyeIcon class="w-3 h-3 mr-1" />
 
-                        </BaseButton>
+                            </BaseButton>
+
+                            <BaseButton @click="handleChangeCustomer" variant="outline" size="sm"
+                                class="text-green-700 border-green-300 hover:bg-green-100" title="Cambiar cliente">
+                                <ArrowsRightLeftIcon class="w-3 h-3 mr-1" />
+
+                            </BaseButton>
+                        </div>
                     </div>
 
                     <!-- Customer Phones -->
@@ -83,10 +91,14 @@
             <BaseLoading size="md" />
         </div>
     </BaseCard>
+
+    <!-- Customer Detail Modal -->
+    <CustomerDetailModal v-if="selectedCustomer" :show="showCustomerDetail" :customer="selectedCustomer"
+        @close="closeCustomerDetail" @edit-customer="handleEditCustomer" />
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import type { OrderType } from '@/types/order'
 import type { Customer, CustomerAddress } from '@/types/customer'
 import { useOrdersStore } from '@/store/orders'
@@ -100,10 +112,12 @@ import BaseLoading from '@/components/ui/BaseLoading.vue'
 import CustomerSelector from '@/components/CustomerSelector.vue'
 import AddressSelector from '@/components/AddressSelector.vue'
 import PhoneNumberItem from '@/components/ui/PhoneNumberItem.vue'
+import CustomerDetailModal from '@/components/orders/CustomerDetailModal.vue'
 
 // Icons
 import {
     UserIcon,
+    EyeIcon,
     CalendarIcon,
     ClockIcon,
     ArrowsRightLeftIcon
@@ -134,6 +148,9 @@ const emit = defineEmits<{
 // Composables
 const ordersStore = useOrdersStore()
 const customersStore = useCustomersStore()
+
+// State
+const showCustomerDetail = ref(false)
 
 // Computed
 const isCustomerRequired = computed(() => {
@@ -231,6 +248,25 @@ const handleChangeCustomer = () => {
     // Clear the selected customer to show the customer selector again
     emit('customerSelected', undefined)
     emit('addressSelected', undefined)
+}
+
+const viewCustomer = () => {
+    if (props.selectedCustomer) {
+        showCustomerDetail.value = true
+    }
+}
+
+const closeCustomerDetail = () => {
+    showCustomerDetail.value = false
+}
+
+const handleEditCustomer = (customer: Customer) => {
+    // Close detail modal
+    showCustomerDetail.value = false
+    // Here you could open an edit modal or navigate to edit page
+    console.log('Edit customer:', customer.id)
+    // For now, just show a toast
+    // success('Funcionalidad de edición', 3000, 'La funcionalidad de edición estará disponible próximamente')
 }
 </script>
 
