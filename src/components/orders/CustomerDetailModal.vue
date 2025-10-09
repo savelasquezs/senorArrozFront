@@ -2,7 +2,7 @@
     <BaseDialog v-model="internalShow" size="xl">
         <div class="customer-detail-modal">
             <!-- Modal Header -->
-            <div class="flex items-center justify-between mb-6" v-if="customer">
+            <div class="flex items-center justify-between mb-6" v-if="currentCustomer">
                 <div class="flex items-center gap-3">
                     <div class="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
                         <UserIcon class="w-5 h-5 text-blue-600" />
@@ -10,7 +10,7 @@
                     <div>
                         <div class="flex items-center gap-2">
                             <h2 class="text-xl font-semibold text-gray-900">
-                                {{ customer.name }}
+                                {{ currentCustomer.name }}
                             </h2>
                             <BaseButton @click="handleEditCustomer" variant="outline" size="sm" class="flex-1">
                                 <span class="flex items-center justify-center">
@@ -19,8 +19,8 @@
                                 </span>
                             </BaseButton>
                         </div>
-                        <PhoneNumberItem :phone-number="customer.phone1" />
-                        <PhoneNumberItem :phone-number="customer.phone2" v-if="customer.phone2" />
+                        <PhoneNumberItem :phone-number="currentCustomer.phone1" />
+                        <PhoneNumberItem :phone-number="currentCustomer.phone2" v-if="currentCustomer.phone2" />
                     </div>
                 </div>
                 <BaseButton @click="handleClose" variant="ghost" size="sm">
@@ -29,7 +29,7 @@
             </div>
 
             <!-- Customer Content -->
-            <div v-if="customer" class="space-y-6">
+            <div v-if="currentCustomer" class="space-y-6">
 
 
                 <!-- Customer Information Grid -->
@@ -37,12 +37,12 @@
 
 
                     <!-- Order Statistics -->
-                    <CustomerStatsCard :customer="customer" :show-actions="showActions" @view-orders="handleViewOrders"
-                        @create-order="handleCreateOrder" />
+                    <CustomerStatsCard :customer="currentCustomer" :show-actions="showActions"
+                        @view-orders="handleViewOrders" @create-order="handleCreateOrder" />
                 </div>
 
                 <!-- Addresses Section -->
-                <CustomerAddressesList :customer="customer" :show-actions="showActions" />
+                <CustomerAddressesList :customer="currentCustomer" :show-actions="showActions" />
             </div>
 
             <!-- Loading State -->
@@ -65,10 +65,39 @@
         </div>
 
     </BaseDialog>
+
+    <!-- Customer Edit Modal -->
+    <BaseDialog v-model="showEditModal" size="lg">
+        <div class="customer-edit-modal">
+            <!-- Modal Header -->
+            <div class="flex items-center justify-between mb-6" v-if="currentCustomer">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
+                        <PencilIcon class="w-5 h-5 text-green-600" />
+                    </div>
+                    <div>
+                        <h2 class="text-xl font-semibold text-gray-900">
+                            Editar Cliente
+                        </h2>
+                        <p class="text-sm text-gray-500">
+                            Modifica la información del cliente
+                        </p>
+                    </div>
+                </div>
+                <BaseButton @click="closeEditModal" variant="ghost" size="sm">
+                    <XMarkIcon class="w-5 h-5" />
+                </BaseButton>
+            </div>
+
+            <!-- Customer Form -->
+            <CustomerForm v-if="currentCustomer" :customer="currentCustomer" :loading="editLoading"
+                @submit="handleCustomerSubmit" @cancel="closeEditModal" />
+        </div>
+    </BaseDialog>
 </template>
 
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { ref, watch, computed } from 'vue'
 import type { Customer } from '@/types/customer'
 import { useToast } from '@/composables/useToast'
 import { useCustomersStore } from '@/store/customers'
@@ -83,6 +112,7 @@ import BaseLoading from '@/components/ui/BaseLoading.vue'
 
 import CustomerStatsCard from '@/components/customer/CustomerStatsCard.vue'
 import CustomerAddressesList from '@/components/customer/CustomerAddressesList.vue'
+import CustomerForm from '@/components/CustomerForm.vue'
 
 // Icons
 import {
@@ -110,10 +140,14 @@ const { show, customer, loading, showActions } = props
 // Internal reactive state for modal visibility
 const internalShow = ref(show)
 
+// State for edit modal
+const showEditModal = ref(false)
+const editLoading = ref(false)
+
 // Watch for prop changes to sync internal state
 watch(() => props.show, (newShow) => {
     internalShow.value = newShow
-    if (newShow && customer) {
+    if (newShow && currentCustomer.value) {
         // Load customer addresses when modal opens
         loadCustomerAddresses()
     }
@@ -130,11 +164,22 @@ watch(internalShow, (newValue) => {
 const emit = defineEmits<{
     (e: 'close'): void
     (e: 'editCustomer', customer: Customer): void
+    (e: 'customerUpdated', customer: Customer): void
 }>()
 
 // Composables
-const { success } = useToast()
+const { success, error: showError } = useToast()
 const customersStore = useCustomersStore()
+
+// Computed customer that uses store current when available, or falls back to prop
+const currentCustomer = computed(() => {
+    // If we have a customer in the store and it matches our prop customer ID, use the store version
+    if (customersStore.current && props.customer && customersStore.current.id === props.customer.id) {
+        return customersStore.current
+    }
+    // Otherwise use the prop customer
+    return props.customer
+})
 
 // Debug logs
 console.log('CustomerDetailModal - props received:', { show, customer, loading, showActions })
@@ -146,24 +191,52 @@ const handleClose = () => {
 }
 
 const loadCustomerAddresses = async () => {
-    if (!customer) return
+    if (!currentCustomer.value) return
 
     try {
-        await customersStore.fetchAddresses(customer.id)
-        console.log('CustomerDetailModal - Addresses loaded for customer:', customer.id)
+        await customersStore.fetchAddresses(currentCustomer.value.id)
+        console.log('CustomerDetailModal - Addresses loaded for customer:', currentCustomer.value.id)
     } catch (error) {
         console.error('CustomerDetailModal - Error loading addresses:', error)
     }
 }
 
 const handleEditCustomer = () => {
-
+    showEditModal.value = true
 }
 
-const handleToggleStatus = () => {
-    // This would typically call an API to toggle customer status
-
+const closeEditModal = () => {
+    showEditModal.value = false
 }
+
+const handleCustomerSubmit = async (formData: any) => {
+    if (!currentCustomer.value) return
+
+    editLoading.value = true
+
+    try {
+        const updateData = {
+            name: formData.name,
+            phone1: formData.phone1,
+            phone2: formData.phone2 || undefined,
+            active: formData.active
+        }
+
+        const updatedCustomer = await customersStore.update(currentCustomer.value.id, updateData)
+
+        success('Cliente actualizado', 2000, 'La información del cliente ha sido actualizada correctamente')
+
+        // Emit event to parent component
+        emit('customerUpdated', updatedCustomer)
+
+        closeEditModal()
+    } catch (error: any) {
+        showError('Error al actualizar cliente', error.message || 'No se pudo actualizar la información del cliente')
+    } finally {
+        editLoading.value = false
+    }
+}
+
 
 const handleViewOrders = (customer: Customer) => {
     // This would typically navigate to orders view filtered by customer
@@ -183,7 +256,8 @@ const handleCreateOrder = (customer: Customer) => {
 </script>
 
 <style scoped>
-.customer-detail-modal {
+.customer-detail-modal,
+.customer-edit-modal {
     max-height: 80vh;
     overflow-y: auto;
 }
