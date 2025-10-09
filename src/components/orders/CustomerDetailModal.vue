@@ -2,18 +2,25 @@
     <BaseDialog v-model="internalShow" size="xl">
         <div class="customer-detail-modal">
             <!-- Modal Header -->
-            <div class="flex items-center justify-between mb-6">
+            <div class="flex items-center justify-between mb-6" v-if="customer">
                 <div class="flex items-center gap-3">
                     <div class="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
                         <UserIcon class="w-5 h-5 text-blue-600" />
                     </div>
                     <div>
-                        <h2 class="text-xl font-semibold text-gray-900">
-                            Detalle del Cliente
-                        </h2>
-                        <p class="text-sm text-gray-500">
-                            Información completa del cliente seleccionado
-                        </p>
+                        <div class="flex items-center gap-2">
+                            <h2 class="text-xl font-semibold text-gray-900">
+                                {{ customer.name }}
+                            </h2>
+                            <BaseButton @click="handleEditCustomer" variant="outline" size="sm" class="flex-1">
+                                <span class="flex items-center justify-center">
+                                    <PencilIcon class="w-4 h-4 mr-2" />
+                                    Editar
+                                </span>
+                            </BaseButton>
+                        </div>
+                        <PhoneNumberItem :phone-number="customer.phone1" />
+                        <PhoneNumberItem :phone-number="customer.phone2" v-if="customer.phone2" />
                     </div>
                 </div>
                 <BaseButton @click="handleClose" variant="ghost" size="sm">
@@ -23,37 +30,11 @@
 
             <!-- Customer Content -->
             <div v-if="customer" class="space-y-6">
-                <!-- Customer Header -->
-                <div class="bg-gray-50 rounded-lg p-4">
-                    <div class="flex items-center justify-between">
-                        <div class="flex items-center space-x-3">
-                            <div class="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
-                                <UserIcon class="w-6 h-6 text-blue-600" />
-                            </div>
-                            <div>
-                                <h3 class="text-lg font-semibold text-gray-900">{{ customer.name }}</h3>
-                                <div class="flex items-center gap-4 mt-1">
-                                    <div class="flex items-center gap-1">
-                                        <PhoneIcon class="w-4 h-4 text-gray-500" />
-                                        <span class="text-sm text-gray-600">{{ customer.phone1 }}</span>
-                                    </div>
-                                    <div v-if="customer.phone2" class="flex items-center gap-1">
-                                        <PhoneIcon class="w-4 h-4 text-gray-500" />
-                                        <span class="text-sm text-gray-600">{{ customer.phone2 }}</span>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        <BaseBadge :type="customer.active ? 'success' : 'danger'"
-                            :text="customer.active ? 'Activo' : 'Inactivo'" size="sm" />
-                    </div>
-                </div>
+
 
                 <!-- Customer Information Grid -->
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <!-- Basic Information -->
-                    <CustomerInfoCard :customer="customer" :show-actions="showActions" @edit="handleEditCustomer"
-                        @toggle-status="handleToggleStatus" />
+
 
                     <!-- Order Statistics -->
                     <CustomerStatsCard :customer="customer" :show-actions="showActions" @view-orders="handleViewOrders"
@@ -91,22 +72,22 @@ import { ref, watch } from 'vue'
 import type { Customer } from '@/types/customer'
 import { useToast } from '@/composables/useToast'
 import { useCustomersStore } from '@/store/customers'
+import PhoneNumberItem from '@/components/ui/PhoneNumberItem.vue'
 
 // Components
 import BaseDialog from '@/components/ui/BaseDialog.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
-import BaseBadge from '@/components/ui/BaseBadge.vue'
+
 import BaseLoading from '@/components/ui/BaseLoading.vue'
 
-// Customer Components
-import CustomerInfoCard from '@/components/customer/CustomerInfoCard.vue'
+
 import CustomerStatsCard from '@/components/customer/CustomerStatsCard.vue'
 import CustomerAddressesList from '@/components/customer/CustomerAddressesList.vue'
 
 // Icons
 import {
     UserIcon,
-    PhoneIcon,
+    PencilIcon,
     XMarkIcon,
     ExclamationTriangleIcon
 } from '@heroicons/vue/24/outline'
@@ -175,14 +156,13 @@ const loadCustomerAddresses = async () => {
     }
 }
 
-const handleEditCustomer = (customer: Customer) => {
-    emit('editCustomer', customer)
+const handleEditCustomer = () => {
+
 }
 
-const handleToggleStatus = (customer: Customer) => {
+const handleToggleStatus = () => {
     // This would typically call an API to toggle customer status
-    console.log('Toggle customer status:', customer.id)
-    success('Estado actualizado', 2000, `Cliente ${customer.active ? 'desactivado' : 'activado'} correctamente`)
+
 }
 
 const handleViewOrders = (customer: Customer) => {
