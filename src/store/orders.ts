@@ -12,9 +12,9 @@ import type {
     CreateOrderDto,
     UpdateOrderDto,
     ActiveOrder,
-    ActiveOrderDetail,
-    ActiveBankPayment,
-    ActiveAppPayment,
+    OrderDetail,
+    OrderBankPayment,
+    OrderAppPayment,
     Product,
     OrderType,
     DraftOrder,
@@ -386,15 +386,14 @@ export const useOrdersStore = defineStore('orders', {
             if (existingDetail) {
                 existingDetail.quantity++
             } else {
-                const orderDetail: ActiveOrderDetail = {
+                const orderDetail: OrderDetail = {
                     id: this.generateUUID(),
                     productId: product.id,
                     productName: product.name,
-                    productPrice: product.price,
-                    productStock: product.stock,
                     quantity: 1,
                     unitPrice: product.price,
                     discount: 0,
+                    subtotal: product.price * 1,
                 }
 
                 order.orderDetails.push(orderDetail)
@@ -437,10 +436,10 @@ export const useOrdersStore = defineStore('orders', {
             const order = this.activeOrders.get(this.activeOrderId)!
             const bank = this.banks.find(b => b.id === bankId)
 
-            const bankPayment: ActiveBankPayment = {
+            const bankPayment: OrderBankPayment = {
                 id: this.generateUUID(),
                 bankId,
-                bankName: bank?.name,
+                bankName: bank?.name || 'Banco',
                 amount,
             }
 
@@ -458,10 +457,12 @@ export const useOrdersStore = defineStore('orders', {
             // Remove existing app payment (only one allowed)
             order.appPayments = []
 
-            const appPayment: ActiveAppPayment = {
+            const appPayment: OrderAppPayment = {
                 id: this.generateUUID(),
                 appId,
-                appName: app?.name,
+                appName: app?.name || 'App',
+                bankId: app?.bankId || 0,
+                bankName: app?.bankName || 'Banco',
                 amount,
             }
 

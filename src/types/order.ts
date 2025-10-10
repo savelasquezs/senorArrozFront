@@ -1,38 +1,51 @@
 // src/types/order.ts
+
+// Importar tipos existentes para evitar duplicación
 import type { PagedResult } from './common'
+import type { BankPayment, AppPayment } from './bank'
 
-// Order Types
+import type { Product, ProductCategory } from './product'
+
+// ===== TIPOS BÁSICOS =====
 export type OrderType = 'onsite' | 'delivery' | 'reservation'
+export type OrderStatus = 'taken' | 'in_preparation' | 'ready' | 'on_the_way' | 'delivered' | 'cancelled'
 
-export interface User {
-    id: number
-    name: string
-    email: string
-    phone?: string
+export interface OrderItem {
+    tempId: string
+    productId: number
+    productName: string
+    productPrice: number
+    quantity: number
+    unitPrice: number
+    discount: number
+    subtotal: number
+    notes: string
 }
 
-export interface Address {
-    id: number
-    customerId: number
-    street: string
-    neighborhood: string
-    city: string
-    phone?: string
-    isDefault: boolean
-    deliveryFee: number
+// ===== TIPOS DE PEDIDOS ACTIVOS (Sistema Existente) =====
+export interface ActiveOrder {
+    id: string
+    branchId: number
+    takenById: number
+    customerId?: number
+    addressId?: number
+    loyaltyRuleId?: number
+    type: OrderType
+    deliveryFee?: number
+    reservedFor?: Date
+    notes?: string
+    orderDetails: OrderDetail[]
+    bankPayments: OrderBankPayment[]
+    appPayments: OrderAppPayment[]
+    subtotal: number
+    discountTotal: number
+    total: number
+    createdAt: string
+    isDirty: boolean
 }
 
-export interface LoyaltyRule {
-    id: number
-    name: string
-    description: string
-    discountPercentage?: number
-}
-
-// Order Detail
 export interface OrderDetail {
-    id: number
-    orderId: number
+    id: string
     productId: number
     productName: string
     quantity: number
@@ -42,18 +55,46 @@ export interface OrderDetail {
     subtotal: number
 }
 
-// Payment related
 export interface OrderBankPayment {
+    id: string
     bankId: number
+    bankName: string
     amount: number
 }
 
 export interface OrderAppPayment {
+    id: string
     appId: number
+    appName: string
+    bankId: number
+    bankName: string
     amount: number
 }
 
-// Main Order entity
+// ===== TIPOS DE PEDIDOS EN BORRADOR (Sistema Nuevo) =====
+export interface DraftOrder {
+    tabId: string
+    tabName: string
+    type: OrderType
+    customerId: number | null
+    customerName: string | null
+    customerPhone: string | null
+    addressId: number | null
+    addressDescription: string | null
+    deliveryFee: number
+    reservedFor: Date | null
+    notes: string
+    orderItems: OrderItem[]
+    bankPayments: BankPayment[]
+    appPayment: AppPayment | null
+    subtotal: number
+    total: number
+    discountTotal: number
+    createdAt: Date
+    updatedAt: Date
+}
+
+// ===== TIPOS DE PEDIDOS COMPLETADOS =====
 export interface Order {
     id: number
     branchId: number
@@ -64,214 +105,25 @@ export interface Order {
     customerName?: string
     customerPhone?: string
     addressId?: number
-    address?: Address
+    addressDescription?: string
     loyaltyRuleId?: number
-    loyaltyRule?: LoyaltyRule
+    loyaltyRuleName?: string
     type: OrderType
+    status: OrderStatus
     deliveryFee?: number
-    reservedFor?: string
-    subtotal: number
-    total: number
-    discountTotal: number
+    reservedFor?: Date
     notes?: string
-    status: string
+    orderDetails: OrderDetail[]
+    bankPayments: BankPayment[]
+    appPayments: AppPayment[]
+    subtotal: number
+    discountTotal: number
+    total: number
     createdAt: string
     updatedAt: string
-
-    // Relations
-    orderDetails: OrderDetail[]
-    bankPayments: OrderBankPayment[]
-    appPayments: OrderAppPayment[]
 }
 
-// DTOs for creation
-export interface CreateOrderDetailDto {
-    productId: number
-    quantity: number
-    unitPrice: number
-    discount?: number
-    notes?: string
-}
-
-export interface CreateOrderBankPaymentDto {
-    bankId: number
-    amount: number
-}
-
-export interface CreateOrderAppPaymentDto {
-    appId: number
-    amount: number
-}
-
-export interface CreateOrderDto {
-    branchId: number
-    takenById: number
-    customerId?: number
-    addressId?: number
-    loyaltyRuleId?: number
-    type: OrderType
-    deliveryFee?: number
-    reservedFor?: string
-    notes?: string
-    orderDetails: CreateOrderDetailDto[]
-    bankPayments?: CreateOrderBankPaymentDto[]
-    appPayments?: CreateOrderAppPaymentDto[]
-}
-
-export interface UpdateOrderDto {
-    customerId?: number
-    addressId?: number
-    loyaltyRuleId?: number
-    type?: OrderType
-    deliveryId?: number
-    reservedFor?: string
-    notes?: string
-}
-
-// Filters
-export interface OrderFilters {
-    branchId?: number
-    customerId?: number
-    type?: OrderType
-    status?: string
-    createdAt?: string
-    reservedFor?: string
-    page?: number
-    pageSize?: number
-    sortBy?: string
-    sortOrder?: 'asc' | 'desc'
-}
-
-// Store State interfaces
-export interface ActiveOrder {
-    id: string // UUID generado en frontend
-    branchId: number
-    takenById: number
-    customerId?: number
-    addressId?: number
-    loyaltyRuleId?: number
-    type: OrderType
-    deliveryFee?: number
-    reservedFor?: string
-    notes?: string
-    orderDetails: ActiveOrderDetail[]
-    bankPayments: ActiveBankPayment[]
-    appPayments: ActiveAppPayment[]
-
-    // Calculated fields
-    subtotal: number
-    total: number
-    discountTotal: number
-
-    // UI state
-    isDirty: boolean
-    createdAt: string
-}
-
-export interface ActiveOrderDetail {
-    id: string // UUID generado en frontend
-    productId: number
-    productName: string
-    productPrice: number
-    productStock?: number
-    quantity: number
-    unitPrice: number
-    discount: number
-    notes?: string
-}
-
-export interface ActiveBankPayment {
-    id: string // UUID generado en frontend
-    bankId: number
-    bankName?: string
-    amount: number
-}
-
-export interface ActiveAppPayment {
-    id: string // UUID generado en frontend
-    appId: number
-    appName?: string
-    amount: number
-}
-
-// Quick access types
-export interface Product {
-    id: number
-    name: string
-    price: number
-    stock?: number
-    categoryId: number
-    categoryName: string
-    active: boolean
-}
-
-export interface ProductCategory {
-    id: number
-    name: string
-    branchId: number
-    active: boolean
-}
-
-// Draft Order System for Multiple Tabs
-export interface DraftOrder {
-    tabId: string                          // Identificador único de la tab
-    tabName: string                        // Nombre de la tab (ej: "Pedido 1")
-
-    // Datos de la orden
-    type: OrderType                        // 'onsite' | 'delivery' | 'reservation'
-    customerId: number | null
-    customerName: string | null
-    customerPhone: string | null
-    addressId: number | null
-    addressDescription: string | null
-    deliveryFee: number
-    reservedFor: Date | null
-    notes: string
-
-    // Items de la orden
-    orderItems: OrderItem[]
-
-    // Pagos
-    bankPayments: BankPayment[]
-    appPayment: AppPayment | null
-
-    // Totales (calculados)
-    subtotal: number
-    total: number
-    discountTotal: number
-
-    // Metadata
-    createdAt: Date
-    updatedAt: Date
-}
-
-export interface OrderItem {
-    tempId: string                         // ID temporal para el frontend
-    productId: number
-    productName: string
-    productPrice: number                   // Precio base del producto
-    quantity: number
-    unitPrice: number                      // Precio modificable
-    discount: number                       // Valor del descuento (no porcentaje)
-    subtotal: number                       // calculado: quantity × unitPrice - discount
-    notes: string
-}
-
-export interface BankPayment {
-    tempId: string
-    bankId: number
-    bankName: string
-    amount: number
-}
-
-export interface AppPayment {
-    tempId: string
-    appId: number
-    appName: string
-    amount: number
-}
-
-// Tab Management
+// ===== TIPOS PARA TABS =====
 export interface OrderTab {
     tabId: string
     tabName: string
@@ -282,55 +134,158 @@ export interface OrderTab {
     isActive: boolean
 }
 
-// Store types
+// ===== TIPOS DE ESTADO DEL STORE =====
 export interface OrdersState {
-    // Main orders list
+    // Sistema existente
     list: PagedResult<Order> | null
     current: Order | null
-
-    // Active orders (work in progress)
     activeOrders: Map<string, ActiveOrder>
     activeOrderId: string | null
+    products: Product[]
+    categories: ProductCategory[]
 
-    // Draft Orders System (Multiple Tabs)
+    // Sistema nuevo de múltiples tabs
     draftOrders: Map<string, DraftOrder>
     currentTabId: string | null
     maxTabs: number
     nextTabNumber: number
 
-    // Products and categories for UI
-    products: Product[]
-    categories: ProductCategory[]
-
-    // UI state
-    isLoading: boolean
+    // Estados de carga
+    loading: boolean
     error: string | null
-
-    // Search and filters
-    searchQuery: string
-    selectedCategory: number | null
+    submitting: boolean
 }
 
-// Persistence
+// Re-exportar tipos de otros archivos
+export type { Product, ProductCategory } from './product'
+export type { Customer, CustomerAddress } from './customer'
+export type { BankPayment, AppPayment } from './bank'
+export type { User } from './user'
+
+// ===== TIPOS PARA PERSISTENCIA =====
 export interface StoredOrdersState {
     draftOrders: DraftOrder[]
     currentTabId: string | null
     nextTabNumber: number
-    lastSaved: string  // ISO timestamp
+    lastSaved: string
 }
 
-// Validation
+// ===== TIPOS PARA VALIDACIÓN =====
 export interface ValidationResult {
     isValid: boolean
     errors: string[]
 }
 
-// Events
-export interface OrderEvent {
-    type: 'created' | 'updated' | 'deleted' | 'status_changed'
-    orderId: number
-    data?: any
+// ===== TIPOS PARA FILTROS =====
+export interface OrderFilters {
+    branchId?: number
+    customerId?: number
+    type?: OrderType
+    status?: OrderStatus
+    fromDate?: string
+    toDate?: string
+    page: number
+    pageSize: number
+    sortBy?: string
+    sortOrder?: 'asc' | 'desc'
 }
 
-export type OrderEventHandler = (event: OrderEvent) => void
+// ===== TIPOS PARA CREACIÓN/ACTUALIZACIÓN =====
+export interface CreateOrderDto {
+    branchId: number
+    takenById: number
+    customerId?: number
+    addressId?: number
+    loyaltyRuleId?: number
+    type: OrderType
+    deliveryFee?: number
+    reservedFor?: Date
+    notes?: string
+    orderDetails: CreateOrderDetailDto[]
+    bankPayments?: CreateBankPaymentDto[]
+    appPayments?: CreateAppPaymentDto[]
+}
 
+export interface CreateOrderDetailDto {
+    productId: number
+    quantity: number
+    unitPrice: number
+    discount?: number
+    notes?: string
+}
+
+export interface CreateBankPaymentDto {
+    bankId: number
+    amount: number
+}
+
+export interface CreateAppPaymentDto {
+    appId: number
+    amount: number
+}
+
+export interface UpdateOrderDto {
+    customerId?: number
+    addressId?: number
+    loyaltyRuleId?: number
+    type?: OrderType
+    deliveryFee?: number
+    reservedFor?: Date
+    notes?: string
+    status?: OrderStatus
+}
+
+// ===== TIPOS PARA FORMULARIOS =====
+export interface OrderFormData {
+    customerId?: number
+    addressId?: number
+    loyaltyRuleId?: number
+    type: OrderType
+    deliveryFee?: number
+    reservedFor?: Date
+    notes?: string
+}
+
+// ===== TIPOS PARA ESTADÍSTICAS =====
+export interface OrderStats {
+    totalOrders: number
+    totalRevenue: number
+    averageOrderValue: number
+    ordersByType: Record<OrderType, number>
+    ordersByStatus: Record<OrderStatus, number>
+    revenueByType: Record<OrderType, number>
+}
+
+// ===== TIPOS PARA REPORTES =====
+export interface OrderReport {
+    period: string
+    totalOrders: number
+    totalRevenue: number
+    averageOrderValue: number
+    topProducts: Array<{
+        productId: number
+        productName: string
+        quantity: number
+        revenue: number
+    }>
+    ordersByHour: Array<{
+        hour: number
+        count: number
+        revenue: number
+    }>
+}
+
+// ===== TIPOS PARA DASHBOARD =====
+export interface OrderDashboard {
+    todayOrders: number
+    todayRevenue: number
+    pendingOrders: number
+    recentOrders: Order[]
+    topCustomers: Array<{
+        customerId: number
+        customerName: string
+        orderCount: number
+        totalSpent: number
+    }>
+    ordersByStatus: Record<OrderStatus, number>
+}

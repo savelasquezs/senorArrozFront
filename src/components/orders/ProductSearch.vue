@@ -199,6 +199,6 @@ onMounted(() => {
 
 <style scoped>
 .product-search {
-    @apply w-full;
+    width: 100%;
 }
 </style>

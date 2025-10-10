@@ -81,85 +81,124 @@ const closeTab = (tabId: string) => {
 
 <style scoped>
 .order-tabs {
-    @apply bg-white border-b border-gray-200 p-4;
+    background-color: white;
+    border-bottom: 1px solid #e5e7eb;
+    padding: 1rem;
 }
 
 .tabs-list {
-    @apply flex gap-2 mb-4 overflow-x-auto;
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+    overflow-x: auto;
 }
 
 .tab-item {
-    @apply flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 cursor-pointer transition-all duration-200 min-w-0 flex-shrink-0;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    background-color: #f9fafb;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.5rem;
+    padding: 0.5rem 0.75rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    min-width: 0;
+    flex-shrink: 0;
 }
 
 .tab-item:hover {
-    @apply bg-gray-100 border-gray-300;
+    background-color: #f3f4f6;
+    border-color: #d1d5db;
 }
 
 .tab-item.active {
-    @apply bg-blue-50 border-blue-300 text-blue-700;
+    background-color: #eff6ff;
+    border-color: #93c5fd;
+    color: #1d4ed8;
 }
 
 .tab-item.has-items {
-    @apply border-green-200 bg-green-50;
+    border-color: #bbf7d0;
+    background-color: #f0fdf4;
 }
 
 .tab-item.has-items.active {
-    @apply border-green-300 bg-green-100;
+    border-color: #86efac;
+    background-color: #dcfce7;
 }
 
 .tab-item.empty {
-    @apply border-gray-200 bg-gray-50 text-gray-500;
+    border-color: #e5e7eb;
+    background-color: #f9fafb;
+    color: #6b7280;
 }
 
 .tab-content {
-    @apply flex flex-col min-w-0;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
 }
 
 .tab-info {
-    @apply flex flex-col;
+    display: flex;
+    flex-direction: column;
 }
 
 .tab-name {
-    @apply text-sm font-medium truncate;
+    font-size: 0.875rem;
+    font-weight: 500;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .item-count {
-    @apply text-xs text-gray-500;
+    font-size: 0.75rem;
+    color: #6b7280;
 }
 
 .tab-total {
-    @apply text-xs font-medium;
+    font-size: 0.75rem;
+    font-weight: 500;
 }
 
 .total-amount {
-    @apply text-green-600;
+    color: #059669;
 }
 
 .tab-item.empty .total-amount {
-    @apply text-gray-400;
+    color: #9ca3af;
 }
 
 .close-button {
-    @apply flex-shrink-0 text-gray-400 hover:text-red-500;
+    flex-shrink: 0;
+    color: #9ca3af;
+}
+
+.close-button:hover {
+    color: #ef4444;
 }
 
 .new-tab-section {
-    @apply flex justify-center;
+    display: flex;
+    justify-content: center;
 }
 
 .new-tab-button {
-    @apply w-full max-w-xs;
+    width: 100%;
+    max-width: 20rem;
 }
 
 /* Responsive */
 @media (max-width: 640px) {
     .tabs-list {
-        @apply flex-col gap-1;
+        flex-direction: column;
+        gap: 0.25rem;
     }
-
+    
     .tab-item {
-        @apply w-full;
+        width: 100%;
     }
 }
 </style>

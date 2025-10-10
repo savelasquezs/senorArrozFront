@@ -186,54 +186,89 @@ watch(() => props.item.discount, () => {
 
 <style scoped>
 .order-item-card {
-    @apply bg-white border border-gray-200 rounded-lg p-4 shadow-sm hover:shadow-md transition-shadow duration-200;
+    background-color: white;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.5rem;
+    padding: 1rem;
+    box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+    transition: box-shadow 0.2s;
+}
+
+.order-item-card:hover {
+    box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
 }
 
 .product-info {
-    @apply mb-3;
+    margin-bottom: 0.75rem;
 }
 
 .product-name {
-    @apply text-lg font-medium text-gray-900 mb-1;
+    font-size: 1.125rem;
+    font-weight: 500;
+    color: #111827;
+    margin-bottom: 0.25rem;
 }
 
 .quantity-controls {
-    @apply flex items-center gap-2 mb-3;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.75rem;
 }
 
 .quantity-input {
-    @apply w-20 text-center;
+    width: 5rem;
+    text-align: center;
 }
 
 .price-controls {
-    @apply grid grid-cols-2 gap-3 mb-3;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.75rem;
+    margin-bottom: 0.75rem;
 }
 
 .price-input {
-    @apply flex flex-col;
+    display: flex;
+    flex-direction: column;
 }
 
 .discount-input {
-    @apply flex flex-col;
+    display: flex;
+    flex-direction: column;
 }
 
 .discount-amount {
-    @apply text-xs text-gray-500 mt-1;
+    font-size: 0.75rem;
+    color: #6b7280;
+    margin-top: 0.25rem;
 }
 
 .subtotal {
-    @apply border-t border-gray-100 pt-3 mb-3;
+    border-top: 1px solid #f3f4f6;
+    padding-top: 0.75rem;
+    margin-bottom: 0.75rem;
 }
 
 .subtotal-line {
-    @apply flex justify-between items-center text-sm mb-1;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.875rem;
+    margin-bottom: 0.25rem;
 }
 
 .discount-line {
-    @apply flex justify-between items-center text-sm mb-1;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.875rem;
+    margin-bottom: 0.25rem;
 }
 
 .actions {
-    @apply flex gap-2 justify-end;
+    display: flex;
+    gap: 0.5rem;
+    justify-content: flex-end;
 }
 </style>

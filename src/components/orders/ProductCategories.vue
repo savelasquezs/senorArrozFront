@@ -285,11 +285,11 @@ onMounted(() => {
 
 <style scoped>
 .product-categories {
-    @apply w-full;
+    width: 100%;
 }
 
 .product-categories.compact {
-    @apply text-sm;
+    font-size: 0.875rem;
 }
 
 /* Scrollbar styling for horizontal layout */

@@ -2,328 +2,253 @@
     <div class="order-sidebar bg-white border-l border-gray-200 h-full flex flex-col">
         <!-- Header -->
         <div class="p-4 border-b border-gray-200">
-            <OrderHeader :order-type="activeOrder?.type || 'delivery'" :order-number="activeOrder?.id?.slice(-4)"
-                :customer-name="getCustomerName(activeOrder?.customerId)"
-                :selected-customer="getCustomer(activeOrder?.customerId)"
-                :selected-address="getAddress(activeOrder?.addressId)"
-                :total-items="activeOrder?.orderDetails?.length || 0" :total-amount="activeOrder?.total || 0"
-                :loading="false" @type-change="handleOrderTypeChange" @clear="clearActiveOrder"
-                @customer-selected="handleCustomerSelect" @address-selected="handleAddressSelect" />
-
-            <!-- Create New Order Button -->
-            <div class="mt-4 flex justify-center">
-                <BaseButton @click="() => createNewOrder()" variant="primary" size="sm" class="w-full">
-                    <PlusIcon class="w-4 h-4 mr-1" />
-                    Nuevo Pedido
-                </BaseButton>
-            </div>
-        </div>
-
-        <!-- Tabs -->
-        <div class="flex-1 overflow-y-auto">
-            <div v-if="activeOrders.length === 0" class="text-center py-8 px-4">
-                <ShoppingBagIcon class="mx-auto h-12 w-12 text-gray-400 mb-4" />
-                <h3 class="text-lg font-medium text-gray-900 mb-2">No hay pedidos</h3>
-                <p class="text-gray-500 mb-4">Crea tu primer pedido para comenzar</p>
-                <BaseButton @click="() => createNewOrder()" variant="primary">
-                    <PlusIcon class="w-4 h-4 mr-2" />
-                    Crear Pedido
-                </BaseButton>
-            </div>
+            <h2 class="text-lg font-semibold text-gray-900 mb-4">Pedidos Activos</h2>
 
             <!-- Order Tabs -->
-            <div v-else class="space-y-1 p-2">
-                <div v-for="order in activeOrders" :key="order.id" @click="setActiveOrder(order.id)" :class="[
-                    'order-tab p-3 rounded-lg border cursor-pointer transition-all',
-                    activeOrderId === order.id
-                        ? 'border-indalo-500 bg-indigo-50'
-                        : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
-                ]">
-                    <!-- Tab Header -->
-                    <div class="flex items-center justify-between mb-2">
-                        <div class="flex items-center">
-                            <!-- Order Type Icon -->
-                            <div :class="[
-                                'w-6 h-6 rounded-full flex items-center justify-center mr-2',
-                                getOrderTypeConfig(order.type).bgClass,
-                                getOrderTypeConfig(order.type).iconClass
-                            ]">
-                                <component :is="getOrderTypeConfig(order.type).icon" class="w-3 h-3" />
-                            </div>
+            <OrderTabs />
+        </div>
 
-                            <div>
-                                <div class="text-sm font-medium text-gray-900">
-                                    Pedido {{ order.id.slice(-4) }}
-                                </div>
-                                <div class="text-xs text-gray-500">
-                                    {{ getOrderTypeConfig(order.type).label }}
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Actions -->
-                        <div class="flex items-center space-x-1">
-                            <!-- Dirty indicator -->
-                            <div v-if="order.isDirty" class="w-2 h-2 bg-yellow-400 rounded-full"
-                                title="Cambios no guardados" />
-
-                            <!-- Close button -->
-                            <BaseButton @click.stop="closeOrder(order.id)" variant="outline" size="sm">
-                                <XMarkIcon class="w-3 h-3" />
-                            </BaseButton>
-                        </div>
-                    </div>
-
-                    <!-- Order Info -->
-                    <div class="text-xs text-gray-600 space-y-1">
-
-
-                        <div v-if="order.type === 'reservation' && order.reservedFor" class="flex items-center">
-                            <ClockIcon class="w-3 h-3 mr-1" />
-                            {{ formatReservationDate(order.reservedFor) }}
-                        </div>
-                    </div>
-
-                    <!-- Order Summary -->
-                    <div class="mt-2 pt-2 border-t border-gray-200">
-                        <div class="flex justify-between text-xs">
-                            <span>{{ order.orderDetails.length }} productos</span>
-                            <span class="font-medium">{{ formatCurrency(order.total) }}</span>
-                        </div>
-                    </div>
+        <!-- Order Content -->
+        <div class="flex-1 overflow-hidden">
+            <!-- No Order State -->
+            <div v-if="!currentOrder" class="flex items-center justify-center h-full p-6">
+                <div class="text-center">
+                    <ShoppingCartIcon class="w-16 h-16 text-gray-400 mx-auto mb-4" />
+                    <h3 class="text-lg font-medium text-gray-900 mb-2">No hay pedidos activos</h3>
+                    <p class="text-gray-500 mb-4">Crea un nuevo pedido para comenzar</p>
+                    <BaseButton @click="createNewOrder" variant="primary">
+                        <span class="flex items-center">
+                            <PlusIcon class="w-4 h-4 mr-2" />
+                            Crear Nuevo Pedido
+                        </span>
+                    </BaseButton>
                 </div>
             </div>
 
-            <!-- Selected Order Content -->
-            <div v-if="activeOrder" class="border-t border-gray-200 mt-4">
-                <div class="overflow-y-auto max-h-96">
-                    <OrderTab :order="activeOrder" />
+            <!-- Order Content -->
+            <div v-else class="h-full flex flex-col">
+                <!-- Order Header -->
+                <div class="p-4 border-b border-gray-200 bg-gray-50">
+                    <div class="flex items-center justify-between mb-3">
+                        <div>
+                            <h3 class="text-lg font-semibold text-gray-900">{{ currentOrder.tabName }}</h3>
+                            <div class="flex items-center gap-2 mt-1">
+                                <BaseBadge :type="getOrderTypeConfig(currentOrder.type).variant" size="sm">
+                                    {{ getOrderTypeConfig(currentOrder.type).label }}
+                                </BaseBadge>
+                                <span class="text-sm text-gray-500">
+                                    {{ currentOrder.orderItems.length }} items
+                                </span>
+                            </div>
+                        </div>
+                        <div class="text-right">
+                            <div class="text-lg font-bold text-green-600">
+                                {{ formatCurrency(currentOrder.total) }}
+                            </div>
+                            <div class="text-xs text-gray-500">Total</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Order Items -->
+                <div class="flex-1 overflow-y-auto">
+                    <OrderItemList :tab-id="currentTabId || ''" @add-products="handleAddProducts"
+                        @edit-item="handleEditItem" />
+                </div>
+
+                <!-- Order Actions -->
+                <div class="p-4 border-t border-gray-200 bg-gray-50 space-y-3">
+                    <!-- Customer Section -->
+                    <CustomerSection :selected-customer="getCustomer(currentOrder.customerId)"
+                        :selected-address="getAddress(currentOrder.addressId)" :order-type="currentOrder.type"
+                        @customer-selected="handleCustomerSelect" @address-selected="handleAddressSelect"
+                        @view-customer-detail="handleViewCustomerDetail" />
+
+                    <!-- Order Notes -->
+                    <div class="space-y-2">
+                        <label class="block text-sm font-medium text-gray-700">Notas del Pedido</label>
+                        <BaseInput :model-value="currentOrder.notes || ''"
+                            @update:model-value="(value) => updateOrderNotes(String(value || ''))"
+                            placeholder="Agregar notas especiales..." type="textarea" rows="2" />
+                    </div>
+
+                    <!-- Action Buttons -->
+                    <div class="flex gap-2">
+                        <BaseButton @click="handleSaveOrder" variant="outline" size="sm" class="flex-1"
+                            :disabled="!canSaveOrder">
+                            <span class="flex items-center justify-center">
+                                <DocumentIcon class="w-4 h-4 mr-2" />
+                                Guardar
+                            </span>
+                        </BaseButton>
+                        <BaseButton @click="handleSubmitOrder" variant="primary" size="sm" class="flex-1"
+                            :disabled="!canSubmitOrder">
+                            <span class="flex items-center justify-center">
+                                <PaperAirplaneIcon class="w-4 h-4 mr-2" />
+                                Enviar
+                            </span>
+                        </BaseButton>
+                    </div>
                 </div>
             </div>
         </div>
 
-        <!-- Confirmation Dialog -->
-        <BaseDialog v-model="showCloseConfirm" title="Confirmar Cierre" size="md">
-            <div class="text-center">
-                <ExclamationTriangleIcon class="mx-auto h-12 w-12 text-yellow-400 mb-4" />
-                <h3 class="text-lg font-medium text-gray-900 mb-2">¿Qué deseas hacer?</h3>
-                <p class="text-gray-500 mb-6">
-                    El pedido "{{ orderToClose?.id?.slice(-4) }}" tiene cambios pendientes.
-                </p>
-
-                <div class="flex space-x-3 justify-center">
-                    <BaseButton @click="saveAndClose" variant="primary" size="sm">
-                        Guardar y Cerrar
-                    </BaseButton>
-                    <BaseButton @click="discardAndClose" variant="danger" size="sm">
-                        Descartar Cambios
-                    </BaseButton>
-                    <BaseButton @click="cancelClose" variant="outline" size="sm">
-                        Cancelar
-                    </BaseButton>
-                </div>
-            </div>
-        </BaseDialog>
+        <!-- Customer Detail Modal -->
+        <CustomerDetailModal v-if="showCustomerDetail && selectedCustomer" :show="showCustomerDetail"
+            :customer="selectedCustomer" @close="closeCustomerDetail" @customer-updated="handleCustomerUpdated" />
     </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
-import { useOrdersStore } from '@/store/orders'
+import { computed, ref } from 'vue'
+import { useCustomersStore } from '@/store/customers'
+import { useOrderPersistence } from '@/composables/useOrderPersistence'
+import { useOrderValidation } from '@/composables/useOrderValidation'
+import { useFormatting } from '@/composables/useFormatting'
 import { useToast } from '@/composables/useToast'
-import type { ActiveOrder, OrderType } from '@/types/order'
 
 // Components
 import BaseButton from '@/components/ui/BaseButton.vue'
-import BaseDialog from '@/components/ui/BaseDialog.vue'
-import OrderTab from '@/components/OrderTab.vue'
-import OrderHeader from '@/components/orders/OrderHeader.vue'
+import BaseBadge from '@/components/ui/BaseBadge.vue'
+import BaseInput from '@/components/ui/BaseInput.vue'
+import OrderTabs from '@/components/orders/OrderTabs.vue'
+import OrderItemList from '@/components/orders/OrderItemList.vue'
+import CustomerSection from '@/components/orders/CustomerSection.vue'
+import CustomerDetailModal from '@/components/orders/CustomerDetailModal.vue'
 
 // Icons
 import {
+    ShoppingCartIcon,
     PlusIcon,
-    XMarkIcon,
-    ShoppingBagIcon,
-    UserIcon,
-    HomeIcon,
-    ClockIcon,
-    ExclamationTriangleIcon,
+    DocumentIcon,
+    PaperAirplaneIcon
 } from '@heroicons/vue/24/outline'
 
 // Composables
-const ordersStore = useOrdersStore()
+const { ordersStore } = useOrderPersistence()
+const { formatCurrency } = useFormatting()
 const { success, error: showError } = useToast()
+const customersStore = useCustomersStore()
 
 // State
-const showCloseConfirm = ref(false)
-const orderToClose = ref<ActiveOrder | null>(null)
+const showCustomerDetail = ref(false)
+const selectedCustomer = ref(null)
 
 // Computed
-const activeOrders = computed(() => ordersStore.activeOrdersList)
-const activeOrderId = computed(() => ordersStore.activeOrderId)
-const activeOrder = computed(() => ordersStore.activeOrder)
+const currentOrder = computed(() => ordersStore.currentOrder)
+const currentTabId = computed(() => ordersStore.currentTabId)
+const { canSubmitOrder } = useOrderValidation(currentOrder.value || undefined)
+
+const canSaveOrder = computed(() => {
+    return currentOrder.value && currentOrder.value.orderItems.length > 0
+})
+
+// Order type configurations
+const getOrderTypeConfig = (type: string) => {
+    const configs = {
+        onsite: { label: 'En el Local', variant: 'info' },
+        delivery: { label: 'Domicilio', variant: 'warning' },
+        reservation: { label: 'Reserva', variant: 'success' }
+    }
+    return configs[type as keyof typeof configs] || configs.onsite
+}
 
 // Methods
-const createNewOrder = (type: OrderType = 'delivery') => {
-    try {
-        ordersStore.createActiveOrder(type)
-        success('Pedido creado', 2000, `Nuevo pedido ${type} creado`)
-    } catch (error) {
-        showError('Error', 'No se pudo crear el pedido')
-    }
+const createNewOrder = () => {
+    ordersStore.createNewTab()
 }
 
-const setActiveOrder = (orderId: string) => {
-    ordersStore.setActiveOrder(orderId)
+const getCustomer = (customerId: number | null) => {
+    if (!customerId) return null
+    return customersStore.list?.items.find((c: any) => c.id === customerId) || null
 }
 
-const closeOrder = (orderId: string) => {
-    const order = ordersStore.activeOrders.get(orderId)
-    if (!order) return
-
-    if (order.isDirty) {
-        orderToClose.value = order
-        showCloseConfirm.value = true
-    } else {
-        confirmClose(orderId)
-    }
-}
-
-const confirmClose = (orderId: string) => {
-    const order = ordersStore.activeOrders.get(orderId)
-    if (order) {
-        ordersStore.activeOrders.delete(orderId)
-        if (ordersStore.activeOrderId === orderId) {
-            ordersStore.activeOrderId = null
-        }
-    }
-}
-
-const saveAndClose = async () => {
-    if (!orderToClose.value) return
-
-    try {
-        // Here you would typically save the order or prompt for save action
-        confirmClose(orderToClose.value.id)
-        success('Pedido guardado', 2000, 'El pedido se ha guardado correctamente')
-    } catch (error) {
-        showError('Error', 'No se pudo guardar el pedido')
-    }
-
-    showCloseConfirm.value = false
-    orderToClose.value = null
-}
-
-const discardAndClose = () => {
-    if (!orderToClose.value) return
-
-    confirmClose(orderToClose.value.id)
-    showCloseConfirm.value = false
-    orderToClose.value = null
-}
-
-const cancelClose = () => {
-    showCloseConfirm.value = false
-    orderToClose.value = null
-}
-
-const getOrderTypeConfig = (type: OrderType) => {
-    const configs = {
-        onsite: {
-            label: 'En Local',
-            bgClass: 'bg-green-100',
-            iconClass: 'text-green-600',
-            icon: 'BuildingStorefrontIcon'
-        },
-        delivery: {
-            label: 'Domicilio',
-            bgClass: 'bg-blue-100',
-            iconClass: 'text-blue-600',
-            icon: 'TruckIcon'
-        },
-        reservation: {
-            label: 'Reserva',
-            bgClass: 'bg-purple-100',
-            iconClass: 'text-purple-600',
-            icon: 'CalendarIcon'
-        }
-    }
-    return configs[type]
-}
-
-const formatCurrency = (amount: number): string => {
-    return new Intl.NumberFormat('es-CO', {
-        style: 'currency',
-        currency: 'COP',
-        minimumFractionDigits: 0,
-    }).format(amount)
-}
-
-const formatReservationDate = (date: string): string => {
-    return new Date(date).toLocaleString('es-CO', {
-        day: '2-digit',
-        month: '2-digit',
-        year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit'
-    })
-}
-
-// Helper methods for OrderHeader
-const getCustomerName = (customerId?: number): string => {
-    if (!customerId) return ''
-    const customer = ordersStore.customers.find(c => c.id === customerId)
-    return customer?.name || ''
-}
-
-const getCustomer = (customerId?: number) => {
-    if (!customerId) return undefined
-    return ordersStore.customers.find(c => c.id === customerId)
-}
-
-const getAddress = (addressId?: number) => {
-    if (!addressId) return undefined
-    // This would need to be implemented in the store to fetch addresses
-    // For now, returning undefined
-    return undefined
-}
-
-// OrderHeader event handlers
-const handleOrderTypeChange = (newType: OrderType) => {
-    if (activeOrder.value) {
-        activeOrder.value.type = newType
-        activeOrder.value.isDirty = true
-    }
-}
-
-const clearActiveOrder = () => {
-    if (activeOrderId.value) {
-        closeOrder(activeOrderId.value)
-    }
+const getAddress = (addressId: number | null) => {
+    if (!addressId) return null
+    // This would need to be implemented based on your address structure
+    return null
 }
 
 const handleCustomerSelect = (customer: any) => {
-    if (activeOrder.value) {
-        activeOrder.value.customerId = customer?.id || null
-        activeOrder.value.isDirty = true
-    }
+    if (!currentTabId.value) return
+    ordersStore.updateCustomer(customer)
 }
 
 const handleAddressSelect = (address: any) => {
-    if (activeOrder.value) {
-        activeOrder.value.addressId = address?.id || null
-        activeOrder.value.isDirty = true
+    if (!currentTabId.value) return
+    ordersStore.updateAddress(address)
+}
+
+const handleViewCustomerDetail = (customer: any) => {
+    selectedCustomer.value = customer
+    showCustomerDetail.value = true
+}
+
+const closeCustomerDetail = () => {
+    showCustomerDetail.value = false
+    selectedCustomer.value = null
+}
+
+const handleCustomerUpdated = (customer: any) => {
+    // Customer updated, refresh if needed
+    console.log('Customer updated:', customer)
+}
+
+const updateOrderNotes = (notes: string) => {
+    if (!currentTabId.value) return
+    ordersStore.updateOrderNotes(notes)
+}
+
+const handleAddProducts = () => {
+    // This would focus on the product grid or open a product selector
+    console.log('Add products from grid')
+}
+
+const handleEditItem = (itemTempId: string) => {
+    // This would open an edit modal for the item
+    console.log('Edit item:', itemTempId)
+}
+
+const handleSaveOrder = () => {
+    if (!canSaveOrder.value) return
+
+    try {
+        // Save order logic would go here
+        success('Pedido guardado', 2000, 'El pedido se ha guardado correctamente')
+    } catch (error: any) {
+        showError('Error al guardar pedido', error.message || 'No se pudo guardar el pedido')
+    }
+}
+
+const handleSubmitOrder = () => {
+    if (!canSubmitOrder.value) return
+
+    try {
+        // Submit order logic would go here
+        success('Pedido enviado', 2000, 'El pedido se ha enviado correctamente')
+    } catch (error: any) {
+        showError('Error al enviar pedido', error.message || 'No se pudo enviar el pedido')
     }
 }
 </script>
 
 <style scoped>
 .order-sidebar {
-    width: 400px;
     min-width: 400px;
+    max-width: 500px;
 }
 
-.order-tab {
-    min-height: 120px;
+@media (max-width: 1024px) {
+    .order-sidebar {
+        min-width: 350px;
+        max-width: 400px;
+    }
+}
+
+@media (max-width: 768px) {
+    .order-sidebar {
+        min-width: 100%;
+        max-width: 100%;
+    }
 }
 </style>

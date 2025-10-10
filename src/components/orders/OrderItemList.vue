@@ -90,7 +90,7 @@ interface Props {
     loading?: boolean
 }
 
-const props = withDefaults(defineProps<Props>(), {
+withDefaults(defineProps<Props>(), {
     loading: false
 })
 
@@ -176,51 +176,82 @@ const handleAddProducts = () => {
 
 <style scoped>
 .order-items-container {
-    @apply space-y-4;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
 }
 
 .loading-state {
-    @apply flex justify-center items-center py-8;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 2rem 0;
 }
 
 .empty-state {
-    @apply text-center py-8 px-4;
+    text-align: center;
+    padding: 2rem 1rem;
 }
 
 .empty-icon {
-    @apply flex justify-center mb-4;
+    display: flex;
+    justify-content: center;
+    margin-bottom: 1rem;
 }
 
 .empty-title {
-    @apply text-lg font-medium text-gray-900 mb-2;
+    font-size: 1.125rem;
+    font-weight: 500;
+    color: #111827;
+    margin-bottom: 0.5rem;
 }
 
 .empty-description {
-    @apply text-sm text-gray-500 mb-4;
+    font-size: 0.875rem;
+    color: #6b7280;
+    margin-bottom: 1rem;
 }
 
 .items-section {
-    @apply space-y-4;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
 }
 
 .items-list {
-    @apply space-y-3;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
 }
 
 .clear-all-section {
-    @apply flex justify-end pt-2 border-t border-gray-100;
+    display: flex;
+    justify-content: flex-end;
+    padding-top: 0.5rem;
+    border-top: 1px solid #f3f4f6;
 }
 
 .totals-summary {
-    @apply bg-gray-50 rounded-lg p-4 space-y-2;
+    background-color: #f9fafb;
+    border-radius: 0.5rem;
+    padding: 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
 }
 
 .summary-line {
-    @apply flex justify-between items-center text-sm;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.875rem;
 }
 
 .total-line {
-    @apply text-base font-bold border-t border-gray-200 pt-2;
+    font-size: 1rem;
+    font-weight: 700;
+    border-top: 1px solid #e5e7eb;
+    padding-top: 0.5rem;
 }
 
 /* Animations */
