@@ -263,8 +263,8 @@ export const useProductCategoriesStore = defineStore('productCategories', () => 
     multiSelect.value = false
   }
 
-  return {
-    // State
+    return {
+        // State
     searchQuery,
     favorites,
     sortBy,
@@ -281,7 +281,7 @@ export const useProductCategoriesStore = defineStore('productCategories', () => 
     hasSelectedCategories,
     selectedCategoriesList,
 
-    // Actions
+        // Actions
     setSearchQuery,
     clearSearch,
     toggleFavorite,

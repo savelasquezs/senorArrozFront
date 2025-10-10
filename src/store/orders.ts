@@ -17,6 +17,10 @@ import type {
     ActiveAppPayment,
     Product,
     OrderType,
+    DraftOrder,
+    OrderItem,
+    OrderTab,
+    StoredOrdersState,
 } from '@/types/order'
 import type {
     Branch,
@@ -44,6 +48,12 @@ export const useOrdersStore = defineStore('orders', {
         // Active orders (work in progress)
         activeOrders: new Map<string, ActiveOrder>(),
         activeOrderId: null as string | null,
+
+        // Draft Orders System (Multiple Tabs)
+        draftOrders: new Map<string, DraftOrder>(),
+        currentTabId: null as string | null,
+        maxTabs: 5,
+        nextTabNumber: 1,
 
         // Products and categories forUI
         products: [] as Product[],
@@ -102,6 +112,28 @@ export const useOrdersStore = defineStore('orders', {
             return Array.from(state.activeOrders.values()).sort(
                 (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
             )
+        },
+
+        // Draft Orders System Getters
+        currentOrder: (state): DraftOrder | null => {
+            if (!state.currentTabId) return null
+            return state.draftOrders.get(state.currentTabId) || null
+        },
+
+        orderTabs: (state): OrderTab[] => {
+            return Array.from(state.draftOrders.values()).map(order => ({
+                tabId: order.tabId,
+                tabName: order.tabName,
+                itemCount: order.orderItems.length,
+                total: order.total,
+                type: order.type,
+                customerName: order.customerName || undefined,
+                isActive: order.tabId === state.currentTabId
+            }))
+        },
+
+        canAddNewTab: (state): boolean => {
+            return state.draftOrders.size < state.maxTabs
         },
 
         // Get categorized products
@@ -603,6 +635,287 @@ export const useOrdersStore = defineStore('orders', {
         clearActiveOrders() {
             this.activeOrders.clear()
             this.activeOrderId = null
+        },
+
+        // Draft Orders System Actions
+        createNewTab() {
+            if (!this.canAddNewTab) return
+
+            const tabId = `tab-${Date.now()}-${this.nextTabNumber}`
+            const tabName = `Pedido ${this.nextTabNumber}`
+
+            const newOrder: DraftOrder = {
+                tabId,
+                tabName,
+                type: 'onsite',
+                customerId: null,
+                customerName: null,
+                customerPhone: null,
+                addressId: null,
+                addressDescription: null,
+                deliveryFee: 0,
+                reservedFor: null,
+                notes: '',
+                orderItems: [],
+                bankPayments: [],
+                appPayment: null,
+                subtotal: 0,
+                total: 0,
+                discountTotal: 0,
+                createdAt: new Date(),
+                updatedAt: new Date()
+            }
+
+            this.draftOrders.set(tabId, newOrder)
+            this.currentTabId = tabId
+            this.nextTabNumber++
+            this.saveToLocalStorage()
+        },
+
+        switchTab(tabId: string) {
+            if (this.draftOrders.has(tabId)) {
+                this.currentTabId = tabId
+                this.saveToLocalStorage()
+            }
+        },
+
+        closeTab(tabId: string) {
+            if (this.draftOrders.has(tabId)) {
+                this.draftOrders.delete(tabId)
+
+                // Si era la tab activa, cambiar a otra
+                if (this.currentTabId === tabId) {
+                    const remainingTabs = Array.from(this.draftOrders.keys())
+                    this.currentTabId = remainingTabs.length > 0 ? remainingTabs[0] : null
+                }
+
+                this.saveToLocalStorage()
+            }
+        },
+
+        renameTab(tabId: string, newName: string) {
+            const order = this.draftOrders.get(tabId)
+            if (order) {
+                order.tabName = newName
+                order.updatedAt = new Date()
+                this.saveToLocalStorage()
+            }
+        },
+
+        // Gestión de Items
+        addProduct(product: Product, quantity: number = 1) {
+            if (!this.currentTabId) return
+
+            const order = this.draftOrders.get(this.currentTabId)
+            if (!order) return
+
+            // Verificar si el producto ya existe en la orden
+            const existingItem = order.orderItems.find(item => item.productId === product.id)
+
+            if (existingItem) {
+                // Si ya existe, aumentar la cantidad
+                existingItem.quantity += quantity
+            } else {
+                // Si no existe, crear nuevo item
+                const newItem: OrderItem = {
+                    tempId: `item-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+                    productId: product.id,
+                    productName: product.name,
+                    productPrice: product.price,
+                    quantity,
+                    unitPrice: product.price,
+                    discount: 0,
+                    subtotal: product.price * quantity,
+                    notes: ''
+                }
+                order.orderItems.push(newItem)
+            }
+
+            this.recalculateDraftOrderTotals(order)
+            this.saveToLocalStorage()
+        },
+
+        removeItem(itemTempId: string) {
+            if (!this.currentTabId) return
+
+            const order = this.draftOrders.get(this.currentTabId)
+            if (!order) return
+
+            order.orderItems = order.orderItems.filter(item => item.tempId !== itemTempId)
+            this.recalculateDraftOrderTotals(order)
+            this.saveToLocalStorage()
+        },
+
+        updateItemQuantity(itemTempId: string, quantity: number) {
+            if (!this.currentTabId || quantity < 1) return
+
+            const order = this.draftOrders.get(this.currentTabId)
+            if (!order) return
+
+            const item = order.orderItems.find(item => item.tempId === itemTempId)
+            if (item) {
+                item.quantity = quantity
+                item.subtotal = (item.quantity * item.unitPrice) - item.discount
+                this.recalculateDraftOrderTotals(order)
+                this.saveToLocalStorage()
+            }
+        },
+
+        updateItemPrice(itemTempId: string, price: number) {
+            if (!this.currentTabId || price < 0) return
+
+            const order = this.draftOrders.get(this.currentTabId)
+            if (!order) return
+
+            const item = order.orderItems.find(item => item.tempId === itemTempId)
+            if (item) {
+                item.unitPrice = price
+                item.subtotal = (item.quantity * item.unitPrice) - item.discount
+                this.recalculateDraftOrderTotals(order)
+                this.saveToLocalStorage()
+            }
+        },
+
+        updateItemDiscount(itemTempId: string, discount: number) {
+            if (!this.currentTabId || discount < 0) return
+
+            const order = this.draftOrders.get(this.currentTabId)
+            if (!order) return
+
+            const item = order.orderItems.find(item => item.tempId === itemTempId)
+            if (item) {
+                item.discount = discount
+                item.subtotal = (item.quantity * item.unitPrice) - item.discount
+                this.recalculateDraftOrderTotals(order)
+                this.saveToLocalStorage()
+            }
+        },
+
+        updateItemNotes(itemTempId: string, notes: string) {
+            if (!this.currentTabId) return
+
+            const order = this.draftOrders.get(this.currentTabId)
+            if (!order) return
+
+            const item = order.orderItems.find(item => item.tempId === itemTempId)
+            if (item) {
+                item.notes = notes
+                order.updatedAt = new Date()
+                this.saveToLocalStorage()
+            }
+        },
+
+        // Gestión de Orden
+        updateOrderType(type: OrderType) {
+            if (!this.currentTabId) return
+
+            const order = this.draftOrders.get(this.currentTabId)
+            if (!order) return
+
+            order.type = type
+            order.updatedAt = new Date()
+            this.saveToLocalStorage()
+        },
+
+        updateCustomer(customer: Customer | null) {
+            if (!this.currentTabId) return
+
+            const order = this.draftOrders.get(this.currentTabId)
+            if (!order) return
+
+            if (customer) {
+                order.customerId = customer.id
+                order.customerName = customer.name
+                order.customerPhone = customer.phone1
+            } else {
+                order.customerId = null
+                order.customerName = null
+                order.customerPhone = null
+            }
+
+            order.updatedAt = new Date()
+            this.saveToLocalStorage()
+        },
+
+        updateAddress(address: any | null) {
+            if (!this.currentTabId) return
+
+            const order = this.draftOrders.get(this.currentTabId)
+            if (!order) return
+
+            if (address) {
+                order.addressId = address.id
+                order.addressDescription = address.address
+                order.deliveryFee = address.deliveryFee || 0
+            } else {
+                order.addressId = null
+                order.addressDescription = null
+                order.deliveryFee = 0
+            }
+
+            this.recalculateDraftOrderTotals(order)
+            this.saveToLocalStorage()
+        },
+
+        updateOrderNotes(notes: string) {
+            if (!this.currentTabId) return
+
+            const order = this.draftOrders.get(this.currentTabId)
+            if (!order) return
+
+            order.notes = notes
+            order.updatedAt = new Date()
+            this.saveToLocalStorage()
+        },
+
+        // Cálculos
+        recalculateDraftOrderTotals(order: DraftOrder) {
+            order.subtotal = order.orderItems.reduce((sum, item) => sum + item.subtotal, 0)
+            order.discountTotal = order.orderItems.reduce((sum, item) => sum + item.discount, 0)
+            order.total = order.subtotal + order.deliveryFee
+            order.updatedAt = new Date()
+        },
+
+        // Persistencia
+        saveToLocalStorage() {
+            const state: StoredOrdersState = {
+                draftOrders: Array.from(this.draftOrders.values()),
+                currentTabId: this.currentTabId,
+                nextTabNumber: this.nextTabNumber,
+                lastSaved: new Date().toISOString()
+            }
+
+            try {
+                localStorage.setItem('senor-arroz-draft-orders', JSON.stringify(state))
+            } catch (error) {
+                console.warn('Error saving to localStorage:', error)
+            }
+        },
+
+        loadFromLocalStorage() {
+            try {
+                const stored = localStorage.getItem('senor-arroz-draft-orders')
+                if (!stored) return
+
+                const data: StoredOrdersState = JSON.parse(stored)
+                const now = new Date()
+                const lastSaved = new Date(data.lastSaved)
+
+                // Verificar TTL (24 horas)
+                const TTL_HOURS = 24
+                if (now.getTime() - lastSaved.getTime() > TTL_HOURS * 60 * 60 * 1000) {
+                    localStorage.removeItem('senor-arroz-draft-orders')
+                    return
+                }
+
+                // Cargar datos
+                this.draftOrders = new Map(data.draftOrders.map(order => [order.tabId, order]))
+                this.currentTabId = data.currentTabId
+                this.nextTabNumber = data.nextTabNumber
+            } catch (error) {
+                console.warn('Error loading from localStorage:', error)
+                localStorage.removeItem('senor-arroz-draft-orders')
+            }
         },
     },
 })

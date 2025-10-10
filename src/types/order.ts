@@ -212,6 +212,76 @@ export interface ProductCategory {
     active: boolean
 }
 
+// Draft Order System for Multiple Tabs
+export interface DraftOrder {
+    tabId: string                          // Identificador único de la tab
+    tabName: string                        // Nombre de la tab (ej: "Pedido 1")
+
+    // Datos de la orden
+    type: OrderType                        // 'onsite' | 'delivery' | 'reservation'
+    customerId: number | null
+    customerName: string | null
+    customerPhone: string | null
+    addressId: number | null
+    addressDescription: string | null
+    deliveryFee: number
+    reservedFor: Date | null
+    notes: string
+
+    // Items de la orden
+    orderItems: OrderItem[]
+
+    // Pagos
+    bankPayments: BankPayment[]
+    appPayment: AppPayment | null
+
+    // Totales (calculados)
+    subtotal: number
+    total: number
+    discountTotal: number
+
+    // Metadata
+    createdAt: Date
+    updatedAt: Date
+}
+
+export interface OrderItem {
+    tempId: string                         // ID temporal para el frontend
+    productId: number
+    productName: string
+    productPrice: number                   // Precio base del producto
+    quantity: number
+    unitPrice: number                      // Precio modificable
+    discount: number                       // Valor del descuento (no porcentaje)
+    subtotal: number                       // calculado: quantity × unitPrice - discount
+    notes: string
+}
+
+export interface BankPayment {
+    tempId: string
+    bankId: number
+    bankName: string
+    amount: number
+}
+
+export interface AppPayment {
+    tempId: string
+    appId: number
+    appName: string
+    amount: number
+}
+
+// Tab Management
+export interface OrderTab {
+    tabId: string
+    tabName: string
+    itemCount: number
+    total: number
+    type: OrderType
+    customerName?: string
+    isActive: boolean
+}
+
 // Store types
 export interface OrdersState {
     // Main orders list
@@ -221,6 +291,12 @@ export interface OrdersState {
     // Active orders (work in progress)
     activeOrders: Map<string, ActiveOrder>
     activeOrderId: string | null
+
+    // Draft Orders System (Multiple Tabs)
+    draftOrders: Map<string, DraftOrder>
+    currentTabId: string | null
+    maxTabs: number
+    nextTabNumber: number
 
     // Products and categories for UI
     products: Product[]
@@ -233,6 +309,20 @@ export interface OrdersState {
     // Search and filters
     searchQuery: string
     selectedCategory: number | null
+}
+
+// Persistence
+export interface StoredOrdersState {
+    draftOrders: DraftOrder[]
+    currentTabId: string | null
+    nextTabNumber: number
+    lastSaved: string  // ISO timestamp
+}
+
+// Validation
+export interface ValidationResult {
+    isValid: boolean
+    errors: string[]
 }
 
 // Events
