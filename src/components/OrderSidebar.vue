@@ -9,7 +9,7 @@
         </div>
 
         <!-- Order Content -->
-        <div class="flex-1 overflow-hidden">
+        <div class="flex-1 overflow-y-auto">
             <!-- No Order State -->
             <div v-if="!currentOrder" class="flex items-center justify-center h-full p-6">
                 <div class="text-center">
@@ -26,9 +26,9 @@
             </div>
 
             <!-- Order Content -->
-            <div v-else class="h-full flex flex-col">
+            <div v-else class="flex flex-col h-full">
                 <!-- Order Header -->
-                <div class="p-4 border-b border-gray-200 bg-gray-50">
+                <div class="flex-shrink-0 p-4 border-b border-gray-200 bg-gray-50">
                     <div class="flex items-center justify-between mb-3">
                         <div>
                             <h3 class="text-lg font-semibold text-gray-900">{{ currentOrder.tabName }}</h3>
@@ -50,44 +50,48 @@
                     </div>
                 </div>
 
-                <!-- Order Items -->
+                <!-- Scrollable Content -->
                 <div class="flex-1 overflow-y-auto">
-                    <OrderItemList :tab-id="currentTabId || ''" @add-products="handleAddProducts"
-                        @edit-item="handleEditItem" />
-                </div>
-
-                <!-- Order Actions -->
-                <div class="p-4 border-t border-gray-200 bg-gray-50 space-y-3">
-                    <!-- Customer Section -->
-                    <CustomerSection :selected-customer="getCustomer(currentOrder.customerId)"
-                        :selected-address="getAddress(currentOrder.addressId)" :order-type="currentOrder.type"
-                        @customer-selected="handleCustomerSelect" @address-selected="handleAddressSelect"
-                        @view-customer-detail="handleViewCustomerDetail" />
-
-                    <!-- Order Notes -->
-                    <div class="space-y-2">
-                        <label class="block text-sm font-medium text-gray-700">Notas del Pedido</label>
-                        <BaseInput :model-value="currentOrder.notes || ''"
-                            @update:model-value="(value) => updateOrderNotes(String(value || ''))"
-                            placeholder="Agregar notas especiales..." type="textarea" rows="2" />
+                    <!-- Order Items -->
+                    <div class="p-4">
+                        <OrderItemList :tab-id="currentTabId || ''" @add-products="handleAddProducts"
+                            @edit-item="handleEditItem" />
                     </div>
 
-                    <!-- Action Buttons -->
-                    <div class="flex gap-2">
-                        <BaseButton @click="handleSaveOrder" variant="outline" size="sm" class="flex-1"
-                            :disabled="!canSaveOrder">
-                            <span class="flex items-center justify-center">
-                                <DocumentIcon class="w-4 h-4 mr-2" />
-                                Guardar
-                            </span>
-                        </BaseButton>
-                        <BaseButton @click="handleSubmitOrder" variant="primary" size="sm" class="flex-1"
-                            :disabled="!canSubmitOrder">
-                            <span class="flex items-center justify-center">
-                                <PaperAirplaneIcon class="w-4 h-4 mr-2" />
-                                Enviar
-                            </span>
-                        </BaseButton>
+                    <!-- Order Actions -->
+                    <div class="p-4 border-t border-gray-200 bg-gray-50 space-y-3">
+                        <!-- Customer Section -->
+                        <CustomerSection :selected-customer="getCustomer(currentOrder.customerId)"
+                            :selected-address="getAddress(currentOrder.addressId)" :order-type="currentOrder.type"
+                            @customer-selected="handleCustomerSelect" @address-selected="handleAddressSelect"
+                            @view-customer-detail="handleViewCustomerDetail"
+                            @order-type-changed="handleOrderTypeChanged" />
+
+                        <!-- Order Notes -->
+                        <div class="space-y-2">
+                            <label class="block text-sm font-medium text-gray-700">Notas del Pedido</label>
+                            <BaseInput :model-value="currentOrder.notes || ''"
+                                @update:model-value="(value) => updateOrderNotes(String(value || ''))"
+                                placeholder="Agregar notas especiales..." type="textarea" rows="2" />
+                        </div>
+
+                        <!-- Action Buttons -->
+                        <div class="flex gap-2">
+                            <BaseButton @click="handleSaveOrder" variant="outline" size="sm" class="flex-1"
+                                :disabled="!canSaveOrder">
+                                <span class="flex items-center justify-center">
+                                    <DocumentIcon class="w-4 h-4 mr-2" />
+                                    Guardar
+                                </span>
+                            </BaseButton>
+                            <BaseButton @click="handleSubmitOrder" variant="primary" size="sm" class="flex-1"
+                                :disabled="!canSubmitOrder">
+                                <span class="flex items-center justify-center">
+                                    <PaperAirplaneIcon class="w-4 h-4 mr-2" />
+                                    Enviar
+                                </span>
+                            </BaseButton>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -100,12 +104,13 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useCustomersStore } from '@/store/customers'
 import { useOrderPersistence } from '@/composables/useOrderPersistence'
 import { useOrderValidation } from '@/composables/useOrderValidation'
 import { useFormatting } from '@/composables/useFormatting'
 import { useToast } from '@/composables/useToast'
+import type { Customer, CustomerAddress } from '@/types/customer'
 
 // Components
 import BaseButton from '@/components/ui/BaseButton.vue'
@@ -132,7 +137,8 @@ const customersStore = useCustomersStore()
 
 // State
 const showCustomerDetail = ref(false)
-const selectedCustomer = ref(null)
+const selectedCustomer = ref<Customer | null>(null)
+const selectedAddress = ref<CustomerAddress | null>(null)
 
 // Computed
 const currentOrder = computed(() => ordersStore.currentOrder)
@@ -164,14 +170,26 @@ const getCustomer = (customerId: number | null) => {
 }
 
 const getAddress = (addressId: number | null) => {
-    if (!addressId) return null
-    // This would need to be implemented based on your address structure
-    return null
+    if (!addressId || !selectedCustomer.value) return null
+    return selectedCustomer.value.addresses?.find((a: CustomerAddress) => a.id === addressId) || null
 }
 
-const handleCustomerSelect = (customer: any) => {
-    if (!currentTabId.value) return
-    ordersStore.updateCustomer(customer)
+const handleCustomerSelect = (customer: Customer | null) => {
+    selectedCustomer.value = customer
+    if (customer && customer.addresses && customer.addresses.length > 0) {
+        const primaryAddress = customer.addresses.find((a: CustomerAddress) => a.isPrimary) || customer.addresses[0]
+        selectedAddress.value = primaryAddress
+        ordersStore.updateCustomer(customer)
+        ordersStore.updateAddress(primaryAddress)
+    } else {
+        selectedAddress.value = null
+        ordersStore.updateCustomer(customer)
+        ordersStore.updateAddress(null)
+    }
+}
+
+const handleOrderTypeChanged = (type: 'onsite' | 'delivery' | 'reservation') => {
+    ordersStore.updateOrderType(type)
 }
 
 const handleAddressSelect = (address: any) => {
@@ -230,6 +248,23 @@ const handleSubmitOrder = () => {
         showError('Error al enviar pedido', error.message || 'No se pudo enviar el pedido')
     }
 }
+
+// Watchers
+watch(currentOrder, (newOrder) => {
+    if (newOrder) {
+        // Update selected customer when switching tabs
+        const customer = getCustomer(newOrder.customerId)
+        selectedCustomer.value = customer
+
+        // Update selected address when switching tabs
+        if (customer) {
+            const address = getAddress(newOrder.addressId)
+            selectedAddress.value = address
+        } else {
+            selectedAddress.value = null
+        }
+    }
+}, { immediate: true })
 </script>
 
 <style scoped>

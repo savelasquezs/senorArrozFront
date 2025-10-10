@@ -1,70 +1,50 @@
 <template>
-    <div class="orders-view min-h-screen bg-gray-50">
-        <!-- Header -->
-        <div class="bg-white shadow">
-            <div class="px-4 sm:px-6 lg:px-8">
-                <div class="py-6">
-                    <div class="flex items-center justify-between">
-                        <div>
-                            <h1 class="text-3xl font-bold text-gray-900">Gestión de Pedidos</h1>
-                            <p class="mt-1 text-sm text-gray-500">
-                                Sistema de toma de pedidos y gestión de órdenes
-                            </p>
-                        </div>
-                        <div class="flex items-center space-x-3">
-                            <BaseButton @click="refreshData" variant="outline" size="sm">
-                                <ArrowPathIcon class="w-4 h-4 mr-2" />
-                                Actualizar
-                            </BaseButton>
-                            <BaseBadge :type="ordersStore.activeOrder ? 'warning' : 'success'" size="lg">
-                                {{ ordersStore.activeOrder ? 'Pedido activo' : 'Sin pedidos activos' }}
-                            </BaseBadge>
-                        </div>
+    <MainLayout>
+
+        <div class="orders-view min-h-screen bg-gray-50">
+            <!-- Header -->
+            <!-- Main Content -->
+            <div class="flex h-[calc(100vh-140px)]">
+                <!-- Left Panel - Products and Categories -->
+                <div class="flex-1 bg-white border-r border-gray-200 overflow-hidden flex flex-col">
+                    <!-- Categories Bar -->
+                    <div class="px-4 border-b border-gray-200 bg-gray-50">
+                        <CategoriesBar :categories="ordersStore.categories"
+                            :products-count="ordersStore.filteredProducts.length"
+                            @category-selected="onCategorySelected" />
+                    </div>
+                    <!-- Search Bar -->
+                    <div class="p-4 border-b border-gray-200">
+                        <BaseInput v-model="ordersStore.searchQuery" placeholder="Buscar productos..."
+                            @input="ordersStore.setSearchQuery" size="lg">
+                            <template #prepend>
+                                <MagnifyingGlassIcon class="w-5 h-5 text-gray-400" />
+                            </template>
+                        </BaseInput>
+                    </div>
+
+
+                    <!-- Products Grid -->
+                    <div class="flex-1 overflow-y-auto p-4">
+                        <ProductsGrid :products="ordersStore.filteredProducts" />
                     </div>
                 </div>
-            </div>
-        </div>
 
-        <!-- Main Content -->
-        <div class="flex h-[calc(100vh-140px)]">
-            <!-- Left Panel - Products and Categories -->
-            <div class="flex-1 bg-white border-r border-gray-200 overflow-hidden flex flex-col">
-                <!-- Categories Bar -->
-                <div class="px-4 border-b border-gray-200 bg-gray-50">
-                    <CategoriesBar :categories="ordersStore.categories"
-                        :products-count="ordersStore.filteredProducts.length" @category-selected="onCategorySelected" />
-                </div>
-                <!-- Search Bar -->
-                <div class="p-4 border-b border-gray-200">
-                    <BaseInput v-model="ordersStore.searchQuery" placeholder="Buscar productos..."
-                        @input="ordersStore.setSearchQuery" size="lg">
-                        <template #prepend>
-                            <MagnifyingGlassIcon class="w-5 h-5 text-gray-400" />
-                        </template>
-                    </BaseInput>
-                </div>
-
-
-                <!-- Products Grid -->
-                <div class="flex-1 overflow-y-auto p-4">
-                    <ProductsGrid :products="ordersStore.filteredProducts" />
-                </div>
+                <!-- Right Panel - Order Sidebar -->
+                <OrderSidebar @order-updated="refreshTotals" />
             </div>
 
-            <!-- Right Panel - Order Sidebar -->
-            <OrderSidebar @order-updated="refreshTotals" />
+            <!-- Loading Overlay -->
+            <BaseLoading v-if="ordersStore.isLoading" text="Cargando datos..." />
+
+            <!-- Error Message -->
+            <BaseAlert v-if="ordersStore.error" type="error" :message="ordersStore.error"
+                class="fixed top-4 right-4 z-50" />
+
+            <!-- Success Toast -->
+            <!-- Toast component will be handled by useToast composable automatically -->
         </div>
-
-        <!-- Loading Overlay -->
-        <BaseLoading v-if="ordersStore.isLoading" text="Cargando datos..." />
-
-        <!-- Error Message -->
-        <BaseAlert v-if="ordersStore.error" type="error" :message="ordersStore.error"
-            class="fixed top-4 right-4 z-50" />
-
-        <!-- Success Toast -->
-        <!-- Toast component will be handled by useToast composable automatically -->
-    </div>
+    </MainLayout>
 </template>
 
 <script setup lang="ts">
@@ -75,8 +55,7 @@ import { useToast } from '@/composables/useToast'
 
 // Components
 import BaseInput from '@/components/ui/BaseInput.vue'
-import BaseButton from '@/components/ui/BaseButton.vue'
-import BaseBadge from '@/components/ui/BaseBadge.vue'
+import MainLayout from '@/components/layout/MainLayout.vue'
 import BaseLoading from '@/components/ui/BaseLoading.vue'
 import BaseAlert from '@/components/ui/BaseAlert.vue'
 import ProductsGrid from '@/components/ProductsGrid.vue'

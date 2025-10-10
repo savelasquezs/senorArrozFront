@@ -249,7 +249,7 @@ import {
     PlusIcon,
     EyeIcon,
     PencilIcon,
-    TrashIcon,
+
     ChevronLeftIcon,
     ChevronRightIcon,
     XMarkIcon

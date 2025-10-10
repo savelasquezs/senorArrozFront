@@ -8,25 +8,30 @@
         <!-- Customer Selected -->
         <div v-else class="space-y-3">
             <!-- Customer Info -->
-            <div class="bg-blue-50 border border-blue-200 rounded-lg p-3">
+            <div class="bg-green-50 border border-green-200 rounded-lg p-3">
                 <div class="flex items-center justify-between">
                     <div class="flex-1">
-                        <h4 class="font-medium text-blue-900">{{ selectedCustomer.name }}</h4>
-                        <div class="flex items-center gap-2 mt-1">
-                            <PhoneNumberItem :phone-number="selectedCustomer.phone1" />
-                            <BaseButton @click="$emit('view-customer-detail', selectedCustomer)" variant="outline"
-                                size="sm" class="ml-auto">
-                                <span class="flex items-center">
-                                    <EyeIcon class="w-4 h-4 mr-1" />
-                                    Ver
-                                </span>
+                        <div class="flex items-center justify-between mb-2">
+                            <h4 class="font-medium text-green-900">{{ selectedCustomer.name }}</h4>
+                            <BaseButton @click="$emit('view-customer-detail', selectedCustomer)" variant="ghost"
+                                size="sm">
+                                <EyeIcon class="w-4 h-4" />
                             </BaseButton>
                         </div>
-                        <div v-if="selectedCustomer.phone2" class="mt-1">
-                            <PhoneNumberItem :phone-number="selectedCustomer.phone2" />
+                        <div class="space-y-1">
+                            <PhoneNumberItem :phone-number="selectedCustomer.phone1" />
+                            <PhoneNumberItem v-if="selectedCustomer.phone2" :phone-number="selectedCustomer.phone2" />
                         </div>
                     </div>
                 </div>
+            </div>
+
+            <!-- Order Type Selector -->
+            <div class="space-y-2">
+                <label class="block text-sm font-medium text-gray-700">Tipo de Pedido</label>
+                <BaseSelect :model-value="orderType" :options="orderTypeOptions"
+                    @update:model-value="(value) => $emit('order-type-changed', value as 'onsite' | 'delivery' | 'reservation')"
+                    size="sm" />
             </div>
 
             <!-- Address Selection (for delivery) -->
@@ -52,6 +57,7 @@ import { useCustomersStore } from '@/store/customers'
 
 // Components
 import BaseButton from '@/components/ui/BaseButton.vue'
+import BaseSelect from '@/components/ui/BaseSelect.vue'
 import CustomerSelector from '@/components/CustomerSelector.vue'
 import AddressSelector from '@/components/AddressSelector.vue'
 import PhoneNumberItem from '@/components/ui/PhoneNumberItem.vue'
@@ -73,10 +79,18 @@ const emit = defineEmits<{
     'customer-selected': [customer: Customer | null]
     'address-selected': [address: CustomerAddress | null]
     'view-customer-detail': [customer: Customer]
+    'order-type-changed': [type: 'onsite' | 'delivery' | 'reservation']
 }>()
 
 // Composables
 const customersStore = useCustomersStore()
+
+// Options for order type selector
+const orderTypeOptions = [
+    { value: 'onsite', label: 'En el Local' },
+    { value: 'delivery', label: 'Domicilio' },
+    { value: 'reservation', label: 'Reserva' },
+]
 
 // Methods
 const handleCustomerSelected = (customerId: number | undefined) => {

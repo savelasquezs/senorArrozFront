@@ -4,33 +4,19 @@
         <div class="tabs-list">
             <div v-for="tab in orderTabs" :key="tab.tabId" class="tab-item" :class="{
                 'active': tab.isActive,
-                'has-items': tab.itemCount > 0,
-                'empty': tab.itemCount === 0
+                'has-items': tab.itemCount > 0
             }" @click="switchTab(tab.tabId)">
-                <div class="tab-content">
-                    <div class="tab-info">
-                        <span class="tab-name">{{ tab.tabName }}</span>
-                        <span class="item-count">{{ tab.itemCount }} items</span>
-                    </div>
-                    <div class="tab-total">
-                        <span class="total-amount">{{ formatCurrency(tab.total) }}</span>
-                    </div>
-                </div>
+                <span class="tab-number">{{ getTabNumber(tab.tabName) }}</span>
                 <BaseButton @click.stop="closeTab(tab.tabId)" variant="ghost" size="sm" class="close-button"
                     title="Cerrar pedido">
                     <XMarkIcon class="w-3 h-3" />
                 </BaseButton>
             </div>
-        </div>
 
-        <!-- New Tab Button -->
-        <div class="new-tab-section">
+            <!-- New Tab Button -->
             <BaseButton @click="createNewTab" :disabled="!canAddNewTab" variant="primary" size="sm"
                 class="new-tab-button">
-                <span class="flex items-center">
-                    <PlusIcon class="w-4 h-4 mr-2" />
-                    Nuevo Pedido
-                </span>
+                <PlusIcon class="w-4 h-4" />
             </BaseButton>
         </div>
     </div>
@@ -39,7 +25,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useOrdersStore } from '@/store/orders'
-import { useFormatting } from '@/composables/useFormatting'
 
 // Components
 import BaseButton from '@/components/ui/BaseButton.vue'
@@ -51,7 +36,6 @@ import {
 } from '@heroicons/vue/24/outline'
 
 // Composables
-const { formatCurrency } = useFormatting()
 const ordersStore = useOrdersStore()
 
 // Computed
@@ -59,6 +43,12 @@ const orderTabs = computed(() => ordersStore.orderTabs)
 const canAddNewTab = computed(() => ordersStore.canAddNewTab)
 
 // Methods
+const getTabNumber = (tabName: string) => {
+    // Extraer el número del nombre del tab (ej: "Pedido #001" -> "001")
+    const match = tabName.match(/#(\d+)/)
+    return match ? match[1] : tabName
+}
+
 const createNewTab = () => {
     ordersStore.createNewTab()
 }
@@ -83,28 +73,29 @@ const closeTab = (tabId: string) => {
 .order-tabs {
     background-color: white;
     border-bottom: 1px solid #e5e7eb;
-    padding: 1rem;
+    padding: 0.5rem;
 }
 
 .tabs-list {
     display: flex;
-    gap: 0.5rem;
-    margin-bottom: 1rem;
+    gap: 0.25rem;
     overflow-x: auto;
+    align-items: center;
 }
 
 .tab-item {
     display: flex;
     align-items: center;
-    gap: 0.5rem;
+    gap: 0.25rem;
     background-color: #f9fafb;
     border: 1px solid #e5e7eb;
-    border-radius: 0.5rem;
-    padding: 0.5rem 0.75rem;
+    border-radius: 0.25rem;
+    padding: 0.25rem 0.5rem;
     cursor: pointer;
     transition: all 0.2s;
     min-width: 0;
     flex-shrink: 0;
+    height: 2rem;
 }
 
 .tab-item:hover {
@@ -113,92 +104,72 @@ const closeTab = (tabId: string) => {
 }
 
 .tab-item.active {
-    background-color: #eff6ff;
-    border-color: #93c5fd;
-    color: #1d4ed8;
+    background-color: #059669;
+    border-color: #059669;
+    color: white;
 }
 
 .tab-item.has-items {
-    border-color: #bbf7d0;
+    border-color: #059669;
     background-color: #f0fdf4;
 }
 
 .tab-item.has-items.active {
-    border-color: #86efac;
-    background-color: #dcfce7;
+    background-color: #059669;
+    border-color: #059669;
+    color: white;
 }
 
-.tab-item.empty {
-    border-color: #e5e7eb;
-    background-color: #f9fafb;
-    color: #6b7280;
-}
-
-.tab-content {
-    display: flex;
-    flex-direction: column;
-    min-width: 0;
-}
-
-.tab-info {
-    display: flex;
-    flex-direction: column;
-}
-
-.tab-name {
-    font-size: 0.875rem;
-    font-weight: 500;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-
-.item-count {
+.tab-number {
     font-size: 0.75rem;
-    color: #6b7280;
-}
-
-.tab-total {
-    font-size: 0.75rem;
-    font-weight: 500;
-}
-
-.total-amount {
-    color: #059669;
-}
-
-.tab-item.empty .total-amount {
-    color: #9ca3af;
+    font-weight: 600;
+    font-family: monospace;
+    min-width: 2rem;
+    text-align: center;
 }
 
 .close-button {
     flex-shrink: 0;
     color: #9ca3af;
+    padding: 0;
+    width: 1rem;
+    height: 1rem;
+    min-width: 1rem;
 }
 
 .close-button:hover {
     color: #ef4444;
 }
 
-.new-tab-section {
-    display: flex;
-    justify-content: center;
+.tab-item.active .close-button {
+    color: rgba(255, 255, 255, 0.7);
+}
+
+.tab-item.active .close-button:hover {
+    color: white;
 }
 
 .new-tab-button {
-    width: 100%;
-    max-width: 20rem;
+    flex-shrink: 0;
+    width: 2rem;
+    height: 2rem;
+    padding: 0;
+    border-radius: 0.25rem;
+}
+
+.new-tab-button:disabled {
+    opacity: 0.5;
 }
 
 /* Responsive */
 @media (max-width: 640px) {
     .tabs-list {
-        flex-direction: column;
+        flex-wrap: wrap;
         gap: 0.25rem;
     }
-    
+
     .tab-item {
-        width: 100%;
+        min-width: 3rem;
     }
 }
 </style>
