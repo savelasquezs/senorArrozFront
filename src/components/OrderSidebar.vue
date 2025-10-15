@@ -1,13 +1,13 @@
 <template>
-    <div class="order-sidebar bg-white border-l border-gray-200 h-full flex flex-col">
+    <div class="order-sidebar bg-white border-l border-gray-200 h-full flex flex-col min-h-0">
         <!-- Header -->
-        <div class="p-4 border-b border-gray-200">
+        <div class="p-4 border-b border-gray-200 flex-shrink-0">
             <!-- Order Tabs -->
             <OrderTabs />
         </div>
 
         <!-- Order Content -->
-        <div class="flex-1 overflow-y-auto">
+        <div class="flex-1 overflow-y-auto min-h-0">
             <!-- No Order State -->
             <div v-if="!currentOrder" class="flex items-center justify-center h-full p-6">
                 <div class="text-center">
@@ -23,49 +23,43 @@
             </div>
 
             <!-- Order Content -->
-            <div v-else class="flex flex-col h-full">
-                <!-- Scrollable Content -->
-                <div class="flex-1 overflow-y-auto">
-                    <!-- Order Items -->
-                    <div class="px-4">
-                        <CustomerSection :selected-customer="getCustomer(currentOrder.customerId)"
-                            :selected-address="getAddress(currentOrder.addressId, getCustomer(currentOrder.customerId))"
-                            :order-type="currentOrder.type" @customer-selected="handleCustomerSelect"
-                            @address-selected="handleAddressSelect" @view-customer-detail="handleViewCustomerDetail"
-                            @order-type-changed="handleOrderTypeChanged" />
-                        <OrderItemList :tab-id="currentTabId || ''" @add-products="handleAddProducts" />
+            <div v-else class="space-y-4 pb-4">
+                <!-- Order Items -->
+                <div class="px-4">
+                    <CustomerSection :selected-customer="getCustomer(currentOrder.customerId)"
+                        :selected-address="getAddress(currentOrder.addressId, getCustomer(currentOrder.customerId))"
+                        :order-type="currentOrder.type" @customer-selected="handleCustomerSelect"
+                        @address-selected="handleAddressSelect" @view-customer-detail="handleViewCustomerDetail"
+                        @order-type-changed="handleOrderTypeChanged" />
+                    <OrderItemList :tab-id="currentTabId || ''" @add-products="handleAddProducts" />
+                </div>
+
+                <!-- Order Actions -->
+                <div class="px-4 py-3 border-t border-gray-200 bg-gray-50 space-y-3">
+                    <!-- Order Notes -->
+                    <div class="space-y-2">
+                        <label class="block text-sm font-medium text-gray-700">Notas del Pedido</label>
+                        <BaseInput :model-value="currentOrder.notes || ''"
+                            @update:model-value="(value) => updateOrderNotes(String(value || ''))"
+                            placeholder="Agregar notas especiales..." type="textarea" rows="2" />
                     </div>
 
-                    <!-- Order Actions -->
-                    <div class="px-4 border-t border-gray-200 bg-gray-50 space-y-3">
-                        <!-- Customer Section -->
-
-
-                        <!-- Order Notes -->
-                        <div class="space-y-2">
-                            <label class="block text-sm font-medium text-gray-700">Notas del Pedido</label>
-                            <BaseInput :model-value="currentOrder.notes || ''"
-                                @update:model-value="(value) => updateOrderNotes(String(value || ''))"
-                                placeholder="Agregar notas especiales..." type="textarea" rows="2" />
-                        </div>
-
-                        <!-- Action Buttons -->
-                        <div class="flex gap-2">
-                            <BaseButton @click="handleSaveOrder" variant="outline" size="sm" class="flex-1"
-                                :disabled="!canSaveOrder">
-                                <span class="flex items-center justify-center">
-                                    <DocumentIcon class="w-4 h-4 mr-2" />
-                                    Guardar
-                                </span>
-                            </BaseButton>
-                            <BaseButton @click="handleSubmitOrder" variant="primary" size="sm" class="flex-1"
-                                :disabled="!canSubmitOrder">
-                                <span class="flex items-center justify-center">
-                                    <PaperAirplaneIcon class="w-4 h-4 mr-2" />
-                                    Enviar
-                                </span>
-                            </BaseButton>
-                        </div>
+                    <!-- Action Buttons -->
+                    <div class="flex gap-2">
+                        <BaseButton @click="handleSaveOrder" variant="outline" size="sm" class="flex-1"
+                            :disabled="!canSaveOrder">
+                            <span class="flex items-center justify-center">
+                                <DocumentIcon class="w-4 h-4 mr-2" />
+                                Guardar
+                            </span>
+                        </BaseButton>
+                        <BaseButton @click="handleSubmitOrder" variant="primary" size="sm" class="flex-1"
+                            :disabled="!canSubmitOrder">
+                            <span class="flex items-center justify-center">
+                                <PaperAirplaneIcon class="w-4 h-4 mr-2" />
+                                Enviar
+                            </span>
+                        </BaseButton>
                     </div>
                 </div>
             </div>

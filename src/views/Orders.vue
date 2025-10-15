@@ -2,9 +2,9 @@
     <MainLayout :no-card="true">
         <div class="orders-view h-full bg-gray-50 flex flex-col">
             <!-- Main Content -->
-            <div class="flex flex-1">
+            <div class="flex flex-1 min-h-0">
                 <!-- Left Panel - Products and Categories -->
-                <div class="flex-1 bg-white border-r border-gray-200 overflow-hidden flex flex-col">
+                <div class="flex-1 bg-white border-r border-gray-200 overflow-hidden flex flex-col min-h-0">
                     <!-- Categories Bar -->
                     <div class="px-4 border-b border-gray-200 bg-gray-50">
                         <CategoriesBar :categories="ordersStore.categories"
