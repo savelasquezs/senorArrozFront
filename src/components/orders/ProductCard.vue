@@ -167,11 +167,11 @@ const handleClick = () => {
     emit('product-click', props.product)
 }
 
-const handleAddToOrder = async () => {
+const handleAddToOrder = () => {
     if (isDisabled.value || props.isLoading) return
 
     try {
-        await ordersStore.addProductToActiveOrder(props.product)
+        ordersStore.addProduct(props.product)
         success('Producto agregado', 1500, `${props.product.name} agregado al pedido`)
         emit('product-add', props.product)
     } catch (error) {

@@ -6,7 +6,7 @@ import type { Product } from '@/types/order'
 
 // Mock del store
 const mockOrdersStore = {
-    addProductToActiveOrder: vi.fn()
+    addProduct: vi.fn()
 }
 
 // Mock del composable
@@ -109,7 +109,7 @@ describe('ProductCard', () => {
         const addButton = wrapper.findComponent({ name: 'BaseButton' })
         await addButton.trigger('click')
 
-        expect(mockOrdersStore.addProductToActiveOrder).toHaveBeenCalledWith(mockProduct)
+        expect(mockOrdersStore.addProduct).toHaveBeenCalledWith(mockProduct)
         expect(wrapper.emitted('product-add')).toBeTruthy()
     })
 

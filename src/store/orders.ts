@@ -11,10 +11,6 @@ import type {
     OrderFilters,
     CreateOrderDto,
     UpdateOrderDto,
-    ActiveOrder,
-    OrderDetail,
-    OrderBankPayment,
-    OrderAppPayment,
     Product,
     OrderType,
     DraftOrder,
@@ -45,10 +41,6 @@ export const useOrdersStore = defineStore('orders', {
         list: null as PagedResult<Order> | null,
         current: null as Order | null,
 
-        // Active orders (work in progress)
-        activeOrders: new Map<string, ActiveOrder>(),
-        activeOrderId: null as string | null,
-
         // Draft Orders System (Multiple Tabs)
         draftOrders: new Map<string, DraftOrder>(),
         currentTabId: null as string | null,
@@ -75,12 +67,6 @@ export const useOrdersStore = defineStore('orders', {
     }),
 
     getters: {
-        // Get current active order
-        activeOrder: (state): ActiveOrder | null => {
-            if (!state.activeOrderId) return null
-            return state.activeOrders.get(state.activeOrderId) || null
-        },
-
         // Get filtered products
         filteredProducts: (state): Product[] => {
             let filtered = state.products
@@ -105,13 +91,6 @@ export const useOrdersStore = defineStore('orders', {
         // Get products by category
         productsByCategory: (state) => (categoryId: number): Product[] => {
             return state.products.filter(p => p.categoryId === categoryId)
-        },
-
-        // Get active orders list
-        activeOrdersList: (state): ActiveOrder[] => {
-            return Array.from(state.activeOrders.values()).sort(
-                (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-            )
         },
 
         // Draft Orders System Getters
@@ -327,180 +306,6 @@ export const useOrdersStore = defineStore('orders', {
             }
         },
 
-        // Active orders management
-        generateUUID(): string {
-            return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
-                const r = Math.random() * 16 | 0
-                const v = c === 'x' ? r : (r & 0x3 | 0x8)
-                return v.toString(16)
-            })
-        },
-
-        createActiveOrder(type: OrderType = 'delivery'): string {
-            const id = this.generateUUID()
-            const now = new Date().toISOString()
-
-            const activeOrder: ActiveOrder = {
-                id,
-                branchId: 0, // Will be set when user selects branch
-                takenById: 0, // Will be set from auth
-                type,
-                orderDetails: [],
-                bankPayments: [],
-                appPayments: [],
-                subtotal: 0,
-                total: 0,
-                discountTotal: 0,
-                isDirty: false,
-                createdAt: now,
-            }
-
-            this.activeOrders.set(id, activeOrder)
-            this.activeOrderId = id
-
-            return id
-        },
-
-        setActiveOrder(id: string) {
-            if (this.activeOrders.has(id)) {
-                this.activeOrderId = id
-            }
-        },
-
-        deleteActiveOrder(id: string) {
-            this.activeOrders.delete(id)
-            if (this.activeOrderId === id) {
-                // Set to another active order or null
-                const remaining = Array.from(this.activeOrders.keys())
-                this.activeOrderId = remaining.length > 0 ? remaining[0] : null
-            }
-        },
-
-        // Order details management
-        addProductToActiveOrder(product: Product) {
-            if (!this.activeOrderId) return
-
-            const order = this.activeOrders.get(this.activeOrderId)!
-            const existingDetail = order.orderDetails.find(d => d.productId === product.id)
-
-            if (existingDetail) {
-                existingDetail.quantity++
-            } else {
-                const orderDetail: OrderDetail = {
-                    id: this.generateUUID(),
-                    productId: product.id,
-                    productName: product.name,
-                    quantity: 1,
-                    unitPrice: product.price,
-                    discount: 0,
-                    subtotal: product.price * 1,
-                }
-
-                order.orderDetails.push(orderDetail)
-            }
-
-            order.isDirty = true
-            this.recalculateOrderTotals(order)
-        },
-
-        updateOrderDetailQuantity(detailId: string, quantity: number) {
-            if (!this.activeOrderId) return
-
-            const order = this.activeOrders.get(this.activeOrderId)!
-            const detail = order.orderDetails.find(d => d.id === detailId)
-
-            if (!detail) return
-
-            if (quantity <= 0) {
-                order.orderDetails = order.orderDetails.filter(d => d.id !== detailId)
-            } else {
-                detail.quantity = quantity
-            }
-
-            order.isDirty = true
-            this.recalculateOrderTotals(order)
-        },
-
-        removeOrderDetail(detailId: string) {
-            if (!this.activeOrderId) return
-
-            const order = this.activeOrders.get(this.activeOrderId)!
-            order.orderDetails = order.orderDetails.filter(d => d.id !== detailId)
-            order.isDirty = true
-            this.recalculateOrderTotals(order)
-        },
-
-        addBankPayment(bankId: number, amount: number) {
-            if (!this.activeOrderId) return
-
-            const order = this.activeOrders.get(this.activeOrderId)!
-            const bank = this.banks.find(b => b.id === bankId)
-
-            const bankPayment: OrderBankPayment = {
-                id: this.generateUUID(),
-                bankId,
-                bankName: bank?.name || 'Banco',
-                amount,
-            }
-
-            order.bankPayments.push(bankPayment)
-            order.isDirty = true
-            this.recalculateOrderTotals(order)
-        },
-
-        addAppPayment(appId: number, amount: number) {
-            if (!this.activeOrderId) return
-
-            const order = this.activeOrders.get(this.activeOrderId)!
-            const app = this.apps.find(a => a.id === appId)
-
-            // Remove existing app payment (only one allowed)
-            order.appPayments = []
-
-            const appPayment: OrderAppPayment = {
-                id: this.generateUUID(),
-                appId,
-                appName: app?.name || 'App',
-                bankId: app?.bankId || 0,
-                bankName: app?.bankName || 'Banco',
-                amount,
-            }
-
-            order.appPayments.push(appPayment)
-            order.isDirty = true
-            this.recalculateOrderTotals(order)
-        },
-
-        removeBankPayment(paymentId: string) {
-            if (!this.activeOrderId) return
-
-            const order = this.activeOrders.get(this.activeOrderId)!
-            order.bankPayments = order.bankPayments.filter(p => p.id !== paymentId)
-            order.isDirty = true
-            this.recalculateOrderTotals(order)
-        },
-
-        removeAppPayment(paymentId: string) {
-            if (!this.activeOrderId) return
-
-            const order = this.activeOrders.get(this.activeOrderId)!
-            order.appPayments = order.appPayments.filter(p => p.id !== paymentId)
-            order.isDirty = true
-            this.recalculateOrderTotals(order)
-        },
-
-        recalculateOrderTotals(order: ActiveOrder) {
-            // Calculate subtotal from order details
-            order.subtotal = order.orderDetails.reduce((sum, detail) => {
-                return sum + (detail.unitPrice * detail.quantity - detail.discount)
-            }, 0)
-
-            // Add delivery fee if applicable
-            const deliveryFee = order.type === 'delivery' ? (order.deliveryFee || 0) : 0
-
-            order.total = order.subtotal + deliveryFee
-        },
-
         // Search and filters
         setSearchQuery(query: string) {
             this.searchQuery = query || ''
@@ -508,83 +313,6 @@ export const useOrdersStore = defineStore('orders', {
 
         setSelectedCategory(categoryId: number | null) {
             this.selectedCategory = categoryId
-        },
-
-        // Validation
-        validateActiveOrder(): { isValid: boolean; errors: string[] } {
-            const order = this.activeOrder
-            if (!order) {
-                return { isValid: false, errors: ['No hay pedido activo'] }
-            }
-
-            const errors: string[] = []
-
-            // Check order details
-            if (order.orderDetails.length === 0) {
-                errors.push('El pedido debe tener al menos un producto')
-            }
-
-            // Check customer for delivery
-            if (order.type === 'delivery' && !order.customerId) {
-                errors.push('Los pedidos delivery requieren un cliente')
-            }
-
-            // Check address for delivery
-            if (order.type === 'delivery' && !order.addressId) {
-                errors.push('Los pedidos delivery requieren una dirección')
-            }
-
-            // Check reserved date for reservation
-            if (order.type === 'reservation' && !order.reservedFor) {
-                errors.push('Las reservaciones requieren una fecha y hora')
-            }
-
-            return { isValid: errors.length === 0, errors }
-        },
-
-        // Submit active order
-        async submitActiveOrder(): Promise<Order | null> {
-            const order = this.activeOrder
-            if (!order) return null
-
-            const validation = this.validateActiveOrder()
-            if (!validation.isValid) {
-                throw new Error(validation.errors.join(', '))
-            }
-
-            const createDto: CreateOrderDto = {
-                branchId: order.branchId,
-                takenById: order.takenById,
-                customerId: order.customerId,
-                addressId: order.addressId,
-                loyaltyRuleId: order.loyaltyRuleId,
-                type: order.type,
-                deliveryFee: order.deliveryFee,
-                reservedFor: order.reservedFor,
-                notes: order.notes,
-                orderDetails: order.orderDetails.map(detail => ({
-                    productId: detail.productId,
-                    quantity: detail.quantity,
-                    unitPrice: detail.unitPrice,
-                    discount: detail.discount,
-                    notes: detail.notes,
-                })),
-                bankPayments: order.bankPayments.map(payment => ({
-                    bankId: payment.bankId,
-                    amount: payment.amount,
-                })),
-                appPayments: order.appPayments.map(payment => ({
-                    appId: payment.appId,
-                    amount: payment.amount,
-                })),
-            }
-
-            const createdOrder = await this.create(createDto)
-
-            // Remove from active orders
-            this.deleteActiveOrder(order.id)
-
-            return createdOrder
         },
 
         // Status updates
@@ -631,11 +359,6 @@ export const useOrdersStore = defineStore('orders', {
         clear() {
             this.current = null
             this.error = null
-        },
-
-        clearActiveOrders() {
-            this.activeOrders.clear()
-            this.activeOrderId = null
         },
 
         // Draft Orders System Actions

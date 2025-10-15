@@ -50,7 +50,6 @@
 <script setup lang="ts">
 import { onMounted, onUnmounted } from 'vue'
 import { useOrdersStore } from '@/store/orders'
-import { useAuthStore } from '@/store/auth'
 import { useToast } from '@/composables/useToast'
 
 // Components
@@ -71,7 +70,6 @@ import {
 
 // Composables
 const ordersStore = useOrdersStore()
-const authStore = useAuthStore()
 const { success } = useToast()
 
 // Methods
@@ -96,22 +94,13 @@ const onCategorySelected = (_categoryId: number | null) => {
 }
 
 const refreshTotals = () => {
-    // Trigger recalculations if needed
-    if (ordersStore.activeOrder) {
-        ordersStore.recalculateOrderTotals(ordersStore.activeOrder)
-    }
+    // Los totales ya se recalculan automáticamente en cada cambio
+    // No necesita hacer nada adicional
 }
 
 // Initialize data
 const initializeData = async () => {
     try {
-        // Set branch and user from auth
-        const activeOrder = ordersStore.activeOrder
-        if (activeOrder) {
-            activeOrder.branchId = authStore.branchId || 0
-            activeOrder.takenById = authStore.user?.id || 0
-        }
-
         // Load all necessary data
         await refreshData()
     } catch (error) {
