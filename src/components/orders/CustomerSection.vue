@@ -19,11 +19,16 @@
                 <div class="flex items-center justify-between">
                     <div class="flex-1">
                         <div class="flex items-center justify-between mb-2">
-                            <h4 class="font-medium text-green-900">{{ selectedCustomer.name }}</h4>
-                            <BaseButton @click="$emit('view-customer-detail', selectedCustomer)" variant="ghost"
-                                size="sm">
-                                <EyeIcon class="w-4 h-4" />
-                            </BaseButton>
+                            <h4 class="font-medium text-green-900 capitalize">{{ selectedCustomer.name }}</h4>
+                            <div class="flex items-center gap-1">
+                                <BaseButton @click="$emit('view-customer-detail', selectedCustomer)" variant="ghost"
+                                    size="sm">
+                                    <EyeIcon class="w-4 h-4" />
+                                </BaseButton>
+                                <BaseButton @click="handleClearCustomer" variant="ghost" size="sm">
+                                    <ArrowPathIcon class="w-4 h-4" />
+                                </BaseButton>
+                            </div>
                         </div>
                         <div class="space-y-1">
                             <PhoneNumberItem :phone-number="selectedCustomer.phone1" />
@@ -33,21 +38,11 @@
                 </div>
             </div>
 
-
-
             <!-- Address Selection (for delivery) -->
             <div v-if="orderType === 'delivery' || orderType === 'reservation'" class="space-y-2">
                 <AddressSelector :customer-id="selectedCustomer.id" :selected-address="selectedAddress?.id || undefined"
                     @address-selected="handleAddressSelected" />
             </div>
-
-            <!-- Change Customer Button -->
-            <BaseButton @click="handleClearCustomer" variant="outline" size="sm" class="w-full">
-                <span class="flex items-center justify-center">
-                    <ArrowPathIcon class="w-4 h-4 mr-2" />
-                    Cambiar Cliente
-                </span>
-            </BaseButton>
         </div>
     </div>
 </template>
