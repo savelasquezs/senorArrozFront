@@ -689,6 +689,24 @@ export const useOrdersStore = defineStore('orders', {
             this.saveToLocalStorage()
         },
 
+        updateDeliveryFee(fee: number) {
+            if (!this.currentTabId) return
+
+            const order = this.draftOrders.get(this.currentTabId)
+            if (!order) return
+
+            // Crear nuevo objeto para disparar reactividad
+            const updatedOrder = {
+                ...order,
+                deliveryFee: fee >= 0 ? fee : 0,
+                updatedAt: new Date()
+            }
+
+            // Recalcular totales (esto también hace el set en el Map)
+            this.recalculateDraftOrderTotals(updatedOrder)
+            this.saveToLocalStorage()
+        },
+
         // Cálculos
         recalculateDraftOrderTotals(order: DraftOrder) {
             const subtotal = order.orderItems.reduce((sum, item) => sum + item.subtotal, 0)

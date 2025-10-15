@@ -7,16 +7,12 @@
 
         <!-- Empty State -->
         <div v-else-if="items.length === 0" class="empty-state">
-            <div class="empty-icon">
-                <ShoppingCartIcon class="w-12 h-12 text-gray-400" />
-            </div>
-            <h3 class="empty-title">No hay productos en este pedido</h3>
-            <p class="empty-description">Agrega productos desde el catálogo</p>
-            <BaseButton @click="handleAddProducts" variant="primary" size="sm" class="mt-4">
-                <span class="flex items-center">
-                    <PlusIcon class="w-4 h-4 mr-2" />
-                    Agregar Productos
-                </span>
+            <ShoppingCartIcon class="w-8 h-8 text-gray-400 mx-auto mb-2" />
+            <h3 class="text-sm font-medium text-gray-900 mb-1">No hay productos</h3>
+            <p class="text-xs text-gray-500 mb-3">Agrega productos desde el catálogo</p>
+            <BaseButton @click="handleAddProducts" variant="primary" size="sm">
+                <PlusIcon class="w-3 h-3 mr-1" />
+                Agregar
             </BaseButton>
         </div>
 
@@ -31,36 +27,40 @@
 
             <!-- Clear All Button -->
             <div v-if="items.length > 0" class="clear-all-section">
-                <BaseButton @click="handleClearAll" variant="outline" size="sm"
-                    class="text-red-600 border-red-300 hover:bg-red-50">
-                    <span class="flex items-center">
-                        <TrashIcon class="w-4 h-4 mr-2" />
-                        Limpiar Todo
-                    </span>
+                <BaseButton @click="handleClearAll" variant="ghost" size="sm" class="text-red-600 hover:bg-red-50">
+                    <div class="flex items-center">
+                        <TrashIcon class="w-3 h-3 mr-1" />
+                        Limpiar
+                    </div>
                 </BaseButton>
+
             </div>
 
             <!-- Totals Summary -->
             <div class="totals-summary">
                 <div class="summary-line">
-                    <span>Items:</span>
-                    <span class="font-medium">{{ items.length }}</span>
+                    <span class="text-xs text-gray-600">Items:</span>
+                    <span class="text-xs font-medium">{{ itemsCount }}</span>
                 </div>
                 <div class="summary-line">
-                    <span>Subtotal:</span>
-                    <span class="font-medium">{{ formatCurrency(subtotal) }}</span>
+                    <span class="text-xs text-gray-600">Subtotal:</span>
+                    <span class="text-xs font-medium">{{ formatCurrency(subtotal) }}</span>
                 </div>
                 <div v-if="discountTotal > 0" class="summary-line text-green-600">
-                    <span>Descuentos:</span>
-                    <span>-{{ formatCurrency(discountTotal) }}</span>
+                    <span class="text-xs">Desc:</span>
+                    <span class="text-xs">-{{ formatCurrency(discountTotal) }}</span>
                 </div>
-                <div v-if="deliveryFee > 0" class="summary-line">
-                    <span>Domicilio:</span>
-                    <span>{{ formatCurrency(deliveryFee) }}</span>
+                <div class="summary-line">
+                    <span class="text-xs text-gray-600">Envío:</span>
+                    <div class="flex items-center gap-1">
+                        <input v-model.number="localDeliveryFee" type="number" min="0" step="100"
+                            @input="handleDeliveryFeeChange"
+                            class="w-16 px-1 py-0.5 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500" />
+                    </div>
                 </div>
                 <div class="summary-line total-line">
-                    <span>Total:</span>
-                    <span class="font-bold text-lg">{{ formatCurrency(total) }}</span>
+                    <span class="text-sm font-bold">Total:</span>
+                    <span class="text-sm font-bold text-emerald-600">{{ formatCurrency(total) }}</span>
                 </div>
             </div>
         </div>
@@ -68,7 +68,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useOrdersStore } from '@/store/orders'
 import { useFormatting } from '@/composables/useFormatting'
 import { useToast } from '@/composables/useToast'
@@ -107,10 +107,19 @@ const ordersStore = useOrdersStore()
 // Computed
 const currentOrder = computed(() => ordersStore.currentOrder)
 const items = computed(() => currentOrder.value?.orderItems || [])
+const itemsCount = computed(() => items.value.reduce((acc, item) => acc + item.quantity, 0))
 const subtotal = computed(() => currentOrder.value?.subtotal || 0)
 const discountTotal = computed(() => currentOrder.value?.discountTotal || 0)
 const deliveryFee = computed(() => currentOrder.value?.deliveryFee || 0)
 const total = computed(() => currentOrder.value?.total || 0)
+
+// Local state
+const localDeliveryFee = ref(deliveryFee.value)
+
+// Watch para sincronizar localDeliveryFee con el store
+watch(deliveryFee, (newFee) => {
+    localDeliveryFee.value = newFee
+})
 
 // Methods
 const handleQuantityChange = (itemTempId: string, quantity: number) => {
@@ -146,6 +155,13 @@ const handleRemoveItem = (itemTempId: string) => {
     }
 }
 
+const handleDeliveryFeeChange = () => {
+    try {
+        ordersStore.updateDeliveryFee(localDeliveryFee.value || 0)
+    } catch (error: any) {
+        showError('Error al actualizar envío', error.message || 'No se pudo actualizar el costo de envío')
+    }
+}
 
 const handleClearAll = () => {
     if (items.value.length === 0) return
@@ -174,80 +190,72 @@ const handleAddProducts = () => {
 .order-items-container {
     display: flex;
     flex-direction: column;
-    gap: 1rem;
+    gap: 0.5rem;
 }
 
 .loading-state {
     display: flex;
     justify-content: center;
     align-items: center;
-    padding: 2rem 0;
+    padding: 1rem 0;
 }
 
 .empty-state {
     text-align: center;
-    padding: 2rem 1rem;
-}
-
-.empty-icon {
-    display: flex;
-    justify-content: center;
-    margin-bottom: 1rem;
-}
-
-.empty-title {
-    font-size: 1.125rem;
-    font-weight: 500;
-    color: #111827;
-    margin-bottom: 0.5rem;
-}
-
-.empty-description {
-    font-size: 0.875rem;
-    color: #6b7280;
-    margin-bottom: 1rem;
+    padding: 1rem;
 }
 
 .items-section {
     display: flex;
     flex-direction: column;
-    gap: 1rem;
+    gap: 0.5rem;
 }
 
 .items-list {
     display: flex;
     flex-direction: column;
-    gap: 0.75rem;
+    gap: 0.5rem;
 }
 
 .clear-all-section {
     display: flex;
     justify-content: flex-end;
-    padding-top: 0.5rem;
+    padding-top: 0.25rem;
     border-top: 1px solid #f3f4f6;
 }
 
 .totals-summary {
     background-color: #f9fafb;
     border-radius: 0.5rem;
-    padding: 1rem;
+    padding: 0.75rem;
     display: flex;
     flex-direction: column;
-    gap: 0.5rem;
+    gap: 0.25rem;
 }
 
 .summary-line {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    font-size: 0.875rem;
 }
 
 .total-line {
-    font-size: 1rem;
-    font-weight: 700;
     border-top: 1px solid #e5e7eb;
-    padding-top: 0.5rem;
+    padding-top: 0.25rem;
+    margin-top: 0.25rem;
+}
+
+/* Eliminar spinner de input number */
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    appearance: none;
+    margin: 0;
+}
+
+input[type="number"] {
+    -moz-appearance: textfield;
+    appearance: textfield;
 }
 
 /* Animations */
