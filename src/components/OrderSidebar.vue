@@ -29,9 +29,9 @@
                     <!-- Order Items -->
                     <div class="px-4">
                         <CustomerSection :selected-customer="getCustomer(currentOrder.customerId)"
-                            :selected-address="getAddress(currentOrder.addressId)" :order-type="currentOrder.type"
-                            @customer-selected="handleCustomerSelect" @address-selected="handleAddressSelect"
-                            @view-customer-detail="handleViewCustomerDetail"
+                            :selected-address="getAddress(currentOrder.addressId, getCustomer(currentOrder.customerId))"
+                            :order-type="currentOrder.type" @customer-selected="handleCustomerSelect"
+                            @address-selected="handleAddressSelect" @view-customer-detail="handleViewCustomerDetail"
                             @order-type-changed="handleOrderTypeChanged" />
                         <OrderItemList :tab-id="currentTabId || ''" @add-products="handleAddProducts"
                             @edit-item="handleEditItem" />
@@ -80,16 +80,15 @@
 
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
-import { useCustomersStore } from '@/store/customers'
 import { useOrderPersistence } from '@/composables/useOrderPersistence'
 import { useOrderValidation } from '@/composables/useOrderValidation'
-import { useFormatting } from '@/composables/useFormatting'
+
 import { useToast } from '@/composables/useToast'
 import type { Customer, CustomerAddress } from '@/types/customer'
 
 // Components
 import BaseButton from '@/components/ui/BaseButton.vue'
-import BaseBadge from '@/components/ui/BaseBadge.vue'
+
 import BaseInput from '@/components/ui/BaseInput.vue'
 import OrderTabs from '@/components/orders/OrderTabs.vue'
 import OrderItemList from '@/components/orders/OrderItemList.vue'
@@ -106,14 +105,11 @@ import {
 
 // Composables
 const { ordersStore } = useOrderPersistence()
-const { formatCurrency } = useFormatting()
 const { success, error: showError } = useToast()
-const customersStore = useCustomersStore()
 
 // State
 const showCustomerDetail = ref(false)
 const selectedCustomer = ref<Customer | null>(null)
-const selectedAddress = ref<CustomerAddress | null>(null)
 
 // Computed
 const currentOrder = computed(() => ordersStore.currentOrder)
@@ -124,15 +120,7 @@ const canSaveOrder = computed(() => {
     return currentOrder.value && currentOrder.value.orderItems.length > 0
 })
 
-// Order type configurations
-const getOrderTypeConfig = (type: string) => {
-    const configs = {
-        onsite: { label: 'En el Local', variant: 'info' },
-        delivery: { label: 'Domicilio', variant: 'warning' },
-        reservation: { label: 'Reserva', variant: 'success' }
-    }
-    return configs[type as keyof typeof configs] || configs.onsite
-}
+
 
 // Methods
 const createNewOrder = () => {
@@ -141,34 +129,27 @@ const createNewOrder = () => {
 
 const getCustomer = (customerId: number | null) => {
     if (!customerId) return null
-    return customersStore.list?.items.find((c: any) => c.id === customerId) || null
+    // Buscar en ordersStore.customers que tiene las direcciones completas
+    return ordersStore.customers.find((c: Customer) => c.id === customerId) || null
 }
 
-const getAddress = (addressId: number | null) => {
-    if (!addressId || !selectedCustomer.value) return null
-    return selectedCustomer.value.addresses?.find((a: CustomerAddress) => a.id === addressId) || null
+const getAddress = (addressId: number | null, customer: Customer | null) => {
+    if (!addressId || !customer) return null
+    return customer.addresses?.find((a: CustomerAddress) => a.id === addressId) || null
 }
 
 const handleCustomerSelect = (customer: Customer | null) => {
-    selectedCustomer.value = customer
-    if (customer && customer.addresses && customer.addresses.length > 0) {
-        const primaryAddress = customer.addresses.find((a: CustomerAddress) => a.isPrimary) || customer.addresses[0]
-        selectedAddress.value = primaryAddress
-        ordersStore.updateCustomer(customer)
-        ordersStore.updateAddress(primaryAddress)
-    } else {
-        selectedAddress.value = null
-        ordersStore.updateCustomer(customer)
-        ordersStore.updateAddress(null)
-    }
+
+    // Solo actualizar el store, no mantener ref local
+    ordersStore.updateCustomer(customer)
+    // Auto-selección ya la maneja CustomerSection, aquí solo recibimos el evento
 }
 
 const handleOrderTypeChanged = (type: 'onsite' | 'delivery' | 'reservation') => {
     ordersStore.updateOrderType(type)
 }
 
-const handleAddressSelect = (address: any) => {
-    if (!currentTabId.value) return
+const handleAddressSelect = (address: CustomerAddress | null) => {
     ordersStore.updateAddress(address)
 }
 
@@ -225,21 +206,10 @@ const handleSubmitOrder = () => {
 }
 
 // Watchers
-watch(currentOrder, (newOrder) => {
-    if (newOrder) {
-        // Update selected customer when switching tabs
-        const customer = getCustomer(newOrder.customerId)
-        selectedCustomer.value = customer
-
-        // Update selected address when switching tabs
-        if (customer) {
-            const address = getAddress(newOrder.addressId)
-            selectedAddress.value = address
-        } else {
-            selectedAddress.value = null
-        }
-    }
-}, { immediate: true })
+watch(currentOrder, () => {
+    // Ya no necesitamos actualizar refs locales, las props se actualizan automáticamente desde el store
+    showCustomerDetail.value = false
+}, { immediate: false })
 </script>
 
 <style scoped>

@@ -8,7 +8,9 @@
                 size="sm" />
         </div>
         <!-- No Customer Selected -->
-        <div v-if="!selectedCustomer" class="space-y-3">
+        <div v-if="!props.selectedCustomer" class="space-y-3">
+
+            cliente: {{ props.selectedCustomer }}
             <CustomerSelector :required="orderType === 'delivery'" @customer-selected="handleCustomerSelected" />
         </div>
 
@@ -19,10 +21,10 @@
                 <div class="flex items-center justify-between">
                     <div class="flex-1">
                         <div class="flex items-center justify-between mb-2">
-                            <h4 class="font-medium text-green-900 capitalize">{{ selectedCustomer.name }}</h4>
+                            <h4 class="font-medium text-green-900 capitalize">{{ props.selectedCustomer.name }}</h4>
                             <div class="flex items-center gap-1">
-                                <BaseButton @click="$emit('view-customer-detail', selectedCustomer)" variant="ghost"
-                                    size="sm">
+                                <BaseButton @click="$emit('view-customer-detail', props.selectedCustomer)"
+                                    variant="ghost" size="sm">
                                     <EyeIcon class="w-4 h-4" />
                                 </BaseButton>
                                 <BaseButton @click="handleClearCustomer" variant="ghost" size="sm">
@@ -31,8 +33,9 @@
                             </div>
                         </div>
                         <div class="space-y-1">
-                            <PhoneNumberItem :phone-number="selectedCustomer.phone1" />
-                            <PhoneNumberItem v-if="selectedCustomer.phone2" :phone-number="selectedCustomer.phone2" />
+                            <PhoneNumberItem :phone-number="props.selectedCustomer.phone1" />
+                            <PhoneNumberItem v-if="props.selectedCustomer.phone2"
+                                :phone-number="props.selectedCustomer.phone2" />
                         </div>
                     </div>
                 </div>
@@ -40,7 +43,8 @@
 
             <!-- Address Selection (for delivery) -->
             <div v-if="orderType === 'delivery' || orderType === 'reservation'" class="space-y-2">
-                <AddressSelector :customer-id="selectedCustomer.id" :selected-address="selectedAddress?.id || undefined"
+                <AddressSelector :customer-id="props.selectedCustomer.id"
+                    :selected-address="props.selectedAddress?.id || undefined"
                     @address-selected="handleAddressSelected" />
             </div>
         </div>
@@ -49,8 +53,6 @@
 
 <script setup lang="ts">
 import type { Customer, CustomerAddress } from '@/types/customer'
-
-import { ref } from 'vue'
 
 // Components
 import BaseButton from '@/components/ui/BaseButton.vue'
@@ -66,14 +68,15 @@ import {
 } from '@heroicons/vue/24/outline'
 
 interface Props {
-
     orderType: 'onsite' | 'delivery' | 'reservation'
+    selectedCustomer?: Customer | null
+    selectedAddress?: CustomerAddress | null
 }
 
-const selectedCustomer = ref<Customer | null>(null)
-const selectedAddress = ref<CustomerAddress | null>(null)
-
-defineProps<Props>()
+const props = withDefaults(defineProps<Props>(), {
+    selectedCustomer: null,
+    selectedAddress: null
+})
 const emit = defineEmits<{
     'customer-selected': [customer: Customer | null]
     'address-selected': [address: CustomerAddress | null]
@@ -92,7 +95,7 @@ const orderTypeOptions = [
 
 // Methods
 const handleCustomerSelected = (customer: Customer) => {
-    selectedCustomer.value = customer
+    // Solo emitir, no modificar estado local
     emit('customer-selected', customer || null)
 
     // Auto-seleccionar dirección principal
@@ -101,35 +104,27 @@ const handleCustomerSelected = (customer: Customer) => {
         const primaryAddress = customer.addresses.find(a => a.isPrimary)
 
         if (primaryAddress) {
-            // Seleccionar la dirección principal
-            selectedAddress.value = primaryAddress
             emit('address-selected', primaryAddress)
         } else {
             // Fallback: seleccionar primera dirección si no hay principal
-            selectedAddress.value = customer.addresses[0]
             emit('address-selected', customer.addresses[0])
         }
     } else {
         // Sin direcciones, limpiar selección
-        selectedAddress.value = null
         emit('address-selected', null)
     }
 }
 
 const handleAddressSelected = (addressId: number | undefined) => {
-    if (addressId && selectedCustomer.value) {
-        const address = selectedCustomer.value.addresses?.find(a => a.id === addressId)
-        selectedAddress.value = address || null
+    if (addressId && props.selectedCustomer) {
+        const address = props.selectedCustomer.addresses?.find(a => a.id === addressId)
         emit('address-selected', address || null)
     } else {
-        selectedAddress.value = null
         emit('address-selected', null)
     }
 }
 
 const handleClearCustomer = () => {
-    selectedCustomer.value = null
-    selectedAddress.value = null
     emit('customer-selected', null)
     emit('address-selected', null)
 }
