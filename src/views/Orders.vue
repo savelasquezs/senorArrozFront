@@ -1,10 +1,8 @@
 <template>
-    <MainLayout>
-
-        <div class="orders-view min-h-screen bg-gray-50">
-            <!-- Header -->
+    <MainLayout :no-card="true">
+        <div class="orders-view h-full bg-gray-50 flex flex-col">
             <!-- Main Content -->
-            <div class="flex h-[calc(100vh-140px)]">
+            <div class="flex flex-1">
                 <!-- Left Panel - Products and Categories -->
                 <div class="flex-1 bg-white border-r border-gray-200 overflow-hidden flex flex-col">
                     <!-- Categories Bar -->
@@ -121,8 +119,4 @@ onUnmounted(() => {
 
 <style scoped>
 /* Additional styles if needed */
-.orders-view {
-    height: 100vh;
-    overflow: hidden;
-}
 </style>

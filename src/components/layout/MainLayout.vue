@@ -10,8 +10,8 @@
 			<TopNavigation @toggle-sidebar="sidebarOpen = !sidebarOpen" />
 
 			<!-- Page content -->
-			<main class="flex-1 overflow-x-hidden overflow-y-auto bg-gray-50 px-6">
-				<div class="max-w-7xl mx-auto h-full flex flex-col">
+			<main class="flex-1 overflow-x-hidden overflow-y-auto bg-gray-50" :class="{ 'px-6': !noCard }">
+				<div :class="noCard ? 'h-full' : 'max-w-7xl mx-auto h-full flex flex-col'">
 					<!-- Page header -->
 
 

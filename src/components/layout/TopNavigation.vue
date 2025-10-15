@@ -1,14 +1,9 @@
 <template>
-	<header
-		class="bg-white border-b border-gray-200 shadow-sm px-6 py-4 flex items-center justify-between"
-	>
+	<header class="bg-white border-b border-gray-200 shadow-sm px-6 py-2 flex items-center justify-between">
 		<MobileMenuButton @toggle="$emit('toggleSidebar')" />
 		<Breadcrumbs />
 		<div class="flex items-center space-x-4">
-			<BranchSelector
-				v-if="authStore.isSuperadmin"
-				:branch-name="authStore.branchName"
-			/>
+			<BranchSelector v-if="authStore.isSuperadmin" :branch-name="authStore.branchName" />
 			<UserMenu />
 		</div>
 	</header>
