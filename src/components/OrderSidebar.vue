@@ -33,8 +33,7 @@
                             :order-type="currentOrder.type" @customer-selected="handleCustomerSelect"
                             @address-selected="handleAddressSelect" @view-customer-detail="handleViewCustomerDetail"
                             @order-type-changed="handleOrderTypeChanged" />
-                        <OrderItemList :tab-id="currentTabId || ''" @add-products="handleAddProducts"
-                            @edit-item="handleEditItem" />
+                        <OrderItemList :tab-id="currentTabId || ''" @add-products="handleAddProducts" />
                     </div>
 
                     <!-- Order Actions -->
@@ -176,11 +175,6 @@ const updateOrderNotes = (notes: string) => {
 const handleAddProducts = () => {
     // This would focus on the product grid or open a product selector
     console.log('Add products from grid')
-}
-
-const handleEditItem = (itemTempId: string) => {
-    // This would open an edit modal for the item
-    console.log('Edit item:', itemTempId)
 }
 
 const handleSaveOrder = () => {

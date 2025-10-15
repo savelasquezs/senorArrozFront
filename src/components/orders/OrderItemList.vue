@@ -26,7 +26,7 @@
             <TransitionGroup name="item-list" tag="div" class="items-list">
                 <OrderItem v-for="item in items" :key="item.tempId" :item="item" :tab-id="tabId"
                     @quantity-change="handleQuantityChange" @price-change="handlePriceChange"
-                    @discount-change="handleDiscountChange" @remove="handleRemoveItem" @edit="handleEditItem" />
+                    @discount-change="handleDiscountChange" @remove="handleRemoveItem" />
             </TransitionGroup>
 
             <!-- Clear All Button -->
@@ -97,7 +97,6 @@ withDefaults(defineProps<Props>(), {
 // Emits
 const emit = defineEmits<{
     addProducts: []
-    editItem: [itemTempId: string]
 }>()
 
 // Composables
@@ -147,9 +146,6 @@ const handleRemoveItem = (itemTempId: string) => {
     }
 }
 
-const handleEditItem = (itemTempId: string) => {
-    emit('editItem', itemTempId)
-}
 
 const handleClearAll = () => {
     if (items.value.length === 0) return
