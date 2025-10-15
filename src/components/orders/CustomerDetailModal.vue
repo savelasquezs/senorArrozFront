@@ -144,21 +144,6 @@ const internalShow = ref(show)
 const showEditModal = ref(false)
 const editLoading = ref(false)
 
-// Watch for prop changes to sync internal state
-watch(() => props.show, (newShow) => {
-    internalShow.value = newShow
-    if (newShow && currentCustomer.value) {
-        // Load customer addresses when modal opens
-        loadCustomerAddresses()
-    }
-}, { immediate: true })
-
-// Watch for internal state changes to emit to parent
-watch(internalShow, (newValue) => {
-    if (!newValue) {
-        handleClose()
-    }
-})
 
 
 const emit = defineEmits<{
@@ -249,6 +234,22 @@ const handleCreateOrder = (customer: Customer) => {
     console.log('Create order for customer:', customer.id)
     success('Nuevo pedido', 2000, 'Pedido creado para el cliente seleccionado')
 }
+
+// Watch for prop changes to sync internal state
+watch(() => props.show, (newShow) => {
+    internalShow.value = newShow
+    if (newShow && currentCustomer.value) {
+        // Load customer addresses when modal opens
+        loadCustomerAddresses()
+    }
+}, { immediate: true })
+
+// Watch for internal state changes to emit to parent
+watch(internalShow, (newValue) => {
+    if (!newValue) {
+        handleClose()
+    }
+})
 
 
 

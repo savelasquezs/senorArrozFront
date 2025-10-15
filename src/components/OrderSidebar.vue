@@ -66,8 +66,8 @@
         </div>
 
         <!-- Customer Detail Modal -->
-        <CustomerDetailModal v-if="showCustomerDetail && selectedCustomer" :show="showCustomerDetail"
-            :customer="selectedCustomer" @close="closeCustomerDetail" @customer-updated="handleCustomerUpdated" />
+        <CustomerDetailModal v-if="selectedCustomer" :show="showCustomerDetail" :customer="selectedCustomer"
+            @close="closeCustomerDetail" @customer-updated="handleCustomerUpdated" />
     </div>
 </template>
 
@@ -147,6 +147,7 @@ const handleAddressSelect = (address: CustomerAddress | null) => {
 }
 
 const handleViewCustomerDetail = (customer: any) => {
+    console.log('handleViewCustomerDetail', customer)
     selectedCustomer.value = customer
     showCustomerDetail.value = true
 }
