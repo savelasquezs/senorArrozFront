@@ -1,5 +1,12 @@
 <template>
     <div class="customer-section">
+        <!-- Order Type Selector -->
+        <div class="space-y-2">
+            <label class="block text-sm font-medium text-gray-700">Tipo de Pedido</label>
+            <BaseSelect :model-value="orderType" :options="orderTypeOptions" value-key="value" display-key="label"
+                @update:model-value="(value) => $emit('order-type-changed', value as 'onsite' | 'delivery' | 'reservation')"
+                size="sm" />
+        </div>
         <!-- No Customer Selected -->
         <div v-if="!selectedCustomer" class="space-y-3">
             <CustomerSelector :required="orderType === 'delivery'" @customer-selected="handleCustomerSelected" />
@@ -26,13 +33,7 @@
                 </div>
             </div>
 
-            <!-- Order Type Selector -->
-            <div class="space-y-2">
-                <label class="block text-sm font-medium text-gray-700">Tipo de Pedido</label>
-                <BaseSelect :model-value="orderType" :options="orderTypeOptions"
-                    @update:model-value="(value) => $emit('order-type-changed', value as 'onsite' | 'delivery' | 'reservation')"
-                    size="sm" />
-            </div>
+
 
             <!-- Address Selection (for delivery) -->
             <div v-if="orderType === 'delivery'" class="space-y-2">
@@ -53,7 +54,8 @@
 
 <script setup lang="ts">
 import type { Customer, CustomerAddress } from '@/types/customer'
-import { useCustomersStore } from '@/store/customers'
+
+import { ref } from 'vue'
 
 // Components
 import BaseButton from '@/components/ui/BaseButton.vue'
@@ -69,12 +71,14 @@ import {
 } from '@heroicons/vue/24/outline'
 
 interface Props {
-    selectedCustomer: Customer | null
-    selectedAddress: CustomerAddress | null
+
     orderType: 'onsite' | 'delivery' | 'reservation'
 }
 
-const props = defineProps<Props>()
+const selectedCustomer = ref<Customer | null>(null)
+const selectedAddress = ref<CustomerAddress | null>(null)
+
+defineProps<Props>()
 const emit = defineEmits<{
     'customer-selected': [customer: Customer | null]
     'address-selected': [address: CustomerAddress | null]
@@ -82,8 +86,7 @@ const emit = defineEmits<{
     'order-type-changed': [type: 'onsite' | 'delivery' | 'reservation']
 }>()
 
-// Composables
-const customersStore = useCustomersStore()
+
 
 // Options for order type selector
 const orderTypeOptions = [
@@ -93,18 +96,16 @@ const orderTypeOptions = [
 ]
 
 // Methods
-const handleCustomerSelected = (customerId: number | undefined) => {
-    if (customerId) {
-        const customer = customersStore.list?.items.find(c => c.id === customerId)
-        emit('customer-selected', customer || null)
-    } else {
-        emit('customer-selected', null)
-    }
+const handleCustomerSelected = (customer: Customer) => {
+    selectedCustomer.value = customer
+    emit('customer-selected', customer || null)
+
 }
 
 const handleAddressSelected = (addressId: number | undefined) => {
-    if (addressId && props.selectedCustomer) {
-        const address = props.selectedCustomer.addresses?.find(a => a.id === addressId)
+
+    if (addressId && selectedCustomer.value) {
+        const address = selectedCustomer.value.addresses?.find(a => a.id === addressId)
         emit('address-selected', address || null)
     } else {
         emit('address-selected', null)

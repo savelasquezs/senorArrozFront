@@ -2,8 +2,6 @@
     <div class="order-sidebar bg-white border-l border-gray-200 h-full flex flex-col">
         <!-- Header -->
         <div class="p-4 border-b border-gray-200">
-            <h2 class="text-lg font-semibold text-gray-900 mb-4">Pedidos Activos</h2>
-
             <!-- Order Tabs -->
             <OrderTabs />
         </div>
@@ -14,7 +12,6 @@
             <div v-if="!currentOrder" class="flex items-center justify-center h-full p-6">
                 <div class="text-center">
                     <ShoppingCartIcon class="w-16 h-16 text-gray-400 mx-auto mb-4" />
-                    <h3 class="text-lg font-medium text-gray-900 mb-2">No hay pedidos activos</h3>
                     <p class="text-gray-500 mb-4">Crea un nuevo pedido para comenzar</p>
                     <BaseButton @click="createNewOrder" variant="primary">
                         <span class="flex items-center">
@@ -27,45 +24,23 @@
 
             <!-- Order Content -->
             <div v-else class="flex flex-col h-full">
-                <!-- Order Header -->
-                <div class="flex-shrink-0 p-4 border-b border-gray-200 bg-gray-50">
-                    <div class="flex items-center justify-between mb-3">
-                        <div>
-                            <h3 class="text-lg font-semibold text-gray-900">{{ currentOrder.tabName }}</h3>
-                            <div class="flex items-center gap-2 mt-1">
-                                <BaseBadge :type="getOrderTypeConfig(currentOrder.type).variant" size="sm">
-                                    {{ getOrderTypeConfig(currentOrder.type).label }}
-                                </BaseBadge>
-                                <span class="text-sm text-gray-500">
-                                    {{ currentOrder.orderItems.length }} items
-                                </span>
-                            </div>
-                        </div>
-                        <div class="text-right">
-                            <div class="text-lg font-bold text-green-600">
-                                {{ formatCurrency(currentOrder.total) }}
-                            </div>
-                            <div class="text-xs text-gray-500">Total</div>
-                        </div>
-                    </div>
-                </div>
-
                 <!-- Scrollable Content -->
                 <div class="flex-1 overflow-y-auto">
                     <!-- Order Items -->
-                    <div class="p-4">
-                        <OrderItemList :tab-id="currentTabId || ''" @add-products="handleAddProducts"
-                            @edit-item="handleEditItem" />
-                    </div>
-
-                    <!-- Order Actions -->
-                    <div class="p-4 border-t border-gray-200 bg-gray-50 space-y-3">
-                        <!-- Customer Section -->
+                    <div class="px-4">
                         <CustomerSection :selected-customer="getCustomer(currentOrder.customerId)"
                             :selected-address="getAddress(currentOrder.addressId)" :order-type="currentOrder.type"
                             @customer-selected="handleCustomerSelect" @address-selected="handleAddressSelect"
                             @view-customer-detail="handleViewCustomerDetail"
                             @order-type-changed="handleOrderTypeChanged" />
+                        <OrderItemList :tab-id="currentTabId || ''" @add-products="handleAddProducts"
+                            @edit-item="handleEditItem" />
+                    </div>
+
+                    <!-- Order Actions -->
+                    <div class="px-4 border-t border-gray-200 bg-gray-50 space-y-3">
+                        <!-- Customer Section -->
+
 
                         <!-- Order Notes -->
                         <div class="space-y-2">

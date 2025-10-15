@@ -66,7 +66,7 @@ import OrderSidebar from '@/components/OrderSidebar.vue'
 // Icons
 import {
     MagnifyingGlassIcon,
-    ArrowPathIcon,
+
 } from '@heroicons/vue/24/outline'
 
 // Composables

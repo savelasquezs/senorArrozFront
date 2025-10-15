@@ -111,7 +111,7 @@ withDefaults(defineProps<Props>(), {
 
 // Emits
 const emit = defineEmits<{
-    customerSelected: [customerId: number | undefined]
+    customerSelected: [customer: Customer]
 }>()
 
 // Composables
@@ -160,7 +160,7 @@ const handleSearch = () => {
 }
 
 const selectCustomer = (customer: Customer) => {
-    emit('customerSelected', customer.id)
+    emit('customerSelected', customer)
     searchQuery.value = ''
     searchResults.value = []
 }
@@ -209,7 +209,7 @@ const createCustomerWrapper = async (customerData: any) => {
 
 const selectCreatedCustomer = () => {
     if (createdCustomer.value) {
-        emit('customerSelected', createdCustomer.value.id)
+        emit('customerSelected', createdCustomer.value)
     }
     closeCreateModal()
 }
