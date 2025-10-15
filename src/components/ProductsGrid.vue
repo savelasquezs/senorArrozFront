@@ -9,8 +9,8 @@
         </div>
 
         <div v-else class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-            <ProductCard v-for="product in products" :key="product.id" :product="product" :show-stock="true"
-                variant="default" @product-click="onProductClick" @product-add="onProductAdd" />
+            <ProductCard v-for="product in products" :key="product.id" :product="product" variant="default"
+                @product-click="onProductClick" @product-add="onProductAdd" />
         </div>
     </div>
 </template>

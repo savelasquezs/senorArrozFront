@@ -22,7 +22,7 @@
         <!-- Products Grid -->
         <div v-else class="products-grid" :class="gridClasses">
             <ProductCard v-for="product in products" :key="product.id" :product="product" :variant="cardVariant"
-                :show-stock="showStock" :is-selected="isProductSelected(product)" @product-click="handleProductClick"
+                :is-selected="isProductSelected(product)" @product-click="handleProductClick"
                 @product-add="handleProductAdd" />
 
         </div>
@@ -50,7 +50,7 @@ interface Props {
     showCategories?: boolean
     emptyMessage?: string
     emptyDescription?: string
-    cardVariant?: 'default' | 'compact' | 'featured'
+    cardVariant?: 'default' | 'compact'
     showStock?: boolean
     selectedProducts?: Product[]
     skeletonCount?: number

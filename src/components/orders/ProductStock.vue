@@ -37,17 +37,30 @@ interface Props {
     variant?: 'badge' | 'bar' | 'icon' | 'text'
     showNumber?: boolean
     size?: 'sm' | 'md' | 'lg'
+    hasUnlimitedStock?: boolean
 }
 
 const props = withDefaults(defineProps<Props>(), {
     lowStockThreshold: 5,
     variant: 'badge',
     showNumber: true,
-    size: 'md'
+    size: 'md',
+    hasUnlimitedStock: false
 })
 
 // Computed
 const stockStatus = computed(() => {
+    // Si tiene stock ilimitado (ej. categoría arroces)
+    if (props.hasUnlimitedStock) {
+        return {
+            type: 'success' as const,
+            text: 'Disponible',
+            icon: CheckCircleIcon,
+            color: 'text-green-600',
+            bgColor: 'bg-green-600'
+        }
+    }
+
     // Handle undefined/null stock
     if (props.stock === undefined || props.stock === null) {
         return {
@@ -91,6 +104,9 @@ const statusText = computed(() => stockStatus.value.text)
 const statusIcon = computed(() => stockStatus.value.icon)
 
 const tooltipText = computed(() => {
+    if (props.hasUnlimitedStock) {
+        return 'Stock ilimitado - Siempre disponible'
+    }
     if (props.stock === undefined || props.stock === null) {
         return 'Información de stock no disponible'
     }
@@ -104,6 +120,7 @@ const tooltipText = computed(() => {
 })
 
 const stockPercentage = computed(() => {
+    if (props.hasUnlimitedStock) return 100
     if (props.stock === undefined || props.stock === null || props.stock <= 0) return 0
     if (props.stock <= props.lowStockThreshold) return (props.stock / props.lowStockThreshold) * 50
     return Math.min(100, (props.stock / 20) * 100) // Assume 20+ is full

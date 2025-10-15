@@ -1,59 +1,23 @@
 <template>
-    <div class="product-card group cursor-pointer bg-white rounded-lg shadow-sm border border-gray-200 hover:shadow-md hover:border-emerald-300 transition-all duration-200"
-        :class="cardClasses" @click="handleClick">
+    <div class="product-card" :class="cardClasses" @click="handleClick">
+        <!-- Product Name -->
+        <h3 class="product-name">
+            {{ product.name }}
+        </h3>
 
-        <!-- Product Image -->
-        <div class="aspect-square bg-gray-100 rounded-t-lg flex items-center justify-center relative overflow-hidden">
-            <!-- Placeholder Image -->
-            <ShoppingBagIcon class="h-8 w-8 text-gray-400" />
-
-            <!-- Stock Overlay -->
-            <div v-if="showStock && product.stock !== undefined" class="absolute top-1 right-1">
-                <ProductStock :stock="product.stock" variant="badge" size="sm" />
-            </div>
-
-            <!-- Loading Overlay -->
-            <div v-if="isLoading" class="absolute inset-0 bg-white bg-opacity-75 flex items-center justify-center">
-                <BaseLoading size="sm" />
-            </div>
+        <!-- Product Price -->
+        <div class="product-price">
+            {{ formatCurrency(product.price) }}
         </div>
 
-        <!-- Product Info -->
-        <div class="p-3">
-            <!-- Product Name -->
-            <h3 class="text-sm font-medium text-gray-900 mb-1 line-clamp-2">
-                {{ product.name }}
-            </h3>
+        <!-- Stock Indicator -->
+        <div class="stock-indicator">
+            <ProductStock :stock="product.stock" :has-unlimited-stock="hasUnlimitedStock" variant="text" size="sm" />
+        </div>
 
-            <!-- Category Badge (only in default variant) -->
-            <div v-if="variant === 'default'" class="mb-1">
-                <BaseBadge type="secondary" :text="product.categoryName || 'Sin categoría'" size="sm" />
-            </div>
-
-            <!-- Price -->
-            <div class="text-base font-semibold text-gray-900 mb-1">
-                {{ formatCurrency(product.price) }}
-            </div>
-
-            <!-- Stock Info (only in default variant) -->
-            <div v-if="variant === 'default' && product.stock !== undefined"
-                class="flex items-center justify-between mb-2">
-                <span class="text-xs text-gray-500">
-                    Stock: {{ product.stock }}
-                </span>
-                <ProductStock :stock="product.stock" variant="text" size="sm" />
-            </div>
-
-            <!-- Add Button -->
-            <BaseButton @click.stop="handleAddToOrder" variant="primary" :size="buttonSize" :loading="isLoading"
-                :disabled="isDisabled" class="w-full">
-                <span class="flex items-center">
-
-                    <PlusIcon class="w-4 h-4 mr-1" />
-                    {{ buttonText }}
-
-                </span>
-            </BaseButton>
+        <!-- Loading Overlay -->
+        <div v-if="isLoading" class="loading-overlay">
+            <BaseLoading size="sm" />
         </div>
     </div>
 </template>
@@ -65,27 +29,20 @@ import { useToast } from '@/composables/useToast'
 import type { Product } from '@/types/order'
 
 // Components
-import BaseButton from '@/components/ui/BaseButton.vue'
-import BaseBadge from '@/components/ui/BaseBadge.vue'
 import BaseLoading from '@/components/ui/BaseLoading.vue'
 import ProductStock from './ProductStock.vue'
-
-// Icons
-import { ShoppingBagIcon, PlusIcon } from '@heroicons/vue/24/outline'
 
 // Props
 interface Props {
     product: Product
     isSelected?: boolean
-    showStock?: boolean
-    variant?: 'default' | 'compact' | 'featured'
+    variant?: 'default' | 'compact'
     disabled?: boolean
     isLoading?: boolean
 }
 
 const props = withDefaults(defineProps<Props>(), {
     isSelected: false,
-    showStock: true,
     variant: 'default',
     disabled: false,
     isLoading: false
@@ -102,54 +59,33 @@ const ordersStore = useOrdersStore()
 const { success } = useToast()
 
 // Computed
+const hasUnlimitedStock = computed(() => {
+    // Categoría "arroces" tiene stock ilimitado
+    return props.product.categoryName?.toLowerCase().includes('arro')
+})
+
 const isDisabled = computed(() => {
-    return props.disabled ||
-        !props.product.active ||
-        (props.product.stock !== undefined && props.product.stock < 0) // Solo deshabilitar si stock es negativo
+    if (props.disabled || !props.product.active) {
+        return true
+    }
+
+    // Si es categoría con stock ilimitado (arroces), nunca está deshabilitado por stock
+    if (hasUnlimitedStock.value) {
+        return false
+    }
+
+    // Para otras categorías, deshabilitar si stock <= 0
+    return props.product.stock !== undefined && props.product.stock <= 0
 })
 
 const cardClasses = computed(() => {
-    const classes = []
-
-    // Variant-specific classes
-    switch (props.variant) {
-        case 'compact':
-            classes.push('p-1')
-            break
-        case 'featured':
-            classes.push('ring-2 ring-emerald-500 ring-opacity-50')
-            break
-        default:
-            classes.push('p-2')
+    const classes = {
+        'disabled': isDisabled.value,
+        'selected': props.isSelected,
+        'loading': props.isLoading,
+        'compact': props.variant === 'compact'
     }
-
-    // State classes
-    if (isDisabled.value) {
-        classes.push('opacity-50 cursor-not-allowed')
-    }
-
-    if (props.isSelected) {
-        classes.push('ring-2 ring-emerald-500')
-    }
-
-    return classes.join(' ')
-})
-
-const buttonSize = computed(() => {
-    switch (props.variant) {
-        case 'compact':
-            return 'sm'
-        case 'featured':
-            return 'md'
-        default:
-            return 'sm'
-    }
-})
-
-const buttonText = computed(() => {
-    if (props.isLoading) return 'Agregando...'
-    if (isDisabled.value) return 'No disponible'
-    return 'Agregar'
+    return classes
 })
 
 // Methods
@@ -162,17 +98,12 @@ const formatCurrency = (amount: number): string => {
 }
 
 const handleClick = () => {
-    if (isDisabled.value) return
-
-    emit('product-click', props.product)
-}
-
-const handleAddToOrder = () => {
     if (isDisabled.value || props.isLoading) return
 
     try {
         ordersStore.addProduct(props.product)
-        success('Producto agregado', 1500, `${props.product.name} agregado al pedido`)
+        success('Producto agregado', 1500, `${props.product.name}`)
+        emit('product-click', props.product)
         emit('product-add', props.product)
     } catch (error) {
         console.error('Error adding product to order:', error)
@@ -181,15 +112,84 @@ const handleAddToOrder = () => {
 </script>
 
 <style scoped>
-.line-clamp-2 {
+.product-card {
+    position: relative;
+    padding: 1rem;
+    background: white;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.5rem;
+    transition: all 0.2s ease;
+    cursor: pointer;
+}
+
+/* Compact variant */
+.product-card.compact {
+    padding: 0.75rem;
+}
+
+/* Hover State - Available Products */
+.product-card:hover:not(.disabled) {
+    background: #f0fdf4;
+    /* emerald-50 */
+    border-color: #10b981;
+    /* emerald-500 */
+    transform: translateY(-2px);
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+}
+
+/* Disabled State - Out of Stock */
+.product-card.disabled {
+    opacity: 0.6;
+    background: #f9fafb;
+    /* gray-50 */
+    border-color: #ef4444;
+    /* red-500 */
+    cursor: not-allowed;
+}
+
+/* Selected State */
+.product-card.selected {
+    background: #d1fae5;
+    /* emerald-100 */
+    border-color: #059669;
+    /* emerald-600 */
+    box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.1);
+}
+
+.product-name {
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: #111827;
+    margin-bottom: 0.5rem;
+    line-height: 1.25rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
     display: -webkit-box;
     -webkit-line-clamp: 2;
     line-clamp: 2;
     -webkit-box-orient: vertical;
-    overflow: hidden;
 }
 
-.product-card {
-    position: relative;
+.product-price {
+    font-size: 1rem;
+    font-weight: 600;
+    color: #059669;
+    /* emerald-600 */
+    margin-bottom: 0.5rem;
+}
+
+.stock-indicator {
+    font-size: 0.75rem;
+    color: #6b7280;
+}
+
+.loading-overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(255, 255, 255, 0.8);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 0.5rem;
 }
 </style>
