@@ -42,7 +42,7 @@
             </div>
 
             <!-- Change Customer Button -->
-            <BaseButton @click="$emit('customer-selected', null)" variant="outline" size="sm" class="w-full">
+            <BaseButton @click="handleClearCustomer" variant="outline" size="sm" class="w-full">
                 <span class="flex items-center justify-center">
                     <ArrowPathIcon class="w-4 h-4 mr-2" />
                     Cambiar Cliente
@@ -100,16 +100,43 @@ const handleCustomerSelected = (customer: Customer) => {
     selectedCustomer.value = customer
     emit('customer-selected', customer || null)
 
+    // Auto-seleccionar dirección principal
+    if (customer && customer.addresses && customer.addresses.length > 0) {
+        // Buscar dirección principal
+        const primaryAddress = customer.addresses.find(a => a.isPrimary)
+
+        if (primaryAddress) {
+            // Seleccionar la dirección principal
+            selectedAddress.value = primaryAddress
+            emit('address-selected', primaryAddress)
+        } else {
+            // Fallback: seleccionar primera dirección si no hay principal
+            selectedAddress.value = customer.addresses[0]
+            emit('address-selected', customer.addresses[0])
+        }
+    } else {
+        // Sin direcciones, limpiar selección
+        selectedAddress.value = null
+        emit('address-selected', null)
+    }
 }
 
 const handleAddressSelected = (addressId: number | undefined) => {
-
     if (addressId && selectedCustomer.value) {
         const address = selectedCustomer.value.addresses?.find(a => a.id === addressId)
+        selectedAddress.value = address || null
         emit('address-selected', address || null)
     } else {
+        selectedAddress.value = null
         emit('address-selected', null)
     }
+}
+
+const handleClearCustomer = () => {
+    selectedCustomer.value = null
+    selectedAddress.value = null
+    emit('customer-selected', null)
+    emit('address-selected', null)
 }
 </script>
 
