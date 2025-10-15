@@ -38,7 +38,7 @@
 
                     <!-- Order Statistics -->
                     <CustomerStatsCard :customer="currentCustomer" :show-actions="showActions"
-                        @view-orders="handleViewOrders" @create-order="handleCreateOrder" />
+                        @view-orders="handleViewOrders" />
                 </div>
 
                 <!-- Addresses Section -->
@@ -229,11 +229,7 @@ const handleViewOrders = (customer: Customer) => {
     success('Funcionalidad de pedidos', 2000, 'La vista de pedidos estará disponible próximamente')
 }
 
-const handleCreateOrder = (customer: Customer) => {
-    // This would typically create a new order for this customer
-    console.log('Create order for customer:', customer.id)
-    success('Nuevo pedido', 2000, 'Pedido creado para el cliente seleccionado')
-}
+
 
 // Watch for prop changes to sync internal state
 watch(() => props.show, (newShow) => {

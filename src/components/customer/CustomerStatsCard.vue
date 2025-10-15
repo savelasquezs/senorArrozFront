@@ -31,12 +31,7 @@
                     Ver Pedidos
                 </span>
             </BaseButton>
-            <BaseButton @click="handleCreateOrder" variant="primary" size="sm" class="flex-1">
-                <span class="flex items-center justify-center">
-                    <PlusIcon class="w-4 h-4 mr-2" />
-                    Nuevo Pedido
-                </span>
-            </BaseButton>
+
         </div>
     </div>
 </template>
@@ -52,7 +47,7 @@ import BaseButton from '@/components/ui/BaseButton.vue'
 import {
     ChartBarIcon,
     ShoppingBagIcon,
-    PlusIcon
+
 } from '@heroicons/vue/24/outline'
 
 interface Props {
@@ -77,7 +72,4 @@ const handleViewOrders = () => {
     emit('viewOrders', props.customer)
 }
 
-const handleCreateOrder = () => {
-    emit('createOrder', props.customer)
-}
 </script>

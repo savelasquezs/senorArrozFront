@@ -203,6 +203,7 @@ watch(currentOrder, () => {
 
 <style scoped>
 .order-sidebar {
+    width: 500px;
     min-width: 400px;
     max-width: 500px;
 }
