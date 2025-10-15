@@ -152,6 +152,7 @@ enum UserRole {
 - `BaseAlert`: Alertas y notificaciones
 - `BaseToast`: Sistema de toasts
 - `BaseSelect`: Select con busqueda dinamica y opcion de creacion al no encontrar resultado.
+- `BaseRadioGroup`: Grupo de radio buttons con estilo segmentado (iOS-style). Soporta tamaños (sm, md, lg), fullWidth, y estados disabled. Ideal para selección de opciones mutuamente excluyentes de forma compacta.
 
 ### Componentes de Layout
 - `MainLayout`: Layout principal con sidebar

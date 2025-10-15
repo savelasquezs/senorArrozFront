@@ -2,8 +2,8 @@
     <div class="customer-section">
         <!-- Order Type Selector -->
         <div class="space-y-2">
-            <label class="block text-sm font-medium text-gray-700">Tipo de Pedido</label>
-            <BaseSelect :model-value="orderType" :options="orderTypeOptions" value-key="value" display-key="label"
+
+            <BaseRadioGroup :model-value="orderType" :options="orderTypeOptions" name="order-type"
                 @update:model-value="(value) => $emit('order-type-changed', value as 'onsite' | 'delivery' | 'reservation')"
                 size="sm" />
         </div>
@@ -36,7 +36,7 @@
 
 
             <!-- Address Selection (for delivery) -->
-            <div v-if="orderType === 'delivery'" class="space-y-2">
+            <div v-if="orderType === 'delivery' || orderType === 'reservation'" class="space-y-2">
                 <AddressSelector :customer-id="selectedCustomer.id" :selected-address="selectedAddress?.id || undefined"
                     @address-selected="handleAddressSelected" />
             </div>
@@ -59,7 +59,7 @@ import { ref } from 'vue'
 
 // Components
 import BaseButton from '@/components/ui/BaseButton.vue'
-import BaseSelect from '@/components/ui/BaseSelect.vue'
+import BaseRadioGroup from '@/components/ui/BaseRadioGroup.vue'
 import CustomerSelector from '@/components/CustomerSelector.vue'
 import AddressSelector from '@/components/AddressSelector.vue'
 import PhoneNumberItem from '@/components/ui/PhoneNumberItem.vue'

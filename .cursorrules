@@ -111,6 +111,7 @@ src/
 - `BaseAlert`: Alertas y notificaciones
 - `BaseToast`: Sistema de toasts
 - `BaseSelect`: Select con búsqueda dinámica y opción de creación
+- `BaseRadioGroup`: Grupo de radio buttons con estilo segmentado (iOS-style)
 
 ## Comandos de Desarrollo
 ```bash

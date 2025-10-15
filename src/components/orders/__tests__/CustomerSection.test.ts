@@ -93,6 +93,10 @@ describe('CustomerSection', () => {
                     BaseLoading: {
                         template: '<div class="loading">Loading...</div>',
                         props: ['size']
+                    },
+                    BaseRadioGroup: {
+                        template: '<div class="base-radio-group"><slot /></div>',
+                        props: ['modelValue', 'options', 'name', 'size']
                     }
                 }
             }
