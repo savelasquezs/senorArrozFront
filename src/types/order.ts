@@ -79,6 +79,7 @@ export interface DraftOrder {
     customerId: number | null
     customerName: string | null
     customerPhone: string | null
+    guestName: string | null
     addressId: number | null
     addressDescription: string | null
     deliveryFee: number
@@ -104,6 +105,7 @@ export interface Order {
     customerId?: number
     customerName?: string
     customerPhone?: string
+    guestName?: string
     addressId?: number
     addressDescription?: string
     loyaltyRuleId?: number
@@ -201,6 +203,7 @@ export interface CreateOrderDto {
     deliveryFee?: number
     reservedFor?: Date
     notes?: string
+    guestName?: string
     orderDetails: CreateOrderDetailDto[]
     bankPayments?: CreateBankPaymentDto[]
     appPayments?: CreateAppPaymentDto[]

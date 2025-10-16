@@ -18,6 +18,7 @@ export function useOrderTabs() {
             customerId: null,
             customerName: null,
             customerPhone: null,
+            guestName: null,
             addressId: null,
             addressDescription: null,
             deliveryFee: 0,

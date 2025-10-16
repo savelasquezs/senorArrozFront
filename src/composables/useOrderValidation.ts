@@ -32,6 +32,12 @@ export function useOrderValidation(order?: DraftOrder) {
             }
         }
 
+        // Validación de guestName para delivery y reservation
+        const requiresGuestName = order.type === 'delivery' || order.type === 'reservation'
+        if (requiresGuestName && !order.guestName?.trim()) {
+            errors.push('El nombre de quien recibe es obligatorio para pedidos de domicilio y reservaciones')
+        }
+
         // Validaciones de pagos
         const totalPayments = calculateTotalPayments(order)
         if (totalPayments > order.total) {

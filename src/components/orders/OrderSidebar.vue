@@ -31,6 +31,22 @@
                         :order-type="currentOrder.type" @customer-selected="handleCustomerSelect"
                         @address-selected="handleAddressSelect" @view-customer-detail="handleViewCustomerDetail"
                         @order-type-changed="handleOrderTypeChanged" />
+
+                    <!-- Guest Name / Recipient Name -->
+                    <div class="py-3 border-b border-gray-200">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">
+                            Nombre de quien recibe
+                            <span v-if="currentOrder.type === 'delivery' || currentOrder.type === 'reservation'"
+                                class="text-red-500">*</span>
+                        </label>
+                        <BaseInput :model-value="currentOrder.guestName || ''"
+                            @update:model-value="(value) => updateGuestName(String(value || ''))"
+                            placeholder="Ej: Juan Pérez, María López..." :error="guestNameError" />
+                        <p class="text-xs text-gray-500 mt-1">
+                            Nombre de quien recibirá el pedido (editable)
+                        </p>
+                    </div>
+
                     <OrderItemList :tab-id="currentTabId || ''" @add-products="handleAddProducts" />
                     <PaymentSelector :order="currentOrder" @payment-updated="handlePaymentUpdated" />
                 </div>
@@ -77,6 +93,7 @@ import { computed, ref, watch } from 'vue'
 import { useOrderPersistence } from '@/composables/useOrderPersistence'
 import { useOrderValidation } from '@/composables/useOrderValidation'
 import { useOrderTabs } from '@/composables/useOrderTabs'
+import { useOrderSubmission } from '@/composables/useOrderSubmission'
 
 import { useToast } from '@/composables/useToast'
 import type { Customer, CustomerAddress } from '@/types/customer'
@@ -100,7 +117,8 @@ import {
 
 // Composables
 const { ordersStore } = useOrderPersistence()
-const { createNewTab, updateOrderType } = useOrderTabs()
+const { createNewTab, updateOrderType, closeTab } = useOrderTabs()
+const { submitOrder } = useOrderSubmission()
 const { success, error: showError } = useToast()
 
 // State
@@ -116,7 +134,15 @@ const canSaveOrder = computed(() => {
     return currentOrder.value && currentOrder.value.orderItems.length > 0
 })
 
-
+const guestNameError = computed(() => {
+    if (!currentOrder.value) return ''
+    // Required for delivery and reservation orders
+    const requiresGuestName = currentOrder.value.type === 'delivery' || currentOrder.value.type === 'reservation'
+    if (requiresGuestName && !currentOrder.value.guestName?.trim()) {
+        return 'El nombre de quien recibe es obligatorio para este tipo de pedido'
+    }
+    return ''
+})
 
 // Methods
 const createNewOrder = () => {
@@ -135,10 +161,20 @@ const getAddress = (addressId: number | null, customer: Customer | null) => {
 }
 
 const handleCustomerSelect = (customer: Customer | null) => {
-
-    // Solo actualizar el store, no mantener ref local
+    // Update customer in store
     ordersStore.updateCustomer(customer)
-    // Auto-selección ya la maneja CustomerSection, aquí solo recibimos el evento
+
+    // Auto-fill guestName with customer name if not already set
+    if (customer && customer.name) {
+        const currentGuestName = currentOrder.value?.guestName
+        // Only auto-fill if guestName is empty
+        if (!currentGuestName || currentGuestName.trim() === '') {
+            ordersStore.updateGuestName(customer.name)
+        }
+    } else if (!customer) {
+        // Customer removed, clear guestName
+        ordersStore.updateGuestName('')
+    }
 }
 
 const handleOrderTypeChanged = (type: 'onsite' | 'delivery' | 'reservation') => {
@@ -175,6 +211,11 @@ const updateOrderNotes = (notes: string) => {
     ordersStore.updateOrderNotes(notes)
 }
 
+const updateGuestName = (name: string) => {
+    if (!currentTabId.value) return
+    ordersStore.updateGuestName(name)
+}
+
 const handleAddProducts = () => {
     // This would focus on the product grid or open a product selector
     console.log('Add products from grid')
@@ -191,9 +232,9 @@ const handleSaveOrder = () => {
     }
 }
 
-const handleSubmitOrder = () => {
-    if (!canSubmitOrder.value) {
-        // Mostrar errores de validación específicos
+const handleSubmitOrder = async () => {
+    if (!canSubmitOrder.value || !currentOrder.value) {
+        // Show validation errors
         if (orderErrors.value.length > 0) {
             orderErrors.value.forEach(error => {
                 showError('Error de validación', error)
@@ -203,11 +244,37 @@ const handleSubmitOrder = () => {
     }
 
     try {
-        // Submit order logic would go here
-        success('Pedido enviado', 2000, 'El pedido se ha enviado correctamente')
+        // Submit the order
+        const createdOrder = await submitOrder(currentOrder.value)
+
+        // Close the current tab and clean up
+        if (currentTabId.value) {
+            closeTab(currentTabId.value)
+        }
+
+        // Show success message
+        success(
+            'Pedido creado exitosamente',
+            3000,
+            `Pedido #${createdOrder.id} - Total: ${formatCurrency(createdOrder.total)}`
+        )
+
     } catch (error: any) {
-        showError('Error al enviar pedido', error.message || 'No se pudo enviar el pedido')
+        console.error('Error submitting order:', error)
+        showError(
+            'Error al crear pedido',
+            error.message || 'No se pudo crear el pedido. Intenta nuevamente.'
+        )
     }
+}
+
+// Helper for currency formatting
+const formatCurrency = (amount: number): string => {
+    return new Intl.NumberFormat('es-CO', {
+        style: 'currency',
+        currency: 'COP',
+        minimumFractionDigits: 0
+    }).format(amount)
 }
 
 // Watchers

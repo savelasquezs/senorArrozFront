@@ -430,6 +430,22 @@ export const useOrdersStore = defineStore('orders', {
             this.saveToLocalStorage()
         },
 
+        updateGuestName(name: string) {
+            if (!this.currentTabId) return
+
+            const order = this.draftOrders.get(this.currentTabId)
+            if (!order) return
+
+            const updatedOrder = {
+                ...order,
+                guestName: name,
+                updatedAt: new Date()
+            }
+
+            this.draftOrders.set(this.currentTabId, updatedOrder)
+            this.saveToLocalStorage()
+        },
+
         updateDeliveryFee(fee: number) {
             if (!this.currentTabId) return
 
