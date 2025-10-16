@@ -200,6 +200,7 @@ export interface CreateOrderDto {
     addressId?: number
     loyaltyRuleId?: number
     type: OrderType
+    status: OrderStatus
     deliveryFee?: number
     reservedFor?: Date
     notes?: string

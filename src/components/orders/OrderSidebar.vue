@@ -63,18 +63,11 @@
 
                     <!-- Action Buttons -->
                     <div class="flex gap-2">
-                        <BaseButton @click="handleSaveOrder" variant="outline" size="sm" class="flex-1"
-                            :disabled="!canSaveOrder">
-                            <span class="flex items-center justify-center">
-                                <DocumentIcon class="w-4 h-4 mr-2" />
-                                Guardar
-                            </span>
-                        </BaseButton>
-                        <BaseButton @click="handleSubmitOrder" variant="primary" size="sm" class="flex-1"
-                            :disabled="!canSubmitOrder">
+                        <BaseButton @click="handleSubmitOrder" variant="primary" size="sm" class="w-full"
+                            :disabled="!canSubmitOrder" :title="submitButtonTooltip">
                             <span class="flex items-center justify-center">
                                 <PaperAirplaneIcon class="w-4 h-4 mr-2" />
-                                Enviar
+                                Enviar Pedido
                             </span>
                         </BaseButton>
                     </div>
@@ -111,7 +104,6 @@ import PaymentSelector from '@/components/payments/PaymentSelector.vue'
 import {
     ShoppingCartIcon,
     PlusIcon,
-    DocumentIcon,
     PaperAirplaneIcon
 } from '@heroicons/vue/24/outline'
 
@@ -130,10 +122,6 @@ const currentOrder = computed(() => ordersStore.currentOrder)
 const currentTabId = computed(() => ordersStore.currentTabId)
 const { canSubmitOrder, orderErrors } = useOrderValidation(currentOrder.value || undefined)
 
-const canSaveOrder = computed(() => {
-    return currentOrder.value && currentOrder.value.orderItems.length > 0
-})
-
 const guestNameError = computed(() => {
     if (!currentOrder.value) return ''
     // Required for delivery and reservation orders
@@ -142,6 +130,28 @@ const guestNameError = computed(() => {
         return 'El nombre de quien recibe es obligatorio para este tipo de pedido'
     }
     return ''
+})
+
+const submitButtonTooltip = computed(() => {
+    if (!currentOrder.value) {
+        return 'No hay pedido activo'
+    }
+
+    if (canSubmitOrder.value) {
+        return 'Enviar pedido al sistema'
+    }
+
+    // Show what's missing
+    const errors = orderErrors.value
+    if (errors.length === 0) {
+        return 'Completando validaciones...'
+    }
+
+    if (errors.length === 1) {
+        return `Falta: ${errors[0]}`
+    }
+
+    return `Faltan ${errors.length} requisitos (click para ver detalles)`
 })
 
 // Methods
@@ -221,27 +231,31 @@ const handleAddProducts = () => {
     console.log('Add products from grid')
 }
 
-const handleSaveOrder = () => {
-    if (!canSaveOrder.value) return
-
-    try {
-        // Save order logic would go here
-        success('Pedido guardado', 2000, 'El pedido se ha guardado correctamente')
-    } catch (error: any) {
-        showError('Error al guardar pedido', error.message || 'No se pudo guardar el pedido')
-    }
-}
-
 const handleSubmitOrder = async () => {
-    if (!canSubmitOrder.value || !currentOrder.value) {
-        // Show validation errors
+    // Show errors if not valid
+    if (!canSubmitOrder.value) {
         if (orderErrors.value.length > 0) {
-            orderErrors.value.forEach(error => {
-                showError('Error de validación', error)
-            })
+            showError(
+                'No se puede enviar el pedido',
+                orderErrors.value.length === 1
+                    ? orderErrors.value[0]
+                    : `${orderErrors.value.length} requisitos faltantes`
+            )
+
+            // Show individual errors if multiple
+            if (orderErrors.value.length > 1) {
+                orderErrors.value.slice(0, 3).forEach((error, index) => {
+                    setTimeout(() => {
+                        showError('Requisito', error)
+                    }, (index + 1) * 600)
+                })
+            }
         }
         return
     }
+
+    // If valid, submit
+    if (!currentOrder.value) return
 
     try {
         // Submit the order

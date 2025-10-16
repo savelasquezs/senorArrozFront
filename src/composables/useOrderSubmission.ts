@@ -51,6 +51,7 @@ export function useOrderSubmission() {
             branchId,
             takenById,
             type: draft.type,
+            status: 'taken',
             notes: draft.notes || undefined,
             guestName: draft.guestName || undefined,
             orderDetails,
