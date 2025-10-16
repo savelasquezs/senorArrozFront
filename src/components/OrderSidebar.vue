@@ -110,7 +110,7 @@ const selectedCustomer = ref<Customer | null>(null)
 // Computed
 const currentOrder = computed(() => ordersStore.currentOrder)
 const currentTabId = computed(() => ordersStore.currentTabId)
-const { canSubmitOrder } = useOrderValidation(currentOrder.value || undefined)
+const { canSubmitOrder, orderErrors } = useOrderValidation(currentOrder.value || undefined)
 
 const canSaveOrder = computed(() => {
     return currentOrder.value && currentOrder.value.orderItems.length > 0
@@ -192,7 +192,15 @@ const handleSaveOrder = () => {
 }
 
 const handleSubmitOrder = () => {
-    if (!canSubmitOrder.value) return
+    if (!canSubmitOrder.value) {
+        // Mostrar errores de validación específicos
+        if (orderErrors.value.length > 0) {
+            orderErrors.value.forEach(error => {
+                showError('Error de validación', error)
+            })
+        }
+        return
+    }
 
     try {
         // Submit order logic would go here

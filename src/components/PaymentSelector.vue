@@ -74,10 +74,13 @@
         </div>
 
         <!-- Payment Summary -->
-        <div v-if="hasPayments" class="mt-3 p-2.5 bg-gray-50 rounded-lg text-xs space-y-1">
+        <div v-if="hasPayments" class="mt-3 p-2.5 rounded-lg text-xs space-y-1"
+            :class="hasOverpayment ? 'bg-red-50 border border-red-200' : 'bg-gray-50'">
             <div class="flex justify-between">
                 <span class="text-gray-600">Total Pagos:</span>
-                <span class="font-medium">{{ formatCurrency(totalPayments) }}</span>
+                <span class="font-medium" :class="hasOverpayment ? 'text-red-600' : ''">
+                    {{ formatCurrency(totalPayments) }}
+                </span>
             </div>
             <div class="flex justify-between">
                 <span class="text-gray-600">Total Pedido:</span>
@@ -92,6 +95,17 @@
         <!-- Total Covered Indicator -->
         <div v-if="!canAddPayments && hasPayments" class="mt-2 text-xs text-emerald-600 font-medium text-center">
             ✓ Total cubierto
+        </div>
+
+        <!-- Overpayment Warning -->
+        <div v-if="hasOverpayment" class="mt-2 p-2 bg-red-50 border border-red-200 rounded-md">
+            <div class="flex items-start gap-2">
+                <ExclamationTriangleIcon class="w-4 h-4 text-red-600 flex-shrink-0 mt-0.5" />
+                <div class="text-xs">
+                    <p class="font-semibold text-red-900">Pagos exceden el total</p>
+                    <p class="text-red-700">Exceso: {{ formatCurrency(overpaymentAmount) }}</p>
+                </div>
+            </div>
         </div>
 
         <!-- Payment Amount Modal -->
@@ -136,6 +150,7 @@ import {
     BuildingLibraryIcon,
     TrashIcon,
     PencilIcon,
+    ExclamationTriangleIcon,
 } from '@heroicons/vue/24/outline'
 
 // Props
@@ -213,6 +228,15 @@ const maxPaymentAmount = computed(() => {
 
     // Máximo = total - pagos actuales + monto que está editando
     return props.order.total - totalPayments.value + currentAmount
+})
+
+const hasOverpayment = computed(() => {
+    return totalPayments.value > props.order.total
+})
+
+const overpaymentAmount = computed(() => {
+    if (!hasOverpayment.value) return 0
+    return totalPayments.value - props.order.total
 })
 
 // Methods
