@@ -70,7 +70,7 @@ import type { CustomerAddress, CustomerAddressFormData } from "@/types/customer"
 import BaseInput from "@/components/ui/BaseInput.vue"
 import BaseButton from "@/components/ui/BaseButton.vue"
 import GoogleMapsSelector from "@/components/ui/GoogleMapsSelector.vue"
-import NeighborhoodSearch from "@/components/ui/NeighborhoodSearch.vue"
+import NeighborhoodSearch from "@/components/neighborhoods/NeighborhoodSearch.vue"
 import {
     HomeIcon,
     InformationCircleIcon,

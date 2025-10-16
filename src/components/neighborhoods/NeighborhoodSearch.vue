@@ -26,8 +26,8 @@
 
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
-import BaseSelect from './BaseSelect.vue'
-import BaseDialog from './BaseDialog.vue'
+import BaseSelect from '@/components/ui/BaseSelect.vue'
+import BaseDialog from '@/components/ui/BaseDialog.vue'
 import NeighborhoodForm from '@/components/neighborhoods/NeighborhoodForm.vue'
 import { useBranchesStore } from '@/store/branches'
 import { useToast } from '@/composables/useToast'

@@ -59,7 +59,7 @@ import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseRadioGroup from '@/components/ui/BaseRadioGroup.vue'
 import CustomerSelector from '@/components/customers/CustomerSelector.vue'
 import AddressSelector from '@/components/customers/address/AddressSelector.vue'
-import PhoneNumberItem from '@/components/ui/PhoneNumberItem.vue'
+import PhoneNumberItem from '@/components/customers/PhoneNumberItem.vue'
 
 // Icons
 import {

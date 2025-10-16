@@ -101,7 +101,7 @@ import { ref, watch, computed } from 'vue'
 import type { Customer } from '@/types/customer'
 import { useToast } from '@/composables/useToast'
 import { useCustomersStore } from '@/store/customers'
-import PhoneNumberItem from '@/components/ui/PhoneNumberItem.vue'
+import PhoneNumberItem from '@/components/customers/PhoneNumberItem.vue'
 
 // Components
 import BaseDialog from '@/components/ui/BaseDialog.vue'
