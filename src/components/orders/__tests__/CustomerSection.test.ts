@@ -1,6 +1,6 @@
 import { mount } from '@vue/test-utils'
 import { describe, it, expect, vi } from 'vitest'
-import CustomerSection from '../CustomerSection.vue'
+import CustomerSection from '@/components/customers/CustomerSection.vue'
 import type { OrderType } from '@/types/order'
 import type { Customer, CustomerAddress } from '@/types/customer'
 

@@ -247,7 +247,7 @@ import BaseDialog from '@/components/ui/BaseDialog.vue'
 import BaseAlert from '@/components/ui/BaseAlert.vue'
 import BaseLoading from '@/components/ui/BaseLoading.vue'
 import BaseInput from '@/components/ui/BaseInput.vue'
-import ProductForm from '@/components/ProductForm.vue'
+import ProductForm from '@/components/products/ProductForm.vue'
 import {
     CubeIcon,
     TagIcon,

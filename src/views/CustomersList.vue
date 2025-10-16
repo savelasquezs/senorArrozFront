@@ -237,7 +237,7 @@ import BaseLoading from '@/components/ui/BaseLoading.vue'
 import BaseDialog from '@/components/ui/BaseDialog.vue'
 import BaseBadge from '@/components/ui/BaseBadge.vue'
 import StatsCard from '@/components/ui/StatsCard.vue'
-import CustomerForm from '@/components/CustomerForm.vue'
+import CustomerForm from '@/components/customers/CustomerForm.vue'
 
 import {
     UserGroupIcon,

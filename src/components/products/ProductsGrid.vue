@@ -22,7 +22,7 @@ import type { Product } from '@/types/order'
 
 // Components
 import BaseLoading from '@/components/ui/BaseLoading.vue'
-import ProductCard from '@/components/orders/ProductCard.vue'
+import ProductCard from '@/components/orders/products/ProductCard.vue'
 
 // Icons
 import { ShoppingBagIcon } from '@heroicons/vue/24/outline'

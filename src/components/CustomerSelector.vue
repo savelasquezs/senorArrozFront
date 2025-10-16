@@ -88,7 +88,7 @@ import type { CreateCustomerDto } from '@/types/customer'
 import BaseInput from '@/components/ui/BaseInput.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseDialog from '@/components/ui/BaseDialog.vue'
-import CustomerForm from '@/components/customers/CustomerForm.vue'
+import CustomerForm from '@/components/CustomerForm.vue'
 
 // Icons
 import {

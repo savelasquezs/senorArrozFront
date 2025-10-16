@@ -209,7 +209,7 @@ import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseLoading from '@/components/ui/BaseLoading.vue'
 import BaseDialog from '@/components/ui/BaseDialog.vue'
 import StatsCard from '@/components/ui/StatsCard.vue'
-import ProductCategoryForm from '@/components/ProductCategoryForm.vue'
+import ProductCategoryForm from '@/components/products/categories/ProductCategoryForm.vue'
 
 import {
     TagIcon,

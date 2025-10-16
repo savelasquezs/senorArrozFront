@@ -15,6 +15,6 @@
 </template>
 
 <script setup lang="ts">
-import PasswordChangeForm from '@/components/PasswordChangeForm.vue';
+import PasswordChangeForm from '@/components/auth/PasswordChangeForm.vue';
 import MainLayout from '@/components/layout/MainLayout.vue';
 </script>

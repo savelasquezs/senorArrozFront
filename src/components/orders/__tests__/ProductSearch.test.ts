@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
 import { setActivePinia, createPinia } from 'pinia'
-import ProductSearch from '../ProductSearch.vue'
+import ProductSearch from '@/components/orders/products/ProductSearch.vue'
 
 // Mock localStorage
 const localStorageMock = {

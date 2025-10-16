@@ -115,7 +115,7 @@ import type { User, UserRole } from '@/types/user'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseDialog from '@/components/ui/BaseDialog.vue'
 import BaseBadge from '@/components/ui/BaseBadge.vue'
-import UserForm from './UserForm.vue'
+import UserForm from '@/components/branches/users/UserForm.vue'
 import {
     PlusIcon,
     UserGroupIcon,

@@ -240,7 +240,7 @@ import BaseLoading from '@/components/ui/BaseLoading.vue'
 import BaseDialog from '@/components/ui/BaseDialog.vue'
 import BaseBadge from '@/components/ui/BaseBadge.vue'
 import StatsCard from '@/components/ui/StatsCard.vue'
-import ProductForm from '@/components/ProductForm.vue'
+import ProductForm from '@/components/products/ProductForm.vue'
 
 import {
     CubeIcon,

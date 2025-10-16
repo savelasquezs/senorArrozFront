@@ -81,7 +81,7 @@
                                     <div class="ml-2">
                                         <p class="text-xs font-medium text-gray-500">Fecha de Registro</p>
                                         <p class="text-xs font-semibold text-gray-900">{{ formatDate(customer.createdAt)
-                                            }}</p>
+                                        }}</p>
                                     </div>
                                 </div>
                             </BaseCard>
@@ -321,8 +321,8 @@ import BaseDialog from '@/components/ui/BaseDialog.vue'
 import BaseAlert from '@/components/ui/BaseAlert.vue'
 import BaseLoading from '@/components/ui/BaseLoading.vue'
 import BaseBadge from '@/components/ui/BaseBadge.vue'
-import CustomerForm from '@/components/CustomerForm.vue'
-import CustomerAddressForm from '@/components/customer/CustomerAddressForm.vue'
+import CustomerForm from '@/components/customers/CustomerForm.vue'
+import CustomerAddressForm from '@/components/customers/address/CustomerAddressForm.vue'
 import {
     UserIcon,
     PencilIcon,

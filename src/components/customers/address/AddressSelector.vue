@@ -148,7 +148,7 @@ import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseBadge from '@/components/ui/BaseBadge.vue'
 import BaseLoading from '@/components/ui/BaseLoading.vue'
 import BaseDialog from '@/components/ui/BaseDialog.vue'
-import CustomerAddressForm from '@/components/customer/CustomerAddressForm.vue'
+import CustomerAddressForm from '@/components/customers/address/CustomerAddressForm.vue'
 
 // Icons
 import {

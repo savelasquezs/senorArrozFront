@@ -57,8 +57,8 @@ import type { Customer, CustomerAddress } from '@/types/customer'
 // Components
 import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseRadioGroup from '@/components/ui/BaseRadioGroup.vue'
-import CustomerSelector from '@/components/CustomerSelector.vue'
-import AddressSelector from '@/components/AddressSelector.vue'
+import CustomerSelector from '@/components/customers/CustomerSelector.vue'
+import AddressSelector from '@/components/customers/address/AddressSelector.vue'
 import PhoneNumberItem from '@/components/ui/PhoneNumberItem.vue'
 
 // Icons

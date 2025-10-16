@@ -84,7 +84,7 @@ import BaseSelect from '@/components/ui/BaseSelect.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseLoading from '@/components/ui/BaseLoading.vue'
 import StatsCard from '@/components/ui/StatsCard.vue'
-import AppPaymentSettlement from '@/components/AppPaymentSettlement.vue'
+import AppPaymentSettlement from '@/components/payments/apps/AppPaymentSettlement.vue'
 
 import {
     MagnifyingGlassIcon,

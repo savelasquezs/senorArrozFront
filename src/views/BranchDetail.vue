@@ -192,7 +192,7 @@
                             <h3 class="text-lg font-semibold text-gray-900">
                                 Bancos
                                 <span class="text-sm font-normal text-gray-500">({{ banksStore.list?.totalCount || 0
-                                }})</span>
+                                    }})</span>
                             </h3>
                             <BaseButton v-if="canManageBanks" @click="openCreateBank" variant="primary" size="sm"
                                 :icon="PlusIcon">
@@ -302,7 +302,7 @@
                             <h3 class="text-lg font-semibold text-gray-900">
                                 Apps de Pago
                                 <span class="text-sm font-normal text-gray-500">({{ appsStore.list?.totalCount || 0
-                                }})</span>
+                                    }})</span>
                             </h3>
                             <BaseButton v-if="canManageApps" @click="openCreateApp" variant="primary" size="sm"
                                 :icon="PlusIcon">
@@ -484,10 +484,10 @@ import BaseDialog from '@/components/ui/BaseDialog.vue'
 import BaseAlert from '@/components/ui/BaseAlert.vue'
 import BaseLoading from '@/components/ui/BaseLoading.vue'
 import BaseBadge from '@/components/ui/BaseBadge.vue'
-import BranchUsersTable from '@/components/BranchUsersTable.vue'
-import BranchForm from '@/components/BranchForm.vue'
-import BankForm from '@/components/BankForm.vue'
-import AppForm from '@/components/AppForm.vue'
+import BranchUsersTable from '@/components/branches/BranchUsersTable.vue'
+import BranchForm from '@/components/branches/BranchForm.vue'
+import BankForm from '@/components/payments/banks/BankForm.vue'
+import AppForm from '@/components/payments/apps/AppForm.vue'
 import {
     BuildingOffice2Icon,
     PencilIcon,

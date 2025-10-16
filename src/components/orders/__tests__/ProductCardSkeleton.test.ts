@@ -1,6 +1,6 @@
 import { mount } from '@vue/test-utils'
 import { describe, it, expect } from 'vitest'
-import ProductCardSkeleton from '@/components/orders/ProductCardSkeleton.vue'
+import ProductCardSkeleton from '@/components/orders/products/ProductCardSkeleton.vue'
 
 describe('ProductCardSkeleton', () => {
     it('renders skeleton elements correctly', () => {

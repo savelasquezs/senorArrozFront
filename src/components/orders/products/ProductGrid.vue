@@ -35,8 +35,8 @@ import { useOrdersStore } from '@/store/orders'
 import type { Product } from '@/types/order'
 
 // Components
-import ProductCard from '@/components/orders/ProductCard.vue'
-import ProductCardSkeleton from '@/components/orders/ProductCardSkeleton.vue'
+import ProductCard from '@/components/orders/products/ProductCard.vue'
+import ProductCardSkeleton from '@/components/orders/products/ProductCardSkeleton.vue'
 
 // Icons
 import { ShoppingBagIcon } from '@heroicons/vue/24/outline'

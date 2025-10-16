@@ -1,6 +1,6 @@
 import { mount } from '@vue/test-utils'
 import { describe, it, expect } from 'vitest'
-import ProductStock from '@/components/orders/ProductStock.vue'
+import ProductStock from '@/components/orders/products/ProductStock.vue'
 
 describe('ProductStock', () => {
     it('shows correct status for available stock', () => {

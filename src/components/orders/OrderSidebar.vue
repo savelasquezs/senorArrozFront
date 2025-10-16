@@ -86,9 +86,9 @@ import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseInput from '@/components/ui/BaseInput.vue'
 import OrderTabs from '@/components/orders/OrderTabs.vue'
 import OrderItemList from '@/components/orders/OrderItemList.vue'
-import CustomerSection from '@/components/orders/CustomerSection.vue'
-import CustomerDetailModal from '@/components/orders/CustomerDetailModal.vue'
-import PaymentSelector from '@/components/PaymentSelector.vue'
+import CustomerSection from '@/components/customers/CustomerSection.vue'
+import CustomerDetailModal from '@/components/customers/CustomerDetailModal.vue'
+import PaymentSelector from '@/components/payments/PaymentSelector.vue'
 
 // Icons
 import {

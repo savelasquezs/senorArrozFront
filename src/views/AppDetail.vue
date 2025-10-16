@@ -237,7 +237,7 @@ import BaseLoading from '@/components/ui/BaseLoading.vue'
 import BaseAlert from '@/components/ui/BaseAlert.vue'
 import BaseSelect from '@/components/ui/BaseSelect.vue'
 import StatsCard from '@/components/ui/StatsCard.vue'
-import AppForm from '@/components/AppForm.vue'
+import AppForm from '@/components/payments/apps/AppForm.vue'
 
 // Icons
 import {

@@ -103,8 +103,8 @@ import { useToast } from '@/composables/useToast'
 // Components
 import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseDialog from '@/components/ui/BaseDialog.vue'
-import CustomerAddressItem from '@/components/customer/CustomerAddressItem.vue'
-import CustomerAddressForm from '@/components/customer/CustomerAddressForm.vue'
+import CustomerAddressItem from '@/components/customers/address/CustomerAddressItem.vue'
+import CustomerAddressForm from '@/components/customers/address/CustomerAddressForm.vue'
 
 // Icons
 import {

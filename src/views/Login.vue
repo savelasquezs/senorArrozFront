@@ -30,7 +30,7 @@
 import { computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/store/auth'
-import LoginForm from '@/components/LoginForm.vue'
+import LoginForm from '@/components/auth/LoginForm.vue'
 
 const router = useRouter()
 const authStore = useAuthStore()

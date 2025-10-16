@@ -110,9 +110,9 @@ import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseLoading from '@/components/ui/BaseLoading.vue'
 
 
-import CustomerStatsCard from '@/components/customer/CustomerStatsCard.vue'
-import CustomerAddressesList from '@/components/customer/CustomerAddressesList.vue'
-import CustomerForm from '@/components/CustomerForm.vue'
+import CustomerStatsCard from '@/components/customers/CustomerStatsCard.vue'
+import CustomerAddressesList from '@/components/customers/CustomerAddressesList.vue'
+import CustomerForm from '@/components/customers/CustomerForm.vue'
 
 // Icons
 import {

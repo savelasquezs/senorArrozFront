@@ -83,7 +83,7 @@ import BaseBadge from '@/components/ui/BaseBadge.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseSelect from '@/components/ui/BaseSelect.vue'
 import BaseLoading from '@/components/ui/BaseLoading.vue'
-import CustomerSection from '@/components/orders/CustomerSection.vue'
+import CustomerSection from '@/components/customers/CustomerSection.vue'
 
 // Icons
 import {

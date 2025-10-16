@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { mount, VueWrapper } from '@vue/test-utils'
 import { setActivePinia, createPinia } from 'pinia'
-import ProductCategories from '../ProductCategories.vue'
+import ProductCategories from '@/components/orders/products/ProductCategories.vue'
 import { useOrdersStore } from '@/store/orders'
 import { useProductCategoriesStore } from '@/store/productCategories'
 import type { ProductCategory } from '@/types/product'

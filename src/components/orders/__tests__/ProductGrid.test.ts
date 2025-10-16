@@ -1,7 +1,7 @@
 import { mount } from '@vue/test-utils'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { setActivePinia, createPinia } from 'pinia'
-import ProductGrid from '@/components/orders/ProductGrid.vue'
+import ProductGrid from '@/components/orders/products/ProductGrid.vue'
 import type { Product } from '@/types/order'
 
 // Mock del store

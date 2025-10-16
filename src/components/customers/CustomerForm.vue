@@ -88,7 +88,7 @@ import type { Customer, CustomerFormData } from '@/types/customer'
 import BaseInput from '@/components/ui/BaseInput.vue'
 import BaseSelect from '@/components/ui/BaseSelect.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
-import CustomerAddressForm from '@/components/customer/CustomerAddressForm.vue'
+import CustomerAddressForm from '@/components/customers/address/CustomerAddressForm.vue'
 import {
     UserIcon,
     PhoneIcon,

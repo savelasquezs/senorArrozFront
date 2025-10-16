@@ -284,8 +284,8 @@ import BaseBadge from '@/components/ui/BaseBadge.vue'
 import BaseDialog from '@/components/ui/BaseDialog.vue'
 import BaseLoading from '@/components/ui/BaseLoading.vue'
 import BaseAlert from '@/components/ui/BaseAlert.vue'
-import BankForm from '@/components/BankForm.vue'
-import AppForm from '@/components/AppForm.vue'
+import BankForm from '@/components/payments/banks/BankForm.vue'
+import AppForm from '@/components/payments/apps/AppForm.vue'
 
 // Icons
 import {
