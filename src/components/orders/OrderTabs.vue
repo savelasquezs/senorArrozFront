@@ -25,6 +25,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useOrdersStore } from '@/store/orders'
+import { useOrderTabs } from '@/composables/useOrderTabs'
 
 // Components
 import BaseButton from '@/components/ui/BaseButton.vue'
@@ -37,6 +38,7 @@ import {
 
 // Composables
 const ordersStore = useOrdersStore()
+const orderTabsComposable = useOrderTabs()
 
 // Computed
 const orderTabs = computed(() => ordersStore.orderTabs)
@@ -50,11 +52,11 @@ const getTabNumber = (tabName: string) => {
 }
 
 const createNewTab = () => {
-    ordersStore.createNewTab()
+    orderTabsComposable.createNewTab()
 }
 
 const switchTab = (tabId: string) => {
-    ordersStore.switchTab(tabId)
+    orderTabsComposable.switchTab(tabId)
 }
 
 const closeTab = (tabId: string) => {
@@ -65,7 +67,7 @@ const closeTab = (tabId: string) => {
         if (!confirmed) return
     }
 
-    ordersStore.closeTab(tabId)
+    orderTabsComposable.closeTab(tabId)
 }
 </script>
 

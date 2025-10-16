@@ -10,7 +10,7 @@
         <!-- No Customer Selected -->
         <div v-if="!props.selectedCustomer" class="space-y-3">
 
-            cliente: {{ props.selectedCustomer }}
+
             <CustomerSelector :required="orderType === 'delivery'" @customer-selected="handleCustomerSelected" />
         </div>
 

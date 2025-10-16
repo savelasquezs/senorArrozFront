@@ -70,6 +70,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { useOrdersStore } from '@/store/orders'
+import { useOrderItems } from '@/composables/useOrderItems'
 import { useFormatting } from '@/composables/useFormatting'
 import { useToast } from '@/composables/useToast'
 
@@ -103,6 +104,7 @@ const emit = defineEmits<{
 const { formatCurrency } = useFormatting()
 const { success, error: showError } = useToast()
 const ordersStore = useOrdersStore()
+const orderItems = useOrderItems()
 
 // Computed
 const currentOrder = computed(() => ordersStore.currentOrder)
@@ -124,7 +126,7 @@ watch(deliveryFee, (newFee) => {
 // Methods
 const handleQuantityChange = (itemTempId: string, quantity: number) => {
     try {
-        ordersStore.updateItemQuantity(itemTempId, quantity)
+        orderItems.updateQuantity(itemTempId, quantity)
     } catch (error: any) {
         showError('Error al actualizar cantidad', error.message || 'No se pudo actualizar la cantidad del producto')
     }
@@ -132,7 +134,7 @@ const handleQuantityChange = (itemTempId: string, quantity: number) => {
 
 const handlePriceChange = (itemTempId: string, price: number) => {
     try {
-        ordersStore.updateItemPrice(itemTempId, price)
+        orderItems.updatePrice(itemTempId, price)
     } catch (error: any) {
         showError('Error al actualizar precio', error.message || 'No se pudo actualizar el precio del producto')
     }
@@ -140,7 +142,7 @@ const handlePriceChange = (itemTempId: string, price: number) => {
 
 const handleDiscountChange = (itemTempId: string, discountValue: number) => {
     try {
-        ordersStore.updateItemDiscount(itemTempId, discountValue)
+        orderItems.updateDiscount(itemTempId, discountValue)
     } catch (error: any) {
         showError('Error al actualizar descuento', error.message || 'No se pudo actualizar el descuento del producto')
     }
@@ -148,7 +150,7 @@ const handleDiscountChange = (itemTempId: string, discountValue: number) => {
 
 const handleRemoveItem = (itemTempId: string) => {
     try {
-        ordersStore.removeItem(itemTempId)
+        orderItems.removeItem(itemTempId)
         success('Producto eliminado', 1500, 'El producto ha sido eliminado del pedido')
     } catch (error: any) {
         showError('Error al eliminar producto', error.message || 'No se pudo eliminar el producto del pedido')
@@ -172,7 +174,7 @@ const handleClearAll = () => {
         try {
             // Eliminar todos los items uno por uno
             items.value.forEach(item => {
-                ordersStore.removeItem(item.tempId)
+                orderItems.removeItem(item.tempId)
             })
             success('Pedido limpiado', 2000, 'Todos los productos han sido eliminados del pedido')
         } catch (error: any) {

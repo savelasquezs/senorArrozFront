@@ -12,9 +12,7 @@ import type {
     CreateOrderDto,
     UpdateOrderDto,
     Product,
-    OrderType,
     DraftOrder,
-    OrderItem,
     OrderTab,
     StoredOrdersState,
 } from '@/types/order'
@@ -361,264 +359,7 @@ export const useOrdersStore = defineStore('orders', {
             this.error = null
         },
 
-        // Draft Orders System Actions
-        createNewTab() {
-            if (!this.canAddNewTab) return
-
-            const tabId = `tab-${Date.now()}-${this.nextTabNumber}`
-            const tabName = `Pedido ${this.nextTabNumber}`
-
-            const newOrder: DraftOrder = {
-                tabId,
-                tabName,
-                type: 'onsite',
-                customerId: null,
-                customerName: null,
-                customerPhone: null,
-                addressId: null,
-                addressDescription: null,
-                deliveryFee: 0,
-                reservedFor: null,
-                notes: '',
-                orderItems: [],
-                bankPayments: [],
-                appPayment: null,
-                subtotal: 0,
-                total: 0,
-                discountTotal: 0,
-                createdAt: new Date(),
-                updatedAt: new Date()
-            }
-
-            this.draftOrders.set(tabId, newOrder)
-            this.currentTabId = tabId
-            this.nextTabNumber++
-            this.saveToLocalStorage()
-        },
-
-        switchTab(tabId: string) {
-            if (this.draftOrders.has(tabId)) {
-                this.currentTabId = tabId
-                this.saveToLocalStorage()
-            }
-        },
-
-        closeTab(tabId: string) {
-            if (this.draftOrders.has(tabId)) {
-                this.draftOrders.delete(tabId)
-
-                // Si era la tab activa, cambiar a otra
-                if (this.currentTabId === tabId) {
-                    const remainingTabs = Array.from(this.draftOrders.keys())
-                    this.currentTabId = remainingTabs.length > 0 ? remainingTabs[0] : null
-                }
-
-                this.saveToLocalStorage()
-            }
-        },
-
-        renameTab(tabId: string, newName: string) {
-            const order = this.draftOrders.get(tabId)
-            if (order) {
-                order.tabName = newName
-                order.updatedAt = new Date()
-                this.saveToLocalStorage()
-            }
-        },
-
-        // Gestión de Items
-        addProduct(product: Product, quantity: number = 1) {
-            if (!this.currentTabId) return
-
-            const order = this.draftOrders.get(this.currentTabId)
-            if (!order) return
-
-            // Verificar si el producto ya existe en la orden
-            const existingItemIndex = order.orderItems.findIndex(item => item.productId === product.id)
-
-            let updatedItems: OrderItem[]
-
-            if (existingItemIndex !== -1) {
-                // Si ya existe, aumentar la cantidad (crear nuevo array inmutable)
-                updatedItems = order.orderItems.map((item, index) => {
-                    if (index === existingItemIndex) {
-                        const newQuantity = item.quantity + quantity
-                        const newSubtotal = (newQuantity * item.unitPrice) - item.discount
-                        return { ...item, quantity: newQuantity, subtotal: newSubtotal }
-                    }
-                    return item
-                })
-            } else {
-                // Si no existe, crear nuevo item y agregarlo
-                const newItem: OrderItem = {
-                    tempId: `item-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-                    productId: product.id,
-                    productName: product.name,
-                    productPrice: product.price,
-                    quantity,
-                    unitPrice: product.price,
-                    discount: 0,
-                    subtotal: product.price * quantity,
-                    notes: ''
-                }
-                updatedItems = [...order.orderItems, newItem]
-            }
-
-            // Crear nuevo objeto order
-            const updatedOrder = {
-                ...order,
-                orderItems: updatedItems,
-                updatedAt: new Date()
-            }
-
-            // Recalcular totales (esto también hace el set en el Map)
-            this.recalculateDraftOrderTotals(updatedOrder)
-            this.saveToLocalStorage()
-        },
-
-        removeItem(itemTempId: string) {
-            if (!this.currentTabId) return
-
-            const order = this.draftOrders.get(this.currentTabId)
-            if (!order) return
-
-            // Crear nuevo objeto con items filtrados
-            const updatedOrder = {
-                ...order,
-                orderItems: order.orderItems.filter(item => item.tempId !== itemTempId),
-                updatedAt: new Date()
-            }
-
-            // Recalcular totales (esto también hace el set en el Map)
-            this.recalculateDraftOrderTotals(updatedOrder)
-            this.saveToLocalStorage()
-        },
-
-        updateItemQuantity(itemTempId: string, quantity: number) {
-            if (!this.currentTabId || quantity < 1) return
-
-            const order = this.draftOrders.get(this.currentTabId)
-            if (!order) return
-
-            // Crear nuevo array de items con el item actualizado
-            const updatedItems = order.orderItems.map(item => {
-                if (item.tempId === itemTempId) {
-                    const newSubtotal = (quantity * item.unitPrice) - item.discount
-                    return { ...item, quantity, subtotal: newSubtotal }
-                }
-                return item
-            })
-
-            // Crear nuevo objeto order
-            const updatedOrder = {
-                ...order,
-                orderItems: updatedItems,
-                updatedAt: new Date()
-            }
-
-            // Recalcular totales (esto también hace el set en el Map)
-            this.recalculateDraftOrderTotals(updatedOrder)
-            this.saveToLocalStorage()
-        },
-
-        updateItemPrice(itemTempId: string, price: number) {
-            if (!this.currentTabId || price < 0) return
-
-            const order = this.draftOrders.get(this.currentTabId)
-            if (!order) return
-
-            // Crear nuevo array de items con el item actualizado
-            const updatedItems = order.orderItems.map(item => {
-                if (item.tempId === itemTempId) {
-                    const newSubtotal = (item.quantity * price) - item.discount
-                    return { ...item, unitPrice: price, subtotal: newSubtotal }
-                }
-                return item
-            })
-
-            // Crear nuevo objeto order
-            const updatedOrder = {
-                ...order,
-                orderItems: updatedItems,
-                updatedAt: new Date()
-            }
-
-            // Recalcular totales (esto también hace el set en el Map)
-            this.recalculateDraftOrderTotals(updatedOrder)
-            this.saveToLocalStorage()
-        },
-
-        updateItemDiscount(itemTempId: string, discount: number) {
-            if (!this.currentTabId || discount < 0) return
-
-            const order = this.draftOrders.get(this.currentTabId)
-            if (!order) return
-
-            // Crear nuevo array de items con el item actualizado
-            const updatedItems = order.orderItems.map(item => {
-                if (item.tempId === itemTempId) {
-                    const newSubtotal = (item.quantity * item.unitPrice) - discount
-                    return { ...item, discount, subtotal: newSubtotal }
-                }
-                return item
-            })
-
-            // Crear nuevo objeto order
-            const updatedOrder = {
-                ...order,
-                orderItems: updatedItems,
-                updatedAt: new Date()
-            }
-
-            // Recalcular totales (esto también hace el set en el Map)
-            this.recalculateDraftOrderTotals(updatedOrder)
-            this.saveToLocalStorage()
-        },
-
-        updateItemNotes(itemTempId: string, notes: string) {
-            if (!this.currentTabId) return
-
-            const order = this.draftOrders.get(this.currentTabId)
-            if (!order) return
-
-            // Crear nuevo array de items con el item actualizado
-            const updatedItems = order.orderItems.map(item => {
-                if (item.tempId === itemTempId) {
-                    return { ...item, notes }
-                }
-                return item
-            })
-
-            // Crear nuevo objeto order
-            const updatedOrder = {
-                ...order,
-                orderItems: updatedItems,
-                updatedAt: new Date()
-            }
-
-            // Reemplazar el objeto completo en el Map
-            this.draftOrders.set(this.currentTabId, updatedOrder)
-            this.saveToLocalStorage()
-        },
-
-        // Gestión de Orden
-        updateOrderType(type: OrderType) {
-            if (!this.currentTabId) return
-
-            const order = this.draftOrders.get(this.currentTabId)
-            if (!order) return
-
-            // Crear nuevo objeto para disparar reactividad
-            const updatedOrder = {
-                ...order,
-                type,
-                updatedAt: new Date()
-            }
-
-            // Reemplazar el objeto completo en el Map
-            this.draftOrders.set(this.currentTabId, updatedOrder)
-            this.saveToLocalStorage()
-        },
+        // Customer and Address Management (keep these in store)
 
         updateCustomer(customer: Customer | null) {
             if (!this.currentTabId) {
@@ -667,7 +408,7 @@ export const useOrdersStore = defineStore('orders', {
             }
 
             // Recalcular totales (esto también hace el set en el Map)
-            this.recalculateDraftOrderTotals(updatedOrder)
+            this.recalculateTotals(updatedOrder)
             this.saveToLocalStorage()
         },
 
@@ -703,12 +444,12 @@ export const useOrdersStore = defineStore('orders', {
             }
 
             // Recalcular totales (esto también hace el set en el Map)
-            this.recalculateDraftOrderTotals(updatedOrder)
+            this.recalculateTotals(updatedOrder)
             this.saveToLocalStorage()
         },
 
-        // Cálculos
-        recalculateDraftOrderTotals(order: DraftOrder) {
+        // Helper Methods (used by composables)
+        recalculateTotals(order: DraftOrder) {
             const subtotal = order.orderItems.reduce((sum, item) => sum + item.subtotal, 0)
             const discountTotal = order.orderItems.reduce((sum, item) => sum + item.discount, 0)
             const total = subtotal + order.deliveryFee

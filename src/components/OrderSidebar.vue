@@ -32,6 +32,7 @@
                         @address-selected="handleAddressSelect" @view-customer-detail="handleViewCustomerDetail"
                         @order-type-changed="handleOrderTypeChanged" />
                     <OrderItemList :tab-id="currentTabId || ''" @add-products="handleAddProducts" />
+                    <PaymentSelector :order="currentOrder" @payment-updated="handlePaymentUpdated" />
                 </div>
 
                 <!-- Order Actions -->
@@ -75,18 +76,19 @@
 import { computed, ref, watch } from 'vue'
 import { useOrderPersistence } from '@/composables/useOrderPersistence'
 import { useOrderValidation } from '@/composables/useOrderValidation'
+import { useOrderTabs } from '@/composables/useOrderTabs'
 
 import { useToast } from '@/composables/useToast'
 import type { Customer, CustomerAddress } from '@/types/customer'
 
 // Components
 import BaseButton from '@/components/ui/BaseButton.vue'
-
 import BaseInput from '@/components/ui/BaseInput.vue'
 import OrderTabs from '@/components/orders/OrderTabs.vue'
 import OrderItemList from '@/components/orders/OrderItemList.vue'
 import CustomerSection from '@/components/orders/CustomerSection.vue'
 import CustomerDetailModal from '@/components/orders/CustomerDetailModal.vue'
+import PaymentSelector from '@/components/PaymentSelector.vue'
 
 // Icons
 import {
@@ -98,6 +100,7 @@ import {
 
 // Composables
 const { ordersStore } = useOrderPersistence()
+const { createNewTab, updateOrderType } = useOrderTabs()
 const { success, error: showError } = useToast()
 
 // State
@@ -117,7 +120,7 @@ const canSaveOrder = computed(() => {
 
 // Methods
 const createNewOrder = () => {
-    ordersStore.createNewTab()
+    createNewTab()
 }
 
 const getCustomer = (customerId: number | null) => {
@@ -139,11 +142,16 @@ const handleCustomerSelect = (customer: Customer | null) => {
 }
 
 const handleOrderTypeChanged = (type: 'onsite' | 'delivery' | 'reservation') => {
-    ordersStore.updateOrderType(type)
+    updateOrderType(type)
 }
 
 const handleAddressSelect = (address: CustomerAddress | null) => {
     ordersStore.updateAddress(address)
+}
+
+const handlePaymentUpdated = () => {
+    // Payment updated, totals recalculate automatically
+    console.log('Payment updated')
 }
 
 const handleViewCustomerDetail = (customer: any) => {
@@ -203,7 +211,6 @@ watch(currentOrder, () => {
 
 <style scoped>
 .order-sidebar {
-    width: 500px;
     min-width: 400px;
     max-width: 500px;
 }

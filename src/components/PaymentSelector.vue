@@ -9,28 +9,33 @@
                 <BaseBadge type="info" size="sm">Máximo 1</BaseBadge>
             </div>
 
-            <div v-if="order.appPayments.length === 0" class="flex space-x-2">
+            <div v-if="!order.appPayment" class="flex space-x-2">
                 <BaseSelect v-model="selectedAppId" :options="appOptions" placeholder="Seleccionar app..." size="sm"
-                    class="flex-1" />
-                <button @click="addAppPayment" :disabled="!selectedAppId"
+                    class="flex-1" value-key="value" display-key="label" />
+                <button @click="handleAddAppPayment" :disabled="!selectedAppId"
                     class="px-3 py-2 text-sm bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed">
                     Agregar
                 </button>
             </div>
 
             <!-- Existing App Payment -->
-            <div v-for="payment in order.appPayments" :key="payment.id"
-                class="flex items-center justify-between p-3 bg-blue-50 rounded-lg border border-blue-200">
+            <div v-else class="flex items-center justify-between p-3 bg-blue-50 rounded-lg border border-blue-200">
                 <div class="flex items-center">
                     <DevicePhoneMobileIcon class="w-4 h-4 text-blue-600 mr-2" />
                     <div>
-                        <div class="text-sm font-medium text-blue-900">{{ payment.appName }}</div>
-                        <div class="text-xs text-blue-600">{{ formatCurrency(payment.amount) }}</div>
+                        <div class="text-sm font-medium text-blue-900">{{ order.appPayment.appName }}</div>
+                        <div class="text-xs text-blue-600">{{ formatCurrency(order.appPayment.amount) }}</div>
                     </div>
                 </div>
-                <BaseButton @click="updateAppPaymentAmount(payment.id)" variant="outline" size="sm">
-                    Editar
-                </BaseButton>
+                <div class="flex gap-1">
+                    <BaseButton @click="handleUpdateAppPayment" variant="outline" size="sm">
+                        Editar
+                    </BaseButton>
+                    <BaseButton @click="handleRemoveAppPayment" variant="outline" size="sm"
+                        class="text-red-600 hover:text-red-700">
+                        <TrashIcon class="w-3 h-3" />
+                    </BaseButton>
+                </div>
             </div>
         </div>
 
@@ -43,15 +48,15 @@
 
             <div class="flex space-x-2">
                 <BaseSelect v-model="selectedBankId" :options="bankOptions" placeholder="Seleccionar banco..." size="sm"
-                    class="flex-1" />
-                <button @click="addBankPayment" :disabled="!selectedBankId"
+                    class="flex-1" value-key="value" display-key="label" />
+                <button @click="handleAddBankPayment" :disabled="!selectedBankId"
                     class="px-3 py-2 text-sm bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed">
                     Agregar
                 </button>
             </div>
 
             <!-- Existing Bank Payments -->
-            <div v-for="payment in order.bankPayments" :key="payment.id"
+            <div v-for="payment in order.bankPayments" :key="payment.tempId"
                 class="flex items-center justify-between p-3 bg-green-50 rounded-lg border border-green-200">
                 <div class="flex items-center">
                     <BuildingLibraryIcon class="w-4 h-4 text-green-600 mr-2" />
@@ -60,10 +65,15 @@
                         <div class="text-xs text-green-600">{{ formatCurrency(payment.amount) }}</div>
                     </div>
                 </div>
-                <BaseButton @click="removeBankPayment(payment.id)" variant="outline" size="sm"
-                    class="text-red-600 hover:text-red-700">
-                    <TrashIcon class="w-3 h-3" />
-                </BaseButton>
+                <div class="flex gap-1">
+                    <BaseButton @click="handleUpdateBankPayment(payment.tempId)" variant="outline" size="sm">
+                        Editar
+                    </BaseButton>
+                    <BaseButton @click="handleRemoveBankPayment(payment.tempId)" variant="outline" size="sm"
+                        class="text-red-600 hover:text-red-700">
+                        <TrashIcon class="w-3 h-3" />
+                    </BaseButton>
+                </div>
             </div>
         </div>
 
@@ -112,7 +122,8 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { useOrdersStore } from '@/store/orders'
-import type { ActiveOrder } from '@/types/order'
+import { useOrderPayments } from '@/composables/useOrderPayments'
+import type { DraftOrder } from '@/types/order'
 
 // Components
 import BaseButton from '@/components/ui/BaseButton.vue'
@@ -130,18 +141,19 @@ import {
 
 // Props
 interface Props {
-    order: ActiveOrder
+    order: DraftOrder
 }
 
 const props = defineProps<Props>()
 
 // Emits
 const emit = defineEmits<{
-    paymentUpdated: [order: ActiveOrder]
+    paymentUpdated: [order: DraftOrder]
 }>()
 
 // Composables
 const ordersStore = useOrdersStore()
+const payments = useOrderPayments()
 
 // State
 const selectedAppId = ref<number | null>(null)
@@ -156,9 +168,12 @@ const editingPayment = ref<{
 
 // Computed
 const appOptions = computed(() => {
-    const usedAppIds = props.order.appPayments.map(p => p.appId)
+    // Si ya hay un app payment, no mostrar opciones
+    if (props.order.appPayment) {
+        return []
+    }
     return ordersStore.apps
-        .filter(app => app.active && !usedAppIds.includes(app.id))
+        .filter(app => app.active)
         .map(app => ({ value: app.id, label: app.name }))
 })
 
@@ -169,11 +184,11 @@ const bankOptions = computed(() => {
 })
 
 const hasPayments = computed(() => {
-    return props.order.appPayments.length > 0 || props.order.bankPayments.length > 0
+    return props.order.appPayment !== null || props.order.bankPayments.length > 0
 })
 
 const totalPayments = computed(() => {
-    const appTotal = props.order.appPayments.reduce((sum, p) => sum + p.amount, 0)
+    const appTotal = props.order.appPayment ? props.order.appPayment.amount : 0
     const bankTotal = props.order.bankPayments.reduce((sum, p) => sum + p.amount, 0)
     return appTotal + bankTotal
 })
@@ -191,12 +206,12 @@ const formatCurrency = (amount: number): string => {
     }).format(amount)
 }
 
-const addAppPayment = () => {
+const handleAddAppPayment = () => {
     if (!selectedAppId.value) return
 
     const maxAmount = props.order.total - totalPayments.value
     editingPayment.value = {
-        id: `app-${selectedAppId.value}`,
+        id: `app-new`,
         type: 'app',
         name: ordersStore.apps.find(app => app.id === selectedAppId.value)?.name || ''
     }
@@ -204,12 +219,12 @@ const addAppPayment = () => {
     showAmountModal.value = true
 }
 
-const addBankPayment = () => {
+const handleAddBankPayment = () => {
     if (!selectedBankId.value) return
 
     const maxAmount = props.order.total - totalPayments.value
     editingPayment.value = {
-        id: `bank-${selectedBankId.value}`,
+        id: `bank-new`,
         type: 'bank',
         name: ordersStore.banks.find(bank => bank.id === selectedBankId.value)?.name || ''
     }
@@ -217,12 +232,12 @@ const addBankPayment = () => {
     showAmountModal.value = true
 }
 
-const updateAppPaymentAmount = (paymentId: string) => {
-    const payment = props.order.appPayments.find(p => p.id === paymentId)
+const handleUpdateAppPayment = () => {
+    const payment = props.order.appPayment
     if (!payment) return
 
     editingPayment.value = {
-        id: paymentId,
+        id: payment.tempId,
         type: 'app',
         name: payment.appName || ''
     }
@@ -230,8 +245,26 @@ const updateAppPaymentAmount = (paymentId: string) => {
     showAmountModal.value = true
 }
 
-const removeBankPayment = (paymentId: string) => {
-    ordersStore.removeBankPayment(paymentId)
+const handleRemoveAppPayment = () => {
+    payments.removeAppPayment()
+    emit('paymentUpdated', props.order)
+}
+
+const handleUpdateBankPayment = (paymentTempId: string) => {
+    const payment = props.order.bankPayments.find(p => p.tempId === paymentTempId)
+    if (!payment) return
+
+    editingPayment.value = {
+        id: payment.tempId,
+        type: 'bank',
+        name: payment.bankName || ''
+    }
+    paymentAmount.value = payment.amount
+    showAmountModal.value = true
+}
+
+const handleRemoveBankPayment = (paymentTempId: string) => {
+    payments.removeBankPayment(paymentTempId)
     emit('paymentUpdated', props.order)
 }
 
@@ -239,9 +272,25 @@ const savePaymentAmount = () => {
     if (!editingPayment.value || paymentAmount.value <= 0) return
 
     if (editingPayment.value.type === 'app') {
-        ordersStore.addAppPayment(paymentAmount.value, paymentAmount.value)
+        if (editingPayment.value.id === 'app-new') {
+            // Adding new app payment
+            const appId = selectedAppId.value
+            if (!appId) return
+            payments.addAppPayment(appId, paymentAmount.value)
+        } else {
+            // Updating existing app payment
+            payments.updateAppPayment(paymentAmount.value)
+        }
     } else if (editingPayment.value.type === 'bank') {
-        ordersStore.addBankPayment(paymentAmount.value, paymentAmount.value)
+        if (editingPayment.value.id === 'bank-new') {
+            // Adding new bank payment
+            const bankId = selectedBankId.value
+            if (!bankId) return
+            payments.addBankPayment(bankId, paymentAmount.value)
+        } else {
+            // Updating existing bank payment
+            payments.updateBankPayment(editingPayment.value.id, paymentAmount.value)
+        }
     }
 
     // Reset selections

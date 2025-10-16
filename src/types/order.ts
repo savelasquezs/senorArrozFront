@@ -56,14 +56,14 @@ export interface OrderDetail {
 }
 
 export interface OrderBankPayment {
-    id: string
+    tempId: string  // Local identifier
     bankId: number
     bankName: string
     amount: number
 }
 
 export interface OrderAppPayment {
-    id: string
+    tempId: string  // Local identifier
     appId: number
     appName: string
     bankId: number
@@ -85,8 +85,8 @@ export interface DraftOrder {
     reservedFor: Date | null
     notes: string
     orderItems: OrderItem[]
-    bankPayments: BankPayment[]
-    appPayment: AppPayment | null
+    bankPayments: OrderBankPayment[]
+    appPayment: OrderAppPayment | null
     subtotal: number
     total: number
     discountTotal: number

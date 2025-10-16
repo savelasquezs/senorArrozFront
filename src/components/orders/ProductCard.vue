@@ -24,7 +24,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
-import { useOrdersStore } from '@/store/orders'
+import { useOrderItems } from '@/composables/useOrderItems'
 import { useToast } from '@/composables/useToast'
 import type { Product } from '@/types/order'
 
@@ -55,7 +55,7 @@ const emit = defineEmits<{
 }>()
 
 // Composables
-const ordersStore = useOrdersStore()
+const orderItems = useOrderItems()
 const { success } = useToast()
 
 // Computed
@@ -101,7 +101,7 @@ const handleClick = () => {
     if (isDisabled.value || props.isLoading) return
 
     try {
-        ordersStore.addProduct(props.product)
+        orderItems.addProduct(props.product)
         success('Producto agregado', 1500, `${props.product.name}`)
         emit('product-click', props.product)
         emit('product-add', props.product)
