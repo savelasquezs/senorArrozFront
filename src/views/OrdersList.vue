@@ -97,7 +97,7 @@
                                 a
                                 <span class="font-medium">{{
                                     Math.min(currentPage * pageSize, totalCount)
-                                    }}</span>
+                                }}</span>
                                 de
                                 <span class="font-medium">{{ totalCount }}</span>
                                 resultados
@@ -380,11 +380,15 @@ const handleAssignDelivery = (order: OrderListItem) => {
 
 const handleOrderUpdated = (updatedOrder?: Order) => {
     if (updatedOrder) {
+        const orderAny = updatedOrder as any // Acceso a campos extra del backend
+
         // ✅ ACTUALIZACIÓN OPTIMISTA - actualizar en la lista local
         const index = orders.value.findIndex(o => o.id === updatedOrder.id)
         if (index !== -1) {
             orders.value[index] = {
                 ...orders.value[index],
+                deliveryManId: orderAny.deliveryManId || null,
+                deliveryManName: orderAny.deliveryManName || null,
                 customerId: updatedOrder.customerId || null,
                 customerName: updatedOrder.customerName || null,
                 customerPhone: updatedOrder.customerPhone || null,
