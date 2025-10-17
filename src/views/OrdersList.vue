@@ -1,11 +1,21 @@
 <template>
-    <div class="container mx-auto px-4 py-6">
+    <MainLayout>
         <!-- Header -->
         <div class="mb-6">
-            <h1 class="text-2xl font-bold text-gray-900">Pedidos</h1>
-            <p class="mt-1 text-sm text-gray-500">
-                Gestiona y visualiza todos los pedidos del sistema
-            </p>
+            <div class="flex items-center justify-between">
+                <div>
+                    <h1 class="text-2xl font-bold text-gray-900">Pedidos</h1>
+                    <p class="mt-1 text-sm text-gray-500">
+                        Gestiona y visualiza todos los pedidos del sistema
+                    </p>
+                </div>
+                <div class="flex items-center space-x-3">
+                    <BaseButton @click="navigateToNewOrder" variant="primary">
+                        <PlusIcon class="w-4 h-4 mr-2" />
+                        Nuevo Pedido
+                    </BaseButton>
+                </div>
+            </div>
         </div>
 
         <!-- Filtros -->
@@ -87,7 +97,7 @@
                                 a
                                 <span class="font-medium">{{
                                     Math.min(currentPage * pageSize, totalCount)
-                                }}</span>
+                                    }}</span>
                                 de
                                 <span class="font-medium">{{ totalCount }}</span>
                                 resultados
@@ -131,16 +141,18 @@
 
         <AssignDeliveryModal v-if="selectedOrder" :open="showAssignDeliveryModal" :order="selectedOrder"
             @close="showAssignDeliveryModal = false" @updated="handleOrderUpdated" />
-    </div>
+    </MainLayout>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import type { OrderListItem } from '@/types/order'
 import { orderApi } from '@/services/MainAPI/orderApi'
 import { useOrderFilters, type OrderFilterState } from '@/composables/useOrderFilters'
 import { useOrderPermissions } from '@/composables/useOrderPermissions'
 import { useToast } from '@/composables/useToast'
+import MainLayout from '@/components/layout/MainLayout.vue'
 import OrdersTable from '@/components/orders/OrdersTable.vue'
 import EditCustomerModal from '@/components/orders/EditCustomerModal.vue'
 import SelectAddressModal from '@/components/orders/SelectAddressModal.vue'
@@ -153,8 +165,10 @@ import {
     ArrowPathIcon,
     ChevronLeftIcon,
     ChevronRightIcon,
+    PlusIcon,
 } from '@heroicons/vue/24/outline'
 
+const router = useRouter()
 const { applyAllFilters, sortOrders } = useOrderFilters()
 const { getNextAllowedStatus, canChangeStatus } = useOrderPermissions()
 const { success, error } = useToast()
@@ -343,6 +357,10 @@ const handleAssignDelivery = (order: OrderListItem) => {
 
 const handleOrderUpdated = () => {
     fetchOrders()
+}
+
+const navigateToNewOrder = () => {
+    router.push('/orders/new')
 }
 
 // Lifecycle
