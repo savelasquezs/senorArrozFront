@@ -5,8 +5,8 @@ import type { User, CreateUserRequest, UpdateUserRequest, UserFilters } from '@/
 
 class UserApi extends BaseApi {
 	// Get all users with optional filters
-	async getUsers(filters?: UserFilters): Promise<ApiResponse<PagedResult<User>>> {
-		return this.get<ApiResponse<PagedResult<User>>>('/Users', { params: filters });
+	async getUsers(filters?: UserFilters): Promise<PagedResult<User>> {
+		return this.get<PagedResult<User>>('/Users', { params: filters });
 	}
 
 	// Get users by branch

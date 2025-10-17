@@ -1,13 +1,11 @@
 <template>
     <BaseDialog :model-value="open" :title="`Asignar Domiciliario - Pedido #${order.id}`"
         @update:model-value="(val) => !val && $emit('close')">
-        <div class="space-y-4">
+        <div class="space-y-10">
             <!-- Info del pedido -->
             <div class="bg-gray-50 rounded-lg p-4">
-                <div class="text-sm text-gray-600">
-                    {{ order.typeDisplayName }} - {{ order.statusDisplayName }}
-                </div>
-                <div v-if="order.deliveryManName" class="mt-2 text-sm">
+
+                <div v-if="order.deliveryManName" class=" text-sm">
                     <span class="text-gray-600">Domiciliario actual:</span>
                     <p class="text-gray-900 font-medium">{{ order.deliveryManName }}</p>
                 </div>
@@ -26,7 +24,7 @@
             </p>
         </div>
 
-        <template #actions>
+        <template #footer>
             <BaseButton variant="secondary" @click="$emit('close')">
                 Cancelar
             </BaseButton>
@@ -95,7 +93,8 @@ const fetchDeliverymen = async () => {
             role: 'Deliveryman',
             active: true
         })
-        deliverymen.value = response.data.items
+        // El backend devuelve directamente PagedResult
+        deliverymen.value = response?.items || []
     } catch (err: any) {
         error('Error al cargar domiciliarios', err.message)
     } finally {

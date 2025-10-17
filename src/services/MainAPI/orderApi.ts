@@ -113,7 +113,18 @@ class OrderApi extends BaseApi {
 
     // 14. Cambiar estado del pedido
     async updateStatus(id: number, status: OrderStatus, reason?: string): Promise<Order> {
-        return this.put<Order>(`/orders/${id}/status`, { status, reason });
+        // Convertir status de snake_case a camelCase para el backend C#
+        const statusMap: Record<OrderStatus, string> = {
+            'taken': 'taken',
+            'in_preparation': 'inPreparation',
+            'ready': 'ready',
+            'on_the_way': 'onTheWay',
+            'delivered': 'delivered',
+            'cancelled': 'cancelled'
+        };
+
+        const backendStatus = statusMap[status] || status;
+        return this.put<Order>(`/orders/${id}/status`, { status: backendStatus, reason });
     }
 
     // 15. Cancelar pedido con razón

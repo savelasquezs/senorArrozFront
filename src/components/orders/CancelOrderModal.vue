@@ -68,7 +68,7 @@
             </div>
         </div>
 
-        <template #actions>
+        <template #footer>
             <BaseButton variant="secondary" @click="$emit('close')">
                 Volver
             </BaseButton>
