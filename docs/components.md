@@ -221,46 +221,54 @@ Navegación de rutas jerárquica.
 ## 🍽️ Componentes de Funcionalidad
 
 ### ProductCard
-Componente base para mostrar productos individuales.
+Componente minimalista para mostrar productos individuales.
+
+**Ubicación:** `src/components/orders/products/ProductCard.vue`
 
 ```vue
 <ProductCard 
   :product="product"
-  :show-stock="true"
   variant="default"
-  @product-click="onProductClick"
-  @product-add="onProductAdd"
+  @add-to-order="onAddToOrder"
 />
 ```
 
 **Props:**
 - `product`: `Product` - Datos del producto
-- `showStock`: `boolean` - Mostrar indicador de stock
-- `variant`: `'default' | 'compact' | 'featured'` - Estilo del card
-- `disabled`: `boolean` - Deshabilitar interacciones
+- `variant`: `'default' | 'compact'` - Estilo del card
 
 **Características:**
-- Diseño atractivo con sombras y hover effects
-- Variantes responsive (default, compact, featured)
-- Indicador de stock visual
-- Botón de agregar con loading state
-- Integración con store de orders
+- **Diseño minimalista**: Solo nombre, precio y stock (sin imagen)
+- **Click para agregar**: Click en cualquier parte de la card agrega el producto
+- **Hover effect**: Background `emerald-50` y borde `emerald-500` al pasar el mouse
+- **Stock ilimitado**: Productos de categoría "arroces" nunca están deshabilitados por stock
+- **Cursor adaptativo**: `not-allowed` para productos sin stock
+- **Responsive**: Se adapta al tamaño del contenedor
+
+**Events:**
+- `@add-to-order` - Emitido cuando se hace click en la card (incluye el producto)
 
 ### ProductStock
-Sub-componente para mostrar estado de stock.
+Sub-componente para mostrar estado de stock con soporte de stock ilimitado.
+
+**Ubicación:** `src/components/orders/products/ProductStock.vue`
 
 ```vue
 <ProductStock 
   :stock="product.stock"
-  variant="badge"
-  size="sm"
+  :has-unlimited-stock="isArrozCategory"
 />
 ```
 
 **Props:**
 - `stock`: `number` - Cantidad en stock
-- `variant`: `'badge' | 'text'` - Forma de mostrar
-- `size`: `'sm' | 'md' | 'lg'` - Tamaño del indicador
+- `hasUnlimitedStock`: `boolean` - Si el producto tiene stock ilimitado
+
+**Estados:**
+- Stock > 50%: Badge verde "Disponible"
+- Stock 20-50%: Badge amarillo "Bajo stock"
+- Stock < 20%: Badge rojo "Agotado"
+- Stock ilimitado: Badge verde "Disponible" (siempre)
 
 **Estados:**
 - **Disponible**: Verde con check
@@ -365,28 +373,58 @@ Barra de categorías clickeables.
 - Filtrado automático
 
 ### OrderSidebar
-Sidebar de pedidos activos con tabs.
+Sidebar principal para gestión de pedidos con sistema de tabs y validación completa.
+
+**Ubicación:** `src/components/orders/OrderSidebar.vue`
 
 ```vue
-<OrderSidebar @order-updated="refreshTotals" />
+<OrderSidebar />
 ```
 
 **Características:**
-- Tabs horizontales para múltiples pedidos
-- Botón "+" para crear nuevo pedido
-- Indicadores de estado (dirty, saved)
-- Scroll automático para muchos tabs
+- **Sistema de tabs**: Múltiples pedidos activos simultáneos
+- **Validación completa**: Feedback visual en tiempo real
+- **Tooltip dinámico**: Muestra requisitos faltantes en botón enviar
+- **Toasts secuenciales**: Mensajes detallados de errores de validación
+- **Auto-guardado**: Persistencia en localStorage
+- **Ancho fijo**: Sidebar con ancho consistente
 
-### OrderTab
-Contenido de cada pedido activo.
+**Estructura del Sidebar:**
 
-**Secciones:**
-1. **CustomerSelector**: Búsqueda por teléfono
-2. **AddressSelector**: Direcciones del cliente (delivery)
-3. **OrderLines**: Lista de productos del pedido
-4. **PaymentSelector**: Métodos de pago
-5. **TotalsPanel**: Totales y descuentos
-6. **Actions**: Botones Save/Send
+1. **OrderTabs**: Tabs horizontales con botón "+" para crear nuevo
+2. **OrderHeader**: 
+   - Select de tipo de pedido (onsite/delivery/reservation)
+   - Input de guestName (obligatorio para delivery/reservation)
+   - Auto-completado con nombre del cliente
+3. **CustomerSection**: 
+   - Búsqueda de cliente por teléfono
+   - Selector de dirección (si es delivery)
+   - Modal de detalle del cliente
+4. **OrderItemList**: 
+   - Lista de productos en el pedido
+   - Actualización de cantidad (+/-)
+   - Eliminación de productos
+5. **PaymentSelector**: 
+   - Gestión de pagos con validación
+   - Cálculo de efectivo
+6. **Totales y Envío**: 
+   - Subtotal, descuentos, total
+   - Botón "Enviar Pedido" con tooltip dinámico
+   - Solo un botón (se removió "Guardar")
+
+**Validaciones Implementadas:**
+- Al menos 1 producto en el pedido
+- Cliente obligatorio para delivery
+- Dirección obligatoria para delivery
+- guestName obligatorio para delivery/reservation
+- Fecha/hora obligatoria para reservation
+- Suma de pagos ≤ total del pedido
+
+**Feedback Visual:**
+- Botón deshabilitado si faltan requisitos
+- Tooltip con mensaje específico de lo que falta
+- Toasts secuenciales explicando cada error
+- Colores de estado (rojo para errores, verde para éxito)
 
 ### CustomerSelector
 Selector de clientes por teléfono.
@@ -426,24 +464,44 @@ Selector de direcciones del cliente.
 - Integración con Google Maps
 
 ### PaymentSelector
-Selector de métodos de pago.
+Selector de métodos de pago con validación de monto máximo.
+
+**Ubicación:** `src/components/orders/payments/PaymentSelector.vue`
 
 ```vue
 <PaymentSelector 
-  :order-total="orderTotal"
-  :bank-payments="bankPayments"
-  :app-payments="appPayments"
-  @add-bank-payment="addBankPayment"
-  @add-app-payment="addAppPayment"
-  @remove-payment="removePayment"
+  :order="draftOrder"
+  :apps="availableApps"
+  :banks="availableBanks"
 />
 ```
 
+**Props:**
+- `order`: `DraftOrder` - Pedido actual con totales y pagos
+- `apps`: `App[]` - Apps de pago disponibles
+- `banks`: `Bank[]` - Bancos disponibles
+
 **Características:**
-- App payments (máximo 1)
-- Bank payments (múltiples)
-- Validación de totales
-- Indicador de efectivo restante
+- **Diseño minimalista**: Padding reducido, iconos compactos
+- **Validación de monto máximo**: Suma de pagos ≤ total del pedido
+- **Efectivo automático**: Calcula diferencia entre total y suma de pagos
+- **App payments**: Máximo 1 por pedido
+- **Bank payments**: Múltiples permitidos
+- **Alerta de sobrepago**: Background rojo cuando suma > total
+- **Deshabilitado inteligente**: No permite agregar pagos si efectivo es 0
+- **Edición inline**: Editar montos directamente en la lista
+
+**Computed Properties:**
+- `cashAmount`: Monto en efectivo (total - suma de pagos)
+- `maxPaymentAmount`: Monto máximo para agregar nuevo pago
+- `canAddPayments`: Si se pueden agregar más pagos
+- `hasOverpayment`: Si hay sobrepago
+- `overpaymentAmount`: Monto del sobrepago
+
+**Validaciones:**
+- No permitir monto mayor al restante
+- Actualización en tiempo real del efectivo
+- Feedback visual inmediato
 
 ### TotalsPanel
 Panel de totales y descuentos.

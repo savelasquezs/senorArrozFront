@@ -4,7 +4,7 @@
         <!-- Branch Name -->
         <div>
             <BaseInput v-model="form.name" label="Nombre de la Sucursal" placeholder="Ej: Sucursal Centro" required
-                :error="errors.name" maxlength="100">
+                :error="errors.name" :maxlength="100">
                 <template #icon>
                     <BuildingOffice2Icon class="w-4 h-4" />
                 </template>
@@ -14,7 +14,7 @@
         <!-- Address -->
         <div>
             <BaseInput v-model="form.address" label="Dirección" placeholder="Ej: Calle 50 # 45-67, Centro" required
-                :error="errors.address" maxlength="200">
+                :error="errors.address" :maxlength="200">
                 <template #icon>
                     <MapPinIcon class="w-4 h-4" />
                 </template>
@@ -24,14 +24,14 @@
         <!-- Phone Numbers -->
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
             <BaseInput v-model="form.phone1" label="Teléfono Principal" type="tel" placeholder="3001234567" required
-                :error="errors.phone1" maxlength="10" @input="validatePhone('phone1')">
+                :error="errors.phone1" :maxlength="10" @input="validatePhone('phone1')">
                 <template #icon>
                     <PhoneIcon class="w-4 h-4" />
                 </template>
             </BaseInput>
 
             <BaseInput v-model="form.phone2" label="Teléfono Secundario " type="tel" placeholder="3007654321"
-                :error="errors.phone2" maxlength="10" @input="validatePhone('phone2')">
+                :error="errors.phone2" :maxlength="10" @input="validatePhone('phone2')">
                 <template #icon>
                     <PhoneIcon class="w-4 h-4" />
                 </template>

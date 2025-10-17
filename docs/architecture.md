@@ -27,7 +27,7 @@
 
 ```
 src/
-├── components/           # Componentes Vue
+├── components/           # Componentes Vue (organización domain-driven)
 │   ├── layout/          # Layout components
 │   │   ├── MainLayout.vue
 │   │   ├── Sidebar.vue
@@ -41,8 +41,43 @@ src/
 │   │   ├── BaseLoading.vue
 │   │   ├── BaseAlert.vue
 │   │   ├── BaseToast.vue
-│   │   └── BaseSelect.vue
-│   └── [feature].vue    # Feature-specific components
+│   │   ├── BaseSelect.vue
+│   │   └── BaseRadioGroup.vue
+│   ├── branches/        # Componentes de sucursales
+│   │   ├── BranchForm.vue
+│   │   ├── BranchUsersTable.vue
+│   │   └── users/
+│   │       └── UserForm.vue
+│   ├── customers/       # Componentes de clientes
+│   │   ├── CustomerForm.vue
+│   │   ├── CustomerSection.vue
+│   │   ├── CustomerDetailModal.vue
+│   │   ├── CustomerSelector.vue
+│   │   ├── CustomerStatsCard.vue
+│   │   ├── PhoneNumberItem.vue
+│   │   └── address/
+│   │       └── CustomerAddressForm.vue
+│   ├── neighborhoods/   # Componentes de barrios
+│   │   └── NeighborhoodSearch.vue
+│   ├── orders/          # Componentes de pedidos
+│   │   ├── OrderSidebar.vue
+│   │   ├── OrderHeader.vue
+│   │   ├── OrderItemList.vue
+│   │   ├── OrderTabs.vue
+│   │   ├── products/
+│   │   │   ├── ProductCard.vue
+│   │   │   ├── ProductGrid.vue
+│   │   │   ├── ProductStock.vue
+│   │   │   ├── ProductCardSkeleton.vue
+│   │   │   ├── ProductCategories.vue
+│   │   │   └── ProductSearch/
+│   │   │       ├── ProductSearch.vue
+│   │   │       ├── SearchInput.vue
+│   │   │       └── FilterPanel.vue
+│   │   └── payments/
+│   │       └── PaymentSelector.vue
+│   └── products/        # Componentes legacy
+│       └── ProductsGrid.vue
 ├── views/               # Page components
 │   ├── Login.vue
 │   ├── Dashboard.vue
@@ -52,12 +87,15 @@ src/
 │   ├── auth.ts
 │   ├── orders.ts
 │   ├── products.ts
+│   ├── productSearch.ts
 │   └── [domain].ts
 ├── services/            # API services
 │   └── MainAPI/
 │       ├── baseApi.ts
 │       ├── authApi.ts
 │       ├── orderApi.ts
+│       ├── productApi.ts
+│       ├── customerApi.ts
 │       └── [domain]Api.ts
 ├── types/               # TypeScript definitions
 │   ├── auth.ts
@@ -65,7 +103,14 @@ src/
 │   ├── product.ts
 │   └── [domain].ts
 ├── composables/         # Vue composables
-│   └── useToast.ts
+│   ├── useToast.ts
+│   ├── useFormatting.ts
+│   ├── useOrderTabs.ts
+│   ├── useOrderItems.ts
+│   ├── useOrderPayments.ts
+│   ├── useOrderValidation.ts
+│   ├── useOrderSubmission.ts
+│   └── useOrderPersistence.ts
 ├── router/              # Vue Router config
 │   └── index.ts
 └── assets/              # Static assets
@@ -154,10 +199,90 @@ export const useStoreName = defineStore('storeName', () => {
 
 ### Stores Principales
 - **auth.ts**: Autenticación, usuario, tokens
-- **orders.ts**: Pedidos activos, productos, categorías
+- **orders.ts**: Estado central de pedidos (estado, productos, categorías)
 - **products.ts**: Gestión de productos y categorías
+- **productSearch.ts**: Estado de búsqueda y filtros
 - **customers.ts**: Clientes y direcciones
 - **banks.ts**: Bancos y apps de pago
+
+## 🧩 Patrón de Composables
+
+Para evitar stores sobrecargados ("god objects"), la lógica compleja se divide en composables especializados con responsabilidades únicas:
+
+### Composables de Orders
+```typescript
+// useOrderTabs.ts - Gestión de tabs de pedidos activos
+export const useOrderTabs = () => {
+  const ordersStore = useOrdersStore()
+  
+  const createNewTab = (type: OrderType) => { /* ... */ }
+  const switchTab = (tabId: string) => { /* ... */ }
+  const closeTab = (tabId: string) => { /* ... */ }
+  const renameTab = (tabId: string, name: string) => { /* ... */ }
+  const updateOrderType = (type: OrderType) => { /* ... */ }
+  
+  return { createNewTab, switchTab, closeTab, renameTab, updateOrderType }
+}
+
+// useOrderItems.ts - CRUD de productos en el pedido
+export const useOrderItems = () => {
+  const ordersStore = useOrdersStore()
+  
+  const addProduct = (product: Product) => { /* ... */ }
+  const removeItem = (detailId: string) => { /* ... */ }
+  const updateQuantity = (detailId: string, quantity: number) => { /* ... */ }
+  
+  return { addProduct, removeItem, updateQuantity, /* ... */ }
+}
+
+// useOrderPayments.ts - Gestión de métodos de pago
+export const useOrderPayments = () => {
+  const ordersStore = useOrdersStore()
+  
+  const addAppPayment = (appId: number, amount: number) => { /* ... */ }
+  const addBankPayment = (bankId: number, amount: number) => { /* ... */ }
+  
+  return { addAppPayment, addBankPayment, /* ... */ }
+}
+
+// useOrderValidation.ts - Validaciones de negocio
+export const useOrderValidation = () => {
+  const validateOrder = (order: DraftOrder) => { /* ... */ }
+  const canSubmitOrder = computed(() => { /* ... */ })
+  const orderErrors = computed(() => { /* ... */ })
+  
+  return { validateOrder, canSubmitOrder, orderErrors }
+}
+
+// useOrderSubmission.ts - Transformación y envío
+export const useOrderSubmission = () => {
+  const transformDraftToCreateDto = (draft: DraftOrder): CreateOrderDto => {
+    return {
+      branchId: draft.branchId,
+      takenById: draft.takenById,
+      type: draft.type,
+      status: 'taken', // Status por defecto
+      guestName: draft.guestName || undefined,
+      // ... más campos
+    }
+  }
+  
+  const submitOrder = async (draft: DraftOrder) => { /* ... */ }
+  
+  return { transformDraftToCreateDto, submitOrder }
+}
+```
+
+### Ventajas del Patrón de Composables
+- **Separación de responsabilidades**: Cada composable tiene una función específica
+- **Reutilización**: Los composables pueden usarse en múltiples componentes
+- **Testing**: Más fácil probar lógica aislada
+- **Mantenibilidad**: Código más organizado y fácil de entender
+- **Escalabilidad**: Agregar funcionalidad sin saturar el store
+
+### Otros Composables
+- **useFormatting.ts**: Formateo de precios, fechas, números
+- **useOrderPersistence.ts**: Persistencia en localStorage
 
 ## 🌐 Arquitectura de APIs
 

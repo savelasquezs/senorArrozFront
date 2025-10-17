@@ -44,37 +44,69 @@
 
 ```
 src/
-├── components/           # Componentes Vue
+├── components/           # Componentes Vue (organización domain-driven)
 │   ├── layout/          # Componentes de layout (Sidebar, TopNav, etc.)
 │   ├── ui/              # Componentes base reutilizables
-│   ├── orders/          # Componentes específicos de pedidos
-│   │   ├── ProductCard.vue
-│   │   ├── ProductGrid.vue
-│   │   ├── ProductStock.vue
-│   │   ├── ProductCardSkeleton.vue
-│   │   ├── ProductSearch.vue
-│   │   ├── ProductSearch/      # Sub-componentes de búsqueda
-│   │   │   ├── SearchInput.vue
-│   │   │   ├── FilterToggle.vue
-│   │   │   ├── ActiveFilters.vue
-│   │   │   ├── FilterPanel.vue
-│   │   │   └── SearchHistory.vue
-│   │   └── __tests__/          # Tests de componentes de pedidos
-│   └── [feature].vue    # Otros componentes específicos
+│   ├── branches/        # Componentes de sucursales
+│   │   ├── BranchForm.vue
+│   │   ├── BranchUsersTable.vue
+│   │   └── users/
+│   │       └── UserForm.vue
+│   ├── customers/       # Componentes de clientes
+│   │   ├── CustomerForm.vue
+│   │   ├── CustomerSection.vue
+│   │   ├── CustomerDetailModal.vue
+│   │   ├── CustomerSelector.vue
+│   │   ├── CustomerStatsCard.vue
+│   │   ├── CustomerAddressesList.vue
+│   │   ├── PhoneNumberItem.vue
+│   │   └── address/
+│   │       └── CustomerAddressForm.vue
+│   ├── neighborhoods/   # Componentes de barrios
+│   │   └── NeighborhoodSearch.vue
+│   ├── orders/          # Componentes de pedidos
+│   │   ├── OrderSidebar.vue
+│   │   ├── OrderHeader.vue
+│   │   ├── OrderItemList.vue
+│   │   ├── OrderTabs.vue
+│   │   ├── products/
+│   │   │   ├── ProductCard.vue
+│   │   │   ├── ProductGrid.vue
+│   │   │   ├── ProductStock.vue
+│   │   │   ├── ProductCardSkeleton.vue
+│   │   │   ├── ProductCategories.vue
+│   │   │   └── ProductSearch/
+│   │   │       ├── ProductSearch.vue
+│   │   │       ├── SearchInput.vue
+│   │   │       ├── FilterToggle.vue
+│   │   │       ├── ActiveFilters.vue
+│   │   │       ├── FilterPanel.vue
+│   │   │       └── SearchHistory.vue
+│   │   ├── payments/
+│   │   │   └── PaymentSelector.vue
+│   │   └── __tests__/
+│   └── products/        # Componentes legacy de productos
+│       └── ProductsGrid.vue
 ├── views/               # Páginas/Vistas principales
 ├── store/               # Stores de Pinia
 │   ├── auth.ts
 │   ├── orders.ts
 │   ├── productSearch.ts
-│   └── __tests__/       # Tests de stores
+│   └── __tests__/
 ├── services/            # APIs y servicios HTTP
-│   └── MainAPI/         # APIs específicas por dominio
+│   └── MainAPI/
 ├── types/               # Definiciones de TypeScript
 │   ├── order.ts
 │   └── product.ts
 ├── composables/         # Composables Vue reutilizables
 │   ├── useFormatting.ts
-│   └── __tests__/       # Tests de composables
+│   ├── useOrderTabs.ts
+│   ├── useOrderItems.ts
+│   ├── useOrderPayments.ts
+│   ├── useOrderValidation.ts
+│   ├── useOrderSubmission.ts
+│   ├── useOrderPersistence.ts
+│   └── __tests__/
 ├── router/              # Configuración de rutas
 ├── test/                # Configuración de tests
 │   └── setup.ts
@@ -112,16 +144,21 @@ enum UserRole {
 ### 1. Sistema de Pedidos
 - **Tipos de Pedido**:
   - `onsite`: En el local (cliente opcional)
-  - `delivery`: A domicilio (cliente + dirección obligatorios)
-  - `reservation`: Reservación (fecha/hora obligatoria)
+  - `delivery`: A domicilio (cliente + dirección + guestName obligatorios)
+  - `reservation`: Reservación (fecha/hora + guestName obligatorios)
 
-- **Estados del Pedido**:
-  - `taken`: Tomado
+- **Estados del Pedido** (estado inicial: `taken`):
+  - `taken`: Tomado (estado por defecto al crear)
   - `in_preparation`: En preparación
   - `ready`: Listo
   - `on_the_way`: En camino
   - `delivered`: Entregado
   - `cancelled`: Cancelado
+
+- **Campo guestName**:
+  - Obligatorio para `delivery` y `reservation`
+  - Auto-completado con nombre del cliente si existe
+  - Editable para casos donde recibe otra persona
 
 ### 2. Gestión de Productos
 - Categorías por sucursal
@@ -163,16 +200,18 @@ enum UserRole {
 ### Componentes de Funcionalidad
 - `ProductsGrid`: Grid de productos con filtros (legacy - usar ProductGrid)
 - `ProductGrid`: Grid responsive optimizado con ProductCard
-- `ProductCard`: Componente base para mostrar productos individuales
-- `ProductStock`: Sub-componente para estado de stock
+- `ProductCard`: Componente minimalista (sin imagen, click para agregar, hover effect, stock ilimitado para "arroces")
+- `ProductStock`: Sub-componente para estado de stock con soporte de stock ilimitado
 - `ProductCardSkeleton`: Skeleton loading para ProductCard
 - `ProductSearch`: Sistema completo de búsqueda y filtros
 - `CategoriesBar`: Barra de categorías clickeables
-- `OrderSidebar`: Sidebar de pedidos activos con tabs
-- `OrderTab`: Contenido de cada pedido activo
+- `OrderSidebar`: Sidebar de pedidos activos con tabs, validación completa y feedback visual
+- `OrderHeader`: Header del pedido con tipo y nombre
+- `OrderItemList`: Lista de productos en el pedido
+- `OrderTabs`: Sistema de tabs para múltiples pedidos
 - `CustomerSelector`: Selector de clientes por teléfono
-- `AddressSelector`: Selector de direcciones del cliente
-- `PaymentSelector`: Selector de métodos de pago
+- `CustomerSection`: Sección de cliente con búsqueda y detalle
+- `PaymentSelector`: Selector de métodos de pago con validación de monto máximo y término "Efectivo"
 
 ## 🗄️ Stores de Pinia
 
@@ -199,18 +238,25 @@ resetPassword()
 // Estado
 list: PagedResult<Order> | null
 current: Order | null
-activeOrders: Map<string, ActiveOrder>
+activeOrders: Map<string, DraftOrder>
 activeOrderId: string | null
 products: Product[]
 categories: ProductCategory[]
 
 // Acciones principales
-createActiveOrder(type)
-addProductToActiveOrder(product)
-updateOrderDetailQuantity(detailId, quantity)
-addBankPayment(bankId, amount)
-addAppPayment(appId, amount)
-submitActiveOrder()
+fetchList(filters)
+fetchById(id)
+create(dto: CreateOrderDto)
+update(id, dto)
+updateGuestName(name)
+recalculateTotals()
+
+// NOTA: La lógica de tabs, items y pagos se movió a composables:
+// - useOrderTabs: Gestión de tabs
+// - useOrderItems: CRUD de productos
+// - useOrderPayments: Gestión de pagos
+// - useOrderValidation: Validaciones
+// - useOrderSubmission: Envío al backend
 ```
 
 ### ProductSearch Store (`productSearch.ts`)
@@ -241,6 +287,66 @@ setStockFilter(filter)
 clearFilters()
 loadSearchHistory()
 saveSearchHistory()
+```
+
+## 🧩 Composables de Gestión de Pedidos
+
+Para evitar stores sobrecargados ("god objects"), la lógica compleja de pedidos se divide en composables especializados:
+
+### useOrderTabs (`composables/useOrderTabs.ts`)
+```typescript
+// Gestión de tabs de pedidos activos
+createNewTab(type: OrderType) - Crear nuevo tab
+switchTab(tabId: string) - Cambiar entre tabs
+closeTab(tabId: string) - Cerrar tab
+renameTab(tabId: string, name: string) - Renombrar tab
+updateOrderType(type: OrderType) - Cambiar tipo de pedido
+```
+
+### useOrderItems (`composables/useOrderItems.ts`)
+```typescript
+// CRUD de productos en el pedido
+addProduct(product: Product) - Agregar producto al pedido
+removeItem(detailId: string) - Quitar producto
+updateQuantity(detailId: string, quantity: number) - Actualizar cantidad
+updatePrice(detailId: string, price: number) - Actualizar precio
+updateDiscount(detailId: string, discount: number) - Aplicar descuento
+updateNotes(detailId: string, notes: string) - Agregar notas
+```
+
+### useOrderPayments (`composables/useOrderPayments.ts`)
+```typescript
+// Gestión de métodos de pago
+addAppPayment(appId: number, amount: number) - Agregar pago por app
+updateAppPayment(tempId: string, amount: number) - Actualizar pago app
+removeAppPayment(tempId: string) - Quitar pago app
+addBankPayment(bankId: number, amount: number) - Agregar pago bancario
+updateBankPayment(tempId: string, data) - Actualizar pago banco
+removeBankPayment(tempId: string) - Quitar pago banco
+```
+
+### useOrderValidation (`composables/useOrderValidation.ts`)
+```typescript
+// Validaciones de negocio
+validateOrder(order: DraftOrder) - Validar pedido completo
+canSubmitOrder: computed - Si se puede enviar el pedido
+orderErrors: computed - Lista de errores de validación
+```
+
+### useOrderSubmission (`composables/useOrderSubmission.ts`)
+```typescript
+// Transformación y envío al backend
+submitOrder(draftOrder: DraftOrder) - Transformar y enviar pedido
+transformDraftToCreateDto(draft: DraftOrder) - Convertir DraftOrder a CreateOrderDto
+// Incluye status: 'taken' por defecto
+```
+
+### useOrderPersistence (`composables/useOrderPersistence.ts`)
+```typescript
+// Persistencia en localStorage
+saveToLocalStorage() - Guardar pedidos activos
+loadFromLocalStorage() - Cargar pedidos guardados
+clearLocalStorage() - Limpiar almacenamiento
 ```
 
 ## 🌐 APIs y Servicios
@@ -283,13 +389,31 @@ saveSearchHistory()
 │ │Tab1 │ │Tab2 │ │Tab3 │                               │
 │ └─────┘ └─────┘ └─────┘                               │
 ├─────────────────────────────────────────────────────────┤
-│ OrderTab: Contenido del pedido activo                  │
-│ - CustomerSelector                                      │
-│ - AddressSelector (si es delivery)                     │
-│ - OrderLines (productos del pedido)                    │
-│ - PaymentSelector                                       │
-│ - TotalsPanel                                           │
-│ - Botones Save/Send                                     │
+│ OrderHeader: Tipo de pedido y nombre                   │
+│ - Select de tipo de pedido (onsite/delivery/reservation)│
+│ - Input de guestName (obligatorio para delivery/reservation)│
+├─────────────────────────────────────────────────────────┤
+│ CustomerSection: Cliente y dirección                   │
+│ - Búsqueda por teléfono                                │
+│ - Selector de dirección (si es delivery)               │
+│ - Modal de detalle del cliente                         │
+├─────────────────────────────────────────────────────────┤
+│ OrderItemList: Productos del pedido                    │
+│ - Lista de productos con cantidad y subtotal           │
+│ - Actualización de cantidad (+/-)                      │
+│ - Eliminación de productos                             │
+├─────────────────────────────────────────────────────────┤
+│ PaymentSelector: Métodos de pago                       │
+│ - App Payments (máx. 1)                                │
+│ - Bank Payments (múltiples)                            │
+│ - Efectivo (diferencia automática)                     │
+│ - Validación: suma ≤ total                             │
+│ - Alerta visual si hay sobrepago                       │
+├─────────────────────────────────────────────────────────┤
+│ Totales y Botón de Envío                               │
+│ - Subtotal, descuentos, total                          │
+│ - Botón "Enviar Pedido" con tooltip dinámico          │
+│ - Validación completa con feedback visual              │
 └─────────────────────────────────────────────────────────┘
 ```
 
@@ -302,9 +426,9 @@ saveSearchHistory()
 4. Cada pedido mantiene su estado independiente
 
 ### 2. Configuración por Tipo
-- **Onsite**: Cliente opcional, puede usar `guest_name`
-- **Delivery**: Cliente obligatorio + dirección obligatoria
-- **Reservation**: Fecha/hora de entrega obligatoria
+- **Onsite**: Cliente opcional, `guestName` opcional
+- **Delivery**: Cliente obligatorio + dirección obligatoria + `guestName` obligatorio (auto-completado con nombre del cliente, editable)
+- **Reservation**: Fecha/hora de entrega obligatoria + `guestName` obligatorio (auto-completado con nombre del cliente, editable)
 
 ### 3. Procesamiento de Pagos
 1. Usuario selecciona métodos de pago
@@ -314,18 +438,32 @@ saveSearchHistory()
 5. Validación: suma de pagos ≤ total
 
 ### 4. Envío del Pedido
-1. Validación de campos obligatorios
-2. Creación del pedido en backend
-3. Eliminación del pedido activo
-4. Actualización de la lista de pedidos
+1. Validación completa de campos obligatorios:
+   - Al menos 1 producto
+   - Cliente (si es delivery)
+   - Dirección (si es delivery)
+   - guestName (si es delivery o reservation)
+   - Fecha/hora (si es reservation)
+   - Suma de pagos ≤ total
+2. Transformación de DraftOrder a CreateOrderDto (incluye `status: 'taken'`)
+3. Creación del pedido en backend
+4. Feedback visual con toasts
+5. Eliminación del pedido activo
+6. Actualización de la lista de pedidos
 
 ## 🎯 Reglas de Negocio Importantes
 
 ### Pedidos
-- Delivery requiere cliente + dirección
+- Delivery requiere cliente + dirección + guestName
+- Reservation requiere fecha/hora + guestName
+- guestName se auto-completa con nombre del cliente pero es editable
+- Todos los pedidos nuevos se crean con `status: 'taken'`
 - Reservation suma en ventas del día de entrega (no creación)
 - Solo 1 app payment por pedido
+- Suma de pagos debe ser ≤ total del pedido
+- Diferencia entre pagos y total se considera efectivo
 - Cancelación requiere motivo
+- Productos de categoría "arroces" tienen stock ilimitado
 
 ### Usuarios
 - Solo 1 superadmin en el sistema

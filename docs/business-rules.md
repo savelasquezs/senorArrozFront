@@ -94,19 +94,26 @@ enum UserRole {
 - **Cliente**: Opcional
 - **Dirección**: No aplica
 - **Delivery Fee**: No aplica
-- **Guest Name**: Campo opcional si no se asigna cliente
+- **guestName**: Campo opcional
 - **Fidelización**: Se aplica si se asigna cliente
+- **Status inicial**: `'taken'`
 
 #### Delivery (A domicilio)
 - **Cliente**: Obligatorio
 - **Dirección**: Obligatoria (seleccionar de las direcciones del cliente)
+- **guestName**: Obligatorio (auto-completado con nombre del cliente, editable)
 - **Delivery Fee**: Obligatorio (basado en la dirección seleccionada)
-- **Validación**: No se puede crear sin cliente y dirección
+- **Validación**: No se puede crear sin cliente, dirección y guestName
+- **Status inicial**: `'taken'`
+- **Nota**: guestName permite especificar quién recibe (puede ser familiar o conocido)
 
 #### Reservation (Reservación)
-- **Cliente**: Obligatorio
-- **Dirección**: Obligatoria (si es delivery)
+- **Cliente**: Opcional
+- **Dirección**: Obligatoria solo si es delivery
+- **guestName**: Obligatorio (auto-completado con nombre del cliente si existe, editable)
 - **Fecha/Hora**: Campo `reservedFor` obligatorio
+- **Validación**: No se puede crear sin fecha/hora y guestName
+- **Status inicial**: `'taken'`
 - **Contabilidad**: Se suma en las ventas del día de entrega (no de creación)
 - **Validación**: No se puede crear sin fecha/hora de entrega
 
@@ -205,6 +212,20 @@ CANCELLED  CANCELLED   CANCELLED  CANCELLED
 - **Precios**: Precios dinámicos por sucursal
 - **Activos**: Productos pueden activarse/desactivarse por sucursal
 
+### Reglas de Stock
+
+#### Stock Ilimitado para Arroces
+- **Categoría especial**: Productos cuya categoría contiene la palabra "arroz" (case-insensitive)
+- **Stock siempre disponible**: Se consideran con stock ilimitado independientemente del valor en `stock`
+- **UI adaptada**: ProductCard y ProductStock muestran "Disponible" siempre
+- **No deshabilitados**: Nunca se deshabilitan por falta de stock
+- **Lógica**: `product.category.name.toLowerCase().includes('arroz')`
+
+#### Stock Normal
+- **Control estricto**: Otros productos respetan el stock registrado
+- **Estados visuales**: Disponible (verde), Bajo stock (amarillo), Agotado (rojo)
+- **Deshabilitado**: Productos con stock 0 no se pueden agregar al pedido
+
 ## 📊 Reportes y Métricas
 
 ### Dashboard por Rol
@@ -245,8 +266,39 @@ CANCELLED  CANCELLED   CANCELLED  CANCELLED
 - **Sesiones**: Logout automático en token expirado
 - **Roles**: Validación de permisos en cada acción
 
-### Validaciones
-- **Frontend**: Validación de formularios antes de envío
+### Reglas de Validación de Pedidos
+
+Validaciones implementadas antes de enviar un pedido al backend:
+
+#### Validaciones Generales
+- **Al menos 1 producto**: El pedido debe tener al menos un producto
+- **Suma de pagos**: Suma de pagos (app + bank) debe ser ≤ total del pedido
+- **Status inicial**: Todos los pedidos nuevos se crean con `status: 'taken'`
+
+#### Validaciones por Tipo de Pedido
+
+**Onsite:**
+- Al menos 1 producto
+
+**Delivery:**
+- Al menos 1 producto
+- Cliente obligatorio
+- Dirección obligatoria
+- guestName obligatorio (auto-completado con nombre del cliente, editable)
+
+**Reservation:**
+- Al menos 1 producto
+- Fecha y hora obligatorias (`reservedFor`)
+- guestName obligatorio (auto-completado con nombre del cliente si existe, editable)
+
+#### Feedback de Validación
+- **Botón deshabilitado**: Si faltan requisitos
+- **Tooltip dinámico**: Muestra el primer requisito que falta
+- **Toasts secuenciales**: Lista todos los errores al intentar enviar
+- **Colores de estado**: Rojo para errores, verde para éxito
+
+### Validaciones Técnicas
+- **Frontend**: Validación de formularios antes de envío (composable `useOrderValidation`)
 - **Backend**: Validación de datos y permisos
 - **Tipos**: TypeScript para type safety en frontend
 

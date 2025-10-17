@@ -5,14 +5,14 @@
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
 
             <BaseInput v-model="form.name" label="Nombre Completo" placeholder="Ej: Juan Pérez González" required
-                :error="errors.name" maxlength="150">
+                :error="errors.name" :maxlength="150">
                 <template #icon>
                     <UserIcon class="w-4 h-4" />
                 </template>
             </BaseInput>
 
             <BaseInput v-model="form.email" label="Email" type="email" placeholder="usuario@ejemplo.com" required
-                :error="errors.email" maxlength="100" @blur="validateEmail">
+                :error="errors.email" :maxlength="100" @blur="validateEmail">
                 <template #icon>
                     <AtSymbolIcon class="w-4 h-4" />
                 </template>
@@ -22,7 +22,7 @@
         <!-- Contact and Role -->
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
             <BaseInput v-model="form.phone" label="Teléfono" type="tel" placeholder="3001234567" required
-                :error="errors.phone" maxlength="10" @input="validatePhone">
+                :error="errors.phone" :maxlength="10" @input="validatePhone">
                 <template #icon>
                     <PhoneIcon class="w-4 h-4" />
                 </template>
