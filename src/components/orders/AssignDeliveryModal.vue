@@ -38,7 +38,7 @@
 
 <script setup lang="ts">
 import { ref, computed, watch, onMounted } from 'vue'
-import type { OrderListItem } from '@/types/order'
+import type { OrderListItem, Order } from '@/types/order'
 import type { User } from '@/types/user'
 import { orderApi } from '@/services/MainAPI/orderApi'
 import { userApi } from '@/services/MainAPI/userApi'
@@ -57,7 +57,7 @@ const props = defineProps<Props>()
 
 const emit = defineEmits<{
     close: []
-    updated: []
+    updated: [order?: Order]
 }>()
 
 const { success, error } = useToast()
@@ -105,17 +105,20 @@ const fetchDeliverymen = async () => {
 const handleSave = async () => {
     saving.value = true
     try {
+        let updatedOrder: Order
+
         if (selectedDeliveryManId.value === null) {
             // Desasignar
-            await orderApi.unassignDelivery(props.order.id)
+            updatedOrder = await orderApi.unassignDelivery(props.order.id)
             success('Domiciliario desasignado', 5000, 'El domiciliario ha sido removido del pedido')
         } else {
             // Asignar
-            await orderApi.assignDelivery(props.order.id, selectedDeliveryManId.value)
+            updatedOrder = await orderApi.assignDelivery(props.order.id, selectedDeliveryManId.value)
             success('Domiciliario asignado', 5000, 'El domiciliario ha sido asignado al pedido')
         }
 
-        emit('updated')
+        // ✅ Emitir el pedido actualizado para actualización optimista
+        emit('updated', updatedOrder)
         emit('close')
     } catch (err: any) {
         error('Error al asignar domiciliario', err.message)

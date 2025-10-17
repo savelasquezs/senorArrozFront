@@ -71,7 +71,7 @@
 
 <script setup lang="ts">
 import { ref, watch, onMounted } from 'vue'
-import type { OrderListItem } from '@/types/order'
+import type { OrderListItem, Order } from '@/types/order'
 import type { CustomerAddress } from '@/types/customer'
 import { orderApi } from '@/services/MainAPI/orderApi'
 import { customerApi } from '@/services/MainAPI/customerApi'
@@ -90,7 +90,7 @@ const props = defineProps<Props>()
 
 const emit = defineEmits<{
     close: []
-    updated: []
+    updated: [order?: Order]
 }>()
 
 const { formatCurrency } = useFormatting()
@@ -133,13 +133,15 @@ const handleSave = async () => {
 
     saving.value = true
     try {
-        await orderApi.update(props.order.id, {
+        const updatedOrder = await orderApi.update(props.order.id, {
             addressId: selectedAddressId.value,
             deliveryFee: selectedAddress.deliveryFee,
         })
 
         success('Dirección actualizada', 5000, 'La dirección del pedido ha sido actualizada')
-        emit('updated')
+
+        // ✅ Emitir el pedido actualizado para actualización optimista
+        emit('updated', updatedOrder)
         emit('close')
     } catch (err: any) {
         error('Error al actualizar dirección', err.message)

@@ -40,7 +40,7 @@
 
 <script setup lang="ts">
 import { ref } from 'vue'
-import type { OrderListItem } from '@/types/order'
+import type { OrderListItem, Order } from '@/types/order'
 import type { Customer } from '@/types/customer'
 import { orderApi } from '@/services/MainAPI/orderApi'
 import { useToast } from '@/composables/useToast'
@@ -57,7 +57,7 @@ const props = defineProps<Props>()
 
 const emit = defineEmits<{
     close: []
-    updated: []
+    updated: [order?: Order]
 }>()
 
 const { success: showSuccess, error: showError } = useToast()
@@ -76,12 +76,14 @@ const handleSave = async () => {
 
     saving.value = true
     try {
-        await orderApi.update(props.order.id, {
+        const updatedOrder = await orderApi.update(props.order.id, {
             customerId: selectedCustomerId.value,
         })
 
         showSuccess('Cliente actualizado', 5000, 'El cliente del pedido ha sido actualizado')
-        emit('updated')
+
+        // ✅ Emitir el pedido actualizado para actualización optimista
+        emit('updated', updatedOrder)
         emit('close')
     } catch (error: any) {
         showError('Error al actualizar cliente', error.message)

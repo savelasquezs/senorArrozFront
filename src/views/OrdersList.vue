@@ -97,7 +97,7 @@
                                 a
                                 <span class="font-medium">{{
                                     Math.min(currentPage * pageSize, totalCount)
-                                }}</span>
+                                    }}</span>
                                 de
                                 <span class="font-medium">{{ totalCount }}</span>
                                 resultados
@@ -147,11 +147,12 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import type { OrderListItem } from '@/types/order'
+import type { OrderListItem, Order } from '@/types/order'
 import { orderApi } from '@/services/MainAPI/orderApi'
 import { useOrderFilters, type OrderFilterState } from '@/composables/useOrderFilters'
 import { useOrderPermissions } from '@/composables/useOrderPermissions'
 import { useToast } from '@/composables/useToast'
+import { getOrderStatusDisplayName } from '@/composables/useFormatting'
 import MainLayout from '@/components/layout/MainLayout.vue'
 import OrdersTable from '@/components/orders/OrdersTable.vue'
 import EditCustomerModal from '@/components/orders/EditCustomerModal.vue'
@@ -342,9 +343,20 @@ const handleChangeStatus = async (order: OrderListItem) => {
     }
 
     try {
-        await orderApi.updateStatus(order.id, nextStatus)
+        const updatedOrder = await orderApi.updateStatus(order.id, nextStatus)
+
+        // ✅ ACTUALIZACIÓN OPTIMISTA - actualizar en la lista local
+        const index = orders.value.findIndex(o => o.id === order.id)
+        if (index !== -1) {
+            orders.value[index] = {
+                ...orders.value[index],
+                status: updatedOrder.status,
+                statusDisplayName: getOrderStatusDisplayName(updatedOrder.status),
+                updatedAt: updatedOrder.updatedAt
+            }
+        }
+
         success('Estado actualizado', 5000, `Pedido cambiado a ${nextStatus}`)
-        await fetchOrders()
     } catch (err: any) {
         error('Error al cambiar estado', err.message)
     }
@@ -355,8 +367,31 @@ const handleAssignDelivery = (order: OrderListItem) => {
     showAssignDeliveryModal.value = true
 }
 
-const handleOrderUpdated = () => {
-    fetchOrders()
+const handleOrderUpdated = (updatedOrder?: Order) => {
+    if (updatedOrder) {
+        // ✅ ACTUALIZACIÓN OPTIMISTA - actualizar en la lista local
+        const index = orders.value.findIndex(o => o.id === updatedOrder.id)
+        if (index !== -1) {
+            orders.value[index] = {
+                ...orders.value[index],
+                customerId: updatedOrder.customerId || null,
+                customerName: updatedOrder.customerName || null,
+                customerPhone: updatedOrder.customerPhone || null,
+                addressId: updatedOrder.addressId || null,
+                addressDescription: updatedOrder.addressDescription || null,
+                guestName: updatedOrder.guestName || null,
+                status: updatedOrder.status,
+                statusDisplayName: getOrderStatusDisplayName(updatedOrder.status),
+                deliveryFee: updatedOrder.deliveryFee || null,
+                notes: updatedOrder.notes || null,
+                updatedAt: updatedOrder.updatedAt
+            }
+        }
+    }
+    // Solo recargar si no se proporcionó el pedido actualizado
+    if (!updatedOrder) {
+        fetchOrders()
+    }
 }
 
 const navigateToNewOrder = () => {

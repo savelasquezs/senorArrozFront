@@ -490,6 +490,42 @@ VITE_API_URL=https://localhost:7049/api  # URL del backend
 
 ## 📝 Convenciones de Código
 
+### ⚡ Reactividad Optimista (REGLA CRÍTICA)
+
+**IMPORTANTE**: Después de cualquier mutación (CREATE, UPDATE, DELETE), **SIEMPRE actualizar el estado local inmediatamente** sin necesidad de recargar desde el servidor. Esto proporciona una experiencia de usuario instantánea y reduce la carga del servidor.
+
+#### Patrón Obligatorio:
+
+**CREATE:**
+```typescript
+const created = await api.create(data)
+items.value.unshift(created)  // Agregar al inicio
+totalCount.value++
+```
+
+**UPDATE:**
+```typescript
+const updated = await api.update(id, data)
+const index = items.value.findIndex(item => item.id === id)
+if (index !== -1) {
+    items.value[index] = { ...items.value[index], ...updated }
+}
+```
+
+**DELETE:**
+```typescript
+await api.delete(id)
+items.value = items.value.filter(item => item.id !== id)
+totalCount.value--
+```
+
+**Componentes child deben emitir el objeto actualizado:**
+```typescript
+emit('updated', updatedObject)  // No solo emitir evento vacío
+```
+
+Ver `.cursorrules` para ejemplos completos y casos de uso.
+
 ### Naming Conventions
 - **Componentes**: PascalCase (`BaseButton.vue`)
 - **Archivos**: camelCase para servicios, PascalCase para componentes

@@ -75,7 +75,34 @@ export const capitalizeFirst = (text: string): string => {
     return text.charAt(0).toUpperCase() + text.slice(1).toLowerCase()
 }
 
+/**
+ * Obtiene el nombre de display para un OrderStatus
+ */
+export const getOrderStatusDisplayName = (status: string): string => {
+    const displayNames: Record<string, string> = {
+        'taken': 'Tomado',
+        'in_preparation': 'En preparación',
+        'inPreparation': 'En preparación',
+        'ready': 'Listo',
+        'on_the_way': 'En camino',
+        'onTheWay': 'En camino',
+        'delivered': 'Entregado',
+        'cancelled': 'Cancelado'
+    }
+    return displayNames[status] || status
+}
 
+/**
+ * Obtiene el nombre de display para un OrderType
+ */
+export const getOrderTypeDisplayName = (type: string): string => {
+    const displayNames: Record<string, string> = {
+        'onsite': 'En el local',
+        'delivery': 'Domicilio',
+        'reservation': 'Reserva'
+    }
+    return displayNames[type] || type
+}
 
 // Exportar como objeto para uso en composables
 export const useFormatting = () => {
@@ -86,6 +113,8 @@ export const useFormatting = () => {
         formatDateShort,
         formatTime,
         truncateText,
-        capitalizeFirst
+        capitalizeFirst,
+        getOrderStatusDisplayName,
+        getOrderTypeDisplayName
     }
 }

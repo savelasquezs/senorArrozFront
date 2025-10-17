@@ -39,6 +39,98 @@ Este es un sistema de gestión de restaurante desarrollado en Vue 3 + TypeScript
 
 ## Reglas de Desarrollo
 
+### Reactividad Optimista (REGLA CRÍTICA)
+
+**IMPORTANTE**: Después de mutaciones (CREATE, UPDATE, DELETE), **SIEMPRE actualizar el estado local inmediatamente** sin recargar desde el servidor. Esto proporciona una UX instantánea.
+
+#### Patrón a seguir:
+
+**CREATE - Agregar al array local:**
+```typescript
+const created = await api.create(data)
+items.value.unshift(created)  // Agregar al inicio de la lista
+if (totalCount.value !== undefined) totalCount.value++
+// ❌ NO hacer: await fetchAll()
+```
+
+**UPDATE - Actualizar item en el array local:**
+```typescript
+const updated = await api.update(id, data)
+
+// Encontrar y actualizar en la lista
+const index = items.value.findIndex(item => item.id === id)
+if (index !== -1) {
+    items.value[index] = { ...items.value[index], ...updated }
+}
+
+// ❌ NO hacer: await fetchAll()
+```
+
+**DELETE - Remover del array local:**
+```typescript
+await api.delete(id)
+items.value = items.value.filter(item => item.id !== id)
+if (totalCount.value !== undefined) totalCount.value--
+// ❌ NO hacer: await fetchAll()
+```
+
+#### Ejemplo implementado en OrdersList.vue:
+```typescript
+const handleChangeStatus = async (order: OrderListItem) => {
+    const updatedOrder = await orderApi.updateStatus(order.id, nextStatus)
+    
+    // ✅ Actualización optimista
+    const index = orders.value.findIndex(o => o.id === order.id)
+    if (index !== -1) {
+        orders.value[index] = {
+            ...orders.value[index],
+            status: updatedOrder.status,
+            statusDisplayName: getStatusDisplayName(updatedOrder.status),
+            updatedAt: updatedOrder.updatedAt
+        }
+    }
+    // ❌ NO: await fetchOrders()
+}
+```
+
+#### Emits de componentes child:
+Los componentes child (modales, forms) deben **emitir el objeto actualizado**:
+```typescript
+// En el modal/componente
+const emit = defineEmits<{
+    updated: [item?: EntityType]  // Incluir el objeto actualizado
+}>()
+
+const handleSave = async () => {
+    const updated = await api.update(id, data)
+    emit('updated', updated)  // ✅ Pasar el objeto
+}
+
+// En el padre
+const handleUpdated = (updated?: EntityType) => {
+    if (updated) {
+        // Actualizar localmente
+        const index = items.value.findIndex(i => i.id === updated.id)
+        if (index !== -1) {
+            items.value[index] = { ...items.value[index], ...updated }
+        }
+    }
+}
+```
+
+#### Cuándo SÍ recargar desde el servidor:
+- ✅ Cambios que afectan múltiples items a la vez
+- ✅ Operaciones complejas que el backend calcula (totales, agregaciones)
+- ✅ Al cambiar de página en paginación
+- ✅ Al aplicar filtros nuevos
+- ✅ Errores de sincronización detectados
+
+#### Beneficios:
+- ⚡ UI instantánea sin esperas de red
+- 📉 Menos carga en el servidor
+- 🎯 Mejor experiencia de usuario
+- 🔄 Datos siempre sincronizados (el servidor devuelve el objeto actualizado)
+
 ### Naming Conventions
 - **Componentes**: PascalCase (`BaseButton.vue`, `OrderSidebar.vue`)
 - **Archivos**: camelCase para servicios (`authApi.ts`), PascalCase para componentes
