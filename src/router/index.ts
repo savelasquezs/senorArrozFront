@@ -164,11 +164,21 @@ const routes: RouteRecordRaw[] = [
     {
         path: '/orders',
         name: 'Orders',
-        component: () => import('@/views/Orders.vue'),
+        component: () => import('@/views/OrdersList.vue'),
         meta: {
             requiresAuth: true,
             requiresRole: [UserRole.SUPERADMIN, UserRole.ADMIN, UserRole.CASHIER],
-            title: 'Gestión de Pedidos'
+            title: 'Pedidos'
+        }
+    },
+    {
+        path: '/orders/:id',
+        name: 'OrderDetail',
+        component: () => import('@/views/OrderDetail.vue'),
+        meta: {
+            requiresAuth: true,
+            requiresRole: [UserRole.SUPERADMIN, UserRole.ADMIN, UserRole.CASHIER],
+            title: 'Detalle del Pedido'
         }
     },
     // {

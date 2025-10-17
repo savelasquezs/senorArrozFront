@@ -89,10 +89,27 @@ class AppPaymentApi extends BaseApi {
         return this.post<string>(`/apppayments/${id}/unsettle`);
     }
 
-    // 8. Eliminar pago de app
-    async deleteAppPayment(id: number): Promise<string> {
-        return this.delete<string>(`/apppayments/${id}`);
+
+
+    // 9. Actualizar monto de pago de app
+    async updateAppPayment(id: number, amount: number): Promise<AppPayment> {
+        return this.put<AppPayment>(`/apppayments/${id}`, { amount });
     }
+
+    // Alias para mantener consistencia con el plan
+    async settle(id: number): Promise<void> {
+        await this.settleAppPayment(id);
+    }
+
+    async unsettle(id: number): Promise<void> {
+        await this.unsettleAppPayment(id);
+    }
+
+    async update(id: number, amount: number): Promise<AppPayment> {
+        return this.updateAppPayment(id, amount);
+    }
+
+
 }
 
 export const appPaymentApi = new AppPaymentApi();

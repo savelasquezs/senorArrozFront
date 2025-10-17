@@ -192,6 +192,85 @@ export interface OrderFilters {
     sortOrder?: 'asc' | 'desc'
 }
 
+// ===== TIPOS PARA VISTA DE LISTA =====
+export interface OrderListItem {
+    id: number
+    branchId: number
+    branchName: string
+    takenById: number
+    takenByName: string
+    customerId: number | null
+    customerName: string | null
+    customerPhone: string | null
+    addressId: number | null
+    addressDescription: string | null
+    deliveryManId: number | null
+    deliveryManName: string | null
+    guestName: string | null
+    type: OrderType
+    typeDisplayName: string
+    deliveryFee: number | null
+    reservedFor: string | null
+    status: OrderStatus
+    statusDisplayName: string
+    statusTimes: Record<string, string>
+    subtotal: number
+    total: number
+    discountTotal: number
+    notes: string | null
+    cancelledReason: string | null
+    createdAt: string
+    updatedAt: string
+}
+
+// ===== TIPOS PARA VISTA DE DETALLE =====
+export interface OrderDetailView extends OrderListItem {
+    orderDetails: OrderDetailItem[]
+    bankPayments: OrderBankPaymentDetail[]
+    appPayments: OrderAppPaymentDetail[]
+}
+
+export interface OrderDetailItem {
+    id: number
+    orderId: number
+    productId: number
+    productName: string
+    productDescription: string | null
+    quantity: number
+    unitPrice: number
+    discount: number
+    subtotal: number
+    notes: string | null
+    createdAt: string
+    updatedAt: string
+}
+
+export interface OrderBankPaymentDetail {
+    id: number
+    orderId: number
+    bankId: number
+    bankName: string
+    branchId: number
+    branchName: string
+    amount: number
+    verifiedAt: string | null
+    isVerified: boolean
+}
+
+export interface OrderAppPaymentDetail {
+    id: number
+    orderId: number
+    appId: number
+    appName: string
+    bankId: number | null
+    bankName: string | null
+    branchId: number
+    branchName: string
+    amount: number
+    isSettled: boolean
+    settledAt: string | null
+}
+
 // ===== TIPOS PARA CREACIÓN/ACTUALIZACIÓN =====
 export interface CreateOrderDto {
     branchId: number
@@ -237,6 +316,20 @@ export interface UpdateOrderDto {
     reservedFor?: Date
     notes?: string
     status?: OrderStatus
+    guestName?: string
+    subtotal?: number
+    total?: number
+    discountTotal?: number
+    orderDetails?: UpdateOrderDetailDto[]
+}
+
+export interface UpdateOrderDetailDto {
+    id?: number
+    productId: number
+    quantity: number
+    unitPrice: number
+    discount: number
+    notes?: string
 }
 
 // ===== TIPOS PARA FORMULARIOS =====

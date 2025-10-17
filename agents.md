@@ -617,7 +617,9 @@ npm run test:coverage
 - ✅ Sistema de autenticación
 - ✅ Layout base y navegación
 - ✅ Gestión de usuarios y roles
-- ✅ Sistema de pedidos básico
+- ✅ Sistema de pedidos básico y creación
+- ✅ **Vista de lista de pedidos completa**
+- ✅ **Vista de detalle de pedidos con edición**
 - ✅ Componentes UI base
 - ✅ Stores de Pinia
 - ✅ APIs de servicios
@@ -628,18 +630,48 @@ npm run test:coverage
 - ✅ **ProductCardSkeleton**: Estados de carga
 - ✅ **ProductSearch Store**: Estado centralizado para búsqueda
 - ✅ **useFormatting**: Composable para formateo
+- ✅ **useOrderPermissions**: Composable para permisos basados en rol
+- ✅ **useOrderFilters**: Composable para filtrado local de pedidos
+- ✅ **OrdersTable, OrdersList**: Vista de tabla con filtros y paginación
+- ✅ **OrderDetail**: Vista de detalle con tabs y edición completa
+- ✅ **OrderProgressBar**: Barra de progreso de estados
+- ✅ **OrderStatusBadge, OrderTypeBadge**: Badges de estado y tipo
 - ✅ **Tests unitarios**: Cobertura completa de componentes
 
 ### En Desarrollo
-- 🚧 Sistema de pagos integrado
 - 🚧 Dashboard y reportes
 
 ### Pendiente
 - ⏳ Módulo de cocina
 - ⏳ Módulo de domicilios
 - ⏳ Sistema de gastos
-- ⏳ Caja y cuadres
+- ⏳ **Módulo de Caja / Gestión Financiera** (Ver detalles abajo)
 - ⏳ Reportes avanzados
+
+### 📝 Módulo de Caja / Gestión Financiera (Pendiente)
+
+El módulo de caja es una funcionalidad pendiente que permitirá una gestión financiera más completa. Actualmente, las acciones individuales de pagos (verificar, liquidar) están disponibles en la vista de detalle de pedidos, pero faltan funcionalidades de gestión masiva y reportes financieros.
+
+**Funcionalidades a implementar:**
+- Vista de liquidación masiva de app payments
+- Vista de verificación masiva de bank payments
+- Cuadre de caja diario
+- Reportes de ingresos por método de pago
+- Gestión de gastos
+- Movimientos entre bancos y caja
+- Dashboard financiero con KPIs
+
+**Endpoints disponibles (pendientes de UI):**
+- `POST /api/app-payments/settle-multiple` - Liquidar múltiples pagos por app
+- Filtros avanzados para pagos pendientes
+- Reportes de ingresos y egresos
+
+**Ubicación sugerida:**
+- Crear vista `/cash-register` para cuadre de caja
+- Crear vista `/payments` para gestión masiva de pagos
+- Agregar sección "Finanzas" en el menú de navegación
+
+**Prioridad:** Media - Las funcionalidades básicas ya están disponibles en el detalle de pedidos, pero este módulo mejoraría la eficiencia para administradores y cajeros.
 
 ## 🔄 Flujo de Trabajo para Desarrollo de Issues
 

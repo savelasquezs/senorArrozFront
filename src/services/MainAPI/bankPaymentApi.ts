@@ -65,10 +65,27 @@ class BankPaymentApi extends BaseApi {
         return this.post<string>(`/bankpayments/${id}/unverify`);
     }
 
-    // 7. Eliminar pago bancario
-    async deleteBankPayment(id: number): Promise<string> {
-        return this.delete<string>(`/bankpayments/${id}`);
+
+
+    // 8. Actualizar monto de pago bancario
+    async updateBankPayment(id: number, amount: number): Promise<BankPayment> {
+        return this.put<BankPayment>(`/bankpayments/${id}`, { amount });
     }
+
+    // Alias para mantener consistencia con el plan
+    async verify(id: number): Promise<void> {
+        await this.verifyBankPayment(id);
+    }
+
+    async unverify(id: number): Promise<void> {
+        await this.unverifyBankPayment(id);
+    }
+
+    async update(id: number, amount: number): Promise<BankPayment> {
+        return this.updateBankPayment(id, amount);
+    }
+
+
 }
 
 export const bankPaymentApi = new BankPaymentApi();

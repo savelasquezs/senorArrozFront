@@ -58,6 +58,7 @@ import {
 	UserIcon,
 	ShieldCheckIcon,
 	BriefcaseIcon,
+	ShoppingBagIcon,
 } from '@heroicons/vue/24/outline';
 import { UserRole } from '@/types/auth';
 
@@ -114,7 +115,7 @@ const navigationItems = computed(() => [
 	{
 		name: 'Pedidos',
 		to: '/orders',
-		icon: ClipboardDocumentListIcon,
+		icon: ShoppingBagIcon,
 		roles: ['Superadmin', 'Admin', 'Cashier'],
 	},
 	{ name: 'Cocina', to: '/kitchen', icon: CogIcon, roles: ['Kitchen'] },
