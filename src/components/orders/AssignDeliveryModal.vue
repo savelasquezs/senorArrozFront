@@ -38,7 +38,7 @@
 
 <script setup lang="ts">
 import { ref, computed, watch, onMounted } from 'vue'
-import type { OrderListItem, Order } from '@/types/order'
+import type { OrderListItem, Order, OrderStatus } from '@/types/order'
 import type { User } from '@/types/user'
 import { orderApi } from '@/services/MainAPI/orderApi'
 import { userApi } from '@/services/MainAPI/userApi'
@@ -51,6 +51,7 @@ import { TruckIcon } from '@heroicons/vue/24/outline'
 interface Props {
     open: boolean
     order: OrderListItem
+    pendingStatusChange?: OrderStatus
 }
 
 const props = defineProps<Props>()
@@ -58,6 +59,7 @@ const props = defineProps<Props>()
 const emit = defineEmits<{
     close: []
     updated: [order?: Order]
+    statusChanged: []
 }>()
 
 const { success, error } = useToast()
@@ -114,11 +116,23 @@ const handleSave = async () => {
         } else {
             // Asignar
             updatedOrder = await orderApi.assignDelivery(props.order.id, selectedDeliveryManId.value)
-            success('Domiciliario asignado', 5000, 'El domiciliario ha sido asignado al pedido')
+
+            // REGLA: Si hay estado pendiente y pedido está en ready, cambiar a on_the_way
+            if (props.pendingStatusChange && props.order.status === 'ready') {
+                updatedOrder = await orderApi.updateStatus(props.order.id, props.pendingStatusChange)
+                success('Domiciliario asignado', 5000, 'Domiciliario asignado y pedido en camino')
+            } else if (props.order.status === 'ready' && !props.pendingStatusChange) {
+                // Auto-cambio: asignar en ready también cambia a on_the_way
+                updatedOrder = await orderApi.updateStatus(props.order.id, 'on_the_way')
+                success('Domiciliario asignado', 5000, 'Domiciliario asignado y pedido en camino')
+            } else {
+                success('Domiciliario asignado', 5000, 'El domiciliario ha sido asignado al pedido')
+            }
         }
 
         // ✅ Emitir el pedido actualizado para actualización optimista
         emit('updated', updatedOrder)
+        emit('statusChanged')
         emit('close')
     } catch (err: any) {
         error('Error al asignar domiciliario', err.message)

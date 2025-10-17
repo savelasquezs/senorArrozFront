@@ -1,6 +1,6 @@
 // src/composables/useOrderPermissions.ts
 import { useAuthStore } from '@/store/auth'
-import type { OrderListItem, OrderStatus } from '@/types/order'
+import type { OrderListItem, OrderStatus, OrderType } from '@/types/order'
 
 /**
  * Composable para manejar permisos de pedidos basados en rol y fecha
@@ -125,10 +125,13 @@ export function useOrderPermissions() {
     }
 
     /**
-     * Obtiene el siguiente estado permitido según el estado actual
+     * Obtiene el siguiente estado permitido según el estado actual y tipo de pedido
      * Devuelve null si no hay siguiente estado o si el usuario no tiene permisos
      */
-    const getNextAllowedStatus = (currentStatus: OrderStatus): OrderStatus | null => {
+    const getNextAllowedStatus = (
+        currentStatus: OrderStatus,
+        orderType: OrderType
+    ): OrderStatus | null => {
         const { userRole } = authStore
 
         // Pedidos cancelados o entregados no pueden avanzar
@@ -136,11 +139,11 @@ export function useOrderPermissions() {
             return null
         }
 
-        // Mapeo de transiciones
+        // Mapeo de transiciones según tipo de pedido
         const transitions: Record<OrderStatus, OrderStatus | null> = {
             taken: 'in_preparation',
             in_preparation: 'ready',
-            ready: 'on_the_way',
+            ready: orderType === 'onsite' ? 'delivered' : 'on_the_way', // onsite salta on_the_way
             on_the_way: 'delivered',
             delivered: null,
             cancelled: null,
@@ -151,9 +154,21 @@ export function useOrderPermissions() {
 
         // Kitchen solo puede avanzar hasta ready
         if (userRole === 'Kitchen') {
-            if (nextStatus === 'on_the_way' || nextStatus === 'delivered') {
-                return null
+            if (currentStatus === 'in_preparation') {
+                return 'ready' // Kitchen solo: in_preparation -> ready
             }
+            return null // Kitchen no puede cambiar otros estados
+        }
+
+        // Deliveryman solo puede cambiar ready->on_the_way y on_the_way->delivered
+        if (userRole === 'Deliveryman') {
+            if (currentStatus === 'ready' && nextStatus === 'on_the_way') {
+                return 'on_the_way'
+            }
+            if (currentStatus === 'on_the_way' && nextStatus === 'delivered') {
+                return 'delivered'
+            }
+            return null
         }
 
         // Cashier puede avanzar hacia adelante pero no retroceder
@@ -185,6 +200,17 @@ export function useOrderPermissions() {
             const allowedTransitions = [
                 ['taken', 'in_preparation'],
                 ['in_preparation', 'ready'],
+            ]
+            return allowedTransitions.some(
+                ([from, to]) => from === currentStatus && to === newStatus
+            )
+        }
+
+        // Deliveryman solo puede cambiar ready->on_the_way y on_the_way->delivered
+        if (userRole === 'Deliveryman') {
+            const allowedTransitions = [
+                ['ready', 'on_the_way'],
+                ['on_the_way', 'delivered'],
             ]
             return allowedTransitions.some(
                 ([from, to]) => from === currentStatus && to === newStatus

@@ -97,7 +97,7 @@
                                 a
                                 <span class="font-medium">{{
                                     Math.min(currentPage * pageSize, totalCount)
-                                    }}</span>
+                                }}</span>
                                 de
                                 <span class="font-medium">{{ totalCount }}</span>
                                 resultados
@@ -140,14 +140,15 @@
             @close="showSelectAddressModal = false" @updated="handleOrderUpdated" />
 
         <AssignDeliveryModal v-if="selectedOrder" :open="showAssignDeliveryModal" :order="selectedOrder"
-            @close="showAssignDeliveryModal = false" @updated="handleOrderUpdated" />
+            :pending-status-change="pendingStatusChange || undefined" @updated="handleOrderUpdated"
+            @status-changed="clearPendingStatusChange" @close="handleAssignDeliveryModalClose" />
     </MainLayout>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import type { OrderListItem, Order } from '@/types/order'
+import type { OrderListItem, Order, OrderStatus } from '@/types/order'
 import { orderApi } from '@/services/MainAPI/orderApi'
 import { useOrderFilters, type OrderFilterState } from '@/composables/useOrderFilters'
 import { useOrderPermissions } from '@/composables/useOrderPermissions'
@@ -202,6 +203,7 @@ const showEditCustomerModal = ref(false)
 const showSelectAddressModal = ref(false)
 const showAssignDeliveryModal = ref(false)
 const selectedOrder = ref<OrderListItem | null>(null)
+const pendingStatusChange = ref<OrderStatus | null>(null)
 
 // Opciones de filtros
 const typeOptions = [
@@ -330,7 +332,7 @@ const handleEditAddress = (order: OrderListItem) => {
 }
 
 const handleChangeStatus = async (order: OrderListItem) => {
-    const nextStatus = getNextAllowedStatus(order.status)
+    const nextStatus = getNextAllowedStatus(order.status, order.type)
 
     if (!nextStatus) {
         error('No se puede cambiar el estado', 'Este pedido ya no puede avanzar más')
@@ -342,6 +344,15 @@ const handleChangeStatus = async (order: OrderListItem) => {
         return
     }
 
+    // REGLA: delivery en ready->on_the_way requiere domiciliario
+    if (order.type === 'delivery' && nextStatus === 'on_the_way' && !order.deliveryManId) {
+        selectedOrder.value = order
+        pendingStatusChange.value = nextStatus
+        showAssignDeliveryModal.value = true
+        return
+    }
+
+    // Proceder con cambio de estado
     try {
         const updatedOrder = await orderApi.updateStatus(order.id, nextStatus)
 
@@ -356,7 +367,7 @@ const handleChangeStatus = async (order: OrderListItem) => {
             }
         }
 
-        success('Estado actualizado', 5000, `Pedido cambiado a ${nextStatus}`)
+        success('Estado actualizado', 5000, `Pedido cambiado a ${getOrderStatusDisplayName(nextStatus)}`)
     } catch (err: any) {
         error('Error al cambiar estado', err.message)
     }
@@ -396,6 +407,15 @@ const handleOrderUpdated = (updatedOrder?: Order) => {
 
 const navigateToNewOrder = () => {
     router.push('/orders/new')
+}
+
+const clearPendingStatusChange = () => {
+    pendingStatusChange.value = null
+}
+
+const handleAssignDeliveryModalClose = () => {
+    clearPendingStatusChange()
+    showAssignDeliveryModal.value = false
 }
 
 // Lifecycle

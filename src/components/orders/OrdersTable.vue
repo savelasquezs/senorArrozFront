@@ -123,13 +123,19 @@
 
                     <!-- Domiciliario (clickeable para asignar/cambiar) -->
                     <td class="px-6 py-4 whitespace-nowrap">
-                        <button class="text-left hover:text-emerald-600 transition-colors"
-                            @click.stop="$emit('assign-delivery', order)">
-                            <div v-if="order.deliveryManName" class="text-sm text-gray-900 hover:underline">
+                        <button :disabled="!canAssignDeliveryman(order)" :class="[
+                            'text-left transition-colors',
+                            canAssignDeliveryman(order)
+                                ? 'hover:text-emerald-600 cursor-pointer'
+                                : 'cursor-not-allowed opacity-50'
+                        ]" @click.stop="canAssignDeliveryman(order) && $emit('assign-delivery', order)">
+                            <div v-if="order.deliveryManName" class="text-sm text-gray-900"
+                                :class="{ 'hover:underline': canAssignDeliveryman(order) }">
                                 {{ order.deliveryManName }}
                             </div>
-                            <div v-else class="text-sm text-gray-400 italic hover:underline">
-                                Asignar
+                            <div v-else class="text-sm text-gray-400 italic"
+                                :class="{ 'hover:underline': canAssignDeliveryman(order) }">
+                                {{ canAssignDeliveryman(order) ? 'Asignar' : 'N/A' }}
                             </div>
                         </button>
                     </td>
@@ -175,6 +181,12 @@ defineEmits<{
 }>()
 
 const { formatCurrency, formatDateTime } = useFormatting()
+
+// Valida si se puede asignar domiciliario al pedido
+const canAssignDeliveryman = (order: OrderListItem): boolean => {
+    return order.type === 'delivery' &&
+        ['ready', 'on_the_way', 'delivered'].includes(order.status)
+}
 
 // Obtiene la fecha del estado actual del pedido
 const getStatusTime = (order: OrderListItem): string | undefined => {
