@@ -97,7 +97,7 @@
                                 a
                                 <span class="font-medium">{{
                                     Math.min(currentPage * pageSize, totalCount)
-                                }}</span>
+                                    }}</span>
                                 de
                                 <span class="font-medium">{{ totalCount }}</span>
                                 resultados
@@ -194,7 +194,7 @@ const filters = ref<OrderFilterState>({
 })
 
 const dateFilters = ref({
-    fromDate: new Date().toISOString().split('T')[0], // Hoy por defecto
+    fromDate: new Date().toLocaleDateString('en-CA', { timeZone: 'America/Bogota' }), // Fecha Colombia en formato YYYY-MM-DD
     toDate: '',
 })
 
