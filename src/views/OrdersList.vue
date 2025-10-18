@@ -380,26 +380,26 @@ const handleAssignDelivery = (order: OrderListItem) => {
 
 const handleOrderUpdated = (updatedOrder?: Order) => {
     if (updatedOrder) {
-        const orderAny = updatedOrder as any // Acceso a campos extra del backend
+        const orderAny = updatedOrder as any // Acceso a todos los campos del backend
 
         // ✅ ACTUALIZACIÓN OPTIMISTA - actualizar en la lista local
-        const index = orders.value.findIndex(o => o.id === updatedOrder.id)
+        const index = orders.value.findIndex(o => o.id === orderAny.id)
         if (index !== -1) {
             orders.value[index] = {
                 ...orders.value[index],
                 deliveryManId: orderAny.deliveryManId || null,
                 deliveryManName: orderAny.deliveryManName || null,
-                customerId: updatedOrder.customerId || null,
-                customerName: updatedOrder.customerName || null,
-                customerPhone: updatedOrder.customerPhone || null,
-                addressId: updatedOrder.addressId || null,
-                addressDescription: updatedOrder.addressDescription || null,
-                guestName: updatedOrder.guestName || null,
-                status: updatedOrder.status,
-                statusDisplayName: getOrderStatusDisplayName(updatedOrder.status),
-                deliveryFee: updatedOrder.deliveryFee || null,
-                notes: updatedOrder.notes || null,
-                updatedAt: updatedOrder.updatedAt
+                customerId: orderAny.customerId || null,
+                customerName: orderAny.customerName || null,
+                customerPhone: orderAny.customerPhone || null,
+                addressId: orderAny.addressId || null,
+                addressDescription: orderAny.addressDescription || null,
+                guestName: orderAny.guestName || null,
+                status: orderAny.status,
+                statusDisplayName: getOrderStatusDisplayName(orderAny.status),
+                deliveryFee: orderAny.deliveryFee || null,
+                notes: orderAny.notes || null,
+                updatedAt: orderAny.updatedAt
             }
         }
     }
