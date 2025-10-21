@@ -6,14 +6,10 @@
         <div class="space-y-2">
             <label class="text-xs font-medium text-gray-700 uppercase tracking-wide">Pago por APP (máx. 1)</label>
 
-            <div v-if="!order.appPayment" class="flex space-x-1.5">
+            <div v-if="!order.appPayment">
                 <BaseSelect v-model="selectedAppId" :options="appOptions" placeholder="Seleccionar app..." size="sm"
-                    class="flex-1 text-xs" value-key="value" display-key="label" :disabled="!canAddPayments" />
-                <button @click="handleAddAppPayment" :disabled="!selectedAppId || !canAddPayments"
-                    :title="!canAddPayments ? 'Total ya cubierto' : ''"
-                    class="px-2.5 py-1.5 text-xs bg-emerald-600 text-white rounded-md hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed">
-                    +
-                </button>
+                    class="text-xs" value-key="value" display-key="label" :disabled="!canAddPayments"
+                    @update:model-value="handleAppSelected" />
             </div>
 
             <!-- Existing App Payment -->
@@ -40,14 +36,10 @@
         <div class="mt-4 space-y-2">
             <label class="text-xs font-medium text-gray-700 uppercase tracking-wide">Pagos Bancarios (múltiples)</label>
 
-            <div class="flex space-x-1.5">
+            <div>
                 <BaseSelect v-model="selectedBankId" :options="bankOptions" placeholder="Seleccionar banco..." size="sm"
-                    class="flex-1 text-xs" value-key="value" display-key="label" :disabled="!canAddPayments" />
-                <button @click="handleAddBankPayment" :disabled="!selectedBankId || !canAddPayments"
-                    :title="!canAddPayments ? 'Total ya cubierto' : ''"
-                    class="px-2.5 py-1.5 text-xs bg-emerald-600 text-white rounded-md hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed">
-                    +
-                </button>
+                    class="text-xs" value-key="value" display-key="label" :disabled="!canAddPayments"
+                    @update:model-value="handleBankSelected" />
             </div>
 
             <!-- Existing Bank Payments -->
@@ -248,29 +240,6 @@ const formatCurrency = (amount: number): string => {
     }).format(amount)
 }
 
-const handleAddAppPayment = () => {
-    if (!selectedAppId.value) return
-
-    editingPayment.value = {
-        id: `app-new`,
-        type: 'app',
-        name: ordersStore.apps.find(app => app.id === selectedAppId.value)?.name || ''
-    }
-    paymentAmount.value = maxPaymentAmount.value
-    showAmountModal.value = true
-}
-
-const handleAddBankPayment = () => {
-    if (!selectedBankId.value) return
-
-    editingPayment.value = {
-        id: `bank-new`,
-        type: 'bank',
-        name: ordersStore.banks.find(bank => bank.id === selectedBankId.value)?.name || ''
-    }
-    paymentAmount.value = maxPaymentAmount.value
-    showAmountModal.value = true
-}
 
 const handleUpdateAppPayment = () => {
     const payment = props.order.appPayment
@@ -350,6 +319,25 @@ const closeAmountModal = () => {
     showAmountModal.value = false
     editingPayment.value = null
     paymentAmount.value = 0
+}
+
+// Auto-add handlers
+const handleAppSelected = (appId: number | null) => {
+    if (appId && canAddPayments.value) {
+        // Auto-agregar con el valor del efectivo restante
+        payments.addAppPayment(appId, cashAmount.value)
+        selectedAppId.value = null // Reset para permitir nueva selección
+        emit('paymentUpdated', props.order)
+    }
+}
+
+const handleBankSelected = (bankId: number | null) => {
+    if (bankId && canAddPayments.value) {
+        // Auto-agregar con el valor del efectivo restante
+        payments.addBankPayment(bankId, cashAmount.value)
+        selectedBankId.value = null // Reset para permitir nueva selección
+        emit('paymentUpdated', props.order)
+    }
 }
 </script>
 
