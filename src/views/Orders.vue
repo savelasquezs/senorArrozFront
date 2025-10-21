@@ -55,7 +55,7 @@ import BaseInput from '@/components/ui/BaseInput.vue'
 import MainLayout from '@/components/layout/MainLayout.vue'
 import BaseLoading from '@/components/ui/BaseLoading.vue'
 import BaseAlert from '@/components/ui/BaseAlert.vue'
-import ProductsGrid from '@/components/products/ProductsGrid.vue'
+import ProductsGrid from '@/components/orders/products/ProductGrid.vue'
 import CategoriesBar from '@/components/products/CategoriesBar.vue'
 import OrderSidebar from '@/components/orders/OrderSidebar.vue'
 // Toast is handled automatically by useToast composable
