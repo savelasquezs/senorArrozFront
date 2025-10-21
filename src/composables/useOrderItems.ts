@@ -38,7 +38,7 @@ export function useOrderItems() {
             updatedItems = [...order.orderItems, newItem]
         }
 
-        const updated = { ...order, orderItems: updatedItems, updatedAt: new Date() }
+        const updated = { ...order, orderItems: updatedItems }
         store.recalculateTotals(updated)
         store.saveToLocalStorage()
     }
@@ -50,8 +50,7 @@ export function useOrderItems() {
 
         const updated = {
             ...order,
-            orderItems: order.orderItems.filter(item => item.tempId !== itemTempId),
-            updatedAt: new Date()
+            orderItems: order.orderItems.filter(item => item.tempId !== itemTempId)
         }
         store.recalculateTotals(updated)
         store.saveToLocalStorage()
@@ -70,7 +69,7 @@ export function useOrderItems() {
             return item
         })
 
-        const updated = { ...order, orderItems: updatedItems, updatedAt: new Date() }
+        const updated = { ...order, orderItems: updatedItems }
         store.recalculateTotals(updated)
         store.saveToLocalStorage()
     }
@@ -88,7 +87,7 @@ export function useOrderItems() {
             return item
         })
 
-        const updated = { ...order, orderItems: updatedItems, updatedAt: new Date() }
+        const updated = { ...order, orderItems: updatedItems }
         store.recalculateTotals(updated)
         store.saveToLocalStorage()
     }
@@ -106,7 +105,7 @@ export function useOrderItems() {
             return item
         })
 
-        const updated = { ...order, orderItems: updatedItems, updatedAt: new Date() }
+        const updated = { ...order, orderItems: updatedItems }
         store.recalculateTotals(updated)
         store.saveToLocalStorage()
     }

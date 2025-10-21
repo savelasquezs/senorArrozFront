@@ -60,6 +60,7 @@ export interface OrderBankPayment {
     bankId: number
     bankName: string
     amount: number
+    manuallyEdited?: boolean  // Indica si fue editado manualmente por el usuario
 }
 
 export interface OrderAppPayment {
@@ -69,6 +70,7 @@ export interface OrderAppPayment {
     bankId: number
     bankName: string
     amount: number
+    manuallyEdited?: boolean  // Indica si fue editado manualmente por el usuario
 }
 
 // ===== TIPOS DE PEDIDOS EN BORRADOR (Sistema Nuevo) =====

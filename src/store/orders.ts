@@ -471,18 +471,53 @@ export const useOrdersStore = defineStore('orders', {
             const total = subtotal + order.deliveryFee
 
             // Crear nuevo objeto con totales actualizados
-            const updatedOrder = {
+            let updatedOrder = {
                 ...order,
                 subtotal,
                 discountTotal,
-                total,
-                updatedAt: new Date()
+                total
             }
+
+            // Auto-ajustar pago único si aplica
+            updatedOrder = this.autoAdjustSinglePayment(updatedOrder)
 
             // Reemplazar el objeto completo en el Map
             if (this.currentTabId && order.tabId === this.currentTabId) {
                 this.draftOrders.set(this.currentTabId, updatedOrder)
             }
+        },
+
+        // Auto-ajustar pago único al total del pedido
+        autoAdjustSinglePayment(order: DraftOrder): DraftOrder {
+            // Contar pagos totales
+            const totalPayments = (order.appPayment ? 1 : 0) + order.bankPayments.length
+
+            // Solo proceder si hay exactamente 1 pago
+            if (totalPayments !== 1) return order
+
+            // Caso 1: Es un app payment sin edición manual
+            if (order.appPayment && !order.appPayment.manuallyEdited) {
+                return {
+                    ...order,
+                    appPayment: {
+                        ...order.appPayment,
+                        amount: order.total
+                    }
+                }
+            }
+
+            // Caso 2: Es un bank payment sin edición manual
+            if (order.bankPayments.length === 1 && !order.bankPayments[0].manuallyEdited) {
+                return {
+                    ...order,
+                    bankPayments: [{
+                        ...order.bankPayments[0],
+                        amount: order.total
+                    }]
+                }
+            }
+
+            return order
         },
 
         // Persistencia

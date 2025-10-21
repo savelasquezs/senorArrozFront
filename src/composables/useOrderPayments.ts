@@ -28,7 +28,7 @@ export function useOrderPayments() {
             amount
         }
 
-        const updated = { ...order, appPayment, updatedAt: new Date() }
+        const updated = { ...order, appPayment }
         store.draftOrders.set(store.currentTabId, updated)
         store.saveToLocalStorage()
     }
@@ -40,8 +40,11 @@ export function useOrderPayments() {
 
         const updated = {
             ...order,
-            appPayment: { ...order.appPayment, amount },
-            updatedAt: new Date()
+            appPayment: {
+                ...order.appPayment,
+                amount,
+                manuallyEdited: true  // Marcar como editado manualmente
+            }
         }
 
         store.draftOrders.set(store.currentTabId, updated)
@@ -53,7 +56,7 @@ export function useOrderPayments() {
         const order = store.draftOrders.get(store.currentTabId)
         if (!order) return
 
-        const updated = { ...order, appPayment: null, updatedAt: new Date() }
+        const updated = { ...order, appPayment: null }
         store.draftOrders.set(store.currentTabId, updated)
         store.saveToLocalStorage()
     }
@@ -75,8 +78,7 @@ export function useOrderPayments() {
 
         const updated = {
             ...order,
-            bankPayments: [...order.bankPayments, bankPayment],
-            updatedAt: new Date()
+            bankPayments: [...order.bankPayments, bankPayment]
         }
 
         store.draftOrders.set(store.currentTabId, updated)
@@ -89,13 +91,14 @@ export function useOrderPayments() {
         if (!order) return
 
         const updatedPayments = order.bankPayments.map(payment =>
-            payment.tempId === paymentTempId ? { ...payment, amount } : payment
+            payment.tempId === paymentTempId
+                ? { ...payment, amount, manuallyEdited: true }  // Marcar como editado manualmente
+                : payment
         )
 
         const updated = {
             ...order,
-            bankPayments: updatedPayments,
-            updatedAt: new Date()
+            bankPayments: updatedPayments
         }
 
         store.draftOrders.set(store.currentTabId, updated)
@@ -109,8 +112,7 @@ export function useOrderPayments() {
 
         const updated = {
             ...order,
-            bankPayments: order.bankPayments.filter(p => p.tempId !== paymentTempId),
-            updatedAt: new Date()
+            bankPayments: order.bankPayments.filter(p => p.tempId !== paymentTempId)
         }
 
         store.draftOrders.set(store.currentTabId, updated)
