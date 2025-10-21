@@ -11,15 +11,15 @@
             </div>
             <div v-if="customer.lastOrderDate" class="flex justify-between">
                 <span class="text-sm text-gray-500">Último Pedido:</span>
-                <span class="text-sm font-medium text-gray-900">{{ formatDate(customer.lastOrderDate) }}</span>
+                <span class="text-sm font-medium text-gray-900">{{ formatDateShort(customer.lastOrderDate) }}</span>
             </div>
             <div class="flex justify-between">
                 <span class="text-sm text-gray-500">Fecha Registro:</span>
-                <span class="text-sm font-medium text-gray-900">{{ formatDate(customer.createdAt) }}</span>
+                <span class="text-sm font-medium text-gray-900">{{ formatDateShort(customer.createdAt) }}</span>
             </div>
             <div class="flex justify-between">
                 <span class="text-sm text-gray-500">Última Actualización:</span>
-                <span class="text-sm font-medium text-gray-900">{{ formatDate(customer.updatedAt) }}</span>
+                <span class="text-sm font-medium text-gray-900">{{ formatDateShort(customer.updatedAt) }}</span>
             </div>
         </div>
 
@@ -65,7 +65,7 @@ const emit = defineEmits<{
 }>()
 
 // Composables
-const { formatDate } = useFormatting()
+const { formatDateShort } = useFormatting()
 
 // Methods
 const handleViewOrders = () => {
