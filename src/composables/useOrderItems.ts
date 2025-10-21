@@ -1,11 +1,19 @@
 // src/composables/useOrderItems.ts
 import { useOrdersStore } from '@/store/orders'
+import { useOrderTabs } from '@/composables/useOrderTabs'
 import type { Product, OrderItem } from '@/types/order'
 
 export function useOrderItems() {
     const store = useOrdersStore()
+    const { createNewTab } = useOrderTabs()
 
     const addProduct = (product: Product, quantity: number = 1) => {
+        // Auto-crear tab si no existe
+        if (!store.currentTabId) {
+            createNewTab()
+        }
+
+        // Safety check
         if (!store.currentTabId) return
         const order = store.draftOrders.get(store.currentTabId)
         if (!order) return

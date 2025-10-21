@@ -47,7 +47,6 @@ import { computed } from 'vue';
 import { useAuthStore } from '@/store/auth';
 import {
 	HomeIcon,
-	ClipboardDocumentListIcon,
 	UsersIcon,
 	CubeIcon,
 	CurrencyDollarIcon,
