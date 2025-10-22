@@ -124,15 +124,16 @@
 
         <!-- Create Address Modal -->
         <BaseDialog v-model="showCreateModal" title="Agregar Nueva Dirección" size="lg">
-            <CustomerAddressForm :model-value="addressFormData" :customer-id="customerId" @submit="createAddress"
-                @cancel="closeCreateModal" :loading="isCreating" submit-button-text="Crear Dirección" />
+            <CustomerAddressForm :model-value="addressFormData" :customer-id="customerId"
+                :branch-id="branchId || undefined" @submit="createAddress" @cancel="closeCreateModal"
+                :loading="isCreating" submit-button-text="Crear Dirección" />
         </BaseDialog>
 
         <!-- Edit Address Modal -->
         <BaseDialog v-model="showEditModal" title="Editar Dirección" size="lg">
             <CustomerAddressForm v-if="editingAddress" :model-value="editFormData" :customer-id="customerId"
-                :address="editingAddress" @submit="updateAddress" @cancel="closeEditModal" :loading="isEditing"
-                submit-button-text="Actualizar Dirección" />
+                :branch-id="branchId || undefined" :address="editingAddress" @submit="updateAddress"
+                @cancel="closeEditModal" :loading="isEditing" submit-button-text="Actualizar Dirección" />
         </BaseDialog>
     </div>
 </template>
@@ -140,6 +141,7 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
 import { useCustomersStore } from '@/store/customers'
+import { useAuthStore } from '@/store/auth'
 import { useToast } from '@/composables/useToast'
 import type { CustomerAddress, CreateCustomerAddressDto, CustomerAddressFormData, UpdateCustomerAddressDto } from '@/types/customer'
 
@@ -189,6 +191,9 @@ const isEditing = ref(false)
 const showAddressSelection = ref(false)
 const editingAddress = ref<CustomerAddress | null>(null)
 
+// Fallback: usar branchId del usuario autenticado
+const authStore = useAuthStore()
+
 const addressFormData = ref<CustomerAddressFormData>({
     neighborhoodId: 0,
     address: '',
@@ -213,6 +218,13 @@ const editFormData = ref<CustomerAddressFormData>({
 const selectedAddress = computed(() => {
     if (!props.selectedAddress || !customerAddresses.value) return null
     return customerAddresses.value.find(a => a.id === props.selectedAddress) || null
+})
+
+// Computed para obtener branchId del cliente
+const branchId = computed(() => {
+
+
+    return authStore.branchId
 })
 
 // Methods
