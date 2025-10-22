@@ -97,7 +97,7 @@
                                 a
                                 <span class="font-medium">{{
                                     Math.min(currentPage * pageSize, totalCount)
-                                }}</span>
+                                    }}</span>
                                 de
                                 <span class="font-medium">{{ totalCount }}</span>
                                 resultados
@@ -153,7 +153,7 @@ import { orderApi } from '@/services/MainAPI/orderApi'
 import { useOrderFilters, type OrderFilterState } from '@/composables/useOrderFilters'
 import { useOrderPermissions } from '@/composables/useOrderPermissions'
 import { useToast } from '@/composables/useToast'
-import { getOrderStatusDisplayName } from '@/composables/useFormatting'
+import { getOrderStatusDisplayName, getOrderTypeDisplayName } from '@/composables/useFormatting'
 import MainLayout from '@/components/layout/MainLayout.vue'
 import OrdersTable from '@/components/orders/OrdersTable.vue'
 import EditCustomerModal from '@/components/orders/EditCustomerModal.vue'
@@ -387,6 +387,8 @@ const handleOrderUpdated = (updatedOrder?: Order) => {
         if (index !== -1) {
             orders.value[index] = {
                 ...orders.value[index],
+                type: orderAny.type,
+                typeDisplayName: getOrderTypeDisplayName(orderAny.type),
                 deliveryManId: orderAny.deliveryManId || null,
                 deliveryManName: orderAny.deliveryManName || null,
                 customerId: orderAny.customerId || null,
