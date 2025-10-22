@@ -69,7 +69,7 @@
 
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
-import { useOrdersStore } from '@/store/orders'
+import { useOrdersDraftsStore } from '@/store/ordersDrafts'
 import { useOrderItems } from '@/composables/useOrderItems'
 import { useFormatting } from '@/composables/useFormatting'
 import { useToast } from '@/composables/useToast'
@@ -103,7 +103,7 @@ const emit = defineEmits<{
 // Composables
 const { formatCurrency } = useFormatting()
 const { success, error: showError } = useToast()
-const ordersStore = useOrdersStore()
+const ordersStore = useOrdersDraftsStore()
 const orderItems = useOrderItems()
 
 // Computed

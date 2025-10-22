@@ -1,11 +1,11 @@
 // src/composables/useOrderSubmission.ts
 import { useAuthStore } from '@/store/auth'
-import { useOrdersStore } from '@/store/orders'
+import { useOrdersDraftsStore } from '@/store/ordersDrafts'
 import type { DraftOrder, CreateOrderDto, CreateOrderDetailDto, CreateBankPaymentDto, CreateAppPaymentDto } from '@/types/order'
 
 export function useOrderSubmission() {
     const authStore = useAuthStore()
-    const ordersStore = useOrdersStore()
+    const ordersStore = useOrdersDraftsStore()
 
     /**
      * Transform DraftOrder to CreateOrderDto for backend submission

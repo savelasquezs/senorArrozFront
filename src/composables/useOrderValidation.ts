@@ -1,10 +1,10 @@
 // src/composables/useOrderValidation.ts
 import { computed } from 'vue'
-import { useOrdersStore } from '@/store/orders'
+import { useOrdersDraftsStore } from '@/store/ordersDrafts'
 import type { DraftOrder, ValidationResult } from '@/types/order'
 
 export function useOrderValidation(order?: DraftOrder) {
-    const ordersStore = useOrdersStore()
+    const ordersStore = useOrdersDraftsStore()
 
     const currentOrder = computed(() => order || ordersStore.currentOrder)
 

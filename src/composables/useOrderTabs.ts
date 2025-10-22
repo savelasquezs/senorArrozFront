@@ -1,9 +1,9 @@
 // src/composables/useOrderTabs.ts
-import { useOrdersStore } from '@/store/orders'
+import { useOrdersDraftsStore } from '@/store/ordersDrafts'
 import type { DraftOrder, OrderType } from '@/types/order'
 
 export function useOrderTabs() {
-    const store = useOrdersStore()
+    const store = useOrdersDraftsStore()
 
     const createNewTab = () => {
         if (store.draftOrders.size >= store.maxTabs) return

@@ -1,9 +1,9 @@
 // src/composables/useOrderPayments.ts
-import { useOrdersStore } from '@/store/orders'
+import { useOrdersDraftsStore } from '@/store/ordersDrafts'
 import type { OrderAppPayment, OrderBankPayment } from '@/types/order'
 
 export function useOrderPayments() {
-    const store = useOrdersStore()
+    const store = useOrdersDraftsStore()
 
     const addAppPayment = (appId: number, amount: number) => {
         if (!store.currentTabId) return

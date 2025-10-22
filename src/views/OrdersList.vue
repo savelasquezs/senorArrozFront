@@ -97,7 +97,7 @@
                                 a
                                 <span class="font-medium">{{
                                     Math.min(currentPage * pageSize, totalCount)
-                                    }}</span>
+                                }}</span>
                                 de
                                 <span class="font-medium">{{ totalCount }}</span>
                                 resultados
@@ -401,6 +401,10 @@ const handleOrderUpdated = (updatedOrder?: Order) => {
                 statusDisplayName: getOrderStatusDisplayName(orderAny.status),
                 deliveryFee: orderAny.deliveryFee || null,
                 notes: orderAny.notes || null,
+                // ✅ INCLUIR TOTALES DEL BACKEND
+                subtotal: orderAny.subtotal || 0,
+                discountTotal: orderAny.discountTotal || 0,
+                total: orderAny.total || 0,
                 updatedAt: orderAny.updatedAt
             }
         }

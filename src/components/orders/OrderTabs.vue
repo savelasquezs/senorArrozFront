@@ -24,7 +24,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
-import { useOrdersStore } from '@/store/orders'
+import { useOrdersDraftsStore } from '@/store/ordersDrafts'
 import { useOrderTabs } from '@/composables/useOrderTabs'
 
 // Components
@@ -37,7 +37,7 @@ import {
 } from '@heroicons/vue/24/outline'
 
 // Composables
-const ordersStore = useOrdersStore()
+const ordersStore = useOrdersDraftsStore()
 const orderTabsComposable = useOrderTabs()
 
 // Computed

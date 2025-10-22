@@ -7,7 +7,7 @@
                 <div class="flex-1 bg-white border-r border-gray-200 overflow-hidden flex flex-col min-h-0">
                     <!-- Categories Bar -->
                     <div class="px-4 border-b border-gray-200 bg-gray-50">
-                        <CategoriesBar :categories="ordersStore.categories"
+                        <CategoriesBar :categories="categories as any"
                             :products-count="ordersStore.filteredProducts.length"
                             @category-selected="onCategorySelected" />
                     </div>
@@ -46,8 +46,9 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, onUnmounted } from 'vue'
-import { useOrdersStore } from '@/store/orders'
+import { onMounted, onUnmounted, computed } from 'vue'
+import { useOrdersDraftsStore } from '@/store/ordersDrafts'
+import { useProductsStore } from '@/store/products'
 import { useToast } from '@/composables/useToast'
 
 // Components
@@ -67,15 +68,33 @@ import {
 } from '@heroicons/vue/24/outline'
 
 // Composables
-const ordersStore = useOrdersStore()
+const ordersStore = useOrdersDraftsStore()
+const productsStore = useProductsStore()
 const { success } = useToast()
+
+// Computed
+const categories = computed(() => {
+    if (!productsStore.list?.items) return []
+
+    const categoryMap = new Map<number, { id: number, name: string }>()
+
+    productsStore.list.items.forEach(product => {
+        if (product.categoryId && !categoryMap.has(product.categoryId)) {
+            categoryMap.set(product.categoryId, {
+                id: product.categoryId,
+                name: product.categoryName || 'Sin categoría'
+            })
+        }
+    })
+
+    return Array.from(categoryMap.values())
+})
 
 // Methods
 const refreshData = async () => {
     try {
         await Promise.all([
-            ordersStore.loadProducts(),
-            ordersStore.loadCategories(),
+            productsStore.fetch({ page: 1, pageSize: 1000 }),
             ordersStore.loadCustomers(),
             ordersStore.loadBanks(),
             ordersStore.loadApps(),

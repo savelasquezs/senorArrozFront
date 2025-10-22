@@ -49,7 +49,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
-import { useOrdersStore } from '@/store/orders'
+import { useOrdersDraftsStore } from '@/store/ordersDrafts'
 import type { ProductCategory } from '@/types/product'
 
 // Components
@@ -79,7 +79,7 @@ const emit = defineEmits<{
 }>()
 
 // Composables
-const ordersStore = useOrdersStore()
+const ordersStore = useOrdersDraftsStore()
 
 // Computed
 const selectedCategory = computed(() => ordersStore.selectedCategory)

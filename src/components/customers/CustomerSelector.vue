@@ -77,8 +77,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch } from 'vue'
-import { useOrdersStore } from '@/store/orders'
+import { ref, watch, onMounted } from 'vue'
 import { useCustomersStore } from '@/store/customers'
 import { useToast } from '@/composables/useToast'
 import type { Customer } from '@/types/customer'
@@ -115,7 +114,6 @@ const emit = defineEmits<{
 }>()
 
 // Composables
-const ordersStore = useOrdersStore()
 const customersStore = useCustomersStore()
 const { success, error: showError } = useToast()
 
@@ -152,7 +150,8 @@ const handleSearch = () => {
     }
 
     const query = searchQuery.value.toLowerCase()
-    searchResults.value = ordersStore.customers.filter(customer =>
+    const allCustomers = customersStore.list?.items || []
+    searchResults.value = allCustomers.filter(customer =>
         customer.name.toLowerCase().includes(query) ||
         customer.phone1?.toLowerCase().includes(query) ||
         customer.phone2?.toLowerCase().includes(query)
@@ -196,8 +195,7 @@ const createCustomerWrapper = async (customerData: any) => {
         const customer = await customersStore.create(createCustomerDto)
         createdCustomer.value = customer
 
-        // Refresh customers list
-        await ordersStore.loadCustomers()
+        // No need to refresh - customersStore updates optimistically
 
         success('Cliente creado', 3000, `${customer.name} ha sido creado correctamente`)
     } catch (error: any) {
@@ -234,6 +232,13 @@ const closeCreateModal = () => {
     }
 }
 
+// Lifecycle
+onMounted(async () => {
+    // Cargar clientes si no están cargados
+    if (!customersStore.list || customersStore.list.items.length === 0) {
+        await customersStore.fetch({ page: 1, pageSize: 1000 })
+    }
+})
 
 // Watch for search query changes
 watch(searchQuery, () => {

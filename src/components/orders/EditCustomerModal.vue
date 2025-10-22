@@ -49,7 +49,7 @@ import { ref, computed, onMounted } from 'vue'
 import type { OrderListItem, Order } from '@/types/order'
 import type { Customer, CustomerAddress } from '@/types/customer'
 import { orderApi } from '@/services/MainAPI/orderApi'
-import { useOrdersStore } from '@/store/orders'
+import { useOrdersDataStore } from '@/store/ordersData'
 import { useToast } from '@/composables/useToast'
 import BaseDialog from '@/components/ui/BaseDialog.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
@@ -69,7 +69,7 @@ const emit = defineEmits<{
 }>()
 
 const { success: showSuccess, error: showError } = useToast()
-const ordersStore = useOrdersStore()
+const ordersStore = useOrdersDataStore()
 
 // Estado
 const saving = ref(false)

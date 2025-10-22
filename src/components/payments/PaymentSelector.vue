@@ -126,7 +126,7 @@
 
 <script setup lang="ts">
 import { ref, computed } from 'vue'
-import { useOrdersStore } from '@/store/orders'
+import { useOrdersDraftsStore } from '@/store/ordersDrafts'
 import { useOrderPayments } from '@/composables/useOrderPayments'
 import type { DraftOrder } from '@/types/order'
 
@@ -158,7 +158,7 @@ const emit = defineEmits<{
 }>()
 
 // Composables
-const ordersStore = useOrdersStore()
+const ordersStore = useOrdersDraftsStore()
 const payments = useOrderPayments()
 
 // State

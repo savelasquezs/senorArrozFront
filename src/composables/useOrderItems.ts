@@ -1,10 +1,10 @@
 // src/composables/useOrderItems.ts
-import { useOrdersStore } from '@/store/orders'
+import { useOrdersDraftsStore } from '@/store/ordersDrafts'
 import { useOrderTabs } from '@/composables/useOrderTabs'
 import type { Product, OrderItem } from '@/types/order'
 
 export function useOrderItems() {
-    const store = useOrdersStore()
+    const store = useOrdersDraftsStore()
     const { createNewTab } = useOrderTabs()
 
     const addProduct = (product: Product, quantity: number = 1) => {

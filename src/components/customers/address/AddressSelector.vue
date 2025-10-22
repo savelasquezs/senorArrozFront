@@ -1,5 +1,10 @@
 <template>
     <div class="address-selector">
+        <!-- Error Message -->
+        <div v-if="errorMessage" class="mb-3 p-3 bg-red-50 border border-red-200 rounded-lg">
+            <p class="text-sm text-red-600">{{ errorMessage }}</p>
+        </div>
+
         <div class="space-y-3">
             <!-- Loading State -->
             <div v-if="isLoading" class="text-center py-4">
@@ -142,6 +147,8 @@
 import { ref, computed, watch } from 'vue'
 import { useCustomersStore } from '@/store/customers'
 import { useAuthStore } from '@/store/auth'
+import { useOrdersDraftsStore } from '@/store/ordersDrafts'
+import { useOrdersDataStore } from '@/store/ordersData'
 import { useToast } from '@/composables/useToast'
 import type { CustomerAddress, CreateCustomerAddressDto, CustomerAddressFormData, UpdateCustomerAddressDto } from '@/types/customer'
 
@@ -165,20 +172,25 @@ import {
 interface Props {
     customerId?: number
     selectedAddress?: number
+    mode?: 'draft' | 'persisted'
 }
 
 const props = withDefaults(defineProps<Props>(), {
     customerId: undefined,
-    selectedAddress: undefined
+    selectedAddress: undefined,
+    mode: 'draft'
 })
 
 // Emits
 const emit = defineEmits<{
-    addressSelected: [addressId: number | undefined]
+    addressSelected: [address: CustomerAddress | undefined]
 }>()
 
 // Composables
 const customersStore = useCustomersStore()
+const authStore = useAuthStore()
+const draftStore = useOrdersDraftsStore()
+const dataStore = useOrdersDataStore()
 const { success, error: showError } = useToast()
 
 // State
@@ -190,9 +202,6 @@ const showEditModal = ref(false)
 const isEditing = ref(false)
 const showAddressSelection = ref(false)
 const editingAddress = ref<CustomerAddress | null>(null)
-
-// Fallback: usar branchId del usuario autenticado
-const authStore = useAuthStore()
 
 const addressFormData = ref<CustomerAddressFormData>({
     neighborhoodId: 0,
@@ -218,6 +227,37 @@ const editFormData = ref<CustomerAddressFormData>({
 const selectedAddress = computed(() => {
     if (!props.selectedAddress || !customerAddresses.value) return null
     return customerAddresses.value.find(a => a.id === props.selectedAddress) || null
+})
+
+// Validación uniforme para ambos modos
+const canSave = computed(() => {
+    // Si no hay customerId, no se puede guardar
+    if (!props.customerId) return false
+
+    // Obtener el tipo de pedido según el modo
+    const orderType = props.mode === 'draft'
+        ? draftStore?.currentOrder?.type
+        : dataStore?.current?.type
+
+    // Si es delivery o reservation, debe tener dirección
+    if ((orderType === 'delivery' || orderType === 'reservation') && !selectedAddress.value) {
+        return false
+    }
+
+    return true
+})
+
+// Mostrar error si intenta guardar sin dirección
+const errorMessage = computed(() => {
+    const orderType = props.mode === 'draft'
+        ? draftStore?.currentOrder?.type
+        : dataStore?.current?.type
+
+    if ((orderType === 'delivery' || orderType === 'reservation') && !selectedAddress.value) {
+        return 'Debe seleccionar una dirección para pedidos a domicilio o reservas'
+    }
+
+    return null
 })
 
 // Computed para obtener branchId del cliente
@@ -246,6 +286,14 @@ const loadCustomerAddresses = async () => {
     try {
         await customersStore.fetchAddresses(props.customerId)
         customerAddresses.value = customersStore.addresses || []
+
+        // Auto-seleccionar solo en modo draft
+        if (props.mode === 'draft' && customerAddresses.value.length > 0 && !props.selectedAddress) {
+            // Buscar dirección principal o tomar la primera
+            const primaryAddress = customerAddresses.value.find(addr => addr.isPrimary)
+            const addressToSelect = primaryAddress || customerAddresses.value[0]
+            emit('addressSelected', addressToSelect)
+        }
     } catch (error) {
         console.error('Error loading addresses:', error)
         customerAddresses.value = []
@@ -255,8 +303,10 @@ const loadCustomerAddresses = async () => {
 }
 
 const selectAddress = (address: CustomerAddress) => {
-    emit('addressSelected', address.id)
+    emit('addressSelected', address)
     showAddressSelection.value = false // Close selection after choosing
+    console.log('Address selected:', address)
+
 }
 
 const clearAddress = () => {
@@ -287,8 +337,8 @@ const createAddress = async (addressData: CreateCustomerAddressDto) => {
         // Refresh addresses list
         await loadCustomerAddresses()
 
-        // Auto-select created address
-        emit('addressSelected', address.id)
+        // Auto-select created address - emit el objeto completo
+        emit('addressSelected', address)
 
         success('Dirección creada', 3000, 'La dirección ha sido creada correctamente')
     } catch (error: any) {
@@ -343,7 +393,7 @@ const updateAddress = async (addressData: CustomerAddressFormData) => {
             // The address is still selected, but now updated
             const updatedAddress = customerAddresses.value.find(a => a.id === editingAddress.value!.id)
             if (updatedAddress) {
-                emit('addressSelected', updatedAddress.id)
+                emit('addressSelected', updatedAddress)
             }
         }
 

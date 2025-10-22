@@ -31,7 +31,7 @@
 
 <script setup lang="ts">
 import { computed, watch } from 'vue'
-import { useOrdersStore } from '@/store/orders'
+import { useOrdersDraftsStore } from '@/store/ordersDrafts'
 import type { Product } from '@/types/order'
 
 // Components
@@ -78,7 +78,7 @@ const emit = defineEmits<{
 }>()
 
 // Composables
-const ordersStore = useOrdersStore()
+const ordersStore = useOrdersDraftsStore()
 
 // Computed
 const products = computed(() => {

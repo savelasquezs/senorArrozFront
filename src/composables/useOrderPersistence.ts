@@ -1,10 +1,10 @@
 // src/composables/useOrderPersistence.ts
 import { onMounted, onUnmounted } from 'vue'
-import { useOrdersStore } from '@/store/orders'
+import { useOrdersDraftsStore } from '@/store/ordersDrafts'
 import { useOrderTabs } from '@/composables/useOrderTabs'
 
 export function useOrderPersistence() {
-    const ordersStore = useOrdersStore()
+    const ordersStore = useOrdersDraftsStore()
     const { createNewTab } = useOrderTabs()
 
     // Cargar datos al montar el componente

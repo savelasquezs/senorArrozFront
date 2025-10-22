@@ -66,6 +66,7 @@ import {
     EyeIcon,
     ArrowPathIcon
 } from '@heroicons/vue/24/outline'
+import { controlsList } from 'happy-dom/lib/PropertySymbol'
 
 interface Props {
     orderType: 'onsite' | 'delivery' | 'reservation'
@@ -115,13 +116,10 @@ const handleCustomerSelected = (customer: Customer) => {
     }
 }
 
-const handleAddressSelected = (addressId: number | undefined) => {
-    if (addressId && props.selectedCustomer) {
-        const address = props.selectedCustomer.addresses?.find(a => a.id === addressId)
-        emit('address-selected', address || null)
-    } else {
-        emit('address-selected', null)
-    }
+const handleAddressSelected = (address: CustomerAddress | undefined) => {
+    // Ya recibe el objeto completo, no necesita buscar
+    console.log('Address selected:', address)
+    emit('address-selected', address || null)
 }
 
 const handleClearCustomer = () => {
