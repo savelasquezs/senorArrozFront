@@ -84,10 +84,12 @@ interface Props {
     currentStatus: OrderStatus
     statusTimes: Record<string, string>
     clickable?: boolean
+    orderType?: 'onsite' | 'delivery' | 'reservation'
 }
 
 const props = withDefaults(defineProps<Props>(), {
-    clickable: false
+    clickable: false,
+    orderType: 'delivery'
 })
 
 const emit = defineEmits<{
@@ -96,18 +98,27 @@ const emit = defineEmits<{
 
 const { formatTime } = useFormatting()
 
-// Pasos del flujo (sin cancelled)
-const steps: Step[] = [
-    { status: 'taken', label: 'Tomado' },
-    { status: 'in_preparation', label: 'En preparación' },
-    { status: 'ready', label: 'Listo' },
-    { status: 'on_the_way', label: 'En camino' },
-    { status: 'delivered', label: 'Entregado' },
-]
+// Pasos del flujo (filtrados según tipo de pedido)
+const steps = computed<Step[]>(() => {
+    const allSteps: Step[] = [
+        { status: 'taken', label: 'Tomado' },
+        { status: 'in_preparation', label: 'En preparación' },
+        { status: 'ready', label: 'Listo' },
+        { status: 'on_the_way', label: 'En camino' },
+        { status: 'delivered', label: 'Entregado' },
+    ]
+
+    // Pedidos onsite saltan on_the_way
+    if (props.orderType === 'onsite') {
+        return allSteps.filter(step => step.status !== 'on_the_way')
+    }
+
+    return allSteps
+})
 
 // Índice del paso actual
 const currentStepIndex = computed(() => {
-    return steps.findIndex((step) => step.status === props.currentStatus)
+    return steps.value.findIndex((step) => step.status === props.currentStatus)
 })
 
 // Métodos
@@ -120,7 +131,7 @@ const isCurrentStep = (status: OrderStatus): boolean => {
 }
 
 const getStepClasses = (status: OrderStatus): string => {
-    const stepIndex = steps.findIndex((s) => s.status === status)
+    const stepIndex = steps.value.findIndex((s) => s.status === status)
 
     if (isCurrentStep(status)) {
         return 'bg-emerald-600 border-emerald-600'
@@ -134,7 +145,7 @@ const getStepClasses = (status: OrderStatus): string => {
 }
 
 const getStepIcon = (status: OrderStatus): any => {
-    const stepIndex = steps.findIndex((s) => s.status === status)
+    const stepIndex = steps.value.findIndex((s) => s.status === status)
 
     // Si está completado, mostrar check
     if (isStepCompleted(stepIndex)) {

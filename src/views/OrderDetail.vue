@@ -42,8 +42,8 @@
 
             <!-- Barra de progreso -->
             <div class="bg-white rounded-lg shadow p-6">
-                <OrderProgressBar :current-status="order.status" :status-times="order.statusTimes" :clickable="true"
-                    @status-click="handleStatusChange" />
+                <OrderProgressBar :current-status="order.status" :status-times="order.statusTimes"
+                    :order-type="order.type" :clickable="true" @status-click="handleStatusChange" />
             </div>
 
             <!-- Tabs de contenido -->
@@ -189,7 +189,8 @@
             @close="showSelectAddressModal = false" @updated="fetchOrderDetail" />
 
         <AssignDeliveryModal v-if="order" :open="showAssignDeliveryModal" :order="order"
-            @close="showAssignDeliveryModal = false" @updated="fetchOrderDetail" />
+            :pending-status-change="pendingStatusChange || undefined" @close="handleAssignDeliveryModalClose"
+            @updated="handleDeliverymanUpdated" @status-changed="handleStatusChanged" />
 
         <CancelOrderModal v-if="order" :open="showCancelModal" :order="order" @close="showCancelModal = false"
             @cancelled="handleOrderCancelled" />
@@ -205,6 +206,7 @@ import { bankPaymentApi } from '@/services/MainAPI/bankPaymentApi'
 import { appPaymentApi } from '@/services/MainAPI/appPaymentApi'
 import { useFormatting } from '@/composables/useFormatting'
 import { useOrderPermissions } from '@/composables/useOrderPermissions'
+import { useOrderStatusChange } from '@/composables/useOrderStatusChange'
 import { useToast } from '@/composables/useToast'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseInput from '@/components/ui/BaseInput.vue'
@@ -240,10 +242,18 @@ const activeTab = ref('info')
 const editableGuestName = ref('')
 const editableNotes = ref('')
 
+// Composable de cambio de estado
+const {
+    pendingStatusChange,
+    showAssignDeliveryModal,
+    handleStatusChange: handleStatusChangeComposable,
+    executeStatusChange,
+    clearPendingStatusChange
+} = useOrderStatusChange()
+
 // Modales
 const showEditCustomerModal = ref(false)
 const showSelectAddressModal = ref(false)
-const showAssignDeliveryModal = ref(false)
 const showCancelModal = ref(false)
 
 // Tabs
@@ -272,18 +282,21 @@ const fetchOrderDetail = async () => {
 const handleStatusChange = async (newStatus: OrderStatus) => {
     if (!order.value) return
 
-    if (!permissions.canChangeStatus(order.value, newStatus)) {
-        error('Sin permisos', 'No tienes permiso para cambiar el estado a ' + newStatus)
-        return
-    }
-
-    try {
-        await orderApi.updateStatus(order.value.id, newStatus)
-        success('Estado actualizado', 5000, `Pedido cambiado a ${newStatus}`)
-        await fetchOrderDetail()
-    } catch (err: any) {
-        error('Error al cambiar estado', err.message)
-    }
+    await handleStatusChangeComposable(
+        order.value,
+        newStatus,
+        (updatedOrder) => {
+            // ✅ Actualización optimista
+            const orderAny = updatedOrder as any
+            order.value = {
+                ...order.value!,
+                status: updatedOrder.status,
+                statusDisplayName: orderAny.statusDisplayName,
+                statusTimes: orderAny.statusTimes || order.value!.statusTimes,
+                updatedAt: orderAny.updatedAt
+            }
+        }
+    )
 }
 
 const updateGuestName = async () => {
@@ -366,6 +379,46 @@ const handleUnsettlePayment = async (paymentId: number) => {
     } catch (err: any) {
         error('Error', err.message)
     }
+}
+
+const handleAssignDeliveryModalClose = () => {
+    clearPendingStatusChange()
+}
+
+const handleDeliverymanUpdated = (updatedOrder?: any) => {
+    if (!order.value || !updatedOrder) return
+
+    const orderAny = updatedOrder as any
+    order.value = {
+        ...order.value,
+        deliveryManId: orderAny.deliveryManId || null,
+        deliveryManName: orderAny.deliveryManName || null,
+        status: orderAny.status,
+        statusDisplayName: orderAny.statusDisplayName,
+        statusTimes: orderAny.statusTimes || order.value.statusTimes,
+        updatedAt: orderAny.updatedAt
+    }
+}
+
+const handleStatusChanged = async (newStatus: OrderStatus) => {
+    if (!order.value) return
+
+    await executeStatusChange(
+        order.value.id,
+        newStatus,
+        (updatedOrder) => {
+            const orderAny = updatedOrder as any
+            order.value = {
+                ...order.value!,
+                deliveryManId: orderAny.deliveryManId || null,
+                deliveryManName: orderAny.deliveryManName || null,
+                status: orderAny.status,
+                statusDisplayName: orderAny.statusDisplayName,
+                statusTimes: orderAny.statusTimes || order.value!.statusTimes,
+                updatedAt: orderAny.updatedAt
+            }
+        }
+    )
 }
 
 const handleOrderCancelled = () => {

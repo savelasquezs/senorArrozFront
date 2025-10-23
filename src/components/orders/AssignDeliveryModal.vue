@@ -59,7 +59,7 @@ const props = defineProps<Props>()
 const emit = defineEmits<{
     close: []
     updated: [order?: Order]
-    statusChanged: []
+    statusChanged: [status: OrderStatus]
 }>()
 
 const { success, error } = useToast()
@@ -132,7 +132,12 @@ const handleSave = async () => {
 
         // ✅ Emitir el pedido actualizado para actualización optimista
         emit('updated', updatedOrder)
-        emit('statusChanged')
+
+        // Si hay un cambio de estado pendiente, emitirlo
+        if (props.pendingStatusChange) {
+            emit('statusChanged', props.pendingStatusChange)
+        }
+
         emit('close')
     } catch (err: any) {
         error('Error al asignar domiciliario', err.message)
