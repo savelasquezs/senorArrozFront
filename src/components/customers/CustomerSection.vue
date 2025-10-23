@@ -66,7 +66,7 @@ import {
     EyeIcon,
     ArrowPathIcon
 } from '@heroicons/vue/24/outline'
-import { controlsList } from 'happy-dom/lib/PropertySymbol'
+
 
 interface Props {
     orderType: 'onsite' | 'delivery' | 'reservation'

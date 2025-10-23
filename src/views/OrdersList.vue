@@ -97,7 +97,7 @@
                                 a
                                 <span class="font-medium">{{
                                     Math.min(currentPage * pageSize, totalCount)
-                                }}</span>
+                                    }}</span>
                                 de
                                 <span class="font-medium">{{ totalCount }}</span>
                                 resultados
@@ -133,8 +133,8 @@
         </div>
 
         <!-- Modales -->
-        <EditCustomerModal v-if="selectedOrder" :open="showEditCustomerModal" :order="selectedOrder"
-            @close="showEditCustomerModal = false" @updated="handleOrderUpdated" />
+        <EditCustomerModal v-if="showEditCustomerModal && selectedOrder" :open="showEditCustomerModal"
+            :order="selectedOrder" @close="showEditCustomerModal = false" @updated="handleOrderUpdated" />
 
         <SelectAddressModal v-if="selectedOrder" :open="showSelectAddressModal" :order="selectedOrder"
             @close="showSelectAddressModal = false" @updated="handleOrderUpdated" />

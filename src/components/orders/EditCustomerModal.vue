@@ -20,6 +20,17 @@
                     @order-type-changed="handleOrderTypeChanged" />
             </div>
 
+            <!-- Guest Name / Recipient Name -->
+            <div class="py-3 border-b border-gray-200">
+                <label class="block text-sm font-medium text-gray-700 mb-2">
+                    Nombre de quien recibe
+                    <span v-if="orderType === 'delivery' || orderType === 'reservation'" class="text-red-500">*</span>
+                </label>
+                <BaseInput :model-value="selectedGuestName"
+                    @update:model-value="(value) => selectedGuestName = String(value || '')"
+                    placeholder="Ej: Juan Pérez, María López..." :error="guestNameError" />
+            </div>
+
             <!-- Información actual (solo si hay cliente) -->
             <div v-if="order.customerName"
                 class="text-sm text-gray-600 bg-blue-50 border border-blue-200 rounded-lg p-3">
@@ -55,6 +66,7 @@ import BaseDialog from '@/components/ui/BaseDialog.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import CustomerSection from '@/components/customers/CustomerSection.vue'
 import CustomerDetailModal from '@/components/customers/CustomerDetailModal.vue'
+import BaseInput from '@/components/ui/BaseInput.vue'
 
 interface Props {
     open: boolean
@@ -75,10 +87,9 @@ const ordersStore = useOrdersDataStore()
 const saving = ref(false)
 const selectedCustomerId = ref<number | null>(props.order.customerId)
 const selectedAddressId = ref<number | null>(props.order.addressId)
+const selectedGuestName = ref<string | null>(props.order.guestName || props.order.customerName || null)
 const orderType = ref<'onsite' | 'delivery' | 'reservation'>(props.order.type)
 const showCustomerDetail = ref(false)
-
-// Computed
 const selectedCustomer = computed(() => {
     if (!selectedCustomerId.value) return null
     return ordersStore.customers.find(c => c.id === selectedCustomerId.value) || null
@@ -90,10 +101,18 @@ const selectedAddress = computed(() => {
 })
 
 const canSave = computed(() => {
-    if (!selectedCustomerId.value) return false
+    // Si es delivery/reservation y no hay cliente, no se puede guardar
+    if ((orderType.value === 'delivery' || orderType.value === 'reservation') && !selectedCustomerId.value) {
+        return false
+    }
 
     // Si es delivery/reservation y no hay dirección, no se puede guardar
     if ((orderType.value === 'delivery' || orderType.value === 'reservation') && !selectedAddressId.value) {
+        return false
+    }
+
+    // Si es delivery/reservation y no hay guestName, no se puede guardar
+    if ((orderType.value === 'delivery' || orderType.value === 'reservation') && !selectedGuestName.value?.trim()) {
         return false
     }
 
@@ -101,8 +120,17 @@ const canSave = computed(() => {
     const hasCustomerChange = selectedCustomerId.value !== props.order.customerId
     const hasTypeChange = orderType.value !== props.order.type
     const hasAddressChange = selectedAddressId.value !== props.order.addressId
+    const hasGuestNameChange = selectedGuestName.value !== props.order.guestName
 
-    return hasCustomerChange || hasTypeChange || hasAddressChange
+    return hasCustomerChange || hasTypeChange || hasAddressChange || hasGuestNameChange
+})
+
+const guestNameError = computed(() => {
+    const requiresGuestName = orderType.value === 'delivery' || orderType.value === 'reservation'
+    if (requiresGuestName && !selectedGuestName.value?.trim()) {
+        return 'El nombre de quien recibe es obligatorio para este tipo de pedido'
+    }
+    return ''
 })
 
 // Lifecycle
@@ -115,6 +143,14 @@ onMounted(async () => {
 // Métodos
 const handleCustomerSelected = (customer: Customer | null) => {
     selectedCustomerId.value = customer?.id || null
+
+    // Auto-fill guestName with customer name if not already set
+    if (customer && customer.name && !selectedGuestName.value?.trim()) {
+        selectedGuestName.value = customer.name
+    } else if (!customer) {
+        // Customer removed, clear guestName
+        selectedGuestName.value = null
+    }
 
     // Si se limpia el cliente, también limpiar la dirección
     if (!customer) {
@@ -150,6 +186,11 @@ const handleSave = async () => {
     try {
         const updateData: any = {
             customerId: selectedCustomerId.value,
+        }
+
+        // Incluir guestName si cambió
+        if (selectedGuestName.value !== props.order.guestName) {
+            updateData.guestName = selectedGuestName.value || undefined
         }
 
         // Incluir tipo si cambió
