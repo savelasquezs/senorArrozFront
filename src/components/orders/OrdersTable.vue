@@ -84,17 +84,17 @@
 
                     <!-- Cliente (clickeable para editar) -->
                     <td class="px-6 py-4 whitespace-nowrap">
-                        <button v-if="order.customerName || order.guestName"
-                            class="text-left hover:text-emerald-600 transition-colors"
+                        <button class="text-left hover:text-emerald-600 transition-colors"
                             @click.stop="$emit('edit-customer', order)">
-                            <div class="text-sm font-medium text-gray-900 hover:underline">
+                            <div v-if="order.customerName || order.guestName"
+                                class="text-sm font-medium text-gray-900 hover:underline">
                                 {{ order.customerName || order.guestName }}
                             </div>
+                            <span v-else class="text-sm text-gray-400 italic hover:underline">Sin cliente</span>
                             <div v-if="order.customerPhone" class="text-sm text-gray-500">
                                 {{ order.customerPhone }}
                             </div>
                         </button>
-                        <span v-else class="text-sm text-gray-400 italic">Sin cliente</span>
                     </td>
 
                     <!-- Dirección (clickeable para cambiar) -->
