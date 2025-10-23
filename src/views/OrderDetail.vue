@@ -1,5 +1,5 @@
 <template>
-    <div class="container mx-auto px-4 py-6">
+    <MainLayout>
         <!-- Loading state -->
         <div v-if="loading" class="flex justify-center items-center py-12">
             <BaseLoading size="lg" />
@@ -194,7 +194,7 @@
 
         <CancelOrderModal v-if="order" :open="showCancelModal" :order="order" @close="showCancelModal = false"
             @cancelled="handleOrderCancelled" />
-    </div>
+    </MainLayout>
 </template>
 
 <script setup lang="ts">
@@ -208,6 +208,7 @@ import { useFormatting } from '@/composables/useFormatting'
 import { useOrderPermissions } from '@/composables/useOrderPermissions'
 import { useOrderStatusChange } from '@/composables/useOrderStatusChange'
 import { useToast } from '@/composables/useToast'
+import MainLayout from '@/components/layout/MainLayout.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseInput from '@/components/ui/BaseInput.vue'
 import BaseLoading from '@/components/ui/BaseLoading.vue'
