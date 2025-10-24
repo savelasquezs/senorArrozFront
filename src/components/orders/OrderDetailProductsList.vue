@@ -124,8 +124,12 @@
             </BaseButton>
         </div>
 
-        <!-- Modal para agregar producto (TODO: implementar) -->
-        <!-- Aquí iría un modal con ProductSearch para agregar nuevos productos -->
+        <!-- Modal para agregar producto -->
+        <AddProductModal 
+            :open="showAddProductModal" 
+            :existing-product-ids="existingProductIds"
+            @close="showAddProductModal = false"
+            @product-added="handleProductAdded" />
     </div>
 </template>
 
@@ -136,6 +140,7 @@ import { useFormatting } from '@/composables/useFormatting'
 import { useToast } from '@/composables/useToast'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseInput from '@/components/ui/BaseInput.vue'
+import AddProductModal from './AddProductModal.vue'
 import { PencilIcon, PlusIcon, TrashIcon } from '@heroicons/vue/24/outline'
 
 interface Props {
@@ -173,6 +178,10 @@ const calculatedTotal = computed(() => {
     return calculatedSubtotal.value - discountTotal.value + props.deliveryFee
 })
 
+const existingProductIds = computed(() => {
+    return localProducts.value.map(p => p.productId)
+})
+
 // Métodos
 const recalculateSubtotal = (item: OrderDetailItem) => {
     item.subtotal = item.quantity * item.unitPrice - item.discount
@@ -192,6 +201,25 @@ const cancelEdit = () => {
 
 const removeProduct = (index: number) => {
     localProducts.value.splice(index, 1)
+}
+
+const handleProductAdded = (newProduct: any) => {
+    localProducts.value.push({
+        id: 0,  // ID 0 indica que es nuevo para el backend
+        productId: newProduct.productId,
+        productName: newProduct.productName,
+        productDescription: newProduct.productDescription,
+        quantity: newProduct.quantity,
+        unitPrice: newProduct.unitPrice,
+        discount: newProduct.discount,
+        notes: newProduct.notes,
+        subtotal: (newProduct.quantity * newProduct.unitPrice) - newProduct.discount,
+        orderId: 0, // Temporal, se asignará en el backend
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+    })
+    
+    showAddProductModal.value = false
 }
 
 const saveChanges = async () => {
