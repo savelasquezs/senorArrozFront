@@ -74,7 +74,8 @@
         <div class="bg-white rounded-lg shadow overflow-hidden">
             <OrdersTable :orders="filteredOrders" :loading="loading" :sort-by="sortBy" :sort-order="sortOrder"
                 @edit-customer="handleEditCustomer" @edit-address="handleEditAddress"
-                @change-status="handleChangeStatus" @assign-delivery="handleAssignDelivery" @sort="handleSort" />
+                @change-status="handleChangeStatus" @assign-delivery="handleAssignDelivery" @edit-type="handleEditType"
+                @sort="handleSort" />
 
             <!-- Paginación -->
             <div v-if="!loading && totalPages > 1" class="bg-gray-50 px-4 py-3 border-t border-gray-200 sm:px-6">
@@ -97,7 +98,7 @@
                                 a
                                 <span class="font-medium">{{
                                     Math.min(currentPage * pageSize, totalCount)
-                                    }}</span>
+                                }}</span>
                                 de
                                 <span class="font-medium">{{ totalCount }}</span>
                                 resultados
@@ -142,6 +143,10 @@
         <AssignDeliveryModal v-if="selectedOrder" :open="showAssignDeliveryModal" :order="selectedOrder"
             :pending-status-change="pendingStatusChange || undefined" @updated="handleOrderUpdated"
             @status-changed="clearPendingStatusChange" @close="handleAssignDeliveryModalClose" />
+
+        <!-- Modal de cambio de tipo -->
+        <EditOrderTypeModal v-if="showEditOrderTypeModal && selectedOrder" :open="showEditOrderTypeModal"
+            :order="selectedOrder" @close="showEditOrderTypeModal = false" @updated="handleOrderTypeUpdated" />
     </MainLayout>
 </template>
 
@@ -159,6 +164,7 @@ import OrdersTable from '@/components/orders/OrdersTable.vue'
 import EditCustomerModal from '@/components/orders/EditCustomerModal.vue'
 import SelectAddressModal from '@/components/orders/SelectAddressModal.vue'
 import AssignDeliveryModal from '@/components/orders/AssignDeliveryModal.vue'
+import EditOrderTypeModal from '@/components/orders/EditOrderTypeModal.vue'
 import BaseInput from '@/components/ui/BaseInput.vue'
 import BaseSelect from '@/components/ui/BaseSelect.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
@@ -202,6 +208,7 @@ const dateFilters = ref({
 const showEditCustomerModal = ref(false)
 const showSelectAddressModal = ref(false)
 const showAssignDeliveryModal = ref(false)
+const showEditOrderTypeModal = ref(false)
 const selectedOrder = ref<OrderListItem | null>(null)
 const pendingStatusChange = ref<OrderStatus | null>(null)
 
@@ -376,6 +383,30 @@ const handleChangeStatus = async (order: OrderListItem) => {
 const handleAssignDelivery = (order: OrderListItem) => {
     selectedOrder.value = order
     showAssignDeliveryModal.value = true
+}
+
+const handleEditType = (order: OrderListItem) => {
+    selectedOrder.value = order
+    showEditOrderTypeModal.value = true
+}
+
+const handleOrderTypeUpdated = (updatedOrder?: Order) => {
+    if (!updatedOrder) return
+
+    const orderAny = updatedOrder as any
+    const index = orders.value.findIndex(o => o.id === orderAny.id)
+    if (index !== -1) {
+        orders.value[index] = {
+            ...orders.value[index],
+            type: orderAny.type,
+            typeDisplayName: getOrderTypeDisplayName(orderAny.type),
+            deliveryFee: orderAny.deliveryFee || null,
+            reservedFor: orderAny.reservedFor || null,
+            addressId: orderAny.addressId || null,
+            addressDescription: orderAny.addressDescription || null,
+            updatedAt: orderAny.updatedAt
+        }
+    }
 }
 
 const handleOrderUpdated = (updatedOrder?: Order) => {

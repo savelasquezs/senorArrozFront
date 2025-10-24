@@ -12,23 +12,36 @@
                 </div>
             </div>
 
-            <!-- Selector de cliente con tipo de pedido y dirección -->
+            <!-- Selector de cliente con dirección -->
             <div>
                 <CustomerSection :selected-customer="selectedCustomer" :selected-address="selectedAddress"
-                    :order-type="orderType" @customer-selected="handleCustomerSelected"
-                    @address-selected="handleAddressSelected" @view-customer-detail="handleViewCustomerDetail"
-                    @order-type-changed="handleOrderTypeChanged" />
+                    :order-type="props.order.type" :show-type-selector="false"
+                    @customer-selected="handleCustomerSelected" @address-selected="handleAddressSelected"
+                    @view-customer-detail="handleViewCustomerDetail" />
             </div>
 
             <!-- Guest Name / Recipient Name -->
             <div class="py-3 border-b border-gray-200">
                 <label class="block text-sm font-medium text-gray-700 mb-2">
                     Nombre de quien recibe
-                    <span v-if="orderType === 'delivery' || orderType === 'reservation'" class="text-red-500">*</span>
+                    <span v-if="props.order.type === 'delivery' || props.order.type === 'reservation'"
+                        class="text-red-500">*</span>
                 </label>
                 <BaseInput :model-value="selectedGuestName"
                     @update:model-value="(value) => selectedGuestName = String(value || '')"
                     placeholder="Ej: Juan Pérez, María López..." :error="guestNameError" />
+            </div>
+
+            <!-- Delivery Fee - SOLO SI TIPO ES DELIVERY -->
+            <div v-if="props.order.type === 'delivery'" class="py-3 border-b border-gray-200">
+                <label class="block text-sm font-medium text-gray-700 mb-2">
+                    Tarifa de domicilio
+                    <span class="text-red-500">*</span>
+                </label>
+                <BaseInput v-model="deliveryFee" type="number" placeholder="0" :error="deliveryFeeError" />
+                <p class="text-xs text-gray-500 mt-1">
+                    Costo del domicilio para este pedido
+                </p>
             </div>
 
             <!-- Información actual (solo si hay cliente) -->
@@ -88,7 +101,7 @@ const saving = ref(false)
 const selectedCustomerId = ref<number | null>(props.order.customerId)
 const selectedAddressId = ref<number | null>(props.order.addressId)
 const selectedGuestName = ref<string | null>(props.order.guestName || props.order.customerName || null)
-const orderType = ref<'onsite' | 'delivery' | 'reservation'>(props.order.type)
+const deliveryFee = ref<number>(props.order.deliveryFee || 0)
 const showCustomerDetail = ref(false)
 const selectedCustomer = computed(() => {
     if (!selectedCustomerId.value) return null
@@ -101,34 +114,46 @@ const selectedAddress = computed(() => {
 })
 
 const canSave = computed(() => {
+    // Si es delivery y no hay deliveryFee válido, no se puede guardar
+    if (props.order.type === 'delivery' && (!deliveryFee.value || deliveryFee.value < 0)) {
+        return false
+    }
+
     // Si es delivery/reservation y no hay cliente, no se puede guardar
-    if ((orderType.value === 'delivery' || orderType.value === 'reservation') && !selectedCustomerId.value) {
+    if ((props.order.type === 'delivery' || props.order.type === 'reservation') && !selectedCustomerId.value) {
         return false
     }
 
     // Si es delivery/reservation y no hay dirección, no se puede guardar
-    if ((orderType.value === 'delivery' || orderType.value === 'reservation') && !selectedAddressId.value) {
+    if ((props.order.type === 'delivery' || props.order.type === 'reservation') && !selectedAddressId.value) {
         return false
     }
 
     // Si es delivery/reservation y no hay guestName, no se puede guardar
-    if ((orderType.value === 'delivery' || orderType.value === 'reservation') && !selectedGuestName.value?.trim()) {
+    if ((props.order.type === 'delivery' || props.order.type === 'reservation') && !selectedGuestName.value?.trim()) {
         return false
     }
 
     // Verificar si hubo algún cambio
     const hasCustomerChange = selectedCustomerId.value !== props.order.customerId
-    const hasTypeChange = orderType.value !== props.order.type
     const hasAddressChange = selectedAddressId.value !== props.order.addressId
     const hasGuestNameChange = selectedGuestName.value !== props.order.guestName
+    const hasDeliveryFeeChange = deliveryFee.value !== props.order.deliveryFee
 
-    return hasCustomerChange || hasTypeChange || hasAddressChange || hasGuestNameChange
+    return hasCustomerChange || hasAddressChange || hasGuestNameChange || hasDeliveryFeeChange
 })
 
 const guestNameError = computed(() => {
-    const requiresGuestName = orderType.value === 'delivery' || orderType.value === 'reservation'
+    const requiresGuestName = props.order.type === 'delivery' || props.order.type === 'reservation'
     if (requiresGuestName && !selectedGuestName.value?.trim()) {
         return 'El nombre de quien recibe es obligatorio para este tipo de pedido'
+    }
+    return ''
+})
+
+const deliveryFeeError = computed(() => {
+    if (props.order.type === 'delivery' && (!deliveryFee.value || deliveryFee.value < 0)) {
+        return 'La tarifa de domicilio es obligatoria'
     }
     return ''
 })
@@ -170,15 +195,6 @@ const handleCloseCustomerDetail = () => {
     showCustomerDetail.value = false
 }
 
-const handleOrderTypeChanged = (newType: 'onsite' | 'delivery' | 'reservation') => {
-    orderType.value = newType
-
-    // Si cambia a onsite, limpiar dirección
-    if (newType === 'onsite') {
-        selectedAddressId.value = null
-    }
-}
-
 const handleSave = async () => {
     if (!selectedCustomerId.value) return
 
@@ -193,13 +209,13 @@ const handleSave = async () => {
             updateData.guestName = selectedGuestName.value || undefined
         }
 
-        // Incluir tipo si cambió
-        if (orderType.value !== props.order.type) {
-            updateData.type = orderType.value
+        // Incluir deliveryFee si cambió y es delivery
+        if (props.order.type === 'delivery' && deliveryFee.value !== props.order.deliveryFee) {
+            updateData.deliveryFee = deliveryFee.value
         }
 
         // Manejar addressId según el tipo
-        if (orderType.value === 'delivery' || orderType.value === 'reservation') {
+        if (props.order.type === 'delivery' || props.order.type === 'reservation') {
             // Incluir addressId si existe
             if (selectedAddressId.value) {
                 updateData.addressId = selectedAddressId.value
@@ -211,11 +227,7 @@ const handleSave = async () => {
 
         const updatedOrder = await orderApi.update(props.order.id, updateData)
 
-        const message = orderType.value !== props.order.type
-            ? 'Cliente y tipo de pedido actualizados'
-            : 'Cliente actualizado'
-
-        showSuccess('Pedido actualizado', 5000, message)
+        showSuccess('Cliente actualizado', 5000)
 
         // ✅ Emitir el pedido actualizado para actualización optimista
         emit('updated', updatedOrder)

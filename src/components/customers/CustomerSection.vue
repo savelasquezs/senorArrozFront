@@ -1,7 +1,7 @@
 <template>
     <div class="customer-section">
-        <!-- Order Type Selector -->
-        <div class="space-y-2">
+        <!-- Order Type Selector - CONDICIONAL -->
+        <div v-if="showTypeSelector" class="space-y-2">
 
             <BaseRadioGroup :model-value="orderType" :options="orderTypeOptions" name="order-type"
                 @update:model-value="(value) => $emit('order-type-changed', value as 'onsite' | 'delivery' | 'reservation')"
@@ -72,11 +72,13 @@ interface Props {
     orderType: 'onsite' | 'delivery' | 'reservation'
     selectedCustomer?: Customer | null
     selectedAddress?: CustomerAddress | null
+    showTypeSelector?: boolean
 }
 
 const props = withDefaults(defineProps<Props>(), {
     selectedCustomer: null,
-    selectedAddress: null
+    selectedAddress: null,
+    showTypeSelector: true
 })
 const emit = defineEmits<{
     'customer-selected': [customer: Customer | null]

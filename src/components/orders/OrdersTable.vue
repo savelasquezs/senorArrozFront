@@ -77,9 +77,12 @@
                         </router-link>
                     </td>
 
-                    <!-- Tipo -->
+                    <!-- Tipo - CLICKEABLE -->
                     <td class="px-6 py-4 whitespace-nowrap">
-                        <OrderTypeBadge :type="order.type" :display-name="order.typeDisplayName" />
+                        <button @click.stop="$emit('edit-type', order)"
+                            class="hover:opacity-80 transition-opacity cursor-pointer">
+                            <OrderTypeBadge :type="order.type" :display-name="order.typeDisplayName" />
+                        </button>
                     </td>
 
                     <!-- Cliente (clickeable para editar) -->
@@ -177,6 +180,7 @@ defineEmits<{
     'edit-address': [order: OrderListItem]
     'change-status': [order: OrderListItem]
     'assign-delivery': [order: OrderListItem]
+    'edit-type': [order: OrderListItem]
     sort: [column: 'id' | 'total' | 'createdAt']
 }>()
 

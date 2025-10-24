@@ -87,8 +87,29 @@
                                 </div>
                             </div>
 
-                            <!-- Dirección -->
-                            <div v-if="order.type === 'delivery'" class="space-y-2">
+
+                            <!-- Guest Name -->
+                            <div class="space-y-2">
+                                <label class="text-sm font-medium text-gray-700">Nombre del invitado</label>
+                                <BaseInput v-model="editableGuestName" placeholder="Nombre de quien recibe"
+                                    :disabled="!permissions.canEditOrder(order)" @blur="updateGuestName" />
+                            </div>
+
+                            <!-- Tipo de pedido - CLICKEABLE -->
+                            <div class="space-y-2">
+                                <label class="text-sm font-medium text-gray-700">Tipo de pedido</label>
+                                <button v-if="permissions.canEditOrder(order)" @click="showEditOrderTypeModal = true"
+                                    class="w-full flex items-center justify-between bg-gray-50 hover:bg-gray-100 rounded-lg p-3 transition-colors cursor-pointer">
+                                    <OrderTypeBadge :type="order.type" :display-name="order.typeDisplayName" />
+                                    <PencilIcon class="w-4 h-4 text-gray-400" />
+                                </button>
+                                <div v-else class="bg-gray-50 rounded-lg p-3">
+                                    <OrderTypeBadge :type="order.type" :display-name="order.typeDisplayName" />
+                                </div>
+                            </div>
+
+                            <!-- Dirección - SOLO SI DELIVERY O RESERVATION -->
+                            <div v-if="order.type === 'delivery' || order.type === 'reservation'" class="space-y-2">
                                 <label class="text-sm font-medium text-gray-700">Dirección de entrega</label>
                                 <div class="flex items-center justify-between bg-gray-50 rounded-lg p-3">
                                     <p class="text-sm text-gray-900">
@@ -101,8 +122,8 @@
                                 </div>
                             </div>
 
-                            <!-- Domiciliario -->
-                            <div class="space-y-2">
+                            <!-- Domiciliario - SOLO SI DELIVERY -->
+                            <div v-if="order.type === 'delivery'" class="space-y-2">
                                 <label class="text-sm font-medium text-gray-700">Domiciliario</label>
                                 <div class="flex items-center justify-between bg-gray-50 rounded-lg p-3">
                                     <p class="text-sm text-gray-900">
@@ -114,24 +135,17 @@
                                 </div>
                             </div>
 
-                            <!-- Guest Name -->
-                            <div class="space-y-2">
-                                <label class="text-sm font-medium text-gray-700">Nombre del invitado</label>
-                                <BaseInput v-model="editableGuestName" placeholder="Nombre de quien recibe"
-                                    :disabled="!permissions.canEditOrder(order)" @blur="updateGuestName" />
-                            </div>
-
-                            <!-- Tipo de pedido -->
-                            <div class="space-y-2">
-                                <label class="text-sm font-medium text-gray-700">Tipo de pedido</label>
+                            <!-- Delivery Fee - SOLO SI DELIVERY -->
+                            <div v-if="order.type === 'delivery'" class="space-y-2">
+                                <label class="text-sm font-medium text-gray-700">Tarifa de domicilio</label>
                                 <div class="bg-gray-50 rounded-lg p-3">
-                                    <p class="text-sm text-gray-900">{{ order.typeDisplayName }}</p>
+                                    <p class="text-sm text-gray-900">{{ formatCurrency(order.deliveryFee || 0) }}</p>
                                 </div>
                             </div>
 
-                            <!-- Fecha de reserva (si aplica) -->
-                            <div v-if="order.reservedFor" class="space-y-2">
-                                <label class="text-sm font-medium text-gray-700">Fecha de reserva</label>
+                            <!-- Fecha de reserva - SOLO SI RESERVATION -->
+                            <div v-if="order.type === 'reservation' && order.reservedFor" class="space-y-2">
+                                <label class="text-sm font-medium text-gray-700">Tener listo a esta hora</label>
                                 <div class="bg-gray-50 rounded-lg p-3">
                                     <p class="text-sm text-gray-900">{{ formatDateTime(order.reservedFor) }}</p>
                                 </div>
@@ -182,18 +196,22 @@
         </div>
 
         <!-- Modales -->
-        <EditCustomerModal v-if="order" :open="showEditCustomerModal" :order="order"
-            @close="showEditCustomerModal = false" @updated="fetchOrderDetail" />
+        <EditCustomerModal v-if="showEditCustomerModal && order" :open="showEditCustomerModal" :order="order"
+            @close="showEditCustomerModal = false" @updated="handleCustomerUpdated" />
 
-        <SelectAddressModal v-if="order" :open="showSelectAddressModal" :order="order"
-            @close="showSelectAddressModal = false" @updated="fetchOrderDetail" />
+        <SelectAddressModal v-if="showSelectAddressModal && order" :open="showSelectAddressModal" :order="order"
+            @close="showSelectAddressModal = false" @updated="handleAddressUpdated" />
 
-        <AssignDeliveryModal v-if="order" :open="showAssignDeliveryModal" :order="order"
+        <AssignDeliveryModal v-if="showAssignDeliveryModal && order" :open="showAssignDeliveryModal" :order="order"
             :pending-status-change="pendingStatusChange || undefined" @close="handleAssignDeliveryModalClose"
             @updated="handleDeliverymanUpdated" @status-changed="handleStatusChanged" />
 
-        <CancelOrderModal v-if="order" :open="showCancelModal" :order="order" @close="showCancelModal = false"
-            @cancelled="handleOrderCancelled" />
+        <CancelOrderModal v-if="showCancelModal && order" :open="showCancelModal" :order="order"
+            @close="showCancelModal = false" @cancelled="handleOrderCancelled" />
+
+        <!-- Modal de cambio de tipo -->
+        <EditOrderTypeModal v-if="showEditOrderTypeModal && order" :open="showEditOrderTypeModal" :order="order"
+            @close="showEditOrderTypeModal = false" @updated="handleOrderTypeUpdated" />
     </MainLayout>
 </template>
 
@@ -220,6 +238,7 @@ import EditCustomerModal from '@/components/orders/EditCustomerModal.vue'
 import SelectAddressModal from '@/components/orders/SelectAddressModal.vue'
 import AssignDeliveryModal from '@/components/orders/AssignDeliveryModal.vue'
 import CancelOrderModal from '@/components/orders/CancelOrderModal.vue'
+import EditOrderTypeModal from '@/components/orders/EditOrderTypeModal.vue'
 import {
     ArrowLeftIcon,
     XCircleIcon,
@@ -231,7 +250,7 @@ import {
 
 const route = useRoute()
 const router = useRouter()
-const { formatDateTime } = useFormatting()
+const { formatDateTime, formatCurrency } = useFormatting()
 const permissions = useOrderPermissions()
 const { success, error } = useToast()
 
@@ -256,6 +275,7 @@ const {
 const showEditCustomerModal = ref(false)
 const showSelectAddressModal = ref(false)
 const showCancelModal = ref(false)
+const showEditOrderTypeModal = ref(false)
 
 // Tabs
 const tabs = [
@@ -424,6 +444,48 @@ const handleStatusChanged = async (newStatus: OrderStatus) => {
 
 const handleOrderCancelled = () => {
     router.push({ name: 'Orders' })
+}
+
+// Handlers optimistas para actualización sin recarga
+const handleOrderTypeUpdated = (updatedOrder?: any) => {
+    if (!updatedOrder) return
+
+    const orderAny = updatedOrder as any
+    order.value = {
+        ...order.value!,
+        type: orderAny.type,
+        typeDisplayName: orderAny.typeDisplayName,
+        deliveryFee: orderAny.deliveryFee || null,
+        reservedFor: orderAny.reservedFor || null,
+        addressId: orderAny.addressId || null,
+        addressDescription: orderAny.addressDescription || null,
+        updatedAt: orderAny.updatedAt
+    }
+}
+
+const handleCustomerUpdated = (updatedOrder?: any) => {
+    if (!updatedOrder) return
+    const orderAny = updatedOrder as any
+    order.value = {
+        ...order.value!,
+        customerId: orderAny.customerId,
+        customerName: orderAny.customerName,
+        customerPhone: orderAny.customerPhone,
+        guestName: orderAny.guestName,
+        deliveryFee: orderAny.deliveryFee || order.value!.deliveryFee, // Mantener si no cambió
+        updatedAt: orderAny.updatedAt
+    }
+}
+
+const handleAddressUpdated = (updatedOrder?: any) => {
+    if (!updatedOrder) return
+    const orderAny = updatedOrder as any
+    order.value = {
+        ...order.value!,
+        addressId: orderAny.addressId,
+        addressDescription: orderAny.addressDescription,
+        updatedAt: orderAny.updatedAt
+    }
 }
 
 // Lifecycle
