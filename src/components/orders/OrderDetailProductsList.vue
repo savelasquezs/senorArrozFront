@@ -125,11 +125,8 @@
         </div>
 
         <!-- Modal para agregar producto -->
-        <AddProductModal 
-            :open="showAddProductModal" 
-            :existing-product-ids="existingProductIds"
-            @close="showAddProductModal = false"
-            @product-added="handleProductAdded" />
+        <AddProductModal :open="showAddProductModal" :existing-product-ids="existingProductIds"
+            @close="showAddProductModal = false" @product-added="handleProductAdded" />
     </div>
 </template>
 
@@ -218,7 +215,7 @@ const handleProductAdded = (newProduct: any) => {
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
     })
-    
+
     showAddProductModal.value = false
 }
 
