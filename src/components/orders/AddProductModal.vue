@@ -1,5 +1,5 @@
 <template>
-    <BaseDialog :model-value="open" title="Agregar Producto" size="2xl" @update:model-value="$emit('close')">
+    <BaseDialog :model-value="open" title="Agregar Producto" size="4xl" @update:model-value="$emit('close')">
         <div class="flex h-full min-h-[500px]">
             <!-- Columna izquierda: Filtros + Lista (60%) -->
             <div class="w-3/5 pr-4 border-r border-gray-200">

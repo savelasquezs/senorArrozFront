@@ -6,7 +6,7 @@
 				<div class="fixed inset-0 bg-black/50 transition-opacity" @click="closeDialog" />
 
 				<!-- Dialog -->
-				<div class="relative bg-white rounded-lg shadow-xl max-w-md w-full max-h-[90vh] overflow-y-auto"
+				<div class="relative bg-white rounded-lg shadow-xl w-full max-h-[90vh] overflow-y-auto"
 					:class="sizeClasses" @click.stop>
 					<!-- Header -->
 					<div v-if="$slots.header || title" class="flex items-center justify-between p-6 pb-0">
@@ -46,7 +46,7 @@ import { XMarkIcon } from '@heroicons/vue/24/outline';
 interface Props {
 	modelValue: boolean;
 	title?: string;
-	size?: 'sm' | 'md' | 'lg' | 'xl' | '2xl';
+	size?: 'sm' | 'md' | 'lg' | 'xl' | '2xl' | '3xl' | '4xl' | '5xl' | '6xl' | '7xl';
 	icon?: any;
 	iconVariant?: 'primary' | 'danger' | 'warning' | 'success';
 	showCloseButton?: boolean;
@@ -70,6 +70,11 @@ const sizeClasses = computed(() => {
 		lg: 'max-w-lg',
 		xl: 'max-w-xl',
 		'2xl': 'max-w-2xl',
+		'3xl': 'max-w-3xl',
+		'4xl': 'max-w-4xl',
+		'5xl': 'max-w-5xl',
+		'6xl': 'max-w-6xl',
+		'7xl': 'max-w-7xl',
 	};
 	return sizes[props.size];
 });
