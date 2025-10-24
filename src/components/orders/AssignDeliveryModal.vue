@@ -134,7 +134,7 @@ const handleSave = async () => {
         emit('updated', updatedOrder)
 
         // Si hay un cambio de estado pendiente, emitirlo
-        if (props.pendingStatusChange) {
+        if (props.pendingStatusChange && typeof props.pendingStatusChange === 'string') {
             emit('statusChanged', props.pendingStatusChange)
         }
 

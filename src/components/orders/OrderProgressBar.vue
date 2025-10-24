@@ -53,8 +53,13 @@
                     ]">
                         {{ step.label }}
                     </p>
-                    <p v-if="statusTimes[step.status]" class="text-xs text-gray-500 mt-0.5">
-                        {{ formatTime(statusTimes[step.status]) }}
+                    <p v-if="normalizedStatusTimes[step.status] && (isStepCompleted(index) || isCurrentStep(step.status))"
+                        class="text-xs text-gray-500 mt-0.5">
+                        {{ formatTime(normalizedStatusTimes[step.status]) }}
+                    </p>
+                    <p v-if="normalizedStatusTimes[step.status] && (isStepCompleted(index) || isCurrentStep(step.status))"
+                        class="text-xs text-emerald-600 font-medium mt-0.5">
+                        {{ formatTimeAgo(normalizedStatusTimes[step.status]) }}
                     </p>
                 </div>
             </div>
@@ -96,7 +101,19 @@ const emit = defineEmits<{
     'status-click': [status: OrderStatus]
 }>()
 
-const { formatTime } = useFormatting()
+const { formatTime, formatTimeAgo } = useFormatting()
+
+// Normalizar claves de statusTimes del backend
+const normalizedStatusTimes = computed(() => {
+    return {
+        taken: props.statusTimes.taken,
+        in_preparation: props.statusTimes.inpreparation,
+        ready: props.statusTimes.ready,
+        on_the_way: props.statusTimes.ontheway,
+        delivered: props.statusTimes.delivered,
+        cancelled: props.statusTimes.cancelled
+    }
+})
 
 // Pasos del flujo (filtrados según tipo de pedido)
 const steps = computed<Step[]>(() => {
@@ -166,8 +183,10 @@ const getStepIcon = (status: OrderStatus): any => {
 }
 
 const getTooltipText = (step: Step): string => {
-    if (props.statusTimes[step.status]) {
-        return `${step.label} - ${formatTime(props.statusTimes[step.status])}`
+    const stepIndex = steps.value.findIndex(s => s.status === step.status)
+    const time = normalizedStatusTimes.value[step.status]
+    if (time && (isStepCompleted(stepIndex) || isCurrentStep(step.status))) {
+        return `${step.label} - ${formatTime(time)} (${formatTimeAgo(time)})`
     }
     return step.label
 }
