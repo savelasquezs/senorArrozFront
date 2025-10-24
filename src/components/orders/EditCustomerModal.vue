@@ -80,6 +80,7 @@ import { orderApi } from '@/services/MainAPI/orderApi'
 import { useOrdersDataStore } from '@/store/ordersData'
 import { useToast } from '@/composables/useToast'
 import { useDeliveryFee } from '@/composables/useDeliveryFee'
+import { useOrderPermissions } from '@/composables/useOrderPermissions'
 import BaseDialog from '@/components/ui/BaseDialog.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import CustomerSection from '@/components/customers/CustomerSection.vue'
@@ -100,6 +101,7 @@ const emit = defineEmits<{
 
 const { success: showSuccess, error: showError } = useToast()
 const ordersStore = useOrdersDataStore()
+const permissions = useOrderPermissions()
 
 // Estado
 const saving = ref(false)
@@ -118,7 +120,12 @@ const selectedAddress = computed(() => {
     return selectedCustomer.value.addresses?.find(a => a.id === selectedAddressId.value) || null
 })
 
+const canEdit = computed(() => permissions.canEditOrder(props.order))
+
 const canSave = computed(() => {
+    // Si no se puede editar, no se puede guardar
+    if (!canEdit.value) return false
+
     // Si es delivery y no hay deliveryFee válido, no se puede guardar
     if (props.order.type === 'delivery' && (!deliveryFee.value || deliveryFee.value < 0)) {
         return false
