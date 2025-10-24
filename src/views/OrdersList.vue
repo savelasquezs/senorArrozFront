@@ -98,7 +98,7 @@
                                 a
                                 <span class="font-medium">{{
                                     Math.min(currentPage * pageSize, totalCount)
-                                }}</span>
+                                    }}</span>
                                 de
                                 <span class="font-medium">{{ totalCount }}</span>
                                 resultados
@@ -135,7 +135,7 @@
 
         <!-- Modales -->
         <EditCustomerModal v-if="showEditCustomerModal && selectedOrder" :open="showEditCustomerModal"
-            :order="selectedOrder" @close="showEditCustomerModal = false" @updated="handleOrderUpdated" />
+            :order="selectedOrder" @close="handleCustomerModalClose" @updated="handleOrderUpdated" />
 
         <SelectAddressModal v-if="selectedOrder" :open="showSelectAddressModal" :order="selectedOrder"
             @close="showSelectAddressModal = false" @updated="handleOrderUpdated" />
@@ -146,7 +146,8 @@
 
         <!-- Modal de cambio de tipo -->
         <EditOrderTypeModal v-if="showEditOrderTypeModal && selectedOrder" :open="showEditOrderTypeModal"
-            :order="selectedOrder" @close="showEditOrderTypeModal = false" @updated="handleOrderTypeUpdated" />
+            :order="selectedOrder" @close="showEditOrderTypeModal = false" @updated="handleOrderTypeUpdated"
+            @type-changed-pending="handleTypePendingChange" @open-customer-modal="handleOpenCustomerModalFromType" />
     </MainLayout>
 </template>
 
@@ -211,6 +212,8 @@ const showAssignDeliveryModal = ref(false)
 const showEditOrderTypeModal = ref(false)
 const selectedOrder = ref<OrderListItem | null>(null)
 const pendingStatusChange = ref<OrderStatus | null>(null)
+const pendingOrderType = ref<'onsite' | 'delivery' | 'reservation' | null>(null)
+const originalOrderType = ref<'onsite' | 'delivery' | 'reservation' | null>(null)
 
 // Opciones de filtros
 const typeOptions = [
@@ -407,6 +410,53 @@ const handleOrderTypeUpdated = (updatedOrder?: Order) => {
             updatedAt: orderAny.updatedAt
         }
     }
+
+    // Limpiar estado temporal
+    pendingOrderType.value = null
+    originalOrderType.value = null
+}
+
+const handleTypePendingChange = (newType: 'onsite' | 'delivery' | 'reservation') => {
+    if (!selectedOrder.value) return
+
+    // Guardar tipo original si es la primera vez
+    if (!originalOrderType.value) {
+        originalOrderType.value = selectedOrder.value.type
+    }
+
+    // Actualizar temporalmente el tipo en la UI
+    pendingOrderType.value = newType
+    const index = orders.value.findIndex(o => o.id === selectedOrder.value!.id)
+    if (index !== -1) {
+        orders.value[index] = {
+            ...orders.value[index],
+            type: newType,
+            typeDisplayName: getOrderTypeDisplayName(newType)
+        }
+        selectedOrder.value = orders.value[index]
+    }
+}
+
+const handleOpenCustomerModalFromType = () => {
+    showEditCustomerModal.value = true
+}
+
+const handleCustomerModalClose = () => {
+    // Si había un cambio de tipo pendiente y se canceló el modal de cliente
+    if (pendingOrderType.value && originalOrderType.value && selectedOrder.value) {
+        // Revertir el tipo
+        const index = orders.value.findIndex(o => o.id === selectedOrder.value!.id)
+        if (index !== -1) {
+            orders.value[index] = {
+                ...orders.value[index],
+                type: originalOrderType.value,
+                typeDisplayName: getOrderTypeDisplayName(originalOrderType.value)
+            }
+            selectedOrder.value = orders.value[index]
+        }
+        pendingOrderType.value = null
+        originalOrderType.value = null
+    }
 }
 
 const handleOrderUpdated = (updatedOrder?: Order) => {
@@ -416,29 +466,53 @@ const handleOrderUpdated = (updatedOrder?: Order) => {
         // ✅ ACTUALIZACIÓN OPTIMISTA - actualizar en la lista local
         const index = orders.value.findIndex(o => o.id === orderAny.id)
         if (index !== -1) {
-            orders.value[index] = {
-                ...orders.value[index],
-                type: orderAny.type,
-                typeDisplayName: getOrderTypeDisplayName(orderAny.type),
-                deliveryManId: orderAny.deliveryManId || null,
-                deliveryManName: orderAny.deliveryManName || null,
-                customerId: orderAny.customerId || null,
-                customerName: orderAny.customerName || null,
-                customerPhone: orderAny.customerPhone || null,
-                addressId: orderAny.addressId || null,
-                addressDescription: orderAny.addressDescription || null,
-                guestName: orderAny.guestName || null,
-                status: orderAny.status,
-                statusDisplayName: getOrderStatusDisplayName(orderAny.status),
-                deliveryFee: orderAny.deliveryFee || null,
-                notes: orderAny.notes || null,
-                // ✅ INCLUIR TOTALES DEL BACKEND
-                subtotal: orderAny.subtotal || 0,
-                discountTotal: orderAny.discountTotal || 0,
-                total: orderAny.total || 0,
-                updatedAt: orderAny.updatedAt
+            // Si había un cambio de tipo pendiente, confirmarlo junto con los datos del cliente
+            if (pendingOrderType.value) {
+                orders.value[index] = {
+                    ...orders.value[index],
+                    type: pendingOrderType.value,
+                    typeDisplayName: getOrderTypeDisplayName(pendingOrderType.value),
+                    customerId: orderAny.customerId || null,
+                    customerName: orderAny.customerName || null,
+                    customerPhone: orderAny.customerPhone || null,
+                    addressId: orderAny.addressId || null,
+                    addressDescription: orderAny.addressDescription || null,
+                    guestName: orderAny.guestName || null,
+                    deliveryFee: orderAny.deliveryFee || null,
+                    // ✅ INCLUIR TOTALES DEL BACKEND
+                    subtotal: orderAny.subtotal || 0,
+                    discountTotal: orderAny.discountTotal || 0,
+                    total: orderAny.total || 0,
+                    updatedAt: orderAny.updatedAt
+                }
+
+                // Limpiar estado temporal
+                pendingOrderType.value = null
+                originalOrderType.value = null
+            } else {
+                // Actualización normal
+                orders.value[index] = {
+                    ...orders.value[index],
+                    customerId: orderAny.customerId || null,
+                    customerName: orderAny.customerName || null,
+                    customerPhone: orderAny.customerPhone || null,
+                    addressId: orderAny.addressId || null,
+                    addressDescription: orderAny.addressDescription || null,
+                    guestName: orderAny.guestName || null,
+                    deliveryFee: orderAny.deliveryFee || null,
+                    // ✅ INCLUIR TOTALES DEL BACKEND
+                    subtotal: orderAny.subtotal || 0,
+                    discountTotal: orderAny.discountTotal || 0,
+                    total: orderAny.total || 0,
+                    updatedAt: orderAny.updatedAt
+                }
             }
         }
+
+        // ✅ Cerrar modales después de actualizar exitosamente
+        showEditCustomerModal.value = false
+        showSelectAddressModal.value = false
+        showAssignDeliveryModal.value = false
     }
     // Solo recargar si no se proporcionó el pedido actualizado
     if (!updatedOrder) {

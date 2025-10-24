@@ -197,7 +197,7 @@
 
         <!-- Modales -->
         <EditCustomerModal v-if="showEditCustomerModal && order" :open="showEditCustomerModal" :order="order"
-            @close="showEditCustomerModal = false" @updated="handleCustomerUpdated" />
+            @close="handleCustomerModalClose" @updated="handleCustomerUpdated" />
 
         <SelectAddressModal v-if="showSelectAddressModal && order" :open="showSelectAddressModal" :order="order"
             @close="showSelectAddressModal = false" @updated="handleAddressUpdated" />
@@ -211,7 +211,8 @@
 
         <!-- Modal de cambio de tipo -->
         <EditOrderTypeModal v-if="showEditOrderTypeModal && order" :open="showEditOrderTypeModal" :order="order"
-            @close="showEditOrderTypeModal = false" @updated="handleOrderTypeUpdated" />
+            @close="showEditOrderTypeModal = false" @updated="handleOrderTypeUpdated"
+            @type-changed-pending="handleTypePendingChange" @open-customer-modal="handleOpenCustomerModalFromType" />
     </MainLayout>
 </template>
 
@@ -226,6 +227,7 @@ import { useFormatting } from '@/composables/useFormatting'
 import { useOrderPermissions } from '@/composables/useOrderPermissions'
 import { useOrderStatusChange } from '@/composables/useOrderStatusChange'
 import { useToast } from '@/composables/useToast'
+import { getOrderTypeDisplayName } from '@/composables/useFormatting'
 import MainLayout from '@/components/layout/MainLayout.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseInput from '@/components/ui/BaseInput.vue'
@@ -261,6 +263,8 @@ const order = ref<OrderDetailView | null>(null)
 const activeTab = ref('info')
 const editableGuestName = ref('')
 const editableNotes = ref('')
+const pendingOrderType = ref<'onsite' | 'delivery' | 'reservation' | null>(null)
+const originalOrderType = ref<'onsite' | 'delivery' | 'reservation' | null>(null)
 
 // Composable de cambio de estado
 const {
@@ -461,20 +465,85 @@ const handleOrderTypeUpdated = (updatedOrder?: any) => {
         addressDescription: orderAny.addressDescription || null,
         updatedAt: orderAny.updatedAt
     }
+
+    // Limpiar estado temporal
+    pendingOrderType.value = null
+    originalOrderType.value = null
+}
+
+const handleTypePendingChange = (newType: 'onsite' | 'delivery' | 'reservation') => {
+    if (!order.value) return
+
+    // Guardar tipo original si es la primera vez
+    if (!originalOrderType.value) {
+        originalOrderType.value = order.value.type
+    }
+
+    // Actualizar temporalmente el tipo en la UI
+    pendingOrderType.value = newType
+    order.value = {
+        ...order.value,
+        type: newType,
+        typeDisplayName: getOrderTypeDisplayName(newType)
+    }
+}
+
+const handleOpenCustomerModalFromType = () => {
+    showEditCustomerModal.value = true
+}
+
+const handleCustomerModalClose = () => {
+    // Si había un cambio de tipo pendiente y se canceló el modal de cliente
+    if (pendingOrderType.value && originalOrderType.value && order.value) {
+        // Revertir el tipo
+        order.value = {
+            ...order.value,
+            type: originalOrderType.value,
+            typeDisplayName: getOrderTypeDisplayName(originalOrderType.value)
+        }
+        pendingOrderType.value = null
+        originalOrderType.value = null
+    }
 }
 
 const handleCustomerUpdated = (updatedOrder?: any) => {
     if (!updatedOrder) return
     const orderAny = updatedOrder as any
-    order.value = {
-        ...order.value!,
-        customerId: orderAny.customerId,
-        customerName: orderAny.customerName,
-        customerPhone: orderAny.customerPhone,
-        guestName: orderAny.guestName,
-        deliveryFee: orderAny.deliveryFee || order.value!.deliveryFee, // Mantener si no cambió
-        updatedAt: orderAny.updatedAt
+
+    // Si había un cambio de tipo pendiente, confirmarlo junto con los datos del cliente
+    if (pendingOrderType.value) {
+        order.value = {
+            ...order.value!,
+            type: pendingOrderType.value,
+            typeDisplayName: getOrderTypeDisplayName(pendingOrderType.value),
+            customerId: orderAny.customerId,
+            customerName: orderAny.customerName,
+            customerPhone: orderAny.customerPhone,
+            guestName: orderAny.guestName,
+            addressId: orderAny.addressId,
+            addressDescription: orderAny.addressDescription,
+            deliveryFee: orderAny.deliveryFee || order.value!.deliveryFee,
+            updatedAt: orderAny.updatedAt
+        }
+
+        // Limpiar estado temporal
+        pendingOrderType.value = null
+        originalOrderType.value = null
+    } else {
+        // Actualización normal
+        order.value = {
+            ...order.value!,
+            customerId: orderAny.customerId,
+            customerName: orderAny.customerName,
+            customerPhone: orderAny.customerPhone,
+            guestName: orderAny.guestName,
+            deliveryFee: orderAny.deliveryFee || order.value!.deliveryFee,
+            updatedAt: orderAny.updatedAt
+        }
     }
+
+    // ✅ Cerrar el modal después de actualizar exitosamente
+    showEditCustomerModal.value = false
 }
 
 const handleAddressUpdated = (updatedOrder?: any) => {

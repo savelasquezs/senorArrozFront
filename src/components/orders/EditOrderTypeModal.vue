@@ -33,8 +33,22 @@
             </div>
 
             <!-- Advertencias según tipo seleccionado -->
-            <div v-if="validationWarning" class="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
-                <p class="text-sm text-yellow-800">{{ validationWarning }}</p>
+            <div v-if="validationWarning" class="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                <div class="flex items-start">
+                    <div class="flex-shrink-0">
+                        <svg class="h-5 w-5 text-blue-400" viewBox="0 0 20 20" fill="currentColor">
+                            <path fill-rule="evenodd"
+                                d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z"
+                                clip-rule="evenodd" />
+                        </svg>
+                    </div>
+                    <div class="ml-3">
+                        <p class="text-sm text-blue-800">{{ validationWarning }}</p>
+                        <p class="mt-1 text-xs text-blue-600">
+                            Te guiaremos paso a paso para completar la información necesaria.
+                        </p>
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -43,7 +57,7 @@
                 Cancelar
             </BaseButton>
             <BaseButton variant="primary" :loading="saving" :disabled="!canSave" @click="handleSave">
-                Guardar cambios
+                {{ validationWarning ? 'Continuar' : 'Guardar cambios' }}
             </BaseButton>
         </template>
     </BaseDialog>
@@ -68,6 +82,8 @@ const props = defineProps<Props>()
 const emit = defineEmits<{
     close: []
     updated: [order?: Order]
+    'type-changed-pending': [newType: 'onsite' | 'delivery' | 'reservation']
+    'open-customer-modal': []
 }>()
 
 const { success, error } = useToast()
@@ -95,36 +111,31 @@ const canSave = computed(() => {
     // Sin cambios
     if (selectedType.value === props.order.type) return false
 
-    // Cambio a delivery: requiere cliente + dirección + guestName
-    if (selectedType.value === 'delivery') {
-        if (!props.order.customerId || !props.order.addressId || !props.order.guestName) {
-            return false
-        }
-    }
-
-    // Cambio a reservation: requiere guestName + reservedFor
-    if (selectedType.value === 'reservation') {
-        if (!props.order.guestName || !reservedFor.value) {
-            return false
-        }
-    }
-
-    return true
+    return true // Permitir cambio siempre, la validación se hace en handleSave
 })
 
 const validationWarning = computed(() => {
-    if (selectedType.value === 'delivery' && !props.order.customerId) {
-        return 'Para cambiar a Domicilio, primero debes asignar un cliente y una dirección'
+    if (selectedType.value === 'delivery') {
+        const missingFields = []
+        if (!props.order.customerId) missingFields.push('cliente')
+        if (!props.order.addressId) missingFields.push('dirección')
+        if (!props.order.guestName) missingFields.push('nombre de quien recibe')
+
+        if (missingFields.length > 0) {
+            return `Para cambiar a Domicilio, necesitarás completar: ${missingFields.join(', ')}`
+        }
     }
-    if (selectedType.value === 'delivery' && !props.order.addressId) {
-        return 'Para cambiar a Domicilio, primero debes asignar una dirección al cliente'
+
+    if (selectedType.value === 'reservation') {
+        const missingFields = []
+        if (!props.order.guestName) missingFields.push('nombre de quien recibe')
+        if (!reservedFor.value) missingFields.push('fecha de reserva')
+
+        if (missingFields.length > 0) {
+            return `Para cambiar a Reserva, necesitarás completar: ${missingFields.join(', ')}`
+        }
     }
-    if (selectedType.value === 'delivery' && !props.order.guestName) {
-        return 'Para cambiar a Domicilio, debes especificar el nombre de quien recibe'
-    }
-    if (selectedType.value === 'reservation' && !props.order.guestName) {
-        return 'Para cambiar a Reserva, debes especificar el nombre de quien recibe'
-    }
+
     return ''
 })
 
@@ -156,6 +167,22 @@ watch(() => props.open, (isOpen) => {
 const handleSave = async () => {
     saving.value = true
     try {
+        // Verificar si el nuevo tipo requiere campos adicionales que no están completos
+        const needsCustomerSetup = selectedType.value === 'delivery' &&
+            (!props.order.customerId || !props.order.addressId || !props.order.guestName)
+
+        const needsReservationSetup = selectedType.value === 'reservation' &&
+            (!props.order.guestName || !reservedFor.value)
+
+        if (needsCustomerSetup || needsReservationSetup) {
+            // Guardar tipo temporalmente y abrir modal de cliente
+            emit('type-changed-pending', selectedType.value)
+            emit('open-customer-modal')
+            emit('close')
+            return
+        }
+
+        // Si no necesita setup adicional, guardar directamente
         const updateData: any = {
             type: selectedType.value
         }
