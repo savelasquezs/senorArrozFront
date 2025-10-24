@@ -109,7 +109,10 @@ class AppPaymentApi extends BaseApi {
         return this.updateAppPayment(id, amount);
     }
 
-
+    // 10. Eliminar pago de app
+    async deletePayment(id: number): Promise<void> {
+        await this.api.delete(`/apppayments/${id}`)
+    }
 }
 
 export const appPaymentApi = new AppPaymentApi();

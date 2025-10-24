@@ -186,10 +186,30 @@
 
                     <!-- Tab: Pagos -->
                     <div v-if="activeTab === 'payments'">
-                        <OrderPaymentsList :bank-payments="order.bankPayments" :app-payments="order.appPayments"
-                            :total="order.total" :can-edit="permissions.canEditPayments(order)"
-                            @verify-payment="handleVerifyPayment" @unverify-payment="handleUnverifyPayment"
-                            @settle-payment="handleSettlePayment" @unsettle-payment="handleUnsettlePayment" />
+                        <!-- Sección: Agregar/Editar Pagos -->
+                        <div class="mb-6">
+                            <h3 class="text-lg font-medium text-gray-900 mb-4">Agregar/Editar Pagos</h3>
+                            <PersistedPaymentSelector :bank-payments="order.bankPayments"
+                                :app-payments="order.appPayments" :total="order.total" :total-payments="totalPayments"
+                                :cash-amount="cashAmount" :can-add-payments="canAddPayments"
+                                :can-edit="permissions.canEditPayments(order)" :bank-options="bankOptions"
+                                :app-options="appOptions" :suggested-amount="getSuggestedAmount()"
+                                @add-app-payment="addAppPayment" @update-app-payment="updateAppPayment"
+                                @remove-app-payment="removeAppPayment" @add-bank-payment="addBankPayment"
+                                @update-bank-payment="updateBankPayment" @remove-bank-payment="removeBankPayment" />
+                        </div>
+
+                        <!-- Sección: Verificación/Liquidación (solo Admin/Superadmin) -->
+                        <div v-if="permissions.canEditPayments(order)" class="border-t pt-6">
+                            <h3 class="text-lg font-medium text-gray-900 mb-4">Verificación y Liquidación</h3>
+                            <p class="text-sm text-gray-600 mb-4">
+                                Esta sección permite verificar pagos bancarios y liquidar pagos por app.
+                            </p>
+                            <OrderPaymentsList :bank-payments="order.bankPayments" :app-payments="order.appPayments"
+                                :total="order.total" :can-edit="false" @verify-payment="handleVerifyPayment"
+                                @unverify-payment="handleUnverifyPayment" @settle-payment="handleSettlePayment"
+                                @unsettle-payment="handleUnsettlePayment" />
+                        </div>
                     </div>
                 </div>
             </div>
@@ -217,7 +237,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import type { OrderDetailView, OrderStatus, UpdateOrderDetailDto } from '@/types/order'
 import { orderApi } from '@/services/MainAPI/orderApi'
@@ -226,6 +246,9 @@ import { appPaymentApi } from '@/services/MainAPI/appPaymentApi'
 import { useFormatting } from '@/composables/useFormatting'
 import { useOrderPermissions } from '@/composables/useOrderPermissions'
 import { useOrderStatusChange } from '@/composables/useOrderStatusChange'
+import { usePersistedOrderPayments } from '@/composables/usePersistedOrderPayments'
+import PersistedPaymentSelector from '@/components/payments/PersistedPaymentSelector.vue'
+import { useOrdersDraftsStore } from '@/store/ordersDrafts'
 import { useToast } from '@/composables/useToast'
 import { getOrderTypeDisplayName } from '@/composables/useFormatting'
 import MainLayout from '@/components/layout/MainLayout.vue'
@@ -256,6 +279,9 @@ const { formatDateTime, formatCurrency } = useFormatting()
 const permissions = useOrderPermissions()
 const { success, error } = useToast()
 
+// Store para opciones de pagos
+const ordersStore = useOrdersDraftsStore()
+
 // Estado
 const loading = ref(false)
 const errorMsg = ref<string | null>(null)
@@ -274,6 +300,48 @@ const {
     executeStatusChange,
     clearPendingStatusChange
 } = useOrderStatusChange()
+
+// Composable de pagos persistidos
+const {
+    totalPayments,
+    cashAmount,
+    canAddPayments,
+    hasSinglePayment,
+    getSuggestedAmount,
+    addAppPayment,
+    updateAppPayment,
+    removeAppPayment,
+    addBankPayment,
+    updateBankPayment,
+    removeBankPayment,
+    autoAdjustSinglePayment,
+} = usePersistedOrderPayments(order, (updates) => {
+    // Callback para actualización optimista
+    if (order.value) {
+        order.value = { ...order.value, ...updates }
+    }
+})
+
+// Opciones para selectores de pagos
+const bankOptions = computed(() => {
+    return ordersStore.banks
+        .filter(bank => bank.active)
+        .map(bank => ({ value: bank.id, label: bank.name }))
+})
+
+const appOptions = computed(() => {
+    return ordersStore.apps
+        .filter(app => app.active)
+        .map(app => ({ value: app.id, label: app.name }))
+})
+
+// Watch para auto-ajustar pago único cuando cambia el total
+watch(() => order.value?.total, async (newTotal, oldTotal) => {
+    if (!newTotal || !oldTotal || newTotal === oldTotal) return
+    if (!hasSinglePayment.value) return
+
+    await autoAdjustSinglePayment()
+}, { deep: true })
 
 // Modales
 const showEditCustomerModal = ref(false)
@@ -301,6 +369,18 @@ const fetchOrderDetail = async () => {
         errorMsg.value = err.message || 'Error al cargar el pedido'
     } finally {
         loading.value = false
+    }
+}
+
+// Cargar datos necesarios para pagos
+const loadPaymentData = async () => {
+    try {
+        await Promise.all([
+            ordersStore.loadBanks(),
+            ordersStore.loadApps()
+        ])
+    } catch (err: any) {
+        console.error('Error loading payment data:', err)
     }
 }
 
@@ -572,7 +652,10 @@ const handleAddressUpdated = (updatedOrder?: any) => {
 }
 
 // Lifecycle
-onMounted(() => {
-    fetchOrderDetail()
+onMounted(async () => {
+    await Promise.all([
+        fetchOrderDetail(),
+        loadPaymentData()
+    ])
 })
 </script>

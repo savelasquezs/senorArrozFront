@@ -85,7 +85,10 @@ class BankPaymentApi extends BaseApi {
         return this.updateBankPayment(id, amount);
     }
 
-
+    // 9. Eliminar pago bancario
+    async deletePayment(id: number): Promise<void> {
+        await this.api.delete(`/bankpayments/${id}`)
+    }
 }
 
 export const bankPaymentApi = new BankPaymentApi();
