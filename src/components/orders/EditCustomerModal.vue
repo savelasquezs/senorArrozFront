@@ -37,10 +37,14 @@
                 <label class="block text-sm font-medium text-gray-700 mb-2">
                     Tarifa de domicilio
                     <span class="text-red-500">*</span>
+                    <span v-if="isSuggestedValue" class="text-xs text-blue-600 ml-2">(sugerido por la dirección)</span>
                 </label>
-                <BaseInput v-model="deliveryFee" type="number" placeholder="0" :error="deliveryFeeError" />
+                <BaseInput v-model="deliveryFee" type="number" placeholder="0" :error="deliveryFeeError"
+                    @input="markAsManuallyEdited" />
                 <p class="text-xs text-gray-500 mt-1">
                     Costo del domicilio para este pedido
+                    <span v-if="isSuggestedValue" class="text-blue-600">• Valor sugerido por la dirección
+                        seleccionada</span>
                 </p>
             </div>
 
@@ -75,6 +79,7 @@ import type { Customer, CustomerAddress } from '@/types/customer'
 import { orderApi } from '@/services/MainAPI/orderApi'
 import { useOrdersDataStore } from '@/store/ordersData'
 import { useToast } from '@/composables/useToast'
+import { useDeliveryFee } from '@/composables/useDeliveryFee'
 import BaseDialog from '@/components/ui/BaseDialog.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import CustomerSection from '@/components/customers/CustomerSection.vue'
@@ -101,7 +106,7 @@ const saving = ref(false)
 const selectedCustomerId = ref<number | null>(props.order.customerId)
 const selectedAddressId = ref<number | null>(props.order.addressId)
 const selectedGuestName = ref<string | null>(props.order.guestName || props.order.customerName || null)
-const deliveryFee = ref<number>(props.order.deliveryFee || 0)
+const { deliveryFee, autoCompleteFromAddress, markAsManuallyEdited, isSuggestedValue } = useDeliveryFee(props.order.deliveryFee || 0)
 const showCustomerDetail = ref(false)
 const selectedCustomer = computed(() => {
     if (!selectedCustomerId.value) return null
@@ -185,6 +190,9 @@ const handleCustomerSelected = (customer: Customer | null) => {
 
 const handleAddressSelected = (address: CustomerAddress | null) => {
     selectedAddressId.value = address?.id || null
+
+    // ✅ Auto-completar deliveryFee usando el composable
+    autoCompleteFromAddress(address)
 }
 
 const handleViewCustomerDetail = () => {

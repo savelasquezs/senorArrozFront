@@ -506,31 +506,45 @@ const handleCustomerModalClose = () => {
     }
 }
 
-const handleCustomerUpdated = (updatedOrder?: any) => {
+const handleCustomerUpdated = async (updatedOrder?: any) => {
     if (!updatedOrder) return
     const orderAny = updatedOrder as any
 
-    // Si había un cambio de tipo pendiente, confirmarlo junto con los datos del cliente
+    // Si había un cambio de tipo pendiente, guardarlo junto con los datos del cliente
     if (pendingOrderType.value) {
-        order.value = {
-            ...order.value!,
-            type: pendingOrderType.value,
-            typeDisplayName: getOrderTypeDisplayName(pendingOrderType.value),
-            customerId: orderAny.customerId,
-            customerName: orderAny.customerName,
-            customerPhone: orderAny.customerPhone,
-            guestName: orderAny.guestName,
-            addressId: orderAny.addressId,
-            addressDescription: orderAny.addressDescription,
-            deliveryFee: orderAny.deliveryFee || order.value!.deliveryFee,
-            updatedAt: orderAny.updatedAt
-        }
+        try {
+            // ✅ Enviar tipo + datos del cliente en una sola petición
+            const finalUpdate = await orderApi.update(order.value!.id, {
+                type: pendingOrderType.value,
+                customerId: orderAny.customerId,
+                addressId: orderAny.addressId,
+                guestName: orderAny.guestName,
+                deliveryFee: orderAny.deliveryFee
+            })
 
-        // Limpiar estado temporal
-        pendingOrderType.value = null
-        originalOrderType.value = null
+            // Actualización optimista con la respuesta del backend
+            order.value = {
+                ...order.value!,
+                type: finalUpdate.type,
+                typeDisplayName: getOrderTypeDisplayName(finalUpdate.type),
+                customerId: finalUpdate.customerId || null,
+                customerName: finalUpdate.customerName || null,
+                customerPhone: finalUpdate.customerPhone || null,
+                addressId: finalUpdate.addressId || null,
+                addressDescription: finalUpdate.addressDescription || null,
+                guestName: finalUpdate.guestName || null,
+                deliveryFee: finalUpdate.deliveryFee || null,
+                updatedAt: finalUpdate.updatedAt
+            }
+
+            // Limpiar estado temporal
+            pendingOrderType.value = null
+            originalOrderType.value = null
+        } catch (err: any) {
+            error('Error al actualizar pedido', err.message)
+        }
     } else {
-        // Actualización normal
+        // Actualización normal (sin cambio de tipo)
         order.value = {
             ...order.value!,
             customerId: orderAny.customerId,

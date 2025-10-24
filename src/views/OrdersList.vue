@@ -98,7 +98,7 @@
                                 a
                                 <span class="font-medium">{{
                                     Math.min(currentPage * pageSize, totalCount)
-                                    }}</span>
+                                }}</span>
                                 de
                                 <span class="font-medium">{{ totalCount }}</span>
                                 resultados
@@ -459,36 +459,50 @@ const handleCustomerModalClose = () => {
     }
 }
 
-const handleOrderUpdated = (updatedOrder?: Order) => {
+const handleOrderUpdated = async (updatedOrder?: Order) => {
     if (updatedOrder) {
         const orderAny = updatedOrder as any // Acceso a todos los campos del backend
 
         // ✅ ACTUALIZACIÓN OPTIMISTA - actualizar en la lista local
         const index = orders.value.findIndex(o => o.id === orderAny.id)
         if (index !== -1) {
-            // Si había un cambio de tipo pendiente, confirmarlo junto con los datos del cliente
+            // Si había un cambio de tipo pendiente, guardarlo junto con los datos del cliente
             if (pendingOrderType.value) {
-                orders.value[index] = {
-                    ...orders.value[index],
-                    type: pendingOrderType.value,
-                    typeDisplayName: getOrderTypeDisplayName(pendingOrderType.value),
-                    customerId: orderAny.customerId || null,
-                    customerName: orderAny.customerName || null,
-                    customerPhone: orderAny.customerPhone || null,
-                    addressId: orderAny.addressId || null,
-                    addressDescription: orderAny.addressDescription || null,
-                    guestName: orderAny.guestName || null,
-                    deliveryFee: orderAny.deliveryFee || null,
-                    // ✅ INCLUIR TOTALES DEL BACKEND
-                    subtotal: orderAny.subtotal || 0,
-                    discountTotal: orderAny.discountTotal || 0,
-                    total: orderAny.total || 0,
-                    updatedAt: orderAny.updatedAt
-                }
+                try {
+                    // ✅ Enviar tipo + datos del cliente en una sola petición
+                    const finalUpdate = await orderApi.update(selectedOrder.value!.id, {
+                        type: pendingOrderType.value,
+                        customerId: orderAny.customerId,
+                        addressId: orderAny.addressId,
+                        guestName: orderAny.guestName,
+                        deliveryFee: orderAny.deliveryFee
+                    })
 
-                // Limpiar estado temporal
-                pendingOrderType.value = null
-                originalOrderType.value = null
+                    // Actualización optimista con la respuesta del backend
+                    orders.value[index] = {
+                        ...orders.value[index],
+                        type: finalUpdate.type,
+                        typeDisplayName: getOrderTypeDisplayName(finalUpdate.type),
+                        customerId: finalUpdate.customerId || null,
+                        customerName: finalUpdate.customerName || null,
+                        customerPhone: finalUpdate.customerPhone || null,
+                        addressId: finalUpdate.addressId || null,
+                        addressDescription: finalUpdate.addressDescription || null,
+                        guestName: finalUpdate.guestName || null,
+                        deliveryFee: finalUpdate.deliveryFee || null,
+                        // ✅ INCLUIR TOTALES DEL BACKEND
+                        subtotal: finalUpdate.subtotal || 0,
+                        discountTotal: finalUpdate.discountTotal || 0,
+                        total: finalUpdate.total || 0,
+                        updatedAt: finalUpdate.updatedAt
+                    }
+
+                    // Limpiar estado temporal
+                    pendingOrderType.value = null
+                    originalOrderType.value = null
+                } catch (err: any) {
+                    error('Error al actualizar pedido', err.message)
+                }
             } else {
                 // Actualización normal
                 orders.value[index] = {
