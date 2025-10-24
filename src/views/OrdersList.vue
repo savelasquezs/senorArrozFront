@@ -97,7 +97,7 @@
                                 a
                                 <span class="font-medium">{{
                                     Math.min(currentPage * pageSize, totalCount)
-                                }}</span>
+                                    }}</span>
                                 de
                                 <span class="font-medium">{{ totalCount }}</span>
                                 resultados
@@ -141,7 +141,7 @@
 
         <AssignDeliveryModal v-if="selectedOrder" :open="showAssignDeliveryModal" :order="selectedOrder"
             :pending-status-change="pendingStatusChange || undefined" @updated="handleOrderUpdated"
-            @status-changed="handleStatusChanged" @close="handleAssignDeliveryModalClose" />
+            @status-changed="clearPendingStatusChange" @close="handleAssignDeliveryModalClose" />
     </MainLayout>
 </template>
 
@@ -154,7 +154,6 @@ import { useOrderFilters, type OrderFilterState } from '@/composables/useOrderFi
 import { useOrderPermissions } from '@/composables/useOrderPermissions'
 import { useToast } from '@/composables/useToast'
 import { getOrderStatusDisplayName, getOrderTypeDisplayName } from '@/composables/useFormatting'
-import { useOrderStatusChange } from '@/composables/useOrderStatusChange'
 import MainLayout from '@/components/layout/MainLayout.vue'
 import OrdersTable from '@/components/orders/OrdersTable.vue'
 import EditCustomerModal from '@/components/orders/EditCustomerModal.vue'
@@ -173,8 +172,8 @@ import {
 
 const router = useRouter()
 const { applyAllFilters, sortOrders } = useOrderFilters()
-const { getNextAllowedStatus } = useOrderPermissions()
-const { error } = useToast()
+const { getNextAllowedStatus, canChangeStatus } = useOrderPermissions()
+const { success, error } = useToast()
 
 // Estado
 const loading = ref(false)
@@ -202,14 +201,9 @@ const dateFilters = ref({
 // Modales
 const showEditCustomerModal = ref(false)
 const showSelectAddressModal = ref(false)
-const {
-    pendingStatusChange,
-    showAssignDeliveryModal,
-    handleStatusChange: handleStatusChangeComposable,
-    executeStatusChange,
-    clearPendingStatusChange
-} = useOrderStatusChange()
+const showAssignDeliveryModal = ref(false)
 const selectedOrder = ref<OrderListItem | null>(null)
+const pendingStatusChange = ref<OrderStatus | null>(null)
 
 // Opciones de filtros
 const typeOptions = [
@@ -345,26 +339,37 @@ const handleChangeStatus = async (order: OrderListItem) => {
         return
     }
 
-    const needsDeliverymanModal = await handleStatusChangeComposable(
-        order,
-        nextStatus,
-        (updatedOrder) => {
-            // ✅ Actualización optimista
-            const index = orders.value.findIndex(o => o.id === order.id)
-            if (index !== -1) {
-                orders.value[index] = {
-                    ...orders.value[index],
-                    status: updatedOrder.status,
-                    statusDisplayName: getOrderStatusDisplayName(updatedOrder.status),
-                    updatedAt: updatedOrder.updatedAt
-                }
+    if (!canChangeStatus(order, nextStatus)) {
+        error('Sin permisos', 'No tienes permiso para cambiar el estado de este pedido')
+        return
+    }
+
+    // REGLA: delivery en ready->on_the_way requiere domiciliario
+    if (order.type === 'delivery' && nextStatus === 'on_the_way' && !order.deliveryManId) {
+        selectedOrder.value = order
+        pendingStatusChange.value = nextStatus
+        showAssignDeliveryModal.value = true
+        return
+    }
+
+    // Proceder con cambio de estado
+    try {
+        const updatedOrder = await orderApi.updateStatus(order.id, nextStatus)
+
+        // ✅ ACTUALIZACIÓN OPTIMISTA - actualizar en la lista local
+        const index = orders.value.findIndex(o => o.id === order.id)
+        if (index !== -1) {
+            orders.value[index] = {
+                ...orders.value[index],
+                status: updatedOrder.status,
+                statusDisplayName: getOrderStatusDisplayName(updatedOrder.status),
+                updatedAt: updatedOrder.updatedAt
             }
         }
-    )
 
-    // Si necesita modal, guardamos el pedido seleccionado
-    if (needsDeliverymanModal) {
-        selectedOrder.value = order
+        success('Estado actualizado', 5000, `Pedido cambiado a ${getOrderStatusDisplayName(nextStatus)}`)
+    } catch (err: any) {
+        error('Error al cambiar estado', err.message)
     }
 }
 
@@ -414,34 +419,13 @@ const navigateToNewOrder = () => {
     router.push('/orders/new')
 }
 
+const clearPendingStatusChange = () => {
+    pendingStatusChange.value = null
+}
 
 const handleAssignDeliveryModalClose = () => {
     clearPendingStatusChange()
-    selectedOrder.value = null
-}
-
-const handleStatusChanged = async (newStatus: OrderStatus) => {
-    if (!selectedOrder.value) return
-
-    await executeStatusChange(
-        selectedOrder.value.id,
-        newStatus,
-        (updatedOrder) => {
-            // ✅ Actualización optimista
-            const index = orders.value.findIndex(o => o.id === selectedOrder.value!.id)
-            if (index !== -1) {
-                const orderAny = updatedOrder as any
-                orders.value[index] = {
-                    ...orders.value[index],
-                    deliveryManId: orderAny.deliveryManId || null,
-                    deliveryManName: orderAny.deliveryManName || null,
-                    status: orderAny.status,
-                    statusDisplayName: getOrderStatusDisplayName(orderAny.status),
-                    updatedAt: orderAny.updatedAt
-                }
-            }
-        }
-    )
+    showAssignDeliveryModal.value = false
 }
 
 // Lifecycle
