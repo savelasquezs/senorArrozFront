@@ -28,7 +28,7 @@
                 </div>
 
                 <div class="flex items-center space-x-2">
-                    <BaseButton variant="secondary" size="sm" @click="$router.push({ name: 'Orders' })">
+                    <BaseButton variant="secondary" size="sm" @click="$router.push({ name: 'OrdersList' })">
                         <ArrowLeftIcon class="w-4 h-4 mr-1" />
                         Volver
                     </BaseButton>
