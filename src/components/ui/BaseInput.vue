@@ -10,7 +10,7 @@
 		<div class="relative">
 			<input :id="inputId" :type="type" v-model="inputValue" :placeholder="placeholder" :required="required"
 				:disabled="disabled" :class="inputClasses" @blur="onBlur" @focus="onFocus" :minlength="minlength"
-				:maxlength="maxlength" @keyup.enter="onEnter" />
+				:maxlength="maxlength" :min="min" :max="max" @keyup.enter="onEnter" />
 			<div v-if="$slots.icon"
 				class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
 				<slot name="icon" />
@@ -38,6 +38,8 @@ interface Props {
 	hint?: string;
 	minlength?: number;
 	maxlength?: number;
+	min?: number;
+	max?: number;
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -68,8 +70,22 @@ const inputValue = computed({
 		if (props.type === 'number') {
 			// '' => null, otherwise Number(...)
 			const parsed = val === '' ? null : Number(val);
-			// Si Number(...) es NaN lo enviamos como null
-			emit('update:modelValue', typeof parsed === 'number' && Number.isNaN(parsed) ? null : parsed);
+
+			if (typeof parsed === 'number' && !Number.isNaN(parsed)) {
+				// Validar min/max
+				let finalValue = parsed;
+
+				if (props.min !== undefined && parsed < props.min) {
+					finalValue = props.min;
+				}
+				if (props.max !== undefined && parsed > props.max) {
+					finalValue = props.max;
+				}
+
+				emit('update:modelValue', finalValue);
+			} else {
+				emit('update:modelValue', null);
+			}
 		} else {
 			emit('update:modelValue', val);
 		}
