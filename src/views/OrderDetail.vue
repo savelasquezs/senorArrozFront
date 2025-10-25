@@ -225,7 +225,7 @@
 import { ref, onMounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import type { OrderDetailView, OrderStatus, UpdateOrderDetailDto } from '@/types/order'
-import { orderApi } from '@/services/MainAPI/orderApi'
+import { useOrdersDataStore } from '@/store/ordersData'
 import { useFormatting } from '@/composables/useFormatting'
 import { useOrderPermissions } from '@/composables/useOrderPermissions'
 import { useOrderStatusChange } from '@/composables/useOrderStatusChange'
@@ -263,15 +263,20 @@ const { success, error } = useToast()
 // Store para opciones de pagos
 const ordersStore = useOrdersDraftsStore()
 
-// Estado
-const loading = ref(false)
-const errorMsg = ref<string | null>(null)
-const order = ref<OrderDetailView | null>(null)
+// Store
+const ordersDataStore = useOrdersDataStore()
+
+// Estado local (solo lo que no está en el store)
 const activeTab = ref('info')
 const editableGuestName = ref('')
 const editableNotes = ref('')
 const pendingOrderType = ref<'onsite' | 'delivery' | 'reservation' | null>(null)
 const originalOrderType = ref<'onsite' | 'delivery' | 'reservation' | null>(null)
+
+// Estado del store (reactivo)
+const order = computed(() => ordersDataStore.current)
+const loading = computed(() => ordersDataStore.isLoading)
+const errorMsg = computed(() => ordersDataStore.error)
 
 // Composable de cambio de estado
 const {
@@ -310,17 +315,13 @@ const tabs = [
 
 // Métodos
 const fetchOrderDetail = async () => {
-    loading.value = true
-    errorMsg.value = null
     try {
         const orderId = parseInt(route.params.id as string)
-        order.value = await orderApi.fetchDetail(orderId)
-        editableGuestName.value = order.value.guestName || ''
-        editableNotes.value = order.value.notes || ''
+        await ordersDataStore.fetchById(orderId)
+        editableGuestName.value = order.value?.guestName || ''
+        editableNotes.value = order.value?.notes || ''
     } catch (err: any) {
-        errorMsg.value = err.message || 'Error al cargar el pedido'
-    } finally {
-        loading.value = false
+        console.error('Error loading order:', err)
     }
 }
 
@@ -353,11 +354,11 @@ const updateGuestName = async () => {
     if (!order.value || editableGuestName.value === order.value.guestName) return
 
     try {
-        await orderApi.update(order.value.id, {
+        await ordersDataStore.update(order.value.id, {
             guestName: editableGuestName.value || undefined,
         })
         success('Actualizado', 5000, 'Nombre del invitado actualizado')
-        await fetchOrderDetail()
+        // ✅ No necesita recargar, update ya actualizó current
     } catch (err: any) {
         error('Error', err.message)
     }
@@ -367,11 +368,11 @@ const updateNotes = async () => {
     if (!order.value || editableNotes.value === order.value.notes) return
 
     try {
-        await orderApi.update(order.value.id, {
+        await ordersDataStore.update(order.value.id, {
             notes: editableNotes.value || undefined,
         })
         success('Actualizado', 5000, 'Notas actualizadas')
-        await fetchOrderDetail()
+        // ✅ No necesita recargar
     } catch (err: any) {
         error('Error', err.message)
     }
@@ -381,20 +382,18 @@ const handleProductsUpdate = async (products: UpdateOrderDetailDto[]) => {
     if (!order.value) return
 
     try {
-        await orderApi.update(order.value.id, {
+        await ordersDataStore.update(order.value.id, {
             orderDetails: products,
         })
         success('Productos actualizados', 5000, 'Los productos del pedido han sido actualizados')
-        await fetchOrderDetail()
+        // ✅ No necesita recargar
     } catch (err: any) {
         error('Error al actualizar productos', err.message)
     }
 }
 
 const handlePaymentUpdated = (updates: Partial<OrderDetailView>) => {
-    if (order.value) {
-        order.value = { ...order.value, ...updates }
-    }
+    ordersDataStore.updateCurrent(updates)
 }
 
 const handleAssignDeliveryModalClose = () => {
@@ -472,40 +471,36 @@ const handleCustomerModalClose = () => {
 // Helpers para actualización optimista
 const updateOrderStatus = (updatedOrder: any) => {
     const orderAny = updatedOrder as any
-    order.value = {
-        ...order.value!,
+    ordersDataStore.updateCurrent({
         status: updatedOrder.status,
         statusDisplayName: orderAny.statusDisplayName,
         statusTimes: orderAny.statusTimes || order.value!.statusTimes,
         updatedAt: orderAny.updatedAt
-    }
+    })
 }
 
 const updateOrderDeliveryman = (updatedOrder: any) => {
     const orderAny = updatedOrder as any
-    order.value = {
-        ...order.value!,
+    ordersDataStore.updateCurrent({
         deliveryManId: orderAny.deliveryManId || null,
         deliveryManName: orderAny.deliveryManName || null,
         status: orderAny.status,
         statusDisplayName: orderAny.statusDisplayName,
         statusTimes: orderAny.statusTimes || order.value!.statusTimes,
         updatedAt: orderAny.updatedAt
-    }
+    })
 }
 
 const updateOrderType = (newType: 'onsite' | 'delivery' | 'reservation') => {
-    order.value = {
-        ...order.value!,
+    ordersDataStore.updateCurrent({
         type: newType,
         typeDisplayName: getOrderTypeDisplayName(newType)
-    }
+    })
 }
 
 const updateOrderCustomer = (updatedOrder: any) => {
     const orderAny = updatedOrder as any
-    order.value = {
-        ...order.value!,
+    ordersDataStore.updateCurrent({
         type: orderAny.type,
         typeDisplayName: getOrderTypeDisplayName(orderAny.type),
         customerId: orderAny.customerId || null,
@@ -516,14 +511,12 @@ const updateOrderCustomer = (updatedOrder: any) => {
         guestName: orderAny.guestName || null,
         deliveryFee: orderAny.deliveryFee || null,
         updatedAt: orderAny.updatedAt
-    }
+    })
 }
 
 // Handler unificado para todos los modales autónomos
 const handleModalUpdated = (updates: Partial<OrderDetailView>) => {
-    if (order.value) {
-        order.value = { ...order.value, ...updates }
-    }
+    ordersDataStore.updateCurrent(updates)
 }
 
 const handleCustomerUpdated = async (updatedOrder?: any) => {
@@ -534,7 +527,7 @@ const handleCustomerUpdated = async (updatedOrder?: any) => {
     if (pendingOrderType.value) {
         try {
             // ✅ Enviar tipo + datos del cliente en una sola petición
-            const finalUpdate = await orderApi.update(order.value!.id, {
+            const finalUpdate = await ordersDataStore.update(order.value!.id, {
                 type: pendingOrderType.value,
                 customerId: orderAny.customerId,
                 addressId: orderAny.addressId,

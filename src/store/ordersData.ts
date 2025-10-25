@@ -6,6 +6,7 @@ import { orderApi } from '@/services/MainAPI/orderApi'
 import { getOrderStatusDisplayName } from '@/composables/useFormatting'
 import type {
     Order,
+    OrderDetailView,
     OrderFilters,
     UpdateOrderDto,
     OrderStatus,
@@ -23,7 +24,7 @@ import type {
 export const useOrdersDataStore = defineStore('ordersData', () => {
     // ===== Estado =====
     const list = ref<PagedResult<Order> | null>(null)
-    const current = ref<Order | null>(null)
+    const current = ref<OrderDetailView | null>(null)
     const isLoading = ref(false)
     const error = ref<string | null>(null)
     const customers = ref<Customer[]>([])
@@ -49,9 +50,10 @@ export const useOrdersDataStore = defineStore('ordersData', () => {
         isLoading.value = true
         error.value = null
         try {
-            current.value = await orderApi.getOrderById(id)
+            current.value = await orderApi.fetchDetail(id)
         } catch (error: any) {
             error.value = error.message || 'Error de conexión'
+            throw error
         } finally {
             isLoading.value = false
         }
@@ -79,7 +81,7 @@ export const useOrdersDataStore = defineStore('ordersData', () => {
 
             // Update current if it's the same order
             if (current.value?.id === id) {
-                current.value = response // El backend ya incluye todos los campos
+                current.value = response as any // Cast temporal hasta que updateOrder devuelva OrderDetailView
             }
 
             return response
@@ -160,6 +162,13 @@ export const useOrdersDataStore = defineStore('ordersData', () => {
         }
     }
 
+    // Helper para actualizaciones locales (no del backend)
+    const updateCurrent = (updates: Partial<OrderDetailView>) => {
+        if (current.value) {
+            current.value = { ...current.value, ...updates }
+        }
+    }
+
     // Clear - COPIAR líneas 357-360
     const clear = () => {
         current.value = null
@@ -195,7 +204,8 @@ export const useOrdersDataStore = defineStore('ordersData', () => {
         fetch,
         fetchById,
         update,
-        updateStatus, // ✅ NUEVO
+        updateCurrent, // ✅ NUEVO - Solo para actualizaciones locales
+        updateStatus,
         remove,
         clear,
         loadCustomers,
