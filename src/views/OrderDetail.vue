@@ -186,29 +186,24 @@
 
                     <!-- Tab: Pagos -->
                     <div v-if="activeTab === 'payments'">
-                        <!-- Sección: Agregar/Editar Pagos -->
                         <div class="mb-6">
-                            <h3 class="text-lg font-medium text-gray-900 mb-4">Agregar/Editar Pagos</h3>
+                            <h3 class="text-lg font-medium text-gray-900 mb-4">Gestión de Pagos</h3>
+                            <p class="text-sm text-gray-600 mb-4">
+                                Administra los pagos del pedido. Los pagos bancarios pueden ser verificados y los pagos
+                                por app pueden ser liquidados.
+                            </p>
                             <PersistedPaymentSelector :bank-payments="order.bankPayments"
                                 :app-payments="order.appPayments" :total="order.total" :total-payments="totalPayments"
                                 :cash-amount="cashAmount" :can-add-payments="canAddPayments"
-                                :can-edit="permissions.canEditPayments(order)" :bank-options="bankOptions"
+                                :can-edit="permissions.canEditPayments(order)"
+                                :can-verify="permissions.canVerifyPayments()"
+                                :can-settle="permissions.canSettleAppPayments()" :bank-options="bankOptions"
                                 :app-options="appOptions" :suggested-amount="getSuggestedAmount()"
                                 @add-app-payment="addAppPayment" @update-app-payment="updateAppPayment"
                                 @remove-app-payment="removeAppPayment" @add-bank-payment="addBankPayment"
-                                @update-bank-payment="updateBankPayment" @remove-bank-payment="removeBankPayment" />
-                        </div>
-
-                        <!-- Sección: Verificación/Liquidación (solo Admin/Superadmin) -->
-                        <div v-if="permissions.canEditPayments(order)" class="border-t pt-6">
-                            <h3 class="text-lg font-medium text-gray-900 mb-4">Verificación y Liquidación</h3>
-                            <p class="text-sm text-gray-600 mb-4">
-                                Esta sección permite verificar pagos bancarios y liquidar pagos por app.
-                            </p>
-                            <OrderPaymentsList :bank-payments="order.bankPayments" :app-payments="order.appPayments"
-                                :total="order.total" :can-edit="false" @verify-payment="handleVerifyPayment"
-                                @unverify-payment="handleUnverifyPayment" @settle-payment="handleSettlePayment"
-                                @unsettle-payment="handleUnsettlePayment" />
+                                @update-bank-payment="updateBankPayment" @remove-bank-payment="removeBankPayment"
+                                @verify-payment="handleVerifyPayment" @unverify-payment="handleUnverifyPayment"
+                                @settle-payment="handleSettlePayment" @unsettle-payment="handleUnsettlePayment" />
                         </div>
                     </div>
                 </div>
@@ -258,7 +253,6 @@ import BaseLoading from '@/components/ui/BaseLoading.vue'
 import OrderTypeBadge from '@/components/orders/OrderTypeBadge.vue'
 import OrderProgressBar from '@/components/orders/OrderProgressBar.vue'
 import OrderDetailProductsList from '@/components/orders/OrderDetailProductsList.vue'
-import OrderPaymentsList from '@/components/orders/OrderPaymentsList.vue'
 import EditCustomerModal from '@/components/orders/EditCustomerModal.vue'
 import SelectAddressModal from '@/components/orders/SelectAddressModal.vue'
 import AssignDeliveryModal from '@/components/orders/AssignDeliveryModal.vue'

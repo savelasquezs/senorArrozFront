@@ -17,19 +17,50 @@
 
             <!-- Existing App Payment -->
             <div v-else class="flex items-center justify-between p-3 bg-blue-50 rounded-lg border border-blue-200">
-                <div class="flex items-center gap-3">
+                <div class="flex items-center gap-3 flex-1">
                     <DevicePhoneMobileIcon class="w-5 h-5 text-blue-600" />
-                    <div>
-                        <div class="text-sm font-medium text-blue-900">{{ appPayments[0].appName }}</div>
+                    <div class="flex-1">
+                        <div class="flex items-center gap-2">
+                            <div class="text-sm font-medium text-blue-900">{{ appPayments[0].appName }}</div>
+                            <!-- Badge de estado de liquidación -->
+                            <span v-if="canSettle" :class="[
+                                'inline-flex items-center px-2 py-1 rounded-full text-xs font-medium',
+                                appPayments[0].isSettled
+                                    ? 'bg-green-100 text-green-800'
+                                    : 'bg-yellow-100 text-yellow-800'
+                            ]">
+                                <component :is="appPayments[0].isSettled ? CheckCircleIcon : ClockIcon"
+                                    class="w-3 h-3 mr-1" />
+                                {{ appPayments[0].isSettled ? 'Liquidado' : 'Pendiente' }}
+                            </span>
+                        </div>
                         <div class="text-sm text-blue-600">{{ formatCurrency(appPayments[0].amount) }}</div>
+                        <div v-if="appPayments[0].isSettled && appPayments[0].settledAt"
+                            class="text-xs text-blue-500 mt-1">
+                            Liquidado: {{ formatDateTime(appPayments[0].settledAt) }}
+                        </div>
                     </div>
                 </div>
-                <div v-if="canEdit" class="flex gap-1">
-                    <BaseButton @click="handleEditAppPayment(appPayments[0])" variant="ghost" size="sm">
+                <div class="flex gap-1">
+                    <!-- Botones de liquidación (Admin/Superadmin) -->
+                    <BaseButton v-if="canSettle && !appPayments[0].isSettled"
+                        @click="$emit('settle-payment', appPayments[0].id)" variant="ghost" size="sm"
+                        title="Liquidar pago">
+                        <CheckIcon class="w-4 h-4 text-emerald-600" />
+                    </BaseButton>
+                    <BaseButton v-if="canSettle && appPayments[0].isSettled"
+                        @click="$emit('unsettle-payment', appPayments[0].id)" variant="ghost" size="sm"
+                        title="Desliquidar pago">
+                        <XMarkIcon class="w-4 h-4 text-gray-600" />
+                    </BaseButton>
+
+                    <!-- Botones de edición (si tiene permisos) -->
+                    <BaseButton v-if="canEdit" @click="handleEditAppPayment(appPayments[0])" variant="ghost" size="sm"
+                        title="Editar monto">
                         <PencilIcon class="w-4 h-4" />
                     </BaseButton>
-                    <BaseButton @click="handleRemoveAppPayment(appPayments[0].id)" variant="ghost" size="sm"
-                        class="text-red-600">
+                    <BaseButton v-if="canEdit" @click="handleRemoveAppPayment(appPayments[0].id)" variant="ghost"
+                        size="sm" class="text-red-600" title="Eliminar pago">
                         <TrashIcon class="w-4 h-4" />
                     </BaseButton>
                 </div>
@@ -54,19 +85,47 @@
             <!-- Existing Bank Payments -->
             <div v-for="payment in bankPayments" :key="payment.id"
                 class="flex items-center justify-between p-3 bg-green-50 rounded-lg border border-green-200">
-                <div class="flex items-center gap-3">
+                <div class="flex items-center gap-3 flex-1">
                     <BuildingLibraryIcon class="w-5 h-5 text-green-600" />
-                    <div>
-                        <div class="text-sm font-medium text-green-900">{{ payment.bankName }}</div>
+                    <div class="flex-1">
+                        <div class="flex items-center gap-2">
+                            <div class="text-sm font-medium text-green-900">{{ payment.bankName }}</div>
+                            <!-- Badge de estado de verificación -->
+                            <span v-if="canVerify" :class="[
+                                'inline-flex items-center px-2 py-1 rounded-full text-xs font-medium',
+                                payment.isVerified
+                                    ? 'bg-green-100 text-green-800'
+                                    : 'bg-yellow-100 text-yellow-800'
+                            ]">
+                                <component :is="payment.isVerified ? CheckCircleIcon : ClockIcon"
+                                    class="w-3 h-3 mr-1" />
+                                {{ payment.isVerified ? 'Verificado' : 'Pendiente' }}
+                            </span>
+                        </div>
                         <div class="text-sm text-green-600">{{ formatCurrency(payment.amount) }}</div>
+                        <div v-if="payment.isVerified && payment.verifiedAt" class="text-xs text-green-500 mt-1">
+                            Verificado: {{ formatDateTime(payment.verifiedAt) }}
+                        </div>
                     </div>
                 </div>
-                <div v-if="canEdit" class="flex gap-1">
-                    <BaseButton @click="handleEditBankPayment(payment)" variant="ghost" size="sm">
+                <div class="flex gap-1">
+                    <!-- Botones de verificación (Admin/Superadmin) -->
+                    <BaseButton v-if="canVerify && !payment.isVerified" @click="$emit('verify-payment', payment.id)"
+                        variant="ghost" size="sm" title="Verificar pago">
+                        <CheckIcon class="w-4 h-4 text-emerald-600" />
+                    </BaseButton>
+                    <BaseButton v-if="canVerify && payment.isVerified" @click="$emit('unverify-payment', payment.id)"
+                        variant="ghost" size="sm" title="Desverificar pago">
+                        <XMarkIcon class="w-4 h-4 text-gray-600" />
+                    </BaseButton>
+
+                    <!-- Botones de edición (si tiene permisos) -->
+                    <BaseButton v-if="canEdit" @click="handleEditBankPayment(payment)" variant="ghost" size="sm"
+                        title="Editar monto">
                         <PencilIcon class="w-4 h-4" />
                     </BaseButton>
-                    <BaseButton @click="handleRemoveBankPayment(payment.id)" variant="ghost" size="sm"
-                        class="text-red-600">
+                    <BaseButton v-if="canEdit" @click="handleRemoveBankPayment(payment.id)" variant="ghost" size="sm"
+                        class="text-red-600" title="Eliminar pago">
                         <TrashIcon class="w-4 h-4" />
                     </BaseButton>
                 </div>
@@ -172,6 +231,10 @@ import {
     TrashIcon,
     PencilIcon,
     PlusIcon,
+    CheckCircleIcon,
+    ClockIcon,
+    CheckIcon,
+    XMarkIcon,
 } from '@heroicons/vue/24/outline'
 
 interface Props {
@@ -182,6 +245,8 @@ interface Props {
     cashAmount: number
     canAddPayments: boolean
     canEdit: boolean
+    canVerify: boolean
+    canSettle: boolean
     bankOptions: { value: number; label: string }[]
     appOptions: { value: number; label: string }[]
     suggestedAmount: number
@@ -196,9 +261,13 @@ const emit = defineEmits<{
     'add-bank-payment': [bankId: number, amount: number]
     'update-bank-payment': [paymentId: number, amount: number]
     'remove-bank-payment': [paymentId: number]
+    'verify-payment': [paymentId: number]
+    'unverify-payment': [paymentId: number]
+    'settle-payment': [paymentId: number]
+    'unsettle-payment': [paymentId: number]
 }>()
 
-const { formatCurrency } = useFormatting()
+const { formatCurrency, formatDateTime } = useFormatting()
 
 // State
 const showAppModal = ref(false)
