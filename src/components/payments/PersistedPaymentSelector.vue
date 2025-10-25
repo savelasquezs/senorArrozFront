@@ -44,12 +44,11 @@
                 <div class="flex gap-1">
                     <!-- Botones de liquidación (Admin/Superadmin) -->
                     <BaseButton v-if="canSettle && !appPayments[0].isSettled"
-                        @click="$emit('settle-payment', appPayments[0].id)" variant="ghost" size="sm"
-                        title="Liquidar pago">
+                        @click="handleSettlePayment(appPayments[0].id)" variant="ghost" size="sm" title="Liquidar pago">
                         <CheckIcon class="w-4 h-4 text-emerald-600" />
                     </BaseButton>
                     <BaseButton v-if="canSettle && appPayments[0].isSettled"
-                        @click="$emit('unsettle-payment', appPayments[0].id)" variant="ghost" size="sm"
+                        @click="handleUnsettlePayment(appPayments[0].id)" variant="ghost" size="sm"
                         title="Desliquidar pago">
                         <XMarkIcon class="w-4 h-4 text-gray-600" />
                     </BaseButton>
@@ -110,11 +109,11 @@
                 </div>
                 <div class="flex gap-1">
                     <!-- Botones de verificación (Admin/Superadmin) -->
-                    <BaseButton v-if="canVerify && !payment.isVerified" @click="$emit('verify-payment', payment.id)"
+                    <BaseButton v-if="canVerify && !payment.isVerified" @click="handleVerifyPayment(payment.id)"
                         variant="ghost" size="sm" title="Verificar pago">
                         <CheckIcon class="w-4 h-4 text-emerald-600" />
                     </BaseButton>
-                    <BaseButton v-if="canVerify && payment.isVerified" @click="$emit('unverify-payment', payment.id)"
+                    <BaseButton v-if="canVerify && payment.isVerified" @click="handleUnverifyPayment(payment.id)"
                         variant="ghost" size="sm" title="Desverificar pago">
                         <XMarkIcon class="w-4 h-4 text-gray-600" />
                     </BaseButton>
@@ -220,7 +219,12 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { useFormatting } from '@/composables/useFormatting'
-import type { OrderBankPaymentDetail, OrderAppPaymentDetail } from '@/types/order'
+import { usePersistedOrderPayments } from '@/composables/usePersistedOrderPayments'
+import { bankPaymentApi } from '@/services/MainAPI/bankPaymentApi'
+import { appPaymentApi } from '@/services/MainAPI/appPaymentApi'
+import { useToast } from '@/composables/useToast'
+import { useOrderPermissions } from '@/composables/useOrderPermissions'
+import type { OrderBankPaymentDetail, OrderAppPaymentDetail, OrderDetailView } from '@/types/order'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseSelect from '@/components/ui/BaseSelect.vue'
 import BaseInput from '@/components/ui/BaseInput.vue'
@@ -238,36 +242,52 @@ import {
 } from '@heroicons/vue/24/outline'
 
 interface Props {
-    bankPayments: OrderBankPaymentDetail[]
-    appPayments: OrderAppPaymentDetail[]
-    total: number
-    totalPayments: number
-    cashAmount: number
-    canAddPayments: boolean
-    canEdit: boolean
-    canVerify: boolean
-    canSettle: boolean
+    order: OrderDetailView
     bankOptions: { value: number; label: string }[]
     appOptions: { value: number; label: string }[]
-    suggestedAmount: number
 }
 
 const props = defineProps<Props>()
 
 const emit = defineEmits<{
-    'add-app-payment': [appId: number, amount: number]
-    'update-app-payment': [paymentId: number, amount: number]
-    'remove-app-payment': [paymentId: number]
-    'add-bank-payment': [bankId: number, amount: number]
-    'update-bank-payment': [paymentId: number, amount: number]
-    'remove-bank-payment': [paymentId: number]
-    'verify-payment': [paymentId: number]
-    'unverify-payment': [paymentId: number]
-    'settle-payment': [paymentId: number]
-    'unsettle-payment': [paymentId: number]
+    'updated': [updates: Partial<OrderDetailView>]
 }>()
 
 const { formatCurrency, formatDateTime } = useFormatting()
+const { success, error } = useToast()
+const permissions = useOrderPermissions()
+
+// Computed para datos del pedido
+const bankPayments = computed(() => props.order.bankPayments)
+const appPayments = computed(() => props.order.appPayments)
+const total = computed(() => props.order.total)
+const orderRef = computed(() => props.order)
+
+// Usar el composable internamente
+const {
+    // totalBankPayments, // No usado directamente en template
+    // totalAppPayments, // No usado directamente en template
+    totalPayments,
+    cashAmount,
+    canAddPayments,
+    // hasSinglePayment, // No usado directamente en template
+    getSuggestedAmount,
+    addAppPayment: addAppPaymentInternal,
+    updateAppPayment: updateAppPaymentInternal,
+    removeAppPayment: removeAppPaymentInternal,
+    addBankPayment: addBankPaymentInternal,
+    updateBankPayment: updateBankPaymentInternal,
+    removeBankPayment: removeBankPaymentInternal,
+    // autoAdjustSinglePayment, // No usado directamente en template
+} = usePersistedOrderPayments(orderRef, (updates) => {
+    // Emitir actualización al padre
+    emit('updated', updates)
+})
+
+// Computed para permisos
+const canEdit = computed(() => permissions.canEditPayments(props.order))
+const canVerify = computed(() => permissions.canVerifyPayments())
+const canSettle = computed(() => permissions.canSettleAppPayments())
 
 // State
 const showAppModal = ref(false)
@@ -279,22 +299,22 @@ const editingAppPayment = ref<OrderAppPaymentDetail | null>(null)
 const editingBankPayment = ref<OrderBankPaymentDetail | null>(null)
 
 // Computed
-const hasAppPayment = computed(() => props.appPayments.length > 0)
+const hasAppPayment = computed(() => appPayments.value.length > 0)
 
 const maxPaymentAmount = computed(() => {
     // Si estamos editando, excluir el monto actual
     if (editingAppPayment.value) {
-        return props.total - props.totalPayments + editingAppPayment.value.amount
+        return total.value - totalPayments.value + editingAppPayment.value.amount
     }
     if (editingBankPayment.value) {
-        return props.total - props.totalPayments + editingBankPayment.value.amount
+        return total.value - totalPayments.value + editingBankPayment.value.amount
     }
-    return props.cashAmount
+    return cashAmount.value
 })
 
 // Methods - App Payments
 const handleAddAppPayment = () => {
-    paymentAmount.value = props.suggestedAmount
+    paymentAmount.value = getSuggestedAmount()
     showAppModal.value = true
 }
 
@@ -305,14 +325,14 @@ const handleEditAppPayment = (payment: OrderAppPaymentDetail) => {
 }
 
 const handleRemoveAppPayment = (paymentId: number) => {
-    emit('remove-app-payment', paymentId)
+    removeAppPaymentInternal(paymentId)
 }
 
 const saveAppPayment = () => {
     if (editingAppPayment.value) {
-        emit('update-app-payment', editingAppPayment.value.id, paymentAmount.value)
+        updateAppPaymentInternal(editingAppPayment.value.id, paymentAmount.value)
     } else if (selectedAppId.value) {
-        emit('add-app-payment', selectedAppId.value, paymentAmount.value)
+        addAppPaymentInternal(selectedAppId.value, paymentAmount.value)
     }
     closeAppModal()
 }
@@ -326,7 +346,7 @@ const closeAppModal = () => {
 
 // Methods - Bank Payments
 const handleAddBankPayment = () => {
-    paymentAmount.value = props.suggestedAmount
+    paymentAmount.value = getSuggestedAmount()
     showBankModal.value = true
 }
 
@@ -337,14 +357,14 @@ const handleEditBankPayment = (payment: OrderBankPaymentDetail) => {
 }
 
 const handleRemoveBankPayment = (paymentId: number) => {
-    emit('remove-bank-payment', paymentId)
+    removeBankPaymentInternal(paymentId)
 }
 
 const saveBankPayment = () => {
     if (editingBankPayment.value) {
-        emit('update-bank-payment', editingBankPayment.value.id, paymentAmount.value)
+        updateBankPaymentInternal(editingBankPayment.value.id, paymentAmount.value)
     } else if (selectedBankId.value) {
-        emit('add-bank-payment', selectedBankId.value, paymentAmount.value)
+        addBankPaymentInternal(selectedBankId.value, paymentAmount.value)
     }
     closeBankModal()
 }
@@ -354,5 +374,66 @@ const closeBankModal = () => {
     selectedBankId.value = null
     editingBankPayment.value = null
     paymentAmount.value = 0
+}
+
+// Métodos de verificación/liquidación
+const handleVerifyPayment = async (paymentId: number) => {
+    try {
+        await bankPaymentApi.verifyBankPayment(paymentId)
+        success('Pago verificado', 5000, 'El pago bancario ha sido verificado')
+
+        // Actualización optimista
+        const updatedPayments = bankPayments.value.map(p =>
+            p.id === paymentId ? { ...p, isVerified: true, verifiedAt: new Date().toISOString() } : p
+        )
+        emit('updated', { bankPayments: updatedPayments })
+    } catch (err: any) {
+        error('Error', err.message)
+    }
+}
+
+const handleUnverifyPayment = async (paymentId: number) => {
+    try {
+        await bankPaymentApi.unverifyBankPayment(paymentId)
+        success('Verificación removida', 5000, 'El pago bancario ha sido desverificado')
+
+        // Actualización optimista
+        const updatedPayments = bankPayments.value.map(p =>
+            p.id === paymentId ? { ...p, isVerified: false, verifiedAt: null } : p
+        )
+        emit('updated', { bankPayments: updatedPayments })
+    } catch (err: any) {
+        error('Error', err.message)
+    }
+}
+
+const handleSettlePayment = async (paymentId: number) => {
+    try {
+        await appPaymentApi.settleAppPayment(paymentId)
+        success('Pago liquidado', 5000, 'El pago por app ha sido liquidado')
+
+        // Actualización optimista
+        const updatedPayments = appPayments.value.map(p =>
+            p.id === paymentId ? { ...p, isSettled: true, settledAt: new Date().toISOString() } : p
+        )
+        emit('updated', { appPayments: updatedPayments })
+    } catch (err: any) {
+        error('Error', err.message)
+    }
+}
+
+const handleUnsettlePayment = async (paymentId: number) => {
+    try {
+        await appPaymentApi.unsettleAppPayment(paymentId)
+        success('Liquidación removida', 5000, 'El pago por app ha sido desliquidado')
+
+        // Actualización optimista
+        const updatedPayments = appPayments.value.map(p =>
+            p.id === paymentId ? { ...p, isSettled: false, settledAt: null } : p
+        )
+        emit('updated', { appPayments: updatedPayments })
+    } catch (err: any) {
+        error('Error', err.message)
+    }
 }
 </script>

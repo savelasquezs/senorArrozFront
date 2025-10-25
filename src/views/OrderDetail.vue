@@ -192,18 +192,8 @@
                                 Administra los pagos del pedido. Los pagos bancarios pueden ser verificados y los pagos
                                 por app pueden ser liquidados.
                             </p>
-                            <PersistedPaymentSelector :bank-payments="order.bankPayments"
-                                :app-payments="order.appPayments" :total="order.total" :total-payments="totalPayments"
-                                :cash-amount="cashAmount" :can-add-payments="canAddPayments"
-                                :can-edit="permissions.canEditPayments(order)"
-                                :can-verify="permissions.canVerifyPayments()"
-                                :can-settle="permissions.canSettleAppPayments()" :bank-options="bankOptions"
-                                :app-options="appOptions" :suggested-amount="getSuggestedAmount()"
-                                @add-app-payment="addAppPayment" @update-app-payment="updateAppPayment"
-                                @remove-app-payment="removeAppPayment" @add-bank-payment="addBankPayment"
-                                @update-bank-payment="updateBankPayment" @remove-bank-payment="removeBankPayment"
-                                @verify-payment="handleVerifyPayment" @unverify-payment="handleUnverifyPayment"
-                                @settle-payment="handleSettlePayment" @unsettle-payment="handleUnsettlePayment" />
+                            <PersistedPaymentSelector :order="order" :bank-options="bankOptions"
+                                :app-options="appOptions" @updated="handlePaymentUpdated" />
                         </div>
                     </div>
                 </div>
@@ -232,16 +222,13 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, computed, watch } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import type { OrderDetailView, OrderStatus, UpdateOrderDetailDto } from '@/types/order'
 import { orderApi } from '@/services/MainAPI/orderApi'
-import { bankPaymentApi } from '@/services/MainAPI/bankPaymentApi'
-import { appPaymentApi } from '@/services/MainAPI/appPaymentApi'
 import { useFormatting } from '@/composables/useFormatting'
 import { useOrderPermissions } from '@/composables/useOrderPermissions'
 import { useOrderStatusChange } from '@/composables/useOrderStatusChange'
-import { usePersistedOrderPayments } from '@/composables/usePersistedOrderPayments'
 import PersistedPaymentSelector from '@/components/payments/PersistedPaymentSelector.vue'
 import { useOrdersDraftsStore } from '@/store/ordersDrafts'
 import { useToast } from '@/composables/useToast'
@@ -295,27 +282,6 @@ const {
     clearPendingStatusChange
 } = useOrderStatusChange()
 
-// Composable de pagos persistidos
-const {
-    totalPayments,
-    cashAmount,
-    canAddPayments,
-    hasSinglePayment,
-    getSuggestedAmount,
-    addAppPayment,
-    updateAppPayment,
-    removeAppPayment,
-    addBankPayment,
-    updateBankPayment,
-    removeBankPayment,
-    autoAdjustSinglePayment,
-} = usePersistedOrderPayments(order, (updates) => {
-    // Callback para actualización optimista
-    if (order.value) {
-        order.value = { ...order.value, ...updates }
-    }
-})
-
 // Opciones para selectores de pagos
 const bankOptions = computed(() => {
     return ordersStore.banks
@@ -328,14 +294,6 @@ const appOptions = computed(() => {
         .filter(app => app.active)
         .map(app => ({ value: app.id, label: app.name }))
 })
-
-// Watch para auto-ajustar pago único cuando cambia el total
-watch(() => order.value?.total, async (newTotal, oldTotal) => {
-    if (!newTotal || !oldTotal || newTotal === oldTotal) return
-    if (!hasSinglePayment.value) return
-
-    await autoAdjustSinglePayment()
-}, { deep: true })
 
 // Modales
 const showEditCustomerModal = ref(false)
@@ -440,43 +398,9 @@ const handleProductsUpdate = async (products: UpdateOrderDetailDto[]) => {
     }
 }
 
-const handleVerifyPayment = async (paymentId: number) => {
-    try {
-        await bankPaymentApi.verify(paymentId)
-        success('Pago verificado', 5000, 'El pago bancario ha sido verificado')
-        await fetchOrderDetail()
-    } catch (err: any) {
-        error('Error', err.message)
-    }
-}
-
-const handleUnverifyPayment = async (paymentId: number) => {
-    try {
-        await bankPaymentApi.unverify(paymentId)
-        success('Verificación removida', 5000, 'El pago bancario ha sido desverificado')
-        await fetchOrderDetail()
-    } catch (err: any) {
-        error('Error', err.message)
-    }
-}
-
-const handleSettlePayment = async (paymentId: number) => {
-    try {
-        await appPaymentApi.settle(paymentId)
-        success('Pago liquidado', 5000, 'El pago por app ha sido liquidado')
-        await fetchOrderDetail()
-    } catch (err: any) {
-        error('Error', err.message)
-    }
-}
-
-const handleUnsettlePayment = async (paymentId: number) => {
-    try {
-        await appPaymentApi.unsettle(paymentId)
-        success('Liquidación removida', 5000, 'El pago por app ha sido desliquidado')
-        await fetchOrderDetail()
-    } catch (err: any) {
-        error('Error', err.message)
+const handlePaymentUpdated = (updates: Partial<OrderDetailView>) => {
+    if (order.value) {
+        order.value = { ...order.value, ...updates }
     }
 }
 
