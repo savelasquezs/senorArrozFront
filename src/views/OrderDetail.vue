@@ -139,7 +139,7 @@
                             <div v-if="order.type === 'delivery'" class="space-y-2">
                                 <label class="text-sm font-medium text-gray-700">Tarifa de domicilio</label>
                                 <div class="bg-gray-50 rounded-lg p-3">
-                                    <p class="text-sm text-gray-900">{{ formatCurrency(order.deliveryFee || 0) }}</p>
+                                    <p class="text-sm text-gray-900">{{ formatCurrency(order?.deliveryFee || 0) }}</p>
                                 </div>
                             </div>
 
@@ -180,8 +180,9 @@
 
                     <!-- Tab: Productos -->
                     <div v-if="activeTab === 'products'">
-                        <OrderDetailProductsList :products="order.orderDetails" :delivery-fee="order.deliveryFee || 0"
-                            :can-edit="permissions.canEditProducts(order)" @save="handleProductsUpdate" />
+                        <OrderDetailProductsList v-if="order" :products="order?.orderDetails"
+                            :delivery-fee="order?.deliveryFee || 0" :can-edit="permissions.canEditProducts(order)"
+                            @save="handleProductsUpdate" />
                     </div>
 
                     <!-- Tab: Pagos -->
@@ -192,7 +193,7 @@
                                 Administra los pagos del pedido. Los pagos bancarios pueden ser verificados y los pagos
                                 por app pueden ser liquidados.
                             </p>
-                            <PersistedPaymentSelector :order="order" :bank-options="bankOptions"
+                            <PersistedPaymentSelector v-if="order" :order="order" :bank-options="bankOptions"
                                 :app-options="appOptions" @updated="handlePaymentUpdated" />
                         </div>
                     </div>

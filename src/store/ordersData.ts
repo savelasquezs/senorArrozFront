@@ -81,7 +81,14 @@ export const useOrdersDataStore = defineStore('ordersData', () => {
 
             // Update current if it's the same order
             if (current.value?.id === id) {
-                current.value = response as any // Cast temporal hasta que updateOrder devuelva OrderDetailView
+                // ✅ Después de actualizar, obtener los datos completos
+                try {
+                    current.value = await orderApi.fetchDetail(id)
+                } catch (fetchError) {
+                    console.error('Error fetching updated order details:', fetchError)
+                    // Si falla el fetch, usar el response con cast
+                    current.value = response as any
+                }
             }
 
             return response

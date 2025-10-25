@@ -66,7 +66,7 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
 import type { OrderListItem, OrderDetailView, Order } from '@/types/order'
-import { orderApi } from '@/services/MainAPI/orderApi'
+import { useOrdersDataStore } from '@/store/ordersData'
 import { useToast } from '@/composables/useToast'
 import BaseDialog from '@/components/ui/BaseDialog.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
@@ -87,6 +87,7 @@ const emit = defineEmits<{
 }>()
 
 const { success, error } = useToast()
+const ordersStore = useOrdersDataStore()
 
 // Estado
 const saving = ref(false)
@@ -207,7 +208,7 @@ const handleSave = async () => {
             updateData.addressId = null
         }
 
-        const updatedOrder = await orderApi.update(props.order.id, updateData)
+        const updatedOrder = await ordersStore.update(props.order.id, updateData)
 
         success('Tipo de pedido actualizado', 5000)
         emit('updated', updatedOrder)

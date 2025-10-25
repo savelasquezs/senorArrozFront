@@ -41,21 +41,21 @@
 
                         <!-- Cantidad -->
                         <td class="px-4 py-3 text-center">
-                            <BaseInput v-if="editing" v-model.number="item.quantity" type="number" min="1" class="w-20"
+                            <BaseInput v-if="editing" v-model.number="item.quantity" type="number" :min="1" class="w-20"
                                 @input="recalculateSubtotal(item)" />
                             <span v-else class="text-sm text-gray-900">{{ item.quantity }}</span>
                         </td>
 
                         <!-- Precio unitario -->
                         <td class="px-4 py-3 text-right">
-                            <BaseInput v-if="editing" v-model.number="item.unitPrice" type="number" min="0" step="100"
+                            <BaseInput v-if="editing" v-model.number="item.unitPrice" type="number" :min="0" step="100"
                                 class="w-28" @input="recalculateSubtotal(item)" />
                             <span v-else class="text-sm text-gray-900">{{ formatCurrency(item.unitPrice) }}</span>
                         </td>
 
                         <!-- Descuento -->
                         <td class="px-4 py-3 text-right">
-                            <BaseInput v-if="editing" v-model.number="item.discount" type="number" min="0" step="100"
+                            <BaseInput v-if="editing" v-model.number="item.discount" type="number" :min="0" step="100"
                                 class="w-28" @input="recalculateSubtotal(item)" />
                             <span v-else class="text-sm text-gray-900">
                                 {{ item.discount > 0 ? formatCurrency(item.discount) : '-' }}

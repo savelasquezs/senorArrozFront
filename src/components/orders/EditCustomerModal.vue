@@ -76,7 +76,6 @@
 import { ref, computed, onMounted } from 'vue'
 import type { OrderListItem, Order } from '@/types/order'
 import type { Customer, CustomerAddress } from '@/types/customer'
-import { orderApi } from '@/services/MainAPI/orderApi'
 import { useOrdersDataStore } from '@/store/ordersData'
 import { useToast } from '@/composables/useToast'
 import { useDeliveryFee } from '@/composables/useDeliveryFee'
@@ -240,7 +239,7 @@ const handleSave = async () => {
             updateData.addressId = null
         }
 
-        const updatedOrder = await orderApi.update(props.order.id, updateData)
+        const updatedOrder = await ordersStore.update(props.order.id, updateData)
 
         showSuccess('Cliente actualizado', 5000)
 

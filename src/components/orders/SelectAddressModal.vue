@@ -73,7 +73,7 @@
 import { ref, watch, onMounted } from 'vue'
 import type { OrderListItem, Order } from '@/types/order'
 import type { CustomerAddress } from '@/types/customer'
-import { orderApi } from '@/services/MainAPI/orderApi'
+import { useOrdersDataStore } from '@/store/ordersData'
 import { customerApi } from '@/services/MainAPI/customerApi'
 import { useFormatting } from '@/composables/useFormatting'
 import { useToast } from '@/composables/useToast'
@@ -95,6 +95,7 @@ const emit = defineEmits<{
 
 const { formatCurrency } = useFormatting()
 const { success, error } = useToast()
+const ordersStore = useOrdersDataStore()
 
 // Estado
 const loading = ref(false)
@@ -133,7 +134,7 @@ const handleSave = async () => {
 
     saving.value = true
     try {
-        const updatedOrder = await orderApi.update(props.order.id, {
+        const updatedOrder = await ordersStore.update(props.order.id, {
             addressId: selectedAddressId.value,
             deliveryFee: selectedAddress.deliveryFee,
         })
