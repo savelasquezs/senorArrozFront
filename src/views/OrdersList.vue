@@ -98,7 +98,7 @@
                                 a
                                 <span class="font-medium">{{
                                     Math.min(currentPage * pageSize, totalCount)
-                                    }}</span>
+                                }}</span>
                                 de
                                 <span class="font-medium">{{ totalCount }}</span>
                                 resultados
