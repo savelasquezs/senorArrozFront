@@ -74,7 +74,7 @@ class AppPaymentApi extends BaseApi {
 
     // 5. Liquidar pago individual
     async settleAppPayment(id: number): Promise<string> {
-        return this.post<string>(`/apppayments/${id}/settle`);
+        return this.post<string>(`/apppayments/${id}/settle`, {});
     }
 
     // 6. Liquidar múltiples pagos
@@ -86,7 +86,7 @@ class AppPaymentApi extends BaseApi {
 
     // 7. Desliquidar pago
     async unsettleAppPayment(id: number): Promise<string> {
-        return this.post<string>(`/apppayments/${id}/unsettle`);
+        return this.post<string>(`/apppayments/${id}/unsettle`, {});
     }
 
 

@@ -57,12 +57,12 @@ class BankPaymentApi extends BaseApi {
         id: number,
         payload?: VerifyBankPaymentDto
     ): Promise<string> {
-        return this.post<string>(`/bankpayments/${id}/verify`, payload);
+        return this.post<string>(`/bankpayments/${id}/verify`, payload || {});
     }
 
     // 6. Desverificar pago bancario
     async unverifyBankPayment(id: number): Promise<string> {
-        return this.post<string>(`/bankpayments/${id}/unverify`);
+        return this.post<string>(`/bankpayments/${id}/unverify`, {});
     }
 
 

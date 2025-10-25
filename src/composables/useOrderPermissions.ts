@@ -9,16 +9,16 @@ export function useOrderPermissions() {
     const authStore = useAuthStore()
 
     /**
-     * Verifica si el pedido fue creado el mismo día (UTC)
+     * Verifica si el pedido fue creado el mismo día (hora local de Colombia)
      */
     const isSameDay = (orderDate: string): boolean => {
         const orderCreated = new Date(orderDate)
         const today = new Date()
 
         return (
-            orderCreated.getUTCFullYear() === today.getUTCFullYear() &&
-            orderCreated.getUTCMonth() === today.getUTCMonth() &&
-            orderCreated.getUTCDate() === today.getUTCDate()
+            orderCreated.getFullYear() === today.getFullYear() &&
+            orderCreated.getMonth() === today.getMonth() &&
+            orderCreated.getDate() === today.getDate()
         )
     }
 
