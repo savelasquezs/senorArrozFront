@@ -343,15 +343,8 @@ const handleStatusChange = async (newStatus: OrderStatus) => {
         order.value,
         newStatus,
         (updatedOrder) => {
-            // ✅ Actualización optimista
-            const orderAny = updatedOrder as any
-            order.value = {
-                ...order.value!,
-                status: updatedOrder.status,
-                statusDisplayName: orderAny.statusDisplayName,
-                statusTimes: orderAny.statusTimes || order.value!.statusTimes,
-                updatedAt: orderAny.updatedAt
-            }
+            // ✅ Actualización optimista usando helper
+            updateOrderStatus(updatedOrder)
         }
     )
 }
@@ -410,17 +403,7 @@ const handleAssignDeliveryModalClose = () => {
 
 const handleDeliverymanUpdated = (updatedOrder?: any) => {
     if (!order.value || !updatedOrder) return
-
-    const orderAny = updatedOrder as any
-    order.value = {
-        ...order.value,
-        deliveryManId: orderAny.deliveryManId || null,
-        deliveryManName: orderAny.deliveryManName || null,
-        status: orderAny.status,
-        statusDisplayName: orderAny.statusDisplayName,
-        statusTimes: orderAny.statusTimes || order.value.statusTimes,
-        updatedAt: orderAny.updatedAt
-    }
+    updateOrderDeliveryman(updatedOrder)
 }
 
 const handleStatusChanged = async (newStatus: OrderStatus) => {
@@ -430,16 +413,7 @@ const handleStatusChanged = async (newStatus: OrderStatus) => {
         order.value.id,
         newStatus,
         (updatedOrder) => {
-            const orderAny = updatedOrder as any
-            order.value = {
-                ...order.value!,
-                deliveryManId: orderAny.deliveryManId || null,
-                deliveryManName: orderAny.deliveryManName || null,
-                status: orderAny.status,
-                statusDisplayName: orderAny.statusDisplayName,
-                statusTimes: orderAny.statusTimes || order.value!.statusTimes,
-                updatedAt: orderAny.updatedAt
-            }
+            updateOrderDeliveryman(updatedOrder)
         }
     )
 }
@@ -453,8 +427,7 @@ const handleOrderTypeUpdated = (updatedOrder?: any) => {
     if (!updatedOrder) return
 
     const orderAny = updatedOrder as any
-    order.value = {
-        ...order.value!,
+    handleModalUpdated({
         type: orderAny.type,
         typeDisplayName: orderAny.typeDisplayName,
         deliveryFee: orderAny.deliveryFee || null,
@@ -462,7 +435,7 @@ const handleOrderTypeUpdated = (updatedOrder?: any) => {
         addressId: orderAny.addressId || null,
         addressDescription: orderAny.addressDescription || null,
         updatedAt: orderAny.updatedAt
-    }
+    })
 
     // Limpiar estado temporal
     pendingOrderType.value = null
@@ -479,11 +452,7 @@ const handleTypePendingChange = (newType: 'onsite' | 'delivery' | 'reservation')
 
     // Actualizar temporalmente el tipo en la UI
     pendingOrderType.value = newType
-    order.value = {
-        ...order.value,
-        type: newType,
-        typeDisplayName: getOrderTypeDisplayName(newType)
-    }
+    updateOrderType(newType)
 }
 
 const handleOpenCustomerModalFromType = () => {
@@ -494,13 +463,66 @@ const handleCustomerModalClose = () => {
     // Si había un cambio de tipo pendiente y se canceló el modal de cliente
     if (pendingOrderType.value && originalOrderType.value && order.value) {
         // Revertir el tipo
-        order.value = {
-            ...order.value,
-            type: originalOrderType.value,
-            typeDisplayName: getOrderTypeDisplayName(originalOrderType.value)
-        }
+        updateOrderType(originalOrderType.value)
         pendingOrderType.value = null
         originalOrderType.value = null
+    }
+}
+
+// Helpers para actualización optimista
+const updateOrderStatus = (updatedOrder: any) => {
+    const orderAny = updatedOrder as any
+    order.value = {
+        ...order.value!,
+        status: updatedOrder.status,
+        statusDisplayName: orderAny.statusDisplayName,
+        statusTimes: orderAny.statusTimes || order.value!.statusTimes,
+        updatedAt: orderAny.updatedAt
+    }
+}
+
+const updateOrderDeliveryman = (updatedOrder: any) => {
+    const orderAny = updatedOrder as any
+    order.value = {
+        ...order.value!,
+        deliveryManId: orderAny.deliveryManId || null,
+        deliveryManName: orderAny.deliveryManName || null,
+        status: orderAny.status,
+        statusDisplayName: orderAny.statusDisplayName,
+        statusTimes: orderAny.statusTimes || order.value!.statusTimes,
+        updatedAt: orderAny.updatedAt
+    }
+}
+
+const updateOrderType = (newType: 'onsite' | 'delivery' | 'reservation') => {
+    order.value = {
+        ...order.value!,
+        type: newType,
+        typeDisplayName: getOrderTypeDisplayName(newType)
+    }
+}
+
+const updateOrderCustomer = (updatedOrder: any) => {
+    const orderAny = updatedOrder as any
+    order.value = {
+        ...order.value!,
+        type: orderAny.type,
+        typeDisplayName: getOrderTypeDisplayName(orderAny.type),
+        customerId: orderAny.customerId || null,
+        customerName: orderAny.customerName || null,
+        customerPhone: orderAny.customerPhone || null,
+        addressId: orderAny.addressId || null,
+        addressDescription: orderAny.addressDescription || null,
+        guestName: orderAny.guestName || null,
+        deliveryFee: orderAny.deliveryFee || null,
+        updatedAt: orderAny.updatedAt
+    }
+}
+
+// Handler unificado para todos los modales autónomos
+const handleModalUpdated = (updates: Partial<OrderDetailView>) => {
+    if (order.value) {
+        order.value = { ...order.value, ...updates }
     }
 }
 
@@ -521,19 +543,7 @@ const handleCustomerUpdated = async (updatedOrder?: any) => {
             })
 
             // Actualización optimista con la respuesta del backend
-            order.value = {
-                ...order.value!,
-                type: finalUpdate.type,
-                typeDisplayName: getOrderTypeDisplayName(finalUpdate.type),
-                customerId: finalUpdate.customerId || null,
-                customerName: finalUpdate.customerName || null,
-                customerPhone: finalUpdate.customerPhone || null,
-                addressId: finalUpdate.addressId || null,
-                addressDescription: finalUpdate.addressDescription || null,
-                guestName: finalUpdate.guestName || null,
-                deliveryFee: finalUpdate.deliveryFee || null,
-                updatedAt: finalUpdate.updatedAt
-            }
+            updateOrderCustomer(finalUpdate)
 
             // Limpiar estado temporal
             pendingOrderType.value = null
@@ -542,16 +552,15 @@ const handleCustomerUpdated = async (updatedOrder?: any) => {
             error('Error al actualizar pedido', err.message)
         }
     } else {
-        // Actualización normal (sin cambio de tipo)
-        order.value = {
-            ...order.value!,
+        // Actualización normal (sin cambio de tipo) - usar handler unificado
+        handleModalUpdated({
             customerId: orderAny.customerId,
             customerName: orderAny.customerName,
             customerPhone: orderAny.customerPhone,
             guestName: orderAny.guestName,
             deliveryFee: orderAny.deliveryFee || order.value!.deliveryFee,
             updatedAt: orderAny.updatedAt
-        }
+        })
     }
 
     // ✅ Cerrar el modal después de actualizar exitosamente
@@ -561,12 +570,11 @@ const handleCustomerUpdated = async (updatedOrder?: any) => {
 const handleAddressUpdated = (updatedOrder?: any) => {
     if (!updatedOrder) return
     const orderAny = updatedOrder as any
-    order.value = {
-        ...order.value!,
+    handleModalUpdated({
         addressId: orderAny.addressId,
         addressDescription: orderAny.addressDescription,
         updatedAt: orderAny.updatedAt
-    }
+    })
 }
 
 // Lifecycle

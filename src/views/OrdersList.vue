@@ -98,7 +98,7 @@
                                 a
                                 <span class="font-medium">{{
                                     Math.min(currentPage * pageSize, totalCount)
-                                }}</span>
+                                    }}</span>
                                 de
                                 <span class="font-medium">{{ totalCount }}</span>
                                 resultados
@@ -393,23 +393,24 @@ const handleEditType = (order: OrderListItem) => {
     showEditOrderTypeModal.value = true
 }
 
-const handleOrderTypeUpdated = (updatedOrder?: Order) => {
-    if (!updatedOrder) return
-
+// Handler unificado para actualización de pedidos en la lista
+const updateOrderInList = (updatedOrder: Order) => {
     const orderAny = updatedOrder as any
     const index = orders.value.findIndex(o => o.id === orderAny.id)
     if (index !== -1) {
         orders.value[index] = {
             ...orders.value[index],
-            type: orderAny.type,
+            ...orderAny,
             typeDisplayName: getOrderTypeDisplayName(orderAny.type),
-            deliveryFee: orderAny.deliveryFee || null,
-            reservedFor: orderAny.reservedFor || null,
-            addressId: orderAny.addressId || null,
-            addressDescription: orderAny.addressDescription || null,
             updatedAt: orderAny.updatedAt
         }
     }
+}
+
+const handleOrderTypeUpdated = (updatedOrder?: Order) => {
+    if (!updatedOrder) return
+
+    updateOrderInList(updatedOrder)
 
     // Limpiar estado temporal
     pendingOrderType.value = null
@@ -504,22 +505,8 @@ const handleOrderUpdated = async (updatedOrder?: Order) => {
                     error('Error al actualizar pedido', err.message)
                 }
             } else {
-                // Actualización normal
-                orders.value[index] = {
-                    ...orders.value[index],
-                    customerId: orderAny.customerId || null,
-                    customerName: orderAny.customerName || null,
-                    customerPhone: orderAny.customerPhone || null,
-                    addressId: orderAny.addressId || null,
-                    addressDescription: orderAny.addressDescription || null,
-                    guestName: orderAny.guestName || null,
-                    deliveryFee: orderAny.deliveryFee || null,
-                    // ✅ INCLUIR TOTALES DEL BACKEND
-                    subtotal: orderAny.subtotal || 0,
-                    discountTotal: orderAny.discountTotal || 0,
-                    total: orderAny.total || 0,
-                    updatedAt: orderAny.updatedAt
-                }
+                // Actualización normal - usar handler unificado
+                updateOrderInList(updatedOrder)
             }
         }
 
