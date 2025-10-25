@@ -41,6 +41,10 @@
                     </th>
                     <th scope="col"
                         class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Pagos
+                    </th>
+                    <th scope="col"
+                        class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Domiciliario
                     </th>
                     <th scope="col"
@@ -124,6 +128,51 @@
                         </div>
                     </td>
 
+                    <!-- Pagos -->
+                    <td class="px-6 py-4">
+                        <div class="space-y-2">
+                            <!-- Bank Payments -->
+                            <div v-if="order.bankPayments && order.bankPayments.length > 0" class="space-y-1">
+                                <div v-for="payment in order.bankPayments" :key="payment.id"
+                                    class="flex items-center justify-between text-xs bg-blue-50 rounded px-2 py-1">
+                                    <div class="flex items-center space-x-2">
+                                        <BanknotesIcon class="w-4 h-4 text-blue-600" />
+                                        <span class="font-medium text-blue-900">{{ payment.bankName }}</span>
+                                        <span class="text-blue-700">{{ formatCurrency(payment.amount) }}</span>
+                                    </div>
+                                    <!-- Botón de verificación -->
+                                    <button v-if="canVerifyPayment(order)"
+                                        @click.stop="$emit('verify-bank-payment', order, payment)" :class="[
+                                            'p-1 rounded transition-colors',
+                                            payment.isVerified
+                                                ? 'text-green-600 hover:bg-green-100'
+                                                : 'text-gray-400 hover:bg-gray-100'
+                                        ]" :title="payment.isVerified ? 'Verificado' : 'Verificar pago'">
+                                        <CheckCircleIcon v-if="payment.isVerified" class="w-4 h-4" />
+                                        <XCircleIcon v-else class="w-4 h-4" />
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- App Payments (solo visualización) -->
+                            <div v-if="order.appPayments && order.appPayments.length > 0" class="space-y-1">
+                                <div v-for="payment in order.appPayments" :key="payment.id"
+                                    class="flex items-center space-x-2 text-xs bg-purple-50 rounded px-2 py-1">
+                                    <DevicePhoneMobileIcon class="w-4 h-4 text-purple-600" />
+                                    <span class="font-medium text-purple-900">{{ payment.appName }}</span>
+                                    <span class="text-purple-700">{{ formatCurrency(payment.amount) }}</span>
+                                </div>
+                            </div>
+
+                            <!-- Sin pagos -->
+                            <span v-if="(!order.bankPayments || order.bankPayments.length === 0) &&
+                                (!order.appPayments || order.appPayments.length === 0)"
+                                class="text-xs text-gray-400 italic">
+                                Efectivo
+                            </span>
+                        </div>
+                    </td>
+
                     <!-- Domiciliario (clickeable para asignar/cambiar) -->
                     <td class="px-6 py-4 whitespace-nowrap">
                         <button :disabled="!canAssignDeliveryman(order)" :class="[
@@ -144,8 +193,9 @@
                     </td>
 
                     <!-- Fecha -->
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {{ formatDateTime(order.createdAt) }}
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <div class="text-xs text-gray-900">{{ formatDate(order.createdAt) }}</div>
+                        <div class="text-xs text-gray-500">{{ formatTime(order.createdAt) }}</div>
                     </td>
                 </tr>
             </tbody>
@@ -155,7 +205,7 @@
 
 <script setup lang="ts">
 import { defineProps, defineEmits } from 'vue'
-import type { OrderListItem } from '@/types/order'
+import type { OrderListItem, OrderBankPaymentDetail } from '@/types/order'
 import OrderStatusBadge from './OrderStatusBadge.vue'
 import OrderTypeBadge from './OrderTypeBadge.vue'
 import BaseLoading from '@/components/ui/BaseLoading.vue'
@@ -164,6 +214,10 @@ import {
     ArrowsUpDownIcon,
     ChevronUpIcon,
     ChevronDownIcon,
+    BanknotesIcon,
+    DevicePhoneMobileIcon,
+    CheckCircleIcon,
+    XCircleIcon,
 } from '@heroicons/vue/24/outline'
 
 interface Props {
@@ -181,10 +235,37 @@ defineEmits<{
     'change-status': [order: OrderListItem]
     'assign-delivery': [order: OrderListItem]
     'edit-type': [order: OrderListItem]
+    'verify-bank-payment': [order: OrderListItem, payment: OrderBankPaymentDetail]
     sort: [column: 'id' | 'total' | 'createdAt']
 }>()
 
-const { formatCurrency, formatDateTime } = useFormatting()
+const { formatCurrency } = useFormatting()
+
+// ✅ NUEVO: Formatear solo fecha
+const formatDate = (dateString: string): string => {
+    const date = new Date(dateString)
+    return date.toLocaleDateString('es-CO', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric'
+    })
+}
+
+// ✅ NUEVO: Formatear solo hora
+const formatTime = (dateString: string): string => {
+    const date = new Date(dateString)
+    return date.toLocaleTimeString('es-CO', {
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: true
+    })
+}
+
+// ✅ NUEVO: Verificar si se puede verificar un pago
+const canVerifyPayment = (order: OrderListItem): boolean => {
+    // Solo si el pedido no está cancelado
+    return order.status !== 'cancelled'
+}
 
 // Valida si se puede asignar domiciliario al pedido
 const canAssignDeliveryman = (order: OrderListItem): boolean => {

@@ -223,6 +223,9 @@ export interface OrderListItem {
     cancelledReason: string | null
     createdAt: string
     updatedAt: string
+    // ✅ NUEVO: Campos de pagos para la tabla
+    bankPayments: OrderBankPaymentDetail[]
+    appPayments: OrderAppPaymentDetail[]
 }
 
 // ===== TIPOS PARA VISTA DE DETALLE =====

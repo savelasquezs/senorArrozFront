@@ -75,7 +75,7 @@
             <OrdersTable :orders="filteredOrders" :loading="loading" :sort-by="sortBy" :sort-order="sortOrder"
                 @edit-customer="handleEditCustomer" @edit-address="handleEditAddress"
                 @change-status="handleChangeStatus" @assign-delivery="handleAssignDelivery" @edit-type="handleEditType"
-                @sort="handleSort" />
+                @verify-bank-payment="handleVerifyBankPayment" @sort="handleSort" />
 
             <!-- Paginación -->
             <div v-if="!loading && totalPages > 1" class="bg-gray-50 px-4 py-3 border-t border-gray-200 sm:px-6">
@@ -98,7 +98,7 @@
                                 a
                                 <span class="font-medium">{{
                                     Math.min(currentPage * pageSize, totalCount)
-                                }}</span>
+                                    }}</span>
                                 de
                                 <span class="font-medium">{{ totalCount }}</span>
                                 resultados
@@ -154,12 +154,13 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import type { OrderListItem, Order, OrderStatus } from '@/types/order'
+import type { OrderListItem, Order, OrderStatus, OrderBankPaymentDetail } from '@/types/order'
 import { orderApi } from '@/services/MainAPI/orderApi'
 import { useOrderFilters, type OrderFilterState } from '@/composables/useOrderFilters'
 import { useOrderPermissions } from '@/composables/useOrderPermissions'
 import { useToast } from '@/composables/useToast'
 import { getOrderStatusDisplayName, getOrderTypeDisplayName } from '@/composables/useFormatting'
+import { bankPaymentApi } from '@/services/MainAPI/bankPaymentApi'
 import MainLayout from '@/components/layout/MainLayout.vue'
 import OrdersTable from '@/components/orders/OrdersTable.vue'
 import EditCustomerModal from '@/components/orders/EditCustomerModal.vue'
@@ -391,6 +392,36 @@ const handleAssignDelivery = (order: OrderListItem) => {
 const handleEditType = (order: OrderListItem) => {
     selectedOrder.value = order
     showEditOrderTypeModal.value = true
+}
+
+// ✅ NUEVO: Handler para verificar pago bancario
+const handleVerifyBankPayment = async (order: OrderListItem, payment: OrderBankPaymentDetail) => {
+    try {
+        if (payment.isVerified) {
+            // Desverificar
+            await bankPaymentApi.unverifyBankPayment(payment.id)
+            success('Pago desverificado', 5000)
+        } else {
+            // Verificar
+            await bankPaymentApi.verifyBankPayment(payment.id)
+            success('Pago verificado', 5000)
+        }
+
+        // ✅ Actualización optimista
+        const index = orders.value.findIndex(o => o.id === order.id)
+        if (index !== -1) {
+            const paymentIndex = orders.value[index].bankPayments.findIndex(p => p.id === payment.id)
+            if (paymentIndex !== -1) {
+                orders.value[index].bankPayments[paymentIndex] = {
+                    ...orders.value[index].bankPayments[paymentIndex],
+                    isVerified: !payment.isVerified,
+                    verifiedAt: !payment.isVerified ? new Date().toISOString() : null
+                }
+            }
+        }
+    } catch (err: any) {
+        error('Error al verificar pago', err.message)
+    }
 }
 
 // Handler unificado para actualización de pedidos en la lista
