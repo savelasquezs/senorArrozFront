@@ -50,8 +50,8 @@
         <!-- Create Customer Modal -->
         <BaseDialog v-model="showCreateModal" title="Crear Nuevo Cliente" size="lg">
             <div v-if="!createdCustomer">
-                <CustomerForm :model-value="createCustomerData" @submit="createCustomerWrapper"
-                    @cancel="closeCreateModal" :loading="isCreating" submit-button-text="Crear Cliente" />
+                <CustomerForm @submit="createCustomerWrapper" @cancel="closeCreateModal" :loading="isCreating"
+                    :initial-phone="searchQuery" submit-button-text="Crear Cliente" />
             </div>
 
             <div v-else class="text-center py-6">
@@ -125,23 +125,6 @@ const isCreating = ref(false)
 const createdCustomer = ref<Customer | null>(null)
 const error = ref('')
 
-const createCustomerData = ref<CreateCustomerDto>({
-    name: '',
-    phone1: '',
-    phone2: '',
-    branchId: 0,
-    initialAddress: {
-        neighborhoodId: 0,
-        address: '',
-        additionalInfo: '',
-        latitude: 0,
-        longitude: 0,
-        isPrimary: true,
-        deliveryFee: 0
-    }
-})
-
-
 // Methods
 const handleSearch = () => {
     if (!searchQuery.value.trim()) {
@@ -164,12 +147,7 @@ const selectCustomer = (customer: Customer) => {
     searchResults.value = []
 }
 
-
 const showCreateCustomer = () => {
-    // Pre-populate form with search query if it looks like a name
-    if (searchQuery.value.trim()) {
-        createCustomerData.value.name = searchQuery.value.trim()
-    }
     showCreateModal.value = true
 }
 
@@ -208,6 +186,7 @@ const createCustomerWrapper = async (customerData: any) => {
 const selectCreatedCustomer = () => {
     if (createdCustomer.value) {
         emit('customerSelected', createdCustomer.value)
+        selectCustomer(createdCustomer.value)
     }
     closeCreateModal()
 }
@@ -215,21 +194,6 @@ const selectCreatedCustomer = () => {
 const closeCreateModal = () => {
     showCreateModal.value = false
     createdCustomer.value = null
-    createCustomerData.value = {
-        name: '',
-        phone1: '',
-        phone2: '',
-        branchId: 0,
-        initialAddress: {
-            neighborhoodId: 0,
-            address: '',
-            additionalInfo: '',
-            latitude: 0,
-            longitude: 0,
-            isPrimary: true,
-            deliveryFee: 0
-        }
-    }
 }
 
 // Lifecycle

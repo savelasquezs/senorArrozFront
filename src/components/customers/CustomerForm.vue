@@ -99,11 +99,13 @@ interface Props {
     customer?: Customer | null
     loading?: boolean
     canSelectBranch?: boolean
+    initialPhone?: string
 }
 
 const props = withDefaults(defineProps<Props>(), {
     loading: false,
-    canSelectBranch: false
+    canSelectBranch: false,
+    initialPhone: ''
 })
 
 const emit = defineEmits<{
@@ -345,8 +347,10 @@ onMounted(async () => {
             form.branchId = authStore.branchId
         }
 
-        // Validate form after initialization
-        validateForm()
+        // Pre-poblar teléfono si se proporciona para nuevo cliente
+        if (!props.customer && props.initialPhone) {
+            form.phone1 = props.initialPhone
+        }
     } catch (error) {
         console.error('Error loading form data:', error)
     }
