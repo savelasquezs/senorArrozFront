@@ -17,8 +17,7 @@
             </BaseInput>
 
             <BaseInput v-model="localForm.additionalInfo" label="Información Adicional"
-                placeholder="Ej: Apto 202, Torre A, Frente al parque" :error="errors.additionalInfo" :maxlength="100"
-                v-if="localForm.additionalInfo">
+                placeholder="Ej: Apto 202, Torre A, Frente al parque" :error="errors.additionalInfo" :maxlength="100">
                 <template #icon>
                     <InformationCircleIcon class="w-4 h-4" />
                 </template>
