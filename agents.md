@@ -210,8 +210,46 @@ enum UserRole {
 - `OrderItemList`: Lista de productos en el pedido
 - `OrderTabs`: Sistema de tabs para múltiples pedidos
 - `CustomerSelector`: Selector de clientes por teléfono
-- `CustomerSection`: Sección de cliente con búsqueda y detalle
 - `PaymentSelector`: Selector de métodos de pago con validación de monto máximo y término "Efectivo"
+
+### Componentes Autónomos ⭐
+Componentes que manejan su propio estado y deciden cuándo emitir vs. actualizar directamente:
+
+- **`CustomerSection`**: Selector de cliente con modo draft/persisted
+  - Modo 'draft': Actualiza `ordersDraftsStore` directamente
+  - Modo 'persisted': Emite eventos para validación externa
+  - Auto-selecciona dirección principal
+  - Auto-completa guestName
+
+- **`PersistedPaymentSelector`**: Gestión completa de pagos
+  - CRUD de pagos (app y bank)
+  - Verificación de bank payments
+  - Liquidación de app payments
+  - Auto-ajuste de pagos al cambiar total
+  - Validación de monto máximo
+  - Emite solo `@updated` cuando hay cambios
+
+- **Modales Autónomos**:
+  - `EditCustomerModal`: Edición de cliente con validación interna
+  - `SelectAddressModal`: Selección/edición de dirección con delivery fee
+  - `EditOrderTypeModal`: Cambio de tipo de pedido con validaciones
+  - Todos manejan API calls, validación y actualizaciones optimistas internamente
+
+**Patrón común:**
+```typescript
+interface Props {
+    mode?: 'draft' | 'persisted'  // Define comportamiento
+}
+
+// Lógica condicional
+if (props.mode === 'draft') {
+    store.updateData(data)  // Actualizar directamente
+} else {
+    emit('data-updated', data)  // Emitir para validación
+}
+```
+
+Ver [docs/patterns.md](./docs/patterns.md) para más detalles.
 
 ## 🗄️ Stores de Pinia
 
@@ -525,6 +563,24 @@ emit('updated', updatedObject)  // No solo emitir evento vacío
 ```
 
 Ver `.cursorrules` para ejemplos completos y casos de uso.
+
+### Patrones Establecidos
+
+#### Componentes Autónomos con Modo
+- Usar prop `mode` para comportamiento condicional (draft/persisted)
+- Decidir internamente cuándo emitir vs. actualizar directamente
+- Ver [docs/patterns.md](./docs/patterns.md) para implementación completa
+
+#### Modales Autónomos
+- Manejar API calls internamente
+- Aplicar actualizaciones optimistas en el store
+- Emitir solo `@updated` con objeto actualizado
+- Padre solo actualiza lista local si es necesario
+
+#### Prellenado de Formularios
+- Usar props `initial*` para prellenar desde búsquedas
+- Ejemplo: `initialPhone`, `initialName`, `initialAddress`
+- Aplicar en `onMounted` si no hay datos de edición
 
 ### Naming Conventions
 - **Componentes**: PascalCase (`BaseButton.vue`)

@@ -890,4 +890,169 @@ describe('ProductCard', () => {
 
 ---
 
-**Próximos pasos**: Ver [Business Rules](./business-rules.md) para entender la lógica de negocio de los componentes.
+## 🎯 Componentes Autónomos Recientes
+
+### CustomerSection
+
+Selector de cliente con modo draft/persisted que maneja su propio estado.
+
+**Props:**
+```typescript
+interface Props {
+    orderType: 'onsite' | 'delivery' | 'reservation'
+    selectedCustomer?: Customer | null
+    selectedAddress?: CustomerAddress | null
+    mode?: 'draft' | 'persisted'
+    showTypeSelector?: boolean
+}
+```
+
+**Comportamiento por modo:**
+- **draft**: Actualiza `ordersDraftsStore` directamente, auto-completa guestName, auto-selecciona dirección
+- **persisted**: Emite eventos para validación externa en modales
+
+**Uso:**
+```vue
+<!-- En OrderSidebar (draft) -->
+<CustomerSection 
+    :selected-customer="customer"
+    :selected-address="address"
+    :order-type="orderType"
+    mode="draft"
+    @view-customer-detail="handleViewDetail"
+/>
+
+<!-- En EditCustomerModal (persisted) -->
+<CustomerSection 
+    :selected-customer="customer"
+    :selected-address="address"
+    :order-type="orderType"
+    :show-type-selector="false"
+    mode="persisted"
+    @customer-selected="handleCustomerSelected"
+    @address-selected="handleAddressSelected"
+/>
+```
+
+### PersistedPaymentSelector
+
+Gestión completa de pagos con CRUD, verificación y liquidación.
+
+**Props:**
+```typescript
+interface Props {
+    order: OrderDetailView
+}
+```
+
+**Funcionalidades:**
+- CRUD de app payments y bank payments
+- Verificación de bank payments
+- Liquidación de app payments
+- Auto-ajuste de pagos al cambiar total del pedido
+- Validación de monto máximo
+- Maneja todo internamente, solo emite `@updated`
+
+**Uso:**
+```vue
+<PersistedPaymentSelector 
+    :order="order"
+    @updated="handlePaymentsUpdated"
+/>
+```
+
+### Modales Autónomos
+
+#### EditCustomerModal
+
+Modal para editar cliente y dirección de un pedido existente.
+
+**Características:**
+- Maneja API calls internamente
+- Validación de campos requeridos según tipo de pedido
+- Auto-completado de delivery fee desde dirección
+- Actualización optimista del store
+- Emite solo `@updated` con pedido actualizado
+
+**Uso:**
+```vue
+<EditCustomerModal 
+    :open="showModal"
+    :order="selectedOrder"
+    @close="showModal = false"
+    @updated="handleUpdated"
+/>
+```
+
+#### SelectAddressModal
+
+Modal para seleccionar/editar dirección y delivery fee.
+
+**Características:**
+- Selector de dirección del cliente
+- Edición de delivery fee
+- Auto-completado desde dirección seleccionada
+- Validación interna
+- Actualización optimista
+
+**Uso:**
+```vue
+<SelectAddressModal 
+    :open="showModal"
+    :order="selectedOrder"
+    @close="showModal = false"
+    @updated="handleUpdated"
+/>
+```
+
+#### EditOrderTypeModal
+
+Modal para cambiar tipo de pedido con validaciones.
+
+**Características:**
+- Cambio de tipo (onsite/delivery/reservation)
+- Validación de campos requeridos por tipo
+- Limpieza de campos no aplicables
+- Actualización optimista
+
+**Uso:**
+```vue
+<EditOrderTypeModal 
+    :open="showModal"
+    :order="selectedOrder"
+    @close="showModal = false"
+    @updated="handleUpdated"
+/>
+```
+
+### Patrón de Prellenado: CustomerForm
+
+Formulario de cliente con prellenado desde búsqueda.
+
+**Props:**
+```typescript
+interface Props {
+    customer?: Customer | null
+    initialPhone?: string  // Prellenar desde búsqueda
+}
+```
+
+**Uso:**
+```vue
+<!-- Usuario buscó "3001234567" y no se encontró -->
+<CustomerForm 
+    :initial-phone="searchQuery"
+    @submit="handleCreate"
+/>
+```
+
+El formulario prellenará automáticamente el campo `phone1` con el valor buscado.
+
+---
+
+## 📚 Referencias
+
+- [Patrones de Arquitectura](./patterns.md) - Patrones detallados de componentes
+- [Recomendaciones](./recommendations.md) - Feature Flags y Services
+- [Business Rules](./business-rules.md) - Lógica de negocio
+- [Development Guide](./development.md) - Convenciones de desarrollo

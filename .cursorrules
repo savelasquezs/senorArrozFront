@@ -218,20 +218,79 @@ npm run test:ui      # UI de testing
 VITE_API_URL=https://localhost:7049/api  # URL del backend
 ```
 
+## Patrones de Componentes
+
+### Componentes Autónomos
+
+Los componentes medianos/grandes deben ser autónomos cuando:
+1. Se usan en múltiples contextos (draft vs persisted, create vs edit)
+2. La lógica es compleja pero repetitiva
+3. Queremos evitar cadenas de eventos
+
+**Usar prop `mode` para comportamiento condicional:**
+```typescript
+interface Props {
+    mode?: 'draft' | 'persisted'
+}
+
+if (props.mode === 'draft') {
+    // Actualiza stores directamente
+    store.updateData(data)
+} else {
+    // Emite eventos para validación externa
+    emit('data-updated', data)
+}
+```
+
+**Ejemplos:** `CustomerSection`, `PersistedPaymentSelector`
+
+### Modales Autónomos
+
+Los modales deben manejar internamente:
+- Llamadas a API
+- Actualizaciones optimistas del store
+- Validación
+- Estados de carga/error
+
+Solo emitir `@updated` con el objeto actualizado cuando hay cambios.
+El padre actualiza su lista localmente (optimistic update).
+
+**Ejemplos:** `EditCustomerModal`, `SelectAddressModal`, `EditOrderTypeModal`
+
+### Prellenado de Formularios
+
+Usar props `initial*` para prellenar formularios desde búsquedas/contexto:
+```typescript
+interface Props {
+    initialPhone?: string
+    initialAddress?: string
+}
+
+onMounted(() => {
+    if (!props.customer && props.initialPhone) {
+        form.phone1 = props.initialPhone
+    }
+})
+```
+
 ## Para Nuevos Desarrolladores
 1. Leer `agents.md` para contexto general
 2. Revisar `docs/README.md` para overview
 3. Estudiar `docs/architecture.md` para setup técnico
-4. Consultar `docs/components.md` para patrones UI
-5. Entender `docs/business-rules.md` para reglas del negocio
-6. Usar `docs/api-reference.md` para integración backend
-7. Seguir `docs/development.md` para convenciones
+4. **Leer `docs/patterns.md` para patrones de arquitectura** ⭐
+5. Consultar `docs/components.md` para patrones UI
+6. Entender `docs/business-rules.md` para reglas del negocio
+7. Usar `docs/api-reference.md` para integración backend
+8. Seguir `docs/development.md` para convenciones
+9. **Revisar `docs/recommendations.md` para mejores prácticas** ⭐
 
 ## Para Agentes IA
 - Usar este archivo como contexto principal
 - Consultar `agents.md` para información completa
+- **Seguir patrones en `docs/patterns.md`** ⭐
 - Seguir patrones establecidos en `docs/components.md`
 - Respetar reglas de negocio en `docs/business-rules.md`
 - Mantener consistencia con el sistema de diseño
 - Usar tipos TypeScript estrictos
 - Preferir componentes base reutilizables
+- **Aplicar recomendaciones de `docs/recommendations.md`** ⭐
