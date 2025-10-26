@@ -10,6 +10,7 @@ export interface OrderFilterState {
     status: OrderStatus | null
     customer: string
     deliveryman: string
+    deliveryManId: number | null // ✅ NUEVO
 }
 
 /**
@@ -93,6 +94,18 @@ export function useOrderFilters() {
     }
 
     /**
+     * Filtra órdenes por ID de domiciliario
+     */
+    const filterByDeliverymanId = (
+        orders: OrderListItem[],
+        deliverymanId: number | null
+    ): OrderListItem[] => {
+        if (!deliverymanId) return orders
+
+        return orders.filter((order) => order.deliveryManId === deliverymanId)
+    }
+
+    /**
      * Aplica todos los filtros al mismo tiempo
      */
     const applyAllFilters = (
@@ -121,9 +134,14 @@ export function useOrderFilters() {
             filtered = filterByCustomer(filtered, filters.customer)
         }
 
-        // Aplicar filtro de domiciliario
+        // Aplicar filtro de domiciliario (nombre)
         if (filters.deliveryman) {
             filtered = filterByDeliveryman(filtered, filters.deliveryman)
+        }
+
+        // Aplicar filtro de domiciliario (ID)
+        if (filters.deliveryManId) {
+            filtered = filterByDeliverymanId(filtered, filters.deliveryManId)
         }
 
         return filtered
@@ -162,6 +180,7 @@ export function useOrderFilters() {
         filterByStatus,
         filterByCustomer,
         filterByDeliveryman,
+        filterByDeliverymanId, // ✅ NUEVO
         applyAllFilters,
         sortOrders,
     }

@@ -18,55 +18,80 @@
             </div>
         </div>
 
-        <!-- Filtros -->
-        <div class="bg-white rounded-lg shadow p-6 mb-6">
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                <!-- Búsqueda general -->
-                <div class="lg:col-span-2">
-                    <BaseInput v-model="filters.search" placeholder="Buscar por ID, cliente, teléfono..."
-                        @input="applyFilters">
-                        <template #icon>
-                            <MagnifyingGlassIcon class="w-4 h-4" />
-                        </template>
-                    </BaseInput>
-                </div>
-
-                <!-- Filtro de tipo -->
-                <BaseSelect v-model="filters.type" :options="typeOptions" placeholder="Todos los tipos"
-                    label="Tipo de pedido" @update:model-value="applyFilters" />
-
-                <!-- Filtro de estado -->
-                <BaseSelect v-model="filters.status" :options="statusOptions" placeholder="Todos los estados"
-                    label="Estado" @update:model-value="applyFilters" />
-
-                <!-- Rango de fechas -->
-                <div class="lg:col-span-2">
-                    <label class="block text-sm font-medium text-gray-700 mb-1">
-                        Rango de fechas
-                    </label>
-                    <div class="grid grid-cols-2 gap-2">
-                        <BaseInput v-model="dateFilters.fromDate" type="date" placeholder="Desde"
-                            @change="fetchOrders" />
-                        <BaseInput v-model="dateFilters.toDate" type="date" placeholder="Hasta" @change="fetchOrders" />
+        <!-- Filtros - Diseño Compacto -->
+        <div class="bg-white rounded-lg shadow mb-6">
+            <!-- Fila de filtros -->
+            <div class="p-4 border-b border-gray-200">
+                <div class="flex flex-wrap items-center gap-3">
+                    <!-- Búsqueda (más ancha) -->
+                    <div class="flex-1 min-w-[250px]">
+                        <BaseInput v-model="filters.search" placeholder="Buscar por ID, cliente, teléfono..."
+                            @input="applyFilters">
+                            <template #icon>
+                                <MagnifyingGlassIcon class="w-4 h-4" />
+                            </template>
+                        </BaseInput>
                     </div>
-                </div>
 
-                <!-- Botón refrescar -->
-                <div class="flex items-end">
-                    <BaseButton variant="secondary" class="w-full" :loading="loading" @click="fetchOrders">
-                        <ArrowPathIcon class="w-4 h-4 mr-2" />
-                        Refrescar
-                    </BaseButton>
+                    <!-- Filtros compactos -->
+                    <div class="flex flex-wrap items-center gap-2">
+                        <!-- Tipo -->
+                        <div class="w-40">
+                            <BaseSelect v-model="filters.type" :options="typeOptions" value-key="value"
+                                display-key="label" placeholder="Tipo" @update:model-value="applyFilters" />
+                        </div>
+
+                        <!-- Estado -->
+                        <div class="w-44">
+                            <BaseSelect v-model="filters.status" :options="statusOptions" value-key="value"
+                                display-key="label" placeholder="Estado" @update:model-value="applyFilters" />
+                        </div>
+
+                        <!-- Domiciliario -->
+                        <div class="w-48">
+                            <DeliverymanFilter v-model="filters.deliveryManId" :orders="orders"
+                                @update:model-value="applyFilters" />
+                        </div>
+
+                        <!-- Rango de fechas compacto -->
+                        <div class="flex items-center gap-2">
+                            <BaseInput v-model="dateFilters.fromDate" type="date" placeholder="Desde" class="w-36"
+                                @change="fetchOrders" />
+                            <span class="text-gray-400">-</span>
+                            <BaseInput v-model="dateFilters.toDate" type="date" placeholder="Hasta" class="w-36"
+                                @change="fetchOrders" />
+                        </div>
+                    </div>
                 </div>
             </div>
 
-            <!-- Contador de resultados -->
-            <div v-if="!loading && filteredOrders.length > 0" class="mt-4 text-sm text-gray-600">
-                Mostrando {{ filteredOrders.length }} de {{ totalCount }} pedidos
-                <button v-if="hasActiveFilters" class="ml-2 text-emerald-600 hover:text-emerald-700 underline"
-                    @click="clearFilters">
-                    Limpiar filtros
-                </button>
+            <!-- Contador de resultados y acciones -->
+            <div class="px-4 py-3 bg-gray-50 flex items-center justify-between">
+                <div class="text-sm text-gray-600">
+                    <span v-if="!loading && filteredOrders.length > 0">
+                        Mostrando <span class="font-medium">{{ filteredOrders.length }}</span>
+                        de <span class="font-medium">{{ totalCount }}</span> pedidos
+                    </span>
+                    <span v-else-if="!loading" class="text-gray-400">
+                        No hay pedidos
+                    </span>
+                    <span v-else class="text-gray-400">
+                        Cargando...
+                    </span>
+                </div>
+
+                <div class="flex items-center gap-2">
+                    <!-- Botón limpiar filtros -->
+                    <BaseButton v-if="hasActiveFilters" variant="ghost" size="sm" @click="clearFilters">
+                        <XMarkIcon class="w-4 h-4 mr-1" />
+                        Limpiar filtros
+                    </BaseButton>
+
+                    <!-- Botón refrescar -->
+                    <BaseButton variant="secondary" size="sm" :loading="loading" @click="fetchOrders">
+                        <ArrowPathIcon class="w-4 h-4" />
+                    </BaseButton>
+                </div>
             </div>
         </div>
 
@@ -98,7 +123,7 @@
                                 a
                                 <span class="font-medium">{{
                                     Math.min(currentPage * pageSize, totalCount)
-                                }}</span>
+                                    }}</span>
                                 de
                                 <span class="font-medium">{{ totalCount }}</span>
                                 resultados
@@ -163,6 +188,7 @@ import { getOrderStatusDisplayName, getOrderTypeDisplayName } from '@/composable
 import { bankPaymentApi } from '@/services/MainAPI/bankPaymentApi'
 import MainLayout from '@/components/layout/MainLayout.vue'
 import OrdersTable from '@/components/orders/OrdersTable.vue'
+import DeliverymanFilter from '@/components/orders/DeliverymanFilter.vue'
 import EditCustomerModal from '@/components/orders/EditCustomerModal.vue'
 import SelectAddressModal from '@/components/orders/SelectAddressModal.vue'
 import AssignDeliveryModal from '@/components/orders/AssignDeliveryModal.vue'
@@ -176,6 +202,7 @@ import {
     ChevronLeftIcon,
     ChevronRightIcon,
     PlusIcon,
+    XMarkIcon,
 } from '@heroicons/vue/24/outline'
 
 const router = useRouter()
@@ -199,6 +226,7 @@ const filters = ref<OrderFilterState>({
     status: null,
     customer: '',
     deliveryman: '',
+    deliveryManId: null, // ✅ NUEVO
 })
 
 const dateFilters = ref({
@@ -217,14 +245,14 @@ const pendingOrderType = ref<'onsite' | 'delivery' | 'reservation' | null>(null)
 const originalOrderType = ref<'onsite' | 'delivery' | 'reservation' | null>(null)
 
 // Opciones de filtros
-const typeOptions = [
+const typeOptions: Array<{ value: string | null; label: string }> = [
     { value: null, label: 'Todos los tipos' },
     { value: 'onsite', label: 'En el local' },
     { value: 'delivery', label: 'Domicilio' },
     { value: 'reservation', label: 'Reserva' },
 ]
 
-const statusOptions = [
+const statusOptions: Array<{ value: string | null; label: string }> = [
     { value: null, label: 'Todos los estados' },
     { value: 'taken', label: 'Tomado' },
     { value: 'in_preparation', label: 'En preparación' },
@@ -267,12 +295,15 @@ const visiblePages = computed(() => {
 })
 
 const hasActiveFilters = computed(() => {
-    return (
+    return !!(
         filters.value.search ||
         filters.value.type ||
         filters.value.status ||
         filters.value.customer ||
-        filters.value.deliveryman
+        filters.value.deliveryman ||
+        filters.value.deliveryManId || // ✅ NUEVO
+        dateFilters.value.fromDate ||
+        dateFilters.value.toDate
     )
 })
 
@@ -307,7 +338,13 @@ const clearFilters = () => {
         status: null,
         customer: '',
         deliveryman: '',
+        deliveryManId: null, // ✅ NUEVO
     }
+    dateFilters.value = {
+        fromDate: new Date().toLocaleDateString('en-CA', { timeZone: 'America/Bogota' }),
+        toDate: '',
+    }
+    fetchOrders()
 }
 
 const changePage = (page: number) => {
