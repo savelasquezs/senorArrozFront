@@ -14,7 +14,7 @@ export function useOrderTabs() {
         const newOrder: DraftOrder = {
             tabId,
             tabName,
-            type: 'onsite',
+            type: 'delivery',
             customerId: null,
             customerName: null,
             customerPhone: null,
