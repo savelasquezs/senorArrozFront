@@ -28,9 +28,7 @@
                 <div class="px-4">
                     <CustomerSection :selected-customer="getCustomer(currentOrder.customerId)"
                         :selected-address="getAddress(currentOrder.addressId, getCustomer(currentOrder.customerId))"
-                        :order-type="currentOrder.type" @customer-selected="handleCustomerSelect"
-                        @address-selected="handleAddressSelect" @view-customer-detail="handleViewCustomerDetail"
-                        @order-type-changed="handleOrderTypeChanged" />
+                        :order-type="currentOrder.type" mode="draft" @view-customer-detail="handleViewCustomerDetail" />
 
                     <!-- Guest Name / Recipient Name -->
                     <div class="py-3 border-b border-gray-200">
@@ -109,7 +107,7 @@ import {
 
 // Composables
 const { ordersStore } = useOrderPersistence()
-const { createNewTab, updateOrderType, closeTab } = useOrderTabs()
+const { createNewTab, closeTab } = useOrderTabs()
 const { submitOrder } = useOrderSubmission()
 const { success, error: showError } = useToast()
 
@@ -170,30 +168,7 @@ const getAddress = (addressId: number | null, customer: Customer | null) => {
     return customer.addresses?.find((a: CustomerAddress) => a.id === addressId) || null
 }
 
-const handleCustomerSelect = (customer: Customer | null) => {
-    // Update customer in store
-    ordersStore.updateCustomer(customer)
-
-    // Auto-fill guestName with customer name if not already set
-    if (customer && customer.name) {
-        const currentGuestName = currentOrder.value?.guestName
-        // Only auto-fill if guestName is empty
-        if (!currentGuestName || currentGuestName.trim() === '') {
-            ordersStore.updateGuestName(customer.name)
-        }
-    } else if (!customer) {
-        // Customer removed, clear guestName
-        ordersStore.updateGuestName('')
-    }
-}
-
-const handleOrderTypeChanged = (type: 'onsite' | 'delivery' | 'reservation') => {
-    updateOrderType(type)
-}
-
-const handleAddressSelect = (address: CustomerAddress | null) => {
-    ordersStore.updateAddress(address)
-}
+// CustomerSelection y AddressSelection ahora se manejan internamente en CustomerSection (modo 'draft')
 
 const handlePaymentUpdated = () => {
     // Payment updated, totals recalculate automatically

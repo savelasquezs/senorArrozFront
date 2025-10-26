@@ -15,7 +15,7 @@
             <!-- Selector de cliente con dirección -->
             <div>
                 <CustomerSection :selected-customer="selectedCustomer" :selected-address="selectedAddress"
-                    :order-type="props.order.type" :show-type-selector="false"
+                    :order-type="props.order.type" :show-type-selector="false" mode="persisted"
                     @customer-selected="handleCustomerSelected" @address-selected="handleAddressSelected"
                     @view-customer-detail="handleViewCustomerDetail" />
             </div>
