@@ -1,5 +1,5 @@
 <template>
-    <BaseDialog :is-open="isOpen" @close="$emit('close')" title="Confirmar cambio a Listo">
+    <BaseDialog :model-value="isOpen" @update:model-value="$emit('close')" title="Confirmar cambio a Listo">
         <div class="space-y-4">
             <p class="text-gray-700">¿Estás seguro de marcar los siguientes pedidos como listos?</p>
 
@@ -67,7 +67,7 @@ const confirmAndUpdate = async () => {
             await ordersStore.updateStatus(order.id, 'ready')
         }
 
-        success(`${props.orders.length} pedido(s) marcado(s) como listos`)
+        success(`${props.orders.length} pedido(s) marcado(s) como listos`, 5000)
 
         console.log('TODO: Imprimir facturas para pedidos:', props.orders.map(o => o.id))
 
