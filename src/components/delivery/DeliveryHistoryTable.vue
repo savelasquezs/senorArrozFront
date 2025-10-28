@@ -83,8 +83,8 @@
             </div>
         </div>
 
-        <BasePagination v-if="totalCount > pageSize" :current-page="page"
-            :total-pages="Math.ceil(totalCount / pageSize)" @update:current-page="handlePageChange" />
+        <BasePagination v-if="totalCount > pageSize" :current-page="page" :total="totalCount" :per-page="pageSize"
+            @change="handlePageChange" />
     </div>
 </template>
 
@@ -94,7 +94,7 @@ import type { OrderListItem } from '@/types/order'
 import { DeliveryService } from '@/services/domain/DeliveryService'
 import { useFormatting } from '@/composables/useFormatting'
 import BaseInput from '@/components/ui/BaseInput.vue'
-import BasePagination from '@/components/ui/BasePagination.vue'
+import BasePagination from '@/components/ui/BasePaginatiopn.vue'
 import NeighborhoodFilter from './NeighborhoodFilter.vue'
 import { ClockIcon } from '@heroicons/vue/24/outline'
 

@@ -114,7 +114,7 @@ const historyFilters = ref<HistoryFilters>({
 
 const cardGridRef = ref<InstanceType<typeof DeliveryCardGrid> | null>(null)
 
-const availableOrders = computed(() => ordersStore.list?.items || [])
+const availableOrders = computed(() => ordersStore.list?.items.filter(o => o.type === 'delivery') || [])
 const historyOrders = computed(() => ordersStore.list?.items || [])
 const historyTotalCount = computed(() => ordersStore.list?.totalCount || 0)
 

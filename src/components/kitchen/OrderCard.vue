@@ -41,16 +41,33 @@
 
         <!-- Variant delivery: muestra dirección, barrio y cantidad de items -->
         <div v-else-if="variant === 'delivery'" class="space-y-2">
+            <!-- Dirección -->
             <div class="flex items-start gap-2 text-sm">
                 <MapPinIcon class="w-4 h-4 text-gray-500 mt-0.5 flex-shrink-0" />
                 <div class="flex-1">
-                    <p class="font-medium text-gray-900">{{ order.addressDescription }}</p>
+                    <p class="font-medium text-gray-900">
+                        {{ order.addressDescription || 'En el local' }}
+                    </p>
                     <p v-if="order.neighborhoodName" class="text-xs text-gray-600 mt-1">
                         📍 {{ order.neighborhoodName }}
                     </p>
                 </div>
             </div>
-            <div class="flex items-center gap-2 text-sm">
+
+            <!-- Cliente o Guest -->
+            <div v-if="order.guestName" class="flex items-center gap-2 text-sm">
+                <UserIcon class="w-4 h-4 text-gray-500" />
+                <span class="text-gray-700">{{ order.guestName }}</span>
+            </div>
+
+            <!-- Info adicional -->
+            <div class="flex items-center justify-between text-xs text-gray-600">
+                <span>Sucursal: {{ order.branchName }}</span>
+                <span>{{ order.typeDisplayName }}</span>
+            </div>
+
+            <!-- Items (solo si tenemos orderItems) -->
+            <div v-if="totalItems > 0" class="flex items-center gap-2 text-sm">
                 <ShoppingBagIcon class="w-4 h-4 text-gray-500" />
                 <span class="text-gray-700">{{ totalItems }} {{ totalItems === 1 ? 'item' : 'items' }}</span>
             </div>
@@ -62,7 +79,7 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import type { OrderListItem, OrderDetailItem } from '@/types/order'
 import { KitchenService } from '@/services/domain/KitchenService'
-import { ClockIcon, HomeIcon, TruckIcon, CalendarIcon, CheckIcon, MapPinIcon, ShoppingBagIcon } from '@heroicons/vue/24/outline'
+import { ClockIcon, HomeIcon, TruckIcon, CalendarIcon, CheckIcon, MapPinIcon, ShoppingBagIcon, UserIcon } from '@heroicons/vue/24/outline'
 import BaseBadge from '@/components/ui/BaseBadge.vue'
 
 interface Props {
