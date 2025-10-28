@@ -158,11 +158,12 @@ const loadHistory = async () => {
 }
 
 const handleOrderReady = async (orderData: any) => {
-    console.log('Pedido listo:', orderData)
-    if (orderData.type === 'delivery') {
-        await loadAvailableOrders()
-        success('Nuevo pedido disponible', 5000, `Pedido #${orderData.id}`)
-    }
+    console.log('🔔 SignalR OrderReady recibido:', orderData)
+    console.log('Tipo de pedido:', orderData.type || 'NO DEFINIDO')
+
+    // Recargar siempre que llegue el evento (el backend ya filtra por tipo delivery)
+    await loadAvailableOrders()
+    success('Nuevo pedido disponible', 5000, `Pedido #${orderData.id}`)
 }
 
 const handleAssign = (orderIds: number[]) => {
@@ -209,12 +210,9 @@ onMounted(async () => {
 
     await loadAvailableOrders()
 
-    // Suscribirse al grupo de SignalR para delivery
-    if (connection.value && authStore.user?.branchId) {
-        await connection.value.invoke('AddToGroup', `Branch_${authStore.user.branchId}_Delivery`)
-        console.log(`SignalR: Suscrito a grupo Branch_${authStore.user.branchId}_Delivery`)
-    }
-
+    // Escuchar eventos de SignalR
     on('OrderReady', handleOrderReady)
+
+    console.log('✅ SignalR: Escuchando evento OrderReady para domicilios')
 })
 </script>
