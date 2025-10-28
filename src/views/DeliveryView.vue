@@ -98,7 +98,7 @@ const ordersStore = useOrdersDataStore()
 const { success, error } = useToast()
 
 const SIGNALR_HUB_URL = 'http://localhost:5257/hubs/orders'
-const { isConnected, on } = useSignalR(SIGNALR_HUB_URL)
+const { isConnected, on, connection } = useSignalR(SIGNALR_HUB_URL)
 
 const activeTab = ref<'available' | 'history'>('available')
 const isLoading = ref(false)
@@ -114,7 +114,11 @@ const historyFilters = ref<HistoryFilters>({
 
 const cardGridRef = ref<InstanceType<typeof DeliveryCardGrid> | null>(null)
 
-const availableOrders = computed(() => ordersStore.list?.items.filter(o => o.type === 'delivery') || [])
+const availableOrders = computed(() => ordersStore.list?.items.filter(o =>
+    o.type === 'delivery' &&
+    o.status === 'ready' &&
+    !o.deliveryManId
+) || [])
 const historyOrders = computed(() => ordersStore.list?.items || [])
 const historyTotalCount = computed(() => ordersStore.list?.totalCount || 0)
 
@@ -204,6 +208,12 @@ onMounted(async () => {
     }
 
     await loadAvailableOrders()
+
+    // Suscribirse al grupo de SignalR para delivery
+    if (connection.value && authStore.user?.branchId) {
+        await connection.value.invoke('AddToGroup', `Branch_${authStore.user.branchId}_Delivery`)
+        console.log(`SignalR: Suscrito a grupo Branch_${authStore.user.branchId}_Delivery`)
+    }
 
     on('OrderReady', handleOrderReady)
 })
