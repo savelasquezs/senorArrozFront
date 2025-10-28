@@ -237,6 +237,20 @@ export const useOrdersDataStore = defineStore('ordersData', () => {
         }
     }
 
+    // Obtener pedidos asignados a un domiciliario
+    const fetchAssignedOrders = async (deliveryManId: number, filters?: { page?: number; pageSize?: number }) => {
+        isLoading.value = true
+        error.value = null
+        try {
+            list.value = await orderApi.fetchAssignedOrders(deliveryManId, filters)
+        } catch (err: any) {
+            error.value = err.message
+            throw err
+        } finally {
+            isLoading.value = false
+        }
+    }
+
     // Obtener historial de entregas
     const fetchDeliveryHistory = async (filters: {
         deliveryManId: number
@@ -287,6 +301,7 @@ export const useOrdersDataStore = defineStore('ordersData', () => {
         // Métodos delivery
         fetchDeliveryReady,
         selfAssignOrders,
+        fetchAssignedOrders,
         fetchDeliveryHistory
     }
 })

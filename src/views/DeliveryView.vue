@@ -34,9 +34,9 @@
                             : 'border-transparent text-gray-500 hover:text-gray-700'
                     ]">
                         Pedidos Disponibles
-                        <span v-if="availableOrders.length > 0"
+                        <span v-if="deliveryStore.availableOrders.length > 0"
                             class="ml-2 py-0.5 px-2 rounded-full text-xs bg-green-100 text-green-600">
-                            {{ availableOrders.length }}
+                            {{ deliveryStore.availableOrders.length }}
                         </span>
                     </button>
 
@@ -47,21 +47,22 @@
                             : 'border-transparent text-gray-500 hover:text-gray-700'
                     ]">
                         Mi Historial
-                        <span v-if="historyTotalCount > 0"
+                        <span v-if="deliveryStore.historyTotalCount > 0"
                             class="ml-2 py-0.5 px-2 rounded-full text-xs bg-blue-100 text-blue-600">
-                            {{ historyTotalCount }}
+                            {{ deliveryStore.historyTotalCount }}
                         </span>
                     </button>
                 </nav>
             </div>
 
             <div v-if="activeTab === 'available'">
-                <DeliveryCardGrid ref="cardGridRef" :orders="availableOrders" @assign="handleAssign" />
+                <DeliveryCardGrid ref="cardGridRef" :orders="deliveryStore.availableOrders" @assign="handleAssign" />
             </div>
 
             <div v-else-if="activeTab === 'history'">
-                <DeliveryHistoryTable :orders="historyOrders" :total-count="historyTotalCount" :page="historyPage"
-                    :page-size="historyPageSize" @page-change="handleHistoryPageChange"
+                <DeliveryHistoryTable :orders="deliveryStore.historyOrders"
+                    :total-count="deliveryStore.historyTotalCount" :page="deliveryStore.historyPage"
+                    :page-size="deliveryStore.historyPageSize" @page-change="handleHistoryPageChange"
                     @filter-change="handleHistoryFilterChange" />
             </div>
         </div>
@@ -72,10 +73,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/store/auth'
-import { useOrdersDataStore } from '@/store/ordersData'
+import { useDeliveryStore } from '@/store/delivery'
 import { useSignalR } from '@/composables/useSignalR'
 import { useToast } from '@/composables/useToast'
 import type { OrderListItem } from '@/types/order'
@@ -86,50 +87,25 @@ import ConfirmAssignmentModal from '@/components/delivery/ConfirmAssignmentModal
 import BaseButton from '@/components/ui/BaseButton.vue'
 import { ArrowPathIcon } from '@heroicons/vue/24/outline'
 
-interface HistoryFilters {
-    fromDate: string
-    toDate: string
-    neighborhoodId: number | null
-}
-
 const router = useRouter()
 const authStore = useAuthStore()
-const ordersStore = useOrdersDataStore()
+const deliveryStore = useDeliveryStore()
 const { success, error } = useToast()
 
 const SIGNALR_HUB_URL = 'http://localhost:5257/hubs/orders'
-const { isConnected, on, connection } = useSignalR(SIGNALR_HUB_URL)
+const { isConnected, on } = useSignalR(SIGNALR_HUB_URL)
 
 const activeTab = ref<'available' | 'history'>('available')
 const isLoading = ref(false)
 const showConfirmModal = ref(false)
 const ordersToAssign = ref<OrderListItem[]>([])
-const historyPage = ref(1)
-const historyPageSize = ref(10)
-const historyFilters = ref<HistoryFilters>({
-    fromDate: new Date().toISOString().split('T')[0],
-    toDate: new Date().toISOString().split('T')[0],
-    neighborhoodId: null
-})
 
 const cardGridRef = ref<InstanceType<typeof DeliveryCardGrid> | null>(null)
-
-const availableOrders = computed(() => ordersStore.list?.items.filter(o =>
-    o.type === 'delivery' &&
-    o.status === 'ready' &&
-    !o.deliveryManId
-) || [])
-const historyOrders = computed(() => ordersStore.list?.items || [])
-const historyTotalCount = computed(() => ordersStore.list?.totalCount || 0)
 
 const loadAvailableOrders = async () => {
     try {
         isLoading.value = true
-        await ordersStore.fetchDeliveryReady({
-            branchId: authStore.user?.branchId,
-            page: 1,
-            pageSize: 100
-        })
+        await deliveryStore.loadAvailableOrders(authStore.user?.branchId)
     } catch (err: any) {
         error('Error al cargar pedidos disponibles', err.message)
     } finally {
@@ -142,14 +118,7 @@ const loadHistory = async () => {
 
     try {
         isLoading.value = true
-        await ordersStore.fetchDeliveryHistory({
-            deliveryManId: authStore.user.id,
-            fromDate: historyFilters.value.fromDate,
-            toDate: historyFilters.value.toDate,
-            neighborhoodId: historyFilters.value.neighborhoodId,
-            page: historyPage.value,
-            pageSize: historyPageSize.value
-        })
+        await deliveryStore.loadHistory(authStore.user.id)
     } catch (err: any) {
         error('Error al cargar historial', err.message)
     } finally {
@@ -167,7 +136,7 @@ const handleOrderReady = async (orderData: any) => {
 }
 
 const handleAssign = (orderIds: number[]) => {
-    ordersToAssign.value = availableOrders.value.filter(o => orderIds.includes(o.id))
+    ordersToAssign.value = deliveryStore.availableOrders.filter((o: OrderListItem) => orderIds.includes(o.id))
     showConfirmModal.value = true
 }
 
@@ -192,15 +161,29 @@ const refreshData = async () => {
 }
 
 const handleHistoryPageChange = async (page: number) => {
-    historyPage.value = page
+    deliveryStore.setHistoryPage(page)
     await loadHistory()
 }
 
-const handleHistoryFilterChange = async (filters: HistoryFilters) => {
-    historyFilters.value = filters
-    historyPage.value = 1
+const handleHistoryFilterChange = async () => {
+    // Note: Filters are not used for history (shows all assigned states)
+    deliveryStore.setHistoryPage(1)
     await loadHistory()
 }
+
+// Watch para cargar datos cuando cambias de tab
+watch(activeTab, async (newTab) => {
+    console.log('🔄 Tab changed:', newTab)
+    if (newTab === 'available') {
+        console.log('📦 Loading available orders...')
+        await loadAvailableOrders()
+        console.log('✅ Available orders loaded:', deliveryStore.availableOrders.length)
+    } else if (newTab === 'history') {
+        console.log('📚 Loading history...')
+        await loadHistory()
+        console.log('✅ History loaded:', deliveryStore.historyOrders.length)
+    }
+})
 
 onMounted(async () => {
     if (authStore.userRole !== 'Deliveryman' && authStore.userRole !== 'Admin' && authStore.userRole !== 'Superadmin') {

@@ -44,7 +44,7 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import type { OrderListItem } from '@/types/order'
-import { useOrdersDataStore } from '@/store/ordersData'
+import { useDeliveryStore } from '@/store/delivery'
 import { useToast } from '@/composables/useToast'
 import BaseDialog from '@/components/ui/BaseDialog.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
@@ -59,7 +59,7 @@ interface Props {
 const props = defineProps<Props>()
 const emit = defineEmits<{ close: [], assigned: [] }>()
 
-const ordersStore = useOrdersDataStore()
+const deliveryStore = useDeliveryStore()
 const { success, error } = useToast()
 const isLoading = ref(false)
 const password = ref('')
@@ -77,7 +77,7 @@ const handleConfirm = async () => {
         isLoading.value = true
 
         const orderIds = props.orders.map(o => o.id)
-        const assigned = await ordersStore.selfAssignOrders(orderIds, password.value)
+        const assigned = await deliveryStore.assignOrders(orderIds, password.value)
 
         // Placeholder de impresión
         console.log('TODO: Imprimir facturas para pedidos:', assigned.map(o => o.id))
