@@ -27,6 +27,9 @@ cp .env.example .env.local
 VITE_API_URL=https://localhost:7049/api
 VITE_APP_NAME=Señor Arroz
 VITE_APP_VERSION=0.0.0
+
+# SignalR Configuration (opcional, con default)
+VITE_SIGNALR_HUB_URL=http://localhost:5257/hubs/orders
 ```
 
 ### Comandos de Desarrollo
@@ -667,6 +670,97 @@ feature/user-auth       # Features
 bugfix/order-validation # Bug fixes
 hotfix/critical-bug     # Hot fixes
 ```
+
+## 🍳 Desarrollo del Módulo de Cocina
+
+### Configuración Local
+
+1. **Instalar dependencia SignalR** (ya incluida):
+```bash
+npm install @microsoft/signalr
+```
+
+2. **Configurar SignalR en backend**:
+- Hub debe estar en `/hubs/orders`
+- Backend debe emitir eventos: `NewOrder`, `ReservationReady`
+- Autenticación JWT debe funcionar
+
+3. **Verificar conexión**:
+```typescript
+// En KitchenView.vue
+const SIGNALR_HUB_URL = import.meta.env.VITE_SIGNALR_HUB_URL || 'http://localhost:5257/hubs/orders'
+```
+
+### Uso de TTS (Text-to-Speech)
+
+El módulo de cocina usa navegador SpeechSynthesis API:
+
+**Activar/Desactivar**:
+```typescript
+const soundEnabled = ref(true)
+const toggleSound = () => {
+    soundEnabled.value = !soundEnabled.value
+}
+```
+
+**Pruebas sin navegador**:
+- Browser DevTools → Application → Logs
+- Verificar mensajes `console.log('TTS:', speechText)`
+
+**Nota**: TTS requiere permiso del usuario en algunos navegadores.
+
+### Testing del Módulo de Cocina
+
+#### Mocking SignalR
+
+```typescript
+import { vi } from 'vitest'
+
+vi.mock('@microsoft/signalr', () => ({
+    HubConnectionBuilder: {
+        withUrl: () => ({
+            withAutomaticReconnect: () => ({
+                configureLogging: () => ({
+                    build: () => ({
+                        start: vi.fn().mockResolvedValue(true),
+                        stop: vi.fn().mockResolvedValue(true),
+                        on: vi.fn(),
+                        off: vi.fn()
+                    })
+                })
+            })
+        })
+    }
+}))
+```
+
+#### Mocking SpeechSynthesis
+
+```typescript
+global.SpeechSynthesis = {
+    speak: vi.fn(),
+    cancel: vi.fn(),
+    onstart: null,
+    onend: null
+} as any
+```
+
+### Impresión (Placeholder)
+
+Actualmente la impresión es un placeholder:
+
+```typescript
+// En ConfirmStatusChangeModal.vue y ReadyOrdersTable.vue
+console.log('TODO: Imprimir facturas para pedidos:', orders.map(o => o.id))
+```
+
+**Para implementar**:
+1. Decidir librería de impresión
+2. Configurar impresora del dispositivo
+3. Generar HTML de factura
+4. Reemplazar console.log con llamada a API de impresión
+
+Ver [docs/modules/kitchen.md](./modules/kitchen.md) para más detalles.
 
 ---
 

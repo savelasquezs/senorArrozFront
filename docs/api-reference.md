@@ -931,6 +931,142 @@ GET /reports/delivery?fromDate=2024-12-01&toDate=2024-12-31&deliverymanId=1
 Authorization: Bearer <token>
 ```
 
+## 🔴 SignalR Hub (Real-Time)
+
+### Configuración
+
+El proyecto utiliza SignalR para actualizaciones en tiempo real sin polling constante.
+
+```typescript
+// Composable: useSignalR
+const { isConnected, on, off } = useSignalR('http://localhost:5257/hubs/orders')
+```
+
+### Autenticación
+
+```typescript
+.withUrl(hubUrl, {
+    accessTokenFactory: () => {
+        const token = localStorage.getItem('auth_token') || ''
+        return token
+    }
+})
+```
+
+### Auto-Reconnect
+
+```typescript
+.withAutomaticReconnect({
+    nextRetryDelayInMilliseconds: () => 3000
+})
+```
+
+### Eventos Disponibles
+
+#### NewOrder
+Se dispara cuando se crea un nuevo pedido o cambia a status `taken`.
+
+```typescript
+on('NewOrder', (orderData) => {
+    // orderData contiene los datos del nuevo pedido
+    await loadOrders()
+    
+    // Opcional: TTS notification
+    if (soundEnabled.value) {
+        speak(`Nuevo pedido número ${orderData.id}`)
+    }
+})
+```
+
+**Payload de ejemplo:**
+```typescript
+{
+    id: 40,
+    status: 'taken',
+    customerName: 'Juan Pérez',
+    // ... más campos
+}
+```
+
+#### ReservationReady
+Se dispara cuando una reservación está próxima.
+
+```typescript
+on('ReservationReady', (reservationData) => {
+    // reservationData contiene datos de la reservación próxima
+    await loadOrders()
+})
+```
+
+**Payload de ejemplo:**
+```typescript
+{
+    id: 42,
+    type: 'reservation',
+    reservedFor: '2024-01-10T14:00:00Z',
+    customerName: 'María García',
+    // ... más campos
+}
+```
+
+### Uso en Módulo de Cocina
+
+```typescript
+// En KitchenView.vue
+import { useSignalR } from '@/composables/useSignalR'
+
+const SIGNALR_HUB_URL = 'http://localhost:5257/hubs/orders'
+const { isConnected, on } = useSignalR(SIGNALR_HUB_URL)
+
+onMounted(() => {
+    on('NewOrder', handleNewOrder)
+    on('ReservationReady', handleReservationReady)
+})
+
+const handleNewOrder = async (orderData: any) => {
+    await loadOrders()
+    if (soundEnabled.value) {
+        speak(generateOrderSpeech(orderData))
+    }
+}
+```
+
+### Indicador de Conexión
+
+```vue
+<div :class="[
+    'flex items-center gap-2 px-3 py-1 rounded-lg text-sm',
+    isConnected ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+]">
+    <span :class="['w-2 h-2 rounded-full', isConnected ? 'bg-green-500' : 'bg-red-500']"></span>
+    {{ isConnected ? 'Conectado' : 'Desconectado' }}
+</div>
+```
+
+### Manual de reconexión
+
+```typescript
+await connection.value.stop()
+await connection.value.start()
+```
+
+### Store Usage (NO direct API calls)
+
+**IMPORTANTE**: El módulo de cocina NO llama directamente a APIs. Usa stores:
+
+```typescript
+// ✅ CORRECTO
+const ordersStore = useOrdersDataStore()
+await ordersStore.fetch({ branchId, page: 1 })
+await ordersStore.updateStatus(orderId, 'ready')
+
+// ❌ INCORRECTO
+await orderApi.fetchOrders({ branchId })
+await orderApi.updateStatus(orderId, 'ready')
+```
+
+Ver [docs/modules/kitchen.md](./modules/kitchen.md) para más detalles.
+
 ## 🔧 Manejo de Errores
 
 ### Estructura de Error

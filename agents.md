@@ -825,6 +825,24 @@ Basado en el backlog de Linear, los siguientes issues recomendados son:
 3. **SEN-13**: OrderItems - Lista de productos del pedido
 4. **SEN-17**: OrderSummary - Resumen compacto
 
+#### Módulo de Cocina ✅
+- **Archivos**: `KitchenView.vue`, 4 componentes en `kitchen/`, `KitchenService.ts`, `useSignalR.ts`, `useTextToSpeech.ts`
+- **Funcionalidades**: Sistema en tiempo real con SignalR, notificaciones TTS, tarjetas seleccionables, cambio de estado en lote
+- **Documentación**: Ver [docs/modules/kitchen.md](./docs/modules/kitchen.md)
+
+#### Quick Start para Módulo de Cocina
+- **Ruta**: `/kitchen` (solo Kitchen, Admin, Superadmin)
+- **Componente principal**: `src/views/KitchenView.vue`
+- **Store utilizado**: `useOrdersDataStore()` (NO llamar a API directamente)
+- **Real-time**: SignalR hub en `http://localhost:5257/hubs/orders`
+- **Eventos**: `NewOrder`, `ReservationReady`
+- **Composables**: `useSignalR()`, `useTextToSpeech()`, `useOrderPermissions()`
+- **Tareas comunes**:
+  - Modificar tiempos máximos: Editar constantes en `KitchenService.ts`
+  - Agregar evento SignalR: Añadir `on('NuevoEvento', callback)` en `KitchenView.vue`
+  - Cambiar colores de tarjetas: Modificar `KitchenService.getCardColorClass()`
+  - Implementar impresión: Reemplazar console.log en `ConfirmStatusChangeModal.vue` y `ReadyOrdersTable.vue`
+
 ## 🤝 Colaboración
 
 ### Para Otros Agentes IA

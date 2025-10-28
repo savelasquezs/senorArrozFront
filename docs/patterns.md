@@ -490,9 +490,167 @@ const handleDelete = async (id: number) => {
 | Formulario desde búsqueda | Prellenado con `initial*` |
 | Después de CREATE/UPDATE/DELETE | Reactividad Optimista |
 
+## 🎨 Patrón de Tarjetas Seleccionables
+
+### Concepto
+
+Tarjetas que son completamente seleccionables con feedback visual sin checkbox visible, usadas en selección múltiple.
+
+### Ejemplo: OrderCard
+
+```vue
+<template>
+    <div :class="[
+        'relative p-4 rounded-lg border-2 transition-all duration-200 cursor-pointer',
+        colorClass,
+        isSelected ? 'ring-4 ring-emerald-500 scale-105 shadow-xl' : 'hover:shadow-lg'
+    ]" @click="$emit('toggle-select', order.id)">
+        <div v-if="isSelected" class="absolute top-2 right-2 bg-emerald-500 rounded-full p-1">
+            <CheckIcon class="w-4 h-4 text-white" />
+        </div>
+        <!-- Contenido -->
+    </div>
+</template>
+```
+
+**Características:**
+- Click en toda la card para seleccionar
+- Feedback visual: ring + escala + sombra
+- Check icon en esquina (solo cuando seleccionado)
+- NO hay checkbox visible
+
+## 🔴 Patrón de Actualizaciones en Tiempo Real
+
+### Concepto
+
+Usar SignalR para actualizaciones en tiempo real sin polling constante.
+
+### Estructura
+
+```typescript
+// Composable: useSignalR.ts
+export function useSignalR(hubUrl: string) {
+    const connection = ref<signalR.HubConnection | null>(null)
+    const isConnected = ref(false)
+    
+    const connect = async () => {
+        connection.value = new signalR.HubConnectionBuilder()
+            .withUrl(hubUrl, {
+                accessTokenFactory: () => localStorage.getItem('auth_token') || ''
+            })
+            .withAutomaticReconnect({
+                nextRetryDelayInMilliseconds: () => 3000
+            })
+            .build()
+        
+        await connection.value.start()
+        isConnected.value = true
+    }
+    
+    const on = (eventName: string, callback: (...args: any[]) => void) => {
+        connection.value?.on(eventName, callback)
+    }
+    
+    return { connection, isConnected, on, off }
+}
+```
+
+**Uso:**
+```typescript
+// En el componente
+const { isConnected, on } = useSignalR('http://localhost:5257/hubs/orders')
+
+onMounted(() => {
+    on('NewOrder', handleNewOrder)
+    on('OrderReady', handleOrderReady)
+})
+
+const handleNewOrder = async (orderData: any) => {
+    await loadOrders()  // Recargar lista
+    // Opcional: TTS notification
+    speak('Nuevo pedido recibido')
+}
+```
+
+**Características:**
+- Auto-reconnect cada 3 segundos
+- Autenticación JWT automática
+- Indicador visual de conexión
+- Eventos tipados con TypeScript
+
+**Beneficios:**
+- ⚡ Actualizaciones instantáneas
+- 📊 Menos carga del servidor (no polling)
+- 🔄 Reconección automática
+- 🎯 Mejor UX
+
+## 🎤 Patrón de Notificaciones por Voz (TTS)
+
+### Concepto
+
+Usar SpeechSynthesis API para notificaciones por voz en contextos donde el usuario no está mirando la pantalla.
+
+### Estructura
+
+```typescript
+// Composable: useTextToSpeech.ts
+export function useTextToSpeech() {
+    const isSupported = ref('speechSynthesis' in window)
+    const isSpeaking = ref(false)
+    
+    const speak = (text: string, options?: { lang?: string; rate?: number }) => {
+        if (!isSupported.value) return
+        
+        window.speechSynthesis.cancel()
+        
+        const utterance = new SpeechSynthesisUtterance(text)
+        utterance.lang = options?.lang || 'es-ES'
+        utterance.rate = options?.rate || 0.9
+        
+        utterance.onstart = () => { isSpeaking.value = true }
+        utterance.onend = () => { isSpeaking.value = false }
+        
+        window.speechSynthesis.speak(utterance)
+    }
+    
+    return { isSupported, isSpeaking, speak, cancel }
+}
+```
+
+**Uso:**
+```typescript
+const { speak } = useTextToSpeech()
+
+// Cuando llega nuevo pedido por SignalR
+const handleNewOrder = async (orderData: any) => {
+    const speechText = `Nuevo pedido número ${order.id}: dos ropa vieja y una coca cola litro y medio`
+    speak(speechText)
+}
+```
+
+**Reglas de formato:**
+- Cantidad en español: "una", "dos", "tres"
+- Conector "y" en último item si hay múltiples
+- Formato: `cantidad producto`
+
+**Toggle:**
+```typescript
+const soundEnabled = ref(true)
+
+const toggleSound = () => {
+    soundEnabled.value = !soundEnabled.value
+}
+
+// Condicional
+if (soundEnabled.value) {
+    speak(speechText)
+}
+```
+
 ## 📚 Referencias
 
 - [docs/components.md](./components.md) - Guía completa de componentes
 - [docs/development.md](./development.md) - Convenciones de desarrollo
+- [docs/modules/kitchen.md](./modules/kitchen.md) - Módulo de cocina completo
 - [.cursorrules](../.cursorrules) - Reglas para agentes IA
 

@@ -96,11 +96,14 @@ Esta documentación está organizada de manera modular para facilitar la navegac
 - Dashboard y reportes
 
 ### ⏳ Pendiente
-- Módulo de cocina
+- ~~Módulo de cocina~~ ✅ Completado
 - Módulo de domicilios
 - Sistema de gastos
 - Caja y cuadres
 - Reportes avanzados
+
+### 📦 Módulos Especializados
+- **[Kitchen Module](./modules/kitchen.md)** - Sistema de cocina en tiempo real con SignalR
 
 ## 🤝 Para Nuevos Desarrolladores
 

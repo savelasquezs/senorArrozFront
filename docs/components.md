@@ -1048,6 +1048,149 @@ interface Props {
 
 El formulario prellenará automáticamente el campo `phone1` con el valor buscado.
 
+## 🍳 Componentes de Cocina
+
+### KitchenView
+Vista principal del módulo de cocina con sistema de tabs y tiempo real.
+
+**Ubicación:** `src/views/KitchenView.vue`
+
+```vue
+<KitchenView />
+```
+
+**Características:**
+- Tabs para "Pedidos Activos" y "Pedidos Listos"
+- Conexión SignalR para actualizaciones en tiempo real
+- Sistema de sonido con TTS para nuevos pedidos
+- Manejo de cambios de estado en lote
+- Indicador de conexión en vivo
+- Botón para actualizar manualmente
+
+**Integración:**
+```typescript
+// KitchenView maneja internamente:
+- SignalR connection (useSignalR)
+- TTS notifications (useTextToSpeech)
+- Store updates (ordersDataStore)
+```
+
+### OrderCard
+Tarjeta seleccionable para mostrar un pedido.
+
+**Ubicación:** `src/components/kitchen/OrderCard.vue`
+
+**Props:**
+```typescript
+interface Props {
+    order: OrderListItem
+    orderItems: OrderDetailItem[]
+    isSelected: boolean
+}
+```
+
+**Emits:**
+- `toggle-select`: [orderId: number]
+
+**Características:**
+- Completamente seleccionable (click en toda la card)
+- Feedback visual con ring verde + escala
+- Cambio de color según tiempo transcurrido
+- Actualización de tiempo cada segundo
+- Icono según tipo de pedido (Home/Truck/Calendar)
+- Muestra ID, estado, tiempo total, tiempo en estado actual
+- Lista productos con cantidades y notas
+
+**Colores dinámicos:**
+- Verde (< 50% del tiempo máximo)
+- Amarillo (50-75%)
+- Naranja (75-100%)
+- Rojo (> 100%)
+
+### OrderCardGrid
+Grid de tarjetas con selección múltiple y filtrado por estado.
+
+**Ubicación:** `src/components/kitchen/OrderCardGrid.vue`
+
+**Props:**
+```typescript
+interface Props {
+    orders: OrderListItem[]
+    orderItemsMap: Map<number, OrderDetailItem[]>
+}
+```
+
+**Emits:**
+- `change-status`: [orderIds: number[], newStatus: OrderStatus]
+
+**Características:**
+- Muestra pedidos separados por estado (Taken / En Preparación)
+- Grid responsive (1/2/3/4 columnas)
+- Selección múltiple con botones globales
+- Botones de acción condicionales según permisos
+- Usa `useOrderPermissions.canChangeStatus()` para validar
+
+**Botones:**
+- "Seleccionar todos" / "Limpiar selección"
+- "Pasar a Preparación" (solo si está en taken)
+- "Marcar como Listo" (solo si está en in_preparation)
+
+### ConfirmStatusChangeModal
+Modal autónomo para confirmar cambio a status `ready`.
+
+**Ubicación:** `src/components/kitchen/ConfirmStatusChangeModal.vue`
+
+**Props:**
+```typescript
+interface Props {
+    isOpen: boolean
+    orders: OrderListItem[]
+    orderItemsMap: Map<number, OrderDetailItem[]>
+}
+```
+
+**Emits:**
+- `close`: []
+- `updated`: []
+
+**Características:**
+- Componente completamente autónomo
+- Maneja su propia actualización con `ordersDataStore.updateStatus()`
+- Muestra preview de todos los pedidos a confirmar
+- Lista productos de cada pedido
+- Mensaje sobre impresión automática (placeholder)
+
+**Importante:** NO depende del padre para actualizar estado.
+
+### ReadyOrdersTable
+Tabla de pedidos listos para recoger o reimprimir.
+
+**Ubicación:** `src/components/kitchen/ReadyOrdersTable.vue`
+
+**Props:**
+```typescript
+interface Props {
+    orders: OrderListItem[]
+    orderItemsMap: Map<number, OrderDetailItem[]>
+}
+```
+
+**Emits:**
+- `reprint`: [orderId: number]
+
+**Características:**
+- Muestra solo pedidos con status `ready`
+- Columna de productos con cantidades
+- Columna de tiempo transcurrido desde taken
+- Botón "Reimprimir" (placeholder para impresora)
+
+**Estructura:**
+```
+| Pedido | Productos | Tiempo | Acciones |
+| #40    | 2x Ropa vieja | 15:30 | [Reimprimir] |
+|        | 1x Coca Cola  |       |            |
+```
+
 ---
 
 ## 📚 Referencias
