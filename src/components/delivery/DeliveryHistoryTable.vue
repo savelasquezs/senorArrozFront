@@ -28,6 +28,8 @@
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Efectivo</th>
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Delivery</th>
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tiempo</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Estado</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Acción</th>
                         </tr>
                     </thead>
                     <tbody class="bg-white divide-y divide-gray-200">
@@ -56,11 +58,26 @@
                             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
                                 {{ formatDeliveryTime(order) }}
                             </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <BaseBadge :variant="getStatusVariant(order.status)">
+                                    {{ order.statusDisplayName }}
+                                </BaseBadge>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <button v-if="order.status === 'on_the_way'" @click="showConfirmDialog(order)"
+                                    :disabled="deliveringOrderId === order.id"
+                                    class="flex items-center justify-center w-8 h-8 rounded-full bg-emerald-100 hover:bg-emerald-200 text-emerald-600 hover:text-emerald-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+                                    <CheckCircleIcon class="w-5 h-5" />
+                                </button>
+                                <span v-else-if="order.status === 'delivered'" class="text-sm text-gray-500">
+                                    Entregado
+                                </span>
+                            </td>
                         </tr>
                     </tbody>
                     <tfoot class="bg-gray-50">
                         <tr>
-                            <td colspan="5" class="px-6 py-4 text-right text-sm font-semibold text-gray-900">
+                            <td colspan="7" class="px-6 py-4 text-right text-sm font-semibold text-gray-900">
                                 Totales:
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap text-sm font-bold text-emerald-600">
@@ -72,6 +89,7 @@
                             <td class="px-6 py-4 whitespace-nowrap text-sm font-bold text-emerald-600">
                                 {{ formatCurrency(totals.grandTotal) }}
                             </td>
+                            <td colspan="2" class="px-6 py-4"></td>
                         </tr>
                     </tfoot>
                 </table>
@@ -86,6 +104,36 @@
         <BasePagination v-if="totalCount > pageSize" :current-page="page" :total="totalCount" :per-page="pageSize"
             @change="handlePageChange" />
     </div>
+
+    <!-- Modal de confirmación -->
+    <BaseDialog :model-value="showModal" @update:model-value="showModal = false" title="Confirmar entrega">
+        <div class="space-y-4">
+            <p class="text-gray-700">¿Confirmar que el pedido <span class="font-bold">#{{ orderToDeliver?.id }}</span>
+                ha sido entregado?</p>
+
+            <div v-if="orderToDeliver" class="bg-gray-50 rounded-lg p-4">
+                <div class="space-y-2 text-sm">
+                    <div><span class="font-medium">Dirección:</span> {{ orderToDeliver.addressDescription || '-' }}
+                    </div>
+                    <div><span class="font-medium">Cliente:</span> {{ orderToDeliver.customerName ||
+                        orderToDeliver.guestName || '-' }}</div>
+                    <div><span class="font-medium">Teléfono:</span> {{ orderToDeliver.customerPhone || '-' }}</div>
+                </div>
+            </div>
+        </div>
+
+        <template #footer>
+            <div class="flex gap-3 justify-end">
+                <BaseButton @click="showModal = false" variant="outline" :disabled="deliveringOrderId !== null">
+                    Cancelar
+                </BaseButton>
+                <BaseButton @click="handleConfirmDelivery" variant="success"
+                    :loading="deliveringOrderId === orderToDeliver?.id">
+                    Confirmar entrega
+                </BaseButton>
+            </div>
+        </template>
+    </BaseDialog>
 </template>
 
 <script setup lang="ts">
@@ -96,7 +144,13 @@ import { useFormatting } from '@/composables/useFormatting'
 import BaseInput from '@/components/ui/BaseInput.vue'
 import BasePagination from '@/components/ui/BasePaginatiopn.vue'
 import NeighborhoodFilter from './NeighborhoodFilter.vue'
-import { ClockIcon } from '@heroicons/vue/24/outline'
+import { ClockIcon, CheckCircleIcon } from '@heroicons/vue/24/outline'
+import BaseButton from '@/components/ui/BaseButton.vue'
+import BaseBadge from '@/components/ui/BaseBadge.vue'
+import BaseDialog from '@/components/ui/BaseDialog.vue'
+import { useOrdersDataStore } from '@/store/ordersData'
+import { useToast } from '@/composables/useToast'
+import type { OrderStatus } from '@/types/order'
 
 interface Props {
     orders: OrderListItem[]
@@ -112,7 +166,7 @@ interface Filters {
 }
 
 const props = defineProps<Props>()
-const emit = defineEmits<{ 'page-change': [page: number], 'filter-change': [filters: Filters] }>()
+const emit = defineEmits<{ 'page-change': [page: number], 'filter-change': [filters: Filters], 'order-delivered': [] }>()
 
 const { formatCurrency } = useFormatting()
 const filters = ref<Filters>({
@@ -130,6 +184,49 @@ const formatDeliveryTime = (order: OrderListItem): string => {
 
 const getCashCollected = (order: OrderListItem): number => {
     return DeliveryService.getCashCollected(order)
+}
+
+// Variables para entrega
+const ordersStore = useOrdersDataStore()
+const { success, error } = useToast()
+const deliveringOrderId = ref<number | null>(null)
+const showModal = ref(false)
+const orderToDeliver = ref<OrderListItem | null>(null)
+
+const getStatusVariant = (status: OrderStatus): 'success' | 'warning' | 'info' | 'default' => {
+    switch (status) {
+        case 'delivered': return 'success'
+        case 'on_the_way': return 'warning'
+        case 'ready': return 'info'
+        default: return 'default'
+    }
+}
+
+const showConfirmDialog = (order: OrderListItem) => {
+    orderToDeliver.value = order
+    showModal.value = true
+}
+
+const handleConfirmDelivery = async () => {
+    if (!orderToDeliver.value) return
+
+    try {
+        deliveringOrderId.value = orderToDeliver.value.id
+        await ordersStore.updateStatus(orderToDeliver.value.id, 'delivered')
+
+        success(`Pedido #${orderToDeliver.value.id} marcado como entregado`, 3000)
+
+        // Cerrar modal
+        showModal.value = false
+        orderToDeliver.value = null
+
+        // Emitir evento para recargar datos
+        emit('order-delivered')
+    } catch (err: any) {
+        error('Error al marcar como entregado', err.message)
+    } finally {
+        deliveringOrderId.value = null
+    }
 }
 
 const handlePageChange = (newPage: number) => {

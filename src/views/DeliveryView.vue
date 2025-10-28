@@ -63,7 +63,7 @@
                 <DeliveryHistoryTable :orders="deliveryStore.historyOrders"
                     :total-count="deliveryStore.historyTotalCount" :page="deliveryStore.historyPage"
                     :page-size="deliveryStore.historyPageSize" @page-change="handleHistoryPageChange"
-                    @filter-change="handleHistoryFilterChange" />
+                    @filter-change="handleHistoryFilterChange" @order-delivered="handleOrderDelivered" />
             </div>
         </div>
 
@@ -168,6 +168,11 @@ const handleHistoryPageChange = async (page: number) => {
 const handleHistoryFilterChange = async () => {
     // Note: Filters are not used for history (shows all assigned states)
     deliveryStore.setHistoryPage(1)
+    await loadHistory()
+}
+
+const handleOrderDelivered = async () => {
+    // Recargar historial para reflejar el cambio de estado
     await loadHistory()
 }
 
