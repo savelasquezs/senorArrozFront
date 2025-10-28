@@ -11,7 +11,7 @@
         <div class="flex items-center justify-between mb-3">
             <div class="flex items-center gap-2">
                 <span class="text-2xl font-bold text-gray-900">#{{ order.id }}</span>
-                <BaseBadge :variant="order.status === 'taken' ? 'warning' : 'info'">
+                <BaseBadge :variant="getStatusVariant()">
                     {{ order.statusDisplayName }}
                 </BaseBadge>
             </div>
@@ -23,18 +23,36 @@
                 <ClockIcon class="w-4 h-4" />
                 <span class="font-medium">Tiempo total: {{ formattedElapsedTime }}</span>
             </div>
-            <div class="text-xs text-gray-500 mt-1">
+            <div v-if="variant === 'kitchen'" class="text-xs text-gray-500 mt-1">
                 En {{ order.statusDisplayName }}: {{ formattedElapsedInStatus }}
             </div>
         </div>
 
-        <div class="space-y-2">
+        <!-- Contenido según variant -->
+        <div v-if="variant === 'kitchen' && orderItems" class="space-y-2">
             <div v-for="item in orderItems" :key="item.id" class="flex items-start gap-2 text-sm">
                 <span class="font-bold text-emerald-600 min-w-[2rem]">{{ item.quantity }}x</span>
                 <div class="flex-1">
                     <p class="font-medium text-gray-900">{{ item.productName }}</p>
                     <p v-if="item.notes" class="text-xs text-gray-600 italic mt-1">Nota: {{ item.notes }}</p>
                 </div>
+            </div>
+        </div>
+
+        <!-- Variant delivery: muestra dirección, barrio y cantidad de items -->
+        <div v-else-if="variant === 'delivery'" class="space-y-2">
+            <div class="flex items-start gap-2 text-sm">
+                <MapPinIcon class="w-4 h-4 text-gray-500 mt-0.5 flex-shrink-0" />
+                <div class="flex-1">
+                    <p class="font-medium text-gray-900">{{ order.addressDescription }}</p>
+                    <p v-if="order.neighborhoodName" class="text-xs text-gray-600 mt-1">
+                        📍 {{ order.neighborhoodName }}
+                    </p>
+                </div>
+            </div>
+            <div class="flex items-center gap-2 text-sm">
+                <ShoppingBagIcon class="w-4 h-4 text-gray-500" />
+                <span class="text-gray-700">{{ totalItems }} {{ totalItems === 1 ? 'item' : 'items' }}</span>
             </div>
         </div>
     </div>
@@ -44,16 +62,20 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import type { OrderListItem, OrderDetailItem } from '@/types/order'
 import { KitchenService } from '@/services/domain/KitchenService'
-import { ClockIcon, HomeIcon, TruckIcon, CalendarIcon, CheckIcon } from '@heroicons/vue/24/outline'
+import { ClockIcon, HomeIcon, TruckIcon, CalendarIcon, CheckIcon, MapPinIcon, ShoppingBagIcon } from '@heroicons/vue/24/outline'
 import BaseBadge from '@/components/ui/BaseBadge.vue'
 
 interface Props {
     order: OrderListItem
-    orderItems: OrderDetailItem[]
+    orderItems?: OrderDetailItem[]
     isSelected: boolean
+    variant?: 'kitchen' | 'delivery'
 }
 
-const props = defineProps<Props>()
+const props = withDefaults(defineProps<Props>(), {
+    variant: 'kitchen'
+})
+
 defineEmits<{ 'toggle-select': [orderId: number] }>()
 
 const elapsedTime = ref(0)
@@ -77,6 +99,17 @@ const orderTypeIcon = computed(() => {
         default: return HomeIcon
     }
 })
+
+const totalItems = computed(() => {
+    return props.orderItems?.reduce((sum, item) => sum + item.quantity, 0) || 0
+})
+
+const getStatusVariant = () => {
+    if (props.order.status === 'taken') return 'warning'
+    if (props.order.status === 'in_preparation') return 'info'
+    if (props.order.status === 'ready') return 'success'
+    return 'info'
+}
 
 onMounted(() => {
     updateTimes()

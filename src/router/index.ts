@@ -223,16 +223,16 @@ const routes: RouteRecordRaw[] = [
             title: 'Cocina'
         }
     },
-    //   {
-    //     path: '/delivery',
-    //     name: 'Delivery',
-    //     component: () => import('@/views/Delivery.vue'),
-    //     meta: {
-    //       requiresAuth: true,
-    //       requiresRole: ['Deliveryman'],
-    //       title: 'Domicilios'
-    //     }
-    //   },
+    {
+        path: '/delivery',
+        name: 'Delivery',
+        component: () => import('@/views/DeliveryView.vue'),
+        meta: {
+            requiresAuth: true,
+            requiresRole: [UserRole.DELIVERYMAN, UserRole.ADMIN, UserRole.SUPERADMIN],
+            title: 'Domicilios'
+        }
+    },
     //   {
     //     path: '/customers',
     //     name: 'Customers',

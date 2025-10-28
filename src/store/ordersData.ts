@@ -5,11 +5,11 @@ import { useCustomersStore } from './customers'
 import { orderApi } from '@/services/MainAPI/orderApi'
 import { getOrderStatusDisplayName } from '@/composables/useFormatting'
 import type {
-    Order,
     OrderDetailView,
     OrderFilters,
     UpdateOrderDto,
     OrderStatus,
+    OrderListItem,
 } from '@/types/order'
 import type {
     Customer,
@@ -23,7 +23,7 @@ import type {
 
 export const useOrdersDataStore = defineStore('ordersData', () => {
     // ===== Estado =====
-    const list = ref<PagedResult<Order> | null>(null)
+    const list = ref<PagedResult<OrderListItem> | null>(null)
     const current = ref<OrderDetailView | null>(null)
     const isLoading = ref(false)
     const error = ref<string | null>(null)
@@ -38,7 +38,7 @@ export const useOrdersDataStore = defineStore('ordersData', () => {
         error.value = null
         try {
             const response = await orderApi.getOrders(filters)
-            list.value = response as PagedResult<Order>
+            list.value = response as unknown as PagedResult<OrderListItem>
         } catch (error: any) {
             error.value = error.message || 'Error de conexión'
         } finally {
@@ -199,6 +199,73 @@ export const useOrdersDataStore = defineStore('ordersData', () => {
         }
     }
 
+    // ===== MÉTODOS PARA MÓDULO DE DOMICILIARIOS =====
+
+    // Obtener pedidos delivery ready
+    const fetchDeliveryReady = async (filters?: { branchId?: number; page?: number; pageSize?: number }) => {
+        isLoading.value = true
+        error.value = null
+        try {
+            list.value = await orderApi.fetchDeliveryReady(filters)
+        } catch (err: any) {
+            error.value = err.message
+            throw err
+        } finally {
+            isLoading.value = false
+        }
+    }
+
+    // Autoasignar pedidos
+    const selfAssignOrders = async (orderIds: number[], password: string) => {
+        isLoading.value = true
+        error.value = null
+        try {
+            const assigned = await orderApi.selfAssignOrders({ orderIds, password })
+
+            // Actualización optimista: remover de lista
+            if (list.value) {
+                list.value.items = list.value.items.filter(o => !orderIds.includes(o.id))
+                list.value.totalCount -= orderIds.length
+            }
+
+            return assigned
+        } catch (err: any) {
+            error.value = err.message
+            throw err
+        } finally {
+            isLoading.value = false
+        }
+    }
+
+    // Obtener historial de entregas
+    const fetchDeliveryHistory = async (filters: {
+        deliveryManId: number
+        fromDate?: string
+        toDate?: string
+        neighborhoodId?: number | null
+        page?: number
+        pageSize?: number
+    }) => {
+        isLoading.value = true
+        error.value = null
+        try {
+            list.value = await orderApi.searchOrders({
+                deliveryManId: filters.deliveryManId,
+                fromDate: filters.fromDate,
+                toDate: filters.toDate,
+                status: 'delivered',
+                type: 'delivery',
+                page: filters.page || 1,
+                pageSize: filters.pageSize || 10
+            })
+        } catch (err: any) {
+            error.value = err.message
+            throw err
+        } finally {
+            isLoading.value = false
+        }
+    }
+
     return {
         // Estado
         list,
@@ -211,11 +278,15 @@ export const useOrdersDataStore = defineStore('ordersData', () => {
         fetch,
         fetchById,
         update,
-        updateCurrent, // ✅ NUEVO - Solo para actualizaciones locales
+        updateCurrent,
         updateStatus,
         remove,
         clear,
         loadCustomers,
-        loadUsers
+        loadUsers,
+        // Métodos delivery
+        fetchDeliveryReady,
+        selfAssignOrders,
+        fetchDeliveryHistory
     }
 })

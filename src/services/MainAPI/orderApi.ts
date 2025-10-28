@@ -141,6 +141,28 @@ class OrderApi extends BaseApi {
     async unassignDelivery(id: number): Promise<Order> {
         return this.put<Order>(`/orders/${id}/unassign-delivery`, {});
     }
+
+    // ===== MÉTODOS PARA MÓDULO DE DOMICILIARIOS =====
+
+    // 18. Obtener pedidos delivery ready (listos para asignar)
+    async fetchDeliveryReady(filters?: { branchId?: number; page?: number; pageSize?: number }): Promise<PagedResult<OrderListItem>> {
+        const params: any = {};
+        if (filters?.branchId) params.branchId = filters.branchId;
+        if (filters?.page) params.page = filters.page;
+        if (filters?.pageSize) params.pageSize = filters.pageSize;
+
+        return this.get<PagedResult<OrderListItem>>('/orders/delivery/ready', { params });
+    }
+
+    // 19. Autoasignar pedidos (usado por domiciliarios)
+    async selfAssignOrders(data: { orderIds: number[]; password: string }): Promise<OrderListItem[]> {
+        return this.post<OrderListItem[]>('/orders/delivery/self-assign', data);
+    }
+
+    // 20. Buscar pedidos con filtros avanzados (para historial)
+    async searchOrders(filters: any): Promise<PagedResult<OrderListItem>> {
+        return this.post<PagedResult<OrderListItem>>('/orders/search', filters);
+    }
 }
 
 export const orderApi = new OrderApi();

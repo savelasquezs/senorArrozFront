@@ -206,6 +206,8 @@ export interface OrderListItem {
     customerPhone: string | null
     addressId: number | null
     addressDescription: string | null
+    neighborhoodId: number | null
+    neighborhoodName: string | null
     deliveryManId: number | null
     deliveryManName: string | null
     guestName: string | null
