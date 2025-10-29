@@ -1,13 +1,13 @@
 <template>
     <MainLayout>
-        <div class="p-6 space-y-6">
-            <div class="flex items-center justify-between">
+        <div class="p-3 md:p-6 space-y-4 md:space-y-6">
+            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                 <div>
-                    <h1 class="text-3xl font-bold text-gray-900">Domicilios</h1>
-                    <p class="text-gray-600 mt-1">Gestión de entregas</p>
+                    <h1 class="text-2xl md:text-3xl font-bold text-gray-900">Domicilios</h1>
+                    <p class="text-sm md:text-base text-gray-600 mt-1">Gestión de entregas</p>
                 </div>
 
-                <div class="flex items-center gap-4">
+                <div class="hidden md:flex items-center gap-4">
                     <div :class="[
                         'flex items-center gap-2 px-3 py-1 rounded-lg text-sm',
                         isConnected ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
@@ -23,9 +23,50 @@
                         </span>
                     </BaseButton>
                 </div>
+
+                <!-- Mobile: Status indicador pequeño -->
+                <div class="md:hidden flex items-center gap-2">
+                    <div :class="[
+                        'flex items-center gap-1.5 px-2 py-1 rounded text-xs',
+                        isConnected ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+                    ]">
+                        <span :class="['w-1.5 h-1.5 rounded-full', isConnected ? 'bg-green-500' : 'bg-red-500']"></span>
+                        {{ isConnected ? 'Conectado' : 'Desconectado' }}
+                    </div>
+                </div>
             </div>
 
-            <div class="border-b border-gray-200">
+            <!-- Mobile: Tabs en grid -->
+            <div class="grid grid-cols-2 gap-2 md:hidden">
+                <button @click="activeTab = 'available'" :class="[
+                    'py-3 px-4 rounded-lg font-medium text-sm transition-colors text-center',
+                    activeTab === 'available'
+                        ? 'bg-emerald-500 text-white'
+                        : 'bg-gray-100 text-gray-600'
+                ]">
+                    <span>Disponibles</span>
+                    <span v-if="deliveryStore.availableOrders.length > 0"
+                        class="ml-2 py-0.5 px-2 rounded-full text-xs bg-white/20 text-white">
+                        {{ deliveryStore.availableOrders.length }}
+                    </span>
+                </button>
+
+                <button @click="activeTab = 'history'" :class="[
+                    'py-3 px-4 rounded-lg font-medium text-sm transition-colors text-center',
+                    activeTab === 'history'
+                        ? 'bg-emerald-500 text-white'
+                        : 'bg-gray-100 text-gray-600'
+                ]">
+                    Historial
+                    <span v-if="deliveryStore.historyTotalCount > 0"
+                        class="ml-2 py-0.5 px-2 rounded-full text-xs bg-white/20 text-white">
+                        {{ deliveryStore.historyTotalCount }}
+                    </span>
+                </button>
+            </div>
+
+            <!-- Desktop: Tabs tradicionales -->
+            <div class="hidden md:block border-b border-gray-200">
                 <nav class="-mb-px flex space-x-8">
                     <button @click="activeTab = 'available'" :class="[
                         'py-4 px-1 border-b-2 font-medium text-sm transition-colors',

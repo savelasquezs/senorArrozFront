@@ -1,20 +1,24 @@
 <template>
     <div class="space-y-6">
-        <div v-if="orders.length > 0" class="flex items-center justify-between bg-gray-50 p-4 rounded-lg">
-            <div class="flex items-center gap-4">
-                <button @click="selectAll" class="text-sm text-emerald-600 hover:text-emerald-700 font-medium">
+        <!-- Mobile: Controles verticales -->
+        <div v-if="orders.length > 0"
+            class="md:flex md:items-center md:justify-between bg-gray-50 p-3 md:p-4 rounded-lg gap-3">
+            <div class="flex items-center gap-2 md:gap-4 mb-3 md:mb-0">
+                <button @click="selectAll"
+                    class="text-xs md:text-sm text-emerald-600 hover:text-emerald-700 font-medium px-2 py-1">
                     Seleccionar todos
                 </button>
-                <button @click="clearSelection" class="text-sm text-gray-600 hover:text-gray-700 font-medium">
-                    Limpiar selección
+                <button @click="clearSelection"
+                    class="text-xs md:text-sm text-gray-600 hover:text-gray-700 font-medium px-2 py-1">
+                    Limpiar
                 </button>
-                <span v-if="selectedOrders.size > 0" class="text-sm text-gray-600">
+                <span v-if="selectedOrders.size > 0" class="text-xs md:text-sm text-gray-600">
                     {{ selectedOrders.size }} seleccionado(s)
                 </span>
             </div>
 
-            <BaseButton v-if="canAssign" @click="handleAssign" variant="primary" size="sm">
-                <span class="flex items-center gap-2">
+            <BaseButton v-if="canAssign" @click="handleAssign" variant="primary" size="sm" class="w-full md:w-auto">
+                <span class="flex items-center gap-2 justify-center">
                     <TruckIcon class="w-4 h-4" />
                     Asignarme ({{ selectedOrders.size }})
                 </span>
@@ -27,22 +31,24 @@
                 class="border border-gray-200 rounded-lg overflow-hidden mb-4">
                 <!-- Header del grupo (clickeable) -->
                 <button @click="toggleNeighborhood(neighborhood)"
-                    class="w-full flex items-center justify-between p-4 bg-gradient-to-r from-emerald-50 to-green-50 hover:from-emerald-100 hover:to-green-100 transition-colors">
-                    <div class="flex items-center gap-3">
-                        <MapPinIcon class="w-5 h-5 text-emerald-600" />
-                        <span class="font-semibold text-gray-900">{{ neighborhood }}</span>
-                        <span class="px-2 py-0.5 bg-emerald-100 text-emerald-700 rounded-full text-sm font-medium">
+                    class="w-full flex items-center justify-between p-3 md:p-4 bg-gradient-to-r from-emerald-50 to-green-50 hover:from-emerald-100 hover:to-green-100 transition-colors">
+                    <div class="flex items-center gap-2 md:gap-3">
+                        <MapPinIcon class="w-4 h-4 md:w-5 md:h-5 text-emerald-600 flex-shrink-0" />
+                        <span class="font-semibold text-sm md:text-base text-gray-900 truncate">{{ neighborhood
+                            }}</span>
+                        <span
+                            class="px-1.5 md:px-2 py-0.5 bg-emerald-100 text-emerald-700 rounded-full text-xs md:text-sm font-medium">
                             {{ group.length }} {{ group.length === 1 ? 'pedido' : 'pedidos' }}
                         </span>
                     </div>
                     <ChevronDownIcon
-                        :class="['w-5 h-5 text-gray-600 transition-transform', isExpanded(neighborhood) && 'rotate-180']" />
+                        :class="['w-4 h-4 md:w-5 md:h-5 text-gray-600 transition-transform flex-shrink-0', isExpanded(neighborhood) && 'rotate-180']" />
                 </button>
 
                 <!-- Contenido del grupo (colapsable) -->
                 <Transition>
-                    <div v-show="isExpanded(neighborhood)" class="p-4 bg-white">
-                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                    <div v-show="isExpanded(neighborhood)" class="p-2 md:p-4 bg-white">
+                        <div class="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2 md:gap-4">
                             <OrderCard v-for="order in group" :key="order.id" :order="order"
                                 :is-selected="selectedOrders.has(order.id)" variant="delivery"
                                 @toggle-select="toggleSelect" />

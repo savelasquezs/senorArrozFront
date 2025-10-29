@@ -1,29 +1,29 @@
 <template>
     <div :class="[
-        'relative p-4 rounded-lg border-2 transition-all duration-200 cursor-pointer',
+        'relative p-3 md:p-4 rounded-lg border-2 transition-all duration-200 cursor-pointer',
         colorClass,
         isSelected ? 'ring-4 ring-emerald-500 scale-105 shadow-xl' : 'hover:shadow-lg hover:scale-102',
     ]" @click="$emit('toggle-select', order.id)">
-        <div v-if="isSelected" class="absolute top-2 right-2 bg-emerald-500 rounded-full p-1">
-            <CheckIcon class="w-4 h-4 text-white" />
+        <div v-if="isSelected" class="absolute top-1.5 right-1.5 md:top-2 md:right-2 bg-emerald-500 rounded-full p-1">
+            <CheckIcon class="w-3 h-3 md:w-4 md:h-4 text-white" />
         </div>
 
-        <div class="flex items-center justify-between mb-3">
-            <div class="flex items-center gap-2">
-                <span class="text-2xl font-bold text-gray-900">#{{ order.id }}</span>
-                <BaseBadge :variant="getStatusVariant()">
+        <div class="flex items-center justify-between mb-2 md:mb-3">
+            <div class="flex items-center gap-1.5 md:gap-2">
+                <span class="text-xl md:text-2xl font-bold text-gray-900">#{{ order.id }}</span>
+                <BaseBadge :variant="getStatusVariant()" class="text-xs md:text-sm">
                     {{ order.statusDisplayName }}
                 </BaseBadge>
             </div>
-            <component :is="orderTypeIcon" class="w-5 h-5 text-gray-400" />
+            <component :is="orderTypeIcon" class="w-4 h-4 md:w-5 md:h-5 text-gray-400" />
         </div>
 
-        <div class="mb-3 text-sm">
-            <div class="flex items-center gap-2 text-gray-700">
-                <ClockIcon class="w-4 h-4" />
-                <span class="font-medium">Tiempo total: {{ formattedElapsedTime }}</span>
+        <div class="mb-2 md:mb-3 text-xs md:text-sm">
+            <div class="flex items-center gap-1.5 md:gap-2 text-gray-700">
+                <ClockIcon class="w-3.5 h-3.5 md:w-4 md:h-4" />
+                <span class="font-medium">Tiempo: {{ formattedElapsedTime }}</span>
             </div>
-            <div v-if="variant === 'kitchen'" class="text-xs text-gray-500 mt-1">
+            <div v-if="variant === 'kitchen'" class="text-xs text-gray-500 mt-1 hidden md:block">
                 En {{ order.statusDisplayName }}: {{ formattedElapsedInStatus }}
             </div>
         </div>
@@ -40,35 +40,35 @@
         </div>
 
         <!-- Variant delivery: muestra dirección, barrio y cantidad de items -->
-        <div v-else-if="variant === 'delivery'" class="space-y-2">
+        <div v-else-if="variant === 'delivery'" class="space-y-1.5 md:space-y-2">
             <!-- Dirección -->
-            <div class="flex items-start gap-2 text-sm">
-                <MapPinIcon class="w-4 h-4 text-gray-500 mt-0.5 flex-shrink-0" />
+            <div class="flex items-start gap-1.5 md:gap-2 text-xs md:text-sm">
+                <MapPinIcon class="w-3.5 h-3.5 md:w-4 md:h-4 text-gray-500 mt-0.5 flex-shrink-0" />
                 <div class="flex-1">
-                    <p class="font-medium text-gray-900">
+                    <p class="font-medium text-gray-900 break-words">
                         {{ order.addressDescription || 'En el local' }}
                     </p>
-                    <p v-if="order.neighborhoodName" class="text-xs text-gray-600 mt-1">
+                    <p v-if="order.neighborhoodName" class="text-xs text-gray-600 mt-0.5">
                         📍 {{ order.neighborhoodName }}
                     </p>
                 </div>
             </div>
 
             <!-- Cliente o Guest -->
-            <div v-if="order.guestName" class="flex items-center gap-2 text-sm">
-                <UserIcon class="w-4 h-4 text-gray-500" />
-                <span class="text-gray-700">{{ order.guestName }}</span>
+            <div v-if="order.guestName" class="flex items-start gap-1.5 md:gap-2 text-xs md:text-sm">
+                <UserIcon class="w-3.5 h-3.5 md:w-4 md:h-4 text-gray-500 flex-shrink-0 mt-0.5" />
+                <span class="text-gray-700 break-words">{{ order.guestName }}</span>
             </div>
 
             <!-- Info adicional -->
             <div class="flex items-center justify-between text-xs text-gray-600">
-                <span>Sucursal: {{ order.branchName }}</span>
-                <span>{{ order.typeDisplayName }}</span>
+                <span class="break-words mr-1">Sucursal: {{ order.branchName }}</span>
+                <span class="hidden sm:inline">{{ order.typeDisplayName }}</span>
             </div>
 
             <!-- Items (solo si tenemos orderItems) -->
-            <div v-if="totalItems > 0" class="flex items-center gap-2 text-sm">
-                <ShoppingBagIcon class="w-4 h-4 text-gray-500" />
+            <div v-if="totalItems > 0" class="flex items-center gap-1.5 md:gap-2 text-xs md:text-sm">
+                <ShoppingBagIcon class="w-3.5 h-3.5 md:w-4 md:h-4 text-gray-500 flex-shrink-0" />
                 <span class="text-gray-700">{{ totalItems }} {{ totalItems === 1 ? 'item' : 'items' }}</span>
             </div>
         </div>
