@@ -54,7 +54,8 @@ export const useDeliveryStore = defineStore('delivery', () => {
                 page: historyPage.value,
                 pageSize: historyPageSize.value
             })
-            historyOrders.value = response.items
+            // Ordenar por ID descendente (más recientes primero)
+            historyOrders.value = [...response.items].sort((a, b) => b.id - a.id)
             historyTotalCount.value = response.totalCount
         } catch (err: any) {
             error.value = err.message
