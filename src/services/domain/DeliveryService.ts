@@ -3,7 +3,8 @@ import type { OrderListItem } from '@/types/order'
 export class DeliveryService {
     // Calcular tiempo de entrega (desde que salió hasta que entregó)
     static getDeliveryTime(order: OrderListItem): number {
-        const onTheWayTime = order.statusTimes?.on_the_way
+        // ✅ Las claves en el backend son camelCase sin separador
+        const onTheWayTime = order.statusTimes?.ontheway
         const deliveredTime = order.statusTimes?.delivered
 
         if (!onTheWayTime || !deliveredTime) return 0
