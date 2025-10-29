@@ -21,14 +21,34 @@
             </BaseButton>
         </div>
 
+        <!-- Grupos por barrio -->
         <div v-if="orders.length > 0">
-            <h3 class="text-lg font-semibold text-gray-900 mb-3 flex items-center gap-2">
-                <span class="w-3 h-3 bg-green-400 rounded-full"></span>
-                Listos para Entrega ({{ orders.length }})
-            </h3>
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                <OrderCard v-for="order in orders" :key="order.id" :order="order"
-                    :is-selected="selectedOrders.has(order.id)" variant="delivery" @toggle-select="toggleSelect" />
+            <div v-for="(group, neighborhood) in ordersByNeighborhood" :key="neighborhood"
+                class="border border-gray-200 rounded-lg overflow-hidden mb-4">
+                <!-- Header del grupo (clickeable) -->
+                <button @click="toggleNeighborhood(neighborhood)"
+                    class="w-full flex items-center justify-between p-4 bg-gradient-to-r from-emerald-50 to-green-50 hover:from-emerald-100 hover:to-green-100 transition-colors">
+                    <div class="flex items-center gap-3">
+                        <MapPinIcon class="w-5 h-5 text-emerald-600" />
+                        <span class="font-semibold text-gray-900">{{ neighborhood }}</span>
+                        <span class="px-2 py-0.5 bg-emerald-100 text-emerald-700 rounded-full text-sm font-medium">
+                            {{ group.length }} {{ group.length === 1 ? 'pedido' : 'pedidos' }}
+                        </span>
+                    </div>
+                    <ChevronDownIcon
+                        :class="['w-5 h-5 text-gray-600 transition-transform', isExpanded(neighborhood) && 'rotate-180']" />
+                </button>
+
+                <!-- Contenido del grupo (colapsable) -->
+                <Transition>
+                    <div v-show="isExpanded(neighborhood)" class="p-4 bg-white">
+                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                            <OrderCard v-for="order in group" :key="order.id" :order="order"
+                                :is-selected="selectedOrders.has(order.id)" variant="delivery"
+                                @toggle-select="toggleSelect" />
+                        </div>
+                    </div>
+                </Transition>
             </div>
         </div>
 
@@ -40,11 +60,11 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import type { OrderListItem } from '@/types/order'
 import OrderCard from '@/components/kitchen/OrderCard.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
-import { TruckIcon, CheckCircleIcon } from '@heroicons/vue/24/outline'
+import { TruckIcon, CheckCircleIcon, MapPinIcon, ChevronDownIcon } from '@heroicons/vue/24/outline'
 
 interface Props {
     orders: OrderListItem[]
@@ -54,6 +74,47 @@ const props = defineProps<Props>()
 const emit = defineEmits<{ assign: [orderIds: number[]] }>()
 
 const selectedOrders = ref(new Set<number>())
+const expandedNeighborhoods = ref<Set<string>>(new Set())
+
+// Computed para agrupar por barrio
+const ordersByNeighborhood = computed(() => {
+    const groups = new Map<string, OrderListItem[]>()
+
+    props.orders.forEach(order => {
+        const neighborhood = order.neighborhoodName || 'Sin barrio'
+        if (!groups.has(neighborhood)) {
+            groups.set(neighborhood, [])
+        }
+        groups.get(neighborhood)!.push(order)
+    })
+
+    // Convertir Map a Array y ordenar por cantidad de pedidos (más pedidos primero)
+    const entries = Array.from(groups.entries()).sort((a, b) => b[1].length - a[1].length)
+
+    // Convertir a objeto para usar en template de Vue
+    const result: Record<string, OrderListItem[]> = {}
+    entries.forEach(([neighborhood, orders]) => {
+        result[neighborhood] = orders
+    })
+    return result
+})
+
+const isExpanded = (neighborhood: string) => expandedNeighborhoods.value.has(neighborhood)
+
+const toggleNeighborhood = (neighborhood: string) => {
+    if (expandedNeighborhoods.value.has(neighborhood)) {
+        expandedNeighborhoods.value.delete(neighborhood)
+    } else {
+        expandedNeighborhoods.value.add(neighborhood)
+    }
+}
+
+// Inicializar: expandir todos por defecto
+watch(() => props.orders, () => {
+    Object.keys(ordersByNeighborhood.value).forEach(neighborhood => {
+        expandedNeighborhoods.value.add(neighborhood)
+    })
+}, { immediate: true })
 
 const toggleSelect = (orderId: number) => {
     if (selectedOrders.value.has(orderId)) {
