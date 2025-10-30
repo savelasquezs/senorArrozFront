@@ -43,8 +43,10 @@ interface Props {
 const props = defineProps<Props>()
 const emit = defineEmits<{ 'route-optimized': [orderIds: number[]], 'geocode-requested': [orderId: number] }>()
 
-const orderedOrders = ref([...props.orders])
-watch(() => props.orders, (val) => { orderedOrders.value = [...val] }, { deep: true })
+const orderedOrders = ref([...props.orders].sort((a, b) => a.id - b.id))
+watch(() => props.orders, (val) => {
+    orderedOrders.value = [...val].sort((a, b) => a.id - b.id)
+}, { deep: true })
 
 
 
