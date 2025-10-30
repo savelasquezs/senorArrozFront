@@ -105,10 +105,29 @@ const getOrderCoords = (order: OrderListItem): GeoLocation | null => {
     return extraCoordsByOrderId.get(order.id) ?? null
 }
 
+const clearMarkers = () => {
+    markers.forEach((m: any) => {
+        if (typeof m.setMap === 'function') m.setMap(null)
+        else m.map = null
+    })
+    markers = []
+}
+
+const fitToMarkers = () => {
+    if (!map) return
+    const bounds = new google.maps.LatLngBounds()
+    markers.forEach((m: any) => {
+        const pos = m.getPosition?.() || m.position
+        if (pos) bounds.extend(pos)
+    })
+    if ((userMarker as any)?.getPosition) bounds.extend((userMarker as any).getPosition())
+    else if ((userMarker as any)?.position) bounds.extend((userMarker as any).position)
+    if (!bounds.isEmpty()) map.fitBounds(bounds)
+}
+
 const loadMarkers = () => {
     if (!map) return
-    markers.forEach((m) => (m as any).map = null)
-    markers = []
+    clearMarkers()
 
     props.orders
         .filter((o) => o.type === 'delivery')
@@ -116,6 +135,9 @@ const loadMarkers = () => {
             const coords = getOrderCoords(order)
             if (coords) addOrderMarker(order, coords)
         })
+
+    // Ajustar vista si hay marcadores
+    if (markers.length > 0) fitToMarkers()
 }
 
 const addOrderMarker = (order: OrderListItem, coords: GeoLocation) => {
@@ -242,6 +264,12 @@ const recalculateRoute = async (orderedIds?: number[]) => {
         strokeWeight: 4,
     })
     routePolyline.setMap(map)
+    // Ajustar vista a la ruta
+    try {
+        const bounds = new google.maps.LatLngBounds()
+        result.route.overview_path.forEach((p: any) => bounds.extend(p))
+        if (!bounds.isEmpty()) map.fitBounds(bounds)
+    } catch { }
     emit('route-calculated', result.optimizedOrder)
 }
 

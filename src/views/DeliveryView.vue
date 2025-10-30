@@ -291,7 +291,9 @@ watch(activeTab, async (newTab) => {
     } else if (newTab === 'map') {
         await loadHistory()
         mapOrders.value = [...deliveryStore.ordersOnTheWay]
-        setTimeout(() => mapRef.value?.recalculateRoute(), 0)
+        // Solo recalcular si hay coordenadas disponibles
+        const hasCoords = mapOrders.value.some(o => typeof (o as any).latitude === 'number' && typeof (o as any).longitude === 'number')
+        if (hasCoords) setTimeout(() => mapRef.value?.recalculateRoute(), 0)
     }
 })
 
