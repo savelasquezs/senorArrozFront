@@ -4,6 +4,7 @@
             <h3 class="font-semibold text-gray-900">Orden de Entrega</h3>
             <BaseButton @click="optimizeRoute" variant="outline" size="sm">
                 Optimizar ruta
+
             </BaseButton>
         </div>
 
@@ -62,6 +63,10 @@ watch(() => props.orders, (val) => {
 const optimizeRoute = () => {
     emit('route-optimized', orderedOrders.value.map(o => o.id))
 }
+watch(() => props.orders, (val) => {
+    console.log('📦 Pedidos recibidos en RouteOrderManager:', val)
+    orderedOrders.value = [...val]
+}, { immediate: true, deep: true })
 
 const hasCoords = (order: any) => typeof order?.latitude === 'number' && typeof order?.longitude === 'number'
 </script>

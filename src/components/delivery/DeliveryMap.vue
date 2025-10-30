@@ -19,54 +19,70 @@ import BaseButton from '@/components/ui/BaseButton.vue'
 import type { OrderListItem } from '@/types/order'
 import { useGeolocation } from '@/composables/useGeolocation'
 import { RouteOptimizationService } from '@/services/domain/RouteOptimizationService'
+import type { GeoLocation } from '@/composables/useGeolocation'
 
+// =========================
+// 🔹 Props y eventos
+// =========================
 interface Props {
     orders: OrderListItem[]
 }
-
 const props = defineProps<Props>()
 const emit = defineEmits<{ 'route-calculated': [waypointOrder: number[]] }>()
 
+// =========================
+// 🔹 Refs y variables
+// =========================
 const mapContainer = ref<HTMLDivElement | null>(null)
-let map: any = null
-let markers: any[] = []
-let userMarker: any = null
-let routePolyline: any = null
-// Coordenadas buscadas en runtime por geocodificación (no persistentes)
-const extraCoordsByOrderId = new Map<number, { lat: number, lng: number }>()
+let map: google.maps.Map | null = null
+let markers: (google.maps.marker.AdvancedMarkerElement | google.maps.Marker)[] = []
+let userMarker: google.maps.marker.AdvancedMarkerElement | google.maps.Marker | null = null
+let routePolyline: google.maps.Polyline | null = null
+const extraCoordsByOrderId = new Map<number, GeoLocation>()
 
 const mapHeight = computed(() => '70vh')
 const { location, requestLocation, startTracking, isLocationEnabled } = useGeolocation()
+const geocoder = ref<google.maps.Geocoder | null>(null)
 
 // =========================
-// 🔹 Inicializar el mapa
+// 🔹 Inicialización
 // =========================
 onMounted(async () => {
     setOptions({
         key: import.meta.env.VITE_GOOGLE_MAPS_API_KEY,
     })
 
-    // Importar librerías modernas
-    const [{ Map }, , , { AdvancedMarkerElement }] = await Promise.all([
+    // Importar módulos modernos
+    const [
+        { Map },
+        ,
+        { AdvancedMarkerElement },
+        { Geocoder }
+    ] = await Promise.all([
         importLibrary('maps'),
-        importLibrary('routes'),
         importLibrary('geometry'),
         importLibrary('marker'),
+        importLibrary('geocoding'),
     ])
 
     // Crear mapa
+    const mapId = import.meta.env.VITE_GOOGLE_MAPS_MAP_ID
+    if (!mapId) {
+        console.warn('⚠️ Falta VITE_GOOGLE_MAPS_MAP_ID. Los Advanced Markers no funcionarán.')
+    }
+
     map = new Map(mapContainer.value as HTMLElement, {
-        center: { lat: 6.2442, lng: -75.5812 }, // Medellín
+        center: { lat: 6.2442, lng: -75.5812 },
         zoom: 13,
         mapTypeControl: false,
         fullscreenControl: false,
         streetViewControl: false,
-        mapId: import.meta.env.VITE_GOOGLE_MAPS_MAP_ID,
+        mapId,
     })
 
-        // Guardar clase de marcador avanzada globalmente
         ; (window as any)._AdvancedMarkerElement = AdvancedMarkerElement
-
+    geocoder.value = new Geocoder()
+    RouteOptimizationService.initialize(map)
     loadMarkers()
 
     if (isLocationEnabled()) {
@@ -75,90 +91,106 @@ onMounted(async () => {
 })
 
 // =========================
-// 🔹 Recargar pedidos
+// 🔹 Observadores
 // =========================
 watch(() => props.orders, () => loadMarkers(), { deep: true })
 
 // =========================
-// 🔹 Cargar marcadores
+// 🔹 Funciones de mapa
 // =========================
-const getOrderCoords = (order: any): { lat: number, lng: number } | null => {
-    if (typeof order?.latitude === 'number' && typeof order?.longitude === 'number') {
-        return { lat: order.latitude, lng: order.longitude }
+const getOrderCoords = (order: OrderListItem): GeoLocation | null => {
+    if (typeof (order as any).latitude === 'number' && typeof (order as any).longitude === 'number') {
+        return { lat: (order as any).latitude, lng: (order as any).longitude }
     }
-    const extra = extraCoordsByOrderId.get(order?.id)
-    return extra ?? null
+    return extraCoordsByOrderId.get(order.id) ?? null
 }
 
-const geocoder = ref<any>(null)
-const ensureGeocoder = () => {
-    if (!geocoder.value) geocoder.value = new (window as any).google.maps.Geocoder()
+const loadMarkers = () => {
+    if (!map) return
+    markers.forEach((m) => (m as any).map = null)
+    markers = []
+
+    props.orders
+        .filter((o) => o.type === 'delivery')
+        .forEach((order) => {
+            const coords = getOrderCoords(order)
+            if (coords) addOrderMarker(order, coords)
+        })
 }
 
-const geocodeOrder = (order: any) => {
-    if (!order?.addressDescription) return
-    ensureGeocoder()
-    geocoder.value.geocode({ address: order.addressDescription }, (results: any, status: any) => {
-        if (status === 'OK' && results?.[0]?.geometry?.location) {
+const addOrderMarker = (order: OrderListItem, coords: GeoLocation) => {
+    if (!map) return
+
+    const AdvancedMarkerElement = (window as any)._AdvancedMarkerElement
+    const navigateUrl = `https://www.google.com/maps/dir/?api=1&destination=${coords.lat},${coords.lng}`
+
+    const infoWindow = new google.maps.InfoWindow({
+        content: `
+        <div class="p-2">
+          <strong>Pedido #${order.id}</strong><br>
+          ${order.addressDescription || ''}
+          <div class="mt-2">
+            <a href="${navigateUrl}" target="_blank" rel="noopener" class="text-emerald-600 underline">
+              Navegar
+            </a>
+          </div>
+        </div>`,
+    })
+
+    let marker: google.maps.marker.AdvancedMarkerElement | google.maps.Marker
+    if (AdvancedMarkerElement && map.getMapTypeId()) {
+        marker = new AdvancedMarkerElement({
+            position: coords,
+            map,
+            title: `Pedido #${order.id}`,
+        })
+        marker.addListener('click', () => infoWindow.open({ map, anchor: marker }))
+    } else {
+        marker = new google.maps.Marker({
+            position: coords,
+            map,
+            title: `Pedido #${order.id}`,
+        })
+        marker.addListener('click', () => infoWindow.open(map, marker))
+    }
+
+    markers.push(marker)
+}
+
+const geocodeOrder = async (order: OrderListItem): Promise<void> => {
+    if (!order.addressDescription || !geocoder.value) return
+
+    try {
+        const { results } = await geocoder.value.geocode({ address: order.addressDescription })
+        if (results.length > 0 && results[0].geometry?.location) {
             const loc = results[0].geometry.location
             const coords = { lat: loc.lat(), lng: loc.lng() }
             extraCoordsByOrderId.set(order.id, coords)
             addOrderMarker(order, coords)
-            recalculateRoute()
-        } else {
-            console.warn('Geocode falló:', status)
+            await recalculateRoute()
         }
-    })
-}
-
-const addOrderMarker = (order: any, coords: { lat: number, lng: number }) => {
-    const AdvancedMarkerElement = (window as any)._AdvancedMarkerElement
-    const ClassicMarker = (window as any).google?.maps?.Marker
-    const navigateUrl = `https://www.google.com/maps/dir/?api=1&destination=${coords.lat},${coords.lng}`
-    const infoWindow = new (window as any).google.maps.InfoWindow({
-        content: `<div class="p-2"><strong>Pedido #${order.id}</strong><br>${order.addressDescription || ''}<div class="mt-2"><a href="${navigateUrl}" target="_blank" rel="noopener" class="text-emerald-600 underline">Navegar</a></div></div>`,
-    })
-    if (AdvancedMarkerElement) {
-        const marker = new AdvancedMarkerElement({ position: coords, map, title: `Pedido #${order.id}` })
-        marker.addListener('click', () => infoWindow.open({ map, anchor: marker }))
-        markers.push(marker)
-    } else if (ClassicMarker) {
-        const marker = new ClassicMarker({ position: coords, map, title: `Pedido #${order.id}` })
-        marker.addListener('click', () => infoWindow.open(map, marker))
-        markers.push(marker)
+    } catch (error) {
+        console.warn('Error al geocodificar dirección:', error)
     }
-}
-
-const loadMarkers = () => {
-    markers.forEach((m) => m.map = null)
-    markers = []
-    props.orders
-        .filter((o: any) => o?.type === 'delivery')
-        .forEach((order: any) => {
-            const coords = getOrderCoords(order)
-            if (coords) {
-                addOrderMarker(order, coords)
-            }
-        })
 }
 
 // =========================
 // 🔹 Marcador del usuario
 // =========================
 const addUserMarker = () => {
-    if (!location.value) return
-    if (userMarker) userMarker.map = null
+    if (!map || !location.value) return
 
+    if (userMarker) (userMarker as any).map = null
     const AdvancedMarkerElement = (window as any)._AdvancedMarkerElement
-    const ClassicMarker = (window as any).google?.maps?.Marker
-    if (AdvancedMarkerElement) {
+
+    if (AdvancedMarkerElement && map.getMapTypeId()) {
         userMarker = new AdvancedMarkerElement({
             position: location.value,
             map,
             title: 'Mi ubicación',
         })
-    } else if (ClassicMarker) {
-        userMarker = new ClassicMarker({
+    } else {
+        userMarker = new google.maps.Marker({
             position: location.value,
             map,
             title: 'Mi ubicación',
@@ -167,40 +199,42 @@ const addUserMarker = () => {
 }
 
 // =========================
-// 🔹 Habilitar ubicación
+// 🔹 Ubicación y ruta
 // =========================
 const handleEnableLocation = async () => {
     const loc = await requestLocation()
-    if (loc) {
+    if (loc && map) {
         map.setCenter(loc)
         addUserMarker()
         startTracking()
     }
 }
 
-// =========================
-// 🔹 Calcular ruta
-// =========================
 const recalculateRoute = async (orderedIds?: number[]) => {
-    if (props.orders.length === 0) return
-    const sourceOrders = orderedIds && orderedIds.length > 0
-        ? orderedIds.map(id => props.orders.find(o => o.id === id)).filter(Boolean) as any[]
+    if (!map || props.orders.length === 0) return
+
+    const sourceOrders = orderedIds?.length
+        ? orderedIds.map((id) => props.orders.find((o) => o.id === id)).filter(Boolean) as OrderListItem[]
         : props.orders
+
     const coordsList = sourceOrders
-        .map((o: any) => ({ orderId: o.id, coords: getOrderCoords(o) }))
-        .filter(x => x.coords) as Array<{ orderId: number, coords: { lat: number, lng: number } }>
+        .map((o) => ({ orderId: o.id, coords: getOrderCoords(o) }))
+        .filter((x) => x.coords) as Array<{ orderId: number; coords: GeoLocation }>
 
     if (coordsList.length === 0) return
 
     const origin = location.value ?? coordsList[0].coords
-    const waypoints = (location.value ? coordsList : coordsList.slice(1))
-        .map(x => ({ lat: x.coords.lat, lng: x.coords.lng, orderId: x.orderId }))
+    const waypoints = (location.value ? coordsList : coordsList.slice(1)).map((x) => ({
+        lat: x.coords.lat,
+        lng: x.coords.lng,
+        orderId: x.orderId,
+    }))
 
     const result = await RouteOptimizationService.optimizeRoute(origin, waypoints)
     if (!result) return
 
     if (routePolyline) routePolyline.setMap(null)
-    routePolyline = new (window as any).google.maps.Polyline({
+    routePolyline = new google.maps.Polyline({
         path: result.route.overview_path,
         geodesic: true,
         strokeColor: '#10b981',
@@ -211,9 +245,11 @@ const recalculateRoute = async (orderedIds?: number[]) => {
     emit('route-calculated', result.optimizedOrder)
 }
 
-// Permitir geocodificar por id desde el padre (lista)
+// =========================
+// 🔹 Exponer funciones públicas
+// =========================
 const geocodeOrderById = (orderId: number) => {
-    const order = props.orders.find(o => o.id === orderId)
+    const order = props.orders.find((o) => o.id === orderId)
     if (order) geocodeOrder(order)
 }
 

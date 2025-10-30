@@ -174,7 +174,12 @@ const cardGridRef = ref<InstanceType<typeof DeliveryCardGrid> | null>(null)
 
 // Mapa: lista local ordenable
 const mapOrders = ref<OrderListItem[]>([])
-const mapRef = ref<InstanceType<typeof DeliveryMap> | null>(null)
+interface DeliveryMapExposed {
+    recalculateRoute: (orderIds?: number[]) => Promise<void>
+    geocodeOrderById: (orderId: number) => void
+}
+
+const mapRef = ref<DeliveryMapExposed | null>(null)
 
 const loadAvailableOrders = async () => {
     try {
