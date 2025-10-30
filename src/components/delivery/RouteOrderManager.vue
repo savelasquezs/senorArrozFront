@@ -2,9 +2,6 @@
     <div class="space-y-3">
         <div class="flex items-center justify-between">
             <h3 class="font-semibold text-gray-900">Orden de Entrega</h3>
-            <BaseButton @click="optimizeRoute" variant="outline" size="sm">
-                Optimizar ruta
-            </BaseButton>
         </div>
 
         <draggable v-model="orderedOrders" item-key="id" handle=".drag-handle" :animation="150" ghost-class="opacity-50"
@@ -37,7 +34,6 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue'
 import draggable from 'vuedraggable'
-import BaseButton from '@/components/ui/BaseButton.vue'
 import type { OrderListItem } from '@/types/order'
 
 interface Props {
@@ -51,10 +47,6 @@ const orderedOrders = ref([...props.orders])
 watch(() => props.orders, (val) => { orderedOrders.value = [...val] }, { deep: true })
 
 
-
-const optimizeRoute = () => {
-    emit('route-optimized', orderedOrders.value.map(o => o.id))
-}
 
 const onReordered = () => {
     emit('route-optimized', orderedOrders.value.map(o => o.id))

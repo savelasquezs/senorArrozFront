@@ -2,10 +2,7 @@
     <div class="w-full">
         <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 mb-2">
 
-            <BaseButton class="w-full sm:w-auto" size="sm" variant="secondary" @click="recalculateRoute()"
-                :disabled="orders.length === 0">
-                Calcular ruta
-            </BaseButton>
+
             <BaseButton class="w-full sm:w-auto" size="sm" variant="outline" @click="openInGoogleMaps"
                 :disabled="orders.length === 0">
                 Abrir en Google Maps
