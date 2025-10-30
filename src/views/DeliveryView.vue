@@ -123,7 +123,15 @@
                     @filter-change="handleHistoryFilterChange" @order-delivered="handleOrderDelivered" />
             </div>
             <div v-else-if="activeTab === 'map'">
-                <DeliveryMap :orders="deliveryStore.ordersOnTheWay" @route-calculated="handleRouteCalculated" />
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-3 md:gap-4">
+                    <div class="lg:col-span-2">
+                        <DeliveryMap ref="mapRef" :orders="mapOrders" @route-calculated="handleRouteCalculated" />
+                    </div>
+                    <div class="lg:col-span-1">
+                        <RouteOrderManager :orders="mapOrders" @route-optimized="handleRouteOptimized"
+                            @geocode-requested="handleGeocodeRequested" />
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -147,6 +155,7 @@ import ConfirmAssignmentModal from '@/components/delivery/ConfirmAssignmentModal
 import BaseButton from '@/components/ui/BaseButton.vue'
 import { ArrowPathIcon } from '@heroicons/vue/24/outline'
 import DeliveryMap from '@/components/delivery/DeliveryMap.vue'
+import RouteOrderManager from '@/components/delivery/RouteOrderManager.vue'
 
 const router = useRouter()
 const authStore = useAuthStore()
@@ -162,6 +171,10 @@ const showConfirmModal = ref(false)
 const ordersToAssign = ref<OrderListItem[]>([])
 
 const cardGridRef = ref<InstanceType<typeof DeliveryCardGrid> | null>(null)
+
+// Mapa: lista local ordenable
+const mapOrders = ref<OrderListItem[]>([])
+const mapRef = ref<InstanceType<typeof DeliveryMap> | null>(null)
 
 const loadAvailableOrders = async () => {
     try {
@@ -241,6 +254,24 @@ const handleRouteCalculated = (_waypointOrder: number[]) => {
     // Placeholder: reordenamiento visual gestionado dentro del componente Map
 }
 
+const handleRouteOptimized = (orderIds: number[]) => {
+    const idToOrder = new Map(mapOrders.value.map(o => [o.id, o]))
+    const reordered: OrderListItem[] = []
+    orderIds.forEach(id => {
+        const found = idToOrder.get(id)
+        if (found) reordered.push(found)
+    })
+    mapOrders.value.forEach(o => {
+        if (!orderIds.includes(o.id)) reordered.push(o)
+    })
+    mapOrders.value = reordered
+    mapRef.value?.recalculateRoute(orderIds)
+}
+
+const handleGeocodeRequested = (orderId: number) => {
+    mapRef.value?.geocodeOrderById(orderId)
+}
+
 // Watch para cargar datos cuando cambias de tab
 watch(activeTab, async (newTab) => {
     console.log('🔄 Tab changed:', newTab)
@@ -254,6 +285,8 @@ watch(activeTab, async (newTab) => {
         console.log('✅ History loaded:', deliveryStore.historyOrders.length)
     } else if (newTab === 'map') {
         await loadHistory()
+        mapOrders.value = [...deliveryStore.ordersOnTheWay]
+        setTimeout(() => mapRef.value?.recalculateRoute(), 0)
     }
 })
 

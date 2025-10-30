@@ -99,8 +99,10 @@ export const useDeliveryStore = defineStore('delivery', () => {
         error.value = null
     }
 
-    // Computed: pedidos en camino
-    const ordersOnTheWay = computed(() => historyOrders.value.filter(o => o.status === 'on_the_way'))
+    // Computed: pedidos en camino (aceptar ambas variantes provenientes del backend)
+    const ordersOnTheWay = computed(() =>
+        historyOrders.value.filter((o) => o.status === 'on_the_way' || (o as any).status === 'onTheWay')
+    )
 
     return {
         // Estado
