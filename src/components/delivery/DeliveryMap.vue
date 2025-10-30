@@ -7,6 +7,9 @@
             <BaseButton size="sm" variant="secondary" @click="recalculateRoute()" :disabled="orders.length === 0">
                 Calcular ruta
             </BaseButton>
+            <BaseButton size="sm" variant="outline" @click="openInGoogleMaps" :disabled="orders.length === 0">
+                Abrir en Google Maps
+            </BaseButton>
         </div>
         <div ref="mapContainer" class="w-full rounded-lg border border-gray-200" :style="{ height: mapHeight }"></div>
     </div>
@@ -282,4 +285,37 @@ const geocodeOrderById = (orderId: number) => {
 }
 
 defineExpose({ recalculateRoute, geocodeOrderById })
+
+// =========================
+// 🔹 Abrir ruta en Google Maps
+// =========================
+const openInGoogleMaps = () => {
+    // Obtener coords válidas en el orden actual
+    const coordsList = props.orders
+        .filter((o) => o.type === 'delivery')
+        .map((o) => getOrderCoords(o))
+        .filter(Boolean) as GeoLocation[]
+
+    if (coordsList.length === 0) return
+
+    // Origen vacío (usa ubicación actual del dispositivo en Google Maps)
+    const destination = coordsList[coordsList.length - 1]
+    const rawWaypoints = coordsList.slice(0, Math.max(coordsList.length - 1, 0))
+
+    // Límite de Google: máximo 25 puntos totales (sin origin => destino + waypoints <= 25)
+    const maxWaypoints = 24
+    const waypoints = rawWaypoints.slice(0, maxWaypoints)
+
+    const fmt = (p: GeoLocation) => `${p.lat},${p.lng}`
+    const base = 'https://www.google.com/maps/dir/?api=1&travelmode=driving'
+    const params = [
+        `destination=${encodeURIComponent(fmt(destination))}`,
+    ]
+    if (waypoints.length > 0) {
+        const wp = waypoints.map(fmt).join('|')
+        params.push(`waypoints=${encodeURIComponent(wp)}`)
+    }
+    const url = `${base}&${params.join('&')}`
+    window.open(url, '_blank')
+}
 </script>
