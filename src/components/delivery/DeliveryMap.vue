@@ -1,13 +1,13 @@
 <template>
     <div class="w-full">
-        <div class="flex items-center gap-2 mb-2">
-            <BaseButton size="sm" variant="outline" @click="handleEnableLocation">
-                Usar mi ubicación
-            </BaseButton>
-            <BaseButton size="sm" variant="secondary" @click="recalculateRoute()" :disabled="orders.length === 0">
+        <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 mb-2">
+
+            <BaseButton class="w-full sm:w-auto" size="sm" variant="secondary" @click="recalculateRoute()"
+                :disabled="orders.length === 0">
                 Calcular ruta
             </BaseButton>
-            <BaseButton size="sm" variant="outline" @click="openInGoogleMaps" :disabled="orders.length === 0">
+            <BaseButton class="w-full sm:w-auto" size="sm" variant="outline" @click="openInGoogleMaps"
+                :disabled="orders.length === 0">
                 Abrir en Google Maps
             </BaseButton>
         </div>
@@ -20,7 +20,6 @@ import { ref, onMounted, watch, computed } from 'vue'
 import { setOptions, importLibrary } from '@googlemaps/js-api-loader'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import type { OrderListItem } from '@/types/order'
-import { useGeolocation } from '@/composables/useGeolocation'
 import { RouteOptimizationService } from '@/services/domain/RouteOptimizationService'
 import type { GeoLocation } from '@/composables/useGeolocation'
 
@@ -39,12 +38,11 @@ const emit = defineEmits<{ 'route-calculated': [waypointOrder: number[]] }>()
 const mapContainer = ref<HTMLDivElement | null>(null)
 let map: google.maps.Map | null = null
 let markers: (google.maps.marker.AdvancedMarkerElement | google.maps.Marker)[] = []
-let userMarker: google.maps.marker.AdvancedMarkerElement | google.maps.Marker | null = null
+// Geolocalización eliminada: sin marcador de usuario
 let routePolyline: google.maps.Polyline | null = null
 const extraCoordsByOrderId = new Map<number, GeoLocation>()
 
 const mapHeight = computed(() => '70vh')
-const { location, requestLocation, startTracking, isLocationEnabled } = useGeolocation()
 const geocoder = ref<google.maps.Geocoder | null>(null)
 
 // =========================
@@ -88,9 +86,7 @@ onMounted(async () => {
     RouteOptimizationService.initialize(map)
     loadMarkers()
 
-    if (isLocationEnabled()) {
-        await handleEnableLocation()
-    }
+    // Geolocalización deshabilitada por requerimiento
 })
 
 // =========================
@@ -123,8 +119,7 @@ const fitToMarkers = () => {
         const pos = m.getPosition?.() || m.position
         if (pos) bounds.extend(pos)
     })
-    if ((userMarker as any)?.getPosition) bounds.extend((userMarker as any).getPosition())
-    else if ((userMarker as any)?.position) bounds.extend((userMarker as any).position)
+    // No considerar marcador de usuario (geolocalización deshabilitada)
     if (!bounds.isEmpty()) map.fitBounds(bounds)
 }
 
@@ -199,41 +194,7 @@ const geocodeOrder = async (order: OrderListItem): Promise<void> => {
     }
 }
 
-// =========================
-// 🔹 Marcador del usuario
-// =========================
-const addUserMarker = () => {
-    if (!map || !location.value) return
-
-    if (userMarker) (userMarker as any).map = null
-    const AdvancedMarkerElement = (window as any)._AdvancedMarkerElement
-
-    if (AdvancedMarkerElement && map.getMapTypeId()) {
-        userMarker = new AdvancedMarkerElement({
-            position: location.value,
-            map,
-            title: 'Mi ubicación',
-        })
-    } else {
-        userMarker = new google.maps.Marker({
-            position: location.value,
-            map,
-            title: 'Mi ubicación',
-        })
-    }
-}
-
-// =========================
-// 🔹 Ubicación y ruta
-// =========================
-const handleEnableLocation = async () => {
-    const loc = await requestLocation()
-    if (loc && map) {
-        map.setCenter(loc)
-        addUserMarker()
-        startTracking()
-    }
-}
+// Geolocalización eliminada
 
 const recalculateRoute = async (orderedIds?: number[]) => {
     if (!map || props.orders.length === 0) return
@@ -248,8 +209,8 @@ const recalculateRoute = async (orderedIds?: number[]) => {
 
     if (coordsList.length === 0) return
 
-    const origin = location.value ?? coordsList[0].coords
-    const waypoints = (location.value ? coordsList : coordsList.slice(1)).map((x) => ({
+    const origin = coordsList[0].coords
+    const waypoints = coordsList.slice(1).map((x) => ({
         lat: x.coords.lat,
         lng: x.coords.lng,
         orderId: x.orderId,

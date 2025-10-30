@@ -123,11 +123,11 @@
                     @filter-change="handleHistoryFilterChange" @order-delivered="handleOrderDelivered" />
             </div>
             <div v-else-if="activeTab === 'map'">
-                <div class="grid grid-cols-1 lg:grid-cols-3 gap-3 md:gap-4">
-                    <div class="lg:col-span-2">
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-2 md:gap-4">
+                    <div class="lg:col-span-2 order-1">
                         <DeliveryMap ref="mapRef" :orders="mapOrders" @route-calculated="handleRouteCalculated" />
                     </div>
-                    <div class="lg:col-span-1">
+                    <div class="lg:col-span-1 order-2">
                         <RouteOrderManager :orders="mapOrders" @route-optimized="handleRouteOptimized"
                             @geocode-requested="handleGeocodeRequested" />
                     </div>
