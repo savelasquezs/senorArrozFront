@@ -37,7 +37,7 @@
             </div>
 
             <!-- Mobile: Tabs en grid -->
-            <div class="grid grid-cols-2 gap-2 md:hidden">
+            <div class="grid grid-cols-3 gap-2 md:hidden">
                 <button @click="activeTab = 'available'" :class="[
                     'py-3 px-4 rounded-lg font-medium text-sm transition-colors text-center',
                     activeTab === 'available'
@@ -62,6 +62,14 @@
                         class="ml-2 py-0.5 px-2 rounded-full text-xs bg-white/20 text-white">
                         {{ deliveryStore.historyTotalCount }}
                     </span>
+                </button>
+                <button @click="activeTab = 'map'" :class="[
+                    'py-3 px-4 rounded-lg font-medium text-sm transition-colors text-center',
+                    activeTab === 'map'
+                        ? 'bg-emerald-500 text-white'
+                        : 'bg-gray-100 text-gray-600'
+                ]">
+                    Mapas
                 </button>
             </div>
 
@@ -93,6 +101,14 @@
                             {{ deliveryStore.historyTotalCount }}
                         </span>
                     </button>
+                    <button @click="activeTab = 'map'" :class="[
+                        'py-4 px-1 border-b-2 font-medium text-sm transition-colors',
+                        activeTab === 'map'
+                            ? 'border-emerald-500 text-emerald-600'
+                            : 'border-transparent text-gray-500 hover:text-gray-700'
+                    ]">
+                        Mapas
+                    </button>
                 </nav>
             </div>
 
@@ -105,6 +121,9 @@
                     :total-count="deliveryStore.historyTotalCount" :page="deliveryStore.historyPage"
                     :page-size="deliveryStore.historyPageSize" @page-change="handleHistoryPageChange"
                     @filter-change="handleHistoryFilterChange" @order-delivered="handleOrderDelivered" />
+            </div>
+            <div v-else-if="activeTab === 'map'">
+                <DeliveryMap :orders="deliveryStore.ordersOnTheWay" @route-calculated="handleRouteCalculated" />
             </div>
         </div>
 
@@ -127,6 +146,7 @@ import DeliveryHistoryTable from '@/components/delivery/DeliveryHistoryTable.vue
 import ConfirmAssignmentModal from '@/components/delivery/ConfirmAssignmentModal.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import { ArrowPathIcon } from '@heroicons/vue/24/outline'
+import DeliveryMap from '@/components/delivery/DeliveryMap.vue'
 
 const router = useRouter()
 const authStore = useAuthStore()
@@ -136,7 +156,7 @@ const { success, error } = useToast()
 const SIGNALR_HUB_URL = 'http://localhost:5257/hubs/orders'
 const { isConnected, on } = useSignalR(SIGNALR_HUB_URL)
 
-const activeTab = ref<'available' | 'history'>('available')
+const activeTab = ref<'available' | 'history' | 'map'>('available')
 const isLoading = ref(false)
 const showConfirmModal = ref(false)
 const ordersToAssign = ref<OrderListItem[]>([])
@@ -217,6 +237,10 @@ const handleOrderDelivered = async () => {
     await loadHistory()
 }
 
+const handleRouteCalculated = (_waypointOrder: number[]) => {
+    // Placeholder: reordenamiento visual gestionado dentro del componente Map
+}
+
 // Watch para cargar datos cuando cambias de tab
 watch(activeTab, async (newTab) => {
     console.log('🔄 Tab changed:', newTab)
@@ -228,6 +252,8 @@ watch(activeTab, async (newTab) => {
         console.log('📚 Loading history...')
         await loadHistory()
         console.log('✅ History loaded:', deliveryStore.historyOrders.length)
+    } else if (newTab === 'map') {
+        await loadHistory()
     }
 })
 

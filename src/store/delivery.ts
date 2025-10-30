@@ -1,6 +1,6 @@
 // src/store/delivery.ts
 import { defineStore } from 'pinia'
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { orderApi } from '@/services/MainAPI/orderApi'
 import type { OrderListItem } from '@/types/order'
 
@@ -99,6 +99,9 @@ export const useDeliveryStore = defineStore('delivery', () => {
         error.value = null
     }
 
+    // Computed: pedidos en camino
+    const ordersOnTheWay = computed(() => historyOrders.value.filter(o => o.status === 'on_the_way'))
+
     return {
         // Estado
         availableOrders,
@@ -115,7 +118,8 @@ export const useDeliveryStore = defineStore('delivery', () => {
         loadHistory,
         assignOrders,
         setHistoryPage,
-        clear
+        clear,
+        ordersOnTheWay
     }
 })
 
