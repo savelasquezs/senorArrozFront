@@ -44,5 +44,4 @@ const onReordered = () => {
     emit('route-optimized', orderedOrders.value.map(o => o.id))
 }
 
-const hasCoords = (order: any) => typeof order?.latitude === 'number' && typeof order?.longitude === 'number'
 </script>

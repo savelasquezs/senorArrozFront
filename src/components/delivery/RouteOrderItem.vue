@@ -19,11 +19,8 @@
 
         <!-- Detalle (solo lectura, compacto para mobile) -->
         <BaseDialog :model-value="openDetail" title="Detalle del pedido" @update:model-value="onToggleDetail">
-            <div v-if="detailLoading" class="py-6 flex justify-center">
-                <BaseLoading />
-            </div>
-            <
-           
+
+            <OrderDetailContent v-if="order" :flat-order="order" />
         </BaseDialog>
 
         <!-- Confirmar entregado -->
@@ -60,16 +57,16 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref } from 'vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseDialog from '@/components/ui/BaseDialog.vue'
 import CustomerAddressForm from '@/components/customers/address/CustomerAddressForm.vue'
 import { useGeolocation } from '@/composables/useGeolocation'
-import type { OrderListItem } from '@/types/order'
-import PhoneNumberItem from '@/components/customers/PhoneNumberItem.vue'
-import BaseLoading from '@/components/ui/BaseLoading.vue'
+
 import { useOrdersDataStore } from '@/store/ordersData'
 import type { CustomerAddressFormData } from '@/types/customer'
+import OrderDetailContent from '@/components/orders/OrderDetailContent.vue'
+import type { OrderListItem } from '@/types/order'
 
 interface Props { order: OrderListItem }
 const props = defineProps<Props>()
@@ -87,8 +84,6 @@ const openCoordsPrompt = ref(false)
 const { requestLocation } = useGeolocation()
 
 const ordersData = useOrdersDataStore()
-const detail = computed(() => ordersData.current)
-const detailLoading = computed(() => ordersData.isLoading)
 
 const onToggleDetail = async (val: boolean) => {
     openDetail.value = val
@@ -123,13 +118,6 @@ const assignCurrentCoords = async () => {
     pendingAddress.value = null
 }
 
-// Cash to collect (total - bank - app)
-const cashToCollect = computed(() => {
-    const t = detail.value?.total ?? props.order.total
-    const bank = (detail.value?.bankPayments || props.order.bankPayments || []).reduce((s: number, p: any) => s + (p.amount || 0), 0)
-    const app = (detail.value?.appPayments || props.order.appPayments || []).reduce((s: number, p: any) => s + (p.amount || 0), 0)
-    return t - bank - app
-})
 
 // Address form model
 const addressForm = ref<CustomerAddressFormData>({

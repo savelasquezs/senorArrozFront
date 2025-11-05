@@ -1,7 +1,7 @@
 // src/composables/useOrderPermissions.ts
 import { useAuthStore } from '@/store/auth'
 import type { OrderListItem, OrderStatus, OrderType } from '@/types/order'
-
+import type { OrderDetailView } from '@/types/order'
 /**
  * Composable para manejar permisos de pedidos basados en rol y fecha
  */
@@ -25,7 +25,7 @@ export function useOrderPermissions() {
     /**
      * Verifica si el usuario puede editar datos básicos del pedido
      */
-    const canEditOrder = (order: OrderListItem): boolean => {
+    const canEditOrder = (order: OrderListItem | OrderDetailView): boolean => {
         const { userRole } = authStore
 
         // Superadmin puede todo
@@ -53,7 +53,7 @@ export function useOrderPermissions() {
     /**
      * Verifica si el usuario puede editar productos del pedido
      */
-    const canEditProducts = (order: OrderListItem): boolean => {
+    const canEditProducts = (order: OrderListItem | OrderDetailView): boolean => {
         const { userRole } = authStore
 
         // Superadmin puede todo
@@ -81,7 +81,7 @@ export function useOrderPermissions() {
     /**
      * Verifica si el usuario puede editar pagos del pedido
      */
-    const canEditPayments = (order: OrderListItem): boolean => {
+    const canEditPayments = (order: OrderListItem | OrderDetailView): boolean => {
         const { userRole } = authStore
 
         // Superadmin puede modificar pagos sin restricciones
@@ -114,7 +114,7 @@ export function useOrderPermissions() {
     /**
      * Verifica si el usuario puede cancelar el pedido
      */
-    const canCancel = (order: OrderListItem): boolean => {
+    const canCancel = (order: OrderListItem | OrderDetailView): boolean => {
         const { userRole } = authStore
 
         // Solo Admin y Superadmin pueden cancelar
@@ -180,7 +180,7 @@ export function useOrderPermissions() {
     /**
      * Verifica si el usuario puede cambiar el pedido a un nuevo estado
      */
-    const canChangeStatus = (order: OrderListItem, newStatus: OrderStatus): boolean => {
+    const canChangeStatus = (order: OrderListItem | OrderDetailView, newStatus: OrderStatus): boolean => {
         const { userRole } = authStore
         const currentStatus = order.status
 
