@@ -129,7 +129,7 @@
                     </div>
                     <div class="lg:col-span-1 order-2">
                         <RouteOrderManager :orders="mapOrders" @route-optimized="handleRouteOptimized"
-                            @geocode-requested="handleGeocodeRequested" />
+                            @geocode-requested="handleGeocodeRequested" @delivered="handleOrderDelivered" />
                     </div>
                 </div>
             </div>
@@ -253,6 +253,8 @@ const handleHistoryFilterChange = async () => {
 const handleOrderDelivered = async () => {
     // Recargar historial para reflejar el cambio de estado
     await loadHistory()
+    mapOrders.value = [...deliveryStore.ordersOnTheWay]
+
 }
 
 const handleRouteCalculated = (_waypointOrder: number[]) => {

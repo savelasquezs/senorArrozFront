@@ -20,7 +20,7 @@
         <!-- Detalle (solo lectura, compacto para mobile) -->
         <BaseDialog :model-value="openDetail" title="Detalle del pedido" @update:model-value="onToggleDetail">
 
-            <OrderDetailContent v-if="order" :flat-order="order" />
+            <OrderDetailContent v-if="order" :flat-order="order" @delivered="openConfirmDelivered = true" />
         </BaseDialog>
 
         <!-- Confirmar entregado -->
@@ -67,7 +67,9 @@ import { useOrdersDataStore } from '@/store/ordersData'
 import type { CustomerAddressFormData } from '@/types/customer'
 import OrderDetailContent from '@/components/orders/OrderDetailContent.vue'
 import type { OrderListItem } from '@/types/order'
+import { useToast } from '@/composables/useToast'
 
+const { success } = useToast()
 interface Props { order: OrderListItem }
 const props = defineProps<Props>()
 const emit = defineEmits<{
@@ -94,8 +96,13 @@ const onToggleDetail = async (val: boolean) => {
     }
 }
 
-const confirmDelivered = () => {
+const confirmDelivered = async () => {
     openConfirmDelivered.value = false
+    openDetail.value = false
+    await ordersData.updateStatus(props.order.id, 'delivered')
+
+    success(`Pedido #${props.order.id} marcado como entregado`, 3000)
+
     emit('delivered', props.order.id)
 }
 

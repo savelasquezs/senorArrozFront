@@ -14,7 +14,7 @@
             </div>
 
             <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
-                <BaseButton variant="secondary" size="sm" class="w-full sm:w-auto"
+                <BaseButton v-if="!isDeliveryman" variant="secondary" size="sm" class="w-full sm:w-auto"
                     @click="$router.push({ name: 'OrdersList' })">
                     <ArrowLeftIcon class="w-4 h-4 mr-1" />
                     Volver
@@ -58,19 +58,38 @@
                         <!-- Cliente -->
                         <div class="space-y-2">
                             <label class="text-xs sm:text-sm font-medium text-gray-700">Cliente</label>
-                            <div class="flex items-center justify-between bg-gray-50 rounded-lg p-2 sm:p-3">
-                                <div>
-                                    <p class="text-xs sm:text-sm font-medium text-gray-900">
-                                        {{ order.customerName || order.guestName || 'Sin cliente' }}
-                                    </p>
-                                    <p v-if="order.customerPhone" class="text-xs text-gray-500">
-                                        {{ order.customerPhone }}
-                                    </p>
+                            <div class="flex flex-col gap-2 bg-gray-50 rounded-lg p-2 sm:p-3">
+                                <div class="flex items-center justify-between">
+                                    <div class="flex-1">
+                                        <p class="text-xs sm:text-sm font-medium text-gray-900">
+                                            {{ order.customerName || order.guestName || 'Sin cliente' }}
+                                        </p>
+                                    </div>
+                                    <BaseButton v-if="permissions.canEditOrder(order)" size="sm" variant="ghost"
+                                        @click="showEditCustomerModal = true">
+                                        <PencilIcon class="w-4 h-4" />
+                                    </BaseButton>
                                 </div>
-                                <BaseButton v-if="permissions.canEditOrder(order)" size="sm" variant="ghost"
-                                    @click="showEditCustomerModal = true">
-                                    <PencilIcon class="w-4 h-4" />
-                                </BaseButton>
+
+                                <!-- Teléfonos del cliente -->
+                                <div v-if="order.customerId && customer" class="space-y-1 mt-2">
+                                    <PhoneNumberItem :phone-number="customer.phone1" />
+                                    <PhoneNumberItem v-if="customer.phone2" :phone-number="customer.phone2" />
+                                </div>
+                                <!-- Fallback: mostrar customerPhone si no hay cliente cargado -->
+                                <div v-else-if="order.customerPhone" class="mt-2">
+                                    <PhoneNumberItem :phone-number="order.customerPhone" />
+                                </div>
+                                <!-- Loading state -->
+                                <div v-if="order.customerId && customerLoading"
+                                    class="mt-2 flex items-center gap-2 text-xs text-gray-500">
+                                    <BaseLoading size="sm" />
+                                    <span>Cargando teléfonos...</span>
+                                </div>
+                                <!-- Error state -->
+                                <div v-if="order.customerId && customerError" class="mt-2 text-xs text-red-500">
+                                    {{ customerError }}
+                                </div>
                             </div>
                         </div>
 
@@ -128,7 +147,7 @@
                             <label class="text-xs sm:text-sm font-medium text-gray-700">Tarifa de domicilio</label>
                             <div class="bg-gray-50 rounded-lg p-2 sm:p-3">
                                 <p class="text-xs sm:text-sm text-gray-900">{{ formatCurrency(order?.deliveryFee || 0)
-                                    }}</p>
+                                }}</p>
                             </div>
                         </div>
 
@@ -245,6 +264,7 @@ import CancelOrderModal from '@/components/orders/CancelOrderModal.vue'
 import EditOrderTypeModal from '@/components/orders/EditOrderTypeModal.vue'
 import BaseInput from '@/components/ui/BaseInput.vue'
 import PersistedPaymentSelector from '@/components/payments/PersistedPaymentSelector.vue'
+import PhoneNumberItem from '@/components/customers/PhoneNumberItem.vue'
 import { useFormatting } from '@/composables/useFormatting'
 import { useOrderPermissions } from '@/composables/useOrderPermissions'
 import { useToast } from '@/composables/useToast'
@@ -252,15 +272,18 @@ import { getOrderTypeDisplayName } from '@/composables/useFormatting'
 import { useOrderStatusChange } from '@/composables/useOrderStatusChange'
 import { useRouter, useRoute } from 'vue-router'
 import type { OrderDetailView, OrderStatus, UpdateOrderDetailDto } from '@/types/order'
+import type { Customer } from '@/types/customer'
 import { useOrdersDraftsStore } from '@/store/ordersDrafts'
 import { useOrdersDataStore } from '@/store/ordersData'
 import { useAuthStore } from '@/store/auth'
 import { onMounted } from 'vue'
+import { customerApi } from '@/services/MainAPI/customerApi'
 
 import type { OrderListItem } from '@/types/order'
 
 
 import BaseButton from '@/components/ui/BaseButton.vue'
+import BaseLoading from '@/components/ui/BaseLoading.vue'
 
 import {
     ArrowLeftIcon,
@@ -280,11 +303,17 @@ const originalOrderType = ref<'onsite' | 'delivery' | 'reservation' | null>(null
 // Estado local (solo lo que no está en el store)
 const editableGuestName = ref('')
 const editableNotes = ref('')
+const customer = ref<Customer | null>(null)
+const customerLoading = ref(false)
+const customerError = ref<string | null>(null)
 
 const props = defineProps<{
     flatOrder: OrderListItem
 }>()
 
+const emit = defineEmits<{
+    (e: 'delivered', orderId: number): void
+}>()
 const order = ref<OrderDetailView | null>(null)
 
 const route = useRoute()
@@ -353,8 +382,33 @@ watch(ordersDataStoreCurrent, (newOrder) => {
         order.value = newOrder
         editableGuestName.value = newOrder.guestName || ''
         editableNotes.value = newOrder.notes || ''
+        // Cargar cliente completo si hay customerId
+        if (newOrder.customerId) {
+            loadCustomer(newOrder.customerId)
+        } else {
+            customer.value = null
+        }
     }
 }, { immediate: true })
+
+// Cargar datos del cliente completo
+const loadCustomer = async (customerId: number) => {
+    if (!customerId) return
+
+    customerLoading.value = true
+    customerError.value = null
+
+    try {
+        const response = await customerApi.getCustomerById(customerId)
+        customer.value = response.data
+    } catch (err: any) {
+        console.error('Error loading customer:', err)
+        customerError.value = 'No se pudieron cargar los teléfonos'
+        customer.value = null
+    } finally {
+        customerLoading.value = false
+    }
+}
 
 const handleStatusChange = async (newStatus: OrderStatus) => {
     if (!order.value) return
@@ -371,7 +425,8 @@ const handleStatusChange = async (newStatus: OrderStatus) => {
 
 const handleDeliverOrder = async () => {
     if (!order.value) return
-    await handleStatusChange('delivered')
+    emit('delivered', order.value.id)
+
 }
 
 const updateGuestName = async () => {
@@ -556,6 +611,13 @@ const handleCustomerUpdated = async (updatedOrder?: any) => {
         })
     }
 
+    // Recargar cliente completo si hay customerId nuevo o cambiado
+    if (orderAny.customerId) {
+        await loadCustomer(orderAny.customerId)
+    } else {
+        customer.value = null
+    }
+
     // ✅ Cerrar el modal después de actualizar exitosamente
     showEditCustomerModal.value = false
 }
@@ -619,8 +681,10 @@ onMounted(async () => {
         loadPaymentData()
     ])
 
-    // Ya no es necesario redirigir desde payments para domiciliarios
-    // porque ahora pueden ver los pagos (solo lectura)
+    // Cargar cliente completo si hay customerId (después de que fetchOrderDetail termine)
+    if (order.value?.customerId) {
+        await loadCustomer(order.value.customerId)
+    }
 })
 
 
