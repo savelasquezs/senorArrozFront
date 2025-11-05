@@ -1,24 +1,25 @@
 <template>
 
-    <div class="space-y-6" v-if="order">
+    <div class="space-y-4 md:space-y-6" v-if="order">
         <!-- Header con ID y acciones -->
-        <div class="flex items-start justify-between">
+        <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-0">
             <div>
-                <div class="flex items-center space-x-3">
-                    <h1 class="text-3xl font-bold text-gray-900">#{{ order.id }}</h1>
+                <div class="flex flex-col sm:flex-row items-start sm:items-center space-y-2 sm:space-y-0 sm:space-x-3">
+                    <h1 class="text-2xl sm:text-3xl font-bold text-gray-900">#{{ order.id }}</h1>
                     <OrderTypeBadge :type="order.type" :display-name="order.typeDisplayName" />
                 </div>
-                <p class="mt-1 text-sm text-gray-500">
+                <p class="mt-1 text-xs sm:text-sm text-gray-500">
                     Creado el {{ formatDateTime(order.createdAt) }}
                 </p>
             </div>
 
-            <div class="flex items-center space-x-2">
-                <BaseButton variant="secondary" size="sm" @click="$router.push({ name: 'OrdersList' })">
+            <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
+                <BaseButton variant="secondary" size="sm" class="w-full sm:w-auto"
+                    @click="$router.push({ name: 'OrdersList' })">
                     <ArrowLeftIcon class="w-4 h-4 mr-1" />
                     Volver
                 </BaseButton>
-                <BaseButton v-if="permissions.canCancel(order)" variant="danger" size="sm"
+                <BaseButton v-if="permissions.canCancel(order)" variant="danger" size="sm" class="w-full sm:w-auto"
                     @click="showCancelModal = true">
                     <XCircleIcon class="w-4 h-4 mr-1" />
                     Cancelar Pedido
@@ -27,39 +28,39 @@
         </div>
 
         <!-- Barra de progreso -->
-        <div class="bg-white rounded-lg shadow p-6">
+        <div v-if="!isDeliveryman" class="bg-white rounded-lg shadow p-4 md:p-6">
             <OrderProgressBar :current-status="order.status" :status-times="order.statusTimes" :order-type="order.type"
                 :clickable="true" @status-click="handleStatusChange" />
         </div>
 
         <!-- Tabs de contenido -->
-        <div class="bg-white rounded-lg shadow">
+        <div class="bg-white rounded-lg shadow overflow-hidden">
             <!-- Tab headers -->
-            <div class="border-b border-gray-200">
-                <nav class="-mb-px flex space-x-8 px-6" aria-label="Tabs">
-                    <button v-for="tab in tabs" :key="tab.id" :class="[
-                        'whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm',
+            <div class="border-b border-gray-200 overflow-x-auto">
+                <nav class="-mb-px flex space-x-4 sm:space-x-8 px-3 sm:px-6 flex-nowrap" aria-label="Tabs">
+                    <button v-for="tab in visibleTabs" :key="tab.id" :class="[
+                        'whitespace-nowrap py-3 sm:py-4 px-2 sm:px-1 border-b-2 font-medium text-xs sm:text-sm flex items-center gap-1 sm:gap-2',
                         activeTab === tab.id
                             ? 'border-emerald-500 text-emerald-600'
                             : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300',
                     ]" @click="activeTab = tab.id">
-                        <component :is="tab.icon" class="w-5 h-5 inline-block mr-2" />
-                        {{ tab.name }}
+                        <component :is="tab.icon" class="w-4 h-4 sm:w-5 sm:h-5 inline-block" />
+                        <span class="hidden sm:inline">{{ tab.name }}</span>
                     </button>
                 </nav>
             </div>
 
             <!-- Tab content -->
-            <div class="p-6">
+            <div class="p-4 sm:p-6">
                 <!-- Tab: Información General -->
                 <div v-if="activeTab === 'info'" class="space-y-6">
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
                         <!-- Cliente -->
                         <div class="space-y-2">
-                            <label class="text-sm font-medium text-gray-700">Cliente</label>
-                            <div class="flex items-center justify-between bg-gray-50 rounded-lg p-3">
+                            <label class="text-xs sm:text-sm font-medium text-gray-700">Cliente</label>
+                            <div class="flex items-center justify-between bg-gray-50 rounded-lg p-2 sm:p-3">
                                 <div>
-                                    <p class="text-sm font-medium text-gray-900">
+                                    <p class="text-xs sm:text-sm font-medium text-gray-900">
                                         {{ order.customerName || order.guestName || 'Sin cliente' }}
                                     </p>
                                     <p v-if="order.customerPhone" class="text-xs text-gray-500">
@@ -76,14 +77,14 @@
 
                         <!-- Guest Name -->
                         <div class="space-y-2">
-                            <label class="text-sm font-medium text-gray-700">Nombre del invitado</label>
+                            <label class="text-xs sm:text-sm font-medium text-gray-700">Nombre del invitado</label>
                             <BaseInput v-model="editableGuestName" placeholder="Nombre de quien recibe"
                                 :disabled="!permissions.canEditOrder(order)" @blur="updateGuestName" />
                         </div>
 
                         <!-- Tipo de pedido - CLICKEABLE -->
                         <div class="space-y-2">
-                            <label class="text-sm font-medium text-gray-700">Tipo de pedido</label>
+                            <label class="text-xs sm:text-sm font-medium text-gray-700">Tipo de pedido</label>
                             <button v-if="permissions.canEditOrder(order)" @click="showEditOrderTypeModal = true"
                                 class="w-full flex items-center justify-between bg-gray-50 hover:bg-gray-100 rounded-lg p-3 transition-colors cursor-pointer">
                                 <OrderTypeBadge :type="order.type" :display-name="order.typeDisplayName" />
@@ -96,9 +97,9 @@
 
                         <!-- Dirección - SOLO SI DELIVERY O RESERVATION -->
                         <div v-if="order.type === 'delivery' || order.type === 'reservation'" class="space-y-2">
-                            <label class="text-sm font-medium text-gray-700">Dirección de entrega</label>
-                            <div class="flex items-center justify-between bg-gray-50 rounded-lg p-3">
-                                <p class="text-sm text-gray-900">
+                            <label class="text-xs sm:text-sm font-medium text-gray-700">Dirección de entrega</label>
+                            <div class="flex items-center justify-between bg-gray-50 rounded-lg p-2 sm:p-3">
+                                <p class="text-xs sm:text-sm text-gray-900">
                                     {{ order.addressDescription || 'Sin dirección' }}
                                 </p>
                                 <BaseButton v-if="permissions.canEditOrder(order)" size="sm" variant="ghost"
@@ -110,12 +111,13 @@
 
                         <!-- Domiciliario - SOLO SI DELIVERY -->
                         <div v-if="order.type === 'delivery'" class="space-y-2">
-                            <label class="text-sm font-medium text-gray-700">Domiciliario</label>
-                            <div class="flex items-center justify-between bg-gray-50 rounded-lg p-3">
-                                <p class="text-sm text-gray-900">
+                            <label class="text-xs sm:text-sm font-medium text-gray-700">Domiciliario</label>
+                            <div class="flex items-center justify-between bg-gray-50 rounded-lg p-2 sm:p-3">
+                                <p class="text-xs sm:text-sm text-gray-900">
                                     {{ order.deliveryManName || 'Sin asignar' }}
                                 </p>
-                                <BaseButton size="sm" variant="ghost" @click="showAssignDeliveryModal = true">
+                                <BaseButton v-if="!isDeliveryman" size="sm" variant="ghost"
+                                    @click="showAssignDeliveryModal = true">
                                     <PencilIcon class="w-4 h-4" />
                                 </BaseButton>
                             </div>
@@ -123,42 +125,43 @@
 
                         <!-- Delivery Fee - SOLO SI DELIVERY -->
                         <div v-if="order.type === 'delivery'" class="space-y-2">
-                            <label class="text-sm font-medium text-gray-700">Tarifa de domicilio</label>
-                            <div class="bg-gray-50 rounded-lg p-3">
-                                <p class="text-sm text-gray-900">{{ formatCurrency(order?.deliveryFee || 0) }}</p>
+                            <label class="text-xs sm:text-sm font-medium text-gray-700">Tarifa de domicilio</label>
+                            <div class="bg-gray-50 rounded-lg p-2 sm:p-3">
+                                <p class="text-xs sm:text-sm text-gray-900">{{ formatCurrency(order?.deliveryFee || 0)
+                                    }}</p>
                             </div>
                         </div>
 
                         <!-- Fecha de reserva - SOLO SI RESERVATION -->
                         <div v-if="order.type === 'reservation' && order.reservedFor" class="space-y-2">
-                            <label class="text-sm font-medium text-gray-700">Tener listo a esta hora</label>
-                            <div class="bg-gray-50 rounded-lg p-3">
-                                <p class="text-sm text-gray-900">{{ formatDateTime(order.reservedFor) }}</p>
+                            <label class="text-xs sm:text-sm font-medium text-gray-700">Tener listo a esta hora</label>
+                            <div class="bg-gray-50 rounded-lg p-2 sm:p-3">
+                                <p class="text-xs sm:text-sm text-gray-900">{{ formatDateTime(order.reservedFor) }}</p>
                             </div>
                         </div>
 
                         <!-- Tomado por -->
                         <div class="space-y-2">
-                            <label class="text-sm font-medium text-gray-700">Tomado por</label>
-                            <div class="bg-gray-50 rounded-lg p-3">
-                                <p class="text-sm text-gray-900">{{ order.takenByName }}</p>
+                            <label class="text-xs sm:text-sm font-medium text-gray-700">Tomado por</label>
+                            <div class="bg-gray-50 rounded-lg p-2 sm:p-3">
+                                <p class="text-xs sm:text-sm text-gray-900">{{ order.takenByName }}</p>
                             </div>
                         </div>
 
                         <!-- Sucursal -->
                         <div class="space-y-2">
-                            <label class="text-sm font-medium text-gray-700">Sucursal</label>
-                            <div class="bg-gray-50 rounded-lg p-3">
-                                <p class="text-sm text-gray-900">{{ order.branchName }}</p>
+                            <label class="text-xs sm:text-sm font-medium text-gray-700">Sucursal</label>
+                            <div class="bg-gray-50 rounded-lg p-2 sm:p-3">
+                                <p class="text-xs sm:text-sm text-gray-900">{{ order.branchName }}</p>
                             </div>
                         </div>
                     </div>
 
                     <!-- Notas -->
                     <div class="space-y-2">
-                        <label class="text-sm font-medium text-gray-700">Notas del pedido</label>
+                        <label class="text-xs sm:text-sm font-medium text-gray-700">Notas del pedido</label>
                         <textarea v-model="editableNotes" rows="3"
-                            class="w-full rounded-lg border-gray-300 shadow-sm focus:border-emerald-500 focus:ring-emerald-500"
+                            class="w-full rounded-lg border-gray-300 shadow-sm focus:border-emerald-500 focus:ring-emerald-500 text-sm sm:text-base"
                             placeholder="Agregar notas..." :disabled="!permissions.canEditOrder(order)"
                             @blur="updateNotes" />
                     </div>
@@ -174,15 +177,39 @@
                 <!-- Tab: Pagos -->
                 <div v-if="activeTab === 'payments'">
                     <div class="mb-6">
-                        <h3 class="text-lg font-medium text-gray-900 mb-4">Gestión de Pagos</h3>
-                        <p class="text-sm text-gray-600 mb-4">
-                            Administra los pagos del pedido. Los pagos bancarios pueden ser verificados y los pagos
-                            por app pueden ser liquidados.
+                        <h3 class="text-base sm:text-lg font-medium text-gray-900 mb-3 sm:mb-4">Gestión de Pagos</h3>
+                        <p class="text-xs sm:text-sm text-gray-600 mb-3 sm:mb-4">
+                            <span v-if="isDeliveryman">Visualiza los pagos del pedido para saber cuánto debes
+                                cobrar.</span>
+                            <span v-else>Administra los pagos del pedido. Los pagos bancarios pueden ser verificados y
+                                los pagos por app pueden ser liquidados.</span>
                         </p>
                         <PersistedPaymentSelector v-if="order" :order="order" :bank-options="bankOptions"
                             :app-options="appOptions" @updated="handlePaymentUpdated" />
                     </div>
                 </div>
+            </div>
+        </div>
+
+        <!-- Sección de entrega para domiciliarios -->
+        <div v-if="isDeliveryman && order && order.status === 'on_the_way'"
+            class="sticky bottom-0 bg-white border-t-2 border-emerald-500 shadow-lg p-4 md:p-6 mt-4 md:mt-6 z-10">
+            <div class="flex flex-col sm:flex-row items-center justify-between gap-4">
+                <!-- Valor a cobrar -->
+                <div class="flex-1 text-center sm:text-left w-full sm:w-auto">
+                    <p class="text-xs sm:text-sm text-gray-600 mb-1">Valor a cobrar</p>
+                    <p class="text-2xl sm:text-3xl md:text-4xl font-bold text-emerald-600">
+                        {{ formatCurrency(cashAmount) }}
+                    </p>
+                </div>
+
+                <!-- Botón entregar -->
+                <BaseButton variant="success" size="lg"
+                    class="w-full sm:w-auto px-6 sm:px-8 py-3 text-base sm:text-lg font-semibold"
+                    @click="handleDeliverOrder">
+                    <CheckCircleIcon class="w-5 h-5 sm:w-6 sm:h-6 mr-2" />
+                    Entregar Pedido
+                </BaseButton>
             </div>
         </div>
     </div>
@@ -227,6 +254,7 @@ import { useRouter, useRoute } from 'vue-router'
 import type { OrderDetailView, OrderStatus, UpdateOrderDetailDto } from '@/types/order'
 import { useOrdersDraftsStore } from '@/store/ordersDrafts'
 import { useOrdersDataStore } from '@/store/ordersData'
+import { useAuthStore } from '@/store/auth'
 import { onMounted } from 'vue'
 
 import type { OrderListItem } from '@/types/order'
@@ -241,9 +269,12 @@ import {
     InformationCircleIcon,
     ShoppingBagIcon,
     CreditCardIcon,
+    CheckCircleIcon,
 } from '@heroicons/vue/24/outline'
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 const permissions = useOrderPermissions()
+const authStore = useAuthStore()
+const isDeliveryman = computed(() => authStore.userRole === 'Deliveryman')
 const pendingOrderType = ref<'onsite' | 'delivery' | 'reservation' | null>(null)
 const originalOrderType = ref<'onsite' | 'delivery' | 'reservation' | null>(null)
 // Estado local (solo lo que no está en el store)
@@ -270,6 +301,11 @@ const showEditCustomerModal = ref(false)
 
 const { pendingStatusChange, showAssignDeliveryModal, handleStatusChange: handleStatusChangeComposable, executeStatusChange, clearPendingStatusChange } = useOrderStatusChange()
 
+const ordersStore = useOrdersDraftsStore()
+
+// Store
+const ordersDataStore = useOrdersDataStore()
+
 // Opciones para selectores de pagos
 const bankOptions = computed(() => {
     return ordersStore.banks
@@ -287,11 +323,6 @@ const showSelectAddressModal = ref(false)
 const showCancelModal = ref(false)
 const showEditOrderTypeModal = ref(false)
 
-const ordersStore = useOrdersDraftsStore()
-
-// Store
-const ordersDataStore = useOrdersDataStore()
-
 
 // Tabs
 const tabs = [
@@ -299,6 +330,31 @@ const tabs = [
     { id: 'products', name: 'Productos', icon: ShoppingBagIcon },
     { id: 'payments', name: 'Pagos', icon: CreditCardIcon },
 ]
+
+// Filtrar tabs para domiciliarios (los domiciliarios pueden ver pagos pero no editarlos)
+const visibleTabs = computed(() => {
+    // Todos los tabs están disponibles para todos los usuarios
+    // Los permisos de edición se manejan dentro de cada componente
+    return tabs
+})
+
+// Computed para calcular efectivo a cobrar
+const cashAmount = computed(() => {
+    if (!order.value) return 0
+    const totalPayments = (order.value.bankPayments?.reduce((sum, p) => sum + p.amount, 0) || 0) +
+        (order.value.appPayments?.reduce((sum, p) => sum + p.amount, 0) || 0)
+    return Math.max(0, order.value.total - totalPayments)
+})
+
+// Sincronizar order del store
+const ordersDataStoreCurrent = computed(() => ordersDataStore.current)
+watch(ordersDataStoreCurrent, (newOrder) => {
+    if (newOrder) {
+        order.value = newOrder
+        editableGuestName.value = newOrder.guestName || ''
+        editableNotes.value = newOrder.notes || ''
+    }
+}, { immediate: true })
 
 const handleStatusChange = async (newStatus: OrderStatus) => {
     if (!order.value) return
@@ -311,6 +367,11 @@ const handleStatusChange = async (newStatus: OrderStatus) => {
             updateOrderStatus(updatedOrder)
         }
     )
+}
+
+const handleDeliverOrder = async () => {
+    if (!order.value) return
+    await handleStatusChange('delivered')
 }
 
 const updateGuestName = async () => {
@@ -557,6 +618,9 @@ onMounted(async () => {
         fetchOrderDetail(),
         loadPaymentData()
     ])
+
+    // Ya no es necesario redirigir desde payments para domiciliarios
+    // porque ahora pueden ver los pagos (solo lectura)
 })
 
 
