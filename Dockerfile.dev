@@ -1,0 +1,24 @@
+# Dockerfile para desarrollo con hot reload
+FROM node:20-alpine
+
+WORKDIR /app
+
+# Build arguments for environment variables
+ARG VITE_API_URL=http://localhost:5000/api
+ARG VITE_SIGNALR_HUB_URL=http://localhost:5000/hubs/orders
+ARG VITE_GOOGLE_MAPS_API_KEY
+ARG VITE_GOOGLE_MAPS_MAP_ID
+
+# Set as environment variables
+ENV VITE_API_URL=$VITE_API_URL
+ENV VITE_SIGNALR_HUB_URL=$VITE_SIGNALR_HUB_URL
+ENV VITE_GOOGLE_MAPS_API_KEY=$VITE_GOOGLE_MAPS_API_KEY
+ENV VITE_GOOGLE_MAPS_MAP_ID=$VITE_GOOGLE_MAPS_MAP_ID
+
+# Expose port 5173 (Vite dev server port)
+EXPOSE 5173
+
+# El código fuente se montará como volumen desde docker-compose
+# Script de inicio que instala dependencias si es necesario y luego ejecuta Vite dev server
+CMD ["sh", "-c", "npm install && npm run dev -- --host 0.0.0.0"]
+

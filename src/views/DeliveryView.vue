@@ -162,7 +162,7 @@ const authStore = useAuthStore()
 const deliveryStore = useDeliveryStore()
 const { success, error } = useToast()
 
-const SIGNALR_HUB_URL = 'http://localhost:5257/hubs/orders'
+const SIGNALR_HUB_URL = import.meta.env.VITE_SIGNALR_HUB_URL || 'http://localhost:5000/hubs/orders'
 const { isConnected, on } = useSignalR(SIGNALR_HUB_URL)
 
 const activeTab = ref<'available' | 'history' | 'map'>('available')
