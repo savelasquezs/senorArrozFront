@@ -136,6 +136,10 @@ const loadGoogleMaps = () => {
 
         const script = document.createElement('script')
         script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places&loading=async`
+        if (mapId && typeof mapId === 'string' && mapId.trim() !== '') {
+            script.src += `&map_ids=${encodeURIComponent(mapId.trim())}`
+            console.log('✅ [GoogleMapsSelector] Including Map ID in script URL:', mapId.trim())
+        }
         script.async = true
         script.defer = true
 
@@ -221,6 +225,15 @@ const initializeMap = async () => {
 
         map = new googleMaps.Map(mapContainer.value, mapConfig)
 
+        // Add error listener to prevent map from being destroyed
+        if ((window as any).google?.maps?.event) {
+            (window as any).google.maps.event.addListenerOnce(map, 'error', (error: any) => {
+                console.error('❌ [GoogleMapsSelector] Map error detected:', error)
+                // No destruir el mapa, solo loguear el error
+                // El mapa seguirá funcionando sin el Map ID si es necesario
+            })
+        }
+
         // Check if component was destroyed during initialization
         if (isDestroyed.value || !mapContainer.value || !mapContainer.value.parentNode) {
             if (map) {
@@ -232,18 +245,9 @@ const initializeMap = async () => {
             }
             return
         }
+
         // Initialize geocoder
         geocoder = new googleMaps.Geocoder()
-
-        // Import Advanced Marker library
-        const { AdvancedMarkerElement } = await (window as any).google.maps.importLibrary("marker")
-
-        // Initialize marker
-        marker = new AdvancedMarkerElement({
-            position: defaultLocation,
-            map: map,
-            title: 'Ubicación seleccionada'
-        })
 
         // Add click listener to map
         map.addListener('click', (event: any) => {
@@ -256,17 +260,60 @@ const initializeMap = async () => {
             }
         })
 
-        // Add marker drag listener (AdvancedMarkerElement uses different event)
-        marker.addListener('dragend', () => {
-            if (marker && !isDestroyed.value && mapContainer.value && mapContainer.value.parentNode) {
-                const position = marker.position
-                const location = {
-                    lat: typeof position === 'object' ? position.lat : position.lat(),
-                    lng: typeof position === 'object' ? position.lng : position.lng()
+        // Try to use Advanced Markers, fallback to traditional markers if it fails
+        try {
+            // Import Advanced Marker library
+            const { AdvancedMarkerElement } = await (window as any).google.maps.importLibrary("marker")
+
+            // Initialize Advanced Marker
+            marker = new AdvancedMarkerElement({
+                position: defaultLocation,
+                map: map,
+                title: 'Ubicación seleccionada'
+            })
+
+            console.log('✅ [GoogleMapsSelector] Advanced Marker created successfully')
+
+            // Add marker drag listener (AdvancedMarkerElement uses different event)
+            marker.addListener('dragend', () => {
+                if (marker && !isDestroyed.value && mapContainer.value && mapContainer.value.parentNode) {
+                    const position = marker.position
+                    const location = {
+                        lat: typeof position === 'object' ? position.lat : position.lat(),
+                        lng: typeof position === 'object' ? position.lng : position.lng()
+                    }
+                    updateLocation(location)
                 }
-                updateLocation(location)
+            })
+        } catch (markerError) {
+            console.warn('⚠️ [GoogleMapsSelector] Advanced Marker failed, using traditional marker:', markerError)
+
+            // Fallback a marcador tradicional
+            try {
+                marker = new googleMaps.Marker({
+                    position: defaultLocation,
+                    map: map,
+                    title: 'Ubicación seleccionada',
+                    draggable: true
+                })
+
+                console.log('✅ [GoogleMapsSelector] Traditional marker created as fallback')
+
+                // Add marker drag listener (traditional marker)
+                marker.addListener('dragend', () => {
+                    if (marker && !isDestroyed.value && mapContainer.value && mapContainer.value.parentNode) {
+                        const location = {
+                            lat: marker.getPosition().lat(),
+                            lng: marker.getPosition().lng()
+                        }
+                        updateLocation(location)
+                    }
+                })
+            } catch (fallbackError) {
+                console.error('❌ [GoogleMapsSelector] Failed to create traditional marker:', fallbackError)
+                // Continuar sin marcador, el mapa seguirá funcionando
             }
-        })
+        }
 
         isMapLoaded.value = true
         console.log('✅ [GoogleMapsSelector] Map initialized successfully')
