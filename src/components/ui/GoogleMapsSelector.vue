@@ -119,6 +119,16 @@ const loadGoogleMaps = () => {
         }
 
         const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY
+        const mapId = import.meta.env.VITE_GOOGLE_MAPS_MAP_ID
+
+        // Debug logs
+        console.log('🔍 [GoogleMapsSelector] Loading Google Maps script:', {
+            apiKey: apiKey ? `${apiKey.substring(0, 10)}...${apiKey.substring(apiKey.length - 4)}` : 'NOT SET',
+            mapId: mapId || 'NOT SET',
+            hasApiKey: !!apiKey,
+            hasMapId: !!mapId
+        })
+
         if (!apiKey) {
             reject(new Error('Google Maps API key not configured'))
             return
@@ -173,16 +183,35 @@ const initializeMap = async () => {
 
         // Get Map ID from environment variable
         const mapId = import.meta.env.VITE_GOOGLE_MAPS_MAP_ID
+        const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY
 
-        map = new googleMaps.Map(mapContainer.value, {
+        // Debug logs before creating map
+        console.log('🔍 [GoogleMapsSelector] Initializing map with config:', {
+            apiKey: apiKey ? `${apiKey.substring(0, 10)}...${apiKey.substring(apiKey.length - 4)}` : 'NOT SET',
+            mapId: mapId || 'NOT SET',
+            hasApiKey: !!apiKey,
+            hasMapId: !!mapId,
+            willUseMapId: !!mapId
+        })
+
+        const mapConfig: any = {
             center: defaultLocation,
             zoom: 15,
             mapTypeControl: false,
             streetViewControl: false,
             fullscreenControl: false,
-            zoomControl: true,
-            ...(mapId && { mapId }) // Map ID for Advanced Markers (only if configured)
-        })
+            zoomControl: true
+        }
+
+        // Only add mapId if it's set
+        if (mapId) {
+            mapConfig.mapId = mapId
+            console.log('✅ [GoogleMapsSelector] Using Map ID:', mapId)
+        } else {
+            console.warn('⚠️ [GoogleMapsSelector] Map ID not set, using default map style')
+        }
+
+        map = new googleMaps.Map(mapContainer.value, mapConfig)
 
         // Check if component was destroyed during initialization
         if (isDestroyed.value || !mapContainer.value || !mapContainer.value.parentNode) {
@@ -232,11 +261,15 @@ const initializeMap = async () => {
         })
 
         isMapLoaded.value = true
-        console.log('Map initialized successfully')
+        console.log('✅ [GoogleMapsSelector] Map initialized successfully')
 
     } catch (err) {
         if (!isDestroyed.value) {
-            console.error('Error initializing map:', err)
+            console.error('❌ [GoogleMapsSelector] Error initializing map:', err)
+            console.error('❌ [GoogleMapsSelector] Error details:', {
+                message: err instanceof Error ? err.message : String(err),
+                stack: err instanceof Error ? err.stack : undefined
+            })
             error.value = 'Error al cargar el mapa'
         }
     }

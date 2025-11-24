@@ -75,7 +75,7 @@ onMounted(async () => {
         mapTypeControl: false,
         fullscreenControl: false,
         streetViewControl: false,
-        mapId,
+        ...(mapId && { mapId }), // Only include mapId if it's defined
     })
 
         ; (window as any)._AdvancedMarkerElement = AdvancedMarkerElement
