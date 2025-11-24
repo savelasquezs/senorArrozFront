@@ -46,8 +46,12 @@ const geocoder = ref<google.maps.Geocoder | null>(null)
 // 🔹 Inicialización
 // =========================
 onMounted(async () => {
+    const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY
+    const mapId = import.meta.env.VITE_GOOGLE_MAPS_MAP_ID
+
     setOptions({
-        key: import.meta.env.VITE_GOOGLE_MAPS_API_KEY,
+        key: apiKey,
+        ...(mapId && { mapIds: [mapId] }), // Include Map ID if available
     })
 
     // Importar módulos modernos

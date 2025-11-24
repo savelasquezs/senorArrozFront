@@ -119,11 +119,14 @@ const loadGoogleMaps = () => {
         }
 
         const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY
+        const mapId = import.meta.env.VITE_GOOGLE_MAPS_MAP_ID
 
         // Debug logs
         console.log('🔍 [GoogleMapsSelector] Loading Google Maps script:', {
             apiKey: apiKey ? `${apiKey.substring(0, 10)}...${apiKey.substring(apiKey.length - 4)}` : 'NOT SET',
-            hasApiKey: !!apiKey
+            mapId: mapId || 'NOT SET',
+            hasApiKey: !!apiKey,
+            hasMapId: !!mapId
         })
 
         if (!apiKey) {
@@ -131,8 +134,15 @@ const loadGoogleMaps = () => {
             return
         }
 
+        // Build script URL with Map ID if available
+        let scriptUrl = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places&loading=async`
+        if (mapId && typeof mapId === 'string' && mapId.trim() !== '') {
+            scriptUrl += `&map_ids=${encodeURIComponent(mapId.trim())}`
+            console.log('✅ [GoogleMapsSelector] Including Map ID in script URL:', mapId.trim())
+        }
+
         const script = document.createElement('script')
-        script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places&loading=async`
+        script.src = scriptUrl
         script.async = true
         script.defer = true
 
@@ -181,9 +191,19 @@ const initializeMap = async () => {
         const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY
 
         // Debug logs before creating map
+        // Get Map ID from environment variable
+        const mapIdRaw = import.meta.env.VITE_GOOGLE_MAPS_MAP_ID
+        const mapId = mapIdRaw && typeof mapIdRaw === 'string' && mapIdRaw.trim() !== '' ? mapIdRaw.trim() : undefined
+
         console.log('🔍 [GoogleMapsSelector] Initializing map with config:', {
             apiKey: apiKey ? `${apiKey.substring(0, 10)}...${apiKey.substring(apiKey.length - 4)}` : 'NOT SET',
-            hasApiKey: !!apiKey
+            mapIdRaw: mapIdRaw || 'NOT SET',
+            mapIdProcessed: mapId || 'NOT SET',
+            mapIdType: typeof mapIdRaw,
+            mapIdLength: mapId?.length || 0,
+            hasApiKey: !!apiKey,
+            hasMapId: !!mapId,
+            willUseMapId: !!mapId
         })
 
         const mapConfig: any = {
@@ -192,7 +212,8 @@ const initializeMap = async () => {
             mapTypeControl: false,
             streetViewControl: false,
             fullscreenControl: false,
-            zoomControl: true
+            zoomControl: true,
+            ...(mapId && { mapId }) // Include Map ID if available
         }
 
         map = new googleMaps.Map(mapContainer.value, mapConfig)
