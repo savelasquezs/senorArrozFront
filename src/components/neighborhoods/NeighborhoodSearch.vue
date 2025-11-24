@@ -1,8 +1,8 @@
 <!-- src/components/ui/NeighborhoodSearch.vue -->
 <template>
     <div class="space-y-2">
-        <BaseSelect v-model="selectedNeighborhoodId" :options="neighborhoodOptions" :label="label"
-            :placeholder="placeholder" :required="required" :error="error" :searchable="true" :allow-create="true"
+        <BaseSelect v-model="selectedNeighborhoodId" :options="neighborhoodOptions" label="Barrio"
+            placeholder="Buscar barrio..." :required="required" :error="error" :searchable="true" :allow-create="true"
             create-label="Crear barrio" value-key="id" display-key="name" @update:model-value="handleSelection"
             @create="handleCreateRequest">
             <template #icon>
@@ -33,32 +33,27 @@ import { useBranchesStore } from '@/store/branches'
 import { useToast } from '@/composables/useToast'
 import { MapPinIcon, PlusIcon } from '@heroicons/vue/24/outline'
 import type { NeighborhoodFormData } from '@/types/customer'
-import { onMounted } from 'vue'
+
 import { useAuthStore } from '@/store/auth'
 
 interface Props {
     modelValue?: number | null
-    label?: string
-    placeholder?: string
     required?: boolean
     error?: string
-    branchId?: number
 }
 
 const props = withDefaults(defineProps<Props>(), {
-    label: 'Barrio',
-    placeholder: 'Buscar barrio...',
     required: false
 })
 
 const emit = defineEmits<{
     'update:modelValue': [value: number | null]
 }>()
-
 const branchesStore = useBranchesStore()
 const { success, error: showError } = useToast()
 
 // Reactive state
+const branchId = computed(() => useAuthStore().branchId)
 const selectedNeighborhoodId = ref<number | null>(null)
 const showCreateForm = ref(false)
 const createLoading = ref(false)
@@ -66,12 +61,16 @@ const createFormData = ref<NeighborhoodFormData | null>(null)
 
 // Computed
 const neighborhoodOptions = computed(() => {
+    if (!branchesStore.currentNeighborhoods) {
+        branchesStore.fetchById(branchId.value || 0)
+
+    }
     if (!branchesStore.currentNeighborhoods) return []
 
     return branchesStore.currentNeighborhoods
         .filter(neighborhood => {
             // Filter by branch if provided
-            if (props.branchId && neighborhood.branchId !== props.branchId) return false
+            if (branchId.value && neighborhood.branchId !== branchId.value) return false
             return true
         })
         .map(neighborhood => ({
@@ -108,7 +107,7 @@ const handleCreateNeighborhood = async (data: NeighborhoodFormData) => {
         // Create neighborhood with current branch
         const newNeighborhood = await branchesStore.createNeighborhood({
             ...data,
-            branchId: props.branchId || 0
+            branchId: branchId.value || 0
         })
 
         // Select the newly created neighborhood
@@ -131,26 +130,7 @@ watch(() => props.modelValue, (newValue) => {
     selectedNeighborhoodId.value = newValue || null
 }, { immediate: true })
 
-// Watch for branch changes to load neighborhoods
-watch(() => props.branchId, async (newBranchId) => {
-    if (newBranchId) {
-        try {
-            await branchesStore.fetchById(newBranchId)
-        } catch (error) {
-            console.error('Error loading branch neighborhoods:', error)
-            showError('Error de Carga', 'No se pudieron cargar los barrios de la sucursal.')
-        }
-    }
-}, { immediate: true })
 
-onMounted(async () => {
-    if (!props.branchId) {
-        const branchId = useAuthStore().branchId
-        if (!branchId) return
-        await branchesStore.fetchById(branchId)
-    }
-    else {
-        await branchesStore.fetchById(props.branchId)
-    }
-})
+
+
 </script>

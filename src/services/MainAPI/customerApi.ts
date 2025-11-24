@@ -75,6 +75,13 @@ class CustomerApi extends BaseApi {
         return this.get<ApiResponse<CustomerAddress[]>>(`/customers/${customerId}/addresses`);
     }
 
+    // 7.5. Obtener dirección específica por ID
+    async getCustomerAddressById(
+        addressId: number
+    ): Promise<ApiResponse<CustomerAddress>> {
+        return this.get<ApiResponse<CustomerAddress>>(`/customers/addresses/${addressId}`);
+    }
+
     // 8. Crear dirección para cliente
     async createCustomerAddress(
         customerId: number,

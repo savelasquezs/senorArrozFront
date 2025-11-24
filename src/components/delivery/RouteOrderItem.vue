@@ -37,8 +37,8 @@
 
         <!-- Editar dirección -->
         <BaseDialog :model-value="openAddress" title="Editar dirección" @update:model-value="openAddress = $event">
-            <CustomerAddressForm :model-value="addressForm" :customer-id="order.customerId || 0"
-                :branch-id="order.branchId" @submit="handleAddressSaved" @cancel="openAddress = false" />
+            <CustomerAddressForm v-model="addressForm" :addressId="order.addressId || undefined"
+                @submit="handleAddressSaved" @cancel="openAddress = false" />
         </BaseDialog>
 
         <!-- Asignar coordenadas actuales -->
@@ -126,14 +126,14 @@ const assignCurrentCoords = async () => {
 }
 
 
-// Address form model
+// Address form model - prellenar con datos del pedido si existen
 const addressForm = ref<CustomerAddressFormData>({
     neighborhoodId: 0,
     address: props.order.addressDescription || '',
     additionalInfo: '',
     latitude: 0,
     longitude: 0,
-    deliveryFee: 0,
+    deliveryFee: props.order.deliveryFee || 0,
     isPrimary: false,
 })
 </script>

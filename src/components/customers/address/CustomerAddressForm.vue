@@ -2,9 +2,8 @@
 <template>
     <form @submit.prevent="handleSubmit" class="space-y-6">
         <!-- Step 1: Neighborhood Selection -->
-        <NeighborhoodSearch v-model="localForm.neighborhoodId" label="Barrio" placeholder="Buscar barrio..."
-            :required="true" :error="errors.neighborhoodId" @update:model-value="validateNeighborhood"
-            :branch-id="branchId" />
+        <NeighborhoodSearch v-model="localForm.neighborhoodId" :required="true" :error="errors.neighborhoodId"
+            @update:model-value="validateNeighborhood" />
 
         <!-- Step 2: Address Input -->
         <div v-if="localForm.neighborhoodId > 0">
@@ -34,10 +33,8 @@
         <!-- Step 3: Google Maps Selector -->
         <div v-if="localForm.address.trim() && showMapsSelector">
             <GoogleMapsSelector v-model="selectedLocation" :error="errors.latitude || errors.longitude"
-                :initial-address="localForm.address" 
-                @location-confirmed="handleLocationConfirmed"
-                @address-updated="handleAddressUpdated"
-                :key="`maps-${address?.id || 'new'}`" />
+                :initial-address="localForm.address" @location-confirmed="handleLocationConfirmed"
+                @address-updated="handleAddressUpdated" :key="`maps-${props.addressId || 'new'}`" />
         </div>
 
         <!-- Primary Address Checkbox -->
@@ -50,13 +47,13 @@
         </div>
 
         <!-- Form Actions -->
-        <div class="flex justify-end space-x-3 pt-6 border-t border-gray-200" v-if="customerId">
+        <div class="flex justify-end space-x-3 pt-6 border-t border-gray-200" v-if="props.addressId">
             <BaseButton @click="$emit('cancel')" variant="secondary" type="button">
                 Cancelar
             </BaseButton>
 
-            <BaseButton type="submit" variant="primary" :loading="loading" :disabled="!isFormValid">
-                {{ address ? 'Actualizar' : 'Crear' }} Dirección
+            <BaseButton type="submit" variant="primary" :disabled="!isFormValid">
+                {{ props.addressId ? 'Actualizar' : 'Crear' }} Dirección
             </BaseButton>
         </div>
     </form>
@@ -67,7 +64,7 @@ import { ref, reactive, computed, watch, onMounted } from "vue"
 import { useCustomersStore } from "@/store/customers"
 import { useBranchesStore } from "@/store/branches"
 import { useToast } from "@/composables/useToast"
-import type { CustomerAddress, CustomerAddressFormData } from "@/types/customer"
+import type { CustomerAddressFormData } from "@/types/customer"
 import BaseInput from "@/components/ui/BaseInput.vue"
 import BaseButton from "@/components/ui/BaseButton.vue"
 import GoogleMapsSelector from "@/components/ui/GoogleMapsSelector.vue"
@@ -78,17 +75,19 @@ import {
     CurrencyDollarIcon,
 } from "@heroicons/vue/24/outline"
 
+
+
+
+
 interface Props {
-    address?: CustomerAddress | null
+    addressId?: number
     modelValue: CustomerAddressFormData
-    customerId: number
-    loading?: boolean
-    branchId?: number
 }
 
-const props = withDefaults(defineProps<Props>(), {
-    loading: false,
-})
+
+
+
+const props = withDefaults(defineProps<Props>(), {})
 
 const emit = defineEmits<{
     submit: [data: CustomerAddressFormData]
@@ -97,16 +96,22 @@ const emit = defineEmits<{
 }>()
 
 const customersStore = useCustomersStore()
-const { success, error: showError } = useToast()
+const { error: showError } = useToast()
 const branchesStore = useBranchesStore()
 
 // Proxy local state with v-model
-const localForm = reactive({ ...props.modelValue })
+const localForm = reactive({
+    ...props.modelValue,
+    additionalInfo: props.modelValue.additionalInfo ?? ''
+})
 
 watch(
     () => props.modelValue,
     (newVal) => {
-        Object.assign(localForm, newVal)
+        Object.assign(localForm, {
+            ...newVal,
+            additionalInfo: newVal.additionalInfo ?? ''
+        })
     },
     { deep: true }
 )
@@ -236,15 +241,41 @@ const handleAddressBlur = () => {
     }
 }
 
-// Load neighborhoods
+// Load neighborhoods and address if editing
 onMounted(async () => {
     try {
+        // Load address data if editing
+        if (props.addressId) {
+            try {
+                const address = await customersStore.fetchAddressById(props.addressId)
+                if (address) {
+                    localForm.neighborhoodId = address.neighborhoodId
+                    localForm.address = address.address
+                    localForm.additionalInfo = address.additionalInfo ?? ''
+                    localForm.latitude = address.latitude ?? 0
+                    localForm.longitude = address.longitude ?? 0
+                    localForm.deliveryFee = address.deliveryFee
+                    localForm.isPrimary = address.isPrimary
+
+                    // Set location for map if available
+                    if (address.latitude && address.longitude) {
+                        selectedLocation.value = {
+                            lat: address.latitude,
+                            lng: address.longitude
+                        }
+                        showMapsSelector.value = true
+                        isLocationConfirmed.value = true
+                    }
+                }
+            } catch (error) {
+                console.error("Error loading address:", error)
+                showError("Error de Carga", "No se pudo cargar la dirección.")
+            }
+        }
+
+        // Load neighborhoods
         await customersStore.fetchNeighborhoods()
-        success(
-            "Barrios Cargados",
-            2000,
-            "Los barrios disponibles han sido cargados correctamente."
-        )
+
     } catch (error) {
         console.error("Error loading neighborhoods:", error)
         showError("Error de Carga", "No se pudieron cargar los barrios disponibles.")

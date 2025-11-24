@@ -155,6 +155,21 @@ export const useCustomersStore = defineStore('customers', () => {
         }
     };
 
+    // Fetch single address by ID
+    const fetchAddressById = async (addressId: number) => {
+        try {
+            isLoading.value = true;
+            error.value = null;
+            const res = await customerApi.getCustomerAddressById(addressId);
+            return res.data;
+        } catch (err: any) {
+            error.value = err.message || 'Error al cargar la dirección';
+            throw err;
+        } finally {
+            isLoading.value = false;
+        }
+    };
+
     // Create customer address
     const createAddress = async (customerId: number, payload: CreateCustomerAddressDto) => {
         try {
@@ -298,6 +313,7 @@ export const useCustomersStore = defineStore('customers', () => {
         update,
         remove,
         fetchAddresses,
+        fetchAddressById,
         createAddress,
         updateAddress,
         removeAddress,

@@ -270,9 +270,12 @@
             <!-- Create/Edit Address Dialog -->
             <BaseDialog v-model="showAddressDialog" :title="editingAddress ? 'Editar Dirección' : 'Nueva Dirección'"
                 :icon="MapPinIcon" size="lg">
-                <CustomerAddressForm :address="editingAddress" :customer-id="customerId" :loading="store.isLoading"
-                    :branch-id="customer?.branchId" v-model="addressFormData" @submit="handleAddressSubmit"
-                    @cancel="showAddressDialog = false" />
+                <CustomerAddressForm 
+                    v-model="addressFormData"
+                    :addressId="editingAddress?.id"
+                    @submit="handleAddressSubmit"
+                    @cancel="showAddressDialog = false" 
+                />
             </BaseDialog>
 
             <!-- Delete Confirmation Dialog -->

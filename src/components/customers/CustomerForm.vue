@@ -43,9 +43,32 @@
 
         <!-- Initial Address Section (only for new customers) -->
         <div v-if="!customer && form.branchId > 0" class="border-t border-gray-200 pt-6">
-            <CustomerAddressForm :address="null" :customer-id="0" :loading="loading" @submit="handleAddressSubmit"
-                @cancel="handleAddressCancel" :branch-id="form.branchId" v-model="form.initialAddress"
-                @update:model-value="handleAddressUpdate" />
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-sm font-medium text-gray-900">Dirección Inicial</h3>
+                <BaseButton @click="openAddressModal" variant="secondary" size="sm" type="button">
+                    <template #icon>
+                        <MapPinIcon class="w-4 h-4" />
+                    </template>
+                    {{ form.initialAddress?.address ? 'Editar Dirección' : 'Agregar Dirección' }}
+                </BaseButton>
+            </div>
+
+            <!-- Preview de dirección si existe -->
+            <div v-if="form.initialAddress?.address" class="bg-gray-50 p-4 rounded-lg">
+                <p class="text-sm text-gray-700">
+                    <span class="font-medium">Dirección:</span> {{ form.initialAddress.address }}
+                </p>
+                <p v-if="form.initialAddress.additionalInfo" class="text-sm text-gray-500 mt-1">
+                    {{ form.initialAddress.additionalInfo }}
+                </p>
+                <p class="text-sm text-gray-500 mt-1">
+                    <span class="font-medium">Tarifa:</span> {{ formatCurrency(form.initialAddress.deliveryFee) }}
+                </p>
+            </div>
+
+            <p v-else class="text-sm text-gray-500 italic">
+                No se ha agregado una dirección inicial (requerida para crear cliente)
+            </p>
         </div>
 
         <!-- Active Status (only for existing customers) -->
@@ -78,6 +101,11 @@
             </BaseButton>
         </div>
     </form>
+
+    <!-- Address Modal (Dual: Create or Edit) -->
+    <BaseDialog v-model="showAddressModal" title="Dirección Inicial" size="lg">
+        <CustomerAddressForm v-model="addressFormData" @submit="handleAddressSubmit" @cancel="closeAddressModal" />
+    </BaseDialog>
 </template>
 
 <script setup lang="ts">
@@ -88,11 +116,14 @@ import type { Customer, CustomerFormData } from '@/types/customer'
 import BaseInput from '@/components/ui/BaseInput.vue'
 import BaseSelect from '@/components/ui/BaseSelect.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
+import BaseDialog from '@/components/ui/BaseDialog.vue'
 import CustomerAddressForm from '@/components/customers/address/CustomerAddressForm.vue'
+import type { CustomerAddressFormData } from '@/types/customer'
 import {
     UserIcon,
     PhoneIcon,
     BuildingOffice2Icon,
+    MapPinIcon,
 } from '@heroicons/vue/24/outline'
 
 interface Props {
@@ -133,7 +164,17 @@ const form = reactive({
     }
 })
 
-const addressFormData = ref<any>(null)
+// Address modal state
+const showAddressModal = ref(false)
+const addressFormData = ref<CustomerAddressFormData>({
+    neighborhoodId: 0,
+    address: '',
+    additionalInfo: '',
+    latitude: undefined,
+    longitude: undefined,
+    isPrimary: true,
+    deliveryFee: 0
+})
 
 const errors = reactive({
     name: '',
@@ -229,36 +270,51 @@ const validateBranch = () => {
     errors.branchId = ''
 }
 
-// Address form handlers
-const handleAddressSubmit = (data: any) => {
-    addressFormData.value = data
-    // Update the form with address data
+// Address modal methods
+const openAddressModal = () => {
+    // Si ya existe una dirección, prellenar el formulario
+    if (form.initialAddress?.address) {
+        addressFormData.value = { ...form.initialAddress }
+    } else {
+        // Reset al abrir para crear nueva
+        addressFormData.value = {
+            neighborhoodId: 0,
+            address: '',
+            additionalInfo: '',
+            latitude: undefined,
+            longitude: undefined,
+            isPrimary: true,
+            deliveryFee: 0
+        }
+    }
+    showAddressModal.value = true
+}
+
+const closeAddressModal = () => {
+    showAddressModal.value = false
+}
+
+const handleAddressSubmit = (data: CustomerAddressFormData) => {
+    // Actualizar la dirección inicial en el formulario
     form.initialAddress = {
         neighborhoodId: data.neighborhoodId,
         address: data.address,
         additionalInfo: data.additionalInfo || '',
-        latitude: data.latitude,
-        longitude: data.longitude,
+        latitude: data.latitude || 0,
+        longitude: data.longitude || 0,
         isPrimary: data.isPrimary,
         deliveryFee: data.deliveryFee
     }
+    closeAddressModal()
 }
 
-const handleAddressCancel = () => {
-    addressFormData.value = null
-}
-
-const handleAddressUpdate = (data: any) => {
-    // Update the form with address data from CustomerAddressForm
-    form.initialAddress = {
-        neighborhoodId: data.neighborhoodId,
-        address: data.address,
-        additionalInfo: data.additionalInfo || '',
-        latitude: data.latitude,
-        longitude: data.longitude,
-        isPrimary: data.isPrimary,
-        deliveryFee: data.deliveryFee
-    }
+// Helper para formatear moneda
+const formatCurrency = (value: number) => {
+    return new Intl.NumberFormat('es-CO', {
+        style: 'currency',
+        currency: 'COP',
+        minimumFractionDigits: 0
+    }).format(value)
 }
 
 const validateForm = () => {
@@ -321,7 +377,15 @@ watch(() => props.customer, (newCustomer) => {
         form.phone2 = ''
         form.branchId = 0
         form.active = true
-        addressFormData.value = null
+        form.initialAddress = {
+            neighborhoodId: 0,
+            address: '',
+            additionalInfo: '',
+            latitude: 0,
+            longitude: 0,
+            isPrimary: true,
+            deliveryFee: 0
+        }
     }
 
     // Clear errors
