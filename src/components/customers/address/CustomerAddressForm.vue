@@ -23,7 +23,7 @@
                 </template>
             </BaseInput>
 
-            <BaseInput v-model="localForm.deliveryFee" label="Tarifa de Domicilio" type="number" min="0" step="100"
+            <BaseInput v-model="localForm.deliveryFee" label="Tarifa de Domicilio" type="number" :min="0" :step="100"
                 placeholder="5000" required :error="errors.deliveryFee">
                 <template #icon>
                     <CurrencyDollarIcon class="w-4 h-4" />
@@ -34,7 +34,9 @@
         <!-- Step 3: Google Maps Selector -->
         <div v-if="localForm.address.trim() && showMapsSelector">
             <GoogleMapsSelector v-model="selectedLocation" :error="errors.latitude || errors.longitude"
-                :initial-address="localForm.address" @location-confirmed="handleLocationConfirmed"
+                :initial-address="localForm.address" 
+                @location-confirmed="handleLocationConfirmed"
+                @address-updated="handleAddressUpdated"
                 :key="`maps-${address?.id || 'new'}`" />
         </div>
 
@@ -104,9 +106,7 @@ const localForm = reactive({ ...props.modelValue })
 watch(
     () => props.modelValue,
     (newVal) => {
-        console.log('CustomerAddressForm - modelValue changed:', newVal)
         Object.assign(localForm, newVal)
-        console.log('CustomerAddressForm - localForm after assign:', localForm)
     },
     { deep: true }
 )
@@ -197,10 +197,8 @@ const validateForm = () => {
     }
 
     if (Number(localForm.deliveryFee) <= 0) {
-        console.log('CustomerAddressForm - deliveryFee validation failed:', localForm.deliveryFee, typeof localForm.deliveryFee)
         errors.deliveryFee = "La tarifa de domicilio es requerida"
     } else {
-        console.log('CustomerAddressForm - deliveryFee validation passed:', localForm.deliveryFee, typeof localForm.deliveryFee)
         errors.deliveryFee = ""
     }
 }
@@ -223,6 +221,13 @@ const handleLocationConfirmed = () => {
     isLocationConfirmed.value = true
     errors.latitude = ""
     errors.longitude = ""
+}
+
+const handleAddressUpdated = (newAddress: string) => {
+    if (newAddress && newAddress.trim()) {
+        localForm.address = newAddress.trim()
+        errors.address = ""
+    }
 }
 
 const handleAddressBlur = () => {

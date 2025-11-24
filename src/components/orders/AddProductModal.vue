@@ -44,15 +44,15 @@
                         <!-- Formulario -->
                         <div class="space-y-4">
                             <!-- Cantidad -->
-                            <BaseInput label="Cantidad" v-model.number="quantity" type="number" min="1"
+                            <BaseInput label="Cantidad" v-model.number="quantity" type="number" :min="1"
                                 :error="quantityError" />
 
                             <!-- Precio unitario -->
-                            <BaseInput label="Precio Unitario" v-model.number="unitPrice" type="number" min="0"
-                                step="100" :error="unitPriceError" />
+                            <BaseInput label="Precio Unitario" v-model.number="unitPrice" type="number" :min="0"
+                                :step="100" :error="unitPriceError" />
 
                             <!-- Descuento -->
-                            <BaseInput label="Descuento" v-model.number="discount" type="number" min="0" step="100" />
+                            <BaseInput label="Descuento" v-model.number="discount" type="number" :min="0" :step="100" />
 
                             <!-- Notas -->
                             <BaseInput label="Notas (opcional)" v-model="notes"

@@ -11,13 +11,14 @@
             </BaseInput>
 
             <!-- Search Results -->
-            <div v-if="searchResults.length > 0 || searchQuery.length > 3"
+            <div v-if="searchQuery.length > 3"
                 class="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-y-auto">
-                <div v-for="(result, index) in searchResults" :key="index" @click="selectAddress(result)"
+                <div v-if="searchResults.length > 0" v-for="(result, index) in searchResults" :key="index"
+                    @click="selectAddress(result)"
                     class="px-4 py-2 hover:bg-gray-100 cursor-pointer border-b border-gray-100">
                     <div class="text-sm font-medium text-gray-900">{{ result.formatted_address }}</div>
                 </div>
-                <div v-if="searchQuery.length > 3" @click="enableManualMode"
+                <div @click="enableManualMode"
                     class="px-4 py-2 hover:bg-emerald-50 cursor-pointer border-t-2 border-emerald-200 bg-emerald-25">
                     <div class="flex items-center text-sm font-medium text-emerald-700">
                         <MapPinIcon class="w-4 h-4 mr-2" />
@@ -168,6 +169,7 @@ const props = withDefaults(defineProps<Props>(), {})
 const emit = defineEmits<{
     'update:modelValue': [location: Location | null]
     'location-confirmed': [location: Location]
+    'address-updated': [address: string]
 }>()
 
 // Reactive state
@@ -192,6 +194,7 @@ let map: any = null
 let marker: any = null
 let geocoder: any = null
 let searchTimeout: any = null
+let sessionToken: any = null
 
 // Load Google Maps script
 const loadGoogleMaps = () => {
@@ -303,6 +306,11 @@ const initializeMap = async () => {
 
         // Initialize geocoder
         geocoder = new googleMaps.Geocoder()
+
+        // Initialize session token for autocomplete
+        if (googleMaps.places && googleMaps.places.AutocompleteSessionToken) {
+            sessionToken = new googleMaps.places.AutocompleteSessionToken()
+        }
 
         // Add click listener to map
         map.addListener('click', (event: any) => {
@@ -428,39 +436,80 @@ const searchAddress = async () => {
             throw new Error('Google Maps Places API not available')
         }
 
-        const request = {
+        // Importar la librería de lugares si no está disponible
+        if (!googleMaps.places.AutocompleteSuggestion) {
+            const { AutocompleteSuggestion } = await googleMaps.importLibrary("places")
+            googleMaps.places.AutocompleteSuggestion = AutocompleteSuggestion
+        }
+
+        // Crear un nuevo session token si no existe
+        if (!sessionToken && googleMaps.places.AutocompleteSessionToken) {
+            sessionToken = new googleMaps.places.AutocompleteSessionToken()
+        }
+
+        const request: any = {
             input: searchQuery.value,
-            includedPrimaryTypes: ['address'],
-            locationRestriction: {
-                country: 'CO'
-            }
+            includedRegionCodes: ['co']
+        }
+
+        // Agregar session token si está disponible
+        if (sessionToken) {
+            request.sessionToken = sessionToken
         }
 
         const { suggestions } = await googleMaps.places.AutocompleteSuggestion.fetchAutocompleteSuggestions(request)
 
-        if (!isDestroyed.value && suggestions) {
-            // Get details for each suggestion using Place API
+        if (!isDestroyed.value && suggestions && suggestions.length > 0) {
+            // Obtener detalles para cada sugerencia
             const promises = suggestions.slice(0, 5).map(async (suggestion: any) => {
-                const place = suggestion.placePrediction.toPlace()
-                await place.fetchFields({
-                    fields: ['displayName', 'formattedAddress', 'location']
-                })
-                return {
-                    formatted_address: place.formattedAddress,
-                    geometry: {
-                        location: {
-                            lat: () => place.location.lat(),
-                            lng: () => place.location.lng()
+                try {
+                    // Verificar que sea una predicción de lugar (no de consulta)
+                    if (!suggestion.placePrediction) {
+                        return null
+                    }
+
+                    const placePrediction = suggestion.placePrediction
+
+                    // Convertir a Place object
+                    const place = placePrediction.toPlace()
+
+                    // Obtener campos necesarios
+                    await place.fetchFields({
+                        fields: ['displayName', 'formattedAddress', 'location']
+                    })
+
+                    // Verificar que tengamos los datos necesarios
+                    if (!place.formattedAddress || !place.location) {
+                        return null
+                    }
+
+                    return {
+                        formatted_address: place.formattedAddress,
+                        geometry: {
+                            location: {
+                                lat: () => place.location.lat(),
+                                lng: () => place.location.lng()
+                            }
                         }
                     }
+                } catch (error) {
+                    console.warn('Error fetching place details:', error)
+                    return null
                 }
             })
 
-            searchResults.value = await Promise.all(promises)
+            const results = await Promise.all(promises)
+            searchResults.value = results.filter(result => result !== null)
+
+            // Renovar session token después de obtener resultados
+            if (googleMaps.places.AutocompleteSessionToken) {
+                sessionToken = new googleMaps.places.AutocompleteSessionToken()
+            }
         } else {
             searchResults.value = []
         }
     } catch (err) {
+        console.error('Error in searchAddress:', err)
         if (!isDestroyed.value) {
             searchResults.value = []
         }
@@ -486,6 +535,7 @@ const selectAddress = (result: SearchResult) => {
     updateLocation(location)
     searchResults.value = []
     searchQuery.value = result.formatted_address
+    emit('address-updated', result.formatted_address)
 }
 
 // Basic methods
@@ -543,6 +593,7 @@ const confirmAddressAndLocation = () => {
 
         emit('update:modelValue', manualLocation.value)
         emit('location-confirmed', manualLocation.value)
+        emit('address-updated', editableAddress.value)
 
         // Reset manual mode
         isManualMode.value = false
@@ -586,6 +637,9 @@ onUnmounted(() => {
         clearTimeout(searchTimeout)
         searchTimeout = null
     }
+
+    // Clear session token
+    sessionToken = null
 
     // Clean up Google Maps instances
     if (marker) {

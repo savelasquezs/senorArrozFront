@@ -20,14 +20,14 @@
         </div>
 
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <BaseInput v-model.number="form.price" label="Precio" type="number" min="0" step="100" required
+            <BaseInput v-model.number="form.price" label="Precio" type="number" :min="0" :step="100" required
                 placeholder="2500" :error="errors.price" @input="validateForm">
                 <template #icon>
                     <CurrencyDollarIcon class="w-4 h-4" />
                 </template>
             </BaseInput>
 
-            <BaseInput v-if="!product" v-model.number="form.stock" label="Stock Inicial" type="number" min="0" step="1"
+            <BaseInput v-if="!product" v-model.number="form.stock" label="Stock Inicial" type="number" :min="0" :step="1"
                 placeholder="50" :error="errors.stock" @input="validateForm">
                 <template #icon>
                     <ArchiveBoxIcon class="w-4 h-4" />

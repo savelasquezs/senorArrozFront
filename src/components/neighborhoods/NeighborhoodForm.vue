@@ -10,7 +10,7 @@
         </BaseInput>
 
         <!-- Delivery Fee -->
-        <BaseInput v-model.number="form.deliveryFee" label="Tarifa de Domicilio" type="number" min="0" step="100"
+        <BaseInput v-model.number="form.deliveryFee" label="Tarifa de Domicilio" type="number" :min="0" :step="100"
             placeholder="5000" required :error="errors.deliveryFee">
             <template #icon>
                 <CurrencyDollarIcon class="w-4 h-4" />
