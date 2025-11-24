@@ -68,7 +68,6 @@ onMounted(async () => {
     ])
 
     // Crear mapa
-    const mapId = import.meta.env.VITE_GOOGLE_MAPS_MAP_ID
     if (!mapId) {
         console.warn('⚠️ Falta VITE_GOOGLE_MAPS_MAP_ID. Los Advanced Markers no funcionarán.')
     }
