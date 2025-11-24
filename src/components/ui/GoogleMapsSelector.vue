@@ -171,6 +171,9 @@ const initializeMap = async () => {
             throw new Error('Google Maps not available or not fully loaded')
         }
 
+        // Get Map ID from environment variable
+        const mapId = import.meta.env.VITE_GOOGLE_MAPS_MAP_ID
+
         map = new googleMaps.Map(mapContainer.value, {
             center: defaultLocation,
             zoom: 15,
@@ -178,7 +181,7 @@ const initializeMap = async () => {
             streetViewControl: false,
             fullscreenControl: false,
             zoomControl: true,
-            mapId: 'DEMO_MAP_ID' // Map ID for Advanced Markers
+            ...(mapId && { mapId }) // Map ID for Advanced Markers (only if configured)
         })
 
         // Check if component was destroyed during initialization
