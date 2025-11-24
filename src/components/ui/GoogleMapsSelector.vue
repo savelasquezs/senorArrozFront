@@ -181,14 +181,22 @@ const initializeMap = async () => {
             throw new Error('Google Maps not available or not fully loaded')
         }
 
-        // Get Map ID from environment variable
-        const mapId = import.meta.env.VITE_GOOGLE_MAPS_MAP_ID
+        // Get Map ID from environment variable with robust validation
+        const mapIdRaw = import.meta.env.VITE_GOOGLE_MAPS_MAP_ID
         const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY
+
+        // Ensure mapId is a valid non-empty string
+        const mapId = mapIdRaw && typeof mapIdRaw === 'string' && mapIdRaw.trim() !== ''
+            ? mapIdRaw.trim()
+            : undefined
 
         // Debug logs before creating map
         console.log('🔍 [GoogleMapsSelector] Initializing map with config:', {
             apiKey: apiKey ? `${apiKey.substring(0, 10)}...${apiKey.substring(apiKey.length - 4)}` : 'NOT SET',
-            mapId: mapId || 'NOT SET',
+            mapIdRaw: mapIdRaw || 'NOT SET',
+            mapIdProcessed: mapId || 'NOT SET',
+            mapIdType: typeof mapIdRaw,
+            mapIdLength: mapId?.length || 0,
             hasApiKey: !!apiKey,
             hasMapId: !!mapId,
             willUseMapId: !!mapId
@@ -203,12 +211,12 @@ const initializeMap = async () => {
             zoomControl: true
         }
 
-        // Only add mapId if it's set
+        // Only add mapId if it's a valid string
         if (mapId) {
             mapConfig.mapId = mapId
             console.log('✅ [GoogleMapsSelector] Using Map ID:', mapId)
         } else {
-            console.warn('⚠️ [GoogleMapsSelector] Map ID not set, using default map style')
+            console.warn('⚠️ [GoogleMapsSelector] Map ID not valid, using default map style')
         }
 
         map = new googleMaps.Map(mapContainer.value, mapConfig)
