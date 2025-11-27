@@ -233,6 +233,16 @@ const routes: RouteRecordRaw[] = [
             title: 'Domicilios'
         }
     },
+    {
+        path: '/deliverymen',
+        name: 'DeliverymenManagement',
+        component: () => import('@/views/DeliverymenManagementView.vue'),
+        meta: {
+            requiresAuth: true,
+            requiresRole: [UserRole.ADMIN, UserRole.CASHIER],
+            title: 'Gestión de Domiciliarios'
+        }
+    },
     //   {
     //     path: '/customers',
     //     name: 'Customers',

@@ -125,6 +125,12 @@ const navigationItems = computed(() => [
 		roles: ['Deliveryman'],
 	},
 	{
+		name: 'Gestión Domiciliarios',
+		to: '/deliverymen',
+		icon: TruckIcon,
+		roles: ['Admin', 'Cashier'],
+	},
+	{
 		name: 'Clientes',
 		to: '/customers',
 		icon: UsersIcon,
