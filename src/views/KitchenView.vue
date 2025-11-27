@@ -1,61 +1,64 @@
 <template>
     <MainLayout>
-        <div class="p-6 space-y-6">
-            <div class="flex items-center justify-between">
+        <div class="p-3 sm:p-4 md:p-6 space-y-4 sm:space-y-5 md:space-y-6">
+            <!-- Header responsive -->
+            <div class="space-y-3 sm:space-y-0 sm:flex sm:items-center sm:justify-between">
+                <!-- Título -->
                 <div>
-                    <h1 class="text-3xl font-bold text-gray-900">Cocina</h1>
-                    <p class="text-gray-600 mt-1">Gestión de pedidos en preparación</p>
+                    <h1 class="text-2xl sm:text-3xl font-bold text-gray-900">Cocina</h1>
+                    <p class="text-sm sm:text-base text-gray-600 mt-0.5 sm:mt-1">Gestión de pedidos en preparación</p>
                 </div>
 
-                <div class="flex items-center gap-4">
+                <!-- Controles -->
+                <div class="flex items-center gap-2 sm:gap-3 md:gap-4 flex-wrap">
                     <div :class="[
-                        'flex items-center gap-2 px-3 py-1 rounded-lg text-sm',
+                        'flex items-center gap-1.5 sm:gap-2 px-2 sm:px-3 py-1 rounded-lg text-xs sm:text-sm',
                         isConnected ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
                     ]">
-                        <span :class="['w-2 h-2 rounded-full', isConnected ? 'bg-green-500' : 'bg-red-500']"></span>
-                        {{ isConnected ? 'Conectado' : 'Desconectado' }}
+                        <span :class="['w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full', isConnected ? 'bg-green-500' : 'bg-red-500']"></span>
+                        <span class="whitespace-nowrap">{{ isConnected ? 'Conectado' : 'Desconectado' }}</span>
                     </div>
 
                     <button @click="toggleSound" :class="[
-                        'p-2 rounded-lg transition-colors',
+                        'p-1.5 sm:p-2 rounded-lg transition-colors',
                         soundEnabled ? 'bg-emerald-100 text-emerald-600' : 'bg-gray-100 text-gray-400'
-                    ]">
-                        <component :is="soundEnabled ? SpeakerWaveIcon : SpeakerXMarkIcon" class="w-6 h-6" />
+                    ]" :title="soundEnabled ? 'Desactivar sonido' : 'Activar sonido'">
+                        <component :is="soundEnabled ? SpeakerWaveIcon : SpeakerXMarkIcon" class="w-5 h-5 sm:w-6 sm:h-6" />
                     </button>
 
                     <BaseButton @click="refreshOrders" variant="outline" size="sm" :loading="isLoading">
-                        <span class="flex items-center gap-2">
-                            <ArrowPathIcon class="w-4 h-4" />
-                            Actualizar
+                        <span class="flex items-center gap-1 sm:gap-2">
+                            <ArrowPathIcon class="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                            <span class="text-xs sm:text-sm">Actualizar</span>
                         </span>
                     </BaseButton>
                 </div>
             </div>
 
-            <div class="border-b border-gray-200">
-                <nav class="-mb-px flex space-x-8">
+            <div class="border-b border-gray-200 -mx-3 px-3 sm:mx-0 sm:px-0">
+                <nav class="-mb-px flex space-x-4 sm:space-x-6 md:space-x-8 overflow-x-auto">
                     <button @click="activeTab = 'active'" :class="[
-                        'py-4 px-1 border-b-2 font-medium text-sm transition-colors',
+                        'py-3 sm:py-4 px-1 border-b-2 font-medium text-xs sm:text-sm transition-colors whitespace-nowrap flex-shrink-0',
                         activeTab === 'active'
                             ? 'border-emerald-500 text-emerald-600'
                             : 'border-transparent text-gray-500 hover:text-gray-700'
                     ]">
-                        Pedidos Activos
+                        <span>Pedidos Activos</span>
                         <span v-if="activeOrders.length > 0"
-                            class="ml-2 py-0.5 px-2 rounded-full text-xs bg-emerald-100 text-emerald-600">
+                            class="ml-1.5 sm:ml-2 py-0.5 px-1.5 sm:px-2 rounded-full text-[10px] sm:text-xs bg-emerald-100 text-emerald-600">
                             {{ activeOrders.length }}
                         </span>
                     </button>
 
                     <button @click="activeTab = 'ready'" :class="[
-                        'py-4 px-1 border-b-2 font-medium text-sm transition-colors',
+                        'py-3 sm:py-4 px-1 border-b-2 font-medium text-xs sm:text-sm transition-colors whitespace-nowrap flex-shrink-0',
                         activeTab === 'ready'
                             ? 'border-emerald-500 text-emerald-600'
                             : 'border-transparent text-gray-500 hover:text-gray-700'
                     ]">
-                        Pedidos Listos
+                        <span>Pedidos Listos</span>
                         <span v-if="readyOrders.length > 0"
-                            class="ml-2 py-0.5 px-2 rounded-full text-xs bg-green-100 text-green-600">
+                            class="ml-1.5 sm:ml-2 py-0.5 px-1.5 sm:px-2 rounded-full text-[10px] sm:text-xs bg-green-100 text-green-600">
                             {{ readyOrders.length }}
                         </span>
                     </button>
@@ -194,7 +197,7 @@ const executeStatusChange = async (orderIds: number[], newStatus: OrderStatus) =
             await ordersStore.updateStatus(orderId, newStatus)
         }
 
-        success(`${orderIds.length} pedido(s) actualizado(s)`)
+        success(`${orderIds.length} pedido(s) actualizado(s)`, 5000)
         await loadOrders()
 
         if (cardGridRef.value) {
@@ -229,7 +232,7 @@ const toggleSound = () => {
 
 const handleReprint = (orderId: number) => {
     console.log('TODO: Reimprimir pedido:', orderId)
-    success('Función de impresión pendiente de configuración')
+    success('Función de impresión pendiente de configuración', 5000)
 }
 
 onMounted(async () => {
