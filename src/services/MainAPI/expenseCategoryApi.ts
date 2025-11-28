@@ -64,3 +64,4 @@ class ExpenseCategoryApi extends BaseApi {
 
 export const expenseCategoryApi = new ExpenseCategoryApi();
 
+

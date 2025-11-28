@@ -434,3 +434,4 @@ onMounted(() => {
     fetchExpenses()
 })
 </script>
+
