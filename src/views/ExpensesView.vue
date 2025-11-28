@@ -292,6 +292,36 @@ const normalizedFilters = computed<ExpenseFilterState>(() => ({
     expenseName: localFilters.value.expenseName || ''
 }))
 
+const normalizeExpense = (header: ExpenseHeader): ExpenseHeader => {
+    const normalizedDetails = header.expenseDetails.map(detail => {
+        const computedTotal = detail.total ?? (detail.amount * detail.quantity)
+        return {
+            ...detail,
+            total: computedTotal,
+        }
+    })
+
+    const total = normalizedDetails.reduce((sum, detail) => sum + (detail.total || 0), 0)
+    const derivedCategories = normalizedDetails
+        .map(detail => detail.expenseCategoryName)
+        .filter((name): name is string => Boolean(name))
+    const derivedBanks = header.expenseBankPayments
+        .map(payment => payment.bankName)
+        .filter((name): name is string => Boolean(name))
+
+    return {
+        ...header,
+        expenseDetails: normalizedDetails,
+        total,
+        categoryNames: header.categoryNames.length > 0
+            ? header.categoryNames
+            : Array.from(new Set(derivedCategories)),
+        bankNames: header.bankNames.length > 0
+            ? header.bankNames
+            : Array.from(new Set(derivedBanks)),
+    }
+}
+
 const filteredExpenses = computed(() => {
     return applyAllFilters(expenses.value, normalizedFilters.value)
 })
@@ -339,7 +369,7 @@ const fetchExpenses = async () => {
             sortOrder: sortOrder.value,
         })
 
-        expenses.value = response.items
+        expenses.value = response.items.map(normalizeExpense)
         totalCount.value = response.totalCount
     } catch (err: any) {
         error('Error al cargar gastos', err.message)
@@ -395,7 +425,7 @@ const handleViewDetail = async (expense: ExpenseHeader) => {
     showDetailModal.value = true
     try {
         const detail = await expenseHeaderApi.getExpenseHeaderById(expense.id)
-        selectedExpense.value = detail
+        selectedExpense.value = normalizeExpense(detail)
     } catch (err: any) {
         error('Error al cargar detalle', err.message)
         showDetailModal.value = false
@@ -449,32 +479,22 @@ const closeFormModal = () => {
 }
 
 const handleSubmitExpense = async (expense: ExpenseHeader) => {
-    const ensureTotal = (header: ExpenseHeader): ExpenseHeader => {
-        if (header.total !== null && header.total !== undefined) {
-            return header
-        }
-
-        const calculatedTotal = header.expenseDetails.reduce((sum, detail) => {
-            const detailTotal = detail.total ?? detail.amount * detail.quantity
-            return sum + detailTotal
-        }, 0)
-
-        return {
-            ...header,
-            total: calculatedTotal
-        }
-    }
-
-    const enrichedExpense = ensureTotal(expense)
+    const enrichedExpense = normalizeExpense(expense)
 
     // Actualización optimista
     const index = expenses.value.findIndex(e => e.id === enrichedExpense.id)
     if (index !== -1) {
-        expenses.value[index] = enrichedExpense
+        const updatedExpenses = [...expenses.value]
+        updatedExpenses.splice(index, 1, enrichedExpense)
+        expenses.value = updatedExpenses
     } else {
         // Es nuevo, agregar al inicio
-        expenses.value.unshift(enrichedExpense)
+        expenses.value = [enrichedExpense, ...expenses.value]
         totalCount.value++
+    }
+
+    if (selectedExpense.value?.id === enrichedExpense.id) {
+        selectedExpense.value = enrichedExpense
     }
 
     closeFormModal()

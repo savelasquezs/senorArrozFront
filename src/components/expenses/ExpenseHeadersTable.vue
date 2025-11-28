@@ -153,7 +153,10 @@ const formatTime = (dateString: string) => {
 }
 
 const calculateTotal = (expense: ExpenseHeader) => {
-    return expense.expenseDetails.reduce((sum, detail) => sum + (detail.total || 0), 0)
+    return expense.expenseDetails.reduce((sum, detail) => {
+        const detailTotal = detail.total ?? (detail.amount * detail.quantity)
+        return sum + detailTotal
+    }, 0)
 }
 
 const SortIcon = defineComponent({

@@ -147,7 +147,7 @@
                     </div>
                     <div class="flex justify-between text-sm mt-2 pt-2 border-t border-gray-300">
                         <span class="font-medium text-gray-700">
-                            {{ formData.expenseBankPayments.length > 0 ? 'Diferencia (Efectivo):' : 'Total a Pagar                            (Efectivo):' }}
+                            {{ formData.expenseBankPayments.length > 0 ? 'Diferencia (Efectivo):' : 'Total a Pagar                                (Efectivo): ' }}
                         </span>
                         <span class="font-semibold" :class="cashDifference >= 0 ? 'text-green-600' : 'text-red-600'">
                             {{ formatCurrency(cashDifference) }}
@@ -292,66 +292,67 @@ onMounted(async () => {
 })
 
 // Inicializar formulario cuando se abre el modal
-watch(() => props.isOpen, async (isOpen) => {
-    if (isOpen) {
-        if (props.editingExpense) {
-            // Modo edición
-            const details = await Promise.all(
-                props.editingExpense.expenseDetails.map(async (detail) => {
-                    // Calcular el total desde el unitario y cantidad
-                    const total = detail.amount * detail.quantity
+const initializeForm = async () => {
+    if (!props.isOpen) {
+        return
+    }
 
-                    // Cargar la unidad del gasto y actualizar el nombre para mostrar "nombre - unidad"
-                    let expenseUnit = detail.expenseUnit
-                    let expenseName = detail.expenseName
+    if (props.editingExpense) {
+        const details = await Promise.all(
+            props.editingExpense.expenseDetails.map(async (detail) => {
+                const total = detail.amount * detail.quantity
+                let expenseUnit = detail.expenseUnit
+                let expenseName = detail.expenseName
 
-                    if (detail.expenseId > 0) {
-                        try {
-                            const response = await expenseApi.getExpenseById(detail.expenseId)
-                            if (response.isSuccess && response.data) {
-                                expenseUnit = response.data.unitDisplay
-                                expenseName = `${response.data.name} - ${response.data.unitDisplay}`
-                            }
-                        } catch (err) {
-                            console.error('Error loading expense unit:', err)
+                if (detail.expenseId > 0) {
+                    try {
+                        const response = await expenseApi.getExpenseById(detail.expenseId)
+                        if (response.isSuccess && response.data) {
+                            expenseUnit = response.data.unitDisplay
+                            expenseName = `${response.data.name} - ${response.data.unitDisplay}`
                         }
+                    } catch (err) {
+                        console.error('Error loading expense unit:', err)
                     }
+                }
 
-                    return {
-                        expenseId: detail.expenseId,
-                        quantity: detail.quantity,
-                        amount: detail.amount,
-                        total: total,
-                        tempId: `detail-${detail.id}`,
-                        expenseName: expenseName,
-                        expenseUnit: expenseUnit,
-                    }
-                })
-            )
+                return {
+                    expenseId: detail.expenseId,
+                    quantity: detail.quantity,
+                    amount: detail.amount,
+                    total,
+                    tempId: `detail-${detail.id}`,
+                    expenseName,
+                    expenseUnit,
+                }
+            })
+        )
 
-            formData.value = {
-                supplierId: props.editingExpense.supplierId,
-                expenseDetails: details,
-                expenseBankPayments: props.editingExpense.expenseBankPayments.map(payment => ({
-                    bankId: payment.bankId,
-                    amount: payment.amount,
-                    tempId: `payment-${payment.id}`,
-                })),
-            }
-            await ensureSupplierOption(formData.value.supplierId)
-        } else {
-            // Modo creación
-            formData.value = {
-                supplierId: null,
-                expenseDetails: [],
-                expenseBankPayments: [],
-            }
-            if (supplierOptions.value.length === 0) {
-                await loadSuppliers()
-            }
+        formData.value = {
+            supplierId: props.editingExpense.supplierId,
+            expenseDetails: details,
+            expenseBankPayments: props.editingExpense.expenseBankPayments.map(payment => ({
+                bankId: payment.bankId,
+                amount: payment.amount,
+                tempId: `payment-${payment.id}`,
+            })),
+        }
+        await ensureSupplierOption(formData.value.supplierId)
+    } else {
+        formData.value = {
+            supplierId: null,
+            expenseDetails: [],
+            expenseBankPayments: [],
+        }
+        if (supplierOptions.value.length === 0) {
+            await loadSuppliers()
         }
     }
-})
+}
+
+watch([() => props.isOpen, () => props.editingExpense], async () => {
+    await initializeForm()
+}, { immediate: true })
 
 // Computed
 const totalExpenses = computed(() => {
