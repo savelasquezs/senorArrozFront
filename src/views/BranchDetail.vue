@@ -192,7 +192,7 @@
                             <h3 class="text-lg font-semibold text-gray-900">
                                 Bancos
                                 <span class="text-sm font-normal text-gray-500">({{ banksStore.list?.totalCount || 0
-                                    }})</span>
+                                }})</span>
                             </h3>
                             <BaseButton v-if="canManageBanks" @click="openCreateBank" variant="primary" size="sm"
                                 :icon="PlusIcon">
@@ -302,7 +302,7 @@
                             <h3 class="text-lg font-semibold text-gray-900">
                                 Apps de Pago
                                 <span class="text-sm font-normal text-gray-500">({{ appsStore.list?.totalCount || 0
-                                    }})</span>
+                                }})</span>
                             </h3>
                             <BaseButton v-if="canManageApps" @click="openCreateApp" variant="primary" size="sm"
                                 :icon="PlusIcon">
@@ -415,6 +415,46 @@
                         </div>
                     </div>
                 </BaseCard>
+
+                <!-- Expenses Section -->
+                <BaseCard>
+                    <div class="space-y-4">
+                        <!-- Tabs -->
+                        <div class="border-b border-gray-200">
+                            <nav class="-mb-px flex space-x-8">
+                                <button @click="expensesActiveTab = 'categories'" :class="[
+                                    expensesActiveTab === 'categories'
+                                        ? 'border-green-500 text-green-600'
+                                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300',
+                                    'whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm'
+                                ]">
+                                    Categorías
+                                </button>
+                                <button @click="expensesActiveTab = 'expenses'" :class="[
+                                    expensesActiveTab === 'expenses'
+                                        ? 'border-green-500 text-green-600'
+                                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300',
+                                    'whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm'
+                                ]">
+                                    Gastos
+                                </button>
+                            </nav>
+                        </div>
+
+                        <!-- Categories Tab -->
+                        <ExpenseCategoriesTable v-if="expensesActiveTab === 'categories'" :list="expenseCategoriesList"
+                            :loading="expenseCategoriesLoading" @create="openCreateExpenseCategory"
+                            @edit="openEditExpenseCategory" @delete="deleteExpenseCategory"
+                            @previous-page="previousExpenseCategoryPage" @next-page="nextExpenseCategoryPage" />
+
+                        <!-- Expenses Tab -->
+                        <ExpensesTable v-if="expensesActiveTab === 'expenses'" :list="expensesList"
+                            :categories="expenseCategoriesList?.items || []" :loading="expensesLoading"
+                            @create="openCreateExpense" @edit="openEditExpense" @delete="deleteExpense"
+                            @filter-change="onExpenseFilterChange" @search-change="onExpenseSearchChange"
+                            @previous-page="previousExpensePage" @next-page="nextExpensePage" />
+                    </div>
+                </BaseCard>
             </div>
 
             <!-- Edit Branch Dialog -->
@@ -465,6 +505,18 @@
                 <AppForm :app="editingApp" :loading="appsStore.isLoading" @submit="handleAppSubmit"
                     @cancel="showAppForm = false" />
             </BaseDialog>
+
+            <!-- Expense Category Form Dialog -->
+            <ExpenseCategoryFormModal :is-open="showExpenseCategoryForm" :editing-category="editingExpenseCategory"
+                :loading="expenseCategoryFormLoading" @close="showExpenseCategoryForm = false"
+                @submit="handleExpenseCategorySubmit" />
+
+            <!-- Expense Form Dialog -->
+            <BaseDialog v-model="showExpenseForm" :title="editingExpense ? 'Editar Gasto' : 'Nuevo Gasto'"
+                :icon="CurrencyDollarIcon" size="lg">
+                <ExpenseForm :expense="editingExpense" :categories="allExpenseCategories" :loading="expenseFormLoading"
+                    @submit="handleExpenseSubmit" @cancel="showExpenseForm = false" />
+            </BaseDialog>
         </div>
     </MainLayout>
 </template>
@@ -488,6 +540,14 @@ import BranchUsersTable from '@/components/branches/BranchUsersTable.vue'
 import BranchForm from '@/components/branches/BranchForm.vue'
 import BankForm from '@/components/payments/banks/BankForm.vue'
 import AppForm from '@/components/payments/apps/AppForm.vue'
+import ExpenseCategoriesTable from '@/components/expenses/ExpenseCategoriesTable.vue'
+import ExpensesTable from '@/components/expenses/ExpensesTable.vue'
+import ExpenseCategoryFormModal from '@/components/expenses/ExpenseCategoryFormModal.vue'
+import ExpenseForm from '@/components/expenses/ExpenseForm.vue'
+import { expenseCategoryApi } from '@/services/MainAPI/expenseCategoryApi'
+import { expenseApi } from '@/services/MainAPI/expenseApi'
+import type { ExpenseCategory, CreateExpenseCategoryDto, Expense, CreateExpenseDto, UpdateExpenseDto } from '@/types/expense'
+import type { PagedResult } from '@/types/common'
 import {
     BuildingOffice2Icon,
     PencilIcon,
@@ -501,7 +561,8 @@ import {
     ExclamationTriangleIcon,
     PlusIcon,
     BuildingLibraryIcon,
-    DevicePhoneMobileIcon
+    DevicePhoneMobileIcon,
+    CurrencyDollarIcon
 } from '@heroicons/vue/24/outline'
 import type { User } from '@/types/user'
 import type { Bank, BankFormData } from '@/types/bank'
@@ -522,6 +583,27 @@ const showBankForm = ref(false)
 const showAppForm = ref(false)
 const editingBank = ref<Bank | null>(null)
 const editingApp = ref<App | null>(null)
+
+// Expenses state
+const expensesActiveTab = ref<'categories' | 'expenses'>('categories')
+const expenseCategoriesList = ref<PagedResult<ExpenseCategory> | null>(null)
+const expenseCategoriesLoading = ref(false)
+const expenseCategoriesPage = ref(1)
+const expenseCategoriesPageSize = ref(10)
+const showExpenseCategoryForm = ref(false)
+const editingExpenseCategory = ref<ExpenseCategory | null>(null)
+const expenseCategoryFormLoading = ref(false)
+
+const expensesList = ref<PagedResult<Expense> | null>(null)
+const expensesLoading = ref(false)
+const expensesPage = ref(1)
+const expensesPageSize = ref(10)
+const expensesCategoryFilter = ref<number | null>(null)
+const expensesNameFilter = ref('')
+const showExpenseForm = ref(false)
+const editingExpense = ref<Expense | null>(null)
+const expenseFormLoading = ref(false)
+const allExpenseCategories = ref<ExpenseCategory[]>([])
 
 const branchId = computed(() => Number(route.params.id))
 
@@ -704,6 +786,183 @@ const deleteApp = async (app: App) => {
         } catch (error: any) {
             showError('Error al eliminar app', error.message || 'No se pudo eliminar la app')
         }
+    }
+}
+
+// Expense Categories Methods
+const loadExpenseCategories = async () => {
+    try {
+        expenseCategoriesLoading.value = true
+        const response = await expenseCategoryApi.getExpenseCategories({
+            page: expenseCategoriesPage.value,
+            pageSize: expenseCategoriesPageSize.value
+        })
+        if (response.isSuccess && response.data) {
+            expenseCategoriesList.value = response.data
+        }
+    } catch (error: any) {
+        showError('Error al cargar categorías', error.message || 'No se pudieron cargar las categorías')
+    } finally {
+        expenseCategoriesLoading.value = false
+    }
+}
+
+const loadAllExpenseCategories = async () => {
+    try {
+        const response = await expenseCategoryApi.getAllExpenseCategories()
+        if (response.isSuccess && response.data) {
+            allExpenseCategories.value = response.data
+        }
+    } catch (error: any) {
+        console.error('Error loading all categories:', error)
+    }
+}
+
+const openCreateExpenseCategory = () => {
+    editingExpenseCategory.value = null
+    showExpenseCategoryForm.value = true
+}
+
+const openEditExpenseCategory = (category: ExpenseCategory) => {
+    editingExpenseCategory.value = category
+    showExpenseCategoryForm.value = true
+}
+
+const handleExpenseCategorySubmit = async (data: CreateExpenseCategoryDto) => {
+    try {
+        expenseCategoryFormLoading.value = true
+        if (editingExpenseCategory.value) {
+            await expenseCategoryApi.updateExpenseCategory(editingExpenseCategory.value.id, data)
+            success('Categoría actualizada', 3000, `La categoría "${data.name}" se ha actualizado correctamente`)
+        } else {
+            await expenseCategoryApi.createExpenseCategory(data)
+            success('Categoría creada', 3000, `La categoría "${data.name}" se ha creado correctamente`)
+        }
+        showExpenseCategoryForm.value = false
+        editingExpenseCategory.value = null
+        await loadExpenseCategories()
+        await loadAllExpenseCategories()
+    } catch (error: any) {
+        showError('Error al guardar categoría', error.message || 'No se pudo guardar la categoría')
+    } finally {
+        expenseCategoryFormLoading.value = false
+    }
+}
+
+const deleteExpenseCategory = async (category: ExpenseCategory) => {
+    if (!confirm(`¿Estás seguro de que deseas eliminar la categoría "${category.name}"?`)) {
+        return
+    }
+    try {
+        await expenseCategoryApi.deleteExpenseCategory(category.id)
+        success('Categoría eliminada', 3000, `La categoría "${category.name}" se ha eliminado correctamente`)
+        await loadExpenseCategories()
+        await loadAllExpenseCategories()
+    } catch (error: any) {
+        showError('Error al eliminar categoría', error.message || 'No se pudo eliminar la categoría')
+    }
+}
+
+const previousExpenseCategoryPage = async () => {
+    if (expenseCategoriesList.value?.hasPreviousPage) {
+        expenseCategoriesPage.value--
+        await loadExpenseCategories()
+    }
+}
+
+const nextExpenseCategoryPage = async () => {
+    if (expenseCategoriesList.value?.hasNextPage) {
+        expenseCategoriesPage.value++
+        await loadExpenseCategories()
+    }
+}
+
+// Expenses Methods
+const loadExpenses = async () => {
+    try {
+        expensesLoading.value = true
+        const response = await expenseApi.getExpenses({
+            categoryId: expensesCategoryFilter.value || undefined,
+            name: expensesNameFilter.value || undefined,
+            page: expensesPage.value,
+            pageSize: expensesPageSize.value
+        })
+        if (response.isSuccess && response.data) {
+            expensesList.value = response.data
+        }
+    } catch (error: any) {
+        showError('Error al cargar gastos', error.message || 'No se pudieron cargar los gastos')
+    } finally {
+        expensesLoading.value = false
+    }
+}
+
+const openCreateExpense = () => {
+    editingExpense.value = null
+    showExpenseForm.value = true
+}
+
+const openEditExpense = (expense: Expense) => {
+    editingExpense.value = expense
+    showExpenseForm.value = true
+}
+
+const handleExpenseSubmit = async (data: CreateExpenseDto | UpdateExpenseDto) => {
+    try {
+        expenseFormLoading.value = true
+        if (editingExpense.value) {
+            await expenseApi.updateExpense(editingExpense.value.id, data as UpdateExpenseDto)
+            success('Gasto actualizado', 3000, `El gasto "${data.name}" se ha actualizado correctamente`)
+        } else {
+            await expenseApi.createExpense(data as CreateExpenseDto)
+            success('Gasto creado', 3000, `El gasto "${data.name}" se ha creado correctamente`)
+        }
+        showExpenseForm.value = false
+        editingExpense.value = null
+        await loadExpenses()
+    } catch (error: any) {
+        showError('Error al guardar gasto', error.message || 'No se pudo guardar el gasto')
+    } finally {
+        expenseFormLoading.value = false
+    }
+}
+
+const deleteExpense = async (expense: Expense) => {
+    if (!confirm(`¿Estás seguro de que deseas eliminar el gasto "${expense.name}"?`)) {
+        return
+    }
+    try {
+        await expenseApi.deleteExpense(expense.id)
+        success('Gasto eliminado', 3000, `El gasto "${expense.name}" se ha eliminado correctamente`)
+        await loadExpenses()
+    } catch (error: any) {
+        showError('Error al eliminar gasto', error.message || 'No se pudo eliminar el gasto')
+    }
+}
+
+const onExpenseFilterChange = async (categoryId: number | null) => {
+    expensesCategoryFilter.value = categoryId
+    expensesPage.value = 1
+    await loadExpenses()
+}
+
+const onExpenseSearchChange = async (name: string) => {
+    expensesNameFilter.value = name
+    expensesPage.value = 1
+    await loadExpenses()
+}
+
+const previousExpensePage = async () => {
+    if (expensesList.value?.hasPreviousPage) {
+        expensesPage.value--
+        await loadExpenses()
+    }
+}
+
+const nextExpensePage = async () => {
+    if (expensesList.value?.hasNextPage) {
+        expensesPage.value++
+        await loadExpenses()
     }
 }
 

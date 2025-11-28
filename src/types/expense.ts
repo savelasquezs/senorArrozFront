@@ -84,3 +84,67 @@ export interface ExpenseHeaderFilters {
 
 export type ExpenseHeaderListResult = PagedResult<ExpenseHeader>
 
+// Expense Category types
+export interface ExpenseCategory {
+    id: number
+    name: string
+    createdAt: string
+    updatedAt: string
+    totalExpenses: number
+}
+
+export interface CreateExpenseCategoryDto {
+    name: string
+}
+
+export interface UpdateExpenseCategoryDto {
+    name: string
+}
+
+export interface ExpenseCategoryFilters {
+    name?: string
+    page: number
+    pageSize: number
+    sortBy?: string
+    sortOrder?: 'asc' | 'desc'
+}
+
+export type ExpenseCategoryListResult = PagedResult<ExpenseCategory>
+
+// Expense types
+export type ExpenseUnit = 'Unit' | 'Kilo' | 'Package' | 'Pound' | 'Gallon'
+
+export interface Expense {
+    id: number
+    name: string
+    categoryId: number
+    categoryName: string
+    unit: ExpenseUnit
+    unitDisplay: string
+    createdAt: string
+    updatedAt: string
+}
+
+export interface CreateExpenseDto {
+    name: string
+    categoryId: number
+    unit: ExpenseUnit
+}
+
+export interface UpdateExpenseDto {
+    name: string
+    categoryId: number
+    unit: ExpenseUnit
+}
+
+export interface ExpenseFilters {
+    categoryId?: number
+    name?: string
+    page: number
+    pageSize: number
+    sortBy?: string
+    sortOrder?: 'asc' | 'desc'
+}
+
+export type ExpenseListResult = PagedResult<Expense>
+

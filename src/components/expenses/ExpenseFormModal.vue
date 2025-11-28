@@ -32,36 +32,63 @@
                     <p class="text-xs mt-1">Haz clic en "Agregar" para comenzar</p>
                 </div>
 
-                <div v-else class="space-y-3">
-                    <div v-for="(detail, index) in formData.expenseDetails" :key="detail.tempId"
-                        class="border rounded-lg p-4 bg-gray-50">
-                        <div class="flex items-start justify-between mb-3">
-                            <h5 class="text-sm font-medium text-gray-700">Detalle {{ index + 1 }}</h5>
-                            <BaseButton type="button" variant="ghost" size="sm" @click="removeDetail(index)">
-                                <TrashIcon class="w-4 h-4 text-red-600" />
-                            </BaseButton>
+                <div v-else>
+                    <!-- Header de columnas -->
+                    <div class="flex items-center gap-2 mb-2 pb-2 border-b border-gray-300">
+                        <div class="flex-1 min-w-[220px]">
+                            <span class="text-xs font-semibold text-gray-700 uppercase">Gasto</span>
                         </div>
+                        <div class="w-20">
+                            <span class="text-xs font-semibold text-gray-700 uppercase">Cant.</span>
+                        </div>
+                        <div class="w-28">
+                            <span class="text-xs font-semibold text-gray-700 uppercase">Total</span>
+                        </div>
+                        <div class="w-28">
+                            <span class="text-xs font-semibold text-gray-700 uppercase">Unit.</span>
+                        </div>
+                        <div class="w-10"></div>
+                    </div>
 
-                        <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
-                            <div>
-                                <label class="block text-xs font-medium text-gray-600 mb-1">Gasto</label>
-                                <BaseInput v-model="detail.expenseName" placeholder="Nombre del gasto..." required />
-                                <p class="text-xs text-gray-400 mt-1">
-                                    Nota: Se necesita API de expenses para autocompletado
-                                </p>
+                    <!-- Filas de gastos -->
+                    <div class="space-y-1.5">
+                        <div v-for="(detail, index) in formData.expenseDetails" :key="detail.tempId"
+                            class="flex items-center gap-2 border rounded-md p-2 bg-white hover:bg-gray-50 transition-colors">
+                            <!-- Gasto (más ancho) -->
+                            <div class="flex-1 min-w-[220px]">
+                                <BaseSelect v-model="detail.expenseId" :options="expenseOptions"
+                                    placeholder="Buscar gasto..." value-key="value" display-key="label" searchable
+                                    required @update:model-value="onExpenseSelected(index, $event)" />
                             </div>
-                            <div>
-                                <label class="block text-xs font-medium text-gray-600 mb-1">Cantidad</label>
-                                <BaseInput v-model.number="detail.quantity" type="number" :min="1" required />
+
+                            <!-- Cantidad -->
+                            <div class="w-20">
+                                <BaseInput v-model.number="detail.quantity" type="number" :min="1" required
+                                    @input="updateUnitPrice(index)" />
                             </div>
-                            <div>
-                                <label class="block text-xs font-medium text-gray-600 mb-1">Precio Unitario</label>
-                                <BaseInput v-model.number="detail.amount" type="number" :min="0" step="100" required />
+
+                            <!-- Total -->
+                            <div class="w-28">
+                                <BaseInput :model-value="detail.total || 0"
+                                    @update:model-value="(val) => { detail.total = Number(val) || 0; updateUnitPrice(index) }"
+                                    type="number" :min="0" step="100" required />
                             </div>
-                        </div>
-                        <div class="mt-2 text-sm text-gray-600">
-                            Total: <span class="font-semibold">{{ formatCurrency(detail.quantity * detail.amount)
-                                }}</span>
+
+                            <!-- Precio Unitario (calculado) -->
+                            <div class="w-28">
+                                <div
+                                    class="px-2 py-1.5 bg-gray-100 rounded-md text-xs text-gray-700 border border-gray-300 text-right font-medium">
+                                    {{ formatCurrency(calculateUnitPrice(detail)) }}
+                                </div>
+                            </div>
+
+                            <!-- Botón eliminar -->
+                            <div class="w-10 flex justify-center">
+                                <BaseButton type="button" variant="ghost" size="sm" @click="removeDetail(index)"
+                                    class="text-red-600 hover:text-red-700 hover:bg-red-50 p-1.5">
+                                    <TrashIcon class="w-4 h-4" />
+                                </BaseButton>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -79,7 +106,7 @@
                     </BaseButton>
                 </div>
 
-                <div v-if="formData.expenseBankPayments.length === 0" class="text-sm text-gray-500 italic">
+                <div v-if="formData.expenseBankPayments.length === 0" class="text-sm text-gray-500 italic mb-3">
                     Sin pagos bancarios (se registrará como efectivo)
                 </div>
 
@@ -100,23 +127,25 @@
                     </div>
                 </div>
 
-                <!-- Resumen de Pagos -->
-                <div v-if="formData.expenseBankPayments.length > 0" class="mt-3 p-3 bg-gray-50 rounded-lg">
+                <!-- Resumen de Pagos (siempre visible) -->
+                <div class="mt-3 p-3 bg-gray-50 rounded-lg">
                     <div class="flex justify-between text-sm">
-                        <span class="text-gray-600">Total Pagos Bancarios:</span>
-                        <span class="font-semibold">{{ formatCurrency(totalBankPayments) }}</span>
+                        <span class="font-medium text-gray-700">Total Gastos:</span>
+                        <span class="font-semibold text-gray-900">{{ formatCurrency(totalExpenses) }}</span>
                     </div>
-                    <div class="flex justify-between text-sm mt-1">
-                        <span class="text-gray-600">Total Gastos:</span>
-                        <span class="font-semibold">{{ formatCurrency(totalExpenses) }}</span>
+                    <div v-if="formData.expenseBankPayments.length > 0" class="flex justify-between text-sm mt-2">
+                        <span class="font-medium text-gray-700">Total Pagos Bancarios:</span>
+                        <span class="font-semibold text-blue-600">{{ formatCurrency(totalBankPayments) }}</span>
                     </div>
-                    <div class="flex justify-between text-sm mt-1 border-t pt-1">
-                        <span class="text-gray-600">Diferencia (Efectivo):</span>
-                        <span class="font-semibold" :class="cashDifference >= 0 ? 'text-emerald-600' : 'text-red-600'">
+                    <div class="flex justify-between text-sm mt-2 pt-2 border-t border-gray-300">
+                        <span class="font-medium text-gray-700">
+                            {{ formData.expenseBankPayments.length > 0 ? 'Diferencia (Efectivo):' : 'Total a Pagar (Efectivo):' }}
+                        </span>
+                        <span class="font-semibold" :class="cashDifference >= 0 ? 'text-green-600' : 'text-red-600'">
                             {{ formatCurrency(cashDifference) }}
                         </span>
                     </div>
-                    <p v-if="cashDifference < 0" class="text-xs text-red-600 mt-1">
+                    <p v-if="cashDifference < 0" class="text-xs text-red-600 mt-2">
                         ⚠️ Los pagos bancarios exceden el total
                     </p>
                 </div>
@@ -139,6 +168,7 @@ import { ref, computed, watch, onMounted } from 'vue'
 import type { ExpenseHeader, CreateExpenseHeaderDto, UpdateExpenseHeaderDto, CreateExpenseDetailDto, CreateExpenseBankPaymentDto } from '@/types/expense'
 import { expenseHeaderApi } from '@/services/MainAPI/expenseHeaderApi'
 import { bankApi } from '@/services/MainAPI/bankApi'
+import { expenseApi } from '@/services/MainAPI/expenseApi'
 import { useFormatting } from '@/composables/useFormatting'
 import { useToast } from '@/composables/useToast'
 import BaseDialog from '@/components/ui/BaseDialog.vue'
@@ -169,7 +199,12 @@ const { error } = useToast()
 // Estado del formulario
 const formData = ref<{
     supplierId: number | null
-    expenseDetails: Array<CreateExpenseDetailDto & { tempId: string; expenseName: string }>
+    expenseDetails: Array<CreateExpenseDetailDto & {
+        tempId: string
+        expenseName: string
+        expenseUnit?: string
+        total?: number  // Total ingresado por el usuario
+    }>
     expenseBankPayments: Array<CreateExpenseBankPaymentDto & { tempId: string }>
 }>({
     supplierId: null,
@@ -180,6 +215,7 @@ const formData = ref<{
 // Opciones
 const supplierOptions = ref<Array<{ value: number; label: string }>>([])
 const bankOptions = ref<Array<{ value: number; label: string }>>([])
+const expenseOptions = ref<Array<{ value: number; label: string; description?: string }>>([])
 
 // Cargar datos iniciales
 onMounted(async () => {
@@ -191,24 +227,65 @@ onMounted(async () => {
         console.error('Error loading banks:', err)
     }
 
+    // Cargar gastos disponibles
+    try {
+        const response = await expenseApi.getAllExpenses()
+        if (response.isSuccess && response.data) {
+            expenseOptions.value = response.data.map(expense => ({
+                value: expense.id,
+                label: `${expense.name} - ${expense.unitDisplay}`, // Mostrar nombre y unidad juntos
+                description: expense.categoryName
+            }))
+        }
+    } catch (err) {
+        console.error('Error loading expenses:', err)
+    }
+
     // TODO: Cargar proveedores cuando se cree la API
     // Por ahora, se pueden obtener de los expense headers existentes
 })
 
 // Inicializar formulario cuando se abre el modal
-watch(() => props.isOpen, (isOpen) => {
+watch(() => props.isOpen, async (isOpen) => {
     if (isOpen) {
         if (props.editingExpense) {
             // Modo edición
+            const details = await Promise.all(
+                props.editingExpense.expenseDetails.map(async (detail) => {
+                    // Calcular el total desde el unitario y cantidad
+                    const total = detail.amount * detail.quantity
+
+                    // Cargar la unidad del gasto y actualizar el nombre para mostrar "nombre - unidad"
+                    let expenseUnit = detail.expenseUnit
+                    let expenseName = detail.expenseName
+
+                    if (detail.expenseId > 0) {
+                        try {
+                            const response = await expenseApi.getExpenseById(detail.expenseId)
+                            if (response.isSuccess && response.data) {
+                                expenseUnit = response.data.unitDisplay
+                                expenseName = `${response.data.name} - ${response.data.unitDisplay}`
+                            }
+                        } catch (err) {
+                            console.error('Error loading expense unit:', err)
+                        }
+                    }
+
+                    return {
+                        expenseId: detail.expenseId,
+                        quantity: detail.quantity,
+                        amount: detail.amount,
+                        total: total,
+                        tempId: `detail-${detail.id}`,
+                        expenseName: expenseName,
+                        expenseUnit: expenseUnit,
+                    }
+                })
+            )
+
             formData.value = {
                 supplierId: props.editingExpense.supplierId,
-                expenseDetails: props.editingExpense.expenseDetails.map(detail => ({
-                    expenseId: detail.expenseId,
-                    quantity: detail.quantity,
-                    amount: detail.amount,
-                    tempId: `detail-${detail.id}`,
-                    expenseName: detail.expenseName,
-                })),
+                expenseDetails: details,
                 expenseBankPayments: props.editingExpense.expenseBankPayments.map(payment => ({
                     bankId: payment.bankId,
                     amount: payment.amount,
@@ -242,17 +319,61 @@ const cashDifference = computed(() => {
 const isFormValid = computed(() => {
     return formData.value.supplierId !== null &&
         formData.value.expenseDetails.length > 0 &&
+        formData.value.expenseDetails.every(d => d.expenseId > 0 && d.quantity > 0 && (d.total || 0) > 0) &&
         cashDifference.value >= 0
 })
 
 // Métodos
+const onExpenseSelected = async (index: number, expenseId: number) => {
+    const expense = expenseOptions.value.find(e => e.value === expenseId)
+    if (expense && formData.value.expenseDetails[index]) {
+        // Cargar la unidad del gasto y actualizar el nombre para mostrar "nombre - unidad"
+        try {
+            const response = await expenseApi.getExpenseById(expenseId)
+            if (response.isSuccess && response.data) {
+                formData.value.expenseDetails[index].expenseUnit = response.data.unitDisplay
+                formData.value.expenseDetails[index].expenseName = `${response.data.name} - ${response.data.unitDisplay}`
+
+                // Actualizar también la opción en el selector para que se muestre con la unidad
+                const optionIndex = expenseOptions.value.findIndex(e => e.value === expenseId)
+                if (optionIndex !== -1) {
+                    expenseOptions.value[optionIndex].label = `${response.data.name} - ${response.data.unitDisplay}`
+                }
+            } else {
+                formData.value.expenseDetails[index].expenseName = expense.label
+            }
+        } catch (err) {
+            console.error('Error loading expense details:', err)
+            formData.value.expenseDetails[index].expenseName = expense.label
+        }
+    }
+}
+
+const calculateUnitPrice = (detail: typeof formData.value.expenseDetails[0]) => {
+    if (!detail.total || !detail.quantity || detail.quantity === 0) {
+        return 0
+    }
+    return Math.round(detail.total / detail.quantity)
+}
+
+const updateUnitPrice = (index: number) => {
+    // El precio unitario se calcula automáticamente, no necesitamos hacer nada aquí
+    // Solo asegurarnos de que el cálculo se actualice
+    const detail = formData.value.expenseDetails[index]
+    if (detail && detail.total && detail.quantity && detail.quantity > 0) {
+        detail.amount = calculateUnitPrice(detail)
+    }
+}
+
 const addDetail = () => {
     formData.value.expenseDetails.push({
-        expenseId: 0, // TODO: Se necesita seleccionar de una lista
+        expenseId: 0,
         quantity: 1,
         amount: 0,
+        total: 0,
         tempId: `temp-${Date.now()}-${Math.random()}`,
-        expenseName: '', // TODO: Se necesita autocompletado
+        expenseName: '',
+        expenseUnit: undefined,
     })
 }
 
