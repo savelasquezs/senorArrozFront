@@ -99,7 +99,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
-import type { DeliverymanAdvance } from '@/types/deliveryman'
+import type { DeliverymanAdvance } from '@/types/deliveryman.ts'
 import { useFormatting } from '@/composables/useFormatting'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import { PlusIcon, PencilIcon, TrashIcon, BanknotesIcon } from '@heroicons/vue/24/outline'

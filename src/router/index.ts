@@ -263,16 +263,16 @@ const routes: RouteRecordRaw[] = [
     //       title: 'Productos'
     //     }
     //   },
-    //   {
-    //     path: '/expenses',
-    //     name: 'Expenses',
-    //     component: () => import('@/views/Expenses.vue'),
-    //     meta: {
-    //       requiresAuth: true,
-    //       requiresRole: ['Superadmin', 'Admin'],
-    //       title: 'Gastos'
-    //     }
-    //   },
+    {
+        path: '/expenses',
+        name: 'Expenses',
+        component: () => import('@/views/ExpensesView.vue'),
+        meta: {
+            requiresAuth: true,
+            requiresRole: [UserRole.SUPERADMIN, UserRole.ADMIN, UserRole.CASHIER],
+            title: 'Gastos'
+        }
+    },
     //   {
     //     path: '/users',
     //     name: 'Users',

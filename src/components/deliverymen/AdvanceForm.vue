@@ -68,9 +68,9 @@
 
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
-import type { DeliverymanAdvance, DeliverymanStats } from '@/types/deliveryman'
+import type { DeliverymanAdvance, DeliverymanStats } from '@/types/deliveryman.ts'
 import { useFormatting } from '@/composables/useFormatting'
-import { useDeliverymanStats } from '@/composables/useDeliverymanStats'
+import { useDeliverymanStats } from '@/composables/useDeliverymanStats.ts'
 import BaseDialog from '@/components/ui/BaseDialog.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 
