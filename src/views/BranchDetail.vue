@@ -57,17 +57,17 @@
 
                             <div class="flex items-center">
                                 <PhoneIcon class="w-5 h-5 text-gray-400 mr-3" />
-                                <div>
+                                <div class="space-y-1">
                                     <p class="text-sm font-medium text-gray-900">Teléfono Principal</p>
-                                    <p class="text-sm text-gray-600">{{ branch.phone1 }}</p>
+                                    <PhoneNumberItem :phone-number="branch.phone1" />
                                 </div>
                             </div>
 
                             <div v-if="branch.phone2" class="flex items-center">
                                 <PhoneIcon class="w-5 h-5 text-gray-400 mr-3" />
-                                <div>
+                                <div class="space-y-1">
                                     <p class="text-sm font-medium text-gray-900">Teléfono Secundario</p>
-                                    <p class="text-sm text-gray-600">{{ branch.phone2 }}</p>
+                                    <PhoneNumberItem :phone-number="branch.phone2" />
                                 </div>
                             </div>
                         </div>
@@ -438,6 +438,14 @@
                                 ]">
                                     Gastos
                                 </button>
+                                <button @click="expensesActiveTab = 'suppliers'" :class="[
+                                    expensesActiveTab === 'suppliers'
+                                        ? 'border-green-500 text-green-600'
+                                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300',
+                                    'whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm'
+                                ]">
+                                    Proveedores
+                                </button>
                             </nav>
                         </div>
 
@@ -453,6 +461,11 @@
                             @create="openCreateExpense" @edit="openEditExpense" @delete="deleteExpense"
                             @filter-change="onExpenseFilterChange" @search-change="onExpenseSearchChange"
                             @previous-page="previousExpensePage" @next-page="nextExpensePage" />
+
+                        <SuppliersTable v-if="expensesActiveTab === 'suppliers'" :list="suppliersList"
+                            :loading="suppliersLoading" :can-manage="canManageSuppliers" @create="openCreateSupplier"
+                            @edit="openEditSupplier" @delete="deleteSupplier" @previous-page="previousSupplierPage"
+                            @next-page="nextSupplierPage" />
                     </div>
                 </BaseCard>
             </div>
@@ -517,6 +530,10 @@
                 <ExpenseForm :expense="editingExpense" :categories="allExpenseCategories" :loading="expenseFormLoading"
                     @submit="handleExpenseSubmit" @cancel="showExpenseForm = false" />
             </BaseDialog>
+
+            <!-- Supplier Form Dialog -->
+            <SupplierFormModal :is-open="showSupplierForm" :editing-supplier="editingSupplier"
+                :loading="supplierFormLoading" @close="closeSupplierForm" @submit="handleSupplierSubmit" />
         </div>
     </MainLayout>
 </template>
@@ -536,6 +553,7 @@ import BaseDialog from '@/components/ui/BaseDialog.vue'
 import BaseAlert from '@/components/ui/BaseAlert.vue'
 import BaseLoading from '@/components/ui/BaseLoading.vue'
 import BaseBadge from '@/components/ui/BaseBadge.vue'
+import PhoneNumberItem from '@/components/customers/PhoneNumberItem.vue'
 import BranchUsersTable from '@/components/branches/BranchUsersTable.vue'
 import BranchForm from '@/components/branches/BranchForm.vue'
 import BankForm from '@/components/payments/banks/BankForm.vue'
@@ -544,9 +562,13 @@ import ExpenseCategoriesTable from '@/components/expenses/ExpenseCategoriesTable
 import ExpensesTable from '@/components/expenses/ExpensesTable.vue'
 import ExpenseCategoryFormModal from '@/components/expenses/ExpenseCategoryFormModal.vue'
 import ExpenseForm from '@/components/expenses/ExpenseForm.vue'
+import SuppliersTable from '@/components/suppliers/SuppliersTable.vue'
+import SupplierFormModal from '@/components/suppliers/SupplierFormModal.vue'
 import { expenseCategoryApi } from '@/services/MainAPI/expenseCategoryApi'
 import { expenseApi } from '@/services/MainAPI/expenseApi'
+import { supplierApi } from '@/services/MainAPI/supplierApi'
 import type { ExpenseCategory, CreateExpenseCategoryDto, Expense, CreateExpenseDto, UpdateExpenseDto } from '@/types/expense'
+import type { Supplier, CreateSupplierDto, UpdateSupplierDto } from '@/types/supplier'
 import type { PagedResult } from '@/types/common'
 import {
     BuildingOffice2Icon,
@@ -585,7 +607,7 @@ const editingBank = ref<Bank | null>(null)
 const editingApp = ref<App | null>(null)
 
 // Expenses state
-const expensesActiveTab = ref<'categories' | 'expenses'>('categories')
+const expensesActiveTab = ref<'categories' | 'expenses' | 'suppliers'>('categories')
 const expenseCategoriesList = ref<PagedResult<ExpenseCategory> | null>(null)
 const expenseCategoriesLoading = ref(false)
 const expenseCategoriesPage = ref(1)
@@ -604,6 +626,15 @@ const showExpenseForm = ref(false)
 const editingExpense = ref<Expense | null>(null)
 const expenseFormLoading = ref(false)
 const allExpenseCategories = ref<ExpenseCategory[]>([])
+
+// Suppliers state
+const suppliersList = ref<PagedResult<Supplier> | null>(null)
+const suppliersLoading = ref(false)
+const suppliersPage = ref(1)
+const suppliersPageSize = ref(10)
+const showSupplierForm = ref(false)
+const editingSupplier = ref<Supplier | null>(null)
+const supplierFormLoading = ref(false)
 
 const branchId = computed(() => Number(route.params.id))
 
@@ -630,6 +661,11 @@ const canManageBanks = computed(() => {
 })
 
 const canManageApps = computed(() => {
+    const userRole = authStore.user?.role
+    return userRole === 'Superadmin' || userRole === 'Admin'
+})
+
+const canManageSuppliers = computed(() => {
     const userRole = authStore.user?.role
     return userRole === 'Superadmin' || userRole === 'Admin'
 })
@@ -786,6 +822,84 @@ const deleteApp = async (app: App) => {
         } catch (error: any) {
             showError('Error al eliminar app', error.message || 'No se pudo eliminar la app')
         }
+    }
+}
+
+// Suppliers actions
+const loadSuppliers = async () => {
+    try {
+        suppliersLoading.value = true
+        const response = await supplierApi.getSuppliers({
+            branchId: branchId.value,
+            page: suppliersPage.value,
+            pageSize: suppliersPageSize.value
+        })
+        suppliersList.value = response
+    } catch (error: any) {
+        showError('Error al cargar proveedores', error.message || 'No se pudieron cargar los proveedores')
+    } finally {
+        suppliersLoading.value = false
+    }
+}
+
+const openCreateSupplier = () => {
+    editingSupplier.value = null
+    showSupplierForm.value = true
+}
+
+const openEditSupplier = (supplier: Supplier) => {
+    editingSupplier.value = supplier
+    showSupplierForm.value = true
+}
+
+const closeSupplierForm = () => {
+    showSupplierForm.value = false
+    editingSupplier.value = null
+}
+
+const handleSupplierSubmit = async (data: CreateSupplierDto) => {
+    try {
+        supplierFormLoading.value = true
+        if (editingSupplier.value) {
+            await supplierApi.updateSupplier(editingSupplier.value.id, data as UpdateSupplierDto)
+            success('Proveedor actualizado', 3000, `El proveedor "${data.name}" se ha actualizado correctamente`)
+        } else {
+            await supplierApi.createSupplier(data, authStore.isSuperadmin ? branchId.value : undefined)
+            success('Proveedor creado', 3000, `El proveedor "${data.name}" se ha creado correctamente`)
+        }
+        closeSupplierForm()
+        await loadSuppliers()
+    } catch (error: any) {
+        showError('Error al guardar proveedor', error.message || 'No se pudo guardar el proveedor')
+    } finally {
+        supplierFormLoading.value = false
+    }
+}
+
+const deleteSupplier = async (supplier: Supplier) => {
+    if (!canManageSuppliers.value) return
+    if (!confirm(`¿Estás seguro de que deseas eliminar el proveedor "${supplier.name}"?`)) return
+
+    try {
+        await supplierApi.deleteSupplier(supplier.id)
+        success('Proveedor eliminado', 3000, `El proveedor "${supplier.name}" se ha eliminado correctamente`)
+        await loadSuppliers()
+    } catch (error: any) {
+        showError('Error al eliminar proveedor', error.message || 'No se pudo eliminar el proveedor')
+    }
+}
+
+const previousSupplierPage = async () => {
+    if (suppliersList.value?.hasPreviousPage) {
+        suppliersPage.value--
+        await loadSuppliers()
+    }
+}
+
+const nextSupplierPage = async () => {
+    if (suppliersList.value?.hasNextPage) {
+        suppliersPage.value++
+        await loadSuppliers()
     }
 }
 
@@ -995,6 +1109,11 @@ onMounted(async () => {
             pageSize: 100,
             branchId: branchId.value
         })
+
+        await loadExpenseCategories()
+        await loadAllExpenseCategories()
+        await loadExpenses()
+        await loadSuppliers()
 
     } catch (error: any) {
         console.error('Error loading branch data:', error)

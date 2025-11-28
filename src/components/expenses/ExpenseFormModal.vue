@@ -4,13 +4,21 @@
         <form @submit.prevent="handleSubmit" class="space-y-6">
             <!-- Selección de Proveedor -->
             <div>
-                <label class="block text-sm font-medium text-gray-700 mb-2">
-                    Proveedor <span class="text-red-500">*</span>
-                </label>
-                <BaseSelect v-model="formData.supplierId" :options="supplierOptions"
-                    placeholder="Seleccionar proveedor..." value-key="value" display-key="label" required />
+                <div class="flex items-start gap-2 mb-2">
+                    <label class="block text-sm font-medium text-gray-700">
+                        Proveedor <span class="text-red-500">*</span>
+                    </label>
+                    <BaseButton v-if="canManageSuppliers" type="button" size="sm" variant="secondary" class="ml-auto"
+                        @click="openSupplierModal">
+                        <PlusIcon class="w-4 h-4 mr-1" />
+                        Nuevo
+                    </BaseButton>
+                </div>
+                <BaseSelect v-model="formData.supplierId" :options="supplierOptions" searchable
+                    :placeholder="suppliersLoading ? 'Cargando proveedores...' : 'Seleccionar proveedor...'"
+                    value-key="value" display-key="label" required :disabled="suppliersLoading" />
                 <p class="text-xs text-gray-500 mt-1">
-                    Nota: Los proveedores se cargarán desde los gastos existentes. Se necesita crear API de proveedores.
+                    Gestiona tus proveedores desde la vista de sucursal o crea uno al vuelo.
                 </p>
             </div>
 
@@ -139,7 +147,7 @@
                     </div>
                     <div class="flex justify-between text-sm mt-2 pt-2 border-t border-gray-300">
                         <span class="font-medium text-gray-700">
-                            {{ formData.expenseBankPayments.length > 0 ? 'Diferencia (Efectivo):' : 'Total a Pagar (Efectivo):' }}
+                            {{ formData.expenseBankPayments.length > 0 ? 'Diferencia (Efectivo):' : 'Total a Pagar                            (Efectivo):' }}
                         </span>
                         <span class="font-semibold" :class="cashDifference >= 0 ? 'text-green-600' : 'text-red-600'">
                             {{ formatCurrency(cashDifference) }}
@@ -161,16 +169,38 @@
             </BaseButton>
         </template>
     </BaseDialog>
+
+    <BaseDialog v-model="showSupplierModal" title="Nuevo proveedor" size="md">
+        <form @submit.prevent="handleSupplierCreate" class="space-y-4">
+            <BaseInput v-model="newSupplier.name" label="Nombre" placeholder="Nombre del proveedor" required />
+            <BaseInput v-model="newSupplier.phone" label="Teléfono" placeholder="Teléfono" required />
+            <BaseInput v-model="newSupplier.address" label="Dirección (opcional)" />
+            <BaseInput v-model="newSupplier.email" label="Email (opcional)" type="email" />
+
+            <div class="flex justify-end space-x-2 pt-2">
+                <BaseButton type="button" variant="secondary" @click="showSupplierModal = false"
+                    :disabled="supplierFormLoading">
+                    Cancelar
+                </BaseButton>
+                <BaseButton type="submit" variant="primary" :loading="supplierFormLoading">
+                    Guardar
+                </BaseButton>
+            </div>
+        </form>
+    </BaseDialog>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, watch, onMounted } from 'vue'
 import type { ExpenseHeader, CreateExpenseHeaderDto, UpdateExpenseHeaderDto, CreateExpenseDetailDto, CreateExpenseBankPaymentDto } from '@/types/expense'
+import type { Supplier, CreateSupplierDto } from '@/types/supplier'
 import { expenseHeaderApi } from '@/services/MainAPI/expenseHeaderApi'
 import { bankApi } from '@/services/MainAPI/bankApi'
 import { expenseApi } from '@/services/MainAPI/expenseApi'
+import { supplierApi } from '@/services/MainAPI/supplierApi'
 import { useFormatting } from '@/composables/useFormatting'
 import { useToast } from '@/composables/useToast'
+import { useAuthStore } from '@/store/auth'
 import BaseDialog from '@/components/ui/BaseDialog.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseInput from '@/components/ui/BaseInput.vue'
@@ -194,7 +224,8 @@ const emit = defineEmits<{
 }>()
 
 const { formatCurrency } = useFormatting()
-const { error } = useToast()
+const { error, success } = useToast()
+const authStore = useAuthStore()
 
 // Estado del formulario
 const formData = ref<{
@@ -216,6 +247,22 @@ const formData = ref<{
 const supplierOptions = ref<Array<{ value: number; label: string }>>([])
 const bankOptions = ref<Array<{ value: number; label: string }>>([])
 const expenseOptions = ref<Array<{ value: number; label: string; description?: string }>>([])
+const suppliersLoading = ref(false)
+const showSupplierModal = ref(false)
+const supplierFormLoading = ref(false)
+interface SupplierFormState {
+    name: string
+    phone: string
+    address: string
+    email: string
+}
+
+const newSupplier = ref<SupplierFormState>({
+    name: '',
+    phone: '',
+    address: '',
+    email: ''
+})
 
 // Cargar datos iniciales
 onMounted(async () => {
@@ -241,8 +288,7 @@ onMounted(async () => {
         console.error('Error loading expenses:', err)
     }
 
-    // TODO: Cargar proveedores cuando se cree la API
-    // Por ahora, se pueden obtener de los expense headers existentes
+    await loadSuppliers()
 })
 
 // Inicializar formulario cuando se abre el modal
@@ -292,12 +338,16 @@ watch(() => props.isOpen, async (isOpen) => {
                     tempId: `payment-${payment.id}`,
                 })),
             }
+            await ensureSupplierOption(formData.value.supplierId)
         } else {
             // Modo creación
             formData.value = {
                 supplierId: null,
                 expenseDetails: [],
                 expenseBankPayments: [],
+            }
+            if (supplierOptions.value.length === 0) {
+                await loadSuppliers()
             }
         }
     }
@@ -323,7 +373,102 @@ const isFormValid = computed(() => {
         cashDifference.value >= 0
 })
 
+const canManageSuppliers = computed(() => {
+    const role = authStore.user?.role
+    return role === 'Superadmin' || role === 'Admin'
+})
+
 // Métodos
+const loadSuppliers = async () => {
+    try {
+        suppliersLoading.value = true
+        const suppliers = await supplierApi.getSuppliersByBranch()
+        supplierOptions.value = suppliers.map(supplier => ({
+            value: supplier.id,
+            label: `${supplier.name} • ${supplier.phone}`
+        }))
+        await ensureSupplierOption(formData.value.supplierId, suppliers)
+    } catch (err) {
+        console.error('Error loading suppliers:', err)
+    } finally {
+        suppliersLoading.value = false
+    }
+}
+
+const ensureSupplierOption = async (supplierId: number | null, existingSuppliers?: Supplier[]) => {
+    if (!supplierId) {
+        return
+    }
+
+    if (supplierOptions.value.some(option => option.value === supplierId)) {
+        return
+    }
+
+    let supplier: Supplier | undefined = existingSuppliers?.find(s => s.id === supplierId)
+
+    if (!supplier) {
+        try {
+            supplier = await supplierApi.getSupplierById(supplierId)
+        } catch (err) {
+            console.error('Error fetching supplier by id:', err)
+        }
+    }
+
+    if (supplier) {
+        supplierOptions.value.push({
+            value: supplier.id,
+            label: `${supplier.name} • ${supplier.phone}`
+        })
+    }
+}
+
+const openSupplierModal = () => {
+    newSupplier.value = {
+        name: '',
+        phone: '',
+        address: '',
+        email: ''
+    }
+    showSupplierModal.value = true
+}
+
+const handleSupplierCreate = async () => {
+    if (!newSupplier.value.name.trim() || !newSupplier.value.phone.trim()) {
+        error('Formulario inválido', 'Nombre y teléfono son obligatorios.')
+        return
+    }
+
+    try {
+        supplierFormLoading.value = true
+        const payload: CreateSupplierDto = {
+            name: newSupplier.value.name.trim(),
+            phone: newSupplier.value.phone.trim(),
+        }
+
+        if (newSupplier.value.address?.trim()) {
+            payload.address = newSupplier.value.address.trim()
+        }
+
+        if (newSupplier.value.email?.trim()) {
+            payload.email = newSupplier.value.email.trim()
+        }
+
+        const createdSupplier = await supplierApi.createSupplier(payload, authStore.isSuperadmin ? authStore.branchId ?? undefined : undefined)
+
+        supplierOptions.value.unshift({
+            value: createdSupplier.id,
+            label: `${createdSupplier.name} • ${createdSupplier.phone}`
+        })
+        formData.value.supplierId = createdSupplier.id
+        showSupplierModal.value = false
+        success('Proveedor creado', 3000, `El proveedor "${createdSupplier.name}" se ha creado correctamente`)
+    } catch (err: any) {
+        error('Error al crear proveedor', err.message || 'No se pudo crear el proveedor')
+    } finally {
+        supplierFormLoading.value = false
+    }
+}
+
 const onExpenseSelected = async (index: number, expenseId: number) => {
     const expense = expenseOptions.value.find(e => e.value === expenseId)
     if (expense && formData.value.expenseDetails[index]) {

@@ -100,8 +100,9 @@
 
         <!-- Tabla -->
         <div class="bg-white rounded-lg shadow overflow-hidden">
-            <ExpensesTable :expenses="filteredExpenses" :loading="loading" :sort-by="sortBy" :sort-order="sortOrder"
-                @view-detail="handleViewDetail" @edit="handleEdit" @delete="handleDelete" @sort="handleSort" />
+            <ExpenseHeadersTable :expenses="filteredExpenses" :loading="loading" :sort-by="sortBy"
+                :sort-order="sortOrder" @view-detail="handleViewDetail" @edit="handleEdit" @delete="handleDelete"
+                @sort="handleSort" />
 
             <!-- Paginación -->
             <div v-if="!loading && totalPages > 1" class="bg-gray-50 px-4 py-3 border-t border-gray-200 sm:px-6">
@@ -174,7 +175,7 @@ import { expenseHeaderApi } from '@/services/MainAPI/expenseHeaderApi'
 import { useExpenseFilters, type ExpenseFilterState } from '@/composables/useExpenseFilters'
 import { useToast } from '@/composables/useToast'
 import MainLayout from '@/components/layout/MainLayout.vue'
-import ExpensesTable from '@/components/expenses/ExpensesTable.vue'
+import ExpenseHeadersTable from '@/components/expenses/ExpenseHeadersTable.vue'
 import ExpenseDetailModal from '@/components/expenses/ExpenseDetailModal.vue'
 import ExpenseFormModal from '@/components/expenses/ExpenseFormModal.vue'
 import BaseInput from '@/components/ui/BaseInput.vue'
@@ -258,8 +259,41 @@ const pageSizeOptions = [
 ]
 
 // Computed
+const toStringArray = (value: unknown): string[] => {
+    if (Array.isArray(value)) {
+        return value.filter((item): item is string => typeof item === 'string' && item.trim().length > 0)
+    }
+    if (typeof value === 'string' && value.trim().length > 0) {
+        return [value]
+    }
+    return []
+}
+
+const toNumberArray = (value: unknown): number[] => {
+    if (Array.isArray(value)) {
+        return value
+            .map(item => (typeof item === 'number' ? item : Number(item)))
+            .filter(item => !Number.isNaN(item))
+    }
+    if (typeof value === 'number' && !Number.isNaN(value)) {
+        return [value]
+    }
+    if (typeof value === 'string' && value.trim().length > 0) {
+        const parsed = Number(value)
+        return Number.isNaN(parsed) ? [] : [parsed]
+    }
+    return []
+}
+
+const normalizedFilters = computed<ExpenseFilterState>(() => ({
+    categoryNames: toStringArray(localFilters.value.categoryNames),
+    bankNames: toStringArray(localFilters.value.bankNames),
+    supplierIds: toNumberArray(localFilters.value.supplierIds),
+    expenseName: localFilters.value.expenseName || ''
+}))
+
 const filteredExpenses = computed(() => {
-    return applyAllFilters(expenses.value, localFilters.value)
+    return applyAllFilters(expenses.value, normalizedFilters.value)
 })
 
 const totalPages = computed(() => Math.ceil(totalCount.value / pageSize.value))
@@ -285,10 +319,10 @@ const hasActiveFilters = computed(() => {
     return !!(
         dateFilters.value.fromDate ||
         dateFilters.value.toDate ||
-        localFilters.value.categoryNames.length > 0 ||
-        localFilters.value.bankNames.length > 0 ||
-        localFilters.value.supplierIds.length > 0 ||
-        localFilters.value.expenseName.trim()
+        normalizedFilters.value.categoryNames.length > 0 ||
+        normalizedFilters.value.bankNames.length > 0 ||
+        normalizedFilters.value.supplierIds.length > 0 ||
+        normalizedFilters.value.expenseName.trim()
     )
 })
 
@@ -415,13 +449,31 @@ const closeFormModal = () => {
 }
 
 const handleSubmitExpense = async (expense: ExpenseHeader) => {
+    const ensureTotal = (header: ExpenseHeader): ExpenseHeader => {
+        if (header.total !== null && header.total !== undefined) {
+            return header
+        }
+
+        const calculatedTotal = header.expenseDetails.reduce((sum, detail) => {
+            const detailTotal = detail.total ?? detail.amount * detail.quantity
+            return sum + detailTotal
+        }, 0)
+
+        return {
+            ...header,
+            total: calculatedTotal
+        }
+    }
+
+    const enrichedExpense = ensureTotal(expense)
+
     // Actualización optimista
-    const index = expenses.value.findIndex(e => e.id === expense.id)
+    const index = expenses.value.findIndex(e => e.id === enrichedExpense.id)
     if (index !== -1) {
-        expenses.value[index] = expense
+        expenses.value[index] = enrichedExpense
     } else {
         // Es nuevo, agregar al inicio
-        expenses.value.unshift(expense)
+        expenses.value.unshift(enrichedExpense)
         totalCount.value++
     }
 
@@ -434,4 +486,3 @@ onMounted(() => {
     fetchExpenses()
 })
 </script>
-
