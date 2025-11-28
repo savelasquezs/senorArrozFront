@@ -1,5 +1,6 @@
 <template>
-    <BaseDialog :model-value="isOpen" @update:model-value="$emit('close')" :title="`Detalle - ${detail?.deliverymanName || ''}`" size="6xl">
+    <BaseDialog :model-value="isOpen" @update:model-value="$emit('close')"
+        :title="`Detalle - ${detail?.deliverymanName || ''}`" size="6xl">
         <div v-if="detail" class="space-y-6">
             <!-- Estadísticas resumidas -->
             <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -52,10 +53,7 @@
             <div>
                 <h4 class="text-sm font-semibold text-gray-700 mb-3">Pedidos del día ({{ detail.orders.length }})</h4>
                 <div class="border rounded-lg overflow-hidden max-h-96 overflow-y-auto">
-                    <OrdersTable 
-                        :orders="detail.orders" 
-                        :loading="false"
-                    />
+                    <OrdersTable :orders="detail.orders" :loading="false" />
                 </div>
             </div>
         </div>
@@ -68,12 +66,8 @@
             <BaseButton @click="$emit('close')" variant="secondary">
                 Cerrar
             </BaseButton>
-            <BaseButton 
-                v-if="detail && detail.currentBalance > detail.baseAmount"
-                @click="handleLiquidate" 
-                variant="success"
-                :loading="loading"
-            >
+            <BaseButton v-if="detail && detail.currentBalance > detail.baseAmount" @click="handleLiquidate"
+                variant="success" :loading="loading">
                 Liquidar ({{ formatCurrency(detail.currentBalance - detail.baseAmount) }})
             </BaseButton>
         </template>
@@ -81,13 +75,12 @@
 </template>
 
 <script setup lang="ts">
-import type { DeliverymanDetail } from '@/types/deliveryman'
+import type { DeliverymanDetail } from '@/types/deliveryman.ts'
 import { useFormatting } from '@/composables/useFormatting'
 import BaseDialog from '@/components/ui/BaseDialog.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseLoading from '@/components/ui/BaseLoading.vue'
 import OrdersTable from '@/components/orders/OrdersTable.vue'
-import { CheckCircleIcon } from '@heroicons/vue/24/outline'
 
 interface Props {
     isOpen: boolean
@@ -105,12 +98,11 @@ const { formatCurrency } = useFormatting()
 
 const handleLiquidate = () => {
     if (!props.detail) return
-    
+
     const liquidationAmount = props.detail.currentBalance - props.detail.baseAmount
-    
+
     if (confirm(`¿Confirmas liquidar a ${props.detail.deliverymanName} con un abono de ${formatCurrency(liquidationAmount)}?`)) {
         emit('liquidate', props.detail.deliverymanId, liquidationAmount)
     }
 }
 </script>
-

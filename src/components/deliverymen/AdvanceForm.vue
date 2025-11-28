@@ -6,18 +6,11 @@
                 <label class="block text-sm font-medium text-gray-700 mb-1">
                     Domiciliario <span class="text-red-500">*</span>
                 </label>
-                <select
-                    v-model="formData.deliverymanId"
-                    required
+                <select v-model="formData.deliverymanId" required
                     class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                    :disabled="!deliverymen || deliverymen.length === 0"
-                >
+                    :disabled="!deliverymen || deliverymen.length === 0">
                     <option :value="null" disabled>Seleccionar domiciliario</option>
-                    <option 
-                        v-for="dm in deliverymen" 
-                        :key="dm.deliverymanId" 
-                        :value="dm.deliverymanId"
-                    >
+                    <option v-for="dm in deliverymen" :key="dm.deliverymanId" :value="dm.deliverymanId">
                         {{ dm.deliverymanName }} ({{ dm.ordersCount }} pedidos)
                     </option>
                 </select>
@@ -31,24 +24,14 @@
                 <label class="block text-sm font-medium text-gray-700 mb-1">
                     Monto <span class="text-red-500">*</span>
                 </label>
-                <input
-                    v-model.number="formData.amount"
-                    type="number"
-                    required
-                    min="1"
-                    step="1000"
-                    :max="maxAmount"
+                <input v-model.number="formData.amount" type="number" required min="1" step="1000" :max="maxAmount"
                     class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                    placeholder="Ingrese el monto"
-                />
+                    placeholder="Ingrese el monto" />
                 <div v-if="suggestedAmount > 0" class="mt-2 space-y-1">
                     <p class="text-sm text-gray-600">
-                        Valor sugerido: 
-                        <button 
-                            type="button"
-                            @click="formData.amount = suggestedAmount"
-                            class="font-semibold text-emerald-600 hover:text-emerald-700 underline"
-                        >
+                        Valor sugerido:
+                        <button type="button" @click="formData.amount = suggestedAmount"
+                            class="font-semibold text-emerald-600 hover:text-emerald-700 underline">
                             {{ formatCurrency(suggestedAmount) }}
                         </button>
                     </p>
@@ -66,12 +49,9 @@
                 <label class="block text-sm font-medium text-gray-700 mb-1">
                     Comentario (opcional)
                 </label>
-                <textarea
-                    v-model="formData.notes"
-                    rows="3"
+                <textarea v-model="formData.notes" rows="3"
                     class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-emerald-500 resize-none"
-                    placeholder="Ej: Abono por cierre de turno"
-                ></textarea>
+                    placeholder="Ej: Abono por cierre de turno"></textarea>
             </div>
         </form>
 
@@ -79,12 +59,7 @@
             <BaseButton @click="handleClose" variant="secondary">
                 Cancelar
             </BaseButton>
-            <BaseButton 
-                @click="handleSubmit" 
-                variant="primary"
-                :loading="loading"
-                :disabled="!isFormValid"
-            >
+            <BaseButton @click="handleSubmit" variant="primary" :loading="loading" :disabled="!isFormValid">
                 {{ editingAdvance ? 'Actualizar' : 'Crear' }} abono
             </BaseButton>
         </template>
@@ -153,9 +128,9 @@ const maxAmount = computed(() => {
 })
 
 const isFormValid = computed(() => {
-    return formData.value.deliverymanId && 
-           formData.value.amount > 0 && 
-           formData.value.amount <= maxAmount.value
+    return formData.value.deliverymanId &&
+        formData.value.amount > 0 &&
+        formData.value.amount <= maxAmount.value
 })
 
 // Cargar datos al editar
@@ -182,7 +157,7 @@ watch(() => props.isOpen, (isOpen) => {
 
 const handleSubmit = () => {
     if (!isFormValid.value) return
-    
+
     emit('submit', {
         deliverymanId: formData.value.deliverymanId!,
         amount: formData.value.amount,
@@ -194,4 +169,3 @@ const handleClose = () => {
     emit('close')
 }
 </script>
-
