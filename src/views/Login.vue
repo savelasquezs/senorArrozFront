@@ -51,7 +51,7 @@ const getRedirectPath = (role: string | null): string => {
     case 'Superadmin':
       return '/dashboard/global'
     case 'Admin':
-      return '/dashboard/global' // Temporal: usar global hasta que se cree branch
+      return '/orders/new'
     case 'Cashier':
       return '/orders'
     case 'Kitchen':

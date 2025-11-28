@@ -378,7 +378,7 @@ function getRedirectPath(role: string | null): string {
         case 'Superadmin':
             return '/dashboard/global'
         case 'Admin':
-            return '/dashboard/branch'
+            return '/orders/new'
         case 'Cashier':
             return '/customers'
         case 'Kitchen':

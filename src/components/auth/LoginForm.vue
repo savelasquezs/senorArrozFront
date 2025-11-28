@@ -131,7 +131,7 @@ const getRedirectPath = (role: string | null): string => {
 		case 'superadmin':
 			return '/dashboard/global';
 		case 'admin':
-			return '/dashboard/branch';
+			return '/orders/new';
 		case 'cashier':
 			return '/orders';
 		case 'kitchen':
