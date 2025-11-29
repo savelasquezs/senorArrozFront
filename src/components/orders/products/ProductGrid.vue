@@ -20,11 +20,32 @@
         </div>
 
         <!-- Products Grid -->
-        <div v-else class="products-grid" :class="gridClasses">
-            <ProductCard v-for="product in products" :key="product.id" :product="product" :variant="cardVariant"
-                :is-selected="isProductSelected(product)" @product-click="handleProductClick"
-                @product-add="handleProductAdd" />
+        <div v-else>
+            <template v-if="isSpecialCategory">
+                <div v-if="productsWithoutChich.length > 0" class="products-grid" :class="gridClasses">
+                    <ProductCard v-for="product in productsWithoutChich" :key="product.id" :product="product"
+                        :variant="cardVariant" :is-selected="isProductSelected(product)"
+                        @product-click="handleProductClick" @product-add="handleProductAdd" />
+                </div>
 
+                <div v-if="productsWithChich.length > 0" class="chich-section">
+                    <div class="chich-divider">
+                        <span class="chich-title">Con chicharrón</span>
+                        <span class="chich-count">{{ productsWithChich.length }}</span>
+                    </div>
+                    <div class="products-grid" :class="gridClasses">
+                        <ProductCard v-for="product in productsWithChich" :key="product.id" :product="product"
+                            :variant="cardVariant" :is-selected="isProductSelected(product)"
+                            @product-click="handleProductClick" @product-add="handleProductAdd" />
+                    </div>
+                </div>
+            </template>
+
+            <div v-else class="products-grid" :class="gridClasses">
+                <ProductCard v-for="product in products" :key="product.id" :product="product"
+                    :variant="cardVariant" :is-selected="isProductSelected(product)"
+                    @product-click="handleProductClick" @product-add="handleProductAdd" />
+            </div>
         </div>
     </div>
 </template>
@@ -83,6 +104,27 @@ const ordersStore = useOrdersDraftsStore()
 // Computed
 const products = computed(() => {
     return props.products.length > 0 ? props.products : ordersStore.filteredProducts
+})
+
+const SPECIAL_CATEGORY_KEYWORDS = ['paisa', 'ropa vieja']
+const chichRegex = /chich/i
+
+const isSpecialCategory = computed(() => {
+    if (!ordersStore.selectedCategory) return false
+    const sampleProduct = products.value.find(product => product.categoryId === ordersStore.selectedCategory)
+    const categoryName = sampleProduct?.categoryName?.toLowerCase().trim()
+    if (!categoryName) return false
+    return SPECIAL_CATEGORY_KEYWORDS.some(keyword => categoryName.includes(keyword))
+})
+
+const productsWithoutChich = computed(() => {
+    if (!isSpecialCategory.value) return []
+    return products.value.filter(product => !chichRegex.test(product.name))
+})
+
+const productsWithChich = computed(() => {
+    if (!isSpecialCategory.value) return []
+    return products.value.filter(product => chichRegex.test(product.name))
 })
 
 const gridClasses = computed(() => {
@@ -155,6 +197,34 @@ watch(products, (newProducts) => {
 
 .products-grid {
     width: 100%;
+}
+
+.chich-section {
+    margin-top: 1.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.chich-divider {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.75rem 1rem;
+    border: 1px dashed #d1d5db;
+    border-radius: 0.75rem;
+    background-color: #f9fafb;
+}
+
+.chich-title {
+    font-weight: 600;
+    color: #065f46;
+}
+
+.chich-count {
+    font-size: 0.875rem;
+    color: #065f46;
+    font-weight: 500;
 }
 
 /* Responsive adjustments */
