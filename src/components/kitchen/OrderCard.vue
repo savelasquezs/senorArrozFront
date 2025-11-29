@@ -1,21 +1,29 @@
 <template>
     <div :class="[
-        'relative p-2 sm:p-3 md:p-4 rounded-lg border-2 transition-all duration-200 cursor-pointer',
+        'relative p-2 sm:p-3 md:p-4 rounded-lg border-2 transition-all duration-200',
+        selectable ? 'cursor-pointer' : 'cursor-default',
         colorClass,
-        isSelected ? 'ring-2 sm:ring-4 ring-emerald-500 scale-105 shadow-xl' : 'hover:shadow-lg hover:scale-102',
-    ]" @click="$emit('toggle-select', order.id)">
-        <div v-if="isSelected" class="absolute top-1 right-1 sm:top-1.5 sm:right-1.5 md:top-2 md:right-2 bg-emerald-500 rounded-full p-0.5 sm:p-1">
+        selectable && isSelected
+            ? 'ring-2 sm:ring-4 ring-emerald-500 scale-105 shadow-xl'
+            : selectable
+                ? 'hover:shadow-lg hover:scale-102'
+                : '',
+    ]" @click="handleClick">
+        <div v-if="selectable && isSelected"
+            class="absolute top-1 right-1 sm:top-1.5 sm:right-1.5 md:top-2 md:right-2 bg-emerald-500 rounded-full p-0.5 sm:p-1">
             <CheckIcon class="w-3 h-3 sm:w-3.5 sm:h-3.5 md:w-4 md:h-4 text-white" />
         </div>
 
         <div class="flex items-center justify-between mb-1.5 sm:mb-2 md:mb-3">
             <div class="flex items-center gap-1 sm:gap-1.5 md:gap-2">
                 <span class="text-lg sm:text-xl md:text-2xl font-bold text-gray-900">#{{ order.id }}</span>
-                <BaseBadge :variant="getStatusVariant()" class="text-[10px] sm:text-xs md:text-sm px-1.5 sm:px-2 py-0.5">
+                <BaseBadge :variant="getStatusVariant()"
+                    class="text-[10px] sm:text-xs md:text-sm px-1.5 sm:px-2 py-0.5">
                     {{ order.statusDisplayName }}
                 </BaseBadge>
             </div>
-            <component :is="orderTypeIcon" class="w-3.5 h-3.5 sm:w-4 sm:h-4 md:w-5 md:h-5 text-gray-400 flex-shrink-0" />
+            <component :is="orderTypeIcon"
+                class="w-3.5 h-3.5 sm:w-4 sm:h-4 md:w-5 md:h-5 text-gray-400 flex-shrink-0" />
         </div>
 
         <div class="mb-1.5 sm:mb-2 md:mb-3 text-[11px] sm:text-xs md:text-sm">
@@ -23,7 +31,8 @@
                 <ClockIcon class="w-3 h-3 sm:w-3.5 sm:h-3.5 md:w-4 md:h-4 flex-shrink-0" />
                 <span class="font-medium">Tiempo: {{ formattedElapsedTime }}</span>
             </div>
-            <div v-if="variant === 'kitchen'" class="text-[10px] sm:text-xs text-gray-500 mt-0.5 sm:mt-1 hidden md:block">
+            <div v-if="variant === 'kitchen'"
+                class="text-[10px] sm:text-xs text-gray-500 mt-0.5 sm:mt-1 hidden md:block">
                 En {{ order.statusDisplayName }}: {{ formattedElapsedInStatus }}
             </div>
         </div>
@@ -31,10 +40,12 @@
         <!-- Contenido según variant -->
         <div v-if="variant === 'kitchen' && orderItems" class="space-y-1 sm:space-y-1.5 md:space-y-2">
             <div v-for="item in orderItems" :key="item.id" class="flex items-start gap-1.5 sm:gap-2 text-xs sm:text-sm">
-                <span class="font-bold text-emerald-600 min-w-[1.5rem] sm:min-w-[2rem] flex-shrink-0">{{ item.quantity }}x</span>
+                <span class="font-bold text-emerald-600 min-w-[1.5rem] sm:min-w-[2rem] flex-shrink-0">{{ item.quantity
+                    }}x</span>
                 <div class="flex-1 min-w-0">
                     <p class="font-medium text-gray-900 break-words">{{ item.productName }}</p>
-                    <p v-if="item.notes" class="text-[10px] sm:text-xs text-gray-600 italic mt-0.5 sm:mt-1 break-words">Nota: {{ item.notes }}</p>
+                    <p v-if="item.notes" class="text-[10px] sm:text-xs text-gray-600 italic mt-0.5 sm:mt-1 break-words">
+                        Nota: {{ item.notes }}</p>
                 </div>
             </div>
         </div>
@@ -55,7 +66,8 @@
             </div>
 
             <!-- Cliente o Guest -->
-            <div v-if="order.guestName" class="flex items-start gap-1 sm:gap-1.5 md:gap-2 text-[11px] sm:text-xs md:text-sm">
+            <div v-if="order.guestName"
+                class="flex items-start gap-1 sm:gap-1.5 md:gap-2 text-[11px] sm:text-xs md:text-sm">
                 <UserIcon class="w-3 h-3 sm:w-3.5 sm:h-3.5 md:w-4 md:h-4 text-gray-500 flex-shrink-0 mt-0.5" />
                 <span class="text-gray-700 break-words min-w-0">{{ order.guestName }}</span>
             </div>
@@ -67,7 +79,8 @@
             </div>
 
             <!-- Items (solo si tenemos orderItems) -->
-            <div v-if="totalItems > 0" class="flex items-center gap-1 sm:gap-1.5 md:gap-2 text-[11px] sm:text-xs md:text-sm">
+            <div v-if="totalItems > 0"
+                class="flex items-center gap-1 sm:gap-1.5 md:gap-2 text-[11px] sm:text-xs md:text-sm">
                 <ShoppingBagIcon class="w-3 h-3 sm:w-3.5 sm:h-3.5 md:w-4 md:h-4 text-gray-500 flex-shrink-0" />
                 <span class="text-gray-700">{{ totalItems }} {{ totalItems === 1 ? 'item' : 'items' }}</span>
             </div>
@@ -87,13 +100,15 @@ interface Props {
     orderItems?: OrderDetailItem[]
     isSelected: boolean
     variant?: 'kitchen' | 'delivery'
+    selectable?: boolean
 }
 
 const props = withDefaults(defineProps<Props>(), {
-    variant: 'kitchen'
+    variant: 'kitchen',
+    selectable: true
 })
 
-defineEmits<{ 'toggle-select': [orderId: number] }>()
+const emit = defineEmits<{ 'toggle-select': [orderId: number] }>()
 
 const elapsedTime = ref(0)
 const elapsedInStatus = ref(0)
@@ -126,6 +141,11 @@ const getStatusVariant = () => {
     if (props.order.status === 'in_preparation') return 'info'
     if (props.order.status === 'ready') return 'success'
     return 'info'
+}
+
+const handleClick = () => {
+    if (!props.selectable) return
+    emit('toggle-select', props.order.id)
 }
 
 onMounted(() => {

@@ -1,7 +1,7 @@
 <template>
     <div class="space-y-6">
         <!-- Mobile: Controles verticales -->
-        <div v-if="orders.length > 0"
+        <div v-if="orders.length > 0 && allowAssignment"
             class="md:flex md:items-center md:justify-between bg-gray-50 p-3 md:p-4 rounded-lg gap-3">
             <div class="flex items-center gap-2 md:gap-4 mb-3 md:mb-0">
                 <button @click="selectAll"
@@ -35,7 +35,7 @@
                     <div class="flex items-center gap-2 md:gap-3">
                         <MapPinIcon class="w-4 h-4 md:w-5 md:h-5 text-emerald-600 flex-shrink-0" />
                         <span class="font-semibold text-sm md:text-base text-gray-900 truncate">{{ neighborhood
-                            }}</span>
+                        }}</span>
                         <span
                             class="px-1.5 md:px-2 py-0.5 bg-emerald-100 text-emerald-700 rounded-full text-xs md:text-sm font-medium">
                             {{ group.length }} {{ group.length === 1 ? 'pedido' : 'pedidos' }}
@@ -50,8 +50,8 @@
                     <div v-show="isExpanded(neighborhood)" class="p-2 md:p-4 bg-white">
                         <div class="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2 md:gap-4">
                             <OrderCard v-for="order in group" :key="order.id" :order="order"
-                                :is-selected="selectedOrders.has(order.id)" variant="delivery"
-                                @toggle-select="toggleSelect" />
+                                :is-selected="allowAssignment && selectedOrders.has(order.id)"
+                                :selectable="allowAssignment" variant="delivery" @toggle-select="toggleSelect" />
                         </div>
                     </div>
                 </Transition>
@@ -74,9 +74,12 @@ import { TruckIcon, CheckCircleIcon, MapPinIcon, ChevronDownIcon } from '@heroic
 
 interface Props {
     orders: OrderListItem[]
+    allowAssignment?: boolean
 }
 
-const props = defineProps<Props>()
+const props = withDefaults(defineProps<Props>(), {
+    allowAssignment: true
+})
 const emit = defineEmits<{ assign: [orderIds: number[]] }>()
 
 const selectedOrders = ref(new Set<number>())
@@ -123,6 +126,7 @@ watch(() => props.orders, () => {
 }, { immediate: true })
 
 const toggleSelect = (orderId: number) => {
+    if (!props.allowAssignment) return
     if (selectedOrders.value.has(orderId)) {
         selectedOrders.value.delete(orderId)
     } else {
@@ -131,10 +135,12 @@ const toggleSelect = (orderId: number) => {
 }
 
 const selectAll = () => {
+    if (!props.allowAssignment) return
     props.orders.forEach(order => selectedOrders.value.add(order.id))
 }
 
 const clearSelection = () => {
+    if (!props.allowAssignment) return
     selectedOrders.value.clear()
 }
 

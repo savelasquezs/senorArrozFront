@@ -11,6 +11,11 @@ export const useDeliveryStore = defineStore('delivery', () => {
     const availablePage = ref(1)
     const availablePageSize = ref(100)
 
+    const preparationOrders = ref<OrderListItem[]>([])
+    const preparationTotalCount = ref(0)
+    const preparationPage = ref(1)
+    const preparationPageSize = ref(100)
+
     const historyOrders = ref<OrderListItem[]>([])
     const historyTotalCount = ref(0)
     const historyPage = ref(1)
@@ -38,6 +43,28 @@ export const useDeliveryStore = defineStore('delivery', () => {
         } catch (err: any) {
             error.value = err.message
             console.error('❌ Error loading available orders:', err)
+            throw err
+        } finally {
+            isLoading.value = false
+        }
+    }
+
+    // Cargar pedidos en preparación (solo lectura para domiciliarios)
+    const loadPreparationOrders = async (branchId?: number) => {
+        isLoading.value = true
+        error.value = null
+        try {
+            const response = await orderApi.searchOrders({
+                branchId,
+                type: 'delivery',
+                status: 'in_preparation',
+                page: preparationPage.value,
+                pageSize: preparationPageSize.value
+            })
+            preparationOrders.value = response.items
+            preparationTotalCount.value = response.totalCount
+        } catch (err: any) {
+            error.value = err.message
             throw err
         } finally {
             isLoading.value = false
@@ -94,6 +121,8 @@ export const useDeliveryStore = defineStore('delivery', () => {
     const clear = () => {
         availableOrders.value = []
         availableTotalCount.value = 0
+        preparationOrders.value = []
+        preparationTotalCount.value = 0
         historyOrders.value = []
         historyTotalCount.value = 0
         error.value = null
@@ -108,6 +137,8 @@ export const useDeliveryStore = defineStore('delivery', () => {
         // Estado
         availableOrders,
         availableTotalCount,
+        preparationOrders,
+        preparationTotalCount,
         historyOrders,
         historyTotalCount,
         historyPage,
@@ -117,6 +148,7 @@ export const useDeliveryStore = defineStore('delivery', () => {
 
         // Acciones
         loadAvailableOrders,
+        loadPreparationOrders,
         loadHistory,
         assignOrders,
         setHistoryPage,

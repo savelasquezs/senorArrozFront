@@ -37,7 +37,7 @@
             </div>
 
             <!-- Mobile: Tabs en grid -->
-            <div class="grid grid-cols-3 gap-2 md:hidden">
+            <div class="grid grid-cols-4 gap-2 md:hidden">
                 <button @click="activeTab = 'available'" :class="[
                     'py-3 px-4 rounded-lg font-medium text-sm transition-colors text-center',
                     activeTab === 'available'
@@ -48,6 +48,19 @@
                     <span v-if="deliveryStore.availableOrders.length > 0"
                         class="ml-2 py-0.5 px-2 rounded-full text-xs bg-white/20 text-white">
                         {{ deliveryStore.availableOrders.length }}
+                    </span>
+                </button>
+
+                <button @click="activeTab = 'preparation'" :class="[
+                    'py-3 px-4 rounded-lg font-medium text-sm transition-colors text-center',
+                    activeTab === 'preparation'
+                        ? 'bg-emerald-500 text-white'
+                        : 'bg-gray-100 text-gray-600'
+                ]">
+                    En preparación
+                    <span v-if="deliveryStore.preparationOrders.length > 0"
+                        class="ml-2 py-0.5 px-2 rounded-full text-xs bg-white/20 text-white">
+                        {{ deliveryStore.preparationOrders.length }}
                     </span>
                 </button>
 
@@ -89,6 +102,19 @@
                         </span>
                     </button>
 
+                    <button @click="activeTab = 'preparation'" :class="[
+                        'py-4 px-1 border-b-2 font-medium text-sm transition-colors',
+                        activeTab === 'preparation'
+                            ? 'border-emerald-500 text-emerald-600'
+                            : 'border-transparent text-gray-500 hover:text-gray-700'
+                    ]">
+                        En preparación
+                        <span v-if="deliveryStore.preparationOrders.length > 0"
+                            class="ml-2 py-0.5 px-2 rounded-full text-xs bg-amber-100 text-amber-700">
+                            {{ deliveryStore.preparationOrders.length }}
+                        </span>
+                    </button>
+
                     <button @click="activeTab = 'history'" :class="[
                         'py-4 px-1 border-b-2 font-medium text-sm transition-colors',
                         activeTab === 'history'
@@ -114,6 +140,10 @@
 
             <div v-if="activeTab === 'available'">
                 <DeliveryCardGrid ref="cardGridRef" :orders="deliveryStore.availableOrders" @assign="handleAssign" />
+            </div>
+
+            <div v-else-if="activeTab === 'preparation'">
+                <DeliveryCardGrid :orders="deliveryStore.preparationOrders" :allow-assignment="false" />
             </div>
 
             <div v-else-if="activeTab === 'history'">
@@ -165,7 +195,7 @@ const { success, error } = useToast()
 const SIGNALR_HUB_URL = import.meta.env.VITE_SIGNALR_HUB_URL || 'http://localhost:5000/hubs/orders'
 const { isConnected, on } = useSignalR(SIGNALR_HUB_URL)
 
-const activeTab = ref<'available' | 'history' | 'map'>('available')
+const activeTab = ref<'available' | 'preparation' | 'history' | 'map'>('available')
 const isLoading = ref(false)
 const showConfirmModal = ref(false)
 const ordersToAssign = ref<OrderListItem[]>([])
@@ -187,6 +217,17 @@ const loadAvailableOrders = async () => {
         await deliveryStore.loadAvailableOrders(authStore.user?.branchId)
     } catch (err: any) {
         error('Error al cargar pedidos disponibles', err.message)
+    } finally {
+        isLoading.value = false
+    }
+}
+
+const loadPreparationOrders = async () => {
+    try {
+        isLoading.value = true
+        await deliveryStore.loadPreparationOrders(authStore.user?.branchId)
+    } catch (err: any) {
+        error('Error al cargar pedidos en preparación', err.message)
     } finally {
         isLoading.value = false
     }
@@ -234,8 +275,19 @@ const closeConfirmModal = () => {
 const refreshData = async () => {
     if (activeTab.value === 'available') {
         await loadAvailableOrders()
-    } else {
+        return
+    }
+
+    if (activeTab.value === 'preparation') {
+        await loadPreparationOrders()
+        return
+    }
+
+    if (activeTab.value === 'history' || activeTab.value === 'map') {
         await loadHistory()
+        if (activeTab.value === 'map') {
+            mapOrders.value = [...deliveryStore.ordersOnTheWay]
+        }
     }
 }
 
@@ -281,19 +333,15 @@ const handleGeocodeRequested = (orderId: number) => {
 
 // Watch para cargar datos cuando cambias de tab
 watch(activeTab, async (newTab) => {
-    console.log('🔄 Tab changed:', newTab)
     if (newTab === 'available') {
-        console.log('📦 Loading available orders...')
         await loadAvailableOrders()
-        console.log('✅ Available orders loaded:', deliveryStore.availableOrders.length)
+    } else if (newTab === 'preparation') {
+        await loadPreparationOrders()
     } else if (newTab === 'history') {
-        console.log('📚 Loading history...')
         await loadHistory()
-        console.log('✅ History loaded:', deliveryStore.historyOrders.length)
     } else if (newTab === 'map') {
         await loadHistory()
         mapOrders.value = [...deliveryStore.ordersOnTheWay]
-        // Solo recalcular si hay coordenadas disponibles
         const hasCoords = mapOrders.value.some(o => typeof (o as any).latitude === 'number' && typeof (o as any).longitude === 'number')
         if (hasCoords) setTimeout(() => mapRef.value?.recalculateRoute(), 0)
     }
