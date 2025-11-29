@@ -64,7 +64,8 @@ export const useOrdersDraftsStore = defineStore('ordersDrafts', () => {
 
     const filteredProducts = computed(() => {
         const productsStore = useProductsStore()
-        let filtered = productsStore.currentProducts
+        // Filtrar primero los productos activos para evitar mostrar inactivos en la orden
+        let filtered = productsStore.currentProducts.filter(product => product.active)
 
         // Aplicar búsqueda
         if (searchQuery.value) {

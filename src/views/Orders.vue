@@ -94,7 +94,7 @@ const categories = computed(() => {
 const refreshData = async () => {
     try {
         await Promise.all([
-            productsStore.fetch({ page: 1, pageSize: 1000 }),
+            productsStore.fetch({ page: 1, pageSize: 1000, active: true }),
             ordersStore.loadCustomers(),
             ordersStore.loadBanks(),
             ordersStore.loadApps(),
