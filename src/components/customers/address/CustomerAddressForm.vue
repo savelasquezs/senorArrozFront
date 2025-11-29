@@ -47,8 +47,8 @@
         </div>
 
         <!-- Form Actions -->
-        <div class="flex justify-end space-x-3 pt-6 border-t border-gray-200" v-if="props.addressId">
-            <BaseButton @click="$emit('cancel')" variant="secondary" type="button">
+        <div class="flex justify-end space-x-3 pt-6 border-t border-gray-200">
+            <BaseButton v-if="props.addressId" @click="$emit('cancel')" variant="secondary" type="button">
                 Cancelar
             </BaseButton>
 
