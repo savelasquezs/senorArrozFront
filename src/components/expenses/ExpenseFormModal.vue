@@ -521,7 +521,7 @@ const canManageSuppliers = computed(() => {
 })
 
 // Métodos
-const loadSuppliers = async () => {
+async function loadSuppliers() {
     try {
         suppliersLoading.value = true
         const suppliers = await supplierApi.getSuppliersByBranch()
@@ -537,7 +537,7 @@ const loadSuppliers = async () => {
     }
 }
 
-const ensureSupplierOption = async (supplierId: number | null, existingSuppliers?: Supplier[]) => {
+async function ensureSupplierOption(supplierId: number | null, existingSuppliers?: Supplier[]) {
     if (!supplierId) {
         return
     }
