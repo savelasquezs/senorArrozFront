@@ -1,5 +1,6 @@
 import { BaseApi } from './baseApi'
 import type { Supplier, SupplierFilters, SupplierListResult, CreateSupplierDto, UpdateSupplierDto } from '@/types/supplier'
+import type { SupplierExpenseSuggestion } from '@/types/expense'
 
 class SupplierApi extends BaseApi {
     async getSuppliers(filters?: SupplierFilters): Promise<SupplierListResult> {
@@ -39,6 +40,10 @@ class SupplierApi extends BaseApi {
 
     async deleteSupplier(id: number): Promise<void> {
         await this.delete<void>(`/suppliers/${id}`)
+    }
+
+    async getSupplierExpenses(supplierId: number): Promise<SupplierExpenseSuggestion[]> {
+        return this.get<SupplierExpenseSuggestion[]>(`/suppliers/${supplierId}/expenses`)
     }
 }
 

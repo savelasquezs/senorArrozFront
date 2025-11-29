@@ -34,6 +34,26 @@
                     </BaseButton>
                 </div>
 
+                <div v-if="supplierHasFavoriteExpenses" class="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-emerald-100 bg-emerald-50/60 px-3 py-2 mb-3">
+                    <div class="flex items-center gap-2 text-sm text-emerald-700">
+                        <SparklesIcon class="w-4 h-4" />
+                        <span>
+                            {{
+                                showAllSupplierExpenses
+                                    ? 'Mostrando todos los gastos. Los frecuentes aparecen primero.'
+                                    : 'Mostrando gastos frecuentes para este proveedor.'
+                            }}
+                        </span>
+                    </div>
+                    <BaseButton type="button" variant="ghost" size="sm" class="text-emerald-700 hover:bg-emerald-100"
+                        @click="toggleExpenseOptionMode">
+                        {{ showAllSupplierExpenses ? 'Ver solo frecuentes' : 'Mostrar todos' }}
+                    </BaseButton>
+                </div>
+                <p v-else-if="supplierExpensesLoading" class="text-xs text-gray-500 mb-3">
+                    Buscando gastos frecuentes para este proveedor...
+                </p>
+
                 <div v-if="formData.expenseDetails.length === 0"
                     class="text-center py-8 text-gray-400 border-2 border-dashed rounded-lg">
                     <p>No hay detalles agregados</p>
@@ -64,8 +84,8 @@
                             class="flex items-center gap-2 border rounded-md p-2 bg-white hover:bg-gray-50 transition-colors">
                             <!-- Gasto (más ancho) -->
                             <div class="flex-1 min-w-[220px]">
-                                <BaseSelect v-model="detail.expenseId" :options="expenseOptions"
-                                    placeholder="Buscar gasto..." value-key="value" display-key="label" searchable
+                                <BaseSelect v-model="detail.expenseId" :options="prioritizedExpenseOptions"
+                                    :placeholder="expenseSelectPlaceholder" value-key="value" display-key="label" searchable
                                     required @update:model-value="onExpenseSelected(index, $event)" />
                             </div>
 
@@ -192,7 +212,7 @@
 
 <script setup lang="ts">
 import { ref, computed, watch, onMounted } from 'vue'
-import type { ExpenseHeader, CreateExpenseHeaderDto, UpdateExpenseHeaderDto, CreateExpenseDetailDto, CreateExpenseBankPaymentDto } from '@/types/expense'
+import type { ExpenseHeader, CreateExpenseHeaderDto, UpdateExpenseHeaderDto, CreateExpenseDetailDto, CreateExpenseBankPaymentDto, SupplierExpenseSuggestion } from '@/types/expense'
 import type { Supplier, CreateSupplierDto } from '@/types/supplier'
 import { expenseHeaderApi } from '@/services/MainAPI/expenseHeaderApi'
 import { bankApi } from '@/services/MainAPI/bankApi'
@@ -205,7 +225,7 @@ import BaseDialog from '@/components/ui/BaseDialog.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseInput from '@/components/ui/BaseInput.vue'
 import BaseSelect from '@/components/ui/BaseSelect.vue'
-import { PlusIcon, TrashIcon } from '@heroicons/vue/24/outline'
+import { PlusIcon, TrashIcon, SparklesIcon } from '@heroicons/vue/24/outline'
 
 interface Props {
     isOpen: boolean
@@ -247,6 +267,9 @@ const formData = ref<{
 const supplierOptions = ref<Array<{ value: number; label: string }>>([])
 const bankOptions = ref<Array<{ value: number; label: string }>>([])
 const expenseOptions = ref<Array<{ value: number; label: string; description?: string }>>([])
+const supplierExpenseSuggestions = ref<SupplierExpenseSuggestion[]>([])
+const supplierExpensesLoading = ref(false)
+const showAllSupplierExpenses = ref(false)
 const suppliersLoading = ref(false)
 const showSupplierModal = ref(false)
 const supplierFormLoading = ref(false)
@@ -262,6 +285,98 @@ const newSupplier = ref<SupplierFormState>({
     phone: '',
     address: '',
     email: ''
+})
+
+const formatLastUsedAt = (value?: string | null) => {
+    if (!value) return ''
+    try {
+        return new Date(value).toLocaleDateString('es-CO', {
+            day: '2-digit',
+            month: 'short',
+            year: 'numeric'
+        })
+    } catch {
+        return ''
+    }
+}
+
+const favoriteExpenseOptions = computed(() => {
+    if (!supplierExpenseSuggestions.value.length) return []
+
+    const optionMap = new Map(expenseOptions.value.map(option => [option.value, option]))
+
+    return supplierExpenseSuggestions.value.map((suggestion) => {
+        const baseOption = optionMap.get(suggestion.expenseId)
+        const descriptionParts: string[] = []
+
+        if (suggestion.lastUnitPrice !== undefined && suggestion.lastUnitPrice !== null) {
+            descriptionParts.push(`Último ${formatCurrency(suggestion.lastUnitPrice)}`)
+        }
+
+        const formattedDate = formatLastUsedAt(suggestion.lastUsedAt)
+        if (formattedDate) {
+            descriptionParts.push(`Actualizado ${formattedDate}`)
+        }
+
+        const mergedDescription = descriptionParts.length > 0
+            ? descriptionParts.join(' • ')
+            : baseOption?.description
+
+        return {
+            value: suggestion.expenseId,
+            label: baseOption?.label ?? `${suggestion.expenseName} - ${suggestion.expenseUnit}`,
+            description: mergedDescription
+        }
+    })
+})
+
+const selectedExpenseIds = computed(() => {
+    return new Set(
+        formData.value.expenseDetails
+            .map(detail => detail.expenseId)
+            .filter((id): id is number => typeof id === 'number' && id > 0)
+    )
+})
+
+const prioritizedExpenseOptions = computed(() => {
+    if (!favoriteExpenseOptions.value.length) {
+        return expenseOptions.value
+    }
+
+    const seen = new Set<number>()
+    const result: Array<{ value: number; label: string; description?: string }> = []
+
+    const pushOption = (option?: { value: number; label: string; description?: string }) => {
+        if (!option || seen.has(option.value)) return
+        seen.add(option.value)
+        result.push(option)
+    }
+
+    favoriteExpenseOptions.value.forEach(pushOption)
+    selectedExpenseIds.value.forEach(id => {
+        const existing = expenseOptions.value.find(option => option.value === id)
+        pushOption(existing)
+    })
+
+    if (showAllSupplierExpenses.value) {
+        expenseOptions.value.forEach(pushOption)
+    }
+
+    return result.length > 0 ? result : expenseOptions.value
+})
+
+const supplierHasFavoriteExpenses = computed(() => favoriteExpenseOptions.value.length > 0)
+
+const expenseSelectPlaceholder = computed(() => {
+    if (supplierExpensesLoading.value) {
+        return 'Cargando gastos frecuentes...'
+    }
+
+    if (supplierHasFavoriteExpenses.value && !showAllSupplierExpenses.value) {
+        return 'Gastos frecuentes del proveedor'
+    }
+
+    return 'Buscar gasto...'
 })
 
 // Cargar datos iniciales
@@ -290,6 +405,25 @@ onMounted(async () => {
 
     await loadSuppliers()
 })
+
+watch(() => formData.value.supplierId, async (supplierId) => {
+    supplierExpenseSuggestions.value = []
+    showAllSupplierExpenses.value = false
+
+    if (!supplierId) {
+        return
+    }
+
+    try {
+        supplierExpensesLoading.value = true
+        supplierExpenseSuggestions.value = await supplierApi.getSupplierExpenses(supplierId)
+    } catch (err) {
+        console.error('Error loading supplier expenses:', err)
+        supplierExpenseSuggestions.value = []
+    } finally {
+        supplierExpensesLoading.value = false
+    }
+}, { immediate: true })
 
 // Inicializar formulario cuando se abre el modal
 const initializeForm = async () => {
@@ -353,6 +487,13 @@ const initializeForm = async () => {
 watch([() => props.isOpen, () => props.editingExpense], async () => {
     await initializeForm()
 }, { immediate: true })
+
+const toggleExpenseOptionMode = () => {
+    if (!supplierHasFavoriteExpenses.value) {
+        return
+    }
+    showAllSupplierExpenses.value = !showAllSupplierExpenses.value
+}
 
 // Computed
 const totalExpenses = computed(() => {

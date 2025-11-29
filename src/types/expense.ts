@@ -148,3 +148,12 @@ export interface ExpenseFilters {
 
 export type ExpenseListResult = PagedResult<Expense>
 
+export interface SupplierExpenseSuggestion {
+    expenseId: number
+    expenseName: string
+    expenseUnit: string
+    usageCount: number
+    lastUsedAt?: string
+    lastUnitPrice?: number
+}
+
