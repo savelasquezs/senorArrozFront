@@ -13,7 +13,8 @@
             </BaseInput>
 
             <BaseInput v-model="form.phone1" label="Teléfono Principal" type="tel" placeholder="3001234567" required
-                :error="errors.phone1" :maxlength="10" @input="validatePhone('phone1'); validateForm()">
+                :error="errors.phone1" :maxlength="10" @paste="handlePhonePaste('phone1', $event)"
+                @input="normalizePhone('phone1'); validatePhone('phone1'); validateForm()">
                 <template #icon>
                     <PhoneIcon class="w-4 h-4" />
                 </template>
@@ -23,7 +24,8 @@
         <!-- Secondary Phone -->
         <div>
             <BaseInput v-model="form.phone2" label="Teléfono Secundario" type="tel" placeholder="3007654321"
-                :error="errors.phone2" :maxlength="10" @input="validatePhone('phone2'); validateForm()">
+                :error="errors.phone2" :maxlength="10" @paste="handlePhonePaste('phone2', $event)"
+                @input="normalizePhone('phone2'); validatePhone('phone2'); validateForm()">
                 <template #icon>
                     <PhoneIcon class="w-4 h-4" />
                 </template>
@@ -259,6 +261,25 @@ const validatePhone = (field: 'phone1' | 'phone2') => {
     }
 
     errors[field] = ''
+}
+
+const normalizePhone = (field: 'phone1' | 'phone2') => {
+    form[field] = form[field].replace(/\D/g, '').slice(0, 10)
+}
+
+const handlePhonePaste = (field: 'phone1' | 'phone2', event: ClipboardEvent) => {
+    event.preventDefault()
+    const pasted = event.clipboardData?.getData('text') ?? ''
+    const clean = pasted.replace(/\D/g, '').slice(0, 10)
+
+    const input = event.target as HTMLInputElement
+    const start = input.selectionStart ?? form[field].length
+    const end = input.selectionEnd ?? form[field].length
+
+    const newValue = form[field].slice(0, start) + clean + form[field].slice(end)
+    form[field] = newValue.slice(0, 10)
+    validatePhone(field)
+    validateForm()
 }
 
 const validateBranch = () => {

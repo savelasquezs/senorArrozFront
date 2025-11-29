@@ -8,8 +8,8 @@
         <!-- Customer Search -->
         <div class="space-y-3">
             <!-- Search Input -->
-            <BaseInput v-model="searchQuery" placeholder="Buscar por teléfono o nombre..." @input="handleSearch"
-                size="sm">
+            <BaseInput v-model="searchQuery" placeholder="Buscar por teléfono o nombre..." @paste="handlePaste"
+                @input="handleSearch" size="sm">
                 <template #prepend>
                     <MagnifyingGlassIcon class="w-4 h-4 text-gray-400" />
                 </template>
@@ -139,6 +139,25 @@ const handleSearch = () => {
         customer.phone1?.toLowerCase().includes(query) ||
         customer.phone2?.toLowerCase().includes(query)
     )
+}
+
+const normalizePhone = (value: string) => {
+    return value.replace(/\D/g, '')
+}
+
+const handlePaste = (event: ClipboardEvent) => {
+    const pasted = event.clipboardData?.getData('text') ?? ''
+    if (!pasted) {
+        return
+    }
+    event.preventDefault()
+    const cleaned = normalizePhone(pasted)
+    const input = event.target as HTMLInputElement
+    const start = input.selectionStart ?? searchQuery.value.length
+    const end = input.selectionEnd ?? searchQuery.value.length
+    const newValue = searchQuery.value.slice(0, start) + cleaned + searchQuery.value.slice(end)
+    searchQuery.value = newValue
+    handleSearch()
 }
 
 const selectCustomer = (customer: Customer) => {
