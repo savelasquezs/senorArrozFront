@@ -166,6 +166,14 @@ export const useOrdersDraftsStore = defineStore('ordersDrafts', () => {
         )
     }
 
+    /** Añade un cliente a la lista del store si no está (p. ej. recién creado), para que getCustomer lo encuentre. */
+    const ensureCustomerInList = (customer: Customer) => {
+        const exists = customers.value.some((c) => c.id === customer.id)
+        if (!exists) {
+            customers.value = [customer, ...customers.value]
+        }
+    }
+
     const updateOrderNotes = (notes: string) => {
         if (!currentTabId.value) return
 
@@ -393,6 +401,7 @@ export const useOrdersDraftsStore = defineStore('ordersDrafts', () => {
         updateCustomer,
         updateAddress,
         addAddressToCustomer,
+        ensureCustomerInList,
         updateOrderNotes,
         updateGuestName,
         updateDeliveryFee,

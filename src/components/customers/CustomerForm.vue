@@ -1,4 +1,4 @@
-<!-- src/components/CustomerForm.vue -->
+c<!-- src/components/CustomerForm.vue -->
 <template>
     <form @submit.prevent="handleSubmit" class="space-y-6">
         <!-- Customer Information -->
@@ -99,8 +99,8 @@
             </BaseButton>
 
             <BaseButton type="submit" variant="primary" :loading="loading" :disabled="!isFormValid">
-                {{ customer ? 'Actualizar' : 'Crear' }} Cliente
-            </BaseButton>
+                {{ submitButtonText || (customer ? 'Actualizar' : 'Crear') + ' Cliente' }}
+            </BaseButton>       
         </div>
     </form>
 
@@ -133,12 +133,15 @@ interface Props {
     loading?: boolean
     canSelectBranch?: boolean
     initialPhone?: string
+    /** Texto del botón de envío (ej. "Crear Cliente"). Si no se pasa, se usa "Actualizar"/"Crear" según haya customer. */
+    submitButtonText?: string
 }
 
 const props = withDefaults(defineProps<Props>(), {
     loading: false,
     canSelectBranch: false,
-    initialPhone: ''
+    initialPhone: '',
+    submitButtonText: ''
 })
 
 const emit = defineEmits<{

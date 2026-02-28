@@ -116,6 +116,10 @@ const orderTypeOptions = [
 // Methods
 const handleCustomerSelected = (customer: Customer) => {
     if (props.mode === 'draft') {
+        // Asegurar que el cliente esté en la lista del store (p. ej. recién creado) para que getCustomer lo encuentre
+        if (customer) {
+            ordersDraftsStore!.ensureCustomerInList(customer)
+        }
         // Lógica de OrderSidebar (pedidos en creación)
         ordersDraftsStore!.updateCustomer(customer)
 
@@ -135,6 +139,7 @@ const handleCustomerSelected = (customer: Customer) => {
             const primaryAddress = customer.addresses.find(a => a.isPrimary)
             const addressToSelect = primaryAddress || customer.addresses[0]
             ordersDraftsStore!.updateAddress(addressToSelect)
+            ordersDraftsStore!.addAddressToCustomer(customer.id, addressToSelect)
         } else {
             ordersDraftsStore!.updateAddress(null)
         }
