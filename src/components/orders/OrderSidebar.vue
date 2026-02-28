@@ -84,6 +84,7 @@ import { computed, ref, watch } from 'vue'
 import { useOrderPersistence } from '@/composables/useOrderPersistence'
 import { useOrderValidation } from '@/composables/useOrderValidation'
 import { useOrderTabs } from '@/composables/useOrderTabs'
+import { useOrderSubmission } from '@/composables/useOrderSubmission'
 
 import { useToast } from '@/composables/useToast'
 import type { Customer, CustomerAddress } from '@/types/customer'
@@ -107,6 +108,7 @@ import {
 // Composables
 const { ordersStore } = useOrderPersistence()
 const { createNewTab, closeTab } = useOrderTabs()
+const { submitOrder } = useOrderSubmission()
 const { success, error: showError } = useToast()
 
 // State
@@ -230,23 +232,24 @@ const handleSubmitOrder = async () => {
     // If valid, submit
     if (!currentOrder.value) return
 
+    const tabToClose = currentTabId.value
     try {
+        await submitOrder(currentOrder.value)
+
         // Close the current tab and clean up
-        if (currentTabId.value) {
-            closeTab(currentTabId.value)
+        if (tabToClose) {
+            closeTab(tabToClose)
         }
 
-        // Show success message
         success(
             'Pedido creado exitosamente',
             3000
         )
-
     } catch (error: any) {
         console.error('Error submitting order:', error)
         showError(
             'Error al crear pedido',
-            error.message || 'No se pudo crear el pedido. Intenta nuevamente.'
+            error?.message || ordersStore.error || 'No se pudo crear el pedido. Intenta nuevamente.'
         )
     }
 }

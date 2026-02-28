@@ -79,7 +79,6 @@ import OrderItem from '@/components/orders/OrderItem.vue'
 // Icons
 import {
     ShoppingCartIcon,
-    PlusIcon,
     TrashIcon
 } from '@heroicons/vue/24/outline'
 
@@ -180,9 +179,7 @@ const handleClearAll = () => {
     }
 }
 
-const handleAddProducts = () => {
-    emit('addProducts')
-}
+
 </script>
 
 <style scoped>
