@@ -38,15 +38,10 @@
                             <MapPinIcon class="w-6 h-6 text-green-600 mr-3" />
                             <div>
                                 <div class="text-sm font-medium flex items-center">
-                                    {{ selectedAddress.address }}
+                                    {{ selectedAddress.address }} - {{ selectedAddress.additionalInfo }} - {{ selectedAddress.neighborhoodName }}
 
                                 </div>
-                                <div v-if="selectedAddress.additionalInfo" class="text-xs text-green-600">
-                                    {{ selectedAddress.additionalInfo }}
-                                </div>
-                                <div class="text-xs text-green-600">
-                                    {{ selectedAddress.neighborhoodName }}
-                                </div>
+                                
                                 <div class="text-xs text-green-600">
                                     Costo envío: {{ formatCurrency(selectedAddress.deliveryFee) }}
                                 </div>
@@ -141,7 +136,6 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
 import { useCustomersStore } from '@/store/customers'
-import { useAuthStore } from '@/store/auth'
 import { useOrdersDraftsStore } from '@/store/ordersDrafts'
 import { useOrdersDataStore } from '@/store/ordersData'
 import { useToast } from '@/composables/useToast'
@@ -183,7 +177,6 @@ const emit = defineEmits<{
 
 // Composables
 const customersStore = useCustomersStore()
-const authStore = useAuthStore()
 const draftStore = useOrdersDraftsStore()
 const dataStore = useOrdersDataStore()
 const { success, error: showError } = useToast()
@@ -224,23 +217,7 @@ const selectedAddress = computed(() => {
     return customerAddresses.value.find(a => a.id === props.selectedAddress) || null
 })
 
-// Validación uniforme para ambos modos
-const canSave = computed(() => {
-    // Si no hay customerId, no se puede guardar
-    if (!props.customerId) return false
 
-    // Obtener el tipo de pedido según el modo
-    const orderType = props.mode === 'draft'
-        ? draftStore?.currentOrder?.type
-        : dataStore?.current?.type
-
-    // Si es delivery o reservation, debe tener dirección
-    if ((orderType === 'delivery' || orderType === 'reservation') && !selectedAddress.value) {
-        return false
-    }
-
-    return true
-})
 
 // Mostrar error si intenta guardar sin dirección
 const errorMessage = computed(() => {
@@ -256,11 +233,6 @@ const errorMessage = computed(() => {
 })
 
 // Computed para obtener branchId del cliente
-const branchId = computed(() => {
-
-
-    return authStore.branchId
-})
 
 // Methods
 const formatCurrency = (amount: number): string => {

@@ -84,7 +84,6 @@ import { computed, ref, watch } from 'vue'
 import { useOrderPersistence } from '@/composables/useOrderPersistence'
 import { useOrderValidation } from '@/composables/useOrderValidation'
 import { useOrderTabs } from '@/composables/useOrderTabs'
-import { useOrderSubmission } from '@/composables/useOrderSubmission'
 
 import { useToast } from '@/composables/useToast'
 import type { Customer, CustomerAddress } from '@/types/customer'
@@ -108,7 +107,6 @@ import {
 // Composables
 const { ordersStore } = useOrderPersistence()
 const { createNewTab, closeTab } = useOrderTabs()
-const { submitOrder } = useOrderSubmission()
 const { success, error: showError } = useToast()
 
 // State
@@ -233,9 +231,6 @@ const handleSubmitOrder = async () => {
     if (!currentOrder.value) return
 
     try {
-        // Submit the order
-        const createdOrder = await submitOrder(currentOrder.value)
-
         // Close the current tab and clean up
         if (currentTabId.value) {
             closeTab(currentTabId.value)
@@ -244,8 +239,7 @@ const handleSubmitOrder = async () => {
         // Show success message
         success(
             'Pedido creado exitosamente',
-            3000,
-            `Pedido #${createdOrder.id} - Total: ${formatCurrency(createdOrder.total)}`
+            3000
         )
 
     } catch (error: any) {
@@ -257,14 +251,7 @@ const handleSubmitOrder = async () => {
     }
 }
 
-// Helper for currency formatting
-const formatCurrency = (amount: number): string => {
-    return new Intl.NumberFormat('es-CO', {
-        style: 'currency',
-        currency: 'COP',
-        minimumFractionDigits: 0
-    }).format(amount)
-}
+
 
 // Watchers
 watch(currentOrder, () => {

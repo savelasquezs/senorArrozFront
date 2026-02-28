@@ -10,10 +10,7 @@
             <ShoppingCartIcon class="w-8 h-8 text-gray-400 mx-auto mb-2" />
             <h3 class="text-sm font-medium text-gray-900 mb-1">No hay productos</h3>
             <p class="text-xs text-gray-500 mb-3">Agrega productos desde el catálogo</p>
-            <BaseButton @click="handleAddProducts" variant="primary" size="sm">
-                <PlusIcon class="w-3 h-3 mr-1" />
-                Agregar
-            </BaseButton>
+          
         </div>
 
         <!-- Items List -->

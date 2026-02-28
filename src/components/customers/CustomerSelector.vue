@@ -21,8 +21,8 @@
                     <UserPlusIcon class="mx-auto h-8 w-8 text-gray-400 mb-2" />
                     <p class="text-sm text-gray-500 mb-3">No se encontró cliente</p>
                     <BaseButton @click="showCreateCustomer" variant="primary" size="sm">
-                        <PlusIcon class="w-4 h-4 mr-2" />
-                        Crear Cliente
+                        
+                        <span class="flex items-center"><PlusIcon class="w-4 h-4 mr-2" />Crear Cliente</span>
                     </BaseButton>
                 </div>
             </div>
