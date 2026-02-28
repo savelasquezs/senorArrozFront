@@ -14,6 +14,7 @@ import type {
 } from '@/types/order'
 import type {
     Customer,
+    CustomerAddress,
 } from '@/types/customer'
 import type {
     Bank,
@@ -148,6 +149,21 @@ export const useOrdersDraftsStore = defineStore('ordersDrafts', () => {
         // Recalcular totales (esto también hace el set en el Map)
         recalculateTotals(updatedOrder)
         saveToLocalStorage()
+    }
+
+    /** Añade o actualiza una dirección en la lista de clientes del store para que getAddress la encuentre (p. ej. tras crear una nueva). */
+    const addAddressToCustomer = (customerId: number, address: CustomerAddress) => {
+        const idx = customers.value.findIndex((c) => c.id === customerId)
+        if (idx === -1) return
+        const customer = customers.value[idx]
+        const prev = customer.addresses ?? []
+        const existingIdx = prev.findIndex((a) => a.id === address.id)
+        const nextAddresses = existingIdx >= 0
+            ? prev.map((a, i) => (i === existingIdx ? address : a))
+            : [...prev, address]
+        customers.value = customers.value.map((c, i) =>
+            i === idx ? { ...c, addresses: nextAddresses } : c
+        )
     }
 
     const updateOrderNotes = (notes: string) => {
@@ -376,6 +392,7 @@ export const useOrdersDraftsStore = defineStore('ordersDrafts', () => {
         // Acciones
         updateCustomer,
         updateAddress,
+        addAddressToCustomer,
         updateOrderNotes,
         updateGuestName,
         updateDeliveryFee,

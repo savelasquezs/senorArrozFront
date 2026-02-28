@@ -156,6 +156,9 @@ const handleCustomerSelected = (customer: Customer) => {
 const handleAddressSelected = (address: CustomerAddress | undefined) => {
     if (props.mode === 'draft') {
         ordersDraftsStore!.updateAddress(address || null)
+        if (address && props.selectedCustomer) {
+            ordersDraftsStore!.addAddressToCustomer(props.selectedCustomer.id, address)
+        }
     } else {
         emit('address-selected', address || null)
     }
