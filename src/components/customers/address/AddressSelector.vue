@@ -119,8 +119,8 @@
                     <!-- Create New Address Button -->
                     <div class="pt-2 border-t border-gray-200">
                         <BaseButton @click="showCreateAddress" variant="outline" size="sm" class="w-full">
-                            <PlusIcon class="w-4 h-4 mr-2" />
-                            Nueva Dirección
+                            
+                           <span class="flex items-center"><PlusIcon class="w-4 h-4 mr-2" />Nueva Dirección</span>
                         </BaseButton>
                     </div>
                 </div>

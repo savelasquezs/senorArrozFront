@@ -10,7 +10,7 @@
             <!-- Search Input -->
             <BaseInput v-model="searchQuery" placeholder="Buscar por teléfono o nombre..." @paste="handlePaste"
                 @input="handleSearch" size="sm">
-                <template #prepend>
+                <template #icon>
                     <MagnifyingGlassIcon class="w-4 h-4 text-gray-400" />
                 </template>
             </BaseInput>
