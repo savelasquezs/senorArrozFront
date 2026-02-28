@@ -19,11 +19,18 @@
 				</template>
 			</BaseInput>
 
-			<BaseInput v-model="form.password" label="Contraseña" type="password" placeholder="••••••••" required
+			<BaseInput v-model="form.password" label="Contraseña" :type="showPassword ? 'text' : 'password'" placeholder="Tu contraseña" required
 				:error="errors.password" @blur="validatePassword">
 				<template #icon>
 					<LockClosedIcon class="h-5 w-5 text-gray-400" />
 				</template>
+				<template #append>
+					<BaseButton variant="ghost" size="sm" @click="togglePasswordVisibility">
+						<EyeIcon v-if="showPassword" class="h-5 w-5 text-gray-400" />
+						<EyeSlashIcon v-else class="h-5 w-5 text-gray-400" />
+					</BaseButton>
+				</template>
+				
 			</BaseInput>
 
 			<div class="flex items-center justify-between">
@@ -63,11 +70,15 @@ import {
 	UserIcon,
 	AtSymbolIcon,
 	LockClosedIcon,
-} from '@heroicons/vue/24/outline';
+	EyeIcon,
+	EyeSlashIcon,
+ 	} from '@heroicons/vue/24/outline';
 
 const router = useRouter();
 const authStore = useAuthStore();
 const { success, error: showError } = useToast();
+
+const showPassword = ref(false);
 
 const form = reactive({
 	email: '',
@@ -102,6 +113,10 @@ const validatePassword = () => {
 	} else if (form.password.length < 6) {
 		errors.value.password = 'La contraseña debe tener al menos 6 caracteres';
 	}
+};
+
+const togglePasswordVisibility = () => {
+	showPassword.value = !showPassword.value;
 };
 
 const handleSubmit = async () => {

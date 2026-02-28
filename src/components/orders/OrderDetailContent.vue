@@ -270,13 +270,12 @@ import { useOrderPermissions } from '@/composables/useOrderPermissions'
 import { useToast } from '@/composables/useToast'
 import { getOrderTypeDisplayName } from '@/composables/useFormatting'
 import { useOrderStatusChange } from '@/composables/useOrderStatusChange'
-import { useRouter, useRoute } from 'vue-router'
+import { useRouter } from 'vue-router'
 import type { OrderDetailView, OrderStatus, UpdateOrderDetailDto } from '@/types/order'
 import type { Customer } from '@/types/customer'
 import { useOrdersDraftsStore } from '@/store/ordersDrafts'
 import { useOrdersDataStore } from '@/store/ordersData'
 import { useAuthStore } from '@/store/auth'
-import { onMounted } from 'vue'
 import { customerApi } from '@/services/MainAPI/customerApi'
 
 import type { OrderListItem } from '@/types/order'
@@ -316,7 +315,6 @@ const emit = defineEmits<{
 }>()
 const order = ref<OrderDetailView | null>(null)
 
-const route = useRoute()
 
 
 const { formatDateTime, formatCurrency } = useFormatting()
@@ -366,6 +364,23 @@ const visibleTabs = computed(() => {
     // Los permisos de edición se manejan dentro de cada componente
     return tabs
 })
+const loadCustomer = async (customerId: number) => {
+    if (!customerId) return
+
+    customerLoading.value = true
+    customerError.value = null
+
+    try {
+        const response = await customerApi.getCustomerById(customerId)
+        customer.value = response.data
+    } catch (err: any) {
+        console.error('Error loading customer:', err)
+        customerError.value = 'No se pudieron cargar los teléfonos'
+        customer.value = null
+    } finally {
+        customerLoading.value = false
+    }
+}
 
 // Computed para calcular efectivo a cobrar
 const cashAmount = computed(() => {
@@ -392,23 +407,6 @@ watch(ordersDataStoreCurrent, (newOrder) => {
 }, { immediate: true })
 
 // Cargar datos del cliente completo
-const loadCustomer = async (customerId: number) => {
-    if (!customerId) return
-
-    customerLoading.value = true
-    customerError.value = null
-
-    try {
-        const response = await customerApi.getCustomerById(customerId)
-        customer.value = response.data
-    } catch (err: any) {
-        console.error('Error loading customer:', err)
-        customerError.value = 'No se pudieron cargar los teléfonos'
-        customer.value = null
-    } finally {
-        customerLoading.value = false
-    }
-}
 
 const handleStatusChange = async (newStatus: OrderStatus) => {
     if (!order.value) return
@@ -652,40 +650,6 @@ const updateOrderCustomer = (updatedOrder: any) => {
     })
 }
 
-// Cargar datos necesarios para pagos
-const loadPaymentData = async () => {
-    try {
-        await Promise.all([
-            ordersStore.loadBanks(),
-            ordersStore.loadApps()
-        ])
-    } catch (err: any) {
-        console.error('Error loading payment data:', err)
-    }
-}
-
-const fetchOrderDetail = async () => {
-    try {
-        const orderId = parseInt(route.params.id as string) || props.flatOrder.id
-        await ordersDataStore.fetchById(orderId)
-        order.value = ordersDataStore.current
-        editableGuestName.value = order.value?.guestName || ''
-        editableNotes.value = order.value?.notes || ''
-    } catch (err: any) {
-        console.error('Error loading order:', err)
-    }
-}
-onMounted(async () => {
-    await Promise.all([
-        fetchOrderDetail(),
-        loadPaymentData()
-    ])
-
-    // Cargar cliente completo si hay customerId (después de que fetchOrderDetail termine)
-    if (order.value?.customerId) {
-        await loadCustomer(order.value.customerId)
-    }
-})
 
 
 </script>

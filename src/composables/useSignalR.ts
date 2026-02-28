@@ -8,6 +8,25 @@ export function useSignalR(hubUrl: string) {
 
     const connect = async () => {
         try {
+            // #region agent log
+            fetch('http://127.0.0.1:7818/ingest/9a13a57c-516e-4a78-9ba1-f52831bbe061', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Debug-Session-Id': '1f0ff7'
+                },
+                body: JSON.stringify({
+                    sessionId: '1f0ff7',
+                    runId: 'initial',
+                    hypothesisId: 'H1',
+                    location: 'useSignalR.ts:connect',
+                    message: 'SignalR connect called',
+                    data: { hubUrl },
+                    timestamp: Date.now()
+                })
+            }).catch(() => { })
+            // #endregion agent log
+
             connection.value = new signalR.HubConnectionBuilder()
                 .withUrl(hubUrl, {
                     accessTokenFactory: () => {
@@ -41,6 +60,24 @@ export function useSignalR(hubUrl: string) {
             console.log('SignalR: Conectado al hub de pedidos')
         } catch (err: any) {
             error.value = err.message || 'Error al conectar'
+            // #region agent log
+            fetch('http://127.0.0.1:7818/ingest/9a13a57c-516e-4a78-9ba1-f52831bbe061', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Debug-Session-Id': '1f0ff7'
+                },
+                body: JSON.stringify({
+                    sessionId: '1f0ff7',
+                    runId: 'initial',
+                    hypothesisId: 'H2',
+                    location: 'useSignalR.ts:connect',
+                    message: 'SignalR connect failed',
+                    data: { hubUrl, errorMessage: err?.message ?? 'unknown' },
+                    timestamp: Date.now()
+                })
+            }).catch(() => { })
+            // #endregion agent log
             console.error('Error SignalR:', err)
         }
     }
