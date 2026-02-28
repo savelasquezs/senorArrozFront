@@ -34,7 +34,7 @@
         <div v-if="localForm.address.trim() && showMapsSelector">
             <GoogleMapsSelector v-model="selectedLocation" :error="errors.latitude || errors.longitude"
                 :initial-address="localForm.address" @location-confirmed="handleLocationConfirmed"
-                @address-updated="handleAddressUpdated" :key="`maps-${props.addressId || 'new'}`" />
+                 :key="`maps-${props.addressId || 'new'}`" />
         </div>
 
         <!-- Primary Address Checkbox -->
@@ -228,12 +228,7 @@ const handleLocationConfirmed = () => {
     errors.longitude = ""
 }
 
-const handleAddressUpdated = (newAddress: string) => {
-    if (newAddress && newAddress.trim()) {
-        localForm.address = newAddress.trim()
-        errors.address = ""
-    }
-}
+
 
 const handleAddressBlur = () => {
     if (localForm.address.trim()) {

@@ -99,19 +99,17 @@
                                 <MapPinIcon class="w-5 h-5 text-gray-400 mr-2 mt-0.5 flex-shrink-0" />
                                 <div class="flex-1 min-w-0">
                                     <div class="text-sm font-medium flex items-center">
-                                        {{ address.address }}
-                                        <BaseBadge v-if="address.isPrimary" type="success" size="sm"
-                                            class="ml-2 flex-shrink-0">
-                                            Principal
-                                        </BaseBadge>
-                                    </div>
-                                    <div class="text-xs text-gray-500 mt-1">
-                                        {{ address.neighborhoodName }}
-                                    </div>
-                                    <div class="text-xs text-gray-500">
-                                        {{ formatCurrency(address.deliveryFee) }}
+                                        {{ address.address }},  {{ address.additionalInfo }}
+                    
                                     </div>
                                 </div>
+                            </div>
+                            <div class="text-xs text-gray-500 mt-1 flex items-center">
+                                {{ address.neighborhoodName }} - {{ formatCurrency(address.deliveryFee) }}
+                                <BaseBadge v-if="address.isPrimary" type="success" size="sm"
+                                    class="ml-2 flex-shrink-0">
+                                    Principal
+                                </BaseBadge>
                             </div>
                         </div>
                     </div>
