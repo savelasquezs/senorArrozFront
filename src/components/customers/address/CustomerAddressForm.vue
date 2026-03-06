@@ -28,13 +28,14 @@
                     <CurrencyDollarIcon class="w-4 h-4" />
                 </template>
             </BaseInput>
+
         </div>
 
         <!-- Step 3: Google Maps Selector -->
         <div v-if="localForm.address.trim() && showMapsSelector">
             <GoogleMapsSelector v-model="selectedLocation" :error="errors.latitude || errors.longitude"
                 :initial-address="localForm.address" @location-confirmed="handleLocationConfirmed"
-                 :key="`maps-${props.addressId || 'new'}`" />
+                :key="`maps-${props.addressId || 'new'}`" />
         </div>
 
         <!-- Primary Address Checkbox -->
@@ -158,10 +159,14 @@ const validateNeighborhood = () => {
         errors.neighborhoodId = "Selecciona un barrio"
         return
     }
-    localForm.deliveryFee =
-        branchesStore.currentNeighborhoods?.find(
-            (n) => n.id === localForm.neighborhoodId
-        )?.deliveryFee || 0
+    // Al CREAR: solo pre-llenar deliveryFee si está en 0 (primera vez). No sobrescribir si el usuario ya lo modificó.
+    // Al editar: nunca sobrescribir.
+    if (!props.addressId && Number(localForm.deliveryFee) === 0) {
+        localForm.deliveryFee =
+            branchesStore.currentNeighborhoods?.find(
+                (n) => n.id === localForm.neighborhoodId
+            )?.deliveryFee || 0
+    }
     errors.neighborhoodId = ""
 }
 
@@ -209,6 +214,7 @@ const validateForm = () => {
 }
 
 const handleSubmit = () => {
+
     validateForm()
     if (!isFormValid.value) return
     emit("submit", { ...localForm })
