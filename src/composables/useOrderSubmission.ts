@@ -72,8 +72,13 @@ export function useOrderSubmission() {
             dto.deliveryFee = draft.deliveryFee
         }
 
-        if (draft.reservedFor && draft.type === 'reservation') {
+        // reservedFor y prepareAt para todos los tipos (pedidos programados)
+        if (draft.reservedFor) {
             dto.reservedFor = draft.reservedFor
+            dto.type = 'reservation' // Si hay fecha de entrega, es reserva
+        }
+        if (draft.prepareAt) {
+            dto.prepareAt = draft.prepareAt
         }
 
         return dto

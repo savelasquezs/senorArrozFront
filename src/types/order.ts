@@ -33,6 +33,7 @@ export interface ActiveOrder {
     type: OrderType
     deliveryFee?: number
     reservedFor?: Date
+    prepareAt?: Date
     notes?: string
     orderDetails: OrderDetail[]
     bankPayments: OrderBankPayment[]
@@ -86,6 +87,7 @@ export interface DraftOrder {
     addressDescription: string | null
     deliveryFee: number
     reservedFor: Date | null
+    prepareAt: Date | null
     notes: string
     orderItems: OrderItem[]
     bankPayments: OrderBankPayment[]
@@ -116,6 +118,7 @@ export interface Order {
     status: OrderStatus
     deliveryFee?: number
     reservedFor?: Date
+    prepareAt?: Date
     notes?: string
     orderDetails: OrderDetail[]
     bankPayments: BankPayment[]
@@ -215,6 +218,7 @@ export interface OrderListItem {
     typeDisplayName: string
     deliveryFee: number | null
     reservedFor: string | null
+    prepareAt: string | null
     status: OrderStatus
     statusDisplayName: string
     statusTimes: Record<string, string>
@@ -289,6 +293,7 @@ export interface CreateOrderDto {
     status: OrderStatus
     deliveryFee?: number
     reservedFor?: Date
+    prepareAt?: Date
     notes?: string
     guestName?: string
     orderDetails: CreateOrderDetailDto[]
@@ -321,6 +326,7 @@ export interface UpdateOrderDto {
     type?: OrderType
     deliveryFee?: number
     reservedFor?: Date
+    prepareAt?: Date
     notes?: string
     status?: OrderStatus
     guestName?: string
@@ -347,6 +353,7 @@ export interface OrderFormData {
     type: OrderType
     deliveryFee?: number
     reservedFor?: Date
+    prepareAt?: Date
     notes?: string
 }
 

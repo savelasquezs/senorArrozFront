@@ -18,18 +18,32 @@
                 <BaseRadioGroup v-model="selectedType" :options="orderTypeOptions" name="order-type" size="sm" />
             </div>
 
-            <!-- Campo condicional: Fecha de reserva (solo si tipo === 'reservation') -->
-            <div v-if="selectedType === 'reservation'" class="space-y-2">
-                <label class="block text-sm font-medium text-gray-700">
-                    Tener listo a esta hora
-                    <span class="text-red-500">*</span>
-                </label>
-                <input v-model="reservedFor" type="datetime-local"
-                    class="w-full rounded-lg border-gray-300 shadow-sm focus:border-emerald-500 focus:ring-emerald-500"
-                    :min="minDateTime" />
-                <p class="text-xs text-gray-500">
-                    Fecha y hora en que el pedido debe estar listo
-                </p>
+            <!-- Campo condicional: Fecha de entrega y preparación (solo si tipo === 'reservation') -->
+            <div v-if="selectedType === 'reservation'" class="space-y-4">
+                <div class="space-y-2">
+                    <label class="block text-sm font-medium text-gray-700">
+                        Tener listo a esta hora (entrega)
+                        <span class="text-red-500">*</span>
+                    </label>
+                    <input v-model="reservedFor" type="datetime-local"
+                        class="w-full rounded-lg border-gray-300 shadow-sm focus:border-emerald-500 focus:ring-emerald-500"
+                        :min="minDateTime"
+                        @change="onReservedForChange" />
+                    <p class="text-xs text-gray-500">
+                        Fecha y hora en que el pedido debe estar listo para el cliente
+                    </p>
+                </div>
+                <div class="space-y-2">
+                    <label class="block text-sm font-medium text-gray-700">
+                        Preparar a esta hora
+                    </label>
+                    <input v-model="prepareAt" type="datetime-local"
+                        class="w-full rounded-lg border-gray-300 shadow-sm focus:border-emerald-500 focus:ring-emerald-500"
+                        :min="minDateTime" />
+                    <p class="text-xs text-gray-500">
+                        Hora en que debe aparecer en cocina (por defecto 1h antes de la entrega)
+                    </p>
+                </div>
             </div>
 
             <!-- Advertencias según tipo seleccionado -->
@@ -93,6 +107,16 @@ const ordersStore = useOrdersDataStore()
 const saving = ref(false)
 const selectedType = ref<'onsite' | 'delivery' | 'reservation'>(props.order.type)
 const reservedFor = ref<string>('')
+const prepareAt = ref<string>('')
+
+// Cuando reservedFor cambia, preparar prepareAt por defecto (reservedFor - 1h)
+const onReservedForChange = () => {
+    if (reservedFor.value) {
+        const rf = new Date(reservedFor.value)
+        rf.setHours(rf.getHours() - 1)
+        prepareAt.value = rf.toISOString().slice(0, 16)
+    }
+}
 
 // Options for order type selector
 const orderTypeOptions = [
@@ -109,10 +133,15 @@ const minDateTime = computed(() => {
 })
 
 const canSave = computed(() => {
-    // Sin cambios
-    if (selectedType.value === props.order.type) return false
-
-    return true // Permitir cambio siempre, la validación se hace en handleSave
+    // Cambio de tipo
+    if (selectedType.value !== props.order.type) return true
+    // Mismo tipo reservation: permitir si cambian reservedFor o prepareAt
+    if (selectedType.value === 'reservation') {
+        const currentRf = props.order.reservedFor ? new Date(props.order.reservedFor).toISOString().slice(0, 16) : ''
+        const currentPa = (props.order as any).prepareAt ? new Date((props.order as any).prepareAt).toISOString().slice(0, 16) : ''
+        return reservedFor.value !== currentRf || prepareAt.value !== currentPa
+    }
+    return false
 })
 
 const validationWarning = computed(() => {
@@ -151,15 +180,23 @@ watch(selectedType, (newType) => {
     }
 })
 
-// Initialize reservedFor if order is already a reservation
+// Initialize reservedFor y prepareAt si el pedido ya es reserva
 watch(() => props.open, (isOpen) => {
     if (isOpen) {
         selectedType.value = props.order.type
         if (props.order.type === 'reservation' && props.order.reservedFor) {
             const date = new Date(props.order.reservedFor)
             reservedFor.value = date.toISOString().slice(0, 16)
+            if (props.order.prepareAt) {
+                prepareAt.value = new Date(props.order.prepareAt).toISOString().slice(0, 16)
+            } else {
+                const pa = new Date(props.order.reservedFor)
+                pa.setHours(pa.getHours() - 1)
+                prepareAt.value = pa.toISOString().slice(0, 16)
+            }
         } else {
             reservedFor.value = ''
+            prepareAt.value = ''
         }
     }
 }, { immediate: true })

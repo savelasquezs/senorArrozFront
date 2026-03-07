@@ -23,6 +23,7 @@ export function useOrderTabs() {
             addressDescription: null,
             deliveryFee: 0,
             reservedFor: null,
+            prepareAt: null,
             notes: '',
             orderItems: [],
             bankPayments: [],

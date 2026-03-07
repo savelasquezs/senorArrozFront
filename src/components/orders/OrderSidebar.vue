@@ -45,6 +45,31 @@
                         </p>
                     </div>
 
+                    <!-- Fecha de entrega y preparación (todos los tipos: recoger, delivery, reserva) -->
+                    <div class="py-3 border-b border-gray-200 space-y-4">
+                        <div class="space-y-2">
+                            <label class="block text-sm font-medium text-gray-700">
+                                Entregar a esta hora
+                                <span v-if="currentOrder.type === 'reservation'" class="text-red-500">*</span>
+                            </label>
+                            <input :value="reservedForLocal" type="datetime-local"
+                                class="w-full rounded-lg border border-gray-300 shadow-sm focus:border-emerald-500 focus:ring-emerald-500 text-sm"
+                                :min="minDateTime" @input="onReservedForInput" />
+
+                        </div>
+                        <div class="space-y-2">
+                            <label class="block text-sm font-medium text-gray-700">
+                                Preparar a esta hora (aparecer en cocina)
+                            </label>
+                            <input :value="prepareAtLocal" type="datetime-local"
+                                class="w-full rounded-lg border border-gray-300 shadow-sm focus:border-emerald-500 focus:ring-emerald-500 text-sm"
+                                :min="minDateTime" @input="onPrepareAtInput" />
+                            <p class="text-xs text-gray-500">
+                                Hora en que debe aparecer en cocina (por defecto 1h antes de la entrega)
+                            </p>
+                        </div>
+                    </div>
+
                     <OrderItemList :tab-id="currentTabId || ''" @add-products="handleAddProducts" />
                     <PaymentSelector :order="currentOrder" @payment-updated="handlePaymentUpdated" />
                 </div>
@@ -151,6 +176,53 @@ const submitButtonTooltip = computed(() => {
 
     return `Faltan ${errors.length} requisitos (click para ver detalles)`
 })
+
+// Fecha/hora para reservas (formato datetime-local: YYYY-MM-DDTHH:mm)
+const minDateTime = computed(() => {
+    const now = new Date()
+    now.setMinutes(now.getMinutes() - now.getTimezoneOffset())
+    return now.toISOString().slice(0, 16)
+})
+
+const reservedForLocal = computed(() => {
+    const rf = currentOrder.value?.reservedFor
+    if (!rf) return ''
+    const d = rf instanceof Date ? rf : new Date(rf)
+    return d.toISOString().slice(0, 16)
+})
+
+const prepareAtLocal = computed(() => {
+    const pa = currentOrder.value?.prepareAt
+    if (!pa) return ''
+    const d = pa instanceof Date ? pa : new Date(pa)
+    return d.toISOString().slice(0, 16)
+})
+
+const onReservedForInput = (e: Event) => {
+    const val = (e.target as HTMLInputElement).value
+    if (!currentTabId.value) return
+    if (!val) {
+        ordersStore.updateReservedFor(null)
+        ordersStore.updatePrepareAt(null)
+        return
+    }
+    const date = new Date(val)
+    ordersStore.updateReservedFor(date)
+    // Por defecto prepareAt = reservedFor - 1h
+    const prepareDate = new Date(date)
+    prepareDate.setHours(prepareDate.getHours() - 1)
+    ordersStore.updatePrepareAt(prepareDate)
+}
+
+const onPrepareAtInput = (e: Event) => {
+    const val = (e.target as HTMLInputElement).value
+    if (!currentTabId.value) return
+    if (!val) {
+        ordersStore.updatePrepareAt(null)
+        return
+    }
+    ordersStore.updatePrepareAt(new Date(val))
+}
 
 // Methods
 const createNewOrder = () => {
@@ -261,6 +333,30 @@ watch(currentOrder, () => {
     // Ya no necesitamos actualizar refs locales, las props se actualizan automáticamente desde el store
     showCustomerDetail.value = false
 }, { immediate: false })
+
+// Valores por defecto: día actual cuando cambia tipo o pestaña (onsite/delivery/reservation)
+// Solo al cambiar tipo o tab, no cuando el usuario limpia (pedido inmediato)
+watch(
+    () => [currentOrder.value?.type, currentTabId.value] as const,
+    () => {
+        if (!currentTabId.value) return
+        const type = currentOrder.value?.type
+        if (!type || (type !== 'onsite' && type !== 'delivery' && type !== 'reservation')) return
+        const order = currentOrder.value
+        if (order?.reservedFor) return // Ya tiene valor, no sobrescribir
+        // Día por defecto: hoy. Hora: 18:00 o la siguiente hora si ya pasó
+        const now = new Date()
+        const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+        let defaultHour = 18
+        if (now.getHours() >= 18) defaultHour = Math.min(22, now.getHours() + 1)
+        today.setHours(defaultHour, 0, 0, 0)
+        const prepareDate = new Date(today)
+        prepareDate.setHours(prepareDate.getHours() - 1)
+        ordersStore.updateReservedFor(today)
+        ordersStore.updatePrepareAt(prepareDate)
+    },
+    { immediate: true }
+)
 </script>
 
 <style scoped>

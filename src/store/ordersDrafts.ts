@@ -223,6 +223,36 @@ export const useOrdersDraftsStore = defineStore('ordersDrafts', () => {
         saveToLocalStorage()
     }
 
+    const updateReservedFor = (date: Date | null) => {
+        if (!currentTabId.value) return
+
+        const order = draftOrders.value.get(currentTabId.value)
+        if (!order) return
+
+        const updatedOrder = {
+            ...order,
+            reservedFor: date,
+        }
+
+        draftOrders.value.set(currentTabId.value, updatedOrder)
+        saveToLocalStorage()
+    }
+
+    const updatePrepareAt = (date: Date | null) => {
+        if (!currentTabId.value) return
+
+        const order = draftOrders.value.get(currentTabId.value)
+        if (!order) return
+
+        const updatedOrder = {
+            ...order,
+            prepareAt: date,
+        }
+
+        draftOrders.value.set(currentTabId.value, updatedOrder)
+        saveToLocalStorage()
+    }
+
     // Helper Methods - COPIAR líneas 468-521
     const recalculateTotals = (order: DraftOrder) => {
         const subtotal = order.orderItems.reduce((sum, item) => sum + item.subtotal, 0)
@@ -311,8 +341,12 @@ export const useOrdersDraftsStore = defineStore('ordersDrafts', () => {
                 return
             }
 
-            // Cargar datos
-            draftOrders.value = new Map(data.draftOrders.map(order => [order.tabId, order]))
+            // Cargar datos (migración: asegurar prepareAt en drafts antiguos)
+            const migratedDrafts = data.draftOrders.map((order: any) => ({
+                ...order,
+                prepareAt: order.prepareAt ?? null
+            }))
+            draftOrders.value = new Map(migratedDrafts.map((order: DraftOrder) => [order.tabId, order]))
             currentTabId.value = data.currentTabId
             nextTabNumber.value = data.nextTabNumber
         } catch (error) {
@@ -404,6 +438,8 @@ export const useOrdersDraftsStore = defineStore('ordersDrafts', () => {
         ensureCustomerInList,
         updateOrderNotes,
         updateGuestName,
+        updateReservedFor,
+        updatePrepareAt,
         updateDeliveryFee,
         recalculateTotals,
         autoAdjustSinglePayment,

@@ -159,6 +159,14 @@
                             </div>
                         </div>
 
+                        <!-- Hora de preparación - cuando existe prepareAt -->
+                        <div v-if="order.prepareAt" class="space-y-2">
+                            <label class="text-xs sm:text-sm font-medium text-gray-700">Preparar a esta hora</label>
+                            <div class="bg-gray-50 rounded-lg p-2 sm:p-3">
+                                <p class="text-xs sm:text-sm text-gray-900">{{ formatDateTime(order.prepareAt) }}</p>
+                            </div>
+                        </div>
+
                         <!-- Tomado por -->
                         <div class="space-y-2">
                             <label class="text-xs sm:text-sm font-medium text-gray-700">Tomado por</label>
@@ -508,6 +516,7 @@ const handleOrderTypeUpdated = (updatedOrder?: any) => {
         typeDisplayName: orderAny.typeDisplayName,
         deliveryFee: orderAny.deliveryFee || null,
         reservedFor: orderAny.reservedFor || null,
+        prepareAt: orderAny.prepareAt || null,
         addressId: orderAny.addressId || null,
         addressDescription: orderAny.addressDescription || null,
         updatedAt: orderAny.updatedAt
