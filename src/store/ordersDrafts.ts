@@ -206,6 +206,22 @@ export const useOrdersDraftsStore = defineStore('ordersDrafts', () => {
         saveToLocalStorage()
     }
 
+    const updateIsLater = (value: boolean) => {
+        if (!currentTabId.value) return
+
+        const order = draftOrders.value.get(currentTabId.value)
+        if (!order) return
+
+        const updatedOrder = {
+            ...order,
+            isLater: value,
+            updatedAt: new Date()
+        }
+
+        draftOrders.value.set(currentTabId.value, updatedOrder)
+        saveToLocalStorage()
+    }
+
     const updateDeliveryFee = (fee: number) => {
         if (!currentTabId.value) return
 
@@ -341,10 +357,11 @@ export const useOrdersDraftsStore = defineStore('ordersDrafts', () => {
                 return
             }
 
-            // Cargar datos (migración: asegurar prepareAt en drafts antiguos)
+            // Cargar datos (migración: asegurar prepareAt e isLater en drafts antiguos)
             const migratedDrafts = data.draftOrders.map((order: any) => ({
                 ...order,
-                prepareAt: order.prepareAt ?? null
+                prepareAt: order.prepareAt ?? null,
+                isLater: order.isLater ?? false
             }))
             draftOrders.value = new Map(migratedDrafts.map((order: DraftOrder) => [order.tabId, order]))
             currentTabId.value = data.currentTabId
@@ -438,6 +455,7 @@ export const useOrdersDraftsStore = defineStore('ordersDrafts', () => {
         ensureCustomerInList,
         updateOrderNotes,
         updateGuestName,
+        updateIsLater,
         updateReservedFor,
         updatePrepareAt,
         updateDeliveryFee,

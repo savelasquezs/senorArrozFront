@@ -46,15 +46,17 @@
                     </div>
                     <div class="space-y-2 flex px-4 ">
                         <label class="block text-sm font-medium text-gray-700 mr-2">Para mas tarde?</label>
-                        <input type="checkbox" v-model="isLater" class="form-checkbox h-5 w-5 text-blue-600">
+                        <input type="checkbox" :checked="currentOrder.isLater" @change="(e) => updateIsLater((e.target as HTMLInputElement).checked)"
+                            class="form-checkbox h-5 w-5 text-blue-600">
                     </div>
                     <!-- Fecha de entrega y preparación (todos los tipos: recoger, delivery, reserva) -->
-                    <div class="py-3 border-b border-gray-200 space-y-4" v-if="isLater">
+                    <div class="py-3 border-b border-gray-200 space-y-4" v-if="currentOrder.isLater">
                         <label class="block text-sm font-medium text-gray-700">Hora preparación</label>
                         <VueDatePicker v-model="prepareAtLocal" time-picker placeholder="Hora preparación"
                             @update:model-value="onPrepareAtInput" />
                         <label class="block text-sm font-medium text-gray-700">Hora entrega</label>
-                        <VueDatePicker v-model="reservedForLocal" time-picker placeholder="Hora entrega" />
+                        <VueDatePicker v-model="reservedForLocal" time-picker placeholder="Hora entrega"
+                            @update:model-value="onReservedForInput" />
                     </div>
 
                     <OrderItemList :tab-id="currentTabId || ''" @add-products="handleAddProducts" />
@@ -133,7 +135,6 @@ const { success, error: showError } = useToast()
 // State
 const showCustomerDetail = ref(false)
 const selectedCustomer = ref<Customer | null>(null)
-const isLater = ref(false)
 const prepareAtLocal = ref<LocalHour | null>(null)
 const reservedForLocal = ref<LocalHour | null>(null)
 
@@ -175,13 +176,24 @@ const submitButtonTooltip = computed(() => {
 })
 
 const onPrepareAtInput = (time: LocalHour | undefined) => {
-    console.log('onPrepareAtInput', time)
-
     if (!time) {
         reservedForLocal.value = null
+        if (currentTabId.value) ordersStore.updatePrepareAt(null)
         return
     }
     reservedForLocal.value = { hours: time.hours + 1, minutes: time.minutes, seconds: time.seconds }
+    const prepareDate = DateTimeService.localHourToDate(time)
+    const reserveDate = DateTimeService.localHourToDate(reservedForLocal.value)
+    if (currentTabId.value) {
+        ordersStore.updatePrepareAt(prepareDate)
+        ordersStore.updateReservedFor(reserveDate)
+    }
+}
+
+const onReservedForInput = (time: LocalHour | undefined) => {
+    if (!time || !currentTabId.value) return
+    const date = DateTimeService.localHourToDate(time)
+    ordersStore.updateReservedFor(date)
 }
 
 
@@ -238,6 +250,11 @@ const updateGuestName = (name: string) => {
     ordersStore.updateGuestName(name)
 }
 
+const updateIsLater = (value: boolean) => {
+    if (!currentTabId.value) return
+    ordersStore.updateIsLater(value)
+}
+
 const handleAddProducts = () => {
     // This would focus on the product grid or open a product selector
     console.log('Add products from grid')
@@ -271,7 +288,7 @@ const handleSubmitOrder = async () => {
 
     const tabToClose = currentTabId.value
     try {
-        if (isLater.value) {
+        if (currentOrder.value.isLater) {
             if (!prepareAtLocal.value || !reservedForLocal.value) return
             currentOrder.value.prepareAt = DateTimeService.localHourToDate(prepareAtLocal.value)
             currentOrder.value.reservedFor = DateTimeService.localHourToDate(reservedForLocal.value)
@@ -304,16 +321,39 @@ watch(currentOrder, () => {
     showCustomerDetail.value = false
 }, { immediate: false })
 
+// Sincronizar prepareAtLocal y reservedForLocal al cambiar de tab
+watch(
+    () => currentTabId.value,
+    () => {
+        const order = currentOrder.value
+        if (!order) {
+            prepareAtLocal.value = null
+            reservedForLocal.value = null
+            return
+        }
+        if (order.prepareAt) {
+            const d = order.prepareAt instanceof Date ? order.prepareAt : new Date(order.prepareAt)
+            prepareAtLocal.value = DateTimeService.dateToLocalHour(d)
+        } else {
+            prepareAtLocal.value = null
+        }
+        if (order.reservedFor) {
+            const d = order.reservedFor instanceof Date ? order.reservedFor : new Date(order.reservedFor)
+            reservedForLocal.value = DateTimeService.dateToLocalHour(d)
+        } else {
+            reservedForLocal.value = null
+        }
+    },
+    { immediate: true }
+)
+
 // Valores por defecto: día actual cuando cambia tipo o pestaña (onsite/delivery/reservation)
-// Solo al cambiar tipo o tab, no cuando el usuario limpia (pedido inmediato)
 watch(
     () => [currentOrder.value?.type, currentTabId.value] as const,
     () => {
         if (!currentTabId.value) return
         const type = currentOrder.value?.type
         if (!type || (type !== 'onsite' && type !== 'delivery' && type !== 'reservation')) return
-
-
     },
     { immediate: true }
 )

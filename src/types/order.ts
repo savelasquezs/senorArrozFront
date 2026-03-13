@@ -88,6 +88,7 @@ export interface DraftOrder {
     deliveryFee: number
     reservedFor: Date | null
     prepareAt: Date | null
+    isLater: boolean
     notes: string
     orderItems: OrderItem[]
     bankPayments: OrderBankPayment[]

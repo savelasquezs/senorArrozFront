@@ -16,4 +16,17 @@ export class DateTimeService {
         const isoLocal = `${dateStr}T${h}:${m}:${s}${COLOMBIA_OFFSET}`
         return new Date(isoLocal)
     }
+
+    static dateToLocalHour(date: Date): LocalHour {
+        const formatter = new Intl.DateTimeFormat('en-CA', {
+            timeZone: COLOMBIA_TIMEZONE,
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit',
+            hour12: false
+        })
+        const parts = formatter.formatToParts(date)
+        const get = (type: string) => parseInt(parts.find(p => p.type === type)?.value || '0', 10)
+        return { hours: get('hour'), minutes: get('minute'), seconds: get('second') }
+    }
 }
