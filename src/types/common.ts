@@ -120,3 +120,10 @@ export interface BranchFilters {
   SortBy?: string;
   SortOrder?: string;
 }
+
+
+export interface LocalHour {
+  hours: number
+  minutes: number
+  seconds: number
+}
