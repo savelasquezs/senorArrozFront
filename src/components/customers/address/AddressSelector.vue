@@ -243,7 +243,7 @@ const formatCurrency = (amount: number): string => {
     }).format(amount)
 }
 
-const loadCustomerAddresses = async () => {
+const loadCustomerAddresses = async (options?: { skipAutoSelect?: boolean }) => {
     if (!props.customerId) {
         customerAddresses.value = []
         return
@@ -254,9 +254,8 @@ const loadCustomerAddresses = async () => {
         await customersStore.fetchAddresses(props.customerId)
         customerAddresses.value = customersStore.addresses || []
 
-        // Auto-seleccionar solo en modo draft
-        if (props.mode === 'draft' && customerAddresses.value.length > 0 && !props.selectedAddress) {
-            // Buscar dirección principal o tomar la primera
+        // Auto-seleccionar solo en modo draft y si no se pidió omitir (p. ej. tras crear dirección, el caller emitirá con el deliveryFee correcto)
+        if (!options?.skipAutoSelect && props.mode === 'draft' && customerAddresses.value.length > 0 && !props.selectedAddress) {
             const primaryAddress = customerAddresses.value.find(addr => addr.isPrimary)
             const addressToSelect = primaryAddress || customerAddresses.value[0]
             emit('addressSelected', addressToSelect)
@@ -301,11 +300,13 @@ const createAddress = async (addressData: CreateCustomerAddressDto) => {
     try {
         const address = await customersStore.createAddress(props.customerId, addressData)
 
-        // Refresh addresses list
-        await loadCustomerAddresses()
+        // Refresh addresses list sin auto-select: nosotros emitimos la dirección con el deliveryFee del formulario
+        await loadCustomerAddresses({ skipAutoSelect: true })
 
-        // Auto-select created address - emit el objeto completo
-        emit('addressSelected', address)
+        // Auto-select created address. Usar deliveryFee del formulario para que el padre guarde ese valor
+        // en el pedido; el backend puede devolver el del barrio. Asegurar número (el form puede enviar string).
+        const formFee = Number(addressData.deliveryFee) || address.deliveryFee || 0
+        emit('addressSelected', { ...address, deliveryFee: formFee })
 
         success('Dirección creada', 3000, 'La dirección ha sido creada correctamente')
     } catch (error: any) {
@@ -353,14 +354,15 @@ const updateAddress = async (addressData: CustomerAddressFormData) => {
         await customersStore.updateAddress(props.customerId, editingAddress.value.id, updateData)
 
         // Refresh addresses list
-        await loadCustomerAddresses()
+        await loadCustomerAddresses({ skipAutoSelect: true })
 
         // Update selected address if it was the one being edited
         if (selectedAddress.value?.id === editingAddress.value.id) {
             // The address is still selected, but now updated
             const updatedAddress = customerAddresses.value.find(a => a.id === editingAddress.value!.id)
             if (updatedAddress) {
-                emit('addressSelected', updatedAddress)
+                const formFee = Number(addressData.deliveryFee) || updatedAddress.deliveryFee || 0
+                emit('addressSelected', { ...updatedAddress, deliveryFee: formFee })
             }
         }
 

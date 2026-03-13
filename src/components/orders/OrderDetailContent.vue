@@ -198,7 +198,7 @@
                 <div v-if="activeTab === 'products'">
                     <OrderDetailProductsList v-if="order" :products="order?.orderDetails"
                         :delivery-fee="order?.deliveryFee || 0" :can-edit="permissions.canEditProducts(order)"
-                        @save="handleProductsUpdate" />
+                        :saving="savingProducts" @save="handleProductsUpdate" />
                 </div>
 
                 <!-- Tab: Pagos -->
@@ -463,17 +463,20 @@ const updateNotes = async () => {
     }
 }
 
+const savingProducts = ref(false)
 const handleProductsUpdate = async (products: UpdateOrderDetailDto[]) => {
     if (!order.value) return
 
+    savingProducts.value = true
     try {
         await ordersDataStore.update(order.value.id, {
             orderDetails: products,
         })
         success('Productos actualizados', 5000, 'Los productos del pedido han sido actualizados')
-        // ✅ No necesita recargar
     } catch (err: any) {
         error('Error al actualizar productos', err.message)
+    } finally {
+        savingProducts.value = false
     }
 }
 

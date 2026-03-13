@@ -60,7 +60,6 @@ export const useOrdersDataStore = defineStore('ordersData', () => {
     }
 
     const update = async (id: number, payload: UpdateOrderDto) => {
-        isLoading.value = true
         error.value = null
         try {
             const response = await orderApi.updateOrder(id, payload)
@@ -95,8 +94,6 @@ export const useOrdersDataStore = defineStore('ordersData', () => {
         } catch (error: any) {
             error.value = error.message || 'Error de conexión'
             throw error
-        } finally {
-            isLoading.value = false
         }
     }
 

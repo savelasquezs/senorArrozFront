@@ -119,7 +119,7 @@
             <BaseButton variant="secondary" @click="cancelEdit">
                 Cancelar
             </BaseButton>
-            <BaseButton variant="primary" :loading="saving" :disabled="localProducts.length === 0" @click="saveChanges">
+            <BaseButton variant="primary" :loading="props.saving" :disabled="localProducts.length === 0" @click="saveChanges">
                 Guardar Cambios
             </BaseButton>
         </div>
@@ -144,6 +144,7 @@ interface Props {
     products: OrderDetailItem[]
     deliveryFee: number
     canEdit: boolean
+    saving?: boolean
 }
 
 const props = defineProps<Props>()

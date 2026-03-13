@@ -217,6 +217,7 @@ const handleSubmit = () => {
 
     validateForm()
     if (!isFormValid.value) return
+
     emit("submit", { ...localForm })
 }
 
