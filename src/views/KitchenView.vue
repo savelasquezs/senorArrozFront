@@ -124,7 +124,8 @@ const loadOrders = async () => {
         await ordersStore.fetch({
             branchId: authStore.user?.branchId,
             page: 1,
-            pageSize: 100
+            pageSize: 100,
+            forKitchen: true
         })
         await loadOrderDetails()
     } catch (err: any) {

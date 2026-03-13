@@ -27,6 +27,7 @@ class OrderApi extends BaseApi {
             if (filters.status) params.Status = filters.status;
             if (filters.fromDate) params.FromDate = filters.fromDate;
             if (filters.toDate) params.ToDate = filters.toDate;
+            if (filters.forKitchen !== undefined) params.ForKitchen = filters.forKitchen;
             params.Page = filters.page || 1;
             params.PageSize = filters.pageSize || 10;
         }

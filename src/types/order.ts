@@ -191,6 +191,7 @@ export interface OrderFilters {
     status?: OrderStatus
     fromDate?: string
     toDate?: string
+    forKitchen?: boolean
     page: number
     pageSize: number
     sortBy?: string
