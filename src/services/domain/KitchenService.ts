@@ -54,5 +54,10 @@ export class KitchenService {
 
         return `Nuevo pedido número ${order.id}: ${items.join('')}`
     }
+
+    static generateOrderNotificationText(order: OrderListItem, products: Array<{ name: string; quantity: number }>): string {
+        const items = products.map(p => `${p.quantity}x ${p.name}`).join(', ')
+        return `Pedido #${order.id}: ${items}`
+    }
 }
 

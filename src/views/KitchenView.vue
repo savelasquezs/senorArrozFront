@@ -19,6 +19,19 @@
                         <span class="whitespace-nowrap">{{ isConnected ? 'Conectado' : 'Desconectado' }}</span>
                     </div>
 
+                    <button v-if="permission === 'default'" @click="requestPermission"
+                        class="flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs bg-amber-100 text-amber-700 hover:bg-amber-200 transition-colors"
+                        title="Activar notificaciones">
+                        <BellIcon class="w-4 h-4" />
+                        <span class="hidden sm:inline">Activar notificaciones</span>
+                    </button>
+                    <div v-else :class="[
+                        'flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs',
+                        permission === 'granted' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'
+                    ]" :title="permission === 'granted' ? 'Notificaciones activas' : 'Notificaciones desactivadas'">
+                        <BellIcon class="w-4 h-4" />
+                        <span class="hidden sm:inline">{{ permission === 'granted' ? 'Notif. OK' : 'No' }}</span>
+                    </div>
                     <button @click="toggleSound" :class="[
                         'p-1.5 sm:p-2 rounded-lg transition-colors',
                         soundEnabled ? 'bg-emerald-100 text-emerald-600' : 'bg-gray-100 text-gray-400'
@@ -87,6 +100,7 @@ import { useAuthStore } from '@/store/auth'
 import { useOrdersDataStore } from '@/store/ordersData'
 import { useSignalR } from '@/composables/useSignalR'
 import { useTextToSpeech } from '@/composables/useTextToSpeech'
+import { useNotifications } from '@/composables/useNotifications'
 import { useToast } from '@/composables/useToast'
 import { KitchenService } from '@/services/domain/KitchenService'
 import type { OrderListItem, OrderDetailItem, OrderStatus } from '@/types/order'
@@ -95,13 +109,14 @@ import OrderCardGrid from '@/components/kitchen/OrderCardGrid.vue'
 import ReadyOrdersTable from '@/components/kitchen/ReadyOrdersTable.vue'
 import ConfirmStatusChangeModal from '@/components/kitchen/ConfirmStatusChangeModal.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
-import { ArrowPathIcon, SpeakerWaveIcon, SpeakerXMarkIcon } from '@heroicons/vue/24/outline'
+import { ArrowPathIcon, SpeakerWaveIcon, SpeakerXMarkIcon, BellIcon } from '@heroicons/vue/24/outline'
 
 const router = useRouter()
 const authStore = useAuthStore()
 const ordersStore = useOrdersDataStore()
 const { success, error } = useToast()
-const { speak } = useTextToSpeech()
+const { speak, cancel } = useTextToSpeech()
+const { permission, requestPermission, notify } = useNotifications()
 
 const SIGNALR_HUB_URL = import.meta.env.VITE_SIGNALR_HUB_URL || 'http://localhost:5000/hubs/orders'
 const { isConnected, on } = useSignalR(SIGNALR_HUB_URL)
@@ -150,33 +165,43 @@ const loadOrderDetails = async () => {
     }
 }
 
+const notifyOrderShownInKitchen = async (orderData: any, isReservation: boolean) => {
+    const order = allOrders.value.find(o => o.id === orderData.id)
+    if (!order || order.status !== 'taken') return
+
+    try {
+        await ordersStore.fetchById(order.id)
+        if (!ordersStore.current) return
+
+        const products = ordersStore.current.orderDetails.map(item => ({
+            name: item.productName,
+            quantity: item.quantity
+        }))
+        const title = isReservation ? `Reserva #${order.id} en cocina` : `Nuevo pedido #${order.id}`
+        const bodyText = KitchenService.generateOrderNotificationText(order, products)
+        const speechText = KitchenService.generateOrderSpeechText(order, products)
+
+        if (soundEnabled.value) {
+            if (permission.value === 'granted') {
+                notify(title, { body: bodyText, tag: `order-${order.id}` })
+            }
+            speak(speechText)
+        }
+    } catch (err) {
+        console.error('Error loading order details for notification/TTS:', err)
+    }
+}
+
 const handleNewOrder = async (orderData: any) => {
     console.log('Nuevo pedido recibido:', orderData)
     await loadOrders()
-
-    if (soundEnabled.value) {
-        const order = allOrders.value.find(o => o.id === orderData.id)
-        if (order && order.status === 'taken') {
-            try {
-                await ordersStore.fetchById(order.id)
-                if (ordersStore.current) {
-                    const products = ordersStore.current.orderDetails.map(item => ({
-                        name: item.productName,
-                        quantity: item.quantity
-                    }))
-                    const speechText = KitchenService.generateOrderSpeechText(order, products)
-                    speak(speechText)
-                }
-            } catch (err) {
-                console.error('Error loading order details for TTS:', err)
-            }
-        }
-    }
+    await notifyOrderShownInKitchen(orderData, false)
 }
 
 const handleReservationReady = async (orderData: any) => {
     console.log('Reserva próxima:', orderData)
     await loadOrders()
+    await notifyOrderShownInKitchen(orderData, true)
 }
 
 const handleChangeStatus = (orderIds: number[], newStatus: OrderStatus) => {
@@ -229,6 +254,11 @@ const refreshOrders = async () => {
 
 const toggleSound = () => {
     soundEnabled.value = !soundEnabled.value
+    if (soundEnabled.value) {
+        speak('Listo')
+    } else {
+        cancel()
+    }
 }
 
 const handleReprint = (orderId: number) => {
@@ -240,6 +270,10 @@ onMounted(async () => {
     if (authStore.userRole !== 'Kitchen' && authStore.userRole !== 'Admin' && authStore.userRole !== 'Superadmin') {
         router.push('/')
         return
+    }
+
+    if (permission.value === 'default') {
+        await requestPermission()
     }
 
     await loadOrders()

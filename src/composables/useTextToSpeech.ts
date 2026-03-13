@@ -19,8 +19,8 @@ export function useTextToSpeech() {
 
         utterance.onstart = () => { isSpeaking.value = true }
         utterance.onend = () => { isSpeaking.value = false }
-        utterance.onerror = (event) => {
-            console.error('Error TTS:', event)
+        utterance.onerror = () => {
+            console.warn('TTS bloqueado (autoplay). Activa el sonido con un click para desbloquear.')
             isSpeaking.value = false
         }
 
