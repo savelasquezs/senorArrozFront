@@ -6,6 +6,14 @@ const KITCHEN_MAX_PREPARATION_TIME = 15 * 60 * 1000 // 15 minutos
 
 export class KitchenService {
     static getElapsedTime(order: OrderListItem): number {
+        // Para reservas: contar desde prepareAt (cuando debe empezar la cocina)
+        if (order.type === 'reservation' && order.prepareAt) {
+            const prepareAtDate = new Date(order.prepareAt)
+            const now = new Date()
+            const elapsed = now.getTime() - prepareAtDate.getTime()
+            return Math.max(0, elapsed)
+        }
+
         const takenTime = order.statusTimes?.taken
         if (!takenTime) return 0
 
@@ -15,12 +23,33 @@ export class KitchenService {
     }
 
     static getElapsedTimeInCurrentStatus(order: OrderListItem): number {
-        const currentStatusTime = order.statusTimes?.[order.status]
+        // Para reservas en "taken": el estado empezó en prepareAt
+        if (order.type === 'reservation' && order.prepareAt && order.status === 'taken') {
+            const prepareAtDate = new Date(order.prepareAt)
+            const now = new Date()
+            const elapsed = now.getTime() - prepareAtDate.getTime()
+            return Math.max(0, elapsed)
+        }
+
+        const statusKey = order.status === 'in_preparation' ? 'inpreparation' : order.status === 'on_the_way' ? 'ontheway' : order.status
+        const currentStatusTime = order.statusTimes?.[statusKey]
         if (!currentStatusTime) return 0
 
         const statusDate = new Date(currentStatusTime)
         const now = new Date()
         return now.getTime() - statusDate.getTime()
+    }
+
+    /** Hora de tener listo = prepareAt + 30 min. Solo para reservas. */
+    static getReadyByTime(order: OrderListItem): Date | null {
+        if (order.type !== 'reservation' || !order.prepareAt) return null
+        const d = new Date(order.prepareAt)
+        d.setMinutes(d.getMinutes() + 30)
+        return d
+    }
+
+    static formatReadyByTime(date: Date): string {
+        return date.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })
     }
 
     static getCardColorClass(order: OrderListItem): string {

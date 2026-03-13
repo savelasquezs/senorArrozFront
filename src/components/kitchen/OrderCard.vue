@@ -31,9 +31,10 @@
                 <ClockIcon class="w-3 h-3 sm:w-3.5 sm:h-3.5 md:w-4 md:h-4 flex-shrink-0" />
                 <span class="font-medium">Tiempo: {{ formattedElapsedTime }}</span>
             </div>
-            <div v-if="variant === 'kitchen'"
-                class="text-[10px] sm:text-xs text-gray-500 mt-0.5 sm:mt-1 hidden md:block">
-                En {{ order.statusDisplayName }}: {{ formattedElapsedInStatus }}
+
+            <div v-if="variant === 'kitchen' && readyByTime"
+                class="text-[10px] sm:text-xs text-emerald-600 mt-0.5 sm:mt-1 font-medium">
+                Listo para: {{ formattedReadyByTime }}
             </div>
         </div>
 
@@ -41,7 +42,7 @@
         <div v-if="variant === 'kitchen' && orderItems" class="space-y-1 sm:space-y-1.5 md:space-y-2">
             <div v-for="item in orderItems" :key="item.id" class="flex items-start gap-1.5 sm:gap-2 text-xs sm:text-sm">
                 <span class="font-bold text-emerald-600 min-w-[1.5rem] sm:min-w-[2rem] flex-shrink-0">{{ item.quantity
-                    }}x</span>
+                }}x</span>
                 <div class="flex-1 min-w-0">
                     <p class="font-medium text-gray-900 break-words">{{ item.productName }}</p>
                     <p v-if="item.notes" class="text-[10px] sm:text-xs text-gray-600 italic mt-0.5 sm:mt-1 break-words">
@@ -111,17 +112,20 @@ const props = withDefaults(defineProps<Props>(), {
 const emit = defineEmits<{ 'toggle-select': [orderId: number] }>()
 
 const elapsedTime = ref(0)
-const elapsedInStatus = ref(0)
+
 let intervalId: number | null = null
 
 const updateTimes = () => {
     elapsedTime.value = KitchenService.getElapsedTime(props.order)
-    elapsedInStatus.value = KitchenService.getElapsedTimeInCurrentStatus(props.order)
 }
 
 const formattedElapsedTime = computed(() => KitchenService.formatElapsedTime(elapsedTime.value))
-const formattedElapsedInStatus = computed(() => KitchenService.formatElapsedTime(elapsedInStatus.value))
 const colorClass = computed(() => KitchenService.getCardColorClass(props.order))
+
+const readyByTime = computed(() => KitchenService.getReadyByTime(props.order))
+const formattedReadyByTime = computed(() =>
+    readyByTime.value ? KitchenService.formatReadyByTime(readyByTime.value) : ''
+)
 
 const orderTypeIcon = computed(() => {
     switch (props.order.type) {
