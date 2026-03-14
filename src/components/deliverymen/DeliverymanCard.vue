@@ -3,7 +3,13 @@
         <div class="flex items-start justify-between mb-2">
             <div>
                 <h3 class="text-base font-semibold text-gray-900">{{ stats.deliverymanName }}</h3>
-                <p class="text-xs text-gray-500">{{ stats.ordersCount }} pedido(s)</p>
+                <button
+                type="button"
+                class="text-xs text-gray-500 hover:text-emerald-600 hover:underline cursor-pointer"
+                @click="$emit('orders-click', stats.deliverymanId)"
+            >
+                {{ stats.ordersCount }} pedido(s)
+            </button>
             </div>
             <span :class="[
                 'px-2 py-1 rounded-full text-xs font-medium',
@@ -57,6 +63,7 @@ interface Props {
 const props = defineProps<Props>()
 const emit = defineEmits<{
     'view-detail': [deliverymanId: number]
+    'orders-click': [deliverymanId: number]
     'base-amount-changed': [deliverymanId: number, amount: number]
 }>()
 
