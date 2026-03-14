@@ -166,7 +166,7 @@
             @close="showSelectAddressModal = false" @updated="handleOrderUpdated" />
 
         <AssignDeliveryModal v-if="selectedOrder" :open="showAssignDeliveryModal" :order="selectedOrder"
-            :pending-status-change="pendingStatusChange || undefined" @updated="handleOrderUpdated"
+            :pending-status-change="pendingStatusChange || undefined" @updated="handleAssignDeliveryUpdated"
             @status-changed="clearPendingStatusChange" @close="handleAssignDeliveryModalClose" />
 
         <!-- Modal de cambio de tipo -->
@@ -426,6 +426,14 @@ const handleAssignDelivery = (order: OrderListItem) => {
     showAssignDeliveryModal.value = true
 }
 
+const handleAssignDeliveryUpdated = async (updatedOrder?: Order) => {
+    await handleOrderUpdated(updatedOrder)
+    // Recargar la lista para reflejar domiciliario y estado en la UI
+    if (updatedOrder) {
+        await fetchOrders()
+    }
+}
+
 const handleEditType = (order: OrderListItem) => {
     selectedOrder.value = order
     showEditOrderTypeModal.value = true
@@ -466,12 +474,23 @@ const updateOrderInList = (updatedOrder: Order) => {
     const orderAny = updatedOrder as any
     const index = orders.value.findIndex(o => o.id === orderAny.id)
     if (index !== -1) {
-        orders.value[index] = {
-            ...orders.value[index],
+        const current = orders.value[index]
+        const merged = {
+            ...current,
             ...orderAny,
-            typeDisplayName: getOrderTypeDisplayName(orderAny.type),
-            updatedAt: orderAny.updatedAt
+            typeDisplayName: getOrderTypeDisplayName(orderAny.type ?? current.type),
+            statusDisplayName: orderAny.status != null
+                ? getOrderStatusDisplayName(String(orderAny.status))
+                : current.statusDisplayName,
+            deliveryManId: orderAny.deliveryManId ?? current.deliveryManId,
+            deliveryManName: orderAny.deliveryManName ?? current.deliveryManName,
+            status: orderAny.status ?? current.status,
+            updatedAt: orderAny.updatedAt ?? current.updatedAt
         }
+        // Reemplazar array completo para garantizar reactividad en Vue
+        const updated = [...orders.value]
+        updated[index] = merged
+        orders.value = updated
     }
 }
 
@@ -575,6 +594,11 @@ const handleOrderUpdated = async (updatedOrder?: Order) => {
             } else {
                 // Actualización normal - usar handler unificado
                 updateOrderInList(updatedOrder)
+                // Actualizar selectedOrder con la referencia del pedido en la lista (evita referencias obsoletas)
+                const updatedIndex = orders.value.findIndex(o => o.id === orderAny.id)
+                if (updatedIndex !== -1) {
+                    selectedOrder.value = orders.value[updatedIndex] as OrderListItem
+                }
             }
         }
 

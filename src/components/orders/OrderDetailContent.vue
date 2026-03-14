@@ -301,7 +301,7 @@ import {
     CreditCardIcon,
     CheckCircleIcon,
 } from '@heroicons/vue/24/outline'
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, onMounted } from 'vue'
 const permissions = useOrderPermissions()
 const authStore = useAuthStore()
 const isDeliveryman = computed(() => authStore.userRole === 'Deliveryman')
@@ -414,7 +414,11 @@ watch(ordersDataStoreCurrent, (newOrder) => {
     }
 }, { immediate: true })
 
-// Cargar datos del cliente completo
+// Cargar bancos y apps para el selector de pagos (solo se cargan en /orders, no en /orders/:id)
+onMounted(() => {
+    ordersStore.loadBanks()
+    ordersStore.loadApps()
+})
 
 const handleStatusChange = async (newStatus: OrderStatus) => {
     if (!order.value) return

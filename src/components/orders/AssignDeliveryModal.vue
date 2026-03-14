@@ -108,22 +108,18 @@ const handleSave = async () => {
     saving.value = true
     try {
         let updatedOrder: Order
+        let statusChangedByBackend = false
 
         if (selectedDeliveryManId.value === null) {
             // Desasignar
             updatedOrder = await orderApi.unassignDelivery(props.order.id)
             success('Domiciliario desasignado', 5000, 'El domiciliario ha sido removido del pedido')
         } else {
-            // Asignar
+            // Asignar — el backend ya cambia Ready → OnTheWay automáticamente, no llamar updateStatus
             updatedOrder = await orderApi.assignDelivery(props.order.id, selectedDeliveryManId.value)
 
-            // REGLA: Si hay estado pendiente y pedido está en ready, cambiar a on_the_way
-            if (props.pendingStatusChange && props.order.status === 'ready') {
-                updatedOrder = await orderApi.updateStatus(props.order.id, props.pendingStatusChange)
-                success('Domiciliario asignado', 5000, 'Domiciliario asignado y pedido en camino')
-            } else if (props.order.status === 'ready' && !props.pendingStatusChange) {
-                // Auto-cambio: asignar en ready también cambia a on_the_way
-                updatedOrder = await orderApi.updateStatus(props.order.id, 'on_the_way')
+            statusChangedByBackend = updatedOrder.status === 'on_the_way' && props.order.status === 'ready'
+            if (statusChangedByBackend) {
                 success('Domiciliario asignado', 5000, 'Domiciliario asignado y pedido en camino')
             } else {
                 success('Domiciliario asignado', 5000, 'El domiciliario ha sido asignado al pedido')
@@ -133,9 +129,9 @@ const handleSave = async () => {
         // ✅ Emitir el pedido actualizado para actualización optimista
         emit('updated', updatedOrder)
 
-        // Si hay un cambio de estado pendiente, emitirlo
-        if (props.pendingStatusChange && typeof props.pendingStatusChange === 'string') {
-            emit('statusChanged', props.pendingStatusChange)
+        // Si el backend cambió el estado (Ready → OnTheWay), notificar al padre para limpiar pendingStatusChange
+        if (statusChangedByBackend) {
+            emit('statusChanged', 'on_the_way')
         }
 
         emit('close')
