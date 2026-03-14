@@ -293,16 +293,26 @@ const routes: RouteRecordRaw[] = [
     //       title: 'Reportes'
     //     }
     //   },
-    //   {
-    //     path: '/cash-register',
-    //     name: 'CashRegister',
-    //     component: () => import('@/views/CashRegister.vue'),
-    //     meta: {
-    //       requiresAuth: true,
-    //       requiresRole: ['Superadmin', 'Admin', 'Cashier'],
-    //       title: 'Caja'
-    //     }
-    //   },
+    {
+        path: '/cash-register',
+        name: 'CashRegister',
+        component: () => import('@/views/CashRegisterView.vue'),
+        meta: {
+            requiresAuth: true,
+            requiresRole: [UserRole.SUPERADMIN, UserRole.ADMIN, UserRole.CASHIER],
+            title: 'Cuadre de Caja'
+        }
+    },
+    {
+        path: '/bank-transfers',
+        name: 'BankTransfers',
+        component: () => import('@/views/BankTransfersView.vue'),
+        meta: {
+            requiresAuth: true,
+            requiresRole: [UserRole.SUPERADMIN, UserRole.ADMIN],
+            title: 'Movimientos entre Bancos'
+        }
+    },
     //   {
     //     path: '/profile',
     //     name: 'Profile',

@@ -58,6 +58,8 @@ import {
 	ShieldCheckIcon,
 	BriefcaseIcon,
 	ShoppingBagIcon,
+	BanknotesIcon,
+	ArrowsRightLeftIcon,
 } from '@heroicons/vue/24/outline';
 import { UserRole } from '@/types/auth';
 
@@ -161,10 +163,16 @@ const navigationItems = computed(() => [
 		roles: ['Superadmin', 'Admin', 'Cashier'],
 	},
 	{
-		name: 'Caja',
+		name: 'Cuadre de Caja',
 		to: '/cash-register',
-		icon: CurrencyDollarIcon,
+		icon: BanknotesIcon,
 		roles: ['Superadmin', 'Admin', 'Cashier'],
+	},
+	{
+		name: 'Movimientos Bancos',
+		to: '/bank-transfers',
+		icon: ArrowsRightLeftIcon,
+		roles: ['Superadmin', 'Admin'],
 	},
 ]);
 
