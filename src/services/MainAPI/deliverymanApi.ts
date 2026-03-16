@@ -19,6 +19,14 @@ export interface CreateAdvanceBody {
     notes?: string
 }
 
+/** Respuesta de GET /deliverymen/with-orders-today */
+export interface DeliverymanWithOrdersTodayItem {
+    id: number
+    name: string
+    ordersCount: number
+    currentBalance: number
+}
+
 class DeliverymanApi extends BaseApi {
     /**
      * Resumen completo del día: domiciliarios con stats + abonos.
@@ -65,6 +73,19 @@ class DeliverymanApi extends BaseApi {
         toDate?: string
     }): Promise<{ advances: DeliverymanAdvance[] }> {
         return this.get<{ advances: DeliverymanAdvance[] }>('/deliverymen/advances', { params })
+    }
+
+    /**
+     * Domiciliarios con pedidos de delivery en el día actual (o rango dado).
+     * Usado para seleccionar a quién aplicar un abono desde otros módulos.
+     */
+    async getWithOrdersToday(params?: {
+        date?: string
+        fromDate?: string
+        toDate?: string
+        branchId?: number
+    }): Promise<DeliverymanWithOrdersTodayItem[]> {
+        return this.get<DeliverymanWithOrdersTodayItem[]>('/deliverymen/with-orders-today', { params })
     }
 
     /**

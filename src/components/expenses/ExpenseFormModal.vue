@@ -178,6 +178,26 @@
                     </p>
                 </div>
             </div>
+
+            <!-- Abono a domiciliario -->
+            <div class="mt-4 border-t border-gray-200 pt-4 space-y-2">
+                <label class="inline-flex items-center gap-2 text-sm text-gray-700">
+                    <input type="checkbox" v-model="isDeliverymanAdvance">
+                    <span>Es abono de domiciliario</span>
+                </label>
+                <div v-if="isDeliverymanAdvance" class="space-y-1">
+                    <BaseSelect v-model="selectedDeliverymanId"
+                        :options="deliverymenOptions"
+                        :placeholder="loadingDeliverymen ? 'Cargando domiciliarios...' : 'Seleccionar domiciliario...'"
+                        value-key="value"
+                        display-key="label"
+                        :disabled="loadingDeliverymen"
+                    />
+                    <p class="text-xs text-gray-500">
+                        Solo se muestran domiciliarios con pedidos de delivery en el día seleccionado.
+                    </p>
+                </div>
+            </div>
         </form>
 
         <template #footer>
@@ -218,6 +238,7 @@ import { expenseHeaderApi } from '@/services/MainAPI/expenseHeaderApi'
 import { bankApi } from '@/services/MainAPI/bankApi'
 import { expenseApi } from '@/services/MainAPI/expenseApi'
 import { supplierApi } from '@/services/MainAPI/supplierApi'
+import { deliverymanApi } from '@/services/MainAPI/deliverymanApi'
 import { useFormatting } from '@/composables/useFormatting'
 import { useToast } from '@/composables/useToast'
 import { useAuthStore } from '@/store/auth'
@@ -286,6 +307,12 @@ const newSupplier = ref<SupplierFormState>({
     address: '',
     email: ''
 })
+
+// Abono a domiciliario
+const isDeliverymanAdvance = ref(false)
+const selectedDeliverymanId = ref<number | null>(null)
+const deliverymenOptions = ref<Array<{ value: number; label: string; ordersCount: number }>>([])
+const loadingDeliverymen = ref(false)
 
 const formatLastUsedAt = (value?: string | null) => {
     if (!value) return ''
@@ -404,6 +431,35 @@ onMounted(async () => {
     }
 
     await loadSuppliers()
+})
+
+watch(isDeliverymanAdvance, async (newVal) => {
+    if (!newVal) {
+        selectedDeliverymanId.value = null
+        return
+    }
+
+    if (deliverymenOptions.value.length > 0) {
+        return
+    }
+
+    loadingDeliverymen.value = true
+    try {
+        const today = new Date().toISOString().slice(0, 10) // YYYY-MM-DD
+        const raw = await deliverymanApi.getWithOrdersToday({ date: today })
+        const list = Array.isArray(raw) ? raw : [raw]
+        deliverymenOptions.value = list.map(dm => ({
+            value: dm.id,
+            label: `${dm.name} (${dm.ordersCount} pedidos)`,
+            ordersCount: dm.ordersCount,
+        }))
+    } catch (err: any) {
+        console.error('Error loading deliverymen with orders:', err)
+        error('Error cargando domiciliarios', err.message || 'No se pudieron cargar los domiciliarios')
+        isDeliverymanAdvance.value = false
+    } finally {
+        loadingDeliverymen.value = false
+    }
 })
 
 watch(() => formData.value.supplierId, async (supplierId) => {
@@ -707,6 +763,20 @@ const handleSubmit = async () => {
             result = await expenseHeaderApi.updateExpenseHeader(props.editingExpense.id, payload as UpdateExpenseHeaderDto)
         } else {
             result = await expenseHeaderApi.createExpenseHeader(payload as CreateExpenseHeaderDto)
+        }
+
+        // Crear abono de domiciliario si corresponde (al crear o al actualizar, si está marcado)
+        if (isDeliverymanAdvance.value && selectedDeliverymanId.value) {
+            const amount = totalExpenses.value
+            try {
+                await deliverymanApi.createAdvance(selectedDeliverymanId.value, {
+                    amount,
+                    notes: `gasto #${result.id} - ${result.supplierName}`,
+                })
+            } catch (advanceError: any) {
+                console.error('Error creating deliveryman advance from expense:', advanceError)
+                error('Gasto guardado, pero falló el abono', advanceError.message || 'Revisa el módulo de domiciliarios')
+            }
         }
 
         emit('submit', result)
