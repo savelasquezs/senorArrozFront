@@ -142,7 +142,7 @@
                                     </div>
                                     <!-- Botón de verificación -->
                                     <button v-if="canVerifyPayment(order)"
-                                        @click.stop="$emit('verify-bank-payment', order, payment)" :class="[
+                                        @click.stop="emit('verify-bank-payment', order, payment)" :class="[
                                             'p-1 rounded transition-colors',
                                             payment.isVerified
                                                 ? 'text-green-600 hover:bg-green-100'
@@ -164,12 +164,19 @@
                                 </div>
                             </div>
 
-                            <!-- Sin pagos -->
-                            <span v-if="(!order.bankPayments || order.bankPayments.length === 0) &&
+                            <!-- Sin pagos = efectivo + acciones rápidas -->
+                            <div v-if="(!order.bankPayments || order.bankPayments.length === 0) &&
                                 (!order.appPayments || order.appPayments.length === 0)"
-                                class="text-xs text-gray-400 italic">
-                                Efectivo
-                            </span>
+                                class="flex flex-wrap items-center gap-1">
+                                <span class="text-xs text-gray-400 italic">
+                                    Efectivo
+                                </span>
+                                <button v-for="bank in (props.quickBanks || []).slice(0, 2)" :key="bank.id"
+                                    class="text-[11px] text-blue-600 hover:text-blue-800 underline decoration-dotted"
+                                    @click.stop="emit('quick-bank-transfer', order, bank.id)">
+                                    {{ formatQuickLabel(bank.name) }}
+                                </button>
+                            </div>
                         </div>
                     </td>
 
@@ -204,8 +211,8 @@
 </template>
 
 <script setup lang="ts">
-import { defineProps, defineEmits } from 'vue'
 import type { OrderListItem, OrderBankPaymentDetail } from '@/types/order'
+import type { Bank } from '@/types/bank'
 import OrderStatusBadge from './OrderStatusBadge.vue'
 import OrderTypeBadge from './OrderTypeBadge.vue'
 import BaseLoading from '@/components/ui/BaseLoading.vue'
@@ -225,23 +232,25 @@ interface Props {
     loading?: boolean
     sortBy?: 'id' | 'total' | 'createdAt'
     sortOrder?: 'asc' | 'desc'
+    quickBanks?: Bank[]
 }
 
-defineProps<Props>()
+const props = defineProps<Props>()
 
-defineEmits<{
+const emit = defineEmits<{
     'edit-customer': [order: OrderListItem]
     'edit-address': [order: OrderListItem]
     'change-status': [order: OrderListItem]
     'assign-delivery': [order: OrderListItem]
     'edit-type': [order: OrderListItem]
     'verify-bank-payment': [order: OrderListItem, payment: OrderBankPaymentDetail]
+    'quick-bank-transfer': [order: OrderListItem, bankId: number]
     sort: [column: 'id' | 'total' | 'createdAt']
 }>()
 
 const { formatCurrency } = useFormatting()
 
-// ✅ NUEVO: Formatear solo fecha
+// Formatear solo fecha
 const formatDate = (dateString: string): string => {
     const date = new Date(dateString)
     return date.toLocaleDateString('es-CO', {
@@ -251,7 +260,7 @@ const formatDate = (dateString: string): string => {
     })
 }
 
-// ✅ NUEVO: Formatear solo hora
+// Formatear solo hora
 const formatTime = (dateString: string): string => {
     const date = new Date(dateString)
     return date.toLocaleTimeString('es-CO', {
@@ -261,7 +270,6 @@ const formatTime = (dateString: string): string => {
     })
 }
 
-// ✅ NUEVO: Verificar si se puede verificar un pago
 const canVerifyPayment = (order: OrderListItem): boolean => {
     // Solo si el pedido no está cancelado
     return order.status !== 'cancelled'
@@ -276,5 +284,10 @@ const canAssignDeliveryman = (order: OrderListItem): boolean => {
 // Obtiene la fecha del estado actual del pedido
 const getStatusTime = (order: OrderListItem): string | undefined => {
     return order.statusTimes[order.status]
+}
+
+const formatQuickLabel = (bankName: string): string => {
+    const base = `Transf ${bankName}`
+    return base.length > 13 ? base.slice(0, 13) : base
 }
 </script>

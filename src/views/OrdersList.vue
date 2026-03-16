@@ -98,9 +98,11 @@
         <!-- Tabla -->
         <div class="bg-white rounded-lg shadow overflow-hidden">
             <OrdersTable :orders="filteredOrders" :loading="loading" :sort-by="sortBy" :sort-order="sortOrder"
+                :quick-banks="quickBanks"
                 @edit-customer="handleEditCustomer" @edit-address="handleEditAddress"
                 @change-status="handleChangeStatus" @assign-delivery="handleAssignDelivery" @edit-type="handleEditType"
-                @verify-bank-payment="handleVerifyBankPayment" @sort="handleSort" />
+                @verify-bank-payment="handleVerifyBankPayment" @quick-bank-transfer="handleQuickBankTransfer"
+                @sort="handleSort" />
 
             <!-- Paginación -->
             <div v-if="!loading && totalPages > 1" class="bg-gray-50 px-4 py-3 border-t border-gray-200 sm:px-6">
@@ -186,6 +188,7 @@ import { useOrderPermissions } from '@/composables/useOrderPermissions'
 import { useToast } from '@/composables/useToast'
 import { getOrderStatusDisplayName, getOrderTypeDisplayName } from '@/composables/useFormatting'
 import { bankPaymentApi } from '@/services/MainAPI/bankPaymentApi'
+import { useBanksStore } from '@/store/banks'
 import MainLayout from '@/components/layout/MainLayout.vue'
 import OrdersTable from '@/components/orders/OrdersTable.vue'
 import DeliverymanFilter from '@/components/orders/DeliverymanFilter.vue'
@@ -206,6 +209,7 @@ import {
 } from '@heroicons/vue/24/outline'
 
 const router = useRouter()
+const banksStore = useBanksStore()
 const { applyAllFilters, sortOrders } = useOrderFilters()
 const { getNextAllowedStatus, canChangeStatus } = useOrderPermissions()
 const { success, error } = useToast()
@@ -621,13 +625,45 @@ const clearPendingStatusChange = () => {
     pendingStatusChange.value = null
 }
 
+const handleQuickBankTransfer = async (order: OrderListItem, bankId: number) => {
+    try {
+        if ((order.bankPayments && order.bankPayments.length > 0) ||
+            (order.appPayments && order.appPayments.length > 0)) {
+            error('No se puede convertir', 'El pedido ya tiene pagos registrados')
+            return
+        }
+
+        await bankPaymentApi.createBankPayment({
+            orderId: order.id,
+            bankId,
+            amount: order.total,
+        })
+
+        success('Pago bancario creado', 4000, 'Se registró el pago en el banco seleccionado')
+        await fetchOrders()
+    } catch (err: any) {
+        error('Error al crear pago', err.message || 'No se pudo crear el pago bancario')
+    }
+}
+
 const handleAssignDeliveryModalClose = () => {
     clearPendingStatusChange()
     showAssignDeliveryModal.value = false
 }
 
+const quickBanks = computed(() => {
+    const items = banksStore.list?.items || []
+    return items
+        .filter(b => b.active)
+        .sort((a, b) => a.id - b.id)
+        .slice(0, 2)
+})
+
 // Lifecycle
-onMounted(() => {
-    fetchOrders()
+onMounted(async () => {
+    await Promise.all([
+        fetchOrders(),
+        banksStore.fetch({ page: 1, pageSize: 10, active: true }),
+    ])
 })
 </script>
