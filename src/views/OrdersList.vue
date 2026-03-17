@@ -18,6 +18,27 @@
             </div>
         </div>
 
+        <!-- Tabs -->
+        <div class="mb-6 border-b border-gray-200">
+            <nav class="-mb-px flex space-x-6">
+                <button
+                    v-for="tab in tabs" :key="tab.value"
+                    @click="switchTab(tab.value)"
+                    :class="[
+                        'pb-3 px-1 text-sm font-medium border-b-2 transition-colors whitespace-nowrap flex items-center gap-1.5',
+                        activeTab === tab.value
+                            ? 'border-emerald-500 text-emerald-600'
+                            : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                    ]"
+                >
+                    <component :is="tab.icon" class="w-4 h-4" />
+                    {{ tab.label }}
+                </button>
+            </nav>
+        </div>
+
+        <!-- ===== TAB: PEDIDOS DEL DÍA ===== -->
+        <template v-if="activeTab === 'orders'">
         <!-- Filtros - Diseño Compacto -->
         <div class="bg-white rounded-lg shadow mb-6">
             <!-- Fila de filtros -->
@@ -102,6 +123,7 @@
                 @edit-customer="handleEditCustomer" @edit-address="handleEditAddress"
                 @change-status="handleChangeStatus" @assign-delivery="handleAssignDelivery" @edit-type="handleEditType"
                 @verify-bank-payment="handleVerifyBankPayment" @quick-bank-transfer="handleQuickBankTransfer"
+                @add-deposit="handleOpenDeposit"
                 @sort="handleSort" />
 
             <!-- Paginación -->
@@ -159,6 +181,101 @@
                 </div>
             </div>
         </div>
+        </template><!-- /tab orders -->
+
+        <!-- ===== TAB: RESERVAS ===== -->
+        <template v-if="activeTab === 'reservations'">
+
+        <!-- Filtros reservas -->
+        <div class="bg-white rounded-lg shadow mb-6">
+            <div class="p-4 border-b border-gray-200">
+                <div class="flex flex-wrap items-center gap-3">
+                    <div class="flex-1 min-w-[250px]">
+                        <BaseInput v-model="resSearch" placeholder="Buscar por ID, cliente, notas..."
+                            @input="resCurrentPage = 1">
+                            <template #icon><MagnifyingGlassIcon class="w-4 h-4" /></template>
+                        </BaseInput>
+                    </div>
+
+                    <div class="flex flex-wrap items-center gap-2">
+                        <!-- Estado reservas -->
+                        <div class="w-48">
+                            <BaseSelect v-model="resStatus" :options="resStatusOptions" value-key="value"
+                                display-key="label" placeholder="Estado" @update:model-value="fetchReservations" />
+                        </div>
+
+                        <!-- Fecha del evento -->
+                        <div class="flex items-center gap-2">
+                            <span class="text-xs text-gray-500 whitespace-nowrap">Fecha evento:</span>
+                            <BaseInput v-model="resFrom" type="date" class="w-36" @change="fetchReservations" />
+                            <span class="text-gray-400">-</span>
+                            <BaseInput v-model="resTo" type="date" class="w-36" @change="fetchReservations" />
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="px-4 py-3 bg-gray-50 flex items-center justify-between">
+                <div class="text-sm text-gray-600">
+                    <span v-if="!resLoading && resFilteredItems.length > 0">
+                        Mostrando <span class="font-medium">{{ resFilteredItems.length }}</span>
+                        de <span class="font-medium">{{ resTotalCount }}</span> reservas
+                    </span>
+                    <span v-else-if="!resLoading" class="text-gray-400">No hay reservas</span>
+                    <span v-else class="text-gray-400">Cargando...</span>
+                </div>
+
+                <div class="flex items-center gap-2">
+                    <BaseButton v-if="resSearch || resStatus || resFrom || resTo" variant="ghost" size="sm" @click="clearResFilters">
+                        <XMarkIcon class="w-4 h-4 mr-1" />Limpiar filtros
+                    </BaseButton>
+                    <BaseButton variant="secondary" size="sm" :loading="resLoading" @click="fetchReservations">
+                        <ArrowPathIcon class="w-4 h-4" />
+                    </BaseButton>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tabla reservas -->
+        <div class="bg-white rounded-lg shadow overflow-hidden">
+            <OrdersTable :orders="resFilteredItems" :loading="resLoading" :sort-by="resSortBy" :sort-order="resSortOrder"
+                :quick-banks="quickBanks"
+                @edit-customer="handleEditCustomer" @edit-address="handleEditAddress"
+                @change-status="handleChangeStatus" @assign-delivery="handleAssignDelivery" @edit-type="handleEditType"
+                @verify-bank-payment="handleVerifyBankPayment" @quick-bank-transfer="handleResQuickBankTransfer"
+                @add-deposit="handleOpenDeposit"
+                @sort="handleResSort" />
+
+            <!-- Paginación reservas -->
+            <div v-if="!resLoading && resTotalPages > 1" class="bg-gray-50 px-4 py-3 border-t border-gray-200 sm:px-6">
+                <div class="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
+                    <p class="text-sm text-gray-700">
+                        Página <span class="font-medium">{{ resCurrentPage }}</span> de
+                        <span class="font-medium">{{ resTotalPages }}</span>
+                    </p>
+                    <nav class="relative z-0 inline-flex rounded-md shadow-sm -space-x-px">
+                        <button :disabled="resCurrentPage === 1"
+                            class="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                            @click="resChangePage(resCurrentPage - 1)">
+                            <ChevronLeftIcon class="h-5 w-5" />
+                        </button>
+                        <button v-for="p in resVisiblePages" :key="p" :class="[
+                            'relative inline-flex items-center px-4 py-2 border text-sm font-medium',
+                            p === resCurrentPage
+                                ? 'z-10 bg-emerald-50 border-emerald-500 text-emerald-600'
+                                : 'bg-white border-gray-300 text-gray-500 hover:bg-gray-50',
+                        ]" @click="resChangePage(p)">{{ p }}</button>
+                        <button :disabled="resCurrentPage === resTotalPages"
+                            class="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                            @click="resChangePage(resCurrentPage + 1)">
+                            <ChevronRightIcon class="h-5 w-5" />
+                        </button>
+                    </nav>
+                </div>
+            </div>
+        </div>
+
+        </template><!-- /tab reservations -->
 
         <!-- Modales -->
         <EditCustomerModal v-if="showEditCustomerModal && selectedOrder" :open="showEditCustomerModal"
@@ -175,6 +292,13 @@
         <EditOrderTypeModal v-if="showEditOrderTypeModal && selectedOrder" :open="showEditOrderTypeModal"
             :order="selectedOrder" @close="showEditOrderTypeModal = false" @updated="handleOrderTypeUpdated"
             @type-changed-pending="handleTypePendingChange" @open-customer-modal="handleOpenCustomerModalFromType" />
+
+        <!-- Modal de abonos de reservas -->
+        <ReservationDepositModal
+            v-model="showDepositModal"
+            :order="depositOrder"
+            @deposited="handleDeposited"
+        />
     </MainLayout>
 </template>
 
@@ -196,6 +320,7 @@ import EditCustomerModal from '@/components/orders/EditCustomerModal.vue'
 import SelectAddressModal from '@/components/orders/SelectAddressModal.vue'
 import AssignDeliveryModal from '@/components/orders/AssignDeliveryModal.vue'
 import EditOrderTypeModal from '@/components/orders/EditOrderTypeModal.vue'
+import ReservationDepositModal from '@/components/reservations/ReservationDepositModal.vue'
 import BaseInput from '@/components/ui/BaseInput.vue'
 import BaseSelect from '@/components/ui/BaseSelect.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
@@ -206,12 +331,28 @@ import {
     ChevronRightIcon,
     PlusIcon,
     XMarkIcon,
+    ClipboardDocumentListIcon,
+    CalendarDaysIcon,
 } from '@heroicons/vue/24/outline'
 
 const router = useRouter()
 const banksStore = useBanksStore()
 const { applyAllFilters, sortOrders } = useOrderFilters()
 const { getNextAllowedStatus, canChangeStatus } = useOrderPermissions()
+
+// ===== TABS =====
+type TabValue = 'orders' | 'reservations'
+const activeTab = ref<TabValue>('orders')
+const tabs = [
+    { value: 'orders' as TabValue, label: 'Pedidos del día', icon: ClipboardDocumentListIcon },
+    { value: 'reservations' as TabValue, label: 'Reservas', icon: CalendarDaysIcon },
+]
+const switchTab = (tab: TabValue) => {
+    activeTab.value = tab
+    if (tab === 'reservations' && reservations.value.length === 0) {
+        fetchReservations()
+    }
+}
 const { success, error } = useToast()
 
 // Estado
@@ -658,6 +799,161 @@ const quickBanks = computed(() => {
         .sort((a, b) => a.id - b.id)
         .slice(0, 2)
 })
+
+// ===== ABONOS DE RESERVAS =====
+const showDepositModal = ref(false)
+const depositOrder = ref<{
+    id: number
+    customerName?: string
+    guestName?: string
+    total: number
+    branchId: number
+} | null>(null)
+
+const handleOpenDeposit = (order: OrderListItem) => {
+    depositOrder.value = {
+        id: order.id,
+        customerName: order.customerName ?? undefined,
+        guestName: order.guestName ?? undefined,
+        total: order.total,
+        branchId: order.branchId,
+    }
+    showDepositModal.value = true
+}
+
+const handleDeposited = () => {
+    success('Abono registrado', 3000, 'El abono fue registrado correctamente')
+}
+
+// ===== RESERVACIONES TAB =====
+const reservations = ref<OrderListItem[]>([])
+const resLoading = ref(false)
+const resTotalCount = ref(0)
+const resCurrentPage = ref(1)
+const resPageSize = ref(10)
+const resSortBy = ref('reservedFor')
+const resSortOrder = ref<'asc' | 'desc'>('asc')
+const resSearch = ref('')
+const resStatus = ref<string | null>(null)
+const resFrom = ref('')
+const resTo = ref('')
+
+const resStatusOptions = [
+    { value: null, label: 'Activas (sin canceladas/entregadas)' },
+    { value: '__all__', label: 'Todas' },
+    { value: 'reservation', label: 'Reserva pendiente' },
+    { value: 'taken', label: 'Tomada' },
+    { value: 'inPreparation', label: 'En preparación' },
+    { value: 'ready', label: 'Lista' },
+    { value: 'delivered', label: 'Entregada' },
+    { value: 'cancelled', label: 'Cancelada' },
+]
+
+const resTotalPages = computed(() => Math.ceil(resTotalCount.value / resPageSize.value))
+const resVisiblePages = computed(() => {
+    const pages: number[] = []
+    const start = Math.max(1, resCurrentPage.value - 2)
+    const end = Math.min(resTotalPages.value, resCurrentPage.value + 2)
+    for (let i = start; i <= end; i++) pages.push(i)
+    return pages
+})
+
+const resFilteredItems = computed(() => {
+    if (!resSearch.value.trim()) return reservations.value
+    const q = resSearch.value.toLowerCase()
+    return reservations.value.filter(o =>
+        String(o.id).includes(q) ||
+        (o.customerName || '').toLowerCase().includes(q) ||
+        (o.guestName || '').toLowerCase().includes(q) ||
+        (o.notes || '').toLowerCase().includes(q)
+    )
+})
+
+const toIsoUtc = (dateStr: string, endOfDay = false): string => {
+    if (!dateStr) return ''
+    const d = new Date(dateStr)
+    if (endOfDay) d.setHours(23, 59, 59, 999)
+    return d.toISOString()
+}
+
+const fetchReservations = async () => {
+    resLoading.value = true
+    try {
+        let statusPayload: string | undefined = undefined
+
+        if (resStatus.value === null) {
+            statusPayload = undefined
+        } else if (resStatus.value === '__all__') {
+            statusPayload = undefined
+        } else {
+            statusPayload = resStatus.value
+        }
+
+        const body: Record<string, any> = {
+            type: 'reservation',
+            page: resCurrentPage.value,
+            pageSize: resPageSize.value,
+            sortBy: resSortBy.value === 'createdAt' ? 'ReservedFor' : resSortBy.value,
+            sortOrder: resSortOrder.value,
+        }
+
+        if (statusPayload) body.status = statusPayload
+        if (resFrom.value) body.reservedFromDate = toIsoUtc(resFrom.value)
+        if (resTo.value) body.reservedToDate = toIsoUtc(resTo.value, true)
+
+        const response = await orderApi.searchOrders(body)
+
+        let items = response.items
+        if (resStatus.value === null) {
+            items = items.filter((o: OrderListItem) => o.status !== 'delivered' && o.status !== 'cancelled')
+        }
+
+        reservations.value = items
+        resTotalCount.value = resStatus.value === null ? items.length : response.totalCount
+    } catch (err: any) {
+        error('Error al cargar reservas', err.message)
+    } finally {
+        resLoading.value = false
+    }
+}
+
+const resChangePage = (page: number) => {
+    resCurrentPage.value = page
+    fetchReservations()
+}
+
+const handleResSort = (field: string) => {
+    if (resSortBy.value === field) {
+        resSortOrder.value = resSortOrder.value === 'asc' ? 'desc' : 'asc'
+    } else {
+        resSortBy.value = field
+        resSortOrder.value = 'asc'
+    }
+    fetchReservations()
+}
+
+const handleResQuickBankTransfer = async (order: OrderListItem, bankId: number) => {
+    try {
+        if ((order.bankPayments && order.bankPayments.length > 0) || (order.appPayments && order.appPayments.length > 0)) {
+            error('No se puede convertir', 'El pedido ya tiene pagos registrados')
+            return
+        }
+        await bankPaymentApi.createBankPayment({ orderId: order.id, bankId, amount: order.total })
+        success('Pago bancario creado', 4000, 'Se registró el pago en el banco seleccionado')
+        await fetchReservations()
+    } catch (err: any) {
+        error('Error al crear pago', err.message || 'No se pudo crear el pago bancario')
+    }
+}
+
+const clearResFilters = () => {
+    resSearch.value = ''
+    resStatus.value = null
+    resFrom.value = ''
+    resTo.value = ''
+    resCurrentPage.value = 1
+    fetchReservations()
+}
 
 // Lifecycle
 onMounted(async () => {

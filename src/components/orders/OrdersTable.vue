@@ -87,6 +87,14 @@
                             class="hover:opacity-80 transition-opacity cursor-pointer">
                             <OrderTypeBadge :type="order.type" :display-name="order.typeDisplayName" />
                         </button>
+                        <!-- Botón abono para reservas activas -->
+                        <button
+                            v-if="order.type === 'reservation' && order.status !== 'cancelled' && order.status !== 'delivered'"
+                            @click.stop="$emit('add-deposit', order)"
+                            class="mt-1 text-xs text-amber-600 hover:text-amber-800 underline decoration-dotted block"
+                        >
+                            + Abono
+                        </button>
                     </td>
 
                     <!-- Cliente (clickeable para editar) -->
@@ -245,6 +253,7 @@ const emit = defineEmits<{
     'edit-type': [order: OrderListItem]
     'verify-bank-payment': [order: OrderListItem, payment: OrderBankPaymentDetail]
     'quick-bank-transfer': [order: OrderListItem, bankId: number]
+    'add-deposit': [order: OrderListItem]
     sort: [column: 'id' | 'total' | 'createdAt']
 }>()
 

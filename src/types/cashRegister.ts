@@ -82,6 +82,7 @@ export interface CashRegisterExpected {
   openingCash: number
   expectedCash: number
   cashFromOrders: number
+  cashDeposits: number
   cashExpenses: number
   advances: number
   asOf: string

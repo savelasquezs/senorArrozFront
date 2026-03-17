@@ -66,6 +66,7 @@
                 <p class="text-lg font-bold text-green-700">{{ formatCurrency(expected.expectedCash) }}</p>
                 <p class="text-xs text-gray-400 mt-1">
                   Ventas: {{ formatCurrency(expected.cashFromOrders) }} |
+                  Abonos reservas: +{{ formatCurrency(expected.cashDeposits) }} |
                   Gastos: -{{ formatCurrency(expected.cashExpenses) }} |
                   Adelantos: -{{ formatCurrency(expected.advances) }}
                 </p>
