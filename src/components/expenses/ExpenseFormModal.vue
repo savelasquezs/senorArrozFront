@@ -445,7 +445,8 @@ watch(isDeliverymanAdvance, async (newVal) => {
 
     loadingDeliverymen.value = true
     try {
-        const today = new Date().toISOString().slice(0, 10) // YYYY-MM-DD
+        // Fecha de hoy en zona Colombia (evitar desfase por UTC)
+        const today = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Bogota' })
         const raw = await deliverymanApi.getWithOrdersToday({ date: today })
         const list = Array.isArray(raw) ? raw : [raw]
         deliverymenOptions.value = list.map(dm => ({
