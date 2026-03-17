@@ -248,11 +248,13 @@ const loadHistory = async () => {
 
 const handleOrderReady = async (orderData: any) => {
     console.log('🔔 SignalR OrderReady recibido:', orderData)
-    console.log('Tipo de pedido:', orderData.type || 'NO DEFINIDO')
-
-    // Recargar siempre que llegue el evento (el backend ya filtra por tipo delivery)
     await loadAvailableOrders()
     success('Nuevo pedido disponible', 5000, `Pedido #${orderData.id}`)
+}
+
+const handleOrderAssigned = async (_orderData: any) => {
+    // Recargar silenciosamente para quitar de la lista el pedido que otro domiciliario tomó
+    await loadAvailableOrders()
 }
 
 const handleAssign = (orderIds: number[]) => {
@@ -357,7 +359,6 @@ onMounted(async () => {
 
     // Escuchar eventos de SignalR
     on('OrderReady', handleOrderReady)
-
-    console.log('✅ SignalR: Escuchando evento OrderReady para domicilios')
+    on('OrderAssigned', handleOrderAssigned)
 })
 </script>
