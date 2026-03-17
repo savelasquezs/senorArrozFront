@@ -38,6 +38,26 @@ export const useOrdersDataStore = defineStore('ordersData', () => {
         error.value = null
         try {
             const response = await orderApi.getOrders(filters)
+
+            // #region agent log
+            fetch('http://127.0.0.1:7818/ingest/41942aad-b391-4788-a785-1ff5a18b90d3', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Debug-Session-Id': '68e7ec',
+                },
+                body: JSON.stringify({
+                    sessionId: '68e7ec',
+                    runId: 'pre-fix',
+                    hypothesisId: 'H1',
+                    location: 'ordersData.ts:fetch',
+                    message: 'orders list payload',
+                    data: response,
+                    timestamp: Date.now(),
+                }),
+            }).catch(() => { })
+            // #endregion agent log
+
             list.value = response as unknown as PagedResult<OrderListItem>
         } catch (error: any) {
             error.value = error.message || 'Error de conexión'
