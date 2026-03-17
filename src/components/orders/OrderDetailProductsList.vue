@@ -173,7 +173,7 @@ const discountTotal = computed(() => {
 })
 
 const calculatedTotal = computed(() => {
-    return calculatedSubtotal.value - discountTotal.value + props.deliveryFee
+    return calculatedSubtotal.value + (props.deliveryFee ?? 0)
 })
 
 const existingProductIds = computed(() => {
