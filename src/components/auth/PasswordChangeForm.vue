@@ -44,48 +44,33 @@
 				</div>
 			</div>
 
-			<!-- Inputs -->
-			<BaseInput
-				v-model="form.currentPassword"
-				label="Contraseña actual"
-				type="password"
-				placeholder="••••••••"
-				required
-				:error="errors.currentPassword"
-				@blur="validateCurrentPassword"
-			>
-				<template #icon>
-					<LockClosedIcon class="h-5 w-5 text-gray-400" />
-				</template>
-			</BaseInput>
+		<!-- Inputs -->
+		<PasswordInput
+			v-model="form.currentPassword"
+			label="Contraseña actual"
+			placeholder="••••••••"
+			required
+			:error="errors.currentPassword"
+			@blur="validateCurrentPassword"
+		/>
 
-			<BaseInput
-				v-model="form.newPassword"
-				label="Nueva contraseña"
-				type="password"
-				placeholder="••••••••"
-				required
-				:error="errors.newPassword"
-				@blur="validateNewPassword"
-			>
-				<template #icon>
-					<LockClosedIcon class="h-5 w-5 text-gray-400" />
-				</template>
-			</BaseInput>
+		<PasswordInput
+			v-model="form.newPassword"
+			label="Nueva contraseña"
+			placeholder="••••••••"
+			required
+			:error="errors.newPassword"
+			@blur="validateNewPassword"
+		/>
 
-			<BaseInput
-				v-model="form.confirmPassword"
-				label="Confirmar nueva contraseña"
-				type="password"
-				placeholder="••••••••"
-				required
-				:error="errors.confirmPassword"
-				@blur="validateConfirmPassword"
-			>
-				<template #icon>
-					<LockClosedIcon class="h-5 w-5 text-gray-400" />
-				</template>
-			</BaseInput>
+		<PasswordInput
+			v-model="form.confirmPassword"
+			label="Confirmar nueva contraseña"
+			placeholder="••••••••"
+			required
+			:error="errors.confirmPassword"
+			@blur="validateConfirmPassword"
+		/>
 
 			<!-- Botón de envío -->
 			<BaseButton
@@ -108,17 +93,10 @@ import { reactive, ref, computed } from 'vue';
 import { useRouter } from 'vue-router';
 import { useAuthStore } from '@/store/auth';
 
-// ✅ Componentes base
 import BaseCard from '@/components/ui/BaseCard.vue';
-import BaseInput from '@/components/ui/BaseInput.vue';
 import BaseButton from '@/components/ui/BaseButton.vue';
-
-// ✅ Heroicons
-import {
-	LockClosedIcon,
-	XCircleIcon,
-	CheckCircleIcon,
-} from '@heroicons/vue/24/outline';
+import PasswordInput from '@/components/ui/PasswordInput.vue';
+import { LockClosedIcon, XCircleIcon, CheckCircleIcon } from '@heroicons/vue/24/outline';
 
 const router = useRouter();
 const authStore = useAuthStore();

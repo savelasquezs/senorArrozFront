@@ -9,23 +9,21 @@
 				Ingresa tu nueva contraseña para restablecer tu cuenta.
 			</p>
 
-			<BaseInput
-				v-model="form.newPassword"
-				label="Nueva contraseña"
-				type="password"
-				placeholder="Ingresa tu nueva contraseña"
-				:error="errors.newPassword"
-				@blur="validateNewPassword"
-			/>
+		<PasswordInput
+			v-model="form.newPassword"
+			label="Nueva contraseña"
+			placeholder="Ingresa tu nueva contraseña"
+			:error="errors.newPassword"
+			@blur="validateNewPassword"
+		/>
 
-			<BaseInput
-				v-model="form.confirmPassword"
-				label="Confirmar contraseña"
-				type="password"
-				placeholder="Confirma tu nueva contraseña"
-				:error="errors.confirmPassword"
-				@blur="validateConfirmPassword"
-			/>
+		<PasswordInput
+			v-model="form.confirmPassword"
+			label="Confirmar contraseña"
+			placeholder="Confirma tu nueva contraseña"
+			:error="errors.confirmPassword"
+			@blur="validateConfirmPassword"
+		/>
 
 			<BaseAlert
 				v-if="authStore.error"
@@ -59,9 +57,9 @@ import { useRouter, useRoute } from 'vue-router';
 import { useAuthStore } from '@/store/auth';
 
 import BaseCard from '@/components/ui/BaseCard.vue';
-import BaseInput from '@/components/ui/BaseInput.vue';
 import BaseButton from '@/components/ui/BaseButton.vue';
-import BaseAlert from '@/components/ui/BaseAlert.vue'; // ✅ Nuevo componente
+import BaseAlert from '@/components/ui/BaseAlert.vue';
+import PasswordInput from '@/components/ui/PasswordInput.vue';
 
 const router = useRouter();
 const route = useRoute();

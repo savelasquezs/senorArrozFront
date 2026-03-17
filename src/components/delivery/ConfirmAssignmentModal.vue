@@ -19,8 +19,8 @@
             </div>
 
             <div class="space-y-2">
-                <BaseInput v-model="password" type="password" label="Contraseña" placeholder="Ingresa tu contraseña"
-                    :error="passwordError" autofocus />
+                <PasswordInput v-model="password" label="Contraseña" placeholder="Ingresa tu contraseña"
+                    :error="passwordError" />
             </div>
 
             <p class="text-sm text-gray-500">
@@ -48,7 +48,7 @@ import { useDeliveryStore } from '@/store/delivery'
 import { useToast } from '@/composables/useToast'
 import BaseDialog from '@/components/ui/BaseDialog.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
-import BaseInput from '@/components/ui/BaseInput.vue'
+import PasswordInput from '@/components/ui/PasswordInput.vue'
 import BaseBadge from '@/components/ui/BaseBadge.vue'
 
 interface Props {

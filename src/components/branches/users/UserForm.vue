@@ -53,20 +53,13 @@
                 <h4 class="text-sm font-medium text-gray-900 mb-4">Configuración de Acceso</h4>
 
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <BaseInput v-model="form.password" label="Contraseña" type="password"
-                        placeholder="Mínimo 8 caracteres" required :error="errors.password" @input="validatePassword">
-                        <template #icon>
-                            <LockClosedIcon class="w-4 h-4" />
-                        </template>
-                    </BaseInput>
+                    <PasswordInput v-model="form.password" label="Contraseña"
+                        placeholder="Mínimo 8 caracteres" required :error="errors.password"
+                        @blur="validatePassword" />
 
-                    <BaseInput v-model="form.confirmPassword" label="Confirmar Contraseña" type="password"
+                    <PasswordInput v-model="form.confirmPassword" label="Confirmar Contraseña"
                         placeholder="Repetir contraseña" required :error="errors.confirmPassword"
-                        @input="validateConfirmPassword">
-                        <template #icon>
-                            <LockClosedIcon class="w-4 h-4" />
-                        </template>
-                    </BaseInput>
+                        @blur="validateConfirmPassword" />
                 </div>
 
                 <!-- Password Requirements -->
@@ -127,12 +120,12 @@ import BaseInput from '@/components/ui/BaseInput.vue'
 import BaseSelect from '@/components/ui/BaseSelect.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseAlert from '@/components/ui/BaseAlert.vue'
+import PasswordInput from '@/components/ui/PasswordInput.vue'
 import {
     UserIcon,
     AtSymbolIcon,
     PhoneIcon,
     ShieldCheckIcon,
-    LockClosedIcon,
     CheckIcon,
     XMarkIcon
 } from '@heroicons/vue/24/outline'
