@@ -41,8 +41,15 @@
                 </div>
             </div>
 
-            <!-- Address Selection (for delivery) -->
+            <!-- Address Selection (for delivery and reservation) -->
             <div v-if="orderType === 'delivery' || orderType === 'reservation'" class="space-y-2">
+                <div class="flex items-center justify-between mb-1">
+                    <span class="text-sm font-medium text-gray-700">
+                        Dirección
+                        <span v-if="orderType === 'delivery'" class="text-red-500">*</span>
+                        <span v-else class="text-gray-400 font-normal text-xs"> (opcional)</span>
+                    </span>
+                </div>
                 <AddressSelector :customer-id="props.selectedCustomer.id"
                     :selected-address="props.selectedAddress?.id || undefined"
                     @address-selected="handleAddressSelected" />
@@ -134,8 +141,9 @@ const handleCustomerSelected = (customer: Customer) => {
             ordersDraftsStore!.updateGuestName('')
         }
 
-        // Auto-selección de dirección
-        if (customer && customer.addresses && customer.addresses.length > 0) {
+        // Auto-selección de dirección (no para reservas: la dirección es opcional)
+        const currentOrderType = ordersDraftsStore!.currentOrder?.type
+        if (currentOrderType !== 'reservation' && customer && customer.addresses && customer.addresses.length > 0) {
             const primaryAddress = customer.addresses.find(a => a.isPrimary)
             const addressToSelect = primaryAddress || customer.addresses[0]
             ordersDraftsStore!.updateAddress(addressToSelect)
