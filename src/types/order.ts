@@ -234,6 +234,7 @@ export interface OrderListItem {
     // ✅ NUEVO: Campos de pagos para la tabla
     bankPayments: OrderBankPaymentDetail[]
     appPayments: OrderAppPaymentDetail[]
+    totalDeposited: number
 }
 
 // ===== TIPOS PARA VISTA DE DETALLE =====

@@ -238,12 +238,15 @@
 
         <!-- Tabla reservas -->
         <div class="bg-white rounded-lg shadow overflow-hidden">
-            <OrdersTable :orders="resFilteredItems" :loading="resLoading" :sort-by="resSortBy" :sort-order="resSortOrder"
-                :quick-banks="quickBanks"
-                @edit-customer="handleEditCustomer" @edit-address="handleEditAddress"
-                @change-status="handleChangeStatus" @assign-delivery="handleAssignDelivery" @edit-type="handleEditType"
-                @verify-bank-payment="handleVerifyBankPayment" @quick-bank-transfer="handleResQuickBankTransfer"
+            <ReservationsTable
+                :reservations="resFilteredItems"
+                :loading="resLoading"
+                :sort-by="resSortBy"
+                :sort-order="resSortOrder"
+                @edit-customer="handleEditCustomer"
+                @edit-address="handleEditAddress"
                 @add-deposit="handleOpenDeposit"
+                @cancel-reservation="handleCancelReservation"
                 @sort="handleResSort" />
 
             <!-- Paginación reservas -->
@@ -321,6 +324,7 @@ import SelectAddressModal from '@/components/orders/SelectAddressModal.vue'
 import AssignDeliveryModal from '@/components/orders/AssignDeliveryModal.vue'
 import EditOrderTypeModal from '@/components/orders/EditOrderTypeModal.vue'
 import ReservationDepositModal from '@/components/reservations/ReservationDepositModal.vue'
+import ReservationsTable from '@/components/reservations/ReservationsTable.vue'
 import BaseInput from '@/components/ui/BaseInput.vue'
 import BaseSelect from '@/components/ui/BaseSelect.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
@@ -953,6 +957,17 @@ const clearResFilters = () => {
     resTo.value = ''
     resCurrentPage.value = 1
     fetchReservations()
+}
+
+const handleCancelReservation = async (order: OrderListItem) => {
+    if (!confirm(`¿Cancelar la reserva #${order.id}?`)) return
+    try {
+        await orderApi.cancel(order.id, 'Cancelada manualmente')
+        success('Reserva cancelada', 3000)
+        await fetchReservations()
+    } catch (err: any) {
+        error('Error al cancelar', err.message || 'No se pudo cancelar la reserva')
+    }
 }
 
 // Lifecycle
