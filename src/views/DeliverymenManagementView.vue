@@ -123,7 +123,8 @@ const authStore = useAuthStore()
 const { success, error } = useToast()
 
 // Estado
-const selectedDate = ref(new Date().toISOString().split('T')[0])
+// Fecha de hoy en zona Colombia (evitar desfase por UTC)
+const selectedDate = ref(new Date().toLocaleDateString('en-CA', { timeZone: 'America/Bogota' }))
 const loading = ref(false)
 const submitting = ref(false)
 const loadingDetail = ref(false)
