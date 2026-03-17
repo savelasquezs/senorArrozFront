@@ -28,10 +28,20 @@
                     <label class="block text-sm font-medium text-gray-700">
                         Detalles del Gasto <span class="text-red-500">*</span>
                     </label>
-                    <BaseButton type="button" variant="secondary" size="sm" @click="addDetail">
-                        <PlusIcon class="w-4 h-4 mr-1" />
-                        Agregar
-                    </BaseButton>
+                    <div class="flex items-center gap-2">
+                        <BaseButton type="button" variant="secondary" size="sm" @click="openCreateExpenseCategory">
+                            <PlusIcon class="w-4 h-4 mr-1" />
+                            Categoría
+                        </BaseButton>
+                        <BaseButton type="button" variant="secondary" size="sm" @click="openCreateExpenseForNewDetail">
+                            <PlusIcon class="w-4 h-4 mr-1" />
+                            Gasto
+                        </BaseButton>
+                        <BaseButton type="button" variant="secondary" size="sm" @click="addDetail">
+                            <PlusIcon class="w-4 h-4 mr-1" />
+                            Agregar
+                        </BaseButton>
+                    </div>
                 </div>
 
                 <div v-if="supplierHasFavoriteExpenses" class="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-emerald-100 bg-emerald-50/60 px-3 py-2 mb-3">
@@ -228,15 +238,27 @@
             </div>
         </form>
     </BaseDialog>
+
+    <!-- Crear categoría de gasto (reutilizado) -->
+    <ExpenseCategoryFormModal :is-open="showExpenseCategoryForm" :editing-category="null"
+        :loading="expenseCategoryFormLoading" @close="showExpenseCategoryForm = false"
+        @submit="handleExpenseCategorySubmit" />
+
+    <!-- Crear gasto (reutilizado) -->
+    <BaseDialog v-model="showExpenseForm" title="Nuevo Gasto" size="lg">
+        <ExpenseForm :expense="null" :categories="allExpenseCategories" :loading="expenseFormLoading"
+            @submit="handleExpenseSubmit" @cancel="showExpenseForm = false" />
+    </BaseDialog>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, watch, onMounted } from 'vue'
-import type { ExpenseHeader, CreateExpenseHeaderDto, UpdateExpenseHeaderDto, CreateExpenseDetailDto, CreateExpenseBankPaymentDto, SupplierExpenseSuggestion } from '@/types/expense'
+import type { ExpenseHeader, CreateExpenseHeaderDto, UpdateExpenseHeaderDto, CreateExpenseDetailDto, CreateExpenseBankPaymentDto, SupplierExpenseSuggestion, ExpenseCategory, CreateExpenseCategoryDto, CreateExpenseDto, Expense } from '@/types/expense'
 import type { Supplier, CreateSupplierDto } from '@/types/supplier'
 import { expenseHeaderApi } from '@/services/MainAPI/expenseHeaderApi'
 import { bankApi } from '@/services/MainAPI/bankApi'
 import { expenseApi } from '@/services/MainAPI/expenseApi'
+import { expenseCategoryApi } from '@/services/MainAPI/expenseCategoryApi'
 import { supplierApi } from '@/services/MainAPI/supplierApi'
 import { deliverymanApi } from '@/services/MainAPI/deliverymanApi'
 import { useFormatting } from '@/composables/useFormatting'
@@ -246,6 +268,8 @@ import BaseDialog from '@/components/ui/BaseDialog.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseInput from '@/components/ui/BaseInput.vue'
 import BaseSelect from '@/components/ui/BaseSelect.vue'
+import ExpenseCategoryFormModal from '@/components/expenses/ExpenseCategoryFormModal.vue'
+import ExpenseForm from '@/components/expenses/ExpenseForm.vue'
 import { PlusIcon, TrashIcon, SparklesIcon } from '@heroicons/vue/24/outline'
 
 interface Props {
@@ -288,6 +312,14 @@ const formData = ref<{
 const supplierOptions = ref<Array<{ value: number; label: string }>>([])
 const bankOptions = ref<Array<{ value: number; label: string }>>([])
 const expenseOptions = ref<Array<{ value: number; label: string; description?: string }>>([])
+
+// Crear categoría / gasto "al vuelo"
+const allExpenseCategories = ref<ExpenseCategory[]>([])
+const showExpenseCategoryForm = ref(false)
+const expenseCategoryFormLoading = ref(false)
+const showExpenseForm = ref(false)
+const expenseFormLoading = ref(false)
+const targetDetailIndexForNewExpense = ref<number | null>(null)
 const supplierExpenseSuggestions = ref<SupplierExpenseSuggestion[]>([])
 const supplierExpensesLoading = ref(false)
 const showAllSupplierExpenses = ref(false)
@@ -417,18 +449,7 @@ onMounted(async () => {
     }
 
     // Cargar gastos disponibles
-    try {
-        const response = await expenseApi.getAllExpenses()
-        if (response.isSuccess && response.data) {
-            expenseOptions.value = response.data.map(expense => ({
-                value: expense.id,
-                label: `${expense.name} - ${expense.unitDisplay}`, // Mostrar nombre y unidad juntos
-                description: expense.categoryName
-            }))
-        }
-    } catch (err) {
-        console.error('Error loading expenses:', err)
-    }
+    await Promise.all([loadExpenses(), loadExpenseCategories()])
 
     await loadSuppliers()
 })
@@ -591,6 +612,90 @@ async function loadSuppliers() {
         console.error('Error loading suppliers:', err)
     } finally {
         suppliersLoading.value = false
+    }
+}
+
+async function loadExpenses() {
+    try {
+        const response = await expenseApi.getAllExpenses()
+        if (response.isSuccess && response.data) {
+            expenseOptions.value = response.data.map(expense => ({
+                value: expense.id,
+                label: `${expense.name} - ${expense.unitDisplay}`,
+                description: expense.categoryName
+            }))
+        }
+    } catch (err) {
+        console.error('Error loading expenses:', err)
+    }
+}
+
+async function loadExpenseCategories() {
+    try {
+        const response = await expenseCategoryApi.getAllExpenseCategories()
+        if (response.isSuccess && response.data) {
+            allExpenseCategories.value = response.data
+        }
+    } catch (err) {
+        console.error('Error loading expense categories:', err)
+    }
+}
+
+const openCreateExpenseCategory = () => {
+    showExpenseCategoryForm.value = true
+}
+
+const openCreateExpenseForNewDetail = () => {
+    // Si el usuario quiere crear un gasto, le creamos la fila y luego asignamos el gasto creado a esa fila.
+    addDetail()
+    targetDetailIndexForNewExpense.value = formData.value.expenseDetails.length - 1
+    showExpenseForm.value = true
+}
+
+const handleExpenseCategorySubmit = async (data: CreateExpenseCategoryDto) => {
+    try {
+        expenseCategoryFormLoading.value = true
+        const created = await expenseCategoryApi.createExpenseCategory({ name: data.name })
+        if (created.isSuccess && created.data) {
+            // Mantener lista de categorías para el modal de creación de gastos
+            allExpenseCategories.value = [created.data, ...allExpenseCategories.value]
+            success('Categoría creada', 4000, created.data.name)
+        }
+        showExpenseCategoryForm.value = false
+    } catch (err: any) {
+        error('Error creando categoría', err?.message || 'No se pudo crear la categoría')
+    } finally {
+        expenseCategoryFormLoading.value = false
+    }
+}
+
+const handleExpenseSubmit = async (data: CreateExpenseDto) => {
+    try {
+        expenseFormLoading.value = true
+        const created = await expenseApi.createExpense(data)
+        if (created.isSuccess && created.data) {
+            const exp: Expense = created.data
+            const option = {
+                value: exp.id,
+                label: `${exp.name} - ${exp.unitDisplay}`,
+                description: exp.categoryName
+            }
+            expenseOptions.value = [option, ...expenseOptions.value]
+
+            const idx = targetDetailIndexForNewExpense.value
+            if (idx !== null && formData.value.expenseDetails[idx]) {
+                formData.value.expenseDetails[idx].expenseId = exp.id
+                await onExpenseSelected(idx, exp.id)
+            }
+
+            success('Gasto creado', 4000, exp.name)
+        }
+        showExpenseForm.value = false
+        targetDetailIndexForNewExpense.value = null
+    } catch (err: any) {
+        error('Error creando gasto', err?.message || 'No se pudo crear el gasto')
+    } finally {
+        expenseFormLoading.value = false
     }
 }
 
