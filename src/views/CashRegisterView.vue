@@ -321,25 +321,6 @@ async function loadData() {
   try {
     expected.value = await cashRegisterApi.getExpected()
 
-    // #region agent log
-    fetch('http://127.0.0.1:7818/ingest/41942aad-b391-4788-a785-1ff5a18b90d3', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Debug-Session-Id': '68e7ec',
-      },
-      body: JSON.stringify({
-        sessionId: '68e7ec',
-        runId: 'pre-fix',
-        hypothesisId: 'H1',
-        location: 'CashRegisterView.vue:loadData',
-        message: 'cash register expected payload',
-        data: expected.value,
-        timestamp: Date.now(),
-      }),
-    }).catch(() => {})
-    // #endregion agent log
-
     // Inicializar conciliaciones con valores del sistema
     bankReconciliations.value = expected.value.banks.map((b) => ({
       bankId: b.bankId,
