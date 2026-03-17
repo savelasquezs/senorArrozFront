@@ -460,13 +460,21 @@ const hasActiveFilters = computed(() => {
 const fetchOrders = async () => {
     loading.value = true
     try {
-        const response = await orderApi.fetchList({
-            fromDate: dateFilters.value.fromDate,
-            toDate: dateFilters.value.toDate || undefined,
+        const body: Record<string, any> = {
             page: currentPage.value,
             pageSize: pageSize.value,
-        })
+            sortBy: sortBy.value,
+            sortOrder: sortOrder.value,
+            excludeFutureReservations: true,
+        }
+        if (dateFilters.value.fromDate) body.fromDate = new Date(dateFilters.value.fromDate).toISOString()
+        if (dateFilters.value.toDate) {
+            const to = new Date(dateFilters.value.toDate)
+            to.setHours(23, 59, 59, 999)
+            body.toDate = to.toISOString()
+        }
 
+        const response = await orderApi.searchOrders(body)
         orders.value = response.items
         totalCount.value = response.totalCount
     } catch (err: any) {
@@ -515,6 +523,8 @@ const handleSort = (column: 'id' | 'total' | 'createdAt') => {
         sortBy.value = column
         sortOrder.value = 'desc'
     }
+    currentPage.value = 1
+    fetchOrders()
 }
 
 // Handlers de eventos de tabla
