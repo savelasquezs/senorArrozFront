@@ -11,7 +11,7 @@
             </div>
 
             <div class="flex gap-1">
-                <BaseButton size="sm" variant="outline" class="px-2" @click="openDetail = true">Ver</BaseButton>
+                <BaseButton size="sm" variant="outline" class="px-2" @click="onToggleDetail(true)">Ver</BaseButton>
                 <BaseButton size="sm" variant="success" class="px-2" @click="openConfirmDelivered = true">✓</BaseButton>
                 <BaseButton size="sm" variant="outline" class="px-2" @click="openAddress = true">Dir</BaseButton>
             </div>
