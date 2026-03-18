@@ -47,11 +47,13 @@
                     <!-- "Para más tarde" solo para onsite/delivery -->
                     <div v-if="currentOrder.type !== 'reservation'" class="space-y-2 flex px-4">
                         <label class="block text-sm font-medium text-gray-700 mr-2">Para más tarde?</label>
-                        <input type="checkbox" :checked="currentOrder.isLater" @change="(e) => updateIsLater((e.target as HTMLInputElement).checked)"
+                        <input type="checkbox" :checked="currentOrder.isLater"
+                            @change="(e) => updateIsLater((e.target as HTMLInputElement).checked)"
                             class="form-checkbox h-5 w-5 text-blue-600">
                     </div>
                     <!-- Hora de preparación/entrega para onsite y delivery (mismo día) -->
-                    <div class="py-3 border-b border-gray-200 space-y-4" v-if="currentOrder.type !== 'reservation' && currentOrder.isLater">
+                    <div class="py-3 border-b border-gray-200 space-y-4"
+                        v-if="currentOrder.type !== 'reservation' && currentOrder.isLater">
                         <label class="block text-sm font-medium text-gray-700">Hora preparación</label>
                         <VueDatePicker v-model="prepareAtLocal" time-picker placeholder="Hora preparación"
                             @update:model-value="onPrepareAtInput" />
@@ -62,16 +64,16 @@
                     <!-- Fecha y hora para reservas (otro día, siempre visible) -->
                     <div class="py-3 border-b border-gray-200 space-y-4" v-if="currentOrder.type === 'reservation'">
                         <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1">Fecha/hora preparación <span class="text-gray-400 font-normal">(opcional)</span></label>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Fecha/hora preparación <span
+                                    class="text-gray-400 font-normal">(opcional)</span></label>
                             <VueDatePicker v-model="prepareAtDateLocal" placeholder="Cuándo empezar a preparar"
-                                :min-date="new Date()"
-                                @update:model-value="onPrepareAtDateInput" />
+                                :min-date="new Date()" @update:model-value="onPrepareAtDateInput" />
                         </div>
                         <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1">Fecha/hora del evento <span class="text-red-500">*</span></label>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Fecha/hora del evento <span
+                                    class="text-red-500">*</span></label>
                             <VueDatePicker v-model="reservedForDateLocal" placeholder="Cuándo se entrega/sirve"
-                                :min-date="new Date()"
-                                @update:model-value="onReservedForDateInput" />
+                                :min-date="new Date()" @update:model-value="onReservedForDateInput" />
                         </div>
                     </div>
 

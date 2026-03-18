@@ -225,8 +225,8 @@ const errorMessage = computed(() => {
         ? draftStore?.currentOrder?.type
         : dataStore?.current?.type
 
-    if ((orderType === 'delivery' || orderType === 'reservation') && !selectedAddress.value) {
-        return 'Debe seleccionar una dirección para pedidos a domicilio o reservas'
+    if (orderType === 'delivery' && !selectedAddress.value) {
+        return 'Debe seleccionar una dirección para pedidos a domicilio'
     }
 
     return null
