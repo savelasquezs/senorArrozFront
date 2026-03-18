@@ -69,7 +69,8 @@
                                 <ArchiveBoxIcon class="w-4 h-4 text-gray-400 mr-2" />
                                 <div>
                                     <p class="text-xs font-medium text-gray-900">Stock</p>
-                                    <p class="text-xs text-gray-600" :class="{
+                                    <p v-if="product.stock === null" class="text-xs text-emerald-600 font-medium">∞ Ilimitado</p>
+                                    <p v-else class="text-xs text-gray-600" :class="{
                                         'text-red-600 font-semibold': product.stock <= 5,
                                         'text-yellow-600 font-medium': product.stock <= 10 && product.stock > 5,
                                         'text-green-600': product.stock > 10

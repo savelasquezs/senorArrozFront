@@ -8,7 +8,7 @@ export interface Product {
     branchName: string;
     name: string;
     price: number;
-    stock: number;
+    stock: number | null;
     active: boolean;
     createdAt: string;
     updatedAt: string;
@@ -38,7 +38,7 @@ export interface CreateProductDto {
     categoryId: number;
     name: string;
     price: number;
-    stock?: number;
+    stock?: number | null;
     active?: boolean;
 }
 
@@ -46,7 +46,7 @@ export interface UpdateProductDto {
     categoryId?: number;
     name?: string;
     price?: number;
-    stock?: number;
+    stock?: number | null;
     active?: boolean;
 }
 
@@ -87,7 +87,7 @@ export interface ProductFormData {
     categoryId: number;
     name: string;
     price: number;
-    stock?: number; // Optional for editing existing products
+    stock?: number | null; // null = stock infinito; undefined = no enviar (edición)
     active: boolean;
 }
 

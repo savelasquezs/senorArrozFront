@@ -60,22 +60,17 @@ const { success } = useToast()
 
 // Computed
 const hasUnlimitedStock = computed(() => {
-    // Categoría "arroces" tiene stock ilimitado
-    return props.product.categoryName?.toLowerCase().includes('arro')
+    return props.product.stock === null
 })
 
 const isDisabled = computed(() => {
     if (props.disabled || !props.product.active) {
         return true
     }
-
-    // Si es categoría con stock ilimitado (arroces), nunca está deshabilitado por stock
     if (hasUnlimitedStock.value) {
         return false
     }
-
-    // Para otras categorías, deshabilitar si stock <= 0
-    return props.product.stock !== undefined && props.product.stock <= 0
+    return props.product.stock !== undefined && props.product.stock !== null && props.product.stock <= 0
 })
 
 const cardClasses = computed(() => {

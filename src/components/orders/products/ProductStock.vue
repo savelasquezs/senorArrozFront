@@ -50,19 +50,19 @@ const props = withDefaults(defineProps<Props>(), {
 
 // Computed
 const stockStatus = computed(() => {
-    // Si tiene stock ilimitado (ej. categoría arroces)
-    if (props.hasUnlimitedStock) {
+    // Stock null = ilimitado (definido en el producto) o flag externo
+    if (props.stock === null || props.hasUnlimitedStock) {
         return {
             type: 'success' as const,
-            text: 'Disponible',
+            text: '∞ Ilimitado',
             icon: CheckCircleIcon,
-            color: 'text-green-600',
-            bgColor: 'bg-green-600'
+            color: 'text-emerald-600',
+            bgColor: 'bg-emerald-600'
         }
     }
 
-    // Handle undefined/null stock
-    if (props.stock === undefined || props.stock === null) {
+    // Handle undefined stock
+    if (props.stock === undefined) {
         return {
             type: 'secondary' as const,
             text: 'Sin información',
@@ -104,10 +104,10 @@ const statusText = computed(() => stockStatus.value.text)
 const statusIcon = computed(() => stockStatus.value.icon)
 
 const tooltipText = computed(() => {
-    if (props.hasUnlimitedStock) {
+    if (props.stock === null || props.hasUnlimitedStock) {
         return 'Stock ilimitado - Siempre disponible'
     }
-    if (props.stock === undefined || props.stock === null) {
+    if (props.stock === undefined) {
         return 'Información de stock no disponible'
     }
     if (props.stock <= 0) {
@@ -120,8 +120,8 @@ const tooltipText = computed(() => {
 })
 
 const stockPercentage = computed(() => {
-    if (props.hasUnlimitedStock) return 100
-    if (props.stock === undefined || props.stock === null || props.stock <= 0) return 0
+    if (props.stock === null || props.hasUnlimitedStock) return 100
+    if (props.stock === undefined || props.stock <= 0) return 0
     if (props.stock <= props.lowStockThreshold) return (props.stock / props.lowStockThreshold) * 50
     return Math.min(100, (props.stock / 20) * 100) // Assume 20+ is full
 })

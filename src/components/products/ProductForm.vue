@@ -27,19 +27,38 @@
                 </template>
             </BaseInput>
 
-            <BaseInput v-if="!product" v-model.number="form.stock" label="Stock Inicial" type="number" :min="0" :step="1"
-                placeholder="50" :error="errors.stock" @input="validateForm">
-                <template #icon>
-                    <ArchiveBoxIcon class="w-4 h-4" />
-                </template>
-            </BaseInput>
+            <!-- Stock para nuevo producto -->
+            <div v-if="!product" class="space-y-2">
+                <div class="flex items-center gap-2 mb-1">
+                    <label class="block text-sm font-medium text-gray-700">Stock Inicial</label>
+                    <label class="flex items-center gap-1.5 text-sm text-gray-600 cursor-pointer ml-auto">
+                        <input type="checkbox" v-model="form.infiniteStock"
+                            class="h-4 w-4 text-emerald-600 focus:ring-emerald-500 border-gray-300 rounded">
+                        <span class="text-emerald-600 font-bold text-base leading-none">∞</span>
+                        Ilimitado
+                    </label>
+                </div>
+                <BaseInput v-if="!form.infiniteStock" v-model.number="form.stock" type="number" :min="0" :step="1"
+                    placeholder="50" :error="errors.stock" @input="validateForm">
+                    <template #icon>
+                        <ArchiveBoxIcon class="w-4 h-4" />
+                    </template>
+                </BaseInput>
+                <div v-else class="flex items-center px-3 py-2 border border-emerald-300 rounded-md bg-emerald-50">
+                    <span class="text-emerald-500 font-bold text-lg mr-2 leading-none">∞</span>
+                    <span class="text-sm text-emerald-700 font-medium">Sin límite de stock</span>
+                </div>
+            </div>
 
-            <!-- Stock display for existing products -->
+            <!-- Stock display para productos existentes -->
             <div v-else class="space-y-1">
                 <label class="block text-sm font-medium text-gray-700">Stock Actual</label>
                 <div class="flex items-center px-3 py-2 border border-gray-300 rounded-md bg-gray-50">
                     <ArchiveBoxIcon class="w-4 h-4 text-gray-400 mr-2" />
-                    <span class="text-sm text-gray-900">{{ form.stock }} unidades</span>
+                    <span v-if="form.stock === null" class="text-sm font-medium text-emerald-700">
+                        ∞ Ilimitado
+                    </span>
+                    <span v-else class="text-sm text-gray-900">{{ form.stock }} unidades</span>
                 </div>
                 <p class="text-xs text-gray-500">El stock se ajusta desde el detalle del producto</p>
             </div>
@@ -65,10 +84,43 @@
             </BaseButton>
         </div>
     </form>
+
+    <!-- Modal confirmación precio $0 -->
+    <BaseDialog :model-value="showPriceZeroConfirm" @update:model-value="showPriceZeroConfirm = false"
+        title="Precio en $0">
+        <div class="space-y-3">
+            <div class="flex items-start gap-3">
+                <div class="flex-shrink-0 w-10 h-10 rounded-full bg-yellow-100 flex items-center justify-center">
+                    <ExclamationTriangleIcon class="w-5 h-5 text-yellow-600" />
+                </div>
+                <div>
+                    <p class="text-sm text-gray-700">
+                        Estás guardando el producto
+                        <span class="font-semibold text-gray-900">{{ form.name }}</span>
+                        con un precio de <span class="font-semibold text-red-600">$0</span>.
+                    </p>
+                    <p class="text-sm text-gray-500 mt-1">
+                        Este producto podrá agregarse a pedidos sin cobrar nada. ¿Deseas continuar?
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <template #footer>
+            <div class="flex gap-3 justify-end">
+                <BaseButton @click="showPriceZeroConfirm = false" variant="secondary">
+                    Volver a revisar
+                </BaseButton>
+                <BaseButton @click="confirmPriceZero" variant="primary">
+                    Sí, guardar con precio $0
+                </BaseButton>
+            </div>
+        </template>
+    </BaseDialog>
 </template>
 
 <script setup lang="ts">
-import { reactive, computed, watch, onMounted } from 'vue'
+import { reactive, computed, watch, onMounted, ref } from 'vue'
 import { useProductCategoriesStore } from '@/store/productCategories'
 import { useAuthStore } from '@/store/auth'
 import { useToast } from '@/composables/useToast'
@@ -76,11 +128,13 @@ import type { Product, ProductFormData } from '@/types/product'
 import BaseInput from '@/components/ui/BaseInput.vue'
 import BaseSelect from '@/components/ui/BaseSelect.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
+import BaseDialog from '@/components/ui/BaseDialog.vue'
 import {
     CubeIcon,
     TagIcon,
     CurrencyDollarIcon,
     ArchiveBoxIcon,
+    ExclamationTriangleIcon,
 } from '@heroicons/vue/24/outline'
 
 interface Props {
@@ -105,7 +159,8 @@ const form = reactive({
     categoryId: 0,
     name: '',
     price: 0,
-    stock: 0,
+    stock: 0 as number | null,
+    infiniteStock: false,
     active: true
 })
 
@@ -128,14 +183,14 @@ const categoryOptions = computed(() => {
 const isFormValid = computed(() => {
     const basicValidation = form.categoryId > 0 &&
         form.name.trim().length >= 3 &&
-        form.price > 0 &&
+        form.price >= 0 &&
         !errors.categoryId &&
         !errors.name &&
         !errors.price
 
     // Only validate stock for new products
     if (!props.product) {
-        return basicValidation && form.stock >= 0 && !errors.stock
+        return basicValidation && (form.infiniteStock || (form.stock !== null && form.stock >= 0 && !errors.stock))
     }
 
     return basicValidation
@@ -161,9 +216,9 @@ const validateForm = () => {
         errors.name = ''
     }
 
-    // Validate price
-    if (form.price <= 0) {
-        errors.price = 'El precio debe ser mayor a 0'
+    // Validate price (0 es válido pero requiere confirmación al guardar)
+    if (form.price < 0) {
+        errors.price = 'El precio no puede ser negativo'
     } else {
         errors.price = ''
     }
@@ -178,19 +233,31 @@ const validateForm = () => {
     }
 }
 
+const showPriceZeroConfirm = ref(false)
+
+const buildFormData = (): ProductFormData => ({
+    categoryId: form.categoryId,
+    name: form.name.trim(),
+    price: form.price,
+    stock: props.product ? undefined : (form.infiniteStock ? null : form.stock),
+    active: form.active
+})
+
 const handleSubmit = () => {
     validateForm()
     if (!isFormValid.value) return
 
-    const formData: ProductFormData = {
-        categoryId: form.categoryId,
-        name: form.name.trim(),
-        price: form.price,
-        stock: props.product ? undefined : form.stock, // Only include stock for new products
-        active: form.active
+    if (form.price === 0) {
+        showPriceZeroConfirm.value = true
+        return
     }
 
-    emit('submit', formData)
+    emit('submit', buildFormData())
+}
+
+const confirmPriceZero = () => {
+    showPriceZeroConfirm.value = false
+    emit('submit', buildFormData())
 }
 
 // Handle category creation
@@ -219,17 +286,17 @@ watch(() => props.product, (newProduct) => {
         form.name = newProduct.name
         form.price = newProduct.price
         form.stock = newProduct.stock
+        form.infiniteStock = newProduct.stock === null
         form.active = newProduct.active
     } else {
-        // Reset form for new product
         form.categoryId = 0
         form.name = ''
         form.price = 0
         form.stock = 0
+        form.infiniteStock = false
         form.active = true
     }
 
-    // Clear errors
     errors.categoryId = ''
     errors.name = ''
     errors.price = ''

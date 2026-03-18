@@ -151,7 +151,8 @@
                                     <div class="text-sm text-gray-900">
                                         <div class="flex items-center">
                                             <ArchiveBoxIcon class="h-4 w-4 text-gray-400 mr-1" />
-                                            <span :class="{
+                                            <span v-if="product.stock === null" class="text-emerald-600 font-medium">∞</span>
+                                            <span v-else :class="{
                                                 'text-red-600 font-semibold': product.stock <= 5,
                                                 'text-yellow-600 font-medium': product.stock <= 10 && product.stock > 5,
                                                 'text-green-600': product.stock > 10
@@ -310,7 +311,7 @@ const inactiveProducts = computed(() => {
 })
 
 const lowStockProducts = computed(() => {
-    return store.list?.items?.filter(p => p.stock <= 5).length || 0
+    return store.list?.items?.filter(p => p.stock !== null && p.stock <= 5).length || 0
 })
 
 // Methods
