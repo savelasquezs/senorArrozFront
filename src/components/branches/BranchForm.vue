@@ -45,7 +45,7 @@
                 <h4 class="font-medium">Información sobre los datos</h4>
                 <ul class="mt-1 text-sm list-disc list-inside space-y-1">
                     <li>El nombre debe ser único en el sistema</li>
-                    <li>Los teléfonos deben ser números celulares válidos (10 dígitos, iniciando con 3)</li>
+                    <li>Los teléfonos deben ser números válidos de 10 dígitos (celular con 3 o fijo con 6)</li>
                     <li>La dirección debe ser completa y específica</li>
                 </ul>
             </div>

@@ -62,12 +62,12 @@ const isValidWhatsAppNumber = computed(() => {
     // Format: 3XX XXX XXXX or +57 3XX XXX XXXX
     const cleanNumber = props.phoneNumber.replace(/\s+/g, '').replace(/[^\d+]/g, '')
 
-    // Colombian cell numbers start with 3 and have 10 digits total
+    // Colombian numbers: mobile start with 3, landlines start with 6 (10 digits)
     // Or international format starting with +57
-    const colombianCellPattern = /^(\+57)?3\d{9}$/
-    const localPattern = /^3\d{9}$/
+    const colombianIntlPattern = /^(\+57)?[36]\d{9}$/
+    const localPattern = /^[36]\d{9}$/
 
-    return colombianCellPattern.test(cleanNumber) || localPattern.test(cleanNumber)
+    return colombianIntlPattern.test(cleanNumber) || localPattern.test(cleanNumber)
 })
 
 const whatsappNumber = computed(() => {

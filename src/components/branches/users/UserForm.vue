@@ -252,8 +252,8 @@ const validatePhone = () => {
         return
     }
 
-    if (!/^3\d{9}$/.test(phone)) {
-        errors.phone = 'Debe ser un número celular válido (10 dígitos, iniciando con 3)'
+    if (!/^[36]\d{9}$/.test(phone)) {
+        errors.phone = 'Debe ser un número válido (10 dígitos, celular con 3 o fijo con 6)'
         return
     }
 
