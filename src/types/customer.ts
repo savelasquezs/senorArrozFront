@@ -46,7 +46,7 @@ export interface CreateCustomerDto {
     phone1: string;
     phone2?: string;
     branchId: number;
-    initialAddress: {
+    initialAddress?: {
         neighborhoodId: number;
         address: string;
         additionalInfo?: string;

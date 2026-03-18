@@ -176,15 +176,9 @@ const createCustomerWrapper = async (customerData: any) => {
         phone1: customerData.phone1,
         phone2: customerData.phone2,
         branchId: customerData.branchId,
-        initialAddress: customerData.initialAddress || {
-            neighborhoodId: 0,
-            address: '',
-            additionalInfo: '',
-            latitude: 0,
-            longitude: 0,
-            isPrimary: true,
-            deliveryFee: 0
-        }
+        initialAddress: customerData.initialAddress?.address?.trim()
+            ? customerData.initialAddress
+            : undefined
     }
 
     isCreating.value = true

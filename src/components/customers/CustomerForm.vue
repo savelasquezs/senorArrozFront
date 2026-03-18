@@ -5,8 +5,8 @@ c<!-- src/components/CustomerForm.vue -->
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
 
 
-            <BaseInput v-model="form.name" label="Nombre Completo" placeholder="Ej: Juan Pérez González" required
-                :error="errors.name" :maxlength="150" :minlength="5" @input="validateForm">
+            <BaseInput v-model="form.name" label="Nombre Completo" placeholder="Ej: Liz, Juan Pérez..." required
+                :error="errors.name" :maxlength="150" :minlength="3" @input="validateForm">
                 <template #icon>
                     <UserIcon class="w-4 h-4" />
                 </template>
@@ -68,8 +68,8 @@ c<!-- src/components/CustomerForm.vue -->
                 </p>
             </div>
 
-            <p v-else class="text-sm text-gray-500 italic">
-                No se ha agregado una dirección inicial (requerida para crear cliente)
+            <p v-else class="text-sm text-gray-400 italic">
+                Sin dirección inicial — se puede agregar después desde el detalle del cliente
             </p>
         </div>
 
@@ -232,16 +232,19 @@ const isFormValid = computed(() => {
         !errors.branchId
 
     if (!props.customer) {
-        // Para nuevos clientes, validar initialAddress completo
+        // La dirección es opcional al crear cliente
         const addr = form.initialAddress
-        const addressValid =
-            addr.neighborhoodId > 0 &&
-            addr.address.trim().length >= 10 &&
-            addr.latitude !== 0 &&
-            addr.longitude !== 0 &&
-            addr.deliveryFee > 0
-
-        return basicValidation && addressValid
+        const hasAddress = addr.address.trim().length > 0
+        // Si se empezó a llenar la dirección, validar que esté completa
+        if (hasAddress) {
+            const addressValid =
+                addr.neighborhoodId > 0 &&
+                addr.address.trim().length >= 10 &&
+                addr.latitude !== 0 &&
+                addr.longitude !== 0 &&
+                addr.deliveryFee > 0
+            return !!basicValidation && addressValid
+        }
     }
 
     return basicValidation
@@ -345,8 +348,8 @@ const validateForm = () => {
     // Validate name
     if (!form.name.trim()) {
         errors.name = 'El nombre es requerido'
-    } else if (form.name.length < 2) {
-        errors.name = 'El nombre debe tener al menos 2 caracteres'
+    } else if (form.name.length < 3) {
+            errors.name = 'El nombre debe tener al menos 3 caracteres'
     } else if (form.name.length > 150) {
         errors.name = 'El nombre no puede tener más de 150 caracteres'
     } else {
@@ -380,7 +383,9 @@ const handleSubmit = () => {
         phone2: form.phone2.trim() || undefined,
         branchId: form.branchId,
         active: form.active,
-        initialAddress: !props.customer ? form.initialAddress : undefined
+        initialAddress: !props.customer && form.initialAddress.address.trim().length > 0
+            ? form.initialAddress
+            : undefined
     }
 
     emit('submit', formData)

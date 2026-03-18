@@ -398,26 +398,22 @@ const handleFormSubmit = async (data: CustomerFormData) => {
             })
             success('Cliente actualizado', 3000, `El cliente "${data.name}" se ha actualizado correctamente`)
         } else {
-            // Para crear, necesitamos asegurarnos de que initialAddress existe
-            if (!data.initialAddress) {
-                showError('Error de validación', 'Se requiere una dirección inicial para crear el cliente')
-                return
-            }
-
             await store.create({
                 name: data.name,
                 phone1: data.phone1,
                 phone2: data.phone2,
                 branchId: data.branchId,
-                initialAddress: {
-                    neighborhoodId: data.initialAddress.neighborhoodId,
-                    address: data.initialAddress.address,
-                    additionalInfo: data.initialAddress.additionalInfo,
-                    latitude: data.initialAddress.latitude ?? 0,
-                    longitude: data.initialAddress.longitude ?? 0,
-                    isPrimary: data.initialAddress.isPrimary ?? true,
-                    deliveryFee: data.initialAddress.deliveryFee
-                }
+                initialAddress: data.initialAddress
+                    ? {
+                        neighborhoodId: data.initialAddress.neighborhoodId,
+                        address: data.initialAddress.address,
+                        additionalInfo: data.initialAddress.additionalInfo,
+                        latitude: data.initialAddress.latitude ?? 0,
+                        longitude: data.initialAddress.longitude ?? 0,
+                        isPrimary: data.initialAddress.isPrimary ?? true,
+                        deliveryFee: data.initialAddress.deliveryFee
+                    }
+                    : undefined
             })
             success('Cliente creado', 3000, `El cliente "${data.name}" se ha creado correctamente`)
         }
