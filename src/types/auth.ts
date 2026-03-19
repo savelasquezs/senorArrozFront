@@ -15,10 +15,12 @@ export interface User {
 	id: number;
 	name: string;
 	email: string;
+	phone: string;
 	active: boolean;
 	role: UserRoleType;
 	branchId: number;
 	branchName: string;
+	profileImageUrl?: string;
 }
 
 export interface LoginResponse {

@@ -43,6 +43,18 @@ class UserApi extends BaseApi {
 	async deleteUser(id: number): Promise<ApiResponse<string>> {
 		return this.delete<ApiResponse<string>>(`/Users/${id}`);
 	}
+
+	// Update own profile (email + phone)
+	async updateProfile(id: number, payload: { email: string; phone: string }): Promise<User> {
+		return this.put<User>(`/Users/${id}/profile`, payload);
+	}
+
+	// Upload profile image
+	async uploadProfileImage(id: number, file: File): Promise<User> {
+		const formData = new FormData();
+		formData.append('file', file);
+		return this.post<User>(`/Users/${id}/profile-image`, formData);
+	}
 }
 
 export const userApi = new UserApi();

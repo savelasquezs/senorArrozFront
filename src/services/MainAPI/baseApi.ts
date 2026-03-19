@@ -21,6 +21,10 @@ export class BaseApi {
 				if (token) {
 					config.headers.Authorization = `Bearer ${token}`;
 				}
+				// FormData: no forzar Content-Type para que el navegador envíe multipart con boundary
+				if (config.data instanceof FormData) {
+					delete config.headers['Content-Type'];
+				}
 				return config;
 			},
 			(error) => Promise.reject(error)

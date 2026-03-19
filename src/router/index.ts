@@ -313,15 +313,15 @@ const routes: RouteRecordRaw[] = [
             title: 'Movimientos entre Bancos'
         }
     },
-    //   {
-    //     path: '/profile',
-    //     name: 'Profile',
-    //     component: () => import('@/views/Profile.vue'),
-    //     meta: {
-    //       requiresAuth: true,
-    //       title: 'Perfil'
-    //     }
-    //   },
+    {
+        path: '/profile',
+        name: 'Profile',
+        component: () => import('@/views/Profile.vue'),
+        meta: {
+            requiresAuth: true,
+            title: 'Perfil'
+        }
+    },
     //   // 404 page
     //   {
     //     path: '/:pathMatch(.*)*',

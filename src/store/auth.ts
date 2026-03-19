@@ -173,6 +173,12 @@ export const useAuthStore = defineStore('auth', () => {
 		error.value = null;
 	};
 
+	const updateUserData = (partial: Partial<User>): void => {
+		if (!user.value) return;
+		user.value = { ...user.value, ...partial };
+		localStorage.setItem('user_data', JSON.stringify(user.value));
+	};
+
 	return {
 		// State
 		user,
@@ -204,5 +210,6 @@ export const useAuthStore = defineStore('auth', () => {
 		clearError,
 		forgotPassword,
 		resetPassword,
+		updateUserData,
 	};
 });
