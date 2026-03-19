@@ -8,7 +8,13 @@
 			<div
 				class="h-8 w-8 rounded-full bg-emerald-600 flex items-center justify-center shadow-sm"
 			>
-				<span class="text-sm font-medium text-white">{{ initials }}</span>
+				<img
+					v-if="avatarUrl"
+					:src="avatarUrl"
+					alt="Foto de perfil"
+					class="w-full h-full object-cover rounded-full"
+				/>
+				<span v-else class="text-sm font-medium text-white">{{ initials }}</span>
 			</div>
 			<span class="ml-2 text-sm font-medium text-gray-700">{{ userName }}</span>
 			<svg
@@ -74,6 +80,16 @@ const initials = computed(() =>
 		.join('')
 		.substring(0, 2)
 );
+
+const API_BASE =
+	import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:8080';
+
+const avatarUrl = computed(() => {
+	const url = authStore.user?.profileImageUrl;
+	if (!url) return null;
+	if (url.startsWith('http')) return url;
+	return `${API_BASE}${url}`;
+});
 
 const logout = async () => {
 	await authStore.logout();
