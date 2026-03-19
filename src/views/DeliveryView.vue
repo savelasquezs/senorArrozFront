@@ -1,143 +1,118 @@
 <template>
     <MainLayout>
         <div class="p-3 md:p-6 space-y-4 md:space-y-6">
-            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+
+            <!-- Header -->
+            <div class="flex items-center justify-between gap-3">
                 <div>
                     <h1 class="text-2xl md:text-3xl font-bold text-gray-900">Domicilios</h1>
                     <p class="text-sm md:text-base text-gray-600 mt-1">Gestión de entregas</p>
                 </div>
 
-                <div class="hidden md:flex items-center gap-4">
-                    <div :class="[
-                        'flex items-center gap-2 px-3 py-1 rounded-lg text-sm',
-                        isConnected ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
-                    ]">
-                        <span :class="['w-2 h-2 rounded-full', isConnected ? 'bg-green-500' : 'bg-red-500']"></span>
-                        {{ isConnected ? 'Conectado' : 'Desconectado' }}
-                    </div>
-
-                    <BaseButton @click="refreshData" variant="outline" size="sm" :loading="isLoading">
-                        <span class="flex items-center gap-2">
-                            <ArrowPathIcon class="w-4 h-4" />
-                            Actualizar
-                        </span>
-                    </BaseButton>
-                </div>
-
-                <!-- Mobile: Status indicador pequeño -->
-                <div class="md:hidden flex items-center gap-2">
+                <div class="flex items-center gap-2">
                     <div :class="[
                         'flex items-center gap-1.5 px-2 py-1 rounded text-xs',
                         isConnected ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
                     ]">
                         <span :class="['w-1.5 h-1.5 rounded-full', isConnected ? 'bg-green-500' : 'bg-red-500']"></span>
-                        {{ isConnected ? 'Conectado' : 'Desconectado' }}
+                        <span class="hidden sm:inline">{{ isConnected ? 'Conectado' : 'Desconectado' }}</span>
                     </div>
+
+                    <BaseButton @click="refreshData" variant="outline" size="sm" :loading="isLoading">
+                        <ArrowPathIcon class="w-4 h-4" />
+                    </BaseButton>
                 </div>
             </div>
 
-            <!-- Mobile: Tabs en grid -->
-            <div class="grid grid-cols-4 gap-2 md:hidden">
-                <button @click="activeTab = 'available'" :class="[
-                    'py-3 px-4 rounded-lg font-medium text-sm transition-colors text-center',
-                    activeTab === 'available'
-                        ? 'bg-emerald-500 text-white'
-                        : 'bg-gray-100 text-gray-600'
-                ]">
-                    <span>Disponibles</span>
-                    <span v-if="deliveryStore.availableOrders.length > 0"
-                        class="ml-2 py-0.5 px-2 rounded-full text-xs bg-white/20 text-white">
-                        {{ deliveryStore.availableOrders.length }}
-                    </span>
-                </button>
-
-                <button @click="activeTab = 'preparation'" :class="[
-                    'py-3 px-4 rounded-lg font-medium text-sm transition-colors text-center',
-                    activeTab === 'preparation'
-                        ? 'bg-emerald-500 text-white'
-                        : 'bg-gray-100 text-gray-600'
-                ]">
-                    En preparación
-                    <span v-if="deliveryStore.preparationOrders.length > 0"
-                        class="ml-2 py-0.5 px-2 rounded-full text-xs bg-white/20 text-white">
-                        {{ deliveryStore.preparationOrders.length }}
-                    </span>
-                </button>
-
-                <button @click="activeTab = 'history'" :class="[
-                    'py-3 px-4 rounded-lg font-medium text-sm transition-colors text-center',
-                    activeTab === 'history'
-                        ? 'bg-emerald-500 text-white'
-                        : 'bg-gray-100 text-gray-600'
-                ]">
-                    Historial
+            <!-- Accesos rápidos debajo del título -->
+            <div class="flex gap-2 flex-wrap">
+                <button
+                    @click="openHistoryModal"
+                    class="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium bg-blue-50 text-blue-700 hover:bg-blue-100 transition-colors"
+                >
+                    <ClipboardDocumentListIcon class="w-4 h-4" />
+                    Mi historial
                     <span v-if="deliveryStore.historyTotalCount > 0"
-                        class="ml-2 py-0.5 px-2 rounded-full text-xs bg-white/20 text-white">
+                        class="py-0.5 px-1.5 rounded-full text-xs bg-blue-200 text-blue-800">
                         {{ deliveryStore.historyTotalCount }}
                     </span>
                 </button>
-                <button @click="activeTab = 'map'" :class="[
-                    'py-3 px-4 rounded-lg font-medium text-sm transition-colors text-center',
-                    activeTab === 'map'
-                        ? 'bg-emerald-500 text-white'
-                        : 'bg-gray-100 text-gray-600'
-                ]">
-                    Mapas
+
+                <button
+                    @click="goToRoute"
+                    class="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition-colors"
+                >
+                    <TruckIcon class="w-4 h-4" />
+                    En ruta
+                    <span v-if="deliveryStore.ordersOnTheWay.length > 0"
+                        class="py-0.5 px-1.5 rounded-full text-xs bg-emerald-200 text-emerald-800">
+                        {{ deliveryStore.ordersOnTheWay.length }}
+                    </span>
                 </button>
             </div>
 
-            <!-- Desktop: Tabs tradicionales -->
-            <div class="hidden md:block border-b border-gray-200">
-                <nav class="-mb-px flex space-x-8">
+            <!-- Tabs: Disponibles y En preparación (ocultos en vista de ruta) -->
+            <template v-if="activeTab !== 'route'">
+                <!-- Mobile -->
+                <div class="grid grid-cols-2 gap-2 md:hidden">
                     <button @click="activeTab = 'available'" :class="[
-                        'py-4 px-1 border-b-2 font-medium text-sm transition-colors',
-                        activeTab === 'available'
-                            ? 'border-emerald-500 text-emerald-600'
-                            : 'border-transparent text-gray-500 hover:text-gray-700'
+                        'py-3 px-4 rounded-lg font-medium text-sm transition-colors text-center',
+                        activeTab === 'available' ? 'bg-emerald-500 text-white' : 'bg-gray-100 text-gray-600'
                     ]">
-                        Pedidos Disponibles
+                        Disponibles
                         <span v-if="deliveryStore.availableOrders.length > 0"
-                            class="ml-2 py-0.5 px-2 rounded-full text-xs bg-green-100 text-green-600">
+                            class="ml-1.5 py-0.5 px-1.5 rounded-full text-xs"
+                            :class="activeTab === 'available' ? 'bg-white/30 text-white' : 'bg-gray-200 text-gray-600'">
                             {{ deliveryStore.availableOrders.length }}
                         </span>
                     </button>
 
                     <button @click="activeTab = 'preparation'" :class="[
-                        'py-4 px-1 border-b-2 font-medium text-sm transition-colors',
-                        activeTab === 'preparation'
-                            ? 'border-emerald-500 text-emerald-600'
-                            : 'border-transparent text-gray-500 hover:text-gray-700'
+                        'py-3 px-4 rounded-lg font-medium text-sm transition-colors text-center',
+                        activeTab === 'preparation' ? 'bg-emerald-500 text-white' : 'bg-gray-100 text-gray-600'
                     ]">
                         En preparación
                         <span v-if="deliveryStore.preparationOrders.length > 0"
-                            class="ml-2 py-0.5 px-2 rounded-full text-xs bg-amber-100 text-amber-700">
+                            class="ml-1.5 py-0.5 px-1.5 rounded-full text-xs"
+                            :class="activeTab === 'preparation' ? 'bg-white/30 text-white' : 'bg-gray-200 text-gray-600'">
                             {{ deliveryStore.preparationOrders.length }}
                         </span>
                     </button>
+                </div>
 
-                    <button @click="activeTab = 'history'" :class="[
-                        'py-4 px-1 border-b-2 font-medium text-sm transition-colors',
-                        activeTab === 'history'
-                            ? 'border-emerald-500 text-emerald-600'
-                            : 'border-transparent text-gray-500 hover:text-gray-700'
-                    ]">
-                        Mi Historial
-                        <span v-if="deliveryStore.historyTotalCount > 0"
-                            class="ml-2 py-0.5 px-2 rounded-full text-xs bg-blue-100 text-blue-600">
-                            {{ deliveryStore.historyTotalCount }}
-                        </span>
-                    </button>
-                    <button @click="activeTab = 'map'" :class="[
-                        'py-4 px-1 border-b-2 font-medium text-sm transition-colors',
-                        activeTab === 'map'
-                            ? 'border-emerald-500 text-emerald-600'
-                            : 'border-transparent text-gray-500 hover:text-gray-700'
-                    ]">
-                        Mapas
-                    </button>
-                </nav>
-            </div>
+                <!-- Desktop -->
+                <div class="hidden md:block border-b border-gray-200">
+                    <nav class="-mb-px flex space-x-8">
+                        <button @click="activeTab = 'available'" :class="[
+                            'py-4 px-1 border-b-2 font-medium text-sm transition-colors',
+                            activeTab === 'available'
+                                ? 'border-emerald-500 text-emerald-600'
+                                : 'border-transparent text-gray-500 hover:text-gray-700'
+                        ]">
+                            Pedidos Disponibles
+                            <span v-if="deliveryStore.availableOrders.length > 0"
+                                class="ml-2 py-0.5 px-2 rounded-full text-xs bg-green-100 text-green-600">
+                                {{ deliveryStore.availableOrders.length }}
+                            </span>
+                        </button>
 
+                        <button @click="activeTab = 'preparation'" :class="[
+                            'py-4 px-1 border-b-2 font-medium text-sm transition-colors',
+                            activeTab === 'preparation'
+                                ? 'border-emerald-500 text-emerald-600'
+                                : 'border-transparent text-gray-500 hover:text-gray-700'
+                        ]">
+                            En preparación
+                            <span v-if="deliveryStore.preparationOrders.length > 0"
+                                class="ml-2 py-0.5 px-2 rounded-full text-xs bg-amber-100 text-amber-700">
+                                {{ deliveryStore.preparationOrders.length }}
+                            </span>
+                        </button>
+                    </nav>
+                </div>
+            </template>
+
+            <!-- Contenido tabs principales -->
             <div v-if="activeTab === 'available'">
                 <DeliveryCardGrid ref="cardGridRef" :orders="deliveryStore.availableOrders" @assign="handleAssign" />
             </div>
@@ -146,27 +121,46 @@
                 <DeliveryCardGrid :orders="deliveryStore.preparationOrders" :allow-assignment="false" />
             </div>
 
-            <div v-else-if="activeTab === 'history'">
-                <DeliveryHistoryTable :orders="deliveryStore.historyOrders"
-                    :total-count="deliveryStore.historyTotalCount" :page="deliveryStore.historyPage"
-                    :page-size="deliveryStore.historyPageSize" @page-change="handleHistoryPageChange"
-                    @filter-change="handleHistoryFilterChange" @order-delivered="handleOrderDelivered" />
-            </div>
-            <div v-else-if="activeTab === 'map'">
-                <div class="grid grid-cols-1 lg:grid-cols-3 gap-2 md:gap-4">
-                    <div class="lg:col-span-2 order-1">
-                        <DeliveryMap ref="mapRef" :orders="mapOrders" @route-calculated="handleRouteCalculated" />
-                    </div>
-                    <div class="lg:col-span-1 order-2">
-                        <RouteOrderManager :orders="mapOrders" @route-optimized="handleRouteOptimized"
-                            @geocode-requested="handleGeocodeRequested" @delivered="handleOrderDelivered" />
-                    </div>
+            <!-- Vista "En ruta" -->
+            <div v-else-if="activeTab === 'route'">
+                <div class="flex items-center gap-3 mb-4">
+                    <button
+                        @click="activeTab = 'available'"
+                        class="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-900 transition-colors"
+                    >
+                        <ArrowLeftIcon class="w-4 h-4" />
+                        Volver
+                    </button>
+                    <h2 class="text-base font-semibold text-gray-900">Pedidos en ruta</h2>
                 </div>
+
+                <RouteOrderManager
+                    :orders="routeOrders"
+                    @route-optimized="handleRouteOptimized"
+                    @delivered="handleOrderDelivered"
+                />
             </div>
         </div>
 
-        <ConfirmAssignmentModal :is-open="showConfirmModal" :orders="ordersToAssign" @close="closeConfirmModal"
-            @assigned="handleAssigned" />
+        <!-- Modal: Mi historial -->
+        <BaseDialog v-model="showHistoryModal" title="Mi Historial" size="xl">
+            <DeliveryHistoryTable
+                :orders="deliveryStore.historyOrders"
+                :total-count="deliveryStore.historyTotalCount"
+                :page="deliveryStore.historyPage"
+                :page-size="deliveryStore.historyPageSize"
+                @page-change="handleHistoryPageChange"
+                @filter-change="handleHistoryFilterChange"
+                @order-delivered="handleOrderDelivered"
+            />
+        </BaseDialog>
+
+        <ConfirmAssignmentModal
+            :is-open="showConfirmModal"
+            :orders="ordersToAssign"
+            @close="closeConfirmModal"
+            @assigned="handleAssigned"
+        />
     </MainLayout>
 </template>
 
@@ -182,10 +176,15 @@ import MainLayout from '@/components/layout/MainLayout.vue'
 import DeliveryCardGrid from '@/components/delivery/DeliveryCardGrid.vue'
 import DeliveryHistoryTable from '@/components/delivery/DeliveryHistoryTable.vue'
 import ConfirmAssignmentModal from '@/components/delivery/ConfirmAssignmentModal.vue'
-import BaseButton from '@/components/ui/BaseButton.vue'
-import { ArrowPathIcon } from '@heroicons/vue/24/outline'
-import DeliveryMap from '@/components/delivery/DeliveryMap.vue'
 import RouteOrderManager from '@/components/delivery/RouteOrderManager.vue'
+import BaseButton from '@/components/ui/BaseButton.vue'
+import BaseDialog from '@/components/ui/BaseDialog.vue'
+import {
+    ArrowPathIcon,
+    ArrowLeftIcon,
+    ClipboardDocumentListIcon,
+    TruckIcon,
+} from '@heroicons/vue/24/outline'
 
 const router = useRouter()
 const authStore = useAuthStore()
@@ -195,21 +194,16 @@ const { success, error } = useToast()
 const SIGNALR_HUB_URL = import.meta.env.VITE_SIGNALR_HUB_URL || 'http://localhost:5000/hubs/orders'
 const { isConnected, on } = useSignalR(SIGNALR_HUB_URL)
 
-const activeTab = ref<'available' | 'preparation' | 'history' | 'map'>('available')
+const activeTab = ref<'available' | 'preparation' | 'route'>('available')
 const isLoading = ref(false)
 const showConfirmModal = ref(false)
+const showHistoryModal = ref(false)
 const ordersToAssign = ref<OrderListItem[]>([])
+const routeOrders = ref<OrderListItem[]>([])
 
 const cardGridRef = ref<InstanceType<typeof DeliveryCardGrid> | null>(null)
 
-// Mapa: lista local ordenable
-const mapOrders = ref<OrderListItem[]>([])
-interface DeliveryMapExposed {
-    recalculateRoute: (orderIds?: number[]) => Promise<void>
-    geocodeOrderById: (orderId: number) => void
-}
-
-const mapRef = ref<DeliveryMapExposed | null>(null)
+// ─── Carga de datos ───────────────────────────────────────────
 
 const loadAvailableOrders = async () => {
     try {
@@ -235,7 +229,6 @@ const loadPreparationOrders = async () => {
 
 const loadHistory = async () => {
     if (!authStore.user?.id) return
-
     try {
         isLoading.value = true
         await deliveryStore.loadHistory(authStore.user.id)
@@ -246,16 +239,31 @@ const loadHistory = async () => {
     }
 }
 
+// ─── Acciones rápidas ─────────────────────────────────────────
+
+const openHistoryModal = async () => {
+    showHistoryModal.value = true
+    await loadHistory()
+}
+
+const goToRoute = async () => {
+    activeTab.value = 'route'
+    await loadHistory()
+    routeOrders.value = [...deliveryStore.ordersOnTheWay]
+}
+
+// ─── SignalR ──────────────────────────────────────────────────
+
 const handleOrderReady = async (orderData: any) => {
-    console.log('🔔 SignalR OrderReady recibido:', orderData)
     await loadAvailableOrders()
     success('Nuevo pedido disponible', 5000, `Pedido #${orderData.id}`)
 }
 
 const handleOrderAssigned = async (_orderData: any) => {
-    // Recargar silenciosamente para quitar de la lista el pedido que otro domiciliario tomó
     await loadAvailableOrders()
 }
+
+// ─── Asignación ───────────────────────────────────────────────
 
 const handleAssign = (orderIds: number[]) => {
     ordersToAssign.value = deliveryStore.availableOrders.filter((o: OrderListItem) => orderIds.includes(o.id))
@@ -264,9 +272,7 @@ const handleAssign = (orderIds: number[]) => {
 
 const handleAssigned = async () => {
     await loadAvailableOrders()
-    if (cardGridRef.value) {
-        cardGridRef.value.clearSelection()
-    }
+    cardGridRef.value?.clearSelection()
 }
 
 const closeConfirmModal = () => {
@@ -274,24 +280,20 @@ const closeConfirmModal = () => {
     ordersToAssign.value = []
 }
 
+// ─── Refresco ─────────────────────────────────────────────────
+
 const refreshData = async () => {
     if (activeTab.value === 'available') {
         await loadAvailableOrders()
-        return
-    }
-
-    if (activeTab.value === 'preparation') {
+    } else if (activeTab.value === 'preparation') {
         await loadPreparationOrders()
-        return
-    }
-
-    if (activeTab.value === 'history' || activeTab.value === 'map') {
+    } else if (activeTab.value === 'route') {
         await loadHistory()
-        if (activeTab.value === 'map') {
-            mapOrders.value = [...deliveryStore.ordersOnTheWay]
-        }
+        routeOrders.value = [...deliveryStore.ordersOnTheWay]
     }
 }
+
+// ─── Historial ────────────────────────────────────────────────
 
 const handleHistoryPageChange = async (page: number) => {
     deliveryStore.setHistoryPage(page)
@@ -299,65 +301,51 @@ const handleHistoryPageChange = async (page: number) => {
 }
 
 const handleHistoryFilterChange = async () => {
-    // Note: Filters are not used for history (shows all assigned states)
     deliveryStore.setHistoryPage(1)
     await loadHistory()
 }
 
+// ─── En ruta ─────────────────────────────────────────────────
+
 const handleOrderDelivered = async () => {
-    // Recargar historial para reflejar el cambio de estado
     await loadHistory()
-    mapOrders.value = [...deliveryStore.ordersOnTheWay]
-
-}
-
-const handleRouteCalculated = (_waypointOrder: number[]) => {
-    // Placeholder: reordenamiento visual gestionado dentro del componente Map
+    routeOrders.value = [...deliveryStore.ordersOnTheWay]
 }
 
 const handleRouteOptimized = (orderIds: number[]) => {
-    const idToOrder = new Map(mapOrders.value.map(o => [o.id, o]))
+    const idToOrder = new Map(routeOrders.value.map(o => [o.id, o]))
     const reordered: OrderListItem[] = []
     orderIds.forEach(id => {
         const found = idToOrder.get(id)
         if (found) reordered.push(found)
     })
-    mapOrders.value.forEach(o => {
+    routeOrders.value.forEach(o => {
         if (!orderIds.includes(o.id)) reordered.push(o)
     })
-    mapOrders.value = reordered
-    mapRef.value?.recalculateRoute(orderIds)
+    routeOrders.value = reordered
 }
 
-const handleGeocodeRequested = (orderId: number) => {
-    mapRef.value?.geocodeOrderById(orderId)
-}
+// ─── Watch tabs ───────────────────────────────────────────────
 
-// Watch para cargar datos cuando cambias de tab
 watch(activeTab, async (newTab) => {
     if (newTab === 'available') {
         await loadAvailableOrders()
     } else if (newTab === 'preparation') {
         await loadPreparationOrders()
-    } else if (newTab === 'history') {
-        await loadHistory()
-    } else if (newTab === 'map') {
-        await loadHistory()
-        mapOrders.value = [...deliveryStore.ordersOnTheWay]
-        const hasCoords = mapOrders.value.some(o => typeof (o as any).latitude === 'number' && typeof (o as any).longitude === 'number')
-        if (hasCoords) setTimeout(() => mapRef.value?.recalculateRoute(), 0)
     }
 })
 
 onMounted(async () => {
-    if (authStore.userRole !== 'Deliveryman' && authStore.userRole !== 'Admin' && authStore.userRole !== 'Superadmin') {
+    if (
+        authStore.userRole !== 'Deliveryman' &&
+        authStore.userRole !== 'Admin' &&
+        authStore.userRole !== 'Superadmin'
+    ) {
         router.push('/')
         return
     }
 
     await loadAvailableOrders()
-
-    // Escuchar eventos de SignalR
     on('OrderReady', handleOrderReady)
     on('OrderAssigned', handleOrderAssigned)
 })
