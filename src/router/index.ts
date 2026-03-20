@@ -54,22 +54,9 @@ const routes: RouteRecordRaw[] = [
         component: () => import('@/views/Dashboard.vue'),
         meta: {
             requiresAuth: true,
+            requiresRole: [UserRole.SUPERADMIN, UserRole.ADMIN],
             title: 'Dashboard'
-        },
-        children: [
-            {
-                path: 'global',
-                name: 'GlobalDashboard',
-                component: () => import('@/views/dashboard/GlobalDashboard.vue'),
-                meta: {
-                    requiresAuth: true,
-                    requiresRole: [UserRole.SUPERADMIN],
-                    title: 'Dashboard Global'
-                }
-            },
-
-
-        ]
+        }
     },
     {
         path: '/branches',
@@ -386,7 +373,7 @@ router.beforeEach(async (to, _from, next) => {
 function getRedirectPath(role: string | null): string {
     switch (role) {
         case 'Superadmin':
-            return '/dashboard/global'
+            return '/dashboard'
         case 'Admin':
             return '/orders/new'
         case 'Cashier':

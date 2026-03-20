@@ -13,13 +13,20 @@
             </div>
         </template>
 
-        <router-view />
+        <GlobalDashboard v-if="authStore.userRole === UserRole.SUPERADMIN" />
+        <AdminDashboard v-else-if="authStore.userRole === UserRole.ADMIN" />
+        <div v-else class="rounded-lg bg-amber-50 border border-amber-200 p-4 text-sm text-amber-900">
+            Tu rol no tiene acceso a esta sección.
+        </div>
     </MainLayout>
 </template>
 
 <script setup lang="ts">
 import { useAuthStore } from '@/store/auth'
+import { UserRole } from '@/types/auth'
 import MainLayout from '@/components/layout/MainLayout.vue'
+import GlobalDashboard from '@/views/dashboard/GlobalDashboard.vue'
+import AdminDashboard from '@/views/dashboard/AdminDashboard.vue'
 
 const authStore = useAuthStore()
 </script>

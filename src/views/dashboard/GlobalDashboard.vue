@@ -1,14 +1,42 @@
 <template>
     <div class="space-y-6">
-        <!-- Stats Overview -->
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            <StatsCard title="Ventas Hoy" :value="stats.todaySales" format="currency" icon="CurrencyDollarIcon"
-                trend="+12%" trend-direction="up" />
-            <StatsCard title="Pedidos Totales" :value="stats.totalOrders" format="number"
-                icon="ClipboardDocumentListIcon" trend="+8%" trend-direction="up" />
-            <StatsCard title="Sucursales Activas" :value="stats.activeBranches" format="number"
-                icon="BuildingStorefrontIcon" />
-            <StatsCard title="Usuarios Conectados" :value="stats.activeUsers" format="number" icon="UsersIcon" />
+        <!-- KPIs (datos de ejemplo hasta conectar API) -->
+        <div
+            class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 sm:gap-6"
+        >
+            <DashboardKpiCard
+                title="Ventas totales"
+                :value="kpis.totalSales"
+                format="currency"
+                :week-change-percent="kpis.totalSalesWeekChangePercent"
+                :year-change-percent="kpis.totalSalesYearChangePercent"
+                icon="currency"
+            />
+            <DashboardKpiCard
+                title="Pedidos"
+                :value="kpis.ordersCount"
+                format="number"
+                :week-change-percent="kpis.ordersWeekChangePercent"
+                :year-change-percent="kpis.ordersYearChangePercent"
+                icon="orders"
+            />
+            <DashboardKpiCard
+                title="Ticket promedio"
+                :value="kpis.avgTicket"
+                format="currency"
+                :week-change-percent="kpis.avgTicketWeekChangePercent"
+                :year-change-percent="kpis.avgTicketYearChangePercent"
+                icon="store"
+            />
+            <DashboardKpiCard
+                title="% cancelaciones"
+                :value="kpis.cancellationRate"
+                format="percent"
+                :week-change-percent="kpis.cancellationRateWeekChangePercent"
+                :year-change-percent="kpis.cancellationRateYearChangePercent"
+                :higher-is-better="false"
+                icon="chart"
+            />
         </div>
 
         <!-- Charts Section -->
@@ -58,14 +86,23 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import BaseCard from '@/components/ui/BaseCard.vue'
-import StatsCard from '@/components/ui/StatsCard.vue'
-import { ClipboardDocumentListIcon, CurrencyDollarIcon, UsersIcon, BuildingStorefrontIcon } from '@heroicons/vue/24/outline'
+import { DashboardKpiCard } from '@/components/dashboard'
+import { ClipboardDocumentListIcon, CurrencyDollarIcon, UsersIcon } from '@heroicons/vue/24/outline'
 
-const stats = ref({
-    todaySales: 2500000,
-    totalOrders: 145,
-    activeBranches: 3,
-    activeUsers: 8
+/** Placeholder; reemplazar con respuesta del API */
+const kpis = ref({
+    totalSales: 2_500_000,
+    totalSalesWeekChangePercent: 5.2,
+    totalSalesYearChangePercent: 12.4,
+    ordersCount: 145,
+    ordersWeekChangePercent: 8.0,
+    ordersYearChangePercent: -1.5,
+    avgTicket: 17_241,
+    avgTicketWeekChangePercent: 3.4,
+    avgTicketYearChangePercent: 6.2,
+    cancellationRate: 2.1,
+    cancellationRateWeekChangePercent: -0.8,
+    cancellationRateYearChangePercent: 0.3,
 })
 
 const recentActivity = ref([

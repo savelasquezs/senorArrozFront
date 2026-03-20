@@ -122,7 +122,7 @@ const handleSubmit = async () => {
 const getRedirectPath = (role: string | null): string => {
 	switch (role) {
 		case 'superadmin':
-			return '/dashboard/global';
+			return '/dashboard';
 		case 'admin':
 			return '/orders/new';
 		case 'cashier':

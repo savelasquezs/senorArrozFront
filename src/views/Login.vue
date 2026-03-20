@@ -49,7 +49,7 @@ onMounted(async () => {
 const getRedirectPath = (role: string | null): string => {
   switch (role) {
     case 'Superadmin':
-      return '/dashboard/global'
+      return '/dashboard'
     case 'Admin':
       return '/orders/new'
     case 'Cashier':

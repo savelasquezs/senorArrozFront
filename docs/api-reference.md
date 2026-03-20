@@ -797,16 +797,14 @@ Content-Type: application/json
 
 ## 📊 Reportes API
 
-### Dashboard API
+### Dashboard (aplicación web)
+
+- Ruta única en el front: **`/dashboard`**. El contenido se define por **rol** (Superadmin: vista multi-sucursal; Admin: sucursal propia). Ver `docs/DASHBOARD_VISIBILITY.md`.
+
 ```typescript
-GET /dashboard/global
-Authorization: Bearer <token>
-
-GET /dashboard/branch/1
-Authorization: Bearer <token>
-
-GET /dashboard/deliveryman/1
-Authorization: Bearer <token>
+// Endpoints REST de agregados (cuando existan en la API), ejemplo:
+// GET /api/dashboard/summary?branchId=...&period=...
+// Authorization: Bearer <token>
 ```
 
 ## 📍 Geolocalización API
