@@ -39,26 +39,16 @@
             />
         </div>
 
-        <!-- Charts Section -->
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <BaseCard title="Ventas por Sucursal" class="col-span-1">
-                <div class="h-80">
-                    <!-- Chart component will go here -->
-                    <div class="flex items-center justify-center h-full text-gray-500">
-                        Gráfico de ventas por sucursal
-                    </div>
-                </div>
-            </BaseCard>
+        <!-- Superadmin: competencia entre sucursales (ver DASHBOARD_VISIBILITY / no Admin) -->
+        <BranchComparisonPanel :rows="branchComparisonRows" />
 
-            <BaseCard title="Pedidos por Estado" class="col-span-1">
-                <div class="h-80">
-                    <!-- Chart component will go here -->
-                    <div class="flex items-center justify-center h-full text-gray-500">
-                        Gráfico de pedidos por estado
-                    </div>
+        <BaseCard title="Pedidos por estado" class="col-span-1">
+            <div class="h-64 sm:h-80">
+                <div class="flex items-center justify-center h-full text-gray-500 text-sm">
+                    Gráfico pendiente (Chart.js)
                 </div>
-            </BaseCard>
-        </div>
+            </div>
+        </BaseCard>
 
         <!-- Recent Activity -->
         <BaseCard title="Actividad Reciente">
@@ -86,7 +76,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import BaseCard from '@/components/ui/BaseCard.vue'
-import { DashboardKpiCard } from '@/components/dashboard'
+import { DashboardKpiCard, BranchComparisonPanel, type BranchComparisonRow } from '@/components/dashboard'
 import { ClipboardDocumentListIcon, CurrencyDollarIcon, UsersIcon } from '@heroicons/vue/24/outline'
 
 /** Placeholder; reemplazar con respuesta del API */
@@ -104,6 +94,43 @@ const kpis = ref({
     cancellationRateWeekChangePercent: -0.8,
     cancellationRateYearChangePercent: 0.3,
 })
+
+/** Mock comparación sucursales; sustituir por GET /api/dashboard/... */
+const branchComparisonRows = ref<BranchComparisonRow[]>([
+    {
+        id: 1,
+        name: 'Santander',
+        salesTotal: 2_850_000,
+        ordersTotal: 162,
+        salesDelivery: 1_920_000,
+        salesOnsite: 930_000,
+        ordersDelivery: 108,
+        ordersOnsite: 54,
+        deliveryTimeMinutes: 34,
+    },
+    {
+        id: 2,
+        name: 'Centro',
+        salesTotal: 2_100_000,
+        ordersTotal: 131,
+        salesDelivery: 1_450_000,
+        salesOnsite: 650_000,
+        ordersDelivery: 89,
+        ordersOnsite: 42,
+        deliveryTimeMinutes: 41,
+    },
+    {
+        id: 3,
+        name: 'Norte',
+        salesTotal: 1_680_000,
+        ordersTotal: 98,
+        salesDelivery: 1_100_000,
+        salesOnsite: 580_000,
+        ordersDelivery: 62,
+        ordersOnsite: 36,
+        deliveryTimeMinutes: 52,
+    },
+])
 
 const recentActivity = ref([
     {

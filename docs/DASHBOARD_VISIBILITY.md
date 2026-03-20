@@ -20,7 +20,13 @@ Todos los componentes reutilizables de dashboards (KPIs, gráficas, filtros de p
 Importar desde el índice del módulo cuando exista:
 
 ```ts
-import { DashboardKpiCard } from '@/components/dashboard'
+import {
+  DashboardKpiCard,
+  DashboardBarChart,
+  DashboardSegmentedTabs,
+  DashboardRankingTable,
+  BranchComparisonPanel,
+} from '@/components/dashboard'
 ```
 
 ### `DashboardKpiCard` (KPIs)

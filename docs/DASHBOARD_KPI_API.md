@@ -129,21 +129,63 @@ Authorization: Bearer …
 
 ---
 
-## 6. Bloques de la vista aún mock (para fases siguientes)
+## 6. Comparación entre sucursales (Superadmin)
 
-| Bloque | Datos que harán falta (borrador) |
-|--------|----------------------------------|
-| **Ventas por sucursal** | Serie o lista `{ branchId, branchName, totalSales }` para el periodo seleccionado. Solo Superadmin o con comparativas; Admin: una sola barra o ocultar. |
-| **Pedidos por estado** | Conteos por `status` (taken, in_preparation, …) para el alcance y día actual o snapshot. |
-| **Actividad reciente** | Lista de eventos (pedido, pago, usuario, etc.) con `description`, `timestamp`, `branchName`; definir paginación. |
+Implementado en front: `BranchComparisonPanel` + filas `BranchComparisonRow[]` (`src/components/dashboard/branchComparison.types.ts`).
 
-Estos no forman parte del objeto `kpis` inicial; pueden ser endpoints aparte (`/api/dashboard/charts/...`, `/api/dashboard/activity`).
+### 6.1 Endpoint y JSON sugeridos
+
+```http
+GET /api/dashboard/branches/comparison?date=YYYY-MM-DD
+Authorization: Bearer …
+```
+
+```jsonc
+{
+  "asOf": "2026-03-14T05:00:00.000Z",
+  "rows": [
+    {
+      "id": 1,
+      "name": "Santander",
+      "salesTotal": 2850000,
+      "ordersTotal": 162,
+      "salesDelivery": 1920000,
+      "salesOnsite": 930000,
+      "ordersDelivery": 108,
+      "ordersOnsite": 54,
+      "deliveryTimeMinutes": 34
+    }
+  ]
+}
+```
+
+| Campo | Uso |
+|-------|-----|
+| `salesTotal` / `ordersTotal` | Barras simples (tabs Ventas / Pedidos) y ranking. |
+| `salesDelivery`, `salesOnsite`, `ordersDelivery`, `ordersOnsite` | Barras **apiladas** (canales delivery / local / onsite). Deben ser coherentes con los totales. |
+| `deliveryTimeMinutes` | Media tiempo entrega por sucursal (definir cálculo en backend; SLAs y `prepare_at`: `DASHBOARD_VISIBILITY.md`). |
+
+**Admin:** no exponer comparativa multi-sucursal (ver `DASHBOARD_VISIBILITY.md`).
 
 ---
 
-## 7. Referencia rápida front
+## 7. Otros bloques aún mock
+
+| Bloque | Datos (borrador) |
+|--------|------------------|
+| **Pedidos por estado** | Conteos por `status` para el alcance y periodo. |
+| **Actividad reciente** | Eventos con `description`, `timestamp`, `branchName`; paginación. |
+
+---
+
+## 8. Referencia rápida front
 
 - Vista: `src/views/dashboard/GlobalDashboard.vue`
-- Componente tarjeta: `src/components/dashboard/DashboardKpiCard.vue`
+- KPI: `DashboardKpiCard.vue`
+- Gráfico barras: `DashboardBarChart.vue`
+- Tabs segmentados: `DashboardSegmentedTabs.vue`
+- Barra mini: `DashboardMiniBar.vue`
+- Tabla ranking: `DashboardRankingTable.vue`
+- Panel comparación: `BranchComparisonPanel.vue`
 
 Cualquier cambio en nombres de campos del JSON debe actualizarse en este documento y en el front a la vez.
