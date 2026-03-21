@@ -31,6 +31,7 @@
                 <DashboardVentasSection
                     v-else-if="activeSection === 'ventas'"
                     key="ventas"
+                    v-model:products-group-by="ventasProductsGroupBy"
                     :loading="ventasLoading"
                     :error="ventasError"
                     :show-branch-comparison="false"
@@ -85,6 +86,7 @@ import { useDashboardPrincipalSection } from '@/composables/dashboard/useDashboa
 import { useDashboardVentasSection } from '@/composables/dashboard/useDashboardVentasSection'
 import { useDashboardDomiciliosSection } from '@/composables/dashboard/useDashboardDomiciliosSection'
 import { useDashboardShellMockState } from '@/composables/dashboard/useDashboardShellMockState'
+import type { VentasProductsGroupBy } from '@/services/MainAPI/dashboardSectionApi'
 import DashboardPrincipalSection from '@/views/dashboard/sections/DashboardPrincipalSection.vue'
 import DashboardVentasSection from '@/views/dashboard/sections/DashboardVentasSection.vue'
 import DashboardGastosSection from '@/views/dashboard/sections/DashboardGastosSection.vue'
@@ -113,12 +115,14 @@ const activeSection = ref<DashboardSectionId>('principal')
 
 const deliveryPeriod = ref(defaultDashboardPeriodThisMonth())
 const evolutionDateRange = ref<[Date, Date]>(defaultDateRangeLastDays(7))
+const ventasProductsGroupBy = ref<VentasProductsGroupBy>('product')
 
 const principalSection = useDashboardPrincipalSection(activeSection, adminBranchIdWritable)
 const ventasSection = useDashboardVentasSection(
 	activeSection,
 	adminBranchIdWritable,
 	evolutionDateRange,
+	ventasProductsGroupBy,
 )
 const domiciliosSection = useDashboardDomiciliosSection(
 	activeSection,

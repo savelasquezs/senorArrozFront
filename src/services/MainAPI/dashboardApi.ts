@@ -102,14 +102,15 @@ class DashboardApi extends BaseApi {
 		return this.get<DashboardSalesEvolutionApiResponse>('/dashboard/sales/evolution', { params });
 	}
 
-	/** Ventas — ranking productos + participación recaudo. */
+	/** Ventas — ranking productos o categorías + participación recaudo. */
 	async getSalesProducts(
 		branchId: number | null,
 		fromIso: string,
 		toIso: string,
 		top = 10,
+		groupBy: 'product' | 'category' = 'product',
 	): Promise<DashboardSalesProductsApiResponse> {
-		const params: Record<string, string | number> = { from: fromIso, to: toIso, top };
+		const params: Record<string, string | number> = { from: fromIso, to: toIso, top, groupBy };
 		if (branchId != null) params.branchId = branchId;
 		return this.get<DashboardSalesProductsApiResponse>('/dashboard/sales/products', { params });
 	}
@@ -152,7 +153,8 @@ export type DashboardSalesEvolutionApiResponse = {
 
 export type DashboardSalesProductsApiResponse = {
 	topByQuantity: Array<{
-		productId: number;
+		/** Producto o categoría según `groupBy` en la petición. */
+		id: number;
 		name: string;
 		quantitySold: number;
 		revenueCop: number;

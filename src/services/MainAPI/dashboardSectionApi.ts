@@ -149,10 +149,12 @@ export type VentasSalesEvolutionPayload = {
 	ordersByYear: OrdersPerHourBlock;
 };
 
+export type VentasProductsGroupBy = 'product' | 'category';
+
 export type VentasProductsPayload = {
 	/** Top por unidades (bar horizontal). */
 	topByQuantity: Array<{
-		productId: number;
+		id: number;
 		name: string;
 		quantitySold: number;
 		revenueCop: number;
@@ -216,12 +218,15 @@ function mapEvolutionFromApi(raw: DashboardSalesEvolutionApiResponse): VentasSal
 function mapProductsFromApi(raw: DashboardSalesProductsApiResponse): VentasProductsPayload {
 	const slices = raw.participationByRevenue ?? [];
 	return {
-		topByQuantity: raw.topByQuantity.map((p) => ({
-			productId: p.productId,
-			name: p.name,
-			quantitySold: p.quantitySold,
-			revenueCop: p.revenueCop,
-		})),
+		topByQuantity: raw.topByQuantity.map((p) => {
+			const row = p as { id?: number; productId?: number; name: string; quantitySold: number; revenueCop: number };
+			return {
+				id: row.id ?? row.productId ?? 0,
+				name: row.name,
+				quantitySold: row.quantitySold,
+				revenueCop: row.revenueCop,
+			};
+		}),
 		participationLabels: slices.map((s) => s.label),
 		participationValues: slices.map((s) => s.revenueCop),
 		participationPercents: slices.map((s) => s.percent),
@@ -237,6 +242,7 @@ function mapProductsFromApi(raw: DashboardSalesProductsApiResponse): VentasProdu
 export async function fetchVentasDashboard(
 	branchId: number | null,
 	dateRange: [Date, Date],
+	productsGroupBy: VentasProductsGroupBy = 'product',
 ): Promise<VentasDashboardPayload> {
 	if (USE_VENTAS_MOCK) {
 		await delay();
@@ -250,13 +256,25 @@ export async function fetchVentasDashboard(
 	const [comp, evo, prod] = await Promise.all([
 		dashboardApi.getSalesComparison(branchId, from, to),
 		dashboardApi.getSalesEvolution(branchId, from, to),
-		dashboardApi.getSalesProducts(branchId, from, to, 10),
+		dashboardApi.getSalesProducts(branchId, from, to, 10, productsGroupBy),
 	]);
 	return {
 		comparisonRows: mapComparisonFromApi(comp),
 		evolution: mapEvolutionFromApi(evo),
 		products: mapProductsFromApi(prod),
 	};
+}
+
+/** Solo ranking + donut de ventas (mismo rango/sucursal). Para cambiar Productos/Categorías sin recargar comparativa ni evolución. */
+export async function fetchVentasProductsOnly(
+	branchId: number | null,
+	dateRange: [Date, Date],
+	productsGroupBy: VentasProductsGroupBy,
+): Promise<VentasProductsPayload | null> {
+	if (USE_VENTAS_MOCK) return null;
+	const { from, to } = encodeDashboardRangeToApi(dateRange);
+	const raw = await dashboardApi.getSalesProducts(branchId, from, to, 10, productsGroupBy);
+	return mapProductsFromApi(raw);
 }
 
 /** @deprecated Usar `fetchVentasDashboard` con rango de fechas. */

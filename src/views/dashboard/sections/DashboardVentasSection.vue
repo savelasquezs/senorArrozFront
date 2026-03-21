@@ -28,17 +28,29 @@
 			/>
 
 			<section class="space-y-4">
-				<div class="flex items-center gap-2">
-					<span class="text-lg" aria-hidden="true">🍗</span>
-					<h2 class="text-base font-semibold text-gray-900">Productos</h2>
+				<div class="flex flex-wrap items-center justify-between gap-3">
+					<div class="flex items-center gap-2">
+						<span class="text-lg" aria-hidden="true">{{ rankingSectionEmoji }}</span>
+						<h2 class="text-base font-semibold text-gray-900">{{ rankingSectionTitle }}</h2>
+					</div>
+					<DashboardSegmentedTabs
+						v-model="productsGroupByModel"
+						:options="productsGroupOptions"
+						aria-label="Ver gráficas por producto o por categoría"
+					/>
 				</div>
 				<div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
 					<BaseCard title="Más vendidos" :padding="'md'">
 						<p class="text-xs text-gray-500 mb-3">
 							Top por <strong>unidades</strong> en el mismo periodo del gráfico (hasta 10).
+							<span v-if="isCategoryMode"> Agrupado por <strong>categoría</strong>.</span>
+							<span v-else> Por <strong>producto</strong>.</span>
 						</p>
-						<div v-if="!hasProductBars" class="h-48 flex items-center justify-center text-sm text-gray-500">
-							Sin datos de productos en este rango (o modo mock de ventas).
+						<div
+							v-if="!hasProductBars"
+							class="h-48 flex items-center justify-center text-sm text-gray-500"
+						>
+							Sin datos de {{ rankingEmptyLabel }} en este rango (o modo mock de ventas).
 						</div>
 						<div v-else class="min-h-[200px]">
 							<DashboardHorizontalBarChart
@@ -51,6 +63,7 @@
 					<BaseCard title="Participación" :padding="'md'">
 						<p class="text-xs text-gray-500 mb-2">
 							Concentración del <strong>recaudo</strong> (top 5 + Otros si aplica).
+							<span v-if="isCategoryMode"> Por <strong>categoría</strong>.</span>
 						</p>
 						<div
 							v-if="!hasParticipation"
@@ -87,12 +100,13 @@ import {
 	TimeEvolutionPanel,
 	DashboardHorizontalBarChart,
 	DashboardRevenueShareDonut,
+	DashboardSegmentedTabs,
 	type BranchComparisonRow,
 	type SalesTimeSeriesBlock,
 	type OrdersPerHourBlock,
 	type BarChartDataset,
 } from '@/components/dashboard';
-import type { VentasProductsPayload } from '@/services/MainAPI/dashboardSectionApi';
+import type { VentasProductsGroupBy, VentasProductsPayload } from '@/services/MainAPI/dashboardSectionApi';
 
 const props = withDefaults(
 	defineProps<{
@@ -115,6 +129,8 @@ const props = withDefaults(
 	{ showBranchComparison: true },
 );
 
+const productsGroupBy = defineModel<VentasProductsGroupBy>('productsGroupBy', { default: 'product' });
+
 const emit = defineEmits<{
 	'update:dateRange': [value: [Date, Date]];
 }>();
@@ -123,6 +139,29 @@ const dateRangeModel = computed({
 	get: () => props.dateRange,
 	set: (v: [Date, Date]) => emit('update:dateRange', v),
 });
+
+/** Tabs usan `string`; enlazamos al mismo ref que el padre. */
+const productsGroupByModel = computed({
+	get: () => productsGroupBy.value,
+	set: (v: string) => {
+		if (v === 'product' || v === 'category') productsGroupBy.value = v;
+	},
+});
+
+const productsGroupOptions = [
+	{ value: 'product', label: 'Productos' },
+	{ value: 'category', label: 'Categorías' },
+];
+
+const isCategoryMode = computed(() => productsGroupBy.value === 'category');
+
+const rankingSectionTitle = computed(() =>
+	isCategoryMode.value ? 'Categorías' : 'Productos',
+);
+
+const rankingSectionEmoji = computed(() => (isCategoryMode.value ? '📂' : '🍗'));
+
+const rankingEmptyLabel = computed(() => (isCategoryMode.value ? 'categorías' : 'productos'));
 
 const hasProductBars = computed(
 	() => (props.productsPayload?.topByQuantity.length ?? 0) > 0,
