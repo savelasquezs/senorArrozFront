@@ -51,6 +51,21 @@
 				/>
 			</div>
 
+			<div class="grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-4">
+				<DashboardGaugeCard
+					title="Tiempo preparación (prom.)"
+					description="Desde inicio efectivo de cocina hasta listo"
+					:value-minutes="avgPrepMinutes"
+					subtitle="Según política de tiempos del negocio"
+				/>
+				<DashboardGaugeCard
+					title="Tiempo entrega (prom.)"
+					description="Listo → entregado al cliente"
+					:value-minutes="avgDeliveryMinutes"
+					subtitle="Domicilios / última milla"
+				/>
+			</div>
+
 			<BaseCard title="Estados de pedidos (ahora)" :padding="'md'">
 				<p class="text-xs text-gray-500 mb-4">
 					Pipeline en curso: Tomado → En preparación → Listo → En camino. El bloque con más pedidos
@@ -96,7 +111,11 @@
 <script setup lang="ts">
 import type { Component } from 'vue';
 import BaseCard from '@/components/ui/BaseCard.vue';
-import { DashboardKpiCard, DashboardOrderStatusKanban } from '@/components/dashboard';
+import {
+	DashboardGaugeCard,
+	DashboardKpiCard,
+	DashboardOrderStatusKanban,
+} from '@/components/dashboard';
 import type { OrderPipelineStatusCounts } from '@/components/dashboard/operation.types';
 import type { KpiState, ActivityItem } from '@/views/dashboard/mock/dashboardMockCore';
 
@@ -111,6 +130,9 @@ defineProps<{
 	loading: boolean;
 	error: string | null;
 	kpis: KpiState | null;
+	/** Mismos mocks/valores que en domicilios; visión rápida en Principal. */
+	avgPrepMinutes: number;
+	avgDeliveryMinutes: number;
 	pipelineCounts: OrderPipelineStatusCounts | null;
 	recentActivity: ActivityItem[];
 	getActivityIcon: (type: string) => Component;

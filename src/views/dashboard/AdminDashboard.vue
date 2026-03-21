@@ -21,6 +21,8 @@
                     :loading="principalLoading"
                     :error="principalError"
                     :kpis="principalData?.kpis ?? null"
+                    :avg-prep-minutes="avgPrepMinutes"
+                    :avg-delivery-minutes="avgDeliveryMinutes"
                     :pipeline-counts="principalData?.pipeline ?? null"
                     :recent-activity="principalData?.recentActivity ?? []"
                     :get-activity-icon="getActivityIcon"

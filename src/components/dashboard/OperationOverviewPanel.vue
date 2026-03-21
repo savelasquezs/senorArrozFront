@@ -1,7 +1,11 @@
 <template>
 	<div class="space-y-6">
-		<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+		<div
+			class="grid grid-cols-1 gap-4"
+			:class="showPrepTimeGauge ? 'md:grid-cols-2' : 'md:grid-cols-1 md:max-w-xl'"
+		>
 			<DashboardGaugeCard
+				v-if="showPrepTimeGauge"
 				title="Tiempo preparación (prom.)"
 				description="Desde inicio efectivo de cocina hasta listo"
 				:value-minutes="avgPrepMinutes"
@@ -214,6 +218,11 @@ const props = withDefaults(
 	defineProps<{
 		/** Si es false, el filtro de sucursal vive fuera (p. ej. sidebar global). */
 		showBranchFilter?: boolean;
+		/**
+		 * En la sección Domicilios suele ser false: la preparación se ve en Principal;
+		 * aquí solo el tiempo de entrega promedio.
+		 */
+		showPrepTimeGauge?: boolean;
 		branchOptions: DeliveryBranchOption[];
 		avgPrepMinutes: number;
 		avgDeliveryMinutes: number;
@@ -222,7 +231,7 @@ const props = withDefaults(
 		evolutionData: number[];
 		evolutionFeeData: number[];
 	}>(),
-	{ showBranchFilter: true },
+	{ showBranchFilter: true, showPrepTimeGauge: false },
 );
 
 function onBranchChange(e: Event) {
