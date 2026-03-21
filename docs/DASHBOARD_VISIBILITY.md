@@ -5,7 +5,27 @@ Este documento es la referencia al construir pantallas de métricas y gráficas.
 ## Ruta en el front
 
 - Una sola ruta: **`/dashboard`** (meta `requiresRole`: Superadmin y Admin).
-- **`Dashboard.vue`** elige el bloque visible según el rol (p. ej. `GlobalDashboard.vue` solo para Superadmin).
+- **`Dashboard.vue`** elige el bloque visible según el rol: `GlobalDashboard.vue` (Superadmin) o `AdminDashboard.vue` (Admin).
+
+## Estructura por secciones (`GlobalDashboard` / `AdminDashboard`)
+
+Ambos paneles **no** cargan ni piden “todo el dashboard” en una sola petición. La UI está dividida en **las mismas categorías** con **sidebar fijo a la derecha** (`DashboardRightNav.vue`):
+
+| Sección (id) | Contenido aproximado |
+|--------------|----------------------|
+| `principal` | KPIs, pipeline Kanban, actividad reciente |
+| `ventas` | Comparación sucursales, evolución temporal, placeholder pedidos por estado |
+| `gastos` | Placeholder (endpoint futuro) |
+| `domicilios` | Operación / domiciliarios (`OperationOverviewPanel`) |
+| `mapa_entregas` | Placeholder (mapa futuro) |
+| `regalos` | Placeholder (endpoint futuro) |
+
+- **Solo una sección activa** se muestra a la vez (componentes bajo `src/views/dashboard/sections/`).
+- **Carga de datos:** al entrar en una sección (o al cambiar el filtro de sucursal mientras está activa) debe usarse el **patrón por vista**: composables en `src/composables/dashboard/` y funciones en `src/services/MainAPI/dashboardSectionApi.ts` (sustituir mocks por HTTP). **Evitar** un único endpoint que devuelva todas las secciones.
+- **Filtro de sucursal (Superadmin):** en el sidebar, “Todas” o una sucursal concreta. Afecta a los bloques que sean susceptibles (Principal, Ventas, Domicilios, etc.). El bloque de domicilios **no** duplica el selector de sucursal cuando el filtro es global (`OperationOverviewPanel` con `showBranchFilter={false}`).
+- **Admin (`AdminDashboard.vue`):** misma navegación por secciones y mismos componentes de sección, **sin** bloque de sucursal en el sidebar; `branchId` viene del perfil (`authStore`) y se pasa a composables y a domicilios sin selector duplicado.
+
+Definición de ids: `src/views/dashboard/dashboardSectionIds.ts`.
 
 ## Contrato API para KPIs (implementación backend)
 
@@ -30,6 +50,7 @@ import {
   TimeEvolutionPanel,
   OperationOverviewPanel,
   DashboardPeriodFilter,
+  DashboardRightNav,
 } from '@/components/dashboard'
 ```
 

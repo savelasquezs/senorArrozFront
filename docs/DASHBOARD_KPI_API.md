@@ -1,6 +1,27 @@
 # Contrato de datos — KPIs del dashboard (backend)
 
-Documento para implementar **después** el endpoint (o endpoints) que alimentan la vista de dashboard (`GlobalDashboard` para Superadmin; futura vista por sucursal para Admin). Reglas de alcance por rol: **`docs/DASHBOARD_VISIBILITY.md`**.
+Documento para implementar **después** los endpoints que alimentan la vista de dashboard (`GlobalDashboard` para Superadmin; futura vista por sucursal para Admin). Reglas de alcance por rol: **`docs/DASHBOARD_VISIBILITY.md`**.
+
+---
+
+## 0. Modelo por sección (rendimiento)
+
+**No** diseñar ni exponer un único `GET /api/dashboard/all` (o equivalente) que devuelva todas las secciones: sería costoso en base de datos, red y memoria.
+
+En su lugar, **un contrato (o grupo pequeño) por categoría** del sidebar, alineado con la carga bajo demanda del front:
+
+| Sección | Responsabilidad del endpoint (ejemplo conceptual) | Front (mock / futuro HTTP) |
+|---------|---------------------------------------------------|----------------------------|
+| **Principal** | KPIs + pipeline operativo + actividad reciente | `fetchPrincipalDashboard` → `useDashboardPrincipalSection` |
+| **Ventas** | Alcance comparación sucursales + series temporales (con `from`/`to` según rango UI) | `fetchVentasDashboardScope` + computeds de series; `useDashboardVentasSection` |
+| **Gastos** | (futuro) resumen / listados de gastos | stub hasta existir ruta |
+| **Domicilios** | Operación: tiempos, pipeline domicilios, evolución, ranking repartidores (ver secciones 9–10 de este doc) | `fetchDomiciliosDashboardScope` (marca de vista) + estado detallado en padre hasta granularizar |
+| **Mapa de entregas** | (futuro) entregas georreferenciadas | stub |
+| **Regalos** | (futuro) campañas / canjes | stub |
+
+Parámetros habituales por petición: `branchId` opcional (Superadmin / agregado), ventanas de fecha, paginación en listas. Al cambiar de sección o de sucursal, el cliente **vuelve a pedir** solo lo necesario para esa vista.
+
+Implementación actual de referencia: `src/services/MainAPI/dashboardSectionApi.ts`, composables en `src/composables/dashboard/`, mocks base en `src/views/dashboard/mock/dashboardMockCore.ts`.
 
 ---
 
@@ -307,7 +328,10 @@ En UI, los **títulos** junto a cada gráfica de domiciliarios muestran la **sum
 
 ## 10. Referencia rápida front
 
-- Vista: `src/views/dashboard/GlobalDashboard.vue`
+- Orquestación: `GlobalDashboard.vue` (Superadmin) y `AdminDashboard.vue` (Admin): sidebar + sección activa; carpeta `src/views/dashboard/`.
+- Secciones: `src/views/dashboard/sections/*.vue`, ids `dashboardSectionIds.ts`.
+- API por sección (mock): `src/services/MainAPI/dashboardSectionApi.ts`; composables: `src/composables/dashboard/` (incl. `useDashboardShellMockState.ts`: periodos, mocks domicilios/ventas compartidos entre `GlobalDashboard` y `AdminDashboard`).
+- Navegación lateral: `DashboardRightNav.vue`
 - KPI: `DashboardKpiCard.vue`
 - Barras: `DashboardBarChart.vue`
 - Línea / área: `DashboardLineChart.vue`

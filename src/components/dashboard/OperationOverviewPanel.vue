@@ -17,7 +17,10 @@
 
 		<BaseCard title="Eficiencia por domiciliario" :padding="'md'">
 			<div class="mb-5 pb-5 border-b border-gray-100 space-y-4">
-				<div class="flex flex-col sm:flex-row sm:flex-wrap gap-3 sm:items-end">
+				<div
+					v-if="showBranchFilter"
+					class="flex flex-col sm:flex-row sm:flex-wrap gap-3 sm:items-end"
+				>
 					<div class="w-full sm:w-auto sm:min-w-[200px]">
 						<label class="block text-xs font-medium text-gray-600 mb-1" for="delivery-branch-filter"
 							>Sucursal</label
@@ -35,11 +38,15 @@
 						</select>
 					</div>
 				</div>
-				<p class="text-xs text-gray-500">
+				<p v-if="showBranchFilter" class="text-xs text-gray-500">
 					<strong>Sucursal:</strong> filtra todo el bloque (domiciliarios visibles, medidores, evolución
 					de fees, barras y dispersión).
 					<strong class="ml-1">Domiciliario</strong> (solo entregas): limita la línea
 					<em>Entregas completadas</em> a quien elijas; la lista depende de la sucursal.
+				</p>
+				<p v-else class="text-xs text-gray-500">
+					<strong>Domiciliario</strong> (solo entregas): la sucursal la define el panel lateral del
+					dashboard (superadmin). Esta lista reacciona a ese filtro.
 				</p>
 				<DashboardPeriodFilter v-model="period" />
 			</div>
@@ -203,15 +210,20 @@ const deliveryEvolutionDriverId = defineModel<number | 'all'>('deliveryEvolution
 	required: true,
 });
 
-const props = defineProps<{
-	branchOptions: DeliveryBranchOption[];
-	avgPrepMinutes: number;
-	avgDeliveryMinutes: number;
-	deliverymen: DeliverymanEfficiencyRow[];
-	evolutionLabels: string[];
-	evolutionData: number[];
-	evolutionFeeData: number[];
-}>();
+const props = withDefaults(
+	defineProps<{
+		/** Si es false, el filtro de sucursal vive fuera (p. ej. sidebar global). */
+		showBranchFilter?: boolean;
+		branchOptions: DeliveryBranchOption[];
+		avgPrepMinutes: number;
+		avgDeliveryMinutes: number;
+		deliverymen: DeliverymanEfficiencyRow[];
+		evolutionLabels: string[];
+		evolutionData: number[];
+		evolutionFeeData: number[];
+	}>(),
+	{ showBranchFilter: true },
+);
 
 function onBranchChange(e: Event) {
 	const v = (e.target as HTMLSelectElement).value;
