@@ -60,6 +60,10 @@
                     <p class="font-medium text-gray-900 break-words">
                         {{ order.addressDescription || 'En el local' }}
                     </p>
+                    <p v-if="order.addressAdditionalInfo"
+                        class="text-[10px] sm:text-xs text-gray-600 mt-0.5 break-words">
+                        {{ order.addressAdditionalInfo }}
+                    </p>
                     <p v-if="order.neighborhoodName" class="text-[10px] sm:text-xs text-gray-600 mt-0.5 break-words">
                         📍 {{ order.neighborhoodName }}
                     </p>

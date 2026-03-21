@@ -53,7 +53,9 @@
                                 <span class="font-bold text-gray-900">#{{ order.id }}</span>
                             </td>
                             <td class="px-6 py-4 text-sm text-gray-900">
-                                {{ order.addressDescription || '-' }}
+                                <div>{{ order.addressDescription || '-' }}</div>
+                                <div v-if="order.addressAdditionalInfo" class="text-xs text-gray-500 mt-0.5">{{
+                                    order.addressAdditionalInfo }}</div>
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
                                 {{ order.neighborhoodName || '-' }}
@@ -128,7 +130,10 @@
                 </div>
 
                 <div class="text-sm text-gray-700 space-y-1">
-                    <div><span class="font-medium">Dirección:</span> {{ order.addressDescription || '-' }}</div>
+                    <div><span class="font-medium">Dirección:</span> {{ order.addressDescription || '-' }}
+                        <span v-if="order.addressAdditionalInfo" class="block text-xs text-gray-500 mt-0.5">{{
+                            order.addressAdditionalInfo }}</span>
+                    </div>
                     <div><span class="font-medium">Barrio:</span> {{ order.neighborhoodName || '-' }}</div>
                     <div><span class="font-medium">Cliente:</span> {{ order.customerName || order.guestName || '-' }}
                     </div>
@@ -180,6 +185,8 @@
             <div v-if="orderToDeliver" class="bg-gray-50 rounded-lg p-4">
                 <div class="space-y-2 text-sm">
                     <div><span class="font-medium">Dirección:</span> {{ orderToDeliver.addressDescription || '-' }}
+                        <span v-if="orderToDeliver.addressAdditionalInfo" class="block text-gray-600 mt-0.5">{{
+                            orderToDeliver.addressAdditionalInfo }}</span>
                     </div>
                     <div><span class="font-medium">Cliente:</span> {{ orderToDeliver.customerName ||
                         orderToDeliver.guestName || '-' }}</div>

@@ -12,6 +12,9 @@
                     <div v-if="order.addressDescription" class="text-sm text-gray-600">
                         📍 {{ order.addressDescription }}
                     </div>
+                    <div v-if="order.addressAdditionalInfo" class="text-xs text-gray-600 mt-0.5">
+                        {{ order.addressAdditionalInfo }}
+                    </div>
                     <div v-if="order.neighborhoodName" class="text-xs text-gray-500 mt-1">
                         Barrio: {{ order.neighborhoodName }}
                     </div>

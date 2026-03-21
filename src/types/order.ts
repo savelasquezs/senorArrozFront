@@ -85,6 +85,7 @@ export interface DraftOrder {
     guestName: string | null
     addressId: number | null
     addressDescription: string | null
+    addressAdditionalInfo?: string | null
     deliveryFee: number
     reservedFor: Date | null
     prepareAt: Date | null
@@ -113,6 +114,7 @@ export interface Order {
     guestName?: string
     addressId?: number
     addressDescription?: string
+    addressAdditionalInfo?: string | null
     loyaltyRuleId?: number
     loyaltyRuleName?: string
     type: OrderType
@@ -211,6 +213,8 @@ export interface OrderListItem {
     customerPhone: string | null
     addressId: number | null
     addressDescription: string | null
+    /** Referencia / apto / info adicional de la dirección (API: addressAdditionalInfo) */
+    addressAdditionalInfo?: string | null
     neighborhoodId: number | null
     neighborhoodName: string | null
     deliveryManId: number | null

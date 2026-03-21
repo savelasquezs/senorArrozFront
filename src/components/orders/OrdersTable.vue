@@ -114,10 +114,13 @@
 
                     <!-- Dirección (clickeable para cambiar) -->
                     <td class="px-6 py-4">
-                        <button v-if="order.addressDescription"
-                            class="text-left text-sm text-gray-900 hover:text-emerald-600 hover:underline transition-colors max-w-xs truncate"
+                        <button v-if="order.addressDescription || order.addressAdditionalInfo"
+                            class="text-left text-sm text-gray-900 hover:text-emerald-600 hover:underline transition-colors max-w-xs"
                             @click.stop="$emit('edit-address', order)">
-                            {{ order.addressDescription }}
+                            <span class="block truncate">{{ order.addressDescription || '—' }}</span>
+                            <span v-if="order.addressAdditionalInfo"
+                                class="block text-xs text-gray-500 font-normal truncate mt-0.5">{{
+                                    order.addressAdditionalInfo }}</span>
                         </button>
                         <span v-else class="text-sm text-gray-400 italic">-</span>
                     </td>

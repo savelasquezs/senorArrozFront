@@ -7,6 +7,9 @@
                 <div class="text-sm font-medium text-gray-900 truncate">
                     #{{ order.id }} · {{ order.addressDescription || 'Sin dirección' }}
                 </div>
+                <div v-if="order.addressAdditionalInfo" class="text-xs text-gray-600 truncate">
+                    {{ order.addressAdditionalInfo }}
+                </div>
                 <div class="text-xs text-gray-500 truncate">{{ order.neighborhoodName || order.branchName }}</div>
             </div>
 
@@ -130,7 +133,7 @@ const assignCurrentCoords = async () => {
 const addressForm = ref<CustomerAddressFormData>({
     neighborhoodId: 0,
     address: props.order.addressDescription || '',
-    additionalInfo: '',
+    additionalInfo: props.order.addressAdditionalInfo || '',
     latitude: 0,
     longitude: 0,
     deliveryFee: props.order.deliveryFee || 0,

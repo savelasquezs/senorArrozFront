@@ -143,6 +143,7 @@ export const useOrdersDraftsStore = defineStore('ordersDrafts', () => {
             ...order,
             addressId: address ? address.id : null,
             addressDescription: address ? address.address : null,
+            addressAdditionalInfo: address ? (address.additionalInfo ?? null) : null,
             deliveryFee: address ? (address.deliveryFee || 0) : 0,
         }
 

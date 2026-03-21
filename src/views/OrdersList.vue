@@ -727,6 +727,7 @@ const handleOrderUpdated = async (updatedOrder?: Order) => {
                         customerPhone: finalUpdate.customerPhone || null,
                         addressId: finalUpdate.addressId || null,
                         addressDescription: finalUpdate.addressDescription || null,
+                        addressAdditionalInfo: (finalUpdate as any).addressAdditionalInfo ?? null,
                         guestName: finalUpdate.guestName || null,
                         deliveryFee: finalUpdate.deliveryFee || null,
                         // ✅ INCLUIR TOTALES DEL BACKEND

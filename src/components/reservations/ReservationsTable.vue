@@ -103,15 +103,19 @@
 
                     <!-- Dirección + Barrio -->
                     <td class="px-4 py-4 max-w-[160px]">
-                        <button v-if="order.addressDescription"
-                            class="text-left text-sm text-gray-900 hover:text-emerald-600 hover:underline transition-colors truncate block max-w-full"
+                        <button v-if="order.addressDescription || order.addressAdditionalInfo"
+                            class="text-left text-sm text-gray-900 hover:text-emerald-600 hover:underline transition-colors block max-w-full"
                             @click.stop="$emit('edit-address', order)">
-                            {{ order.addressDescription }}
+                            <span class="block truncate">{{ order.addressDescription || '—' }}</span>
+                            <span v-if="order.addressAdditionalInfo"
+                                class="block text-xs text-gray-500 font-normal truncate mt-0.5">{{
+                                    order.addressAdditionalInfo }}</span>
                         </button>
                         <div v-if="order.neighborhoodName" class="text-xs text-gray-400 truncate">
                             {{ order.neighborhoodName }}
                         </div>
-                        <span v-if="!order.addressDescription" class="text-sm text-gray-400 italic">—</span>
+                        <span v-if="!order.addressDescription && !order.addressAdditionalInfo"
+                            class="text-sm text-gray-400 italic">—</span>
                     </td>
 
                     <!-- Fecha evento -->

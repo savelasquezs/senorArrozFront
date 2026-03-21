@@ -117,10 +117,15 @@
                         <!-- Dirección - SOLO SI DELIVERY O RESERVATION -->
                         <div v-if="order.type === 'delivery' || order.type === 'reservation'" class="space-y-2">
                             <label class="text-xs sm:text-sm font-medium text-gray-700">Dirección de entrega</label>
-                            <div class="flex items-center justify-between bg-gray-50 rounded-lg p-2 sm:p-3">
-                                <p class="text-xs sm:text-sm text-gray-900">
-                                    {{ order.addressDescription || 'Sin dirección' }}
-                                </p>
+                            <div class="flex items-center justify-between bg-gray-50 rounded-lg p-2 sm:p-3 gap-2">
+                                <div class="min-w-0 flex-1">
+                                    <p class="text-xs sm:text-sm text-gray-900">
+                                        {{ order.addressDescription || 'Sin dirección' }}
+                                    </p>
+                                    <p v-if="order.addressAdditionalInfo" class="mt-1 text-xs text-gray-600">
+                                        {{ order.addressAdditionalInfo }}
+                                    </p>
+                                </div>
                                 <BaseButton v-if="permissions.canEditOrder(order)" size="sm" variant="ghost"
                                     @click="showSelectAddressModal = true">
                                     <PencilIcon class="w-4 h-4" />
@@ -526,6 +531,7 @@ const handleOrderTypeUpdated = (updatedOrder?: any) => {
         prepareAt: orderAny.prepareAt || null,
         addressId: orderAny.addressId || null,
         addressDescription: orderAny.addressDescription || null,
+        addressAdditionalInfo: orderAny.addressAdditionalInfo ?? null,
         updatedAt: orderAny.updatedAt
     })
 
@@ -642,6 +648,7 @@ const handleAddressUpdated = (updatedOrder?: any) => {
     handleModalUpdated({
         addressId: orderAny.addressId,
         addressDescription: orderAny.addressDescription,
+        addressAdditionalInfo: orderAny.addressAdditionalInfo ?? null,
         updatedAt: orderAny.updatedAt
     })
 }
@@ -660,6 +667,7 @@ const updateOrderCustomer = (updatedOrder: any) => {
         customerPhone: orderAny.customerPhone || null,
         addressId: orderAny.addressId || null,
         addressDescription: orderAny.addressDescription || null,
+        addressAdditionalInfo: orderAny.addressAdditionalInfo ?? null,
         guestName: orderAny.guestName || null,
         deliveryFee: orderAny.deliveryFee || null,
         updatedAt: orderAny.updatedAt

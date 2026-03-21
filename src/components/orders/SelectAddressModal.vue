@@ -7,9 +7,14 @@
                 <div class="text-sm text-gray-600">
                     Pedido <span class="font-medium text-gray-900">#{{ order.id }}</span>
                 </div>
-                <div v-if="order.addressDescription" class="mt-2 text-sm">
-                    <span class="text-gray-600">Dirección actual:</span>
-                    <p class="text-gray-900 font-medium">{{ order.addressDescription }}</p>
+                <div v-if="order.addressDescription || order.addressAdditionalInfo" class="mt-2 text-sm space-y-1">
+                    <template v-if="order.addressDescription">
+                        <span class="text-gray-600">Dirección actual:</span>
+                        <p class="text-gray-900 font-medium">{{ order.addressDescription }}</p>
+                    </template>
+                    <p v-if="order.addressAdditionalInfo" class="text-gray-600 text-sm">
+                        <span class="font-medium text-gray-700">Referencia:</span> {{ order.addressAdditionalInfo }}
+                    </p>
                 </div>
             </div>
 
