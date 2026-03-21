@@ -134,16 +134,32 @@
                 </BaseCard>
 
                 <!-- Neighborhoods Section -->
-                <BaseCard v-if="branch.neighborhoods && branch.neighborhoods.length > 0">
+                <BaseCard>
                     <div class="space-y-4">
-                        <h3 class="text-lg font-semibold text-gray-900">
-                            Barrios de Cobertura
-                            <span class="text-sm font-normal text-gray-500">({{ branch.neighborhoods.length }})</span>
-                        </h3>
+                        <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                            <h3 class="text-lg font-semibold text-gray-900">
+                                Barrios de Cobertura
+                                <span class="text-sm font-normal text-gray-500">({{ branch.neighborhoods?.length || 0
+                                }})</span>
+                            </h3>
+                            <BaseButton v-if="canManageNeighborhoods" @click="openCreateNeighborhood" variant="primary"
+                                size="sm" :icon="PlusIcon">
+                                Nuevo Barrio
+                            </BaseButton>
+                        </div>
 
-                        <div class="overflow-hidden shadow ring-1 ring-black ring-opacity-5 rounded-lg">
+                        <div v-if="!branch.neighborhoods?.length"
+                            class="text-center py-10 text-gray-500 border border-dashed border-gray-200 rounded-lg">
+                            <MapPinIcon class="mx-auto h-12 w-12 text-gray-400" />
+                            <p class="mt-2 text-sm">No hay barrios registrados para esta sucursal.</p>
+                            <p v-if="canManageNeighborhoods" class="mt-1 text-xs text-gray-400">Usa «Nuevo Barrio» para
+                                agregar el primero.</p>
+                        </div>
+
+                        <div v-else
+                            class="max-h-96 overflow-y-auto shadow ring-1 ring-black ring-opacity-5 rounded-lg">
                             <table class="min-w-full divide-y divide-gray-200">
-                                <thead class="bg-gray-50">
+                                <thead class="bg-gray-50 sticky top-0 z-10 shadow-sm">
                                     <tr>
                                         <th
                                             class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -161,6 +177,10 @@
                                             class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                             Direcciones
                                         </th>
+                                        <th v-if="canManageNeighborhoods"
+                                            class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                            Acciones
+                                        </th>
                                     </tr>
                                 </thead>
                                 <tbody class="bg-white divide-y divide-gray-200">
@@ -177,6 +197,20 @@
                                         </td>
                                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                                             {{ neighborhood.totalAddresses || 0 }}
+                                        </td>
+                                        <td v-if="canManageNeighborhoods"
+                                            class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                            <div class="flex justify-end flex-wrap gap-2">
+                                                <BaseButton @click="openEditNeighborhood(neighborhood)" variant="outline"
+                                                    size="sm" :icon="PencilIcon">
+                                                    Editar
+                                                </BaseButton>
+                                                <BaseButton @click="confirmDeleteNeighborhood(neighborhood)"
+                                                    variant="outline" size="sm" :icon="TrashIcon"
+                                                    class="text-red-600 hover:text-red-700">
+                                                    Eliminar
+                                                </BaseButton>
+                                            </div>
                                         </td>
                                     </tr>
                                 </tbody>
@@ -534,6 +568,13 @@
             <!-- Supplier Form Dialog -->
             <SupplierFormModal :is-open="showSupplierForm" :editing-supplier="editingSupplier"
                 :loading="supplierFormLoading" @close="closeSupplierForm" @submit="handleSupplierSubmit" />
+
+            <!-- Neighborhood Form Dialog -->
+            <BaseDialog v-model="showNeighborhoodForm" :title="editingNeighborhood ? 'Editar Barrio' : 'Nuevo Barrio'"
+                :icon="MapPinIcon" size="md">
+                <NeighborhoodForm :neighborhood="editingNeighborhood" :loading="neighborhoodFormLoading"
+                    @submit="handleNeighborhoodSubmit" @cancel="closeNeighborhoodForm" />
+            </BaseDialog>
         </div>
     </MainLayout>
 </template>
@@ -556,6 +597,7 @@ import BaseBadge from '@/components/ui/BaseBadge.vue'
 import PhoneNumberItem from '@/components/customers/PhoneNumberItem.vue'
 import BranchUsersTable from '@/components/branches/BranchUsersTable.vue'
 import BranchForm from '@/components/branches/BranchForm.vue'
+import NeighborhoodForm from '@/components/neighborhoods/NeighborhoodForm.vue'
 import BankForm from '@/components/payments/banks/BankForm.vue'
 import AppForm from '@/components/payments/apps/AppForm.vue'
 import ExpenseCategoriesTable from '@/components/expenses/ExpenseCategoriesTable.vue'
@@ -569,7 +611,8 @@ import { expenseApi } from '@/services/MainAPI/expenseApi'
 import { supplierApi } from '@/services/MainAPI/supplierApi'
 import type { ExpenseCategory, CreateExpenseCategoryDto, Expense, CreateExpenseDto, UpdateExpenseDto } from '@/types/expense'
 import type { Supplier, CreateSupplierDto, UpdateSupplierDto } from '@/types/supplier'
-import type { PagedResult } from '@/types/common'
+import type { NeighborhoodSummary, PagedResult } from '@/types/common'
+import type { NeighborhoodFormData } from '@/types/customer'
 import {
     BuildingOffice2Icon,
     PencilIcon,
@@ -605,6 +648,11 @@ const showBankForm = ref(false)
 const showAppForm = ref(false)
 const editingBank = ref<Bank | null>(null)
 const editingApp = ref<App | null>(null)
+
+// Neighborhoods
+const showNeighborhoodForm = ref(false)
+const editingNeighborhood = ref<NeighborhoodSummary | null>(null)
+const neighborhoodFormLoading = ref(false)
 
 // Expenses state
 const expensesActiveTab = ref<'categories' | 'expenses' | 'suppliers'>('categories')
@@ -670,8 +718,93 @@ const canManageSuppliers = computed(() => {
     return userRole === 'Superadmin' || userRole === 'Admin'
 })
 
+const canManageNeighborhoods = computed(() => {
+    const userRole = authStore.user?.role
+    return userRole === 'Superadmin' || userRole === 'Admin'
+})
+
 const handleUserError = (message: string) => {
     showError('Error manejando usuario', message)
+}
+
+const openCreateNeighborhood = () => {
+    editingNeighborhood.value = null
+    showNeighborhoodForm.value = true
+}
+
+const openEditNeighborhood = (neighborhood: NeighborhoodSummary) => {
+    editingNeighborhood.value = neighborhood
+    showNeighborhoodForm.value = true
+}
+
+const closeNeighborhoodForm = () => {
+    showNeighborhoodForm.value = false
+    editingNeighborhood.value = null
+}
+
+const handleNeighborhoodSubmit = async (data: NeighborhoodFormData) => {
+    try {
+        neighborhoodFormLoading.value = true
+        if (editingNeighborhood.value) {
+            await branchesStore.updateNeighborhood(
+                branchId.value,
+                editingNeighborhood.value.id,
+                data
+            )
+            success(
+                'Barrio actualizado',
+                3000,
+                `El barrio "${data.name}" se ha actualizado correctamente`
+            )
+        } else {
+            await branchesStore.createNeighborhood({
+                ...data,
+                branchId: branchId.value
+            })
+            success(
+                'Barrio creado',
+                3000,
+                `El barrio "${data.name}" se ha creado correctamente`
+            )
+        }
+        closeNeighborhoodForm()
+    } catch (error: any) {
+        console.error('Error saving neighborhood:', error)
+        showError(
+            'Error al guardar barrio',
+            error.message || 'No se pudo guardar el barrio'
+        )
+    } finally {
+        neighborhoodFormLoading.value = false
+    }
+}
+
+const confirmDeleteNeighborhood = async (neighborhood: NeighborhoodSummary) => {
+    if (!canManageNeighborhoods.value) return
+    if (
+        !confirm(
+            `¿Eliminar el barrio "${neighborhood.name}"? No podrás si tiene direcciones o pedidos asociados.`
+        )
+    ) {
+        return
+    }
+    try {
+        neighborhoodFormLoading.value = true
+        await branchesStore.deleteNeighborhood(branchId.value, neighborhood.id)
+        success(
+            'Barrio eliminado',
+            3000,
+            `El barrio "${neighborhood.name}" se ha eliminado correctamente`
+        )
+    } catch (error: any) {
+        console.error('Error deleting neighborhood:', error)
+        showError(
+            'Error al eliminar barrio',
+            error.message || 'No se pudo eliminar el barrio'
+        )
+    } finally {
+        neighborhoodFormLoading.value = false
+    }
 }
 
 const totalCustomers = computed(() => {

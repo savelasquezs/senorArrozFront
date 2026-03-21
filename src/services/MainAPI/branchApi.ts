@@ -55,14 +55,23 @@ class BranchApi extends BaseApi {
 	}
 
 	async updateNeighborhood(
-		id: number,
+		branchId: number,
+		neighborhoodId: number,
 		payload: NeighborhoodFormData
 	): Promise<ApiResponse<NeighborhoodSummary>> {
-		return this.put<ApiResponse<NeighborhoodSummary>>(`/Branches/${id}/neighborhoods`, payload);
+		return this.put<ApiResponse<NeighborhoodSummary>>(
+			`/Branches/${branchId}/neighborhoods/${neighborhoodId}`,
+			payload
+		);
 	}
 
-	async deleteNeighborhood(id: number): Promise<ApiResponse<string>> {
-		return this.delete<ApiResponse<string>>(`/Branches/${id}/neighborhoods`);
+	async deleteNeighborhood(
+		branchId: number,
+		neighborhoodId: number
+	): Promise<ApiResponse<string>> {
+		return this.delete<ApiResponse<string>>(
+			`/Branches/${branchId}/neighborhoods/${neighborhoodId}`
+		);
 	}
 }
 

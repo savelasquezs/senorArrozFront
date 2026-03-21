@@ -3,15 +3,15 @@
     <form @submit.prevent="handleSubmit" class="space-y-6">
         <!-- Neighborhood Name -->
         <BaseInput v-model="form.name" label="Nombre del Barrio" placeholder="Ej: El Poblado, Laureles, Centro" required
-            :error="errors.name" :maxlength="100">
+            :error="errors.name" :maxlength="150">
             <template #icon>
                 <MapPinIcon class="w-4 h-4" />
             </template>
         </BaseInput>
 
         <!-- Delivery Fee -->
-        <BaseInput v-model.number="form.deliveryFee" label="Tarifa de Domicilio" type="number" :min="0" :step="100"
-            placeholder="5000" required :error="errors.deliveryFee">
+        <BaseInput v-model.number="form.deliveryFee" label="Tarifa de Domicilio" type="number" :min="0" :max="50000"
+            :step="100" placeholder="5000" required :error="errors.deliveryFee">
             <template #icon>
                 <CurrencyDollarIcon class="w-4 h-4" />
             </template>
@@ -46,6 +46,7 @@
 <script setup lang="ts">
 import { ref, reactive, computed, watch } from 'vue'
 import type { Neighborhood, NeighborhoodFormData } from '@/types/customer'
+import type { NeighborhoodSummary } from '@/types/common'
 import BaseInput from '@/components/ui/BaseInput.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseAlert from '@/components/ui/BaseAlert.vue'
@@ -56,7 +57,7 @@ import {
 } from '@heroicons/vue/24/outline'
 
 interface Props {
-    neighborhood?: Neighborhood | NeighborhoodFormData | null
+    neighborhood?: Neighborhood | NeighborhoodFormData | NeighborhoodSummary | null
     loading?: boolean
     neigborhoodNameToCreate?: string
 }
@@ -95,8 +96,8 @@ const validateForm = () => {
         errors.name = 'El nombre del barrio es requerido'
     } else if (form.name.length < 2) {
         errors.name = 'El nombre debe tener al menos 2 caracteres'
-    } else if (form.name.length > 100) {
-        errors.name = 'El nombre no puede tener más de 100 caracteres'
+    } else if (form.name.length > 150) {
+        errors.name = 'El nombre no puede tener más de 150 caracteres'
     } else {
         errors.name = ''
     }
@@ -104,8 +105,8 @@ const validateForm = () => {
     // Validate delivery fee
     if (form.deliveryFee < 0) {
         errors.deliveryFee = 'La tarifa no puede ser negativa'
-    } else if (form.deliveryFee > 100000) {
-        errors.deliveryFee = 'La tarifa no puede ser mayor a $100,000'
+    } else if (form.deliveryFee > 50000) {
+        errors.deliveryFee = 'La tarifa no puede ser mayor a $50,000 (límite del sistema)'
     } else {
         errors.deliveryFee = ''
     }

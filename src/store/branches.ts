@@ -111,15 +111,15 @@ export const useBranchesStore = defineStore('branches', () => {
 	// Neighborhood management functions
 	const createNeighborhood = async (data: NeighborhoodFormData & { branchId: number }) => {
 		try {
-			isLoading.value = true;
 			error.value = null;
 
-			// Create neighborhood via API
 			const res = await branchApi.createNeighborhood(data);
 			const newNeighborhood = res.data;
 
-			// Update current branch neighborhoods
-			if (current.value && current.value.neighborhoods) {
+			if (current.value) {
+				if (!current.value.neighborhoods) {
+					current.value.neighborhoods = [];
+				}
 				current.value.neighborhoods.push(newNeighborhood);
 			}
 
@@ -127,23 +127,22 @@ export const useBranchesStore = defineStore('branches', () => {
 		} catch (err: any) {
 			error.value = err.message || 'Error al crear el barrio';
 			throw err;
-		} finally {
-			isLoading.value = false;
 		}
 	};
 
-	const updateNeighborhood = async (id: number, data: NeighborhoodFormData) => {
+	const updateNeighborhood = async (
+		branchId: number,
+		neighborhoodId: number,
+		data: NeighborhoodFormData
+	) => {
 		try {
-			isLoading.value = true;
 			error.value = null;
 
-			// Update neighborhood via API
-			const res = await branchApi.updateNeighborhood(id, data);
+			const res = await branchApi.updateNeighborhood(branchId, neighborhoodId, data);
 			const updatedNeighborhood = res.data;
 
-			// Update current branch neighborhoods
 			if (current.value && current.value.neighborhoods) {
-				const index = current.value.neighborhoods.findIndex(n => n.id === id);
+				const index = current.value.neighborhoods.findIndex(n => n.id === neighborhoodId);
 				if (index !== -1) {
 					current.value.neighborhoods[index] = updatedNeighborhood;
 				}
@@ -153,28 +152,23 @@ export const useBranchesStore = defineStore('branches', () => {
 		} catch (err: any) {
 			error.value = err.message || 'Error al actualizar el barrio';
 			throw err;
-		} finally {
-			isLoading.value = false;
 		}
 	};
 
-	const deleteNeighborhood = async (id: number) => {
+	const deleteNeighborhood = async (branchId: number, neighborhoodId: number) => {
 		try {
-			isLoading.value = true;
 			error.value = null;
 
-			// Delete neighborhood via API
-			await branchApi.deleteNeighborhood(id);
+			await branchApi.deleteNeighborhood(branchId, neighborhoodId);
 
-			// Remove from current branch neighborhoods
 			if (current.value && current.value.neighborhoods) {
-				current.value.neighborhoods = current.value.neighborhoods.filter(n => n.id !== id);
+				current.value.neighborhoods = current.value.neighborhoods.filter(
+					n => n.id !== neighborhoodId
+				);
 			}
 		} catch (err: any) {
 			error.value = err.message || 'Error al eliminar el barrio';
 			throw err;
-		} finally {
-			isLoading.value = false;
 		}
 	};
 
