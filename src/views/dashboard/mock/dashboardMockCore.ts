@@ -145,6 +145,8 @@ export function buildPrincipalMock(branchId: number | null): {
 	kpis: KpiState;
 	pipeline: OrderPipelineStatusCounts;
 	recentActivity: ActivityItem[];
+	avgPrepMinutes: number;
+	avgDeliveryMinutes: number;
 } {
 	const totalAll = totalSalesAllBranches();
 	if (branchId == null) {
@@ -152,12 +154,16 @@ export function buildPrincipalMock(branchId: number | null): {
 			kpis: { ...BASE_KPIS },
 			pipeline: { ...BASE_PIPELINE },
 			recentActivity: [...BASE_RECENT_ACTIVITY],
+			avgPrepMinutes: 0,
+			avgDeliveryMinutes: 0,
 		};
 	}
 	const row = BASE_BRANCH_COMPARISON_ROWS.find((b) => b.id === branchId);
 	const ratio = row ? Math.max(0.15, row.salesTotal / totalAll) : 0.25;
 
 	return {
+		avgPrepMinutes: 0,
+		avgDeliveryMinutes: 0,
 		kpis: {
 			totalSales: Math.round(BASE_KPIS.totalSales * ratio),
 			totalSalesWeekChangePercent: BASE_KPIS.totalSalesWeekChangePercent,

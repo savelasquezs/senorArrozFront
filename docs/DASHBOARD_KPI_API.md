@@ -10,12 +10,12 @@ Documento para implementar **después** los endpoints que alimentan la vista de 
 
 En su lugar, **un contrato (o grupo pequeño) por categoría** del sidebar, alineado con la carga bajo demanda del front:
 
-| Sección | Responsabilidad del endpoint (ejemplo conceptual) | Front (mock / futuro HTTP) |
-|---------|---------------------------------------------------|----------------------------|
-| **Principal** | KPIs + pipeline operativo + actividad reciente | `fetchPrincipalDashboard` → `useDashboardPrincipalSection` |
+| Sección | Responsabilidad del endpoint | Front |
+|---------|-------------------------------|--------|
+| **Principal** | **`GET /api/dashboard/main`** — KPIs (rolling 7d/365d **o** rango explícito `kpiFrom`/`kpiTo` UTC), pipeline en curso, actividad reciente. Ver **`senorArrozAPI/docs/DASHBOARD_API.md`**. | `fetchPrincipalDashboard` → `useDashboardPrincipalSection` (opcional `kpiRange` en options). Mock: `VITE_DASHBOARD_PRINCIPAL_MOCK=true`. |
 | **Ventas** | Alcance comparación sucursales + series temporales (con `from`/`to` según rango UI) | `fetchVentasDashboardScope` + computeds de series; `useDashboardVentasSection` |
 | **Gastos** | (futuro) resumen / listados de gastos | stub hasta existir ruta |
-| **Domicilios** | Operación: tiempos, pipeline domicilios, evolución, ranking repartidores (ver secciones 9–10 de este doc) | `fetchDomiciliosDashboardScope` (marca de vista) + estado detallado en padre hasta granularizar |
+| **Domicilios** | **`GET /api/dashboard/delivery`** — `from` y `to` obligatorios (UTC ISO), `branchId?`; tiempos medios, repartidores, evolución por bucket. | `fetchDeliveryDashboard` + `useDashboardDomiciliosSection` (periodo compartido con `useDashboardShellMockState`). Mock: `VITE_DASHBOARD_DELIVERY_MOCK=true` (sin llamada al API). |
 | **Mapa de entregas** | (futuro) entregas georreferenciadas | stub |
 | **Regalos** | (futuro) campañas / canjes | stub |
 

@@ -14,8 +14,8 @@
                     :loading="principalLoading"
                     :error="principalError"
                     :kpis="principalData?.kpis ?? null"
-                    :avg-prep-minutes="avgPrepMinutes"
-                    :avg-delivery-minutes="avgDeliveryMinutes"
+                    :avg-prep-minutes="principalData?.avgPrepMinutes ?? 0"
+                    :avg-delivery-minutes="principalData?.avgDeliveryMinutes ?? 0"
                     :pipeline-counts="principalData?.pipeline ?? null"
                     :recent-activity="principalData?.recentActivity ?? []"
                     :get-activity-icon="getActivityIcon"
@@ -69,6 +69,7 @@
 import { ref, computed } from 'vue'
 import { DashboardRightNav } from '@/components/dashboard'
 import { BASE_BRANCH_COMPARISON_ROWS } from '@/views/dashboard/mock/dashboardMockCore'
+import { defaultDashboardPeriodThisMonth } from '@/utils/dashboardPeriodPresets'
 import { useAuthStore } from '@/store/auth'
 import type { DashboardSectionId } from '@/views/dashboard/dashboardSectionIds'
 import { useDashboardPrincipalSection } from '@/composables/dashboard/useDashboardPrincipalSection'
@@ -89,9 +90,16 @@ const activeSection = ref<DashboardSectionId>('principal')
 /** Filtro de sucursal global (superadmin). */
 const globalDashboardBranchId = ref<number | null>(null)
 
+/** Periodo Domicilios (compartido: API `from`/`to` + UI del shell). */
+const deliveryPeriod = ref(defaultDashboardPeriodThisMonth())
+
 const principalSection = useDashboardPrincipalSection(activeSection, globalDashboardBranchId)
 const ventasSection = useDashboardVentasSection(activeSection, globalDashboardBranchId)
-const domiciliosSection = useDashboardDomiciliosSection(activeSection, globalDashboardBranchId)
+const domiciliosSection = useDashboardDomiciliosSection(
+	activeSection,
+	globalDashboardBranchId,
+	deliveryPeriod,
+)
 
 const principalData = principalSection.data
 const principalLoading = principalSection.loading
@@ -114,7 +122,6 @@ const ventasComparisonRows = computed(() => {
 
 const {
     evolutionDateRange,
-    deliveryPeriod,
     deliveryEvolutionDriverId,
     deliveryBranchOptions,
     deliveryEvolutionBundle,
@@ -137,5 +144,8 @@ const {
     branchId: globalDashboardBranchId,
     ventasComparisonRows,
     scopeVentasChartsToBranch: false,
+    deliveryPeriod,
+    deliveryFromApi: domiciliosSection.deliveryPayload,
+    activeSection,
 })
 </script>

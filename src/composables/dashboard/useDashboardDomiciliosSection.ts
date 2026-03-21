@@ -1,36 +1,58 @@
 import { ref, watch, computed, type Ref } from 'vue';
-import { fetchDomiciliosDashboardScope } from '@/services/MainAPI/dashboardSectionApi';
+import {
+	fetchDeliveryDashboard,
+	USE_DELIVERY_MOCK,
+	type DeliveryDashboardPayload,
+} from '@/services/MainAPI/dashboardSectionApi';
 import type { DashboardSectionId } from '@/views/dashboard/dashboardSectionIds';
+import type { DashboardPeriodValue } from '@/utils/dashboardPeriodPresets';
 
 /**
- * Marca carga de la vista Domicilios; el detalle operativo (periodo, gráficas) lo orquesta el padre.
+ * Carga datos de Domicilios desde `GET /api/dashboard/delivery` (rango del periodo + sucursal).
+ * Con mock, `deliveryPayload` queda `null` y el shell usa datos demo.
  */
 export function useDashboardDomiciliosSection(
 	activeSection: Ref<DashboardSectionId>,
 	branchId: Ref<number | null>,
+	deliveryPeriod: Ref<DashboardPeriodValue>,
 ) {
-	const ready = ref(false);
+	const deliveryPayload = ref<DeliveryDashboardPayload | null>(null);
 	const loading = ref(false);
 	const error = ref<string | null>(null);
 
 	const isActive = computed(() => activeSection.value === 'domicilios');
+
+	function periodRangeKey() {
+		const [a, b] = deliveryPeriod.value.range;
+		return `${a.getTime()}-${b.getTime()}-${deliveryPeriod.value.presetId}`;
+	}
 
 	async function load() {
 		if (!isActive.value) return;
 		loading.value = true;
 		error.value = null;
 		try {
-			await fetchDomiciliosDashboardScope(branchId.value);
-			ready.value = true;
+			if (USE_DELIVERY_MOCK) {
+				deliveryPayload.value = null;
+				return;
+			}
+			deliveryPayload.value = await fetchDeliveryDashboard(
+				branchId.value,
+				deliveryPeriod.value.range,
+			);
 		} catch (e) {
 			error.value = e instanceof Error ? e.message : 'Error al cargar Domicilios';
-			ready.value = false;
+			deliveryPayload.value = null;
 		} finally {
 			loading.value = false;
 		}
 	}
 
-	watch([isActive, branchId], () => void load(), { immediate: true });
+	watch(
+		[isActive, branchId, () => periodRangeKey()],
+		() => void load(),
+		{ immediate: true },
+	);
 
-	return { ready, loading, error, refresh: load };
+	return { deliveryPayload, loading, error, refresh: load };
 }

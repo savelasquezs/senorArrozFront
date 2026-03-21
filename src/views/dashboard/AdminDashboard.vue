@@ -21,8 +21,8 @@
                     :loading="principalLoading"
                     :error="principalError"
                     :kpis="principalData?.kpis ?? null"
-                    :avg-prep-minutes="avgPrepMinutes"
-                    :avg-delivery-minutes="avgDeliveryMinutes"
+                    :avg-prep-minutes="principalData?.avgPrepMinutes ?? 0"
+                    :avg-delivery-minutes="principalData?.avgDeliveryMinutes ?? 0"
                     :pipeline-counts="principalData?.pipeline ?? null"
                     :recent-activity="principalData?.recentActivity ?? []"
                     :get-activity-icon="getActivityIcon"
@@ -77,6 +77,7 @@
 import { ref, computed, watch } from 'vue'
 import { DashboardRightNav } from '@/components/dashboard'
 import { BASE_BRANCH_COMPARISON_ROWS } from '@/views/dashboard/mock/dashboardMockCore'
+import { defaultDashboardPeriodThisMonth } from '@/utils/dashboardPeriodPresets'
 import { useAuthStore } from '@/store/auth'
 import type { DashboardSectionId } from '@/views/dashboard/dashboardSectionIds'
 import { useDashboardPrincipalSection } from '@/composables/dashboard/useDashboardPrincipalSection'
@@ -109,9 +110,15 @@ const adminBranchId = computed(() => adminBranchIdWritable.value)
 
 const activeSection = ref<DashboardSectionId>('principal')
 
+const deliveryPeriod = ref(defaultDashboardPeriodThisMonth())
+
 const principalSection = useDashboardPrincipalSection(activeSection, adminBranchIdWritable)
 const ventasSection = useDashboardVentasSection(activeSection, adminBranchIdWritable)
-const domiciliosSection = useDashboardDomiciliosSection(activeSection, adminBranchIdWritable)
+const domiciliosSection = useDashboardDomiciliosSection(
+	activeSection,
+	adminBranchIdWritable,
+	deliveryPeriod,
+)
 
 const principalData = principalSection.data
 const principalLoading = principalSection.loading
@@ -134,7 +141,6 @@ const ventasComparisonRows = computed(() => {
 
 const {
     evolutionDateRange,
-    deliveryPeriod,
     deliveryEvolutionDriverId,
     deliveryBranchOptions,
     deliveryEvolutionBundle,
@@ -157,5 +163,8 @@ const {
     branchId: adminBranchIdWritable,
     ventasComparisonRows,
     scopeVentasChartsToBranch: true,
+    deliveryPeriod,
+    deliveryFromApi: domiciliosSection.deliveryPayload,
+    activeSection,
 })
 </script>

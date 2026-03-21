@@ -14,6 +14,8 @@ import {
 import { BASE_BRANCH_COMPARISON_ROWS, BASE_DELIVERYMEN_MOCK } from '@/views/dashboard/mock/dashboardMockCore';
 import { defaultDashboardPeriodThisMonth } from '@/utils/dashboardPeriodPresets';
 import type { DashboardPeriodValue } from '@/utils/dashboardPeriodPresets';
+import type { DashboardSectionId } from '@/views/dashboard/dashboardSectionIds';
+import type { DeliveryDashboardPayload } from '@/services/MainAPI/dashboardSectionApi';
 import { buildDeliveryEvolutionBundle, scaleSeriesToTargetSum } from '@/utils/deliveryEvolutionSeries';
 import { ClipboardDocumentListIcon, CurrencyDollarIcon, UsersIcon } from '@heroicons/vue/24/outline';
 
@@ -27,6 +29,12 @@ export interface UseDashboardShellMockStateOptions {
 	 * Superadmin: false (multi-sucursal).
 	 */
 	scopeVentasChartsToBranch?: boolean;
+	/** Periodo Domicilios (misma ref que `useDashboardDomiciliosSection`). Si no se pasa, el shell usa una ref interna. */
+	deliveryPeriod?: Ref<DashboardPeriodValue>;
+	/** Payload de `GET /api/dashboard/delivery` cuando la sección Domicilios está activa. */
+	deliveryFromApi?: Ref<DeliveryDashboardPayload | null>;
+	/** Para usar datos del API solo mientras se muestra Domicilios (evita mezclar medias en Principal). */
+	activeSection?: Ref<DashboardSectionId>;
 }
 
 function scopeSalesBlock(
@@ -78,11 +86,25 @@ function mockOrderCounts(len: number, seed: number) {
  * series de ventas/pedidos de demostración y helpers de actividad.
  */
 export function useDashboardShellMockState(options: UseDashboardShellMockStateOptions) {
-	const { branchId, ventasComparisonRows, scopeVentasChartsToBranch = false } = options;
+	const {
+		branchId,
+		ventasComparisonRows,
+		scopeVentasChartsToBranch = false,
+		deliveryPeriod: deliveryPeriodOption,
+		deliveryFromApi,
+		activeSection,
+	} = options;
 
 	const evolutionDateRange = ref<[Date, Date]>(defaultDateRangeLastDays(7));
-	const deliveryPeriod = ref<DashboardPeriodValue>(defaultDashboardPeriodThisMonth());
+	const internalDeliveryPeriod = ref<DashboardPeriodValue>(defaultDashboardPeriodThisMonth());
+	const deliveryPeriod = deliveryPeriodOption ?? internalDeliveryPeriod;
 	const deliveryEvolutionDriverId = ref<number | 'all'>('all');
+
+	/** Datos de domicilios del API solo en la sección correspondiente. */
+	const domiciliosApiPayload = computed((): DeliveryDashboardPayload | null => {
+		if (activeSection?.value !== 'domicilios') return null;
+		return deliveryFromApi?.value ?? null;
+	});
 
 	watch(branchId, () => {
 		deliveryEvolutionDriverId.value = 'all';
@@ -92,11 +114,21 @@ export function useDashboardShellMockState(options: UseDashboardShellMockStateOp
 		BASE_BRANCH_COMPARISON_ROWS.map((b) => ({ id: b.id, name: b.name })),
 	);
 
-	const deliveryEvolutionBundle = computed(() =>
-		buildDeliveryEvolutionBundle(deliveryPeriod.value.range),
-	);
+	const deliveryEvolutionBundle = computed(() => {
+		const api = domiciliosApiPayload.value;
+		if (api) {
+			return {
+				labels: api.evolutionLabels,
+				deliveries: api.evolutionDeliveries,
+				feesTotal: api.evolutionFees,
+			};
+		}
+		return buildDeliveryEvolutionBundle(deliveryPeriod.value.range);
+	});
 
 	const scaledDeliverymenAll = computed<DeliverymanEfficiencyRow[]>(() => {
+		const api = domiciliosApiPayload.value;
+		if (api) return api.deliverymen;
 		const [from, to] = deliveryPeriod.value.range;
 		const seed =
 			Math.abs(Math.floor(from.getTime() / 86400000) + Math.floor(to.getTime() / 86400000)) % 97;
@@ -149,34 +181,35 @@ export function useDashboardShellMockState(options: UseDashboardShellMockStateOp
 		filteredDeliverymenEfficiency.value.reduce((s, d) => s + d.deliveryFeeTotal, 0),
 	);
 
-	const deliveryEvolutionDeliveriesScaled = computed(() =>
-		scaleSeriesToTargetSum(
+	const deliveryEvolutionDeliveriesScaled = computed(() => {
+		if (domiciliosApiPayload.value) {
+			return domiciliosApiPayload.value.evolutionDeliveries;
+		}
+		return scaleSeriesToTargetSum(
 			deliveryEvolutionBundle.value.deliveries,
 			deliveryEvolutionDeliveriesTargetSum.value,
-		),
-	);
+		);
+	});
 
-	const deliveryEvolutionFeesScaled = computed(() =>
-		scaleSeriesToTargetSum(
+	const deliveryEvolutionFeesScaled = computed(() => {
+		if (domiciliosApiPayload.value) {
+			return domiciliosApiPayload.value.evolutionFees;
+		}
+		return scaleSeriesToTargetSum(
 			deliveryEvolutionBundle.value.feesTotal,
 			deliveryEvolutionFeesTargetSum.value,
-		),
-	);
+		);
+	});
 
+	/** Solo sección Domicilios; datos reales vía `deliveryFromApi`. Sin API (mock o carga): 0. */
 	const avgPrepMinutes = computed(() => {
-		const s = Math.abs(Math.floor(deliveryPeriod.value.range[0].getTime() / 86400000)) % 40;
-		let v = 22 + s * 0.35;
-		const bid = branchId.value;
-		if (bid != null) v += (bid * 1.7) % 4.5;
-		return Math.round(v * 10) / 10;
+		if (activeSection?.value !== 'domicilios') return 0;
+		return deliveryFromApi?.value?.avgPrepMinutes ?? 0;
 	});
 
 	const avgDeliveryMinutes = computed(() => {
-		const s = Math.abs(Math.floor(deliveryPeriod.value.range[1].getTime() / 86400000)) % 50;
-		let v = 34 + s * 0.42;
-		const bid = branchId.value;
-		if (bid != null) v += (bid * 2.1) % 5;
-		return Math.round(v * 10) / 10;
+		if (activeSection?.value !== 'domicilios') return 0;
+		return deliveryFromApi?.value?.avgDeliveryMinutes ?? 0;
 	});
 
 	const salesByDayBase = computed<SalesTimeSeriesBlock>(() => {

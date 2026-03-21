@@ -130,7 +130,7 @@ defineProps<{
 	loading: boolean;
 	error: string | null;
 	kpis: KpiState | null;
-	/** Mismos mocks/valores que en domicilios; visión rápida en Principal. */
+	/** Desde `GET /api/dashboard/main` (ventana alineada a KPIs). */
 	avgPrepMinutes: number;
 	avgDeliveryMinutes: number;
 	pipelineCounts: OrderPipelineStatusCounts | null;
