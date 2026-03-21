@@ -17,7 +17,11 @@ import {
 	dashboardApi,
 	type DashboardMainApiResponse,
 	type DashboardDeliveryApiResponse,
+	type DashboardSalesComparisonApiResponse,
+	type DashboardSalesEvolutionApiResponse,
+	type DashboardSalesProductsApiResponse,
 } from './dashboardApi';
+import type { SalesTimeSeriesBlock, OrdersPerHourBlock } from '@/components/dashboard';
 
 const MOCK_LATENCY_MS = 60;
 
@@ -26,6 +30,9 @@ export const USE_PRINCIPAL_MOCK = import.meta.env.VITE_DASHBOARD_PRINCIPAL_MOCK 
 
 /** Forzar mock de Domicilios (sin llamar a `/dashboard/delivery`). */
 export const USE_DELIVERY_MOCK = import.meta.env.VITE_DASHBOARD_DELIVERY_MOCK === 'true';
+
+/** Mock de Ventas: no llama a `/dashboard/sales/*` (comparativa mock + series demo del shell). */
+export const USE_VENTAS_MOCK = import.meta.env.VITE_DASHBOARD_VENTAS_MOCK === 'true';
 
 function delay(ms = MOCK_LATENCY_MS): Promise<void> {
 	return new Promise((resolve) => setTimeout(resolve, ms));
@@ -131,16 +138,134 @@ export async function fetchDeliveryDashboard(
 	return mapDeliveryFromApi(raw);
 }
 
-export type VentasDashboardScopePayload = {
-	comparisonRows: BranchComparisonRow[];
+export type VentasSalesEvolutionPayload = {
+	salesByDay: SalesTimeSeriesBlock;
+	salesByHour: SalesTimeSeriesBlock;
+	salesByMonth: SalesTimeSeriesBlock;
+	salesByYear: SalesTimeSeriesBlock;
+	ordersByDay: OrdersPerHourBlock;
+	ordersByHour: OrdersPerHourBlock;
+	ordersByMonth: OrdersPerHourBlock;
+	ordersByYear: OrdersPerHourBlock;
 };
 
-/** Alcance de sucursal para comparación y series (mock). */
+export type VentasProductsPayload = {
+	/** Top por unidades (bar horizontal). */
+	topByQuantity: Array<{
+		productId: number;
+		name: string;
+		quantitySold: number;
+		revenueCop: number;
+	}>;
+	/** Donut participación por recaudo. */
+	participationLabels: string[];
+	participationValues: number[];
+	participationPercents: number[];
+	totalRevenueCop: number;
+	totalQuantity: number;
+};
+
+export type VentasDashboardPayload = {
+	comparisonRows: BranchComparisonRow[];
+	/** `null` si mock o error parcial: el padre usa series demo del shell. */
+	evolution: VentasSalesEvolutionPayload | null;
+	products: VentasProductsPayload | null;
+};
+
+function mapComparisonFromApi(raw: DashboardSalesComparisonApiResponse): BranchComparisonRow[] {
+	return raw.rows.map((r) => ({
+		id: r.id,
+		name: r.name,
+		salesTotal: r.salesTotal,
+		ordersTotal: r.ordersTotal,
+		salesDelivery: r.salesDelivery,
+		salesOnsite: r.salesOnsite,
+		ordersDelivery: r.ordersDelivery,
+		ordersOnsite: r.ordersOnsite,
+		deliveryTimeMinutes: r.deliveryTimeMinutes,
+	}));
+}
+
+function mapSalesBlock(block: DashboardSalesEvolutionApiResponse['salesByDay']): SalesTimeSeriesBlock {
+	return {
+		labels: block.labels,
+		datasets: block.datasets.map((d) => ({
+			label: d.label,
+			data: d.data,
+		})),
+	};
+}
+
+function mapOrdersBlock(block: DashboardSalesEvolutionApiResponse['ordersByDay']): OrdersPerHourBlock {
+	return { labels: block.labels, counts: block.counts };
+}
+
+function mapEvolutionFromApi(raw: DashboardSalesEvolutionApiResponse): VentasSalesEvolutionPayload {
+	return {
+		salesByDay: mapSalesBlock(raw.salesByDay),
+		salesByHour: mapSalesBlock(raw.salesByHour),
+		salesByMonth: mapSalesBlock(raw.salesByMonth),
+		salesByYear: mapSalesBlock(raw.salesByYear),
+		ordersByDay: mapOrdersBlock(raw.ordersByDay),
+		ordersByHour: mapOrdersBlock(raw.ordersByHour),
+		ordersByMonth: mapOrdersBlock(raw.ordersByMonth),
+		ordersByYear: mapOrdersBlock(raw.ordersByYear),
+	};
+}
+
+function mapProductsFromApi(raw: DashboardSalesProductsApiResponse): VentasProductsPayload {
+	const slices = raw.participationByRevenue ?? [];
+	return {
+		topByQuantity: raw.topByQuantity.map((p) => ({
+			productId: p.productId,
+			name: p.name,
+			quantitySold: p.quantitySold,
+			revenueCop: p.revenueCop,
+		})),
+		participationLabels: slices.map((s) => s.label),
+		participationValues: slices.map((s) => s.revenueCop),
+		participationPercents: slices.map((s) => s.percent),
+		totalRevenueCop: raw.totalRevenueCop,
+		totalQuantity: raw.totalQuantity,
+	};
+}
+
+/**
+ * Datos de la sección Ventas: comparativa, evolución temporal y productos.
+ * Con `VITE_DASHBOARD_VENTAS_MOCK=true` solo devuelve filas de comparación mock y `evolution`/`products` en null.
+ */
+export async function fetchVentasDashboard(
+	branchId: number | null,
+	dateRange: [Date, Date],
+): Promise<VentasDashboardPayload> {
+	if (USE_VENTAS_MOCK) {
+		await delay();
+		return {
+			comparisonRows: filterBranchComparisonRows(BASE_BRANCH_COMPARISON_ROWS, branchId),
+			evolution: null,
+			products: null,
+		};
+	}
+	const { from, to } = encodeDashboardRangeToApi(dateRange);
+	const [comp, evo, prod] = await Promise.all([
+		dashboardApi.getSalesComparison(branchId, from, to),
+		dashboardApi.getSalesEvolution(branchId, from, to),
+		dashboardApi.getSalesProducts(branchId, from, to, 10),
+	]);
+	return {
+		comparisonRows: mapComparisonFromApi(comp),
+		evolution: mapEvolutionFromApi(evo),
+		products: mapProductsFromApi(prod),
+	};
+}
+
+/** @deprecated Usar `fetchVentasDashboard` con rango de fechas. */
 export async function fetchVentasDashboardScope(
 	branchId: number | null,
-): Promise<VentasDashboardScopePayload> {
-	await delay();
-	return {
-		comparisonRows: filterBranchComparisonRows(BASE_BRANCH_COMPARISON_ROWS, branchId),
-	};
+): Promise<{ comparisonRows: BranchComparisonRow[] }> {
+	const { comparisonRows } = await fetchVentasDashboard(branchId, [
+		new Date(Date.now() - 7 * 86400000),
+		new Date(),
+	]);
+	return { comparisonRows };
 }

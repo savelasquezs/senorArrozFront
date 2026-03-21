@@ -79,6 +79,87 @@ class DashboardApi extends BaseApi {
 		if (branchId != null) params.branchId = branchId;
 		return this.get<DashboardDeliveryApiResponse>('/dashboard/delivery', { params });
 	}
+
+	/** Ventas — comparativa sucursales. */
+	async getSalesComparison(
+		branchId: number | null,
+		fromIso: string,
+		toIso: string,
+	): Promise<DashboardSalesComparisonApiResponse> {
+		const params: Record<string, string | number> = { from: fromIso, to: toIso };
+		if (branchId != null) params.branchId = branchId;
+		return this.get<DashboardSalesComparisonApiResponse>('/dashboard/sales/comparison', { params });
+	}
+
+	/** Ventas — bloques día/hora/mes/año para TimeEvolutionPanel. */
+	async getSalesEvolution(
+		branchId: number | null,
+		fromIso: string,
+		toIso: string,
+	): Promise<DashboardSalesEvolutionApiResponse> {
+		const params: Record<string, string | number> = { from: fromIso, to: toIso };
+		if (branchId != null) params.branchId = branchId;
+		return this.get<DashboardSalesEvolutionApiResponse>('/dashboard/sales/evolution', { params });
+	}
+
+	/** Ventas — ranking productos + participación recaudo. */
+	async getSalesProducts(
+		branchId: number | null,
+		fromIso: string,
+		toIso: string,
+		top = 10,
+	): Promise<DashboardSalesProductsApiResponse> {
+		const params: Record<string, string | number> = { from: fromIso, to: toIso, top };
+		if (branchId != null) params.branchId = branchId;
+		return this.get<DashboardSalesProductsApiResponse>('/dashboard/sales/products', { params });
+	}
 }
+
+export type DashboardSalesComparisonApiResponse = {
+	rows: Array<{
+		id: number;
+		name: string;
+		salesTotal: number;
+		ordersTotal: number;
+		salesDelivery: number;
+		salesOnsite: number;
+		ordersDelivery: number;
+		ordersOnsite: number;
+		deliveryTimeMinutes: number;
+	}>;
+};
+
+export type DashboardSalesTimeSeriesApiBlock = {
+	labels: string[];
+	datasets: Array<{ label: string; data: number[] }>;
+};
+
+export type DashboardOrdersTimelineApiBlock = {
+	labels: string[];
+	counts: number[];
+};
+
+export type DashboardSalesEvolutionApiResponse = {
+	salesByDay: DashboardSalesTimeSeriesApiBlock;
+	salesByHour: DashboardSalesTimeSeriesApiBlock;
+	salesByMonth: DashboardSalesTimeSeriesApiBlock;
+	salesByYear: DashboardSalesTimeSeriesApiBlock;
+	ordersByDay: DashboardOrdersTimelineApiBlock;
+	ordersByHour: DashboardOrdersTimelineApiBlock;
+	ordersByMonth: DashboardOrdersTimelineApiBlock;
+	ordersByYear: DashboardOrdersTimelineApiBlock;
+};
+
+export type DashboardSalesProductsApiResponse = {
+	topByQuantity: Array<{
+		productId: number;
+		name: string;
+		quantitySold: number;
+		revenueCop: number;
+	}>;
+	participationByRevenue: Array<{ label: string; percent: number; revenueCop: number }>;
+	totalRevenueCop: number;
+	totalQuantity: number;
+};
 
 export const dashboardApi = new DashboardApi();

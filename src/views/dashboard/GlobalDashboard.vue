@@ -36,6 +36,7 @@
                     :orders-by-hour="ordersByHour"
                     :orders-by-month="ordersByMonth"
                     :orders-by-year="ordersByYear"
+                    :products-payload="ventasProducts"
                 />
                 <DashboardGastosSection v-else-if="activeSection === 'gastos'" key="gastos" />
                 <DashboardDomiciliosSection
@@ -67,7 +68,7 @@
 
 <script setup lang="ts">
 import { ref, computed } from 'vue'
-import { DashboardRightNav } from '@/components/dashboard'
+import { DashboardRightNav, defaultDateRangeLastDays } from '@/components/dashboard'
 import { BASE_BRANCH_COMPARISON_ROWS } from '@/views/dashboard/mock/dashboardMockCore'
 import { defaultDashboardPeriodThisMonth } from '@/utils/dashboardPeriodPresets'
 import { useAuthStore } from '@/store/auth'
@@ -93,8 +94,15 @@ const globalDashboardBranchId = ref<number | null>(null)
 /** Periodo Domicilios (compartido: API `from`/`to` + UI del shell). */
 const deliveryPeriod = ref(defaultDashboardPeriodThisMonth())
 
+/** Rango Ventas (TimeEvolutionPanel + API `/dashboard/sales/*`). */
+const evolutionDateRange = ref<[Date, Date]>(defaultDateRangeLastDays(7))
+
 const principalSection = useDashboardPrincipalSection(activeSection, globalDashboardBranchId)
-const ventasSection = useDashboardVentasSection(activeSection, globalDashboardBranchId)
+const ventasSection = useDashboardVentasSection(
+	activeSection,
+	globalDashboardBranchId,
+	evolutionDateRange,
+)
 const domiciliosSection = useDashboardDomiciliosSection(
 	activeSection,
 	globalDashboardBranchId,
@@ -120,8 +128,9 @@ const ventasComparisonRows = computed(() => {
     return BASE_BRANCH_COMPARISON_ROWS
 })
 
+const ventasProducts = computed(() => ventasSection.data.value?.products ?? null)
+
 const {
-    evolutionDateRange,
     deliveryEvolutionDriverId,
     deliveryBranchOptions,
     deliveryEvolutionBundle,
@@ -130,14 +139,14 @@ const {
     deliveryEvolutionFeesScaled,
     avgPrepMinutes,
     avgDeliveryMinutes,
-    salesByDay,
-    salesByHour,
-    salesByMonth,
-    salesByYear,
-    ordersByDay,
-    ordersByHour,
-    ordersByMonth,
-    ordersByYear,
+    salesByDay: shellSalesByDay,
+    salesByHour: shellSalesByHour,
+    salesByMonth: shellSalesByMonth,
+    salesByYear: shellSalesByYear,
+    ordersByDay: shellOrdersByDay,
+    ordersByHour: shellOrdersByHour,
+    ordersByMonth: shellOrdersByMonth,
+    ordersByYear: shellOrdersByYear,
     getActivityIcon,
     formatDate,
 } = useDashboardShellMockState({
@@ -147,5 +156,31 @@ const {
     deliveryPeriod,
     deliveryFromApi: domiciliosSection.deliveryPayload,
     activeSection,
+    evolutionDateRange,
 })
+
+const salesByDay = computed(
+	() => ventasSection.data.value?.evolution?.salesByDay ?? shellSalesByDay.value,
+)
+const salesByHour = computed(
+	() => ventasSection.data.value?.evolution?.salesByHour ?? shellSalesByHour.value,
+)
+const salesByMonth = computed(
+	() => ventasSection.data.value?.evolution?.salesByMonth ?? shellSalesByMonth.value,
+)
+const salesByYear = computed(
+	() => ventasSection.data.value?.evolution?.salesByYear ?? shellSalesByYear.value,
+)
+const ordersByDay = computed(
+	() => ventasSection.data.value?.evolution?.ordersByDay ?? shellOrdersByDay.value,
+)
+const ordersByHour = computed(
+	() => ventasSection.data.value?.evolution?.ordersByHour ?? shellOrdersByHour.value,
+)
+const ordersByMonth = computed(
+	() => ventasSection.data.value?.evolution?.ordersByMonth ?? shellOrdersByMonth.value,
+)
+const ordersByYear = computed(
+	() => ventasSection.data.value?.evolution?.ordersByYear ?? shellOrdersByYear.value,
+)
 </script>

@@ -13,7 +13,7 @@ En su lugar, **un contrato (o grupo pequeño) por categoría** del sidebar, alin
 | Sección | Responsabilidad del endpoint | Front |
 |---------|-------------------------------|--------|
 | **Principal** | **`GET /api/dashboard/main`** — KPIs (rolling 7d/365d **o** rango explícito `kpiFrom`/`kpiTo` UTC), pipeline en curso, actividad reciente. Ver **`senorArrozAPI/docs/DASHBOARD_API.md`**. | `fetchPrincipalDashboard` → `useDashboardPrincipalSection` (opcional `kpiRange` en options). Mock: `VITE_DASHBOARD_PRINCIPAL_MOCK=true`. |
-| **Ventas** | Alcance comparación sucursales + series temporales (con `from`/`to` según rango UI) | `fetchVentasDashboardScope` + computeds de series; `useDashboardVentasSection` |
+| **Ventas** | `GET /api/dashboard/sales/comparison`, `.../evolution`, `.../products` (`from`/`to` + `branchId?`). Mock: `VITE_DASHBOARD_VENTAS_MOCK=true`. | `fetchVentasDashboard` + `useDashboardVentasSection(activeSection, branchId, evolutionDateRange)`; series API o demo del shell. |
 | **Gastos** | (futuro) resumen / listados de gastos | stub hasta existir ruta |
 | **Domicilios** | **`GET /api/dashboard/delivery`** — `from` y `to` obligatorios (UTC ISO), `branchId?`; tiempos medios, repartidores, evolución por bucket. | `fetchDeliveryDashboard` + `useDashboardDomiciliosSection` (periodo compartido con `useDashboardShellMockState`). Mock: `VITE_DASHBOARD_DELIVERY_MOCK=true` (sin llamada al API). |
 | **Mapa de entregas** | (futuro) entregas georreferenciadas | stub |

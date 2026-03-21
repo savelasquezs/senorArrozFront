@@ -1,18 +1,24 @@
 import { ref, watch, computed, type Ref } from 'vue';
 import {
-	fetchVentasDashboardScope,
-	type VentasDashboardScopePayload,
+	fetchVentasDashboard,
+	type VentasDashboardPayload,
 } from '@/services/MainAPI/dashboardSectionApi';
 import type { DashboardSectionId } from '@/views/dashboard/dashboardSectionIds';
 
+function rangeKey(range: [Date, Date]) {
+	const [a, b] = range;
+	return `${a.getTime()}-${b.getTime()}`;
+}
+
 /**
- * Carga el alcance de Ventas (filas comparación por sucursal). Las series temporales se derivan en el padre.
+ * Carga Ventas: comparativa, evolución temporal y productos para el rango del `TimeEvolutionPanel`.
  */
 export function useDashboardVentasSection(
 	activeSection: Ref<DashboardSectionId>,
 	branchId: Ref<number | null>,
+	dateRange: Ref<[Date, Date]>,
 ) {
-	const data = ref<VentasDashboardScopePayload | null>(null);
+	const data = ref<VentasDashboardPayload | null>(null);
 	const loading = ref(false);
 	const error = ref<string | null>(null);
 
@@ -23,7 +29,7 @@ export function useDashboardVentasSection(
 		loading.value = true;
 		error.value = null;
 		try {
-			data.value = await fetchVentasDashboardScope(branchId.value);
+			data.value = await fetchVentasDashboard(branchId.value, dateRange.value);
 		} catch (e) {
 			error.value = e instanceof Error ? e.message : 'Error al cargar Ventas';
 			data.value = null;
@@ -32,7 +38,11 @@ export function useDashboardVentasSection(
 		}
 	}
 
-	watch([isActive, branchId], () => void load(), { immediate: true });
+	watch(
+		[isActive, branchId, () => rangeKey(dateRange.value)],
+		() => void load(),
+		{ immediate: true },
+	);
 
 	return { data, loading, error, refresh: load };
 }
