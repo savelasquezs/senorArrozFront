@@ -2,58 +2,39 @@
 import type { OrderListItem, OrderType, OrderStatus } from '@/types/order'
 
 /**
- * Estado de filtros para órdenes
+ * Estado de filtros para órdenes (filtros locales sobre la página cargada).
+ * bankId se aplica en el servidor vía searchOrders, no aquí.
  */
 export interface OrderFilterState {
     search: string
     type: OrderType | null
     status: OrderStatus | null
     customer: string
-    deliveryman: string
-    deliveryManId: number | null // ✅ NUEVO
 }
 
 /**
  * Composable para filtrar órdenes localmente
  */
 export function useOrderFilters() {
-    /**
-     * Filtra órdenes por búsqueda general
-     * Busca en: ID, nombre cliente, teléfono cliente, guestName
-     */
     const filterBySearch = (orders: OrderListItem[], query: string): OrderListItem[] => {
         if (!query.trim()) return orders
 
         const searchLower = query.toLowerCase().trim()
 
         return orders.filter((order) => {
-            // Buscar en ID
             if (order.id.toString().includes(searchLower)) return true
-
-            // Buscar en nombre de cliente
             if (order.customerName?.toLowerCase().includes(searchLower)) return true
-
-            // Buscar en teléfono de cliente
             if (order.customerPhone?.toLowerCase().includes(searchLower)) return true
-
-            // Buscar en guestName
             if (order.guestName?.toLowerCase().includes(searchLower)) return true
-
             return false
         })
     }
 
-    /**
-     * Filtra órdenes por tipo de pedido
-     */
     const filterByType = (orders: OrderListItem[], type: OrderType | null): OrderListItem[] => {
         if (!type) return orders
         return orders.filter((order) => order.type === type)
     }
 
-    /**
-     * Filtra órdenes por estado
-     */
     const filterByStatus = (
         orders: OrderListItem[],
         status: OrderStatus | null
@@ -62,9 +43,6 @@ export function useOrderFilters() {
         return orders.filter((order) => order.status === status)
     }
 
-    /**
-     * Filtra órdenes por nombre de cliente
-     */
     const filterByCustomer = (orders: OrderListItem[], customerName: string): OrderListItem[] => {
         if (!customerName.trim()) return orders
 
@@ -77,79 +55,31 @@ export function useOrderFilters() {
         })
     }
 
-    /**
-     * Filtra órdenes por nombre de domiciliario
-     */
-    const filterByDeliveryman = (
-        orders: OrderListItem[],
-        deliverymanName: string
-    ): OrderListItem[] => {
-        if (!deliverymanName.trim()) return orders
-
-        const searchLower = deliverymanName.toLowerCase().trim()
-
-        return orders.filter((order) => {
-            return order.deliveryManName?.toLowerCase().includes(searchLower) || false
-        })
-    }
-
-    /**
-     * Filtra órdenes por ID de domiciliario
-     */
-    const filterByDeliverymanId = (
-        orders: OrderListItem[],
-        deliverymanId: number | null
-    ): OrderListItem[] => {
-        if (!deliverymanId) return orders
-
-        return orders.filter((order) => order.deliveryManId === deliverymanId)
-    }
-
-    /**
-     * Aplica todos los filtros al mismo tiempo
-     */
     const applyAllFilters = (
         orders: OrderListItem[],
         filters: OrderFilterState
     ): OrderListItem[] => {
         let filtered = orders
 
-        // Aplicar búsqueda general
         if (filters.search) {
             filtered = filterBySearch(filtered, filters.search)
         }
 
-        // Aplicar filtro de tipo
         if (filters.type) {
             filtered = filterByType(filtered, filters.type)
         }
 
-        // Aplicar filtro de estado
         if (filters.status) {
             filtered = filterByStatus(filtered, filters.status)
         }
 
-        // Aplicar filtro de cliente
         if (filters.customer) {
             filtered = filterByCustomer(filtered, filters.customer)
-        }
-
-        // Aplicar filtro de domiciliario (nombre)
-        if (filters.deliveryman) {
-            filtered = filterByDeliveryman(filtered, filters.deliveryman)
-        }
-
-        // Aplicar filtro de domiciliario (ID)
-        if (filters.deliveryManId) {
-            filtered = filterByDeliverymanId(filtered, filters.deliveryManId)
         }
 
         return filtered
     }
 
-    /**
-     * Ordena órdenes por una columna específica
-     */
     const sortOrders = (
         orders: OrderListItem[],
         sortBy: 'id' | 'total' | 'createdAt',
@@ -179,10 +109,7 @@ export function useOrderFilters() {
         filterByType,
         filterByStatus,
         filterByCustomer,
-        filterByDeliveryman,
-        filterByDeliverymanId, // ✅ NUEVO
         applyAllFilters,
         sortOrders,
     }
 }
-
