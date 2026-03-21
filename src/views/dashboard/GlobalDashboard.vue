@@ -39,7 +39,18 @@
                     :orders-by-year="ordersByYear"
                     :products-payload="ventasProducts"
                 />
-                <DashboardGastosSection v-else-if="activeSection === 'gastos'" key="gastos" />
+                <DashboardGastosSection
+                    v-else-if="activeSection === 'gastos'"
+                    key="gastos"
+                    v-model:date-range="gastosDateRange"
+                    v-model:filter-category-id="gastosFilterCategoryId"
+                    v-model:filter-expense-id="gastosFilterExpenseId"
+                    v-model:series-granularity="gastosSeriesGranularity"
+                    :loading="gastosLoading"
+                    :series-busy="gastosSeriesBusy"
+                    :error="gastosError"
+                    :payload="gastosData"
+                />
                 <DashboardDomiciliosSection
                     v-else-if="activeSection === 'domicilios'"
                     key="domicilios"
@@ -76,6 +87,7 @@ import { useAuthStore } from '@/store/auth'
 import type { DashboardSectionId } from '@/views/dashboard/dashboardSectionIds'
 import { useDashboardPrincipalSection } from '@/composables/dashboard/useDashboardPrincipalSection'
 import { useDashboardVentasSection } from '@/composables/dashboard/useDashboardVentasSection'
+import { useDashboardGastosSection } from '@/composables/dashboard/useDashboardGastosSection'
 import { useDashboardDomiciliosSection } from '@/composables/dashboard/useDashboardDomiciliosSection'
 import { useDashboardShellMockState } from '@/composables/dashboard/useDashboardShellMockState'
 import type { VentasProductsGroupBy } from '@/services/MainAPI/dashboardSectionApi'
@@ -98,6 +110,7 @@ const deliveryPeriod = ref(defaultDashboardPeriodThisMonth())
 
 /** Rango Ventas (TimeEvolutionPanel + API `/dashboard/sales/*`). */
 const evolutionDateRange = ref<[Date, Date]>(defaultDateRangeLastDays(7))
+const gastosDateRange = ref<[Date, Date]>(defaultDateRangeLastDays(30))
 const ventasProductsGroupBy = ref<VentasProductsGroupBy>('product')
 
 const principalSection = useDashboardPrincipalSection(activeSection, globalDashboardBranchId)
@@ -108,10 +121,20 @@ const ventasSection = useDashboardVentasSection(
 	ventasProductsGroupBy,
 )
 const domiciliosSection = useDashboardDomiciliosSection(
-	activeSection,
-	globalDashboardBranchId,
-	deliveryPeriod,
+    activeSection,
+    globalDashboardBranchId,
+    deliveryPeriod,
 )
+const gastosSection = useDashboardGastosSection(activeSection, globalDashboardBranchId, gastosDateRange)
+const {
+	loading: gastosLoading,
+	seriesBusy: gastosSeriesBusy,
+	error: gastosError,
+	data: gastosData,
+	filterCategoryId: gastosFilterCategoryId,
+	filterExpenseId: gastosFilterExpenseId,
+	seriesGranularity: gastosSeriesGranularity,
+} = gastosSection
 
 const principalData = principalSection.data
 const principalLoading = principalSection.loading

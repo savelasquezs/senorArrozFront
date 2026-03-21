@@ -114,6 +114,44 @@ class DashboardApi extends BaseApi {
 		if (branchId != null) params.branchId = branchId;
 		return this.get<DashboardSalesProductsApiResponse>('/dashboard/sales/products', { params });
 	}
+
+	async getExpenseSummary(
+		branchId: number | null,
+		fromIso: string,
+		toIso: string,
+	): Promise<DashboardExpenseSummaryApiResponse> {
+		const params: Record<string, string> = { from: fromIso, to: toIso };
+		if (branchId != null) params.branchId = String(branchId);
+		return this.get<DashboardExpenseSummaryApiResponse>('/dashboard/expenses/summary', { params });
+	}
+
+	async getExpenseByCategory(
+		branchId: number | null,
+		fromIso: string,
+		toIso: string,
+	): Promise<DashboardExpenseByCategoryApiResponse> {
+		const params: Record<string, string> = { from: fromIso, to: toIso };
+		if (branchId != null) params.branchId = String(branchId);
+		return this.get<DashboardExpenseByCategoryApiResponse>('/dashboard/expenses/by-category', { params });
+	}
+
+	async getExpenseTimeSeries(
+		branchId: number | null,
+		fromIso: string,
+		toIso: string,
+		opts?: {
+			categoryId?: number | null;
+			expenseId?: number | null;
+			granularity?: 'day' | 'month' | 'auto';
+		},
+	): Promise<DashboardExpenseTimeSeriesApiResponse> {
+		const params: Record<string, string> = { from: fromIso, to: toIso };
+		if (branchId != null) params.branchId = String(branchId);
+		if (opts?.categoryId != null) params.categoryId = String(opts.categoryId);
+		if (opts?.expenseId != null) params.expenseId = String(opts.expenseId);
+		if (opts?.granularity && opts.granularity !== 'auto') params.granularity = opts.granularity;
+		return this.get<DashboardExpenseTimeSeriesApiResponse>('/dashboard/expenses/timeseries', { params });
+	}
 }
 
 export type DashboardSalesComparisonApiResponse = {
@@ -162,6 +200,33 @@ export type DashboardSalesProductsApiResponse = {
 	participationByRevenue: Array<{ label: string; percent: number; revenueCop: number }>;
 	totalRevenueCop: number;
 	totalQuantity: number;
+};
+
+export type DashboardExpenseSummaryApiResponse = {
+	totalCop: number;
+	headerCount: number;
+	lineCount: number;
+	avgDailyCop: number;
+	avgTicketCop: number;
+	previousPeriodTotalCop: number;
+	previousPeriodHeaderCount: number;
+	totalChangeFromPreviousPercent: number;
+};
+
+export type DashboardExpenseByCategoryApiResponse = {
+	slices: Array<{
+		categoryId: number;
+		name: string;
+		totalCop: number;
+		percent: number;
+	}>;
+};
+
+export type DashboardExpenseTimeSeriesApiResponse = {
+	labels: string[];
+	amountsCop: number[];
+	granularity: string;
+	seriesLabel: string;
 };
 
 export const dashboardApi = new DashboardApi();

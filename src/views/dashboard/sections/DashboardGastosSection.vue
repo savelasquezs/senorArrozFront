@@ -1,12 +1,283 @@
 <template>
-	<BaseCard title="Gastos" :padding="'md'">
-		<p class="text-sm text-gray-600">
-			Esta sección mostrará el resumen de gastos cuando exista el endpoint correspondiente. Por ahora no hay
-			datos cargados aquí (carga por vista, sin query monolítica del dashboard).
-		</p>
-	</BaseCard>
+	<div class="space-y-6">
+		<div
+			v-if="loading"
+			class="rounded-xl border border-gray-200 bg-white p-10 text-center text-sm text-gray-500"
+		>
+			Cargando Gastos…
+		</div>
+		<div
+			v-else-if="error"
+			class="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800"
+		>
+			{{ error }}
+		</div>
+		<template v-else>
+			<div class="flex flex-col gap-4 lg:flex-row lg:flex-wrap lg:items-end lg:justify-between">
+				<DashboardDateRangeFilter v-model="dateRangeModel" label="Periodo (gastos registrados)" />
+				<div class="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-end">
+					<div class="min-w-[200px]">
+						<label class="block text-xs font-medium text-gray-600 mb-1">Categoría (línea)</label>
+						<select
+							v-model.number="categorySelectValue"
+							class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 bg-white"
+						>
+							<option :value="0">Todas — total</option>
+							<option v-for="c in categoryOptions" :key="c.id" :value="c.id">
+								{{ c.name }}
+							</option>
+						</select>
+					</div>
+					<div v-if="filterCategoryId != null" class="min-w-[220px]">
+						<label class="block text-xs font-medium text-gray-600 mb-1">Gasto (catálogo)</label>
+						<select
+							v-model.number="expenseSelectValue"
+							class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 bg-white"
+							:disabled="expenseOptionsLoading"
+						>
+							<option :value="0">Todos en la categoría</option>
+							<option v-for="e in expenseOptions" :key="e.id" :value="e.id">
+								{{ e.name }}
+							</option>
+						</select>
+					</div>
+					<div class="min-w-[160px]">
+						<label class="block text-xs font-medium text-gray-600 mb-1">Escala tiempo</label>
+						<select
+							v-model="granularityModel"
+							class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 bg-white"
+						>
+							<option value="auto">Automática</option>
+							<option value="day">Por día</option>
+							<option value="month">Por mes</option>
+						</select>
+					</div>
+				</div>
+			</div>
+
+			<div v-if="payload?.summary" class="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+				<BaseCard :padding="'md'" :shadow="'sm'">
+					<p class="text-[11px] font-medium text-gray-500">Total gastado</p>
+					<p class="mt-1 text-lg font-bold text-gray-900 tabular-nums">
+						{{ formatCop(payload.summary.totalCop) }}
+					</p>
+					<p
+						class="mt-2 text-[10px] flex items-center gap-1"
+						:class="deltaClass(payload.summary.totalChangeFromPreviousPercent)"
+					>
+						<span class="font-semibold tabular-nums">
+							{{ formatDeltaPercent(payload.summary.totalChangeFromPreviousPercent) }}
+						</span>
+						<span class="text-gray-500">vs periodo anterior</span>
+					</p>
+				</BaseCard>
+				<BaseCard :padding="'md'" :shadow="'sm'">
+					<p class="text-[11px] font-medium text-gray-500">Promedio diario</p>
+					<p class="mt-1 text-lg font-bold text-gray-900 tabular-nums">
+						{{ formatCop(Math.round(payload.summary.avgDailyCop)) }}
+					</p>
+				</BaseCard>
+				<BaseCard :padding="'md'" :shadow="'sm'">
+					<p class="text-[11px] font-medium text-gray-500">Comprobantes</p>
+					<p class="mt-1 text-lg font-bold text-gray-900 tabular-nums">
+						{{ payload.summary.headerCount }}
+					</p>
+				</BaseCard>
+				<BaseCard :padding="'md'" :shadow="'sm'">
+					<p class="text-[11px] font-medium text-gray-500">Ticket medio</p>
+					<p class="mt-1 text-lg font-bold text-gray-900 tabular-nums">
+						{{ formatCop(Math.round(payload.summary.avgTicketCop)) }}
+					</p>
+				</BaseCard>
+			</div>
+
+			<div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
+				<BaseCard title="Por categoría" :padding="'md'">
+					<p class="text-xs text-gray-500 mb-3">Participación del periodo (importe por categoría).</p>
+					<div
+						v-if="!pieLabels.length"
+						class="h-52 flex items-center justify-center text-sm text-gray-500"
+					>
+						Sin gastos en este rango.
+					</div>
+					<DashboardRevenueShareDonut
+						v-else
+						:labels="pieLabels"
+						:values="pieValues"
+						:percents="piePercents"
+					/>
+				</BaseCard>
+				<BaseCard title="Evolución" :padding="'md'">
+					<p class="text-xs text-gray-500 mb-2">
+						{{ payload?.timeSeries?.seriesLabel ?? 'Serie' }}
+						<span v-if="payload?.timeSeries" class="text-gray-400">
+							· {{ payload.timeSeries.granularity === 'month' ? 'por mes' : 'por día' }}
+						</span>
+					</p>
+					<div
+						class="relative min-h-[220px]"
+						:class="{ 'opacity-60 pointer-events-none': seriesBusy }"
+					>
+						<div
+							v-if="!lineLabels.length"
+							class="h-52 flex items-center justify-center text-sm text-gray-500"
+						>
+							Sin puntos en la serie para este filtro.
+						</div>
+						<DashboardLineChart
+							v-else
+							:labels="lineLabels"
+							:datasets="lineDatasets"
+							y-format="currency"
+							variant="area"
+						/>
+					</div>
+				</BaseCard>
+			</div>
+		</template>
+	</div>
 </template>
 
 <script setup lang="ts">
+import { computed, ref, watch } from 'vue';
 import BaseCard from '@/components/ui/BaseCard.vue';
+import {
+	DashboardDateRangeFilter,
+	DashboardLineChart,
+	DashboardRevenueShareDonut,
+} from '@/components/dashboard';
+import type { LineChartDataset } from '@/components/dashboard';
+import { expenseCategoryApi } from '@/services/MainAPI/expenseCategoryApi';
+import { expenseApi } from '@/services/MainAPI/expenseApi';
+import type { Expense } from '@/types/expense';
+import type { GastosDashboardPayload } from '@/composables/dashboard/useDashboardGastosSection';
+
+const props = defineProps<{
+	loading: boolean;
+	seriesBusy: boolean;
+	error: string | null | undefined;
+	/** `null` hasta la primera carga exitosa. */
+	payload: GastosDashboardPayload | null | undefined;
+}>();
+
+const dateRange = defineModel<[Date, Date]>('dateRange', { required: true });
+const filterCategoryId = defineModel<number | null>('filterCategoryId', { default: null });
+const filterExpenseId = defineModel<number | null>('filterExpenseId', { default: null });
+const seriesGranularity = defineModel<'auto' | 'day' | 'month'>('seriesGranularity', {
+	default: 'auto',
+});
+
+const dateRangeModel = dateRange;
+
+const categoryOptions = ref<Array<{ id: number; name: string }>>([]);
+const expenseOptions = ref<Expense[]>([]);
+const expenseOptionsLoading = ref(false);
+
+const categorySelectValue = computed({
+	get: () => (filterCategoryId.value == null ? 0 : filterCategoryId.value),
+	set: (v: number) => {
+		filterCategoryId.value = v === 0 ? null : v;
+	},
+});
+
+const expenseSelectValue = computed({
+	get: () => (filterExpenseId.value == null ? 0 : filterExpenseId.value),
+	set: (v: number) => {
+		filterExpenseId.value = v === 0 ? null : v;
+	},
+});
+
+const granularityModel = computed({
+	get: () => seriesGranularity.value,
+	set: (v: string) => {
+		if (v === 'day' || v === 'month' || v === 'auto') seriesGranularity.value = v;
+	},
+});
+
+async function loadCategories() {
+	try {
+		const res = await expenseCategoryApi.getAllExpenseCategories();
+		const list = res.data ?? [];
+		categoryOptions.value = list.map((c) => ({ id: c.id, name: c.name }));
+	} catch {
+		categoryOptions.value = [];
+	}
+}
+
+watch(
+	() => filterCategoryId.value,
+	async (catId) => {
+		expenseOptions.value = [];
+		if (catId == null) return;
+		expenseOptionsLoading.value = true;
+		try {
+			const res = await expenseApi.getExpenses({
+				categoryId: catId,
+				page: 1,
+				pageSize: 500,
+				sortBy: 'name',
+				sortOrder: 'asc',
+			});
+			expenseOptions.value = res.data?.items ?? [];
+		} catch {
+			expenseOptions.value = [];
+		} finally {
+			expenseOptionsLoading.value = false;
+		}
+	},
+	{ immediate: true },
+);
+
+void loadCategories();
+
+function formatCop(n: number) {
+	return new Intl.NumberFormat('es-CO', {
+		style: 'currency',
+		currency: 'COP',
+		minimumFractionDigits: 0,
+		maximumFractionDigits: 0,
+	}).format(n);
+}
+
+function formatDeltaPercent(p: number) {
+	const sign = p > 0 ? '+' : '';
+	return `${sign}${p.toFixed(1)} %`;
+}
+
+function deltaClass(p: number) {
+	if (p > 0) return 'text-amber-700';
+	if (p < 0) return 'text-emerald-700';
+	return 'text-gray-600';
+}
+
+const pieLabels = computed(() => props.payload?.byCategory.map((s) => s.name) ?? []);
+const pieValues = computed(() => props.payload?.byCategory.map((s) => s.totalCop) ?? []);
+const piePercents = computed(() => props.payload?.byCategory.map((s) => s.percent) ?? []);
+
+const lineLabels = computed(() => {
+	const raw = props.payload?.timeSeries?.labels ?? [];
+	return raw.map((l) => {
+		if (/^\d{4}-\d{2}-\d{2}$/.test(l)) {
+			const d = new Date(`${l}T12:00:00`);
+			return d.toLocaleDateString('es-CO', { day: '2-digit', month: 'short' });
+		}
+		if (/^\d{4}-\d{2}$/.test(l)) {
+			const [y, m] = l.split('-').map(Number);
+			const d = new Date(y, m - 1, 1);
+			return d.toLocaleDateString('es-CO', { month: 'short', year: 'numeric' });
+		}
+		return l;
+	});
+});
+
+const lineDatasets = computed((): LineChartDataset[] => {
+	const amounts = props.payload?.timeSeries?.amountsCop ?? [];
+	const label = props.payload?.timeSeries?.seriesLabel ?? 'Gastos';
+	return [
+		{
+			label,
+			data: amounts.map((n) => Number(n)),
+		},
+	];
+});
 </script>
