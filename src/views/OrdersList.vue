@@ -2,40 +2,22 @@
     <MainLayout>
         <div class="flex flex-col lg:flex-row gap-6 items-start">
             <!-- Sidebar: tabs fijos -->
-            <aside class="w-full lg:w-52 shrink-0 lg:sticky lg:top-2 z-20">
-                <nav
-                    class="flex flex-row lg:flex-col gap-2 p-2 rounded-lg border border-gray-200 bg-gray-50 lg:bg-white shadow-sm">
-                    <button v-for="tab in tabs" :key="tab.value" type="button" @click="switchTab(tab.value)" :class="[
-                        'flex items-center gap-2 rounded-md px-3 py-2.5 text-sm font-medium transition-colors text-left lg:w-full',
-                        activeTab === tab.value
-                            ? 'bg-emerald-600 text-white shadow-sm'
-                            : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
-                    ]">
-                        <component :is="tab.icon" class="w-4 h-4 shrink-0" />
-                        <span class="whitespace-nowrap">{{ tab.label }}</span>
-                    </button>
-                </nav>
-            </aside>
+           
 
             <div class="flex-1 min-w-0 w-full space-y-6">
-                <div class="flex flex-wrap items-center justify-between gap-3">
-                    <h1 class="text-2xl font-bold text-gray-900">
-                        {{ activeTab === 'orders' ? 'Pedidos' : 'Reservas' }}
-                    </h1>
-                    <BaseButton v-if="activeTab === 'orders'" @click="navigateToNewOrder" variant="primary" size="sm"
-                        class="inline-flex items-center gap-1.5 shrink-0">
-                        <PlusIcon class="w-3.5 h-3.5 shrink-0" />
-                        <span>Nuevo pedido</span>
-                    </BaseButton>
-                </div>
+                
 
                 <!-- ===== TAB: PEDIDOS DEL DÍA ===== -->
                 <template v-if="activeTab === 'orders'">
                     <div class="bg-white rounded-lg shadow mb-6">
                         <div class="p-4 border-b border-gray-200">
                             <div class="flex flex-wrap items-end gap-3">
-                                <div class="flex-1 min-w-[200px]">
-                                    <BaseInput v-model="filters.search" placeholder="Buscar por ID, cliente, teléfono..."
+                                <div class="w-28 sm:w-32 shrink-0">
+                                    <BaseInput v-model="filters.totalQuery" type="text" inputmode="decimal"
+                                        placeholder="$$ Total"  class="w-full" @input="applyFilters" />
+                                </div>
+                                <div class="flex-1 min-w-[180px]">
+                                    <BaseInput v-model="filters.search" placeholder="Cliente, teléfono, invitado…"
                                         @input="applyFilters">
                                         <template #icon>
                                             <MagnifyingGlassIcon class="w-4 h-4" />
@@ -92,8 +74,8 @@
                         </div>
                     </div>
 
-                    <div class="bg-white rounded-lg shadow overflow-hidden min-w-0">
-                        <div class="overflow-x-auto">
+                    <div class="bg-white rounded-lg shadow overflow-hidden min-w-0 flex flex-col max-h-[min(75vh,42rem)]">
+                        <div class="overflow-y-auto overflow-x-auto min-h-0 min-w-0 flex-1">
                             <OrdersTable :orders="filteredOrders" :loading="loading" :sort-by="sortBy"
                                 :sort-order="sortOrder" :quick-banks="quickBanks"
                                 @edit-customer="handleEditCustomer" @edit-address="handleEditAddress"
@@ -253,6 +235,28 @@
                 </template><!-- /tab reservations -->
 
             </div>
+            <aside class="w-full lg:w-52 shrink-0 lg:sticky lg:top-2 z-20">
+                <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
+                   
+                    <BaseButton v-if="activeTab === 'orders'" @click="navigateToNewOrder" variant="primary" size="sm"
+                        class="inline-flex items-center gap-1.5 shrink-0">
+                        <PlusIcon class="w-3.5 h-3.5 shrink-0" />
+                        <span>Nuevo pedido</span>
+                    </BaseButton>
+                </div>
+                <nav
+                    class="flex flex-row lg:flex-col gap-2 p-2 rounded-lg border border-gray-200 bg-gray-50 lg:bg-white shadow-sm">
+                    <button v-for="tab in tabs" :key="tab.value" type="button" @click="switchTab(tab.value)" :class="[
+                        'flex items-center gap-2 rounded-md px-3 py-2.5 text-sm font-medium transition-colors text-left lg:w-full',
+                        activeTab === tab.value
+                            ? 'bg-emerald-600 text-white shadow-sm'
+                            : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+                    ]">
+                        <component :is="tab.icon" class="w-4 h-4 shrink-0" />
+                        <span class="whitespace-nowrap">{{ tab.label }}</span>
+                    </button>
+                </nav>
+            </aside>
         </div>
 
         <!-- Modales -->
@@ -344,6 +348,7 @@ const sortOrder = ref<'asc' | 'desc'>('desc')
 
 // Filtros
 const filters = ref<OrderFilterState>({
+    totalQuery: '',
     search: '',
     type: null,
     status: null,
@@ -424,6 +429,7 @@ const hasActiveFilters = computed(() => {
     const defaultFrom = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Bogota' })
     const fromDiffers = dateFilters.value.fromDate && dateFilters.value.fromDate !== defaultFrom
     return !!(
+        filters.value.totalQuery?.trim() ||
         filters.value.search ||
         filters.value.type ||
         filters.value.status ||
@@ -472,6 +478,7 @@ const applyFilters = () => {
 
 const clearFilters = () => {
     filters.value = {
+        totalQuery: '',
         search: '',
         type: null,
         status: null,

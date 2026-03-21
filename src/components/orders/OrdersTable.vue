@@ -1,7 +1,7 @@
 <template>
     <div class="overflow-x-auto">
         <table class="min-w-full divide-y divide-gray-200">
-            <thead class="bg-gray-50">
+            <thead class="sticky top-0 z-10 bg-gray-50 shadow-sm">
                 <tr>
                     <th scope="col"
                         class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
@@ -61,14 +61,14 @@
             </thead>
             <tbody class="bg-white divide-y divide-gray-200">
                 <tr v-if="loading">
-                    <td colspan="8" class="px-6 py-12 text-center text-gray-500">
+                    <td colspan="9" class="px-6 py-12 text-center text-gray-500">
                         <div class="flex justify-center">
                             <BaseLoading size="md" />
                         </div>
                     </td>
                 </tr>
                 <tr v-else-if="!orders || orders.length === 0">
-                    <td colspan="8" class="px-6 py-12 text-center text-gray-500">
+                    <td colspan="9" class="px-6 py-12 text-center text-gray-500">
                         No se encontraron pedidos
                     </td>
                 </tr>
