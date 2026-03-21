@@ -169,7 +169,64 @@ Authorization: Bearer …
 
 ---
 
-## 7. Otros bloques aún mock
+## 7. Evolución en el tiempo (Superadmin)
+
+Front: `TimeEvolutionPanel` (`SalesTimeSeriesBlock`, `OrdersPerHourBlock` / `OrdersTimeSeriesBlock` en `timeEvolution.types.ts`). Rango con `DashboardDateRangeFilter`. **Granularidad** unificada: **día | hora | mes | año** (tabs `DashboardSegmentedTabs`). Convenciones: **día / mes / año** = todos los buckets entre `from` y `to` (meses como primer día de cada mes; años como años enteros); **hora** = último día del rango (`to`) para ventas multi-sucursal y pedidos por hora.
+
+### 7.1 Ventas en el tiempo (multi-línea)
+
+- **Por día:** eje X = días en `[from, to]`; eje Y = ventas (COP); una serie por sucursal.
+- **Por hora:** eje X = horas (ej. 08:00–21:00) del día `to`; multi-sucursal.
+- **Por mes:** eje X = meses calendario en el rango (ej. “ene 2025”); multi-sucursal; totales mensuales.
+- **Por año:** eje X = años (`from.year` … `to.year`); multi-sucursal; totales anuales.
+
+```http
+GET /api/dashboard/sales-timeline?granularity=day|hour|month|year&from=YYYY-MM-DD&to=YYYY-MM-DD&branchIds=
+Authorization: Bearer …
+```
+
+Respuesta sugerida (alineada con el front):
+
+```jsonc
+{
+  "granularity": "day",
+  "labels": ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"],
+  "series": [
+    { "branchId": 1, "branchName": "Santander", "values": [820000, 910000, ...] }
+  ]
+}
+```
+
+El front transforma `series` → `datasets` de `DashboardLineChart` (misma longitud que `labels`). Ventas: filtrar pedidos **entregados** y fecha de negocio acordada (ver §3 del mismo doc).
+
+### 7.2 Pedidos (serie agregada, misma granularidad)
+
+- **Por hora:** `labels` + `counts`; UI: **área** o **barras**.
+- **Por día / mes / año:** `labels` + `counts`; UI: **barras** (pedidos totales por bucket).
+
+```http
+GET /api/dashboard/orders-timeline?granularity=day|hour|month|year&from=YYYY-MM-DD&to=YYYY-MM-DD
+Authorization: Bearer …
+```
+
+Ejemplo respuesta (misma forma para cualquier granularidad):
+
+```jsonc
+{
+  "labels": ["08:00", "09:00", "..."],
+  "counts": [12, 18, 25, ...]
+}
+```
+
+**Admin:** solo su sucursal; sin multi-línea cruzada si no aplica.
+
+Utilidades front para buckets: `daysInclusive`, `monthsInclusive`, `yearsInclusive` (`dashboardDateUtils.ts`).
+
+**Presets de periodo (reutilizables):** definiciones y `getDateRangeForPreset` en `src/utils/dashboardPeriodPresets.ts`. UI: `DashboardPeriodFilter.vue` (chips: Hoy, Ayer, Esta quincena, Quincena pasada, Este mes, Mes pasado, Este año + rango personalizado con `DashboardDateRangeFilter`). La serie mock de evolución de entregas por granularidad está en `src/utils/deliveryEvolutionSeries.ts` (`buildDeliveryEvolutionSeries`).
+
+---
+
+## 8. Otros bloques aún mock
 
 | Bloque | Datos (borrador) |
 |--------|------------------|
@@ -178,14 +235,89 @@ Authorization: Bearer …
 
 ---
 
-## 8. Referencia rápida front
+## 9. Operación en vivo (Kanban, tiempos, domiciliarios)
+
+Los bloques **Operación de pedidos** (`OperationOverviewPanel` + hijos) muestran el tubería operativo y eficiencia. Convenciones UI:
+
+- **Kanban + contadores:** columnas `Taken` / `In preparation` / `Ready` / `On the way` (en UI: Tomado, En preparación, Listo, En camino).
+- **Cuello de botella (heurística):** columna con **mayor conteo**; si hay empate, todas las empatadas se marcan. La lógica puede refinarse (ej. tiempo acumulado en columna).
+- **Medidor (gauge):** colores por minutos — verde **&lt; 30**, amarillo **30–45**, rojo **&gt; 45** (constante `minuteGaugeColor` en `gaugeColors.ts`). Máximo mostrado en arco: 60 min (solo visual).
+- **Eficiencia domiciliarios:** barras horizontales (entregas) o dispersión (eje X = tiempo promedio de entrega min, eje Y = pedidos entregados).
+
+### JSON sugerido — contadores pipeline
+
+`GET /api/dashboard/operation/pipeline?branchId=` (superadmin con filtro sucursal; admin: su sucursal)
+
+```json
+{
+  "taken": 14,
+  "in_preparation": 11,
+  "ready": 7,
+  "on_the_way": 18
+}
+```
+
+Nombres de campo en front: `OrderPipelineStatusCounts` (`operation.types.ts`).
+
+### JSON sugerido — tiempos promedio (minutos)
+
+`GET /api/dashboard/operation/avg-times?branchId=&from=&to=`
+
+```json
+{
+  "avg_prep_minutes": 26.4,
+  "avg_delivery_minutes": 41.2
+}
+```
+
+- **Tiempo preparación:** de **Tomado** a **Listo** (mismo criterio que tablas `preparation_time_seconds`: `COALESCE(prepare_at, taken_at)` → Ready).
+- **Tiempo entrega:** de **Listo** a **Entregado** (`ready_at` → `delivered_at`).
+
+### JSON sugerido — eficiencia por domiciliario
+
+`GET /api/dashboard/operation/deliverymen?branchId=&from=&to=`
+
+- **`branchId`:** si se omite (superadmin), el front puede mostrar todas las sucursales; si se envía, solo domiciliarios de esa sucursal. **Admin:** siempre su sucursal (equivalente a `branchId` fijo).
+
+```json
+{
+  "items": [
+    {
+      "id": 1,
+      "branch_id": 1,
+      "name": "Carlos R.",
+      "delivered_count": 32,
+      "avg_delivery_minutes": 33,
+      "delivery_fee_total": 185000
+    }
+  ]
+}
+```
+
+- **`branch_id`:** sucursal del repartidor (para filtrar el bloque en UI).
+- **`delivery_fee_total`:** suma del costo de domicilio (delivery fee) cobrado en pedidos entregados por ese repartidor en el periodo `from`–`to` (COP, entero).
+
+Para la **evolución temporal** (entregas + recaudo fees) con la misma granularidad, el front usa `buildDeliveryEvolutionBundle` + `scaleSeriesToTargetSum` (mock) o un endpoint tipo `GET .../operation/delivery-evolution?branchId=&from=&to=` devolviendo `labels`, `deliveries[]`, `fees_total[]` (COP por bucket). La línea **solo de entregas** puede filtrarse por **`userId` / `deliverymanId`** (mismo endpoint con `deliverymanId=` opcional) para que la serie ya venga desglosada; si no, el back puede devolver solo el agregado de sucursal y el front escala (como el mock).
+
+En UI, los **títulos** junto a cada gráfica de domiciliarios muestran la **suma** de la serie o de las filas según el periodo. Para fees se muestra además la parte del **domiciliario** según `DELIVERY_FEE_DRIVER_SHARE` (por defecto **70%**, `src/constants/deliveryFeeShare.ts`); la gráfica de barras horizontales de fees por persona es **apilada** (70% / 30% resto).
+
+**Admin:** solo su sucursal. **Superadmin:** todas o filtradas por sucursal. Datos en vivo pueden complementarse con SignalR (evento de cambio de estado) recalculando contadores.
+
+---
+
+## 10. Referencia rápida front
 
 - Vista: `src/views/dashboard/GlobalDashboard.vue`
 - KPI: `DashboardKpiCard.vue`
-- Gráfico barras: `DashboardBarChart.vue`
+- Barras: `DashboardBarChart.vue`
+- Línea / área: `DashboardLineChart.vue`
 - Tabs segmentados: `DashboardSegmentedTabs.vue`
 - Barra mini: `DashboardMiniBar.vue`
 - Tabla ranking: `DashboardRankingTable.vue`
-- Panel comparación: `BranchComparisonPanel.vue`
+- Comparación sucursales: `BranchComparisonPanel.vue`
+- Evolución temporal: `TimeEvolutionPanel.vue`
+- **Operación:** `OperationOverviewPanel.vue`, `DashboardOrderStatusKanban.vue`, `DashboardGaugeCard.vue`, `DashboardGaugeDoughnut.vue`, `DashboardHorizontalBarChart.vue`, `DashboardDeliveryScatterChart.vue`, `DashboardPeriodFilter.vue`, tipos `operation.types.ts`, colores gauge `gaugeColors.ts`, utilidades `dashboardPeriodPresets.ts`, `deliveryEvolutionSeries.ts`
+- Filtro fechas (rango): `DashboardDateRangeFilter.vue`, utilidades `dashboardDateUtils.ts`
+- Colores series: `chartColors.ts` (`getBranchSeriesColor`)
 
 Cualquier cambio en nombres de campos del JSON debe actualizarse en este documento y en el front a la vez.

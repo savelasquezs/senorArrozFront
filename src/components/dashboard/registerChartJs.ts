@@ -3,6 +3,12 @@ import {
 	CategoryScale,
 	LinearScale,
 	BarElement,
+	LineElement,
+	PointElement,
+	Filler,
+	ArcElement,
+	DoughnutController,
+	ScatterController,
 	Title,
 	Tooltip,
 	Legend,
@@ -13,6 +19,19 @@ let registered = false;
 /** Registra controladores de Chart.js una sola vez (evita errores en HMR). */
 export function registerChartJs(): void {
 	if (registered) return;
-	ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend);
+	ChartJS.register(
+		CategoryScale,
+		LinearScale,
+		BarElement,
+		LineElement,
+		PointElement,
+		Filler,
+		ArcElement,
+		DoughnutController,
+		ScatterController,
+		Title,
+		Tooltip,
+		Legend,
+	);
 	registered = true;
 }

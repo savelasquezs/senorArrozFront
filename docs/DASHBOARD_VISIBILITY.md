@@ -23,9 +23,13 @@ Importar desde el índice del módulo cuando exista:
 import {
   DashboardKpiCard,
   DashboardBarChart,
+  DashboardLineChart,
   DashboardSegmentedTabs,
   DashboardRankingTable,
   BranchComparisonPanel,
+  TimeEvolutionPanel,
+  OperationOverviewPanel,
+  DashboardPeriodFilter,
 } from '@/components/dashboard'
 ```
 
