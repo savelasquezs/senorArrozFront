@@ -19,7 +19,7 @@ export const useDeliveryStore = defineStore('delivery', () => {
     const historyOrders = ref<OrderListItem[]>([])
     const historyTotalCount = ref(0)
     const historyPage = ref(1)
-    const historyPageSize = ref(10)
+    const historyPageSize = ref(100)
 
     const isLoading = ref(false)
     const error = ref<string | null>(null)
@@ -81,7 +81,7 @@ export const useDeliveryStore = defineStore('delivery', () => {
                 page: historyPage.value,
                 pageSize: historyPageSize.value
             })
-            // Ordenar por ID descendente (más recientes primero)
+            // API devuelve CreatedAt desc; mantener id desc como respaldo dentro de la página
             historyOrders.value = [...response.items].sort((a, b) => b.id - a.id)
             historyTotalCount.value = response.totalCount
         } catch (err: any) {

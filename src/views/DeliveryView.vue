@@ -121,8 +121,8 @@
                 <DeliveryCardGrid :orders="deliveryStore.preparationOrders" :allow-assignment="false" />
             </div>
 
-            <!-- Vista "En ruta" -->
-            <div v-else-if="activeTab === 'route'">
+            <!-- Vista "En ruta" (scroll vertical si hay muchos pedidos) -->
+            <div v-else-if="activeTab === 'route'" class="min-w-0">
                 <div class="flex items-center gap-3 mb-4">
                     <button
                         @click="activeTab = 'available'"
@@ -134,11 +134,13 @@
                     <h2 class="text-base font-semibold text-gray-900">Pedidos en ruta</h2>
                 </div>
 
-                <RouteOrderManager
-                    :orders="routeOrders"
-                    @route-optimized="handleRouteOptimized"
-                    @delivered="handleOrderDelivered"
-                />
+                <div class="max-h-[min(75vh,42rem)] overflow-y-auto overflow-x-hidden min-w-0 pr-1">
+                    <RouteOrderManager
+                        :orders="routeOrders"
+                        @route-optimized="handleRouteOptimized"
+                        @delivered="handleOrderDelivered"
+                    />
+                </div>
             </div>
         </div>
 
@@ -273,6 +275,12 @@ const handleAssign = (orderIds: number[]) => {
 const handleAssigned = async () => {
     await loadAvailableOrders()
     cardGridRef.value?.clearSelection()
+    if (authStore.user?.id) {
+        await loadHistory()
+        if (activeTab.value === 'route') {
+            routeOrders.value = [...deliveryStore.ordersOnTheWay]
+        }
+    }
 }
 
 const closeConfirmModal = () => {

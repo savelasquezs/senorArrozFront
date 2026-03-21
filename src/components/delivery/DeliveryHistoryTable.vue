@@ -1,7 +1,7 @@
 <template>
-    <div class="space-y-3 md:space-y-4">
+    <div class="flex flex-col gap-3 md:gap-4 max-h-[min(80vh,44rem)] min-h-0">
         <!-- Mobile: Header y filtros verticales -->
-        <div class="md:flex md:items-center md:justify-between bg-gray-50 p-3 md:p-4 rounded-lg gap-3">
+        <div class="shrink-0 md:flex md:items-center md:justify-between bg-gray-50 p-3 md:p-4 rounded-lg gap-3">
             <h3 class="text-base md:text-lg font-semibold text-gray-900 mb-3 md:mb-0">Mi Historial ({{ totalCount }})
             </h3>
 
@@ -29,11 +29,13 @@
             </div>
         </div>
 
+        <!-- Lista con scroll (muchos pedidos / página 100) -->
+        <div class="min-h-0 flex-1 overflow-y-auto overflow-x-hidden space-y-3 md:space-y-4 pr-0.5">
         <!-- Desktop: Tabla -->
         <div class="hidden md:block bg-white rounded-lg border border-gray-200 overflow-hidden">
             <div class="overflow-x-auto">
                 <table class="min-w-full divide-y divide-gray-200">
-                    <thead class="bg-gray-50">
+                    <thead class="sticky top-0 z-10 bg-gray-50 shadow-sm">
                         <tr>
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Pedido</th>
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Dirección</th>
@@ -172,8 +174,12 @@
             </div>
         </div>
 
-        <BasePagination v-if="totalCount > pageSize" :current-page="page" :total="totalCount" :per-page="pageSize"
-            @change="handlePageChange" />
+        </div>
+
+        <div class="shrink-0 pt-1">
+            <BasePagination v-if="totalCount > pageSize" :current-page="page" :total="totalCount" :per-page="pageSize"
+                @change="handlePageChange" />
+        </div>
     </div>
 
     <!-- Modal de confirmación -->

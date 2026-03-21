@@ -80,9 +80,7 @@ const mainContentClasses = computed(() => [
 	sidebarOpen.value ? 'ml-64' : 'ml-0'
 ]);
 
-const pageTitle = computed(() => {
-	return props.pageTitle || (route.meta.title as string) || '';
-});
+
 
 // Check if user can take orders
 const canTakeOrders = computed(() => {
