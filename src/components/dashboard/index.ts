@@ -23,6 +23,8 @@ export { getBranchSeriesColor, branchSeriesColors } from './chartColors';
 export { minuteGaugeColor } from './gaugeColors';
 export {
 	defaultDateRangeLastDays,
+	defaultDateRangeToday,
+	defaultDateRangeYesterday,
 	daysInclusive,
 	monthsInclusive,
 	yearsInclusive,

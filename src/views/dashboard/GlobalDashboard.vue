@@ -82,7 +82,7 @@
 
 <script setup lang="ts">
 import { ref, computed } from 'vue'
-import { DashboardRightNav, defaultDateRangeLastDays } from '@/components/dashboard'
+import { DashboardRightNav, defaultDateRangeToday } from '@/components/dashboard'
 import { BASE_BRANCH_COMPARISON_ROWS } from '@/views/dashboard/mock/dashboardMockCore'
 import { defaultDashboardPeriodThisMonth } from '@/utils/dashboardPeriodPresets'
 import { useAuthStore } from '@/store/auth'
@@ -111,12 +111,16 @@ const globalDashboardBranchId = ref<number | null>(null)
 /** Periodo Domicilios (compartido: API `from`/`to` + UI del shell). */
 const deliveryPeriod = ref(defaultDashboardPeriodThisMonth())
 
-/** Periodo global (sidebar): ventas, peso por categoría y gastos. */
-const globalDashboardDateRange = ref<[Date, Date]>(defaultDateRangeLastDays(7))
+/** Periodo global (sidebar): principal, ventas, peso por categoría y gastos. Por defecto: hoy. */
+const globalDashboardDateRange = ref<[Date, Date]>(defaultDateRangeToday())
 const globalTimeGranularity = ref<DashboardTimeGranularity>('day')
 const ventasProductsGroupBy = ref<VentasProductsGroupBy>('product')
 
-const principalSection = useDashboardPrincipalSection(activeSection, globalDashboardBranchId)
+const principalSection = useDashboardPrincipalSection(
+	activeSection,
+	globalDashboardBranchId,
+	globalDashboardDateRange,
+)
 const ventasSection = useDashboardVentasSection(
 	activeSection,
 	globalDashboardBranchId,

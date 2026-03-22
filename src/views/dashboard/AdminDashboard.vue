@@ -90,7 +90,7 @@
 
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
-import { DashboardRightNav, defaultDateRangeLastDays } from '@/components/dashboard'
+import { DashboardRightNav, defaultDateRangeToday } from '@/components/dashboard'
 import { BASE_BRANCH_COMPARISON_ROWS } from '@/views/dashboard/mock/dashboardMockCore'
 import { defaultDashboardPeriodThisMonth } from '@/utils/dashboardPeriodPresets'
 import { useAuthStore } from '@/store/auth'
@@ -129,11 +129,15 @@ const adminBranchId = computed(() => adminBranchIdWritable.value)
 const activeSection = ref<DashboardSectionId>('principal')
 
 const deliveryPeriod = ref(defaultDashboardPeriodThisMonth())
-const globalDashboardDateRange = ref<[Date, Date]>(defaultDateRangeLastDays(7))
+const globalDashboardDateRange = ref<[Date, Date]>(defaultDateRangeToday())
 const globalTimeGranularity = ref<DashboardTimeGranularity>('day')
 const ventasProductsGroupBy = ref<VentasProductsGroupBy>('product')
 
-const principalSection = useDashboardPrincipalSection(activeSection, adminBranchIdWritable)
+const principalSection = useDashboardPrincipalSection(
+	activeSection,
+	adminBranchIdWritable,
+	globalDashboardDateRange,
+)
 const ventasSection = useDashboardVentasSection(
 	activeSection,
 	adminBranchIdWritable,

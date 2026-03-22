@@ -13,6 +13,19 @@ export function defaultDateRangeLastDays(n: number): [Date, Date] {
 	return [start, end];
 }
 
+/** Rango por defecto: solo el día en curso (inicio y fin del mismo día local). */
+export function defaultDateRangeToday(): [Date, Date] {
+	const day = startOfDay(new Date());
+	return [new Date(day), new Date(day)];
+}
+
+/** Un solo día: ayer (calendario local). */
+export function defaultDateRangeYesterday(): [Date, Date] {
+	const y = startOfDay(new Date());
+	y.setDate(y.getDate() - 1);
+	return [new Date(y), new Date(y)];
+}
+
 /** Días calendario desde `from` hasta `to` inclusive (ambos normalizados a inicio de día). Máximo `maxDays` por seguridad. */
 export function daysInclusive(from: Date, to: Date, maxDays = 62): Date[] {
 	const s = startOfDay(from);
