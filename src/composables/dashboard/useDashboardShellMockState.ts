@@ -13,7 +13,6 @@ import {
 } from '@/components/dashboard';
 import { BASE_BRANCH_COMPARISON_ROWS, BASE_DELIVERYMEN_MOCK } from '@/views/dashboard/mock/dashboardMockCore';
 import { defaultDashboardPeriodThisMonth } from '@/utils/dashboardPeriodPresets';
-import type { DashboardPeriodValue } from '@/utils/dashboardPeriodPresets';
 import type { DashboardSectionId } from '@/views/dashboard/dashboardSectionIds';
 import type { DeliveryDashboardPayload } from '@/services/MainAPI/dashboardSectionApi';
 import { buildDeliveryEvolutionBundle, scaleSeriesToTargetSum } from '@/utils/deliveryEvolutionSeries';
@@ -29,8 +28,8 @@ export interface UseDashboardShellMockStateOptions {
 	 * Superadmin: false (multi-sucursal).
 	 */
 	scopeVentasChartsToBranch?: boolean;
-	/** Periodo Domicilios (misma ref que `useDashboardDomiciliosSection`). Si no se pasa, el shell usa una ref interna. */
-	deliveryPeriod?: Ref<DashboardPeriodValue>;
+	/** Rango de fechas para mock de domicilios (misma ref que sidebar + `useDashboardDomiciliosSection`). */
+	deliveryDateRange?: Ref<[Date, Date]>;
 	/** Payload de `GET /api/dashboard/delivery` cuando la sección Domicilios está activa. */
 	deliveryFromApi?: Ref<DeliveryDashboardPayload | null>;
 	/** Para usar datos del API solo mientras se muestra Domicilios (evita mezclar medias en Principal). */
@@ -92,7 +91,7 @@ export function useDashboardShellMockState(options: UseDashboardShellMockStateOp
 		branchId,
 		ventasComparisonRows,
 		scopeVentasChartsToBranch = false,
-		deliveryPeriod: deliveryPeriodOption,
+		deliveryDateRange: deliveryDateRangeOption,
 		deliveryFromApi,
 		activeSection,
 		evolutionDateRange: evolutionDateRangeOption,
@@ -100,8 +99,8 @@ export function useDashboardShellMockState(options: UseDashboardShellMockStateOp
 
 	const internalEvolutionDateRange = ref<[Date, Date]>(defaultDateRangeLastDays(7));
 	const evolutionDateRange = evolutionDateRangeOption ?? internalEvolutionDateRange;
-	const internalDeliveryPeriod = ref<DashboardPeriodValue>(defaultDashboardPeriodThisMonth());
-	const deliveryPeriod = deliveryPeriodOption ?? internalDeliveryPeriod;
+	const internalDeliveryDateRange = ref<[Date, Date]>(defaultDashboardPeriodThisMonth().range);
+	const deliveryDateRange = deliveryDateRangeOption ?? internalDeliveryDateRange;
 	const deliveryEvolutionDriverId = ref<number | 'all'>('all');
 
 	/** Datos de domicilios del API solo en la sección correspondiente. */
@@ -127,13 +126,13 @@ export function useDashboardShellMockState(options: UseDashboardShellMockStateOp
 				feesTotal: api.evolutionFees,
 			};
 		}
-		return buildDeliveryEvolutionBundle(deliveryPeriod.value.range);
+		return buildDeliveryEvolutionBundle(deliveryDateRange.value);
 	});
 
 	const scaledDeliverymenAll = computed<DeliverymanEfficiencyRow[]>(() => {
 		const api = domiciliosApiPayload.value;
 		if (api) return api.deliverymen;
-		const [from, to] = deliveryPeriod.value.range;
+		const [from, to] = deliveryDateRange.value;
 		const seed =
 			Math.abs(Math.floor(from.getTime() / 86400000) + Math.floor(to.getTime() / 86400000)) % 97;
 		return BASE_DELIVERYMEN_MOCK.map((row, i) => {
@@ -412,7 +411,7 @@ export function useDashboardShellMockState(options: UseDashboardShellMockStateOp
 
 	return {
 		evolutionDateRange,
-		deliveryPeriod,
+		deliveryDateRange,
 		deliveryEvolutionDriverId,
 		deliveryBranchOptions,
 		deliveryEvolutionBundle,

@@ -5,16 +5,20 @@ import {
 	type DeliveryDashboardPayload,
 } from '@/services/MainAPI/dashboardSectionApi';
 import type { DashboardSectionId } from '@/views/dashboard/dashboardSectionIds';
-import type { DashboardPeriodValue } from '@/utils/dashboardPeriodPresets';
-
 /**
- * Carga datos de Domicilios desde `GET /api/dashboard/delivery` (rango del periodo + sucursal).
+ * Carga datos de Domicilios desde `GET /api/dashboard/delivery` (rango + sucursal).
+ * El rango debe ser el mismo que el filtro global del sidebar (`dateRange`).
  * Con mock, `deliveryPayload` queda `null` y el shell usa datos demo.
  */
+function rangeKey(range: [Date, Date]) {
+	const [a, b] = range;
+	return `${a.getTime()}-${b.getTime()}`;
+}
+
 export function useDashboardDomiciliosSection(
 	activeSection: Ref<DashboardSectionId>,
 	branchId: Ref<number | null>,
-	deliveryPeriod: Ref<DashboardPeriodValue>,
+	dateRange: Ref<[Date, Date]>,
 ) {
 	const deliveryPayload = ref<DeliveryDashboardPayload | null>(null);
 	const loading = ref(false);
@@ -24,11 +28,6 @@ export function useDashboardDomiciliosSection(
 	const hasCompletedInitialLoad = ref(false);
 
 	const isActive = computed(() => activeSection.value === 'domicilios');
-
-	function periodRangeKey() {
-		const [a, b] = deliveryPeriod.value.range;
-		return `${a.getTime()}-${b.getTime()}-${deliveryPeriod.value.presetId}`;
-	}
 
 	async function load() {
 		if (!isActive.value) return;
@@ -41,10 +40,7 @@ export function useDashboardDomiciliosSection(
 				deliveryPayload.value = null;
 				return;
 			}
-			deliveryPayload.value = await fetchDeliveryDashboard(
-				branchId.value,
-				deliveryPeriod.value.range,
-			);
+			deliveryPayload.value = await fetchDeliveryDashboard(branchId.value, dateRange.value);
 		} catch (e) {
 			error.value = e instanceof Error ? e.message : 'Error al cargar Domicilios';
 			if (!hadData) deliveryPayload.value = null;
@@ -56,7 +52,7 @@ export function useDashboardDomiciliosSection(
 	}
 
 	watch(
-		[isActive, branchId, () => periodRangeKey()],
+		[isActive, branchId, () => rangeKey(dateRange.value)],
 		() => void load(),
 		{ immediate: true },
 	);

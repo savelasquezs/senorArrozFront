@@ -58,9 +58,9 @@
                     key="domicilios"
                     :loading="domiciliosLoading"
                     :error="domiciliosError"
+                    :date-range="globalDashboardDateRange"
                     :show-branch-filter="false"
                     :branch-options="deliveryBranchOptions"
-                    v-model:period="deliveryPeriod"
                     v-model:branch-id="globalDashboardBranchId"
                     v-model:delivery-evolution-driver-id="deliveryEvolutionDriverId"
                     :avg-prep-minutes="avgPrepMinutes"
@@ -84,7 +84,6 @@
 import { ref, computed } from 'vue'
 import { DashboardRightNav, defaultDateRangeToday } from '@/components/dashboard'
 import { BASE_BRANCH_COMPARISON_ROWS } from '@/views/dashboard/mock/dashboardMockCore'
-import { defaultDashboardPeriodThisMonth } from '@/utils/dashboardPeriodPresets'
 import { useAuthStore } from '@/store/auth'
 import type { DashboardSectionId } from '@/views/dashboard/dashboardSectionIds'
 import { useDashboardPrincipalSection } from '@/composables/dashboard/useDashboardPrincipalSection'
@@ -108,10 +107,7 @@ const activeSection = ref<DashboardSectionId>('principal')
 /** Filtro de sucursal global (superadmin). */
 const globalDashboardBranchId = ref<number | null>(null)
 
-/** Periodo Domicilios (compartido: API `from`/`to` + UI del shell). */
-const deliveryPeriod = ref(defaultDashboardPeriodThisMonth())
-
-/** Periodo global (sidebar): principal, ventas, peso por categoría y gastos. Por defecto: hoy. */
+/** Periodo global (sidebar): principal, ventas, domicilios, peso por categoría y gastos. Por defecto: hoy. */
 const globalDashboardDateRange = ref<[Date, Date]>(defaultDateRangeToday())
 const globalTimeGranularity = ref<DashboardTimeGranularity>('day')
 const ventasProductsGroupBy = ref<VentasProductsGroupBy>('product')
@@ -128,9 +124,9 @@ const ventasSection = useDashboardVentasSection(
 	ventasProductsGroupBy,
 )
 const domiciliosSection = useDashboardDomiciliosSection(
-    activeSection,
-    globalDashboardBranchId,
-    deliveryPeriod,
+	activeSection,
+	globalDashboardBranchId,
+	globalDashboardDateRange,
 )
 const gastosSection = useDashboardGastosSection(
 	activeSection,
@@ -191,7 +187,7 @@ const {
     branchId: globalDashboardBranchId,
     ventasComparisonRows,
     scopeVentasChartsToBranch: false,
-    deliveryPeriod,
+    deliveryDateRange: globalDashboardDateRange,
     deliveryFromApi: domiciliosSection.deliveryPayload,
     activeSection,
     evolutionDateRange: globalDashboardDateRange,

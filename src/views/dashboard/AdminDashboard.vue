@@ -66,9 +66,9 @@
                     key="domicilios"
                     :loading="domiciliosLoading"
                     :error="domiciliosError"
+                    :date-range="globalDashboardDateRange"
                     :show-branch-filter="false"
                     :branch-options="deliveryBranchOptions"
-                    v-model:period="deliveryPeriod"
                     v-model:branch-id="adminBranchIdWritable"
                     v-model:delivery-evolution-driver-id="deliveryEvolutionDriverId"
                     :avg-prep-minutes="avgPrepMinutes"
@@ -92,7 +92,6 @@
 import { ref, computed, watch } from 'vue'
 import { DashboardRightNav, defaultDateRangeToday } from '@/components/dashboard'
 import { BASE_BRANCH_COMPARISON_ROWS } from '@/views/dashboard/mock/dashboardMockCore'
-import { defaultDashboardPeriodThisMonth } from '@/utils/dashboardPeriodPresets'
 import { useAuthStore } from '@/store/auth'
 import type { DashboardSectionId } from '@/views/dashboard/dashboardSectionIds'
 import { useDashboardPrincipalSection } from '@/composables/dashboard/useDashboardPrincipalSection'
@@ -128,7 +127,6 @@ const adminBranchId = computed(() => adminBranchIdWritable.value)
 
 const activeSection = ref<DashboardSectionId>('principal')
 
-const deliveryPeriod = ref(defaultDashboardPeriodThisMonth())
 const globalDashboardDateRange = ref<[Date, Date]>(defaultDateRangeToday())
 const globalTimeGranularity = ref<DashboardTimeGranularity>('day')
 const ventasProductsGroupBy = ref<VentasProductsGroupBy>('product')
@@ -145,9 +143,9 @@ const ventasSection = useDashboardVentasSection(
 	ventasProductsGroupBy,
 )
 const domiciliosSection = useDashboardDomiciliosSection(
-    activeSection,
-    adminBranchIdWritable,
-    deliveryPeriod,
+	activeSection,
+	adminBranchIdWritable,
+	globalDashboardDateRange,
 )
 const gastosSection = useDashboardGastosSection(
 	activeSection,
@@ -208,7 +206,7 @@ const {
     branchId: adminBranchIdWritable,
     ventasComparisonRows,
     scopeVentasChartsToBranch: true,
-    deliveryPeriod,
+    deliveryDateRange: globalDashboardDateRange,
     deliveryFromApi: domiciliosSection.deliveryPayload,
     activeSection,
     evolutionDateRange: globalDashboardDateRange,

@@ -14,17 +14,17 @@
 				{{ error }}
 			</div>
 			<OperationOverviewPanel
-			v-model:period="periodModel"
-			v-model:branch-id="branchIdModel"
-			v-model:delivery-evolution-driver-id="driverIdModel"
-			:show-branch-filter="showBranchFilter"
-			:branch-options="branchOptions"
-			:avg-prep-minutes="avgPrepMinutes"
-			:avg-delivery-minutes="avgDeliveryMinutes"
-			:deliverymen="deliverymen"
-			:evolution-labels="evolutionLabels"
-			:evolution-data="evolutionData"
-			:evolution-fee-data="evolutionFeeData"
+				:date-range="dateRange"
+				v-model:branch-id="branchIdModel"
+				v-model:delivery-evolution-driver-id="driverIdModel"
+				:show-branch-filter="showBranchFilter"
+				:branch-options="branchOptions"
+				:avg-prep-minutes="avgPrepMinutes"
+				:avg-delivery-minutes="avgDeliveryMinutes"
+				:deliverymen="deliverymen"
+				:evolution-labels="evolutionLabels"
+				:evolution-data="evolutionData"
+				:evolution-fee-data="evolutionFeeData"
 			/>
 		</template>
 	</div>
@@ -34,11 +34,11 @@
 import { computed } from 'vue';
 import { OperationOverviewPanel } from '@/components/dashboard';
 import type { DeliveryBranchOption, DeliverymanEfficiencyRow } from '@/components/dashboard';
-import type { DashboardPeriodValue } from '@/utils/dashboardPeriodPresets';
-
 const props = defineProps<{
 	loading: boolean;
 	error: string | null;
+	/** Mismo rango que el filtro “Periodo” del sidebar. */
+	dateRange: [Date, Date];
 	showBranchFilter: boolean;
 	branchOptions: DeliveryBranchOption[];
 	avgPrepMinutes: number;
@@ -47,21 +47,14 @@ const props = defineProps<{
 	evolutionLabels: string[];
 	evolutionData: number[];
 	evolutionFeeData: number[];
-	period: DashboardPeriodValue;
 	branchId: number | null;
 	deliveryEvolutionDriverId: number | 'all';
 }>();
 
 const emit = defineEmits<{
-	'update:period': [value: DashboardPeriodValue];
 	'update:branchId': [value: number | null];
 	'update:deliveryEvolutionDriverId': [value: number | 'all'];
 }>();
-
-const periodModel = computed({
-	get: () => props.period,
-	set: (v: DashboardPeriodValue) => emit('update:period', v),
-});
 
 const branchIdModel = computed({
 	get: () => props.branchId,

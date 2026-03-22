@@ -52,7 +52,11 @@
 					<strong>Domiciliario</strong> (solo entregas): la sucursal la define el panel lateral del
 					dashboard (superadmin). Esta lista reacciona a ese filtro.
 				</p>
-				<DashboardPeriodFilter v-model="period" />
+				<p class="text-xs text-gray-600 rounded-lg border border-gray-100 bg-gray-50/80 px-3 py-2">
+					<strong class="text-gray-800">Rango de fechas</strong> (mismo que
+					<em>Periodo</em> en el panel lateral):
+					<span class="tabular-nums text-gray-900">{{ formattedDateRange }}</span>
+				</p>
 			</div>
 
 			<div class="mb-6">
@@ -201,14 +205,11 @@ import DashboardHorizontalBarChart from './DashboardHorizontalBarChart.vue';
 import DashboardDeliveryScatterChart from './DashboardDeliveryScatterChart.vue';
 import DashboardSegmentedTabs from './DashboardSegmentedTabs.vue';
 import DashboardLineChart from './DashboardLineChart.vue';
-import DashboardPeriodFilter from './DashboardPeriodFilter.vue';
 import { formatTooltipCurrency } from './chartFormat';
 import { getBranchSeriesColor } from './chartColors';
 import type { DeliveryBranchOption, DeliverymanEfficiencyRow } from './operation.types';
-import type { DashboardPeriodValue } from '@/utils/dashboardPeriodPresets';
 import { DELIVERY_FEE_DRIVER_SHARE } from '@/constants/deliveryFeeShare';
 
-const period = defineModel<DashboardPeriodValue>('period', { required: true });
 const branchId = defineModel<number | null>('branchId', { required: true });
 const deliveryEvolutionDriverId = defineModel<number | 'all'>('deliveryEvolutionDriverId', {
 	required: true,
@@ -224,6 +225,8 @@ const props = withDefaults(
 		 */
 		showPrepTimeGauge?: boolean;
 		branchOptions: DeliveryBranchOption[];
+		/** Alineado al filtro global del sidebar (no hay segundo selector de fechas aquí). */
+		dateRange: [Date, Date];
 		avgPrepMinutes: number;
 		avgDeliveryMinutes: number;
 		deliverymen: DeliverymanEfficiencyRow[];
@@ -233,6 +236,16 @@ const props = withDefaults(
 	}>(),
 	{ showBranchFilter: true, showPrepTimeGauge: false },
 );
+
+const formattedDateRange = computed(() => {
+	const [a, b] = props.dateRange;
+	const opts: Intl.DateTimeFormatOptions = {
+		day: '2-digit',
+		month: 'short',
+		year: 'numeric',
+	};
+	return `${a.toLocaleDateString('es-CO', opts)} — ${b.toLocaleDateString('es-CO', opts)}`;
+});
 
 function onBranchChange(e: Event) {
 	const v = (e.target as HTMLSelectElement).value;
