@@ -294,6 +294,7 @@ import { useOrderPermissions } from '@/composables/useOrderPermissions'
 import { useToast } from '@/composables/useToast'
 import { getOrderStatusDisplayName, getOrderTypeDisplayName } from '@/composables/useFormatting'
 import { bankPaymentApi } from '@/services/MainAPI/bankPaymentApi'
+import type { BankPayment } from '@/types/bank'
 import { useBanksStore } from '@/store/banks'
 import MainLayout from '@/components/layout/MainLayout.vue'
 import OrdersTable from '@/components/orders/OrdersTable.vue'
@@ -785,14 +786,14 @@ const handleQuickBankTransfer = async (order: OrderListItem, bankId: number) => 
             return
         }
 
-        await bankPaymentApi.createBankPayment({
+        const created = await bankPaymentApi.createBankPayment({
             orderId: order.id,
             bankId,
             amount: order.total,
         })
 
+        patchListOrderBankPayment(order.id, created)
         success('Pago bancario creado', 4000, 'Se registró el pago en el banco seleccionado')
-        await fetchOrders()
     } catch (err: any) {
         error('Error al crear pago', err.message || 'No se pudo crear el pago bancario')
     }
@@ -810,6 +811,39 @@ const quickBanks = computed(() => {
         .sort((a, b) => a.id - b.id)
         .slice(0, 2)
 })
+
+/** Respuesta POST /bankpayments → forma esperada en filas del listado */
+const bankPaymentToListDetail = (p: BankPayment): OrderBankPaymentDetail => ({
+    id: p.id,
+    orderId: p.orderId,
+    bankId: p.bankId,
+    bankName: p.bankName,
+    branchId: p.branchId,
+    branchName: p.branchName,
+    amount: p.amount,
+    verifiedAt: p.verifiedAt ?? null,
+    isVerified: p.isVerified,
+})
+
+const patchListOrderBankPayment = (orderId: number, created: BankPayment) => {
+    const idx = orders.value.findIndex((o) => o.id === orderId)
+    if (idx === -1) return
+    const order = orders.value[idx]
+    orders.value[idx] = {
+        ...order,
+        bankPayments: [...(order.bankPayments || []), bankPaymentToListDetail(created)],
+    }
+}
+
+const patchReservationBankPayment = (orderId: number, created: BankPayment) => {
+    const idx = reservations.value.findIndex((o) => o.id === orderId)
+    if (idx === -1) return
+    const order = reservations.value[idx]
+    reservations.value[idx] = {
+        ...order,
+        bankPayments: [...(order.bankPayments || []), bankPaymentToListDetail(created)],
+    }
+}
 
 // ===== ABONOS DE RESERVAS =====
 const showDepositModal = ref(false)
@@ -949,9 +983,9 @@ const handleResQuickBankTransfer = async (order: OrderListItem, bankId: number) 
             error('No se puede convertir', 'El pedido ya tiene pagos registrados')
             return
         }
-        await bankPaymentApi.createBankPayment({ orderId: order.id, bankId, amount: order.total })
+        const created = await bankPaymentApi.createBankPayment({ orderId: order.id, bankId, amount: order.total })
+        patchReservationBankPayment(order.id, created)
         success('Pago bancario creado', 4000, 'Se registró el pago en el banco seleccionado')
-        await fetchReservations()
     } catch (err: any) {
         error('Error al crear pago', err.message || 'No se pudo crear el pago bancario')
     }

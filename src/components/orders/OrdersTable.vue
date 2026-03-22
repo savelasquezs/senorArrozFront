@@ -83,12 +83,12 @@
 
                     <!-- Tipo - CLICKEABLE -->
                     <td class="px-6 py-4 whitespace-nowrap">
-                        <button @click.stop="$emit('edit-type', order)"
+                        <button type="button" @click.stop="$emit('edit-type', order)"
                             class="hover:opacity-80 transition-opacity cursor-pointer">
                             <OrderTypeBadge :type="order.type" :display-name="order.typeDisplayName" />
                         </button>
                         <!-- Botón abono para reservas activas -->
-                        <button
+                        <button type="button"
                             v-if="order.type === 'reservation' && order.status !== 'cancelled' && order.status !== 'delivered'"
                             @click.stop="$emit('add-deposit', order)"
                             class="mt-1 text-xs text-amber-600 hover:text-amber-800 underline decoration-dotted block"
@@ -99,7 +99,7 @@
 
                     <!-- Cliente (clickeable para editar) -->
                     <td class="px-6 py-4 whitespace-nowrap">
-                        <button class="text-left hover:text-emerald-600 transition-colors"
+                        <button type="button" class="text-left hover:text-emerald-600 transition-colors"
                             @click.stop="$emit('edit-customer', order)">
                             <div v-if="order.customerName || order.guestName"
                                 class="text-sm font-medium text-gray-900 hover:underline">
@@ -114,7 +114,7 @@
 
                     <!-- Dirección (clickeable para cambiar) -->
                     <td class="px-6 py-4">
-                        <button v-if="order.addressDescription || order.addressAdditionalInfo"
+                        <button type="button" v-if="order.addressDescription || order.addressAdditionalInfo"
                             class="text-left text-sm text-gray-900 hover:text-emerald-600 hover:underline transition-colors max-w-xs"
                             @click.stop="$emit('edit-address', order)">
                             <span class="block truncate">{{ order.addressDescription || '—' }}</span>
@@ -152,7 +152,7 @@
                                         <span class="text-blue-700">{{ formatCurrency(payment.amount) }}</span>
                                     </div>
                                     <!-- Botón de verificación -->
-                                    <button v-if="canVerifyPayment(order)"
+                                    <button type="button" v-if="canVerifyPayment(order)"
                                         @click.stop="emit('verify-bank-payment', order, payment)" :class="[
                                             'p-1 rounded transition-colors',
                                             payment.isVerified
@@ -182,7 +182,7 @@
                                 <span class="text-xs text-gray-400 italic">
                                     Efectivo
                                 </span>
-                                <button v-for="bank in (props.quickBanks || []).slice(0, 2)" :key="bank.id"
+                                <button type="button" v-for="bank in (props.quickBanks || []).slice(0, 2)" :key="bank.id"
                                     class="text-[11px] text-blue-600 hover:text-blue-800 underline decoration-dotted"
                                     @click.stop="emit('quick-bank-transfer', order, bank.id)">
                                     {{ formatQuickLabel(bank.name) }}
@@ -193,7 +193,7 @@
 
                     <!-- Domiciliario (clickeable para asignar/cambiar) -->
                     <td class="px-6 py-4 whitespace-nowrap">
-                        <button :disabled="!canAssignDeliveryman(order)" :class="[
+                        <button type="button" :disabled="!canAssignDeliveryman(order)" :class="[
                             'text-left transition-colors',
                             canAssignDeliveryman(order)
                                 ? 'hover:text-emerald-600 cursor-pointer'
