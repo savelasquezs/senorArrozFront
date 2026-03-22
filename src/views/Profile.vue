@@ -74,7 +74,7 @@
                         v-model="form.phone"
                         label="Teléfono"
                         type="tel"
-                        maxlength="10"
+                        :maxlength="10"
                         :error="errors.phone"
                         @input="normalizePhone; validateForm()"
                     >

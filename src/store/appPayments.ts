@@ -191,7 +191,7 @@ export const useAppPaymentsStore = defineStore('appPayments', {
             this.isLoading = true
             this.error = null
             try {
-                await appPaymentApi.deleteAppPayment(id)
+                await appPaymentApi.deletePayment(id)
                 // Remove from list
                 if (this.list) {
                     this.list.items = this.list.items.filter(item => item.id !== id)

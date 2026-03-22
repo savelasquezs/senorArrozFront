@@ -87,7 +87,6 @@ import CustomerSection from '@/components/customers/CustomerSection.vue'
 
 // Icons
 import {
-    UserIcon,
     ShoppingBagIcon,
     CurrencyDollarIcon,
     TrashIcon
@@ -117,8 +116,8 @@ const props = withDefaults(defineProps<Props>(), {
 const emit = defineEmits<{
     (e: 'typeChange', type: OrderType): void
     (e: 'clear'): void
-    (e: 'customerSelected', customer: Customer | undefined): void
-    (e: 'addressSelected', address: CustomerAddress | undefined): void
+    (e: 'customerSelected', customer: Customer | null): void
+    (e: 'addressSelected', address: CustomerAddress | null): void
 }>()
 
 // Composables
@@ -187,14 +186,14 @@ const handleClear = () => {
     emit('clear')
 }
 
-const handleCustomerSelect = (customer: Customer | undefined) => {
-    internalSelectedCustomer.value = customer
+const handleCustomerSelect = (customer: Customer | null) => {
+    internalSelectedCustomer.value = customer ?? undefined
     internalSelectedAddress.value = undefined // Clear address when customer changes
     emit('customerSelected', customer)
 }
 
-const handleAddressSelect = (address: CustomerAddress | undefined) => {
-    internalSelectedAddress.value = address
+const handleAddressSelect = (address: CustomerAddress | null) => {
+    internalSelectedAddress.value = address ?? undefined
     emit('addressSelected', address)
 }
 </script>

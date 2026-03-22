@@ -26,6 +26,76 @@ export function defaultDateRangeYesterday(): [Date, Date] {
 	return [new Date(y), new Date(y)];
 }
 
+/** Mes calendario en curso: día 1 → último día del mes (hora local). */
+export function defaultDateRangeThisMonth(): [Date, Date] {
+	const now = new Date();
+	const first = new Date(now.getFullYear(), now.getMonth(), 1);
+	const last = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+	return [startOfDay(first), startOfDay(last)];
+}
+
+/** Mes calendario anterior completo. */
+export function defaultDateRangeLastMonth(): [Date, Date] {
+	const now = new Date();
+	const first = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+	const last = new Date(now.getFullYear(), now.getMonth(), 0);
+	return [startOfDay(first), startOfDay(last)];
+}
+
+/**
+ * Quincena en curso: días 1–15 o 16–último del mes (calendario local).
+ */
+export function defaultDateRangeThisFortnight(): [Date, Date] {
+	const now = new Date();
+	const y = now.getFullYear();
+	const m = now.getMonth();
+	const d = now.getDate();
+
+	if (d <= 15) {
+		const first = new Date(y, m, 1);
+		const last = new Date(y, m, 15);
+		return [startOfDay(first), startOfDay(last)];
+	}
+	const first = new Date(y, m, 16);
+	const last = new Date(y, m + 1, 0);
+	return [startOfDay(first), startOfDay(last)];
+}
+
+/**
+ * Quincena anterior: si estamos en 1ª quincena, la 2ª del mes pasado; si en 2ª, la 1ª del mismo mes.
+ */
+export function defaultDateRangeLastFortnight(): [Date, Date] {
+	const now = new Date();
+	const y = now.getFullYear();
+	const m = now.getMonth();
+	const d = now.getDate();
+
+	if (d <= 15) {
+		const first = new Date(y, m - 1, 16);
+		const last = new Date(y, m, 0);
+		return [startOfDay(first), startOfDay(last)];
+	}
+	const first = new Date(y, m, 1);
+	const last = new Date(y, m, 15);
+	return [startOfDay(first), startOfDay(last)];
+}
+
+/** Año calendario en curso (1 ene – 31 dic). */
+export function defaultDateRangeThisYear(): [Date, Date] {
+	const y = new Date().getFullYear();
+	const first = new Date(y, 0, 1);
+	const last = new Date(y, 11, 31);
+	return [startOfDay(first), startOfDay(last)];
+}
+
+/** Año calendario anterior completo. */
+export function defaultDateRangeLastYear(): [Date, Date] {
+	const y = new Date().getFullYear() - 1;
+	const first = new Date(y, 0, 1);
+	const last = new Date(y, 11, 31);
+	return [startOfDay(first), startOfDay(last)];
+}
+
 /** Días calendario desde `from` hasta `to` inclusive (ambos normalizados a inicio de día). Máximo `maxDays` por seguridad. */
 export function daysInclusive(from: Date, to: Date, maxDays = 62): Date[] {
 	const s = startOfDay(from);

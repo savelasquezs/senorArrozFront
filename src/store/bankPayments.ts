@@ -159,7 +159,7 @@ export const useBankPaymentsStore = defineStore('bankPayments', {
             this.isLoading = true
             this.error = null
             try {
-                await bankPaymentApi.deleteBankPayment(id)
+                await bankPaymentApi.deletePayment(id)
                 // Remove from list
                 if (this.list) {
                     this.list.items = this.list.items.filter(item => item.id !== id)

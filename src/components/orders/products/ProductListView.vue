@@ -100,7 +100,7 @@ const isProductDisabled = (product: Product) => {
     }
 
     // Para otras categorías, deshabilitar si stock <= 0
-    return product.stock !== undefined && product.stock <= 0
+    return product.stock != null && product.stock <= 0
 }
 
 const isProductSelected = (product: Product) => {

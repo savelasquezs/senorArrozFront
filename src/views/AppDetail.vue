@@ -72,11 +72,9 @@
 
                 <!-- Statistics Cards -->
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    <StatsCard title="Total Pagos" :value="appPayments.length" icon="CreditCardIcon" color="blue" />
-                    <StatsCard title="Pagos Liquidados" :value="settledPayments.length" icon="CheckCircleIcon"
-                        color="green" />
-                    <StatsCard title="Pagos Pendientes" :value="unsettledPayments.length" icon="ClockIcon"
-                        color="yellow" />
+                    <StatsCard title="Total Pagos" :value="appPayments.length" icon="currency" />
+                    <StatsCard title="Pagos Liquidados" :value="settledPayments.length" icon="clipboard" />
+                    <StatsCard title="Pagos Pendientes" :value="unsettledPayments.length" icon="store" />
                 </div>
 
                 <!-- App Payments Section -->
@@ -175,15 +173,15 @@
                                         {{ formatCurrency(payment.amount) }}
                                     </td>
                                     <td class="px-6 py-4 whitespace-nowrap">
-                                        <BaseBadge :type="payment.isSettled ? 'success' : 'warning'"
-                                            :text="payment.isSettled ? 'Liquidado' : 'Pendiente'" />
+                                        <BaseBadge :type="payment.isSetted ? 'success' : 'warning'"
+                                            :text="payment.isSetted ? 'Liquidado' : 'Pendiente'" />
                                     </td>
                                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                                         {{ formatDate(payment.createdAt) }}
                                     </td>
                                     <td v-if="canManageAppPayments"
                                         class="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-2">
-                                        <button v-if="!payment.isSettled" @click="settlePayment(payment.id)"
+                                        <button v-if="!payment.isSetted" @click="settlePayment(payment.id)"
                                             class="text-green-600 hover:text-green-900">
                                             Liquidar
                                         </button>
@@ -225,7 +223,7 @@ import { useAppsStore } from '@/store/apps'
 import { useAppPaymentsStore } from '@/store/appPayments'
 import { useAuthStore } from '@/store/auth'
 import { useToast } from '@/composables/useToast'
-import type { App, AppPayment } from '@/types/bank'
+import type { AppPayment } from '@/types/bank'
 import type { UpdateAppDto } from '@/types/bank'
 
 // Components
@@ -271,11 +269,11 @@ const canManageApp = computed(() => authStore.isAdmin || authStore.isSuperadmin)
 const canManageAppPayments = computed(() => authStore.isAdmin || authStore.isSuperadmin)
 
 const settledPayments = computed(() =>
-    appPayments.value.filter(p => p.isSettled)
+    appPayments.value.filter(p => p.isSetted)
 )
 
 const unsettledPayments = computed(() =>
-    appPayments.value.filter(p => !p.isSettled)
+    appPayments.value.filter(p => !p.isSetted)
 )
 
 const allPaymentsSelected = computed(() =>
@@ -385,7 +383,7 @@ const settleSelectedPayments = async () => {
             if (selectedPayments.value.length === 1) {
                 await appPaymentsStore.settle(selectedPayments.value[0])
             } else {
-                await appPaymentsStore.settleMultiple(selectedPayments.value)
+                await appPaymentsStore.settleMultiple({ paymentIds: selectedPayments.value })
             }
 
             success('Pagos liquidados', 3000, `${selectedPayments.value.length} pagos se han liquidado correctamente`)

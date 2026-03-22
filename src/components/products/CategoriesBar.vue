@@ -50,6 +50,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useOrdersDraftsStore } from '@/store/ordersDrafts'
+import { useProductCategoriesStore } from '@/store/productCategories'
 import type { ProductCategory } from '@/types/product'
 
 // Components
@@ -80,18 +81,21 @@ const emit = defineEmits<{
 
 // Composables
 const ordersStore = useOrdersDraftsStore()
+const categoriesStore = useProductCategoriesStore()
 
 // Computed
 const selectedCategory = computed(() => ordersStore.selectedCategory)
 
-const selectedCategoryName = computed(() => {
-    if (!selectedCategory.value || props.categories.length === 0) return null
+const categories = computed(() =>
+	props.categories.length > 0 ? props.categories : categoriesStore.currentCategories,
+)
 
-    const category = props.categories.find(c => c.id === selectedCategory.value)
+const selectedCategoryName = computed(() => {
+    if (!selectedCategory.value) return null
+
+    const category = categories.value.find((c) => c.id === selectedCategory.value)
     return category?.name || null
 })
-
-const categories = computed(() => props.categories.length > 0 ? props.categories : ordersStore.categories)
 
 const productsCount = computed(() => {
     if (!selectedCategory.value) return ordersStore.products.length

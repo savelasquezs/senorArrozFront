@@ -23,10 +23,10 @@
                     <BaseSelect v-model="filters.active" :options="statusOptions" label="Estado"
                         placeholder="Todos los estados" value-key="value" display-key="label" />
                     <BaseInput :model-value="filters.minPrice?.toString() || ''" label="Precio Mín" type="number"
-                        min="0" placeholder="0"
+                        :min="0" placeholder="0"
                         @update:model-value="filters.minPrice = $event ? Number($event) : undefined" />
                     <BaseInput :model-value="filters.maxPrice?.toString() || ''" label="Precio Máx" type="number"
-                        min="0" placeholder="999999"
+                        :min="0" placeholder="999999"
                         @update:model-value="filters.maxPrice = $event ? Number($event) : undefined" />
                     <div class="flex items-end">
                         <BaseButton @click="load" variant="primary" size="md" :icon="MagnifyingGlassIcon" full-width>

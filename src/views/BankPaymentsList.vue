@@ -17,7 +17,7 @@
 
                 <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
                     <BaseInput v-model="filters.orderId" label="Orden ID" type="number" placeholder="123" />
-                    <BaseSelect v-model.number="filters.bankId" :options="bankOptions" label="Banco"
+                    <BaseSelect v-model="filters.bankId" :options="bankOptions" label="Banco"
                         placeholder="Todos los bancos" value-key="value" display-key="label" />
                     <BaseSelect v-model="filters.verified" :options="verifiedOptions" label="Estado"
                         placeholder="Todos los estados" />
@@ -33,10 +33,10 @@
 
             <!-- Stats Cards -->
             <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
-                <StatsCard title="Total Pagos" :value="store.list?.totalCount || 0" icon="credit-card" />
-                <StatsCard title="Pagos Verificados" :value="verifiedPayments" icon="check-circle" />
-                <StatsCard title="Pagos Pendientes" :value="unverifiedPayments" icon="clock" />
-                <StatsCard title="Monto Total" :value="formatCurrency(totalAmount)" icon="currency-dollar" />
+                <StatsCard title="Total Pagos" :value="store.list?.totalCount || 0" icon="currency" />
+                <StatsCard title="Pagos Verificados" :value="verifiedPayments" icon="clipboard" />
+                <StatsCard title="Pagos Pendientes" :value="unverifiedPayments" icon="store" />
+                <StatsCard title="Monto Total" :value="formatCurrency(totalAmount)" icon="currency" />
             </div>
 
             <!-- Verification Component -->
@@ -100,7 +100,7 @@ const { success, error: showError } = useToast()
 // Filters
 const filters = ref<BankPaymentFilters>({
     orderId: undefined,
-    bankId: undefined,
+    bankId: null,
     verified: undefined,
     fromDate: undefined,
     toDate: undefined,
@@ -163,7 +163,7 @@ const load = async () => {
 const clearFilters = async () => {
     filters.value = {
         orderId: undefined,
-        bankId: undefined,
+        bankId: null,
         verified: undefined,
         fromDate: undefined,
         toDate: undefined,

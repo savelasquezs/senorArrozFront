@@ -117,7 +117,7 @@ export interface BankPayment {
 
 export interface BankPaymentFilters {
     orderId?: number
-    bankId?: number
+    bankId?: number | null
     branchId?: number
     verified?: boolean
     fromDate?: string
@@ -156,8 +156,8 @@ export interface AppPayment {
 
 export interface AppPaymentFilters {
     orderId?: number
-    appId?: number
-    bankId?: number
+    appId?: number | null
+    bankId?: number | null
     branchId?: number
     settled?: boolean
     fromDate?: string

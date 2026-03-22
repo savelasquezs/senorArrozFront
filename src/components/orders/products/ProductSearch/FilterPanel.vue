@@ -11,12 +11,12 @@
         <div class="grid grid-cols-2 gap-4">
             <div>
                 <label class="block text-sm font-medium text-gray-700 mb-2">Precio Mín</label>
-                <BaseInput :model-value="minPrice?.toString() || ''" type="number" placeholder="0" min="0"
+                <BaseInput :model-value="minPrice?.toString() || ''" type="number" placeholder="0" :min="0"
                     @update:model-value="handleMinPriceChange" />
             </div>
             <div>
                 <label class="block text-sm font-medium text-gray-700 mb-2">Precio Máx</label>
-                <BaseInput :model-value="maxPrice?.toString() || ''" type="number" placeholder="999999" min="0"
+                <BaseInput :model-value="maxPrice?.toString() || ''" type="number" placeholder="999999" :min="0"
                     @update:model-value="handleMaxPriceChange" />
             </div>
         </div>

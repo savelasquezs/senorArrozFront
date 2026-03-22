@@ -167,7 +167,7 @@ const categoriesStore = useProductCategoriesStore()
 
 // Computed
 const categories = computed(() =>
-    props.categories.length > 0 ? props.categories : ordersStore.categories
+    props.categories.length > 0 ? props.categories : categoriesStore.currentCategories,
 )
 
 const filteredCategories = computed(() => {
@@ -185,7 +185,7 @@ const allProductsCount = computed(() => ordersStore.products.length)
 const selectedCategoryInfo = computed(() => {
     if (!selectedCategory.value) return null
 
-    const category = categories.value.find(c => c.id === selectedCategory.value)
+    const category = categories.value.find((c: ProductCategory) => c.id === selectedCategory.value)
     return category || null
 })
 

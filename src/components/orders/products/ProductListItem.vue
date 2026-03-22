@@ -55,7 +55,7 @@ const isDisabled = computed(() => {
     }
 
     // Para otras categorías, deshabilitar si stock <= 0
-    return props.product.stock !== undefined && props.product.stock <= 0
+    return props.product.stock != null && props.product.stock <= 0
 })
 
 const hasUnlimitedStock = computed(() => {

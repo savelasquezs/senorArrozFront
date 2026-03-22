@@ -24,7 +24,7 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import { Doughnut } from 'vue-chartjs';
-import type { ChartData, ChartOptions } from 'chart.js';
+import type { ChartData, ChartOptions, TooltipItem } from 'chart.js';
 import { registerChartJs } from './registerChartJs';
 import { minuteGaugeColor } from './gaugeColors';
 
@@ -87,7 +87,7 @@ const chartOptions = computed<ChartOptions<'doughnut'>>(() => ({
 					if (ctx.dataIndex === 0) return ` ${displayMinutes.value} min`;
 					return '';
 				},
-				filter: (item) => item.dataIndex === 0,
+				filter: (item: TooltipItem<'doughnut'>) => item.dataIndex === 0,
 			},
 		},
 	},

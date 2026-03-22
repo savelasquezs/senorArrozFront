@@ -17,9 +17,9 @@
 
                 <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
                     <BaseInput v-model="filters.orderId" label="Orden ID" type="number" placeholder="123" />
-                    <BaseSelect v-model.number="filters.appId" :options="appOptions" label="App"
+                    <BaseSelect v-model="filters.appId" :options="appOptions" label="App"
                         placeholder="Todas las apps" value-key="value" display-key="label" />
-                    <BaseSelect v-model.number="filters.bankId" :options="bankOptions" label="Banco"
+                    <BaseSelect v-model="filters.bankId" :options="bankOptions" label="Banco"
                         placeholder="Todos los bancos" value-key="value" display-key="label" />
                     <BaseSelect v-model="filters.settled" :options="settledOptions" label="Estado"
                         placeholder="Todos los estados" />
@@ -35,10 +35,10 @@
 
             <!-- Stats Cards -->
             <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
-                <StatsCard title="Total Pagos" :value="store.list?.totalCount || 0" icon="credit-card" />
-                <StatsCard title="Pagos Liquidados" :value="settledPayments" icon="check-circle" />
-                <StatsCard title="Pagos Pendientes" :value="unsettledPayments" icon="clock" />
-                <StatsCard title="Monto Pendiente" :value="formatCurrency(unsettledAmount)" icon="currency-dollar" />
+                <StatsCard title="Total Pagos" :value="store.list?.totalCount || 0" icon="currency" />
+                <StatsCard title="Pagos Liquidados" :value="settledPayments" icon="clipboard" />
+                <StatsCard title="Pagos Pendientes" :value="unsettledPayments" icon="store" />
+                <StatsCard title="Monto Pendiente" :value="formatCurrency(unsettledAmount)" icon="currency" />
             </div>
 
             <!-- Settlement Component -->
@@ -104,8 +104,8 @@ const { success, error: showError } = useToast()
 // Filters
 const filters = ref<AppPaymentFilters>({
     orderId: undefined,
-    appId: undefined,
-    bankId: undefined,
+    appId: null,
+    bankId: null,
     settled: undefined,
     fromDate: undefined,
     toDate: undefined,
@@ -181,8 +181,8 @@ const load = async () => {
 const clearFilters = async () => {
     filters.value = {
         orderId: undefined,
-        appId: undefined,
-        bankId: undefined,
+        appId: null,
+        bankId: null,
         settled: undefined,
         fromDate: undefined,
         toDate: undefined,

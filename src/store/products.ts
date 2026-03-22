@@ -148,12 +148,13 @@ export const useProductsStore = defineStore('products', () => {
             if (list.value) {
                 const index = list.value.items.findIndex(product => product.id === id);
                 if (index !== -1) {
-                    list.value.items[index].stock += payload.quantity;
+                    const row = list.value.items[index];
+                    row.stock = (row.stock ?? 0) + payload.quantity;
                 }
             }
 
             if (current.value && current.value.id === id) {
-                current.value.stock += payload.quantity;
+                current.value.stock = (current.value.stock ?? 0) + payload.quantity;
             }
 
             return res.data;

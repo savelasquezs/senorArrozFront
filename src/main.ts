@@ -24,15 +24,12 @@ window.addEventListener('error', (event) => {
 const app = createApp(App);
 
 // Vue error handler
-app.config.errorHandler = (err, instance, info) => {
+app.config.errorHandler = (err, _instance, info) => {
     console.error('Vue error:', err, 'Info:', info)
-    // Check if it's a DOM manipulation error
-    if (err && err.message && err.message.includes('insertBefore')) {
+    if (err instanceof Error && err.message.includes('insertBefore')) {
         console.error('Vue DOM manipulation error detected:', err)
-        // Don't re-throw the error to prevent app crashes
         return
     }
-    // For other errors, let Vue handle them normally
     throw err
 }
 

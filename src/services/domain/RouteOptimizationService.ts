@@ -1,4 +1,4 @@
-import type { Location } from '@/composables/useGeolocation'
+import type { GeoLocation } from '@/composables/useGeolocation'
 
 export class RouteOptimizationService {
     private static directionsService: any = null
@@ -10,9 +10,9 @@ export class RouteOptimizationService {
     }
 
     static async optimizeRoute(
-        origin: Location,
-        waypoints: Array<Location & { orderId: number }>,
-        destination?: Location
+        origin: GeoLocation,
+        waypoints: Array<GeoLocation & { orderId: number }>,
+        destination?: GeoLocation
     ): Promise<{
         route: any
         optimizedOrder: number[]
@@ -61,7 +61,7 @@ export class RouteOptimizationService {
         })
     }
 
-    static async getSimpleRoute(origin: Location, destination: Location): Promise<any> {
+    static async getSimpleRoute(origin: GeoLocation, destination: GeoLocation): Promise<any> {
         if (!RouteOptimizationService.directionsService) return null
         return new Promise((resolve) => {
             RouteOptimizationService.directionsService.route(
