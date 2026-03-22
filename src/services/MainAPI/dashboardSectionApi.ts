@@ -165,6 +165,12 @@ export type VentasProductsPayload = {
 	participationPercents: number[];
 	totalRevenueCop: number;
 	totalQuantity: number;
+	/** Gramos vendidos por categoría (productos con peso unitario definido). */
+	weightByCategory: Array<{
+		categoryId: number;
+		name: string;
+		totalWeightGrams: number;
+	}>;
 };
 
 export type VentasDashboardPayload = {
@@ -217,6 +223,7 @@ function mapEvolutionFromApi(raw: DashboardSalesEvolutionApiResponse): VentasSal
 
 function mapProductsFromApi(raw: DashboardSalesProductsApiResponse): VentasProductsPayload {
 	const slices = raw.participationByRevenue ?? [];
+	const w = raw.weightByCategory ?? [];
 	return {
 		topByQuantity: raw.topByQuantity.map((p) => {
 			const row = p as { id?: number; productId?: number; name: string; quantitySold: number; revenueCop: number };
@@ -232,6 +239,11 @@ function mapProductsFromApi(raw: DashboardSalesProductsApiResponse): VentasProdu
 		participationPercents: slices.map((s) => s.percent),
 		totalRevenueCop: raw.totalRevenueCop,
 		totalQuantity: raw.totalQuantity,
+		weightByCategory: w.map((x) => ({
+			categoryId: x.categoryId,
+			name: x.name,
+			totalWeightGrams: x.totalWeightGrams,
+		})),
 	};
 }
 

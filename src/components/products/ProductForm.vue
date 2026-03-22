@@ -27,6 +27,24 @@
                 </template>
             </BaseInput>
 
+            <BaseInput
+                v-model.number="formWeightGramsModel"
+                label="Peso unitario (g)"
+                type="number"
+                :min="0"
+                :step="1"
+                placeholder="Opcional — ej. 500"
+                :error="errors.weightGrams"
+                @input="validateForm"
+            >
+                <template #icon>
+                    <ScaleIcon class="w-4 h-4" />
+                </template>
+            </BaseInput>
+            <p class="text-xs text-gray-500 md:col-span-2 -mt-2">
+                Opcional. Se usa en el dashboard de ventas para sumar kilos vendidos por categoría (unidades × peso).
+            </p>
+
             <!-- Stock para nuevo producto -->
             <div v-if="!product" class="space-y-2">
                 <div class="flex items-center gap-2 mb-1">
@@ -135,6 +153,7 @@ import {
     CurrencyDollarIcon,
     ArchiveBoxIcon,
     ExclamationTriangleIcon,
+    ScaleIcon,
 } from '@heroicons/vue/24/outline'
 
 interface Props {
@@ -160,6 +179,8 @@ const form = reactive({
     name: '',
     price: 0,
     stock: 0 as number | null,
+    /** null = sin peso; número = gramos */
+    weightGrams: null as number | null,
     infiniteStock: false,
     active: true
 })
@@ -168,7 +189,21 @@ const errors = reactive({
     categoryId: '',
     name: '',
     price: '',
-    stock: ''
+    stock: '',
+    weightGrams: '',
+})
+
+/** BaseInput no acepta bien `null` en v-model.number; usamos '' como vacío. */
+const formWeightGramsModel = computed({
+    get: () => (form.weightGrams === null || form.weightGrams === undefined ? '' : form.weightGrams),
+    set: (v: number | string) => {
+        if (v === '' || v === null || (typeof v === 'number' && Number.isNaN(v))) {
+            form.weightGrams = null
+        } else {
+            const n = typeof v === 'number' ? v : Number(v)
+            form.weightGrams = Number.isNaN(n) ? null : n
+        }
+    },
 })
 
 // Computed properties
@@ -186,7 +221,8 @@ const isFormValid = computed(() => {
         form.price >= 0 &&
         !errors.categoryId &&
         !errors.name &&
-        !errors.price
+        !errors.price &&
+        !errors.weightGrams
 
     // Only validate stock for new products
     if (!props.product) {
@@ -223,9 +259,15 @@ const validateForm = () => {
         errors.price = ''
     }
 
+    if (form.weightGrams != null && form.weightGrams < 0) {
+        errors.weightGrams = 'El peso no puede ser negativo'
+    } else {
+        errors.weightGrams = ''
+    }
+
     // Validate stock (only for new products)
     if (!props.product) {
-        if (form.stock < 0) {
+        if (form.stock != null && form.stock < 0) {
             errors.stock = 'El stock no puede ser negativo'
         } else {
             errors.stock = ''
@@ -240,6 +282,7 @@ const buildFormData = (): ProductFormData => ({
     name: form.name.trim(),
     price: form.price,
     stock: props.product ? undefined : (form.infiniteStock ? null : form.stock),
+    weightGrams: form.weightGrams,
     active: form.active
 })
 
@@ -286,6 +329,7 @@ watch(() => props.product, (newProduct) => {
         form.name = newProduct.name
         form.price = newProduct.price
         form.stock = newProduct.stock
+        form.weightGrams = newProduct.weightGrams ?? null
         form.infiniteStock = newProduct.stock === null
         form.active = newProduct.active
     } else {
@@ -293,6 +337,7 @@ watch(() => props.product, (newProduct) => {
         form.name = ''
         form.price = 0
         form.stock = 0
+        form.weightGrams = null
         form.infiniteStock = false
         form.active = true
     }
@@ -301,6 +346,7 @@ watch(() => props.product, (newProduct) => {
     errors.name = ''
     errors.price = ''
     errors.stock = ''
+    errors.weightGrams = ''
 }, { immediate: true })
 
 // Load categories on mount

@@ -200,6 +200,12 @@ export type DashboardSalesProductsApiResponse = {
 	participationByRevenue: Array<{ label: string; percent: number; revenueCop: number }>;
 	totalRevenueCop: number;
 	totalQuantity: number;
+	/** Peso total vendido (g) por categoría; solo productos con peso definido. */
+	weightByCategory?: Array<{
+		categoryId: number;
+		name: string;
+		totalWeightGrams: number;
+	}>;
 };
 
 export type DashboardExpenseSummaryApiResponse = {

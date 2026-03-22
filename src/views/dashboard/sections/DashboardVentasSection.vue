@@ -81,6 +81,29 @@
 				</div>
 			</section>
 
+			<BaseCard title="Peso vendido por categoría" :padding="'md'">
+				<p class="text-xs text-gray-500 mb-3">
+					Suma de <strong>unidades × peso unitario (g)</strong> por categoría, solo productos con peso
+					definido. Mismo periodo que el gráfico superior.
+					<span v-if="hasWeightChart" class="block mt-1 text-gray-600">
+						Total: <strong>{{ formatWeightKgGrams(weightTotalGrams) }}</strong>
+					</span>
+				</p>
+				<div
+					v-if="!hasWeightChart"
+					class="h-48 flex items-center justify-center text-sm text-gray-500"
+				>
+					Sin peso registrado en productos o sin ventas con peso en este rango.
+				</div>
+				<div v-else class="min-h-[200px]">
+					<DashboardHorizontalBarChart
+						:labels="weightBarLabels"
+						:datasets="weightBarDatasets"
+						y-format="number"
+					/>
+				</div>
+			</BaseCard>
+
 			<BaseCard title="Pedidos por estado" class="col-span-1">
 				<div class="h-64 sm:h-80">
 					<div class="flex items-center justify-center h-full text-gray-500 text-sm">
@@ -186,4 +209,28 @@ const productBarDatasets = computed((): BarChartDataset[] => [
 const participationLabels = computed(() => props.productsPayload?.participationLabels ?? []);
 const participationValues = computed(() => props.productsPayload?.participationValues ?? []);
 const participationPercents = computed(() => props.productsPayload?.participationPercents ?? []);
+
+const weightRows = computed(() => props.productsPayload?.weightByCategory ?? []);
+const hasWeightChart = computed(() => weightRows.value.length > 0);
+const weightTotalGrams = computed(() =>
+	weightRows.value.reduce((s, r) => s + r.totalWeightGrams, 0),
+);
+
+const weightBarLabels = computed(() => weightRows.value.map((r) => r.name));
+const weightBarDatasets = computed((): BarChartDataset[] => [
+	{
+		label: 'Gramos vendidos (g)',
+		data: weightRows.value.map((r) => r.totalWeightGrams),
+		backgroundColor: 'rgba(37, 99, 235, 0.85)',
+	},
+]);
+
+/** Muestra kg si >= 1000 g para lectura rápida. */
+function formatWeightKgGrams(grams: number): string {
+	if (grams >= 1000) {
+		const kg = grams / 1000;
+		return `${kg.toLocaleString('es-CO', { maximumFractionDigits: 2 })} kg (${grams.toLocaleString('es-CO')} g)`;
+	}
+	return `${grams.toLocaleString('es-CO')} g`;
+}
 </script>

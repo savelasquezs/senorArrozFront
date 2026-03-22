@@ -9,6 +9,8 @@ export interface Product {
     name: string;
     price: number;
     stock: number | null;
+    /** Peso unitario en gramos (opcional); usado en dashboard ventas por categoría. */
+    weightGrams?: number | null;
     active: boolean;
     createdAt: string;
     updatedAt: string;
@@ -39,6 +41,7 @@ export interface CreateProductDto {
     name: string;
     price: number;
     stock?: number | null;
+    weightGrams?: number | null;
     active?: boolean;
 }
 
@@ -47,6 +50,7 @@ export interface UpdateProductDto {
     name?: string;
     price?: number;
     stock?: number | null;
+    weightGrams?: number | null;
     active?: boolean;
 }
 
@@ -88,6 +92,7 @@ export interface ProductFormData {
     name: string;
     price: number;
     stock?: number | null; // null = stock infinito; undefined = no enviar (edición)
+    weightGrams?: number | null;
     active: boolean;
 }
 
