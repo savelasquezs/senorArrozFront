@@ -93,7 +93,7 @@ import {
     XMarkIcon
 } from '@heroicons/vue/24/outline'
 
-import type { AppPaymentFilters } from '@/types/bank'
+import type { AppPaymentFilters, AppPaymentListUiFilters } from '@/types/bank'
 
 const store = useAppPaymentsStore()
 const appsStore = useAppsStore()
@@ -102,13 +102,13 @@ const auth = useAuthStore()
 const { success, error: showError } = useToast()
 
 // Filters
-const filters = ref<AppPaymentFilters>({
-    orderId: undefined,
+const filters = ref<AppPaymentListUiFilters>({
+    orderId: null,
     appId: null,
     bankId: null,
     settled: undefined,
-    fromDate: undefined,
-    toDate: undefined,
+    fromDate: null,
+    toDate: null,
     page: 1,
     pageSize: 10
 })
@@ -161,12 +161,12 @@ const unsettledAmount = computed(() => {
 const load = async () => {
     try {
         const filtersToSend: AppPaymentFilters = {
-            orderId: filters.value.orderId,
+            orderId: filters.value.orderId ?? undefined,
             appId: filters.value.appId,
             bankId: filters.value.bankId,
             settled: filters.value.settled,
-            fromDate: filters.value.fromDate,
-            toDate: filters.value.toDate,
+            fromDate: filters.value.fromDate ?? undefined,
+            toDate: filters.value.toDate ?? undefined,
             branchId: auth.isSuperadmin ? undefined : (auth.branchId || undefined),
             page: filters.value.page || 1,
             pageSize: filters.value.pageSize || 10
@@ -180,12 +180,12 @@ const load = async () => {
 
 const clearFilters = async () => {
     filters.value = {
-        orderId: undefined,
+        orderId: null,
         appId: null,
         bankId: null,
         settled: undefined,
-        fromDate: undefined,
-        toDate: undefined,
+        fromDate: null,
+        toDate: null,
         page: 1,
         pageSize: 10
     }

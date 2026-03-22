@@ -90,7 +90,7 @@ import {
     XMarkIcon
 } from '@heroicons/vue/24/outline'
 
-import type { BankPaymentFilters } from '@/types/bank'
+import type { BankPaymentFilters, BankPaymentListUiFilters } from '@/types/bank'
 
 const store = useBankPaymentsStore()
 const banksStore = useBanksStore()
@@ -98,12 +98,12 @@ const auth = useAuthStore()
 const { success, error: showError } = useToast()
 
 // Filters
-const filters = ref<BankPaymentFilters>({
-    orderId: undefined,
+const filters = ref<BankPaymentListUiFilters>({
+    orderId: null,
     bankId: null,
     verified: undefined,
-    fromDate: undefined,
-    toDate: undefined,
+    fromDate: null,
+    toDate: null,
     page: 1,
     pageSize: 10
 })
@@ -144,11 +144,11 @@ const totalAmount = computed(() => {
 const load = async () => {
     try {
         const filtersToSend: BankPaymentFilters = {
-            orderId: filters.value.orderId,
+            orderId: filters.value.orderId ?? undefined,
             bankId: filters.value.bankId,
             verified: filters.value.verified,
-            fromDate: filters.value.fromDate,
-            toDate: filters.value.toDate,
+            fromDate: filters.value.fromDate ?? undefined,
+            toDate: filters.value.toDate ?? undefined,
             branchId: auth.isSuperadmin ? undefined : (auth.branchId || undefined),
             page: filters.value.page || 1,
             pageSize: filters.value.pageSize || 10
@@ -162,11 +162,11 @@ const load = async () => {
 
 const clearFilters = async () => {
     filters.value = {
-        orderId: undefined,
+        orderId: null,
         bankId: null,
         verified: undefined,
-        fromDate: undefined,
-        toDate: undefined,
+        fromDate: null,
+        toDate: null,
         page: 1,
         pageSize: 10
     }

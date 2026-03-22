@@ -128,6 +128,17 @@ export interface BankPaymentFilters {
     sortOrder?: 'asc' | 'desc'
 }
 
+/** Filtros en pantalla (null para v-model con BaseInput, sin `undefined` en el tipo). */
+export interface BankPaymentListUiFilters {
+    orderId: number | null
+    bankId: number | null
+    verified?: boolean
+    fromDate: string | null
+    toDate: string | null
+    page: number
+    pageSize: number
+}
+
 export interface CreateBankPaymentDto {
     orderId: number
     bankId: number
@@ -166,6 +177,18 @@ export interface AppPaymentFilters {
     pageSize: number
     sortBy?: string
     sortOrder?: 'asc' | 'desc'
+}
+
+/** Filtros en pantalla (null para v-model con BaseInput). */
+export interface AppPaymentListUiFilters {
+    orderId: number | null
+    appId: number | null
+    bankId: number | null
+    settled?: boolean
+    fromDate: string | null
+    toDate: string | null
+    page: number
+    pageSize: number
 }
 
 export interface CreateAppPaymentDto {

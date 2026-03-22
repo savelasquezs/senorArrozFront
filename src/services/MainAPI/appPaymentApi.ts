@@ -18,9 +18,9 @@ class AppPaymentApi extends BaseApi {
         // Mapear parámetros de frontend (camelCase) a backend (PascalCase)
         const params: any = {};
         if (filters) {
-            if (filters.orderId !== undefined) params.OrderId = filters.orderId;
-            if (filters.appId !== undefined) params.AppId = filters.appId;
-            if (filters.bankId !== undefined) params.BankId = filters.bankId;
+            if (filters.orderId != null) params.OrderId = filters.orderId;
+            if (filters.appId != null) params.AppId = filters.appId;
+            if (filters.bankId != null) params.BankId = filters.bankId;
             if (filters.branchId !== undefined) params.BranchId = filters.branchId;
             if (filters.settled !== undefined) params.Settled = filters.settled;
             if (filters.fromDate) params.FromDate = filters.fromDate;
