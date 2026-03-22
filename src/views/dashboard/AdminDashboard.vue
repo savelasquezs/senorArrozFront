@@ -2,6 +2,8 @@
     <div class="flex flex-col lg:flex-row-reverse lg:items-start min-h-0 gap-0">
         <DashboardRightNav
             v-model="activeSection"
+            v-model:date-range="globalDashboardDateRange"
+            v-model:time-granularity="globalTimeGranularity"
             :branch-id="adminBranchId"
             :branch-options="deliveryBranchOptions"
             :show-branch-filter="false"
@@ -32,11 +34,12 @@
                     v-else-if="activeSection === 'ventas'"
                     key="ventas"
                     v-model:products-group-by="ventasProductsGroupBy"
+                    v-model:time-granularity="globalTimeGranularity"
                     :loading="ventasLoading"
                     :error="ventasError"
                     :show-branch-comparison="false"
                     :comparison-rows="ventasComparisonRows"
-                    v-model:date-range="evolutionDateRange"
+                    :date-range="globalDashboardDateRange"
                     :sales-by-day="salesByDay"
                     :sales-by-hour="salesByHour"
                     :sales-by-month="salesByMonth"
@@ -51,10 +54,8 @@
                 <DashboardGastosSection
                     v-else-if="activeSection === 'gastos'"
                     key="gastos"
-                    v-model:date-range="gastosDateRange"
                     v-model:filter-category-id="gastosFilterCategoryId"
                     v-model:filter-expense-id="gastosFilterExpenseId"
-                    v-model:series-granularity="gastosSeriesGranularity"
                     :loading="gastosLoading"
                     :series-busy="gastosSeriesBusy"
                     :error="gastosError"
@@ -100,6 +101,7 @@ import { useDashboardGastosSection } from '@/composables/dashboard/useDashboardG
 import { useDashboardDomiciliosSection } from '@/composables/dashboard/useDashboardDomiciliosSection'
 import { useDashboardShellMockState } from '@/composables/dashboard/useDashboardShellMockState'
 import type { VentasProductsGroupBy } from '@/services/MainAPI/dashboardSectionApi'
+import type { DashboardTimeGranularity } from '@/views/dashboard/dashboardGlobalFilters'
 import DashboardPrincipalSection from '@/views/dashboard/sections/DashboardPrincipalSection.vue'
 import DashboardVentasSection from '@/views/dashboard/sections/DashboardVentasSection.vue'
 import DashboardGastosSection from '@/views/dashboard/sections/DashboardGastosSection.vue'
@@ -127,15 +129,15 @@ const adminBranchId = computed(() => adminBranchIdWritable.value)
 const activeSection = ref<DashboardSectionId>('principal')
 
 const deliveryPeriod = ref(defaultDashboardPeriodThisMonth())
-const evolutionDateRange = ref<[Date, Date]>(defaultDateRangeLastDays(7))
-const gastosDateRange = ref<[Date, Date]>(defaultDateRangeLastDays(30))
+const globalDashboardDateRange = ref<[Date, Date]>(defaultDateRangeLastDays(7))
+const globalTimeGranularity = ref<DashboardTimeGranularity>('day')
 const ventasProductsGroupBy = ref<VentasProductsGroupBy>('product')
 
 const principalSection = useDashboardPrincipalSection(activeSection, adminBranchIdWritable)
 const ventasSection = useDashboardVentasSection(
 	activeSection,
 	adminBranchIdWritable,
-	evolutionDateRange,
+	globalDashboardDateRange,
 	ventasProductsGroupBy,
 )
 const domiciliosSection = useDashboardDomiciliosSection(
@@ -143,7 +145,12 @@ const domiciliosSection = useDashboardDomiciliosSection(
     adminBranchIdWritable,
     deliveryPeriod,
 )
-const gastosSection = useDashboardGastosSection(activeSection, adminBranchIdWritable, gastosDateRange)
+const gastosSection = useDashboardGastosSection(
+	activeSection,
+	adminBranchIdWritable,
+	globalDashboardDateRange,
+	globalTimeGranularity,
+)
 const {
 	loading: gastosLoading,
 	seriesBusy: gastosSeriesBusy,
@@ -151,7 +158,6 @@ const {
 	data: gastosData,
 	filterCategoryId: gastosFilterCategoryId,
 	filterExpenseId: gastosFilterExpenseId,
-	seriesGranularity: gastosSeriesGranularity,
 } = gastosSection
 
 const principalData = principalSection.data
@@ -201,7 +207,7 @@ const {
     deliveryPeriod,
     deliveryFromApi: domiciliosSection.deliveryPayload,
     activeSection,
-    evolutionDateRange,
+    evolutionDateRange: globalDashboardDateRange,
 })
 
 const salesByDay = computed(

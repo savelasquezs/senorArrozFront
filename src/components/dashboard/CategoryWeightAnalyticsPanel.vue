@@ -1,20 +1,10 @@
 <template>
 	<BaseCard title="Peso vendido por categoría" :padding="'md'">
 		<div class="space-y-6">
-			<div
-				class="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end sm:justify-between pb-3 border-b border-gray-100"
-			>
-				<DashboardDateRangeFilter
-					v-model="dateRangeModel"
-					label="Periodo (peso)"
-					:max-date="maxSelectableDate"
-					:min-date="minSelectableDate"
-				/>
-				<p class="text-[11px] text-gray-500 max-w-xl sm:text-right leading-relaxed">
-					Datos de <strong>pedidos reales</strong> (líneas con producto que tiene peso en gramos). La torta y
-					los % usan el mismo rango. La evolución depende de la escala y de la categoría elegida.
-				</p>
-			</div>
+			<p class="text-[11px] text-gray-500 pb-3 border-b border-gray-100 leading-relaxed">
+				El <strong>periodo</strong> y la <strong>escala</strong> están en el panel lateral. Datos reales:
+				líneas con producto que tiene peso (g). La torta usa el rango; la evolución, la categoría elegida.
+			</p>
 
 			<div
 				v-if="USE_VENTAS_MOCK"
@@ -63,14 +53,6 @@
 
 					<section class="space-y-3 border-t border-gray-100 pt-6 xl:border-t-0 xl:pt-0 xl:border-l xl:pl-8 xl:border-gray-100">
 						<h3 class="text-sm font-semibold text-gray-900">Evolución en el tiempo</h3>
-						<div class="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
-							<p class="text-xs text-gray-500">Escala</p>
-							<DashboardSegmentedTabs
-								v-model="granularityModel"
-								:options="granularityTabs"
-								aria-label="Escala de tiempo peso por categoría"
-							/>
-						</div>
 						<div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
 							<label class="text-xs font-medium text-gray-700 shrink-0" for="cw-cat">Categoría</label>
 							<select
@@ -115,58 +97,25 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
 import BaseCard from '@/components/ui/BaseCard.vue';
-import DashboardDateRangeFilter from './DashboardDateRangeFilter.vue';
-import DashboardSegmentedTabs from './DashboardSegmentedTabs.vue';
 import DashboardLineChart from './DashboardLineChart.vue';
 import DashboardWeightShareDonut from './DashboardWeightShareDonut.vue';
 import { dashboardApi, type DashboardCategoryWeightsApiResponse } from '@/services/MainAPI/dashboardApi';
 import { encodeDashboardRangeToApi, USE_VENTAS_MOCK } from '@/services/MainAPI/dashboardSectionApi';
 import type { LineChartDataset } from './lineChart.types';
+import {
+	weightApiGranularity,
+	type DashboardTimeGranularity,
+} from '@/views/dashboard/dashboardGlobalFilters';
 
 const props = defineProps<{
 	branchId: number | null;
 	dateRange: [Date, Date];
+	timeGranularity: DashboardTimeGranularity;
 }>();
-
-const emit = defineEmits<{
-	'update:dateRange': [value: [Date, Date]];
-}>();
-
-const dateRangeModel = computed({
-	get: () => props.dateRange,
-	set: (v: [Date, Date]) => emit('update:dateRange', v),
-});
-
-const maxSelectableDate = computed(() => {
-	const d = new Date();
-	d.setHours(23, 59, 59, 999);
-	return d;
-});
-
-const minSelectableDate = computed(() => {
-	const d = new Date();
-	d.setFullYear(d.getFullYear() - 2);
-	d.setHours(0, 0, 0, 0);
-	return d;
-});
 
 const loading = ref(false);
 const error = ref<string | null>(null);
 const payload = ref<DashboardCategoryWeightsApiResponse | null>(null);
-
-const granularity = ref<'day' | 'month' | 'year'>('day');
-const granularityModel = computed({
-	get: () => granularity.value,
-	set: (v: string) => {
-		if (v === 'month' || v === 'year' || v === 'day') granularity.value = v;
-	},
-});
-
-const granularityTabs = [
-	{ value: 'day', label: 'Por día' },
-	{ value: 'month', label: 'Por mes' },
-	{ value: 'year', label: 'Por año' },
-];
 
 const selectedCategoryId = ref<number | null>(null);
 const selectedCategoryModel = computed({
@@ -176,8 +125,10 @@ const selectedCategoryModel = computed({
 	},
 });
 
+const weightEvolutionGranularity = computed(() => weightApiGranularity(props.timeGranularity));
+
 const granularityLabel = computed(() => {
-	switch (granularity.value) {
+	switch (weightEvolutionGranularity.value) {
 		case 'month':
 			return 'mes';
 		case 'year':
@@ -213,7 +164,9 @@ function formatBucketLabel(iso: string, g: 'day' | 'month' | 'year'): string {
 }
 
 const evolutionLabels = computed(() =>
-	(payload.value?.evolution ?? []).map((e) => formatBucketLabel(e.bucketStartUtc, granularity.value)),
+	(payload.value?.evolution ?? []).map((e) =>
+		formatBucketLabel(e.bucketStartUtc, weightEvolutionGranularity.value),
+	),
 );
 
 const evolutionDatasets = computed((): LineChartDataset[] => {
@@ -251,7 +204,7 @@ async function load() {
 	try {
 		const { from, to } = encodeDashboardRangeToApi(props.dateRange);
 		const raw = await dashboardApi.getSalesCategoryWeights(props.branchId, from, to, {
-			granularity: granularity.value,
+			granularity: weightEvolutionGranularity.value,
 			categoryId: selectedCategoryId.value,
 		});
 		payload.value = raw;
@@ -268,7 +221,14 @@ async function load() {
 }
 
 watch(
-	() => [props.branchId, props.dateRange[0].getTime(), props.dateRange[1].getTime(), granularity.value, selectedCategoryId.value] as const,
+	() =>
+		[
+			props.branchId,
+			props.dateRange[0].getTime(),
+			props.dateRange[1].getTime(),
+			props.timeGranularity,
+			selectedCategoryId.value,
+		] as const,
 	() => void load(),
 	{ immediate: true },
 );

@@ -1,6 +1,6 @@
 <template>
 	<div
-		class="inline-flex rounded-lg border border-gray-200 bg-gray-50 p-0.5 gap-0.5"
+		class="inline-flex flex-wrap rounded-lg border border-gray-200 bg-gray-50 p-0.5 gap-0.5"
 		role="tablist"
 		:aria-label="ariaLabel"
 	>

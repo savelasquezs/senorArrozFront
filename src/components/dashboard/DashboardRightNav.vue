@@ -22,6 +22,32 @@
 				</button>
 			</nav>
 		</div>
+		<div v-if="showGlobalFilters" class="border-b border-gray-100 p-3 space-y-3">
+			<div>
+				<p class="text-xs font-semibold uppercase tracking-wide text-gray-500">Periodo</p>
+				<DashboardDateRangeFilter
+					v-model="dateRangeModel"
+					class="mt-1.5"
+					label="Desde / hasta"
+					:max-date="maxSelectableDate"
+					:min-date="minSelectableDate"
+					teleport="body"
+				/>
+			</div>
+			<div>
+				<p class="text-xs font-semibold uppercase tracking-wide text-gray-500">Escala</p>
+				<DashboardSegmentedTabs
+					v-model="timeGranularityModel"
+					class="mt-1.5 w-full"
+					:options="granularityTabs"
+					aria-label="Escala temporal global del dashboard"
+				/>
+			</div>
+			<p class="text-[10px] leading-snug text-gray-500">
+				Aplica a ventas, peso por categoría y gastos. <strong>Hora</strong>: último día del rango en ventas.
+                Sin recargar la página.
+			</p>
+		</div>
 		<div v-if="showBranchFilter" class="mt-auto border-t border-gray-100 p-3">
 			<label class="block text-xs font-medium text-gray-600 mb-1" for="dashboard-global-branch"
 				>Sucursal</label
@@ -45,21 +71,69 @@
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue';
 import { DASHBOARD_SECTION_NAV } from '@/views/dashboard/dashboardSectionIds';
 import type { DashboardSectionId } from '@/views/dashboard/dashboardSectionIds';
 import type { DeliveryBranchOption } from './operation.types';
+import DashboardDateRangeFilter from './DashboardDateRangeFilter.vue';
+import DashboardSegmentedTabs from './DashboardSegmentedTabs.vue';
+import {
+	DASHBOARD_TIME_GRANULARITY_TABS,
+	type DashboardTimeGranularity,
+} from '@/views/dashboard/dashboardGlobalFilters';
 
-defineProps<{
-	modelValue: DashboardSectionId;
-	branchId: number | null;
-	branchOptions: DeliveryBranchOption[];
-	showBranchFilter: boolean;
-}>();
+const props = withDefaults(
+	defineProps<{
+		modelValue: DashboardSectionId;
+		branchId: number | null;
+		branchOptions: DeliveryBranchOption[];
+		showBranchFilter: boolean;
+		/** Filtro global de fechas (compartido entre secciones). */
+		dateRange: [Date, Date];
+		timeGranularity: DashboardTimeGranularity;
+		showGlobalFilters?: boolean;
+	}>(),
+	{ showGlobalFilters: true },
+);
 
 const emit = defineEmits<{
 	'update:modelValue': [value: DashboardSectionId];
 	'update:branchId': [value: number | null];
+	'update:dateRange': [value: [Date, Date]];
+	'update:timeGranularity': [value: DashboardTimeGranularity];
 }>();
+
+const dateRangeModel = computed({
+	get: () => props.dateRange,
+	set: (v: [Date, Date]) => emit('update:dateRange', v),
+});
+
+const timeGranularityModel = computed({
+	get: () => props.timeGranularity,
+	set: (v: string) => {
+		if (v === 'day' || v === 'hour' || v === 'month' || v === 'year') {
+			emit('update:timeGranularity', v);
+		}
+	},
+});
+
+const granularityTabs = DASHBOARD_TIME_GRANULARITY_TABS.map((x) => ({
+	value: x.value,
+	label: x.label,
+}));
+
+const maxSelectableDate = computed(() => {
+	const d = new Date();
+	d.setHours(23, 59, 59, 999);
+	return d;
+});
+
+const minSelectableDate = computed(() => {
+	const d = new Date();
+	d.setFullYear(d.getFullYear() - 2);
+	d.setHours(0, 0, 0, 0);
+	return d;
+});
 
 function onBranchChange(e: Event) {
 	const v = (e.target as HTMLSelectElement).value;

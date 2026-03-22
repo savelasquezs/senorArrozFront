@@ -1,30 +1,10 @@
 <template>
 	<BaseCard :padding="'md'" :shadow="'sm'">
 		<div class="space-y-8">
-			<div
-				class="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end sm:justify-between pb-4 border-b border-gray-100"
-			>
-				<DashboardDateRangeFilter
-					v-model="dateRange"
-					:max-date="maxSelectableDate"
-					:min-date="minSelectableDate"
-					label="Periodo del gráfico"
-				/>
-				<p class="text-[11px] text-gray-500 max-w-xl sm:text-right leading-relaxed">
-					<strong>Granularidad:</strong> afecta ventas y pedidos.
-					<strong class="ml-1">Día / mes / año:</strong> todos los períodos dentro del rango.
-					<strong class="ml-1">Hora:</strong> usa el <strong>último día</strong> del rango; pedidos: área o barras.
-				</p>
-			</div>
-
-			<div class="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
-				<p class="text-xs font-medium text-gray-700">Escala de tiempo</p>
-				<DashboardSegmentedTabs
-					v-model="timeGranularity"
-					:options="granularityTabs"
-					aria-label="Granularidad ventas y pedidos"
-				/>
-			</div>
+			<p class="text-[11px] text-gray-500 pb-2 border-b border-gray-100 leading-relaxed">
+				Periodo y escala se controlan en el <strong>panel lateral</strong>.
+				<strong class="ml-1">Hora:</strong> último día del rango; pedidos: área o barras.
+			</p>
 
 			<section class="space-y-3">
 				<div>
@@ -84,7 +64,6 @@ import BaseCard from '@/components/ui/BaseCard.vue';
 import DashboardLineChart from './DashboardLineChart.vue';
 import DashboardBarChart from './DashboardBarChart.vue';
 import DashboardSegmentedTabs from './DashboardSegmentedTabs.vue';
-import DashboardDateRangeFilter from './DashboardDateRangeFilter.vue';
 import type { OrdersPerHourBlock, SalesTimeSeriesBlock } from './timeEvolution.types';
 
 const props = defineProps<{
@@ -98,30 +77,8 @@ const props = defineProps<{
 	ordersByYear: OrdersPerHourBlock;
 }>();
 
-const dateRange = defineModel<[Date, Date]>('dateRange', { required: true });
-
-const maxSelectableDate = computed(() => {
-	const d = new Date();
-	d.setHours(23, 59, 59, 999);
-	return d;
-});
-
-const minSelectableDate = computed(() => {
-	const d = new Date();
-	d.setFullYear(d.getFullYear() - 2);
-	d.setHours(0, 0, 0, 0);
-	return d;
-});
-
-const timeGranularity = ref<string>('day');
+const timeGranularity = defineModel<string>('timeGranularity', { default: 'day' });
 const ordersDisplay = ref<string>('area');
-
-const granularityTabs = [
-	{ value: 'day', label: 'Por día' },
-	{ value: 'hour', label: 'Por hora' },
-	{ value: 'month', label: 'Por mes' },
-	{ value: 'year', label: 'Por año' },
-];
 
 const ordersDisplayTabs = [
 	{ value: 'area', label: 'Área' },
@@ -129,7 +86,7 @@ const ordersDisplayTabs = [
 ];
 
 const activeSalesBlock = computed((): SalesTimeSeriesBlock => {
-	switch (timeGranularity.value) {
+	switch (timeGranularity.value as string) {
 		case 'hour':
 			return props.salesByHour;
 		case 'month':
@@ -142,7 +99,7 @@ const activeSalesBlock = computed((): SalesTimeSeriesBlock => {
 });
 
 const activeOrdersBlock = computed((): OrdersPerHourBlock => {
-	switch (timeGranularity.value) {
+	switch (timeGranularity.value as string) {
 		case 'hour':
 			return props.ordersByHour;
 		case 'month':
@@ -155,7 +112,7 @@ const activeOrdersBlock = computed((): OrdersPerHourBlock => {
 });
 
 const ordersSectionTitle = computed(() => {
-	switch (timeGranularity.value) {
+	switch (timeGranularity.value as string) {
 		case 'hour':
 			return 'Pedidos por hora';
 		case 'month':
@@ -168,7 +125,7 @@ const ordersSectionTitle = computed(() => {
 });
 
 const ordersSectionHint = computed(() => {
-	switch (timeGranularity.value) {
+	switch (timeGranularity.value as string) {
 		case 'hour':
 			return 'Agregado de todas las sucursales; último día del rango.';
 		case 'day':

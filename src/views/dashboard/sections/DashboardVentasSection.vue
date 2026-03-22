@@ -16,7 +16,7 @@
 			<BranchComparisonPanel v-if="showBranchComparison" :rows="comparisonRows" />
 
 			<TimeEvolutionPanel
-				v-model:date-range="dateRangeModel"
+				v-model:time-granularity="timeGranularity"
 				:sales-by-day="salesByDay"
 				:sales-by-hour="salesByHour"
 				:sales-by-month="salesByMonth"
@@ -82,7 +82,8 @@
 			</section>
 
 			<CategoryWeightAnalyticsPanel
-				v-model:date-range="dateRangeModel"
+				:date-range="dateRange"
+				:time-granularity="timeGranularity"
 				:branch-id="branchId"
 			/>
 
@@ -113,6 +114,7 @@ import {
 	type BarChartDataset,
 } from '@/components/dashboard';
 import type { VentasProductsGroupBy, VentasProductsPayload } from '@/services/MainAPI/dashboardSectionApi';
+import type { DashboardTimeGranularity } from '@/views/dashboard/dashboardGlobalFilters';
 
 const props = withDefaults(
 	defineProps<{
@@ -138,15 +140,7 @@ const props = withDefaults(
 );
 
 const productsGroupBy = defineModel<VentasProductsGroupBy>('productsGroupBy', { default: 'product' });
-
-const emit = defineEmits<{
-	'update:dateRange': [value: [Date, Date]];
-}>();
-
-const dateRangeModel = computed({
-	get: () => props.dateRange,
-	set: (v: [Date, Date]) => emit('update:dateRange', v),
-});
+const timeGranularity = defineModel<DashboardTimeGranularity>('timeGranularity', { default: 'day' });
 
 /** Tabs usan `string`; enlazamos al mismo ref que el padre. */
 const productsGroupByModel = computed({

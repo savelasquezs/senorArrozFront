@@ -13,49 +13,38 @@
 			{{ error }}
 		</div>
 		<template v-else>
-			<div class="flex flex-col gap-4 lg:flex-row lg:flex-wrap lg:items-end lg:justify-between">
-				<DashboardDateRangeFilter v-model="dateRangeModel" label="Periodo (gastos registrados)" />
-				<div class="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-end">
-					<div class="min-w-[200px]">
-						<label class="block text-xs font-medium text-gray-600 mb-1">Categoría (línea)</label>
-						<select
-							v-model.number="categorySelectValue"
-							class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 bg-white"
-						>
-							<option :value="0">Todas — total</option>
-							<option v-for="c in categoryOptions" :key="c.id" :value="c.id">
-								{{ c.name }}
-							</option>
-						</select>
-					</div>
-					<div v-if="filterCategoryId != null" class="min-w-[220px]">
-						<label class="block text-xs font-medium text-gray-600 mb-1">Gasto (catálogo)</label>
-						<select
-							v-model.number="expenseSelectValue"
-							class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 bg-white"
-							:disabled="expenseOptionsLoading"
-						>
-							<option :value="0">Todos en la categoría</option>
-							<option v-for="e in expenseOptions" :key="e.id" :value="e.id">
-								{{ e.name }}
-							</option>
-						</select>
-					</div>
-					<div class="min-w-[160px]">
-						<label class="block text-xs font-medium text-gray-600 mb-1">Escala tiempo</label>
-						<select
-							v-model="granularityModel"
-							class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 bg-white"
-						>
-							<option value="auto">Automática</option>
-							<option value="day">Por día</option>
-							<option value="month">Por mes</option>
-						</select>
-					</div>
+			<p class="text-[11px] text-gray-500 mb-3">
+				El periodo y la escala de la serie están en el <strong>panel lateral</strong>.
+			</p>
+			<div class="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-end">
+				<div class="min-w-[200px]">
+					<label class="block text-xs font-medium text-gray-600 mb-1">Categoría (línea)</label>
+					<select
+						v-model.number="categorySelectValue"
+						class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 bg-white"
+					>
+						<option :value="0">Todas — total</option>
+						<option v-for="c in categoryOptions" :key="c.id" :value="c.id">
+							{{ c.name }}
+						</option>
+					</select>
+				</div>
+				<div v-if="filterCategoryId != null" class="min-w-[220px]">
+					<label class="block text-xs font-medium text-gray-600 mb-1">Gasto (catálogo)</label>
+					<select
+						v-model.number="expenseSelectValue"
+						class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 bg-white"
+						:disabled="expenseOptionsLoading"
+					>
+						<option :value="0">Todos en la categoría</option>
+						<option v-for="e in expenseOptions" :key="e.id" :value="e.id">
+							{{ e.name }}
+						</option>
+					</select>
 				</div>
 			</div>
 
-			<div v-if="payload?.summary" class="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+			<div v-if="payload?.summary" class="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4 mt-4">
 				<BaseCard :padding="'md'" :shadow="'sm'">
 					<p class="text-[11px] font-medium text-gray-500">Total gastado</p>
 					<p class="mt-1 text-lg font-bold text-gray-900 tabular-nums">
@@ -141,11 +130,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
 import BaseCard from '@/components/ui/BaseCard.vue';
-import {
-	DashboardDateRangeFilter,
-	DashboardLineChart,
-	DashboardRevenueShareDonut,
-} from '@/components/dashboard';
+import { DashboardLineChart, DashboardRevenueShareDonut } from '@/components/dashboard';
 import type { LineChartDataset } from '@/components/dashboard';
 import { expenseCategoryApi } from '@/services/MainAPI/expenseCategoryApi';
 import { expenseApi } from '@/services/MainAPI/expenseApi';
@@ -160,14 +145,8 @@ const props = defineProps<{
 	payload: GastosDashboardPayload | null | undefined;
 }>();
 
-const dateRange = defineModel<[Date, Date]>('dateRange', { required: true });
 const filterCategoryId = defineModel<number | null>('filterCategoryId', { default: null });
 const filterExpenseId = defineModel<number | null>('filterExpenseId', { default: null });
-const seriesGranularity = defineModel<'auto' | 'day' | 'month'>('seriesGranularity', {
-	default: 'auto',
-});
-
-const dateRangeModel = dateRange;
 
 const categoryOptions = ref<Array<{ id: number; name: string }>>([]);
 const expenseOptions = ref<Expense[]>([]);
@@ -184,13 +163,6 @@ const expenseSelectValue = computed({
 	get: () => (filterExpenseId.value == null ? 0 : filterExpenseId.value),
 	set: (v: number) => {
 		filterExpenseId.value = v === 0 ? null : v;
-	},
-});
-
-const granularityModel = computed({
-	get: () => seriesGranularity.value,
-	set: (v: string) => {
-		if (v === 'day' || v === 'month' || v === 'auto') seriesGranularity.value = v;
 	},
 });
 

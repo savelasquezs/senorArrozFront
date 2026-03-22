@@ -2,6 +2,10 @@ import { ref, watch, computed, type Ref } from 'vue';
 import { dashboardApi } from '@/services/MainAPI/dashboardApi';
 import { encodeDashboardRangeToApi } from '@/services/MainAPI/dashboardSectionApi';
 import type { DashboardSectionId } from '@/views/dashboard/dashboardSectionIds';
+import {
+	expenseTimeSeriesGranularity,
+	type DashboardTimeGranularity,
+} from '@/views/dashboard/dashboardGlobalFilters';
 
 export type GastosSummaryPayload = {
 	totalCop: number;
@@ -69,12 +73,13 @@ function rangeKey(range: [Date, Date]) {
 /**
  * Gastos del dashboard: KPIs, torta por categoría y línea temporal filtrable.
  * Cambiar categoría/gasto/granularidad solo actualiza la serie (sin pantalla de carga completa).
- * Cambiar rango/sucursal actualiza todo sin bloquear la UI tras la primera carga.
+ * Cambiar rango/sucursal/granularidad global actualiza todo sin bloquear la UI tras la primera carga.
  */
 export function useDashboardGastosSection(
 	activeSection: Ref<DashboardSectionId>,
 	branchId: Ref<number | null>,
 	dateRange: Ref<[Date, Date]>,
+	timeGranularity: Ref<DashboardTimeGranularity>,
 ) {
 	const data = ref<GastosDashboardPayload | null>(null);
 	const loading = ref(false);
@@ -83,7 +88,6 @@ export function useDashboardGastosSection(
 
 	const filterCategoryId = ref<number | null>(null);
 	const filterExpenseId = ref<number | null>(null);
-	const seriesGranularity = ref<'auto' | 'day' | 'month'>('auto');
 
 	const isActive = computed(() => activeSection.value === 'gastos');
 
@@ -104,8 +108,7 @@ export function useDashboardGastosSection(
 		try {
 			const { from, to } = encodeDashboardRangeToApi(dateRange.value);
 			const b = branchId.value;
-			const granOpt =
-				seriesGranularity.value === 'auto' ? undefined : seriesGranularity.value;
+			const granOpt = expenseTimeSeriesGranularity(timeGranularity.value);
 			const [summaryRaw, catRaw, tsRaw] = await Promise.all([
 				dashboardApi.getExpenseSummary(b, from, to),
 				dashboardApi.getExpenseByCategory(b, from, to),
@@ -141,8 +144,7 @@ export function useDashboardGastosSection(
 		seriesBusy.value = true;
 		try {
 			const { from, to } = encodeDashboardRangeToApi(dateRange.value);
-			const granOpt =
-				seriesGranularity.value === 'auto' ? undefined : seriesGranularity.value;
+			const granOpt = expenseTimeSeriesGranularity(timeGranularity.value);
 			const tsRaw = await dashboardApi.getExpenseTimeSeries(branchId.value, from, to, {
 				categoryId: filterCategoryId.value,
 				expenseId: filterExpenseId.value,
@@ -162,7 +164,7 @@ export function useDashboardGastosSection(
 	}
 
 	watch(
-		[isActive, branchId, () => rangeKey(dateRange.value)],
+		[isActive, branchId, () => rangeKey(dateRange.value), timeGranularity],
 		() => {
 			if (!isActive.value) return;
 			void loadCoreAndSeries(data.value != null);
@@ -171,7 +173,7 @@ export function useDashboardGastosSection(
 	);
 
 	watch(
-		[filterCategoryId, filterExpenseId, seriesGranularity],
+		[filterCategoryId, filterExpenseId],
 		() => {
 			if (!isActive.value || !data.value) return;
 			void loadSeriesOnly();
@@ -185,6 +187,5 @@ export function useDashboardGastosSection(
 		error,
 		filterCategoryId,
 		filterExpenseId,
-		seriesGranularity,
 	};
 }
