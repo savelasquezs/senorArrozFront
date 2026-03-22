@@ -38,6 +38,7 @@
                     :orders-by-month="ordersByMonth"
                     :orders-by-year="ordersByYear"
                     :products-payload="ventasProducts"
+                    :branch-id="globalDashboardBranchId"
                 />
                 <DashboardGastosSection
                     v-else-if="activeSection === 'gastos'"

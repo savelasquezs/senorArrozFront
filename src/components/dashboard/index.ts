@@ -13,6 +13,8 @@ export { default as DashboardGaugeDoughnut } from './DashboardGaugeDoughnut.vue'
 export { default as DashboardGaugeCard } from './DashboardGaugeCard.vue';
 export { default as DashboardHorizontalBarChart } from './DashboardHorizontalBarChart.vue';
 export { default as DashboardRevenueShareDonut } from './DashboardRevenueShareDonut.vue';
+export { default as DashboardWeightShareDonut } from './DashboardWeightShareDonut.vue';
+export { default as CategoryWeightAnalyticsPanel } from './CategoryWeightAnalyticsPanel.vue';
 export { default as DashboardDeliveryScatterChart } from './DashboardDeliveryScatterChart.vue';
 export { default as OperationOverviewPanel } from './OperationOverviewPanel.vue';
 export { default as DashboardRightNav } from './DashboardRightNav.vue';

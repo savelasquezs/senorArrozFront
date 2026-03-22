@@ -115,6 +115,24 @@ class DashboardApi extends BaseApi {
 		return this.get<DashboardSalesProductsApiResponse>('/dashboard/sales/products', { params });
 	}
 
+	/** Peso vendido (g) por categoría + evolución opcional por categoría (datos reales de líneas de pedido). */
+	async getSalesCategoryWeights(
+		branchId: number | null,
+		fromIso: string,
+		toIso: string,
+		opts: { granularity: 'day' | 'month' | 'year'; categoryId?: number | null },
+	): Promise<DashboardCategoryWeightsApiResponse> {
+		const params: Record<string, string | number> = {
+			from: fromIso,
+			to: toIso,
+			granularity: opts.granularity,
+		};
+		if (branchId != null) params.branchId = branchId;
+		if (opts.categoryId != null && opts.categoryId !== undefined)
+			params.categoryId = opts.categoryId;
+		return this.get<DashboardCategoryWeightsApiResponse>('/dashboard/sales/category-weights', { params });
+	}
+
 	async getExpenseSummary(
 		branchId: number | null,
 		fromIso: string,
@@ -187,6 +205,18 @@ export type DashboardSalesEvolutionApiResponse = {
 	ordersByHour: DashboardOrdersTimelineApiBlock;
 	ordersByMonth: DashboardOrdersTimelineApiBlock;
 	ordersByYear: DashboardOrdersTimelineApiBlock;
+};
+
+export type DashboardCategoryWeightsApiResponse = {
+	byCategory: Array<{
+		categoryId: number;
+		name: string;
+		totalWeightGrams: number;
+	}>;
+	evolution: Array<{
+		bucketStartUtc: string;
+		totalWeightGrams: number;
+	}>;
 };
 
 export type DashboardSalesProductsApiResponse = {

@@ -20,3 +20,8 @@ export function formatTooltipCurrency(value: number): string {
 		maximumFractionDigits: 0,
 	}).format(value);
 }
+
+/** Gramos (tooltip peso vendido). */
+export function formatTooltipGrams(value: number): string {
+	return `${new Intl.NumberFormat('es-CO', { maximumFractionDigits: 0 }).format(value)} g`;
+}
