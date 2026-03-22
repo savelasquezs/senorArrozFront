@@ -18,7 +18,10 @@ export function useDashboardDomiciliosSection(
 ) {
 	const deliveryPayload = ref<DeliveryDashboardPayload | null>(null);
 	const loading = ref(false);
+	const refreshBusy = ref(false);
 	const error = ref<string | null>(null);
+	/** Tras el primer intento, los cambios de filtro no vuelven a mostrar el skeleton de toda la sección. */
+	const hasCompletedInitialLoad = ref(false);
 
 	const isActive = computed(() => activeSection.value === 'domicilios');
 
@@ -29,7 +32,9 @@ export function useDashboardDomiciliosSection(
 
 	async function load() {
 		if (!isActive.value) return;
-		loading.value = true;
+		const hadData = hasCompletedInitialLoad.value;
+		if (hadData) refreshBusy.value = true;
+		else loading.value = true;
 		error.value = null;
 		try {
 			if (USE_DELIVERY_MOCK) {
@@ -42,9 +47,11 @@ export function useDashboardDomiciliosSection(
 			);
 		} catch (e) {
 			error.value = e instanceof Error ? e.message : 'Error al cargar Domicilios';
-			deliveryPayload.value = null;
+			if (!hadData) deliveryPayload.value = null;
 		} finally {
 			loading.value = false;
+			refreshBusy.value = false;
+			hasCompletedInitialLoad.value = true;
 		}
 	}
 
@@ -54,5 +61,5 @@ export function useDashboardDomiciliosSection(
 		{ immediate: true },
 	);
 
-	return { deliveryPayload, loading, error, refresh: load };
+	return { deliveryPayload, loading, refreshBusy, hasCompletedInitialLoad, error, refresh: load };
 }

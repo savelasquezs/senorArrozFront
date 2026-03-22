@@ -21,13 +21,17 @@ export function useDashboardPrincipalSection(
 ) {
 	const data = ref<PrincipalDashboardPayload | null>(null);
 	const loading = ref(false);
+	/** Solo “pantalla completa” en la primera carga; con filtros posteriores se usa overlay en la vista. */
+	const refreshBusy = ref(false);
 	const error = ref<string | null>(null);
 
 	const isActive = computed(() => activeSection.value === 'principal');
 
 	async function load() {
 		if (!isActive.value) return;
-		loading.value = true;
+		const hadData = data.value != null;
+		if (hadData) refreshBusy.value = true;
+		else loading.value = true;
 		error.value = null;
 		try {
 			data.value = await fetchPrincipalDashboard(branchId.value, {
@@ -35,9 +39,10 @@ export function useDashboardPrincipalSection(
 			});
 		} catch (e) {
 			error.value = e instanceof Error ? e.message : 'Error al cargar Principal';
-			data.value = null;
+			if (!hadData) data.value = null;
 		} finally {
 			loading.value = false;
+			refreshBusy.value = false;
 		}
 	}
 
@@ -47,5 +52,5 @@ export function useDashboardPrincipalSection(
 		{ immediate: true },
 	);
 
-	return { data, loading, error, refresh: load };
+	return { data, loading, refreshBusy, error, refresh: load };
 }

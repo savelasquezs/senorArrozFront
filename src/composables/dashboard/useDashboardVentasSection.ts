@@ -25,6 +25,7 @@ export function useDashboardVentasSection(
 ) {
 	const data = ref<VentasDashboardPayload | null>(null);
 	const loading = ref(false);
+	const refreshBusy = ref(false);
 	const error = ref<string | null>(null);
 
 	const isActive = computed(() => activeSection.value === 'ventas');
@@ -35,7 +36,9 @@ export function useDashboardVentasSection(
 	async function loadFull() {
 		if (!isActive.value) return;
 		const seq = ++fullLoadSeq;
-		loading.value = true;
+		const hadData = data.value != null;
+		if (hadData) refreshBusy.value = true;
+		else loading.value = true;
 		error.value = null;
 		const groupByForThisFetch = productsGroupBy.value;
 		try {
@@ -49,9 +52,12 @@ export function useDashboardVentasSection(
 		} catch (e) {
 			if (seq !== fullLoadSeq) return;
 			error.value = e instanceof Error ? e.message : 'Error al cargar Ventas';
-			data.value = null;
+			if (!hadData) data.value = null;
 		} finally {
-			if (seq === fullLoadSeq) loading.value = false;
+			if (seq === fullLoadSeq) {
+				loading.value = false;
+				refreshBusy.value = false;
+			}
 		}
 		// Tras quitar el loading: si el agrupamiento cambió durante la petición, actualizar solo gráficas de productos.
 		if (seq === fullLoadSeq && data.value && productsGroupBy.value !== groupByForThisFetch) {
@@ -88,6 +94,7 @@ export function useDashboardVentasSection(
 	return {
 		data,
 		loading,
+		refreshBusy,
 		error,
 		refresh: loadFull,
 	};
