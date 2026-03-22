@@ -3,7 +3,8 @@
 		<div class="space-y-6">
 			<p class="text-[11px] text-gray-500 pb-3 border-b border-gray-100 leading-relaxed">
 				El <strong>periodo</strong> y la <strong>escala</strong> están en el panel lateral. Datos reales:
-				líneas con producto que tiene peso (g). La torta usa el rango; la evolución, la categoría elegida.
+				líneas con producto que tiene peso (g). La torta resume el rango; la evolución muestra
+				<strong>todas las categorías</strong> o <strong>una</strong> si la eliges abajo.
 			</p>
 
 			<div
@@ -19,7 +20,7 @@
 			</div>
 
 			<div
-				v-else-if="loading"
+				v-else-if="loading && !payload"
 				class="rounded-lg border border-gray-200 bg-gray-50 py-8 text-center text-sm text-gray-500"
 			>
 				Cargando pesos por categoría…
@@ -53,40 +54,46 @@
 
 					<section class="space-y-3 border-t border-gray-100 pt-6 xl:border-t-0 xl:pt-0 xl:border-l xl:pl-8 xl:border-gray-100">
 						<h3 class="text-sm font-semibold text-gray-900">Evolución en el tiempo</h3>
-						<div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
+						<form class="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3" @submit.prevent>
 							<label class="text-xs font-medium text-gray-700 shrink-0" for="cw-cat">Categoría</label>
 							<select
 								id="cw-cat"
 								v-model="selectedCategoryModel"
 								class="w-full sm:max-w-xs rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-emerald-600 focus:outline-none focus:ring-1 focus:ring-emerald-600"
+								@change.stop
 							>
-								<option value="">— Todas (solo torta arriba) —</option>
+								<option value="">— Todas (multilínea) —</option>
 								<option v-for="c in categoryOptions" :key="c.categoryId" :value="String(c.categoryId)">
 									{{ c.name }}
 								</option>
 							</select>
-						</div>
+						</form>
 						<p class="text-xs text-gray-500">
-							Selecciona una categoría para ver gramos vendidos por
-							<strong>{{ granularityLabel }}</strong> en el período.
+							Sin selección: una línea por categoría. Con categoría: una sola serie por
+							<strong>{{ granularityLabel }}</strong>.
 						</p>
-						<div
-							v-if="!selectedCategoryId"
-							class="h-48 flex items-center justify-center text-sm text-gray-500 border border-dashed border-gray-200 rounded-lg"
-						>
-							Elige una categoría para ver la evolución.
+						<div class="relative min-h-[12rem]">
+							<div
+								v-if="chartBusy"
+								class="absolute inset-0 z-10 flex items-center justify-center rounded-lg bg-white/70 text-sm text-gray-600 backdrop-blur-[1px]"
+							>
+								Actualizando gráfico…
+							</div>
+							<div
+								v-if="!hasEvolution"
+								class="h-48 flex items-center justify-center text-sm text-gray-500 border border-dashed border-gray-200 rounded-lg"
+							>
+								{{ evolutionEmptyMessage }}
+							</div>
+							<DashboardLineChart
+								v-else
+								:labels="evolutionLabels"
+								:datasets="evolutionDatasets"
+								y-format="number"
+								variant="line"
+								:curve-tension="0.35"
+							/>
 						</div>
-						<div v-else-if="!hasEvolution" class="h-48 flex items-center justify-center text-sm text-gray-500">
-							Sin datos de peso para esta categoría en el rango.
-						</div>
-						<DashboardLineChart
-							v-else
-							:labels="evolutionLabels"
-							:datasets="evolutionDatasets"
-							y-format="number"
-							variant="line"
-							:curve-tension="0.35"
-						/>
 					</section>
 				</div>
 			</template>
@@ -113,7 +120,9 @@ const props = defineProps<{
 	timeGranularity: DashboardTimeGranularity;
 }>();
 
-const loading = ref(false);
+/** Carga inicial del panel (sin datos aún). Las actualizaciones por categoría usan `chartBusy`. */
+const loading = ref(!USE_VENTAS_MOCK);
+const chartBusy = ref(false);
 const error = ref<string | null>(null);
 const payload = ref<DashboardCategoryWeightsApiResponse | null>(null);
 
@@ -163,27 +172,75 @@ function formatBucketLabel(iso: string, g: 'day' | 'month' | 'year'): string {
 	return String(d.getFullYear());
 }
 
-const evolutionLabels = computed(() =>
-	(payload.value?.evolution ?? []).map((e) =>
-		formatBucketLabel(e.bucketStartUtc, weightEvolutionGranularity.value),
-	),
-);
+function mergeAlignedCategoryWeightSeries(
+	series: Array<{
+		categoryId: number;
+		name: string;
+		points: Array<{ bucketStartUtc: string; totalWeightGrams: number }>;
+	}>,
+	g: 'day' | 'month' | 'year',
+): { labelStrings: string[]; datasets: LineChartDataset[] } {
+	const bucketSet = new Set<string>();
+	for (const s of series) {
+		for (const p of s.points) {
+			bucketSet.add(p.bucketStartUtc);
+		}
+	}
+	const sorted = [...bucketSet].sort((a, b) => new Date(a).getTime() - new Date(b).getTime());
+	const labelStrings = sorted.map((iso) => formatBucketLabel(iso, g));
+	const idx = new Map<string, number>();
+	sorted.forEach((iso, i) => idx.set(iso, i));
+	const datasets: LineChartDataset[] = series.map((s) => {
+		const data = new Array<number>(sorted.length).fill(0);
+		for (const p of s.points) {
+			const i = idx.get(p.bucketStartUtc);
+			if (i !== undefined) data[i] = p.totalWeightGrams;
+		}
+		return { label: `Gramos (${s.name})`, data };
+	});
+	return { labelStrings, datasets };
+}
 
-const evolutionDatasets = computed((): LineChartDataset[] => {
-	const id = selectedCategoryId.value;
-	const name =
-		(payload.value?.byCategory ?? []).find((c) => c.categoryId === id)?.name ?? 'Categoría';
-	return [
-		{
-			label: `Gramos (${name})`,
-			data: (payload.value?.evolution ?? []).map((e) => e.totalWeightGrams),
-		},
-	];
+const evolutionLabels = computed(() => {
+	const g = weightEvolutionGranularity.value;
+	if (selectedCategoryId.value != null) {
+		return (payload.value?.evolution ?? []).map((e) => formatBucketLabel(e.bucketStartUtc, g));
+	}
+	const multi = payload.value?.evolutionsByCategory ?? [];
+	return mergeAlignedCategoryWeightSeries(multi, g).labelStrings;
 });
 
-const hasEvolution = computed(
-	() => selectedCategoryId.value != null && (payload.value?.evolution?.length ?? 0) > 0,
-);
+const evolutionDatasets = computed((): LineChartDataset[] => {
+	const g = weightEvolutionGranularity.value;
+	if (selectedCategoryId.value != null) {
+		const id = selectedCategoryId.value;
+		const name =
+			(payload.value?.byCategory ?? []).find((c) => c.categoryId === id)?.name ?? 'Categoría';
+		return [
+			{
+				label: `Gramos (${name})`,
+				data: (payload.value?.evolution ?? []).map((e) => e.totalWeightGrams),
+			},
+		];
+	}
+	const multi = payload.value?.evolutionsByCategory ?? [];
+	return mergeAlignedCategoryWeightSeries(multi, g).datasets;
+});
+
+const hasEvolution = computed(() => {
+	if (selectedCategoryId.value != null) {
+		return (payload.value?.evolution?.length ?? 0) > 0;
+	}
+	const m = payload.value?.evolutionsByCategory ?? [];
+	return m.some((s) => (s.points?.length ?? 0) > 0);
+});
+
+const evolutionEmptyMessage = computed(() => {
+	if (selectedCategoryId.value != null) {
+		return 'Sin datos de peso para esta categoría en el rango.';
+	}
+	return 'Sin datos de peso por categoría en el rango.';
+});
 
 function formatWeightKgGrams(grams: number): string {
 	if (grams >= 1000) {
@@ -197,9 +254,12 @@ async function load() {
 	if (USE_VENTAS_MOCK) {
 		payload.value = null;
 		error.value = null;
+		loading.value = false;
 		return;
 	}
-	loading.value = true;
+	const hadPayload = payload.value != null;
+	if (!hadPayload) loading.value = true;
+	else chartBusy.value = true;
 	error.value = null;
 	try {
 		const { from, to } = encodeDashboardRangeToApi(props.dateRange);
@@ -207,7 +267,11 @@ async function load() {
 			granularity: weightEvolutionGranularity.value,
 			categoryId: selectedCategoryId.value,
 		});
-		payload.value = raw;
+		payload.value = {
+			...raw,
+			evolutionsByCategory: raw.evolutionsByCategory ?? [],
+			evolution: raw.evolution ?? [],
+		};
 		const ids = new Set((raw.byCategory ?? []).map((c) => c.categoryId));
 		if (selectedCategoryId.value != null && !ids.has(selectedCategoryId.value)) {
 			selectedCategoryId.value = null;
@@ -217,6 +281,7 @@ async function load() {
 		payload.value = null;
 	} finally {
 		loading.value = false;
+		chartBusy.value = false;
 	}
 }
 

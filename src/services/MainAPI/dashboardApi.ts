@@ -213,9 +213,16 @@ export type DashboardCategoryWeightsApiResponse = {
 		name: string;
 		totalWeightGrams: number;
 	}>;
+	/** Serie única cuando se envía `categoryId` en la petición. */
 	evolution: Array<{
 		bucketStartUtc: string;
 		totalWeightGrams: number;
+	}>;
+	/** Una serie por categoría cuando no se envía `categoryId`. */
+	evolutionsByCategory?: Array<{
+		categoryId: number;
+		name: string;
+		points: Array<{ bucketStartUtc: string; totalWeightGrams: number }>;
 	}>;
 };
 
