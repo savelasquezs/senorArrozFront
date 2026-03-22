@@ -51,6 +51,20 @@ export function useOrderPermissions() {
     }
 
     /**
+     * Tarifa de domicilio en detalle de pedido: solo Admin y Superadmin (no domiciliario ni cajero en esta pantalla).
+     * Mismas reglas de “mismo día” que canEditOrder para pedidos entregados.
+     */
+    const canEditDeliveryFee = (order: OrderListItem | OrderDetailView): boolean => {
+        const { userRole } = authStore
+        if (userRole !== 'Admin' && userRole !== 'Superadmin') return false
+        if (order.type !== 'delivery') return false
+        if (order.status === 'cancelled') return userRole === 'Superadmin'
+        if (userRole === 'Superadmin') return true
+        if (order.status === 'delivered') return isSameDay(order.createdAt)
+        return true
+    }
+
+    /**
      * Verifica si el usuario puede editar productos del pedido
      */
     const canEditProducts = (order: OrderListItem | OrderDetailView): boolean => {
@@ -290,6 +304,7 @@ export function useOrderPermissions() {
     return {
         isSameDay,
         canEditOrder,
+        canEditDeliveryFee,
         canEditProducts,
         canEditPayments,
         canVerifyPayments,

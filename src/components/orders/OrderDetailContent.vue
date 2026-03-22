@@ -150,9 +150,20 @@
                         <!-- Delivery Fee - SOLO SI DELIVERY -->
                         <div v-if="order.type === 'delivery'" class="space-y-2">
                             <label class="text-xs sm:text-sm font-medium text-gray-700">Tarifa de domicilio</label>
-                            <div class="bg-gray-50 rounded-lg p-2 sm:p-3">
-                                <p class="text-xs sm:text-sm text-gray-900">{{ formatCurrency(order?.deliveryFee || 0)
-                                }}</p>
+                            <div v-if="permissions.canEditDeliveryFee(order)"
+                                class="flex flex-col sm:flex-row sm:items-end gap-2 bg-gray-50 rounded-lg p-2 sm:p-3">
+                                <BaseInput v-model="editableDeliveryFee" type="number" :min="0" :max="50000"
+                                    :step="100" class="flex-1 min-w-0" placeholder="0"
+                                    :hint="`Actual: ${formatCurrency(order?.deliveryFee || 0)}`"
+                                    @blur="updateDeliveryFee" />
+                                <BaseButton size="sm" variant="secondary" class="shrink-0 w-full sm:w-auto"
+                                    :loading="savingDeliveryFee" @click="updateDeliveryFee">
+                                    Guardar tarifa
+                                </BaseButton>
+                            </div>
+                            <div v-else class="bg-gray-50 rounded-lg p-2 sm:p-3">
+                                <p class="text-xs sm:text-sm text-gray-900">{{ formatCurrency(order?.deliveryFee || 0) }}
+                                </p>
                             </div>
                         </div>
 
@@ -315,6 +326,8 @@ const originalOrderType = ref<'onsite' | 'delivery' | 'reservation' | null>(null
 // Estado local (solo lo que no está en el store)
 const editableGuestName = ref('')
 const editableNotes = ref('')
+const editableDeliveryFee = ref<number | null>(null)
+const savingDeliveryFee = ref(false)
 const customer = ref<Customer | null>(null)
 const customerLoading = ref(false)
 const customerError = ref<string | null>(null)
@@ -410,6 +423,10 @@ watch(ordersDataStoreCurrent, (newOrder) => {
         order.value = newOrder
         editableGuestName.value = newOrder.guestName || ''
         editableNotes.value = newOrder.notes || ''
+        editableDeliveryFee.value =
+            newOrder.deliveryFee !== null && newOrder.deliveryFee !== undefined
+                ? Number(newOrder.deliveryFee)
+                : 0
         // Cargar cliente completo si hay customerId
         if (newOrder.customerId) {
             loadCustomer(newOrder.customerId)
@@ -469,6 +486,34 @@ const updateNotes = async () => {
         // ✅ No necesita recargar
     } catch (err: any) {
         error('Error', err.message)
+    }
+}
+
+const updateDeliveryFee = async () => {
+    if (!order.value || !permissions.canEditDeliveryFee(order.value)) return
+
+    const raw = editableDeliveryFee.value
+    const next = raw === null || raw === undefined || Number.isNaN(Number(raw)) ? 0 : Math.max(0, Math.round(Number(raw)))
+    const current = order.value.deliveryFee !== null && order.value.deliveryFee !== undefined
+        ? Math.round(Number(order.value.deliveryFee))
+        : 0
+    if (next === current) return
+
+    if (next > 50000) {
+        error('Tarifa inválida', 'El valor no puede superar $50.000')
+        editableDeliveryFee.value = current
+        return
+    }
+
+    savingDeliveryFee.value = true
+    try {
+        await ordersDataStore.update(order.value.id, { deliveryFee: next })
+        success('Tarifa actualizada', 4000, 'Se recalculó el total del pedido')
+    } catch (err: any) {
+        error('Error al guardar tarifa', err.message)
+        editableDeliveryFee.value = current
+    } finally {
+        savingDeliveryFee.value = false
     }
 }
 
