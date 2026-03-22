@@ -13,8 +13,8 @@
                         <div class="p-4 border-b border-gray-200">
                             <div class="flex flex-wrap items-end gap-3">
                                 <div class="w-28 sm:w-32 shrink-0">
-                                    <BaseInput v-model="filters.totalQuery" type="text" inputmode="decimal"
-                                        placeholder="$$ Total"  class="w-full" @input="applyFilters" />
+                                    <BaseInput v-model="filters.totalQuery" type="text" inputmode="numeric"
+                                        placeholder="Total (dígitos)" class="w-full" @input="applyFilters" />
                                 </div>
                                 <div class="flex-1 min-w-[180px]">
                                     <BaseInput v-model="filters.search" placeholder="Cliente, teléfono, invitado…"
@@ -451,12 +451,9 @@ const fetchOrders = async () => {
             sortOrder: sortOrder.value,
             excludeFutureReservations: true,
         }
-        if (dateFilters.value.fromDate) body.fromDate = new Date(dateFilters.value.fromDate).toISOString()
-        if (dateFilters.value.toDate) {
-            const to = new Date(dateFilters.value.toDate)
-            to.setHours(23, 59, 59, 999)
-            body.toDate = to.toISOString()
-        }
+        // Solo YYYY-MM-DD: el API interpreta el día en hora Colombia (evita UTC midnight de toISOString)
+        if (dateFilters.value.fromDate) body.fromDate = dateFilters.value.fromDate
+        if (dateFilters.value.toDate) body.toDate = dateFilters.value.toDate
 
         if (bankFilterId.value != null) {
             body.bankId = bankFilterId.value

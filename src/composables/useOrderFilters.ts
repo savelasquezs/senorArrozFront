@@ -6,7 +6,7 @@ import type { OrderListItem, OrderType, OrderStatus } from '@/types/order'
  * bankId se aplica en el servidor vía searchOrders, no aquí.
  */
 export interface OrderFilterState {
-    /** Valor total del pedido (número; tolerancia para decimales) */
+    /** Dígitos del total: al tipear se acota por prefijo (ej. 3 → 30 → 300 para 30000). */
     totalQuery: string
     search: string
     type: OrderType | null
@@ -18,24 +18,21 @@ export interface OrderFilterState {
  * Composable para filtrar órdenes localmente
  */
 export function useOrderFilters() {
-    /** Interpreta el texto como monto (acepta coma o punto decimal). */
-    const parseTotalFilterValue = (raw: string): number | null => {
-        const t = raw.trim().replace(/\s/g, '')
-        if (!t) return null
-        const normalized = t.replace(/,/g, '.')
-        const n = Number(normalized)
-        return Number.isFinite(n) ? n : null
-    }
+    /** Solo dígitos del campo (ignora $, puntos de miles, comas, espacios). */
+    const digitPrefixFromTotalQuery = (raw: string): string => raw.replace(/\D/g, '')
 
-    /** Pedidos cuyo total coincide con el monto indicado (±1 céntimo). */
+    /** Total redondeado a entero como string (en la práctica no hay decimales). */
+    const orderTotalAsDigitString = (total: number): string => String(Math.round(total))
+
+    /**
+     * Pedidos cuyo total (como entero) empieza por los dígitos tipeados.
+     * Ej. total 30000: "3" → "30" → "300" acota progresivamente.
+     */
     const filterByTotal = (orders: OrderListItem[], query: string): OrderListItem[] => {
-        const t = query.trim()
-        if (!t) return orders
-        const target = parseTotalFilterValue(query)
-        if (target === null) return []
+        const digits = digitPrefixFromTotalQuery(query)
+        if (!digits) return orders
 
-        const eps = 0.01
-        return orders.filter((order) => Math.abs(order.total - target) < eps)
+        return orders.filter((order) => orderTotalAsDigitString(order.total).startsWith(digits))
     }
 
     const filterBySearch = (orders: OrderListItem[], query: string): OrderListItem[] => {
@@ -129,7 +126,8 @@ export function useOrderFilters() {
 
     return {
         filterByTotal,
-        parseTotalFilterValue,
+        digitPrefixFromTotalQuery,
+        orderTotalAsDigitString,
         filterBySearch,
         filterByType,
         filterByStatus,
