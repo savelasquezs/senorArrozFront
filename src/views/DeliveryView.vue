@@ -151,6 +151,8 @@
                 :total-count="deliveryStore.historyTotalCount"
                 :page="deliveryStore.historyPage"
                 :page-size="deliveryStore.historyPageSize"
+                :from-date="deliveryStore.historyFromDate"
+                :to-date="deliveryStore.historyToDate"
                 @page-change="handleHistoryPageChange"
                 @filter-change="handleHistoryFilterChange"
                 @order-delivered="handleOrderDelivered"
@@ -229,7 +231,8 @@ const loadPreparationOrders = async () => {
     }
 }
 
-const loadHistory = async () => {
+/** Historial del modal (filtrado por fechas en el store) */
+const loadHistoryModal = async () => {
     if (!authStore.user?.id) return
     try {
         isLoading.value = true
@@ -241,16 +244,26 @@ const loadHistory = async () => {
     }
 }
 
+/** Pedidos asignados sin filtro de fecha (en ruta, badges) */
+const loadRouteAssigned = async () => {
+    if (!authStore.user?.id) return
+    try {
+        await deliveryStore.loadRouteAssignedOrders(authStore.user.id)
+    } catch (err: any) {
+        error('Error al cargar pedidos en ruta', err.message)
+    }
+}
+
 // ─── Acciones rápidas ─────────────────────────────────────────
 
 const openHistoryModal = async () => {
     showHistoryModal.value = true
-    await loadHistory()
+    await loadHistoryModal()
 }
 
 const goToRoute = async () => {
     activeTab.value = 'route'
-    await loadHistory()
+    await loadRouteAssigned()
     routeOrders.value = [...deliveryStore.ordersOnTheWay]
 }
 
@@ -276,7 +289,10 @@ const handleAssigned = async () => {
     await loadAvailableOrders()
     cardGridRef.value?.clearSelection()
     if (authStore.user?.id) {
-        await loadHistory()
+        await loadRouteAssigned()
+        if (showHistoryModal.value) {
+            await loadHistoryModal()
+        }
         if (activeTab.value === 'route') {
             routeOrders.value = [...deliveryStore.ordersOnTheWay]
         }
@@ -296,7 +312,7 @@ const refreshData = async () => {
     } else if (activeTab.value === 'preparation') {
         await loadPreparationOrders()
     } else if (activeTab.value === 'route') {
-        await loadHistory()
+        await loadRouteAssigned()
         routeOrders.value = [...deliveryStore.ordersOnTheWay]
     }
 }
@@ -305,18 +321,26 @@ const refreshData = async () => {
 
 const handleHistoryPageChange = async (page: number) => {
     deliveryStore.setHistoryPage(page)
-    await loadHistory()
+    await loadHistoryModal()
 }
 
-const handleHistoryFilterChange = async () => {
+const handleHistoryFilterChange = async (filters: {
+    fromDate: string
+    toDate: string
+    neighborhoodId: number | null
+}) => {
+    deliveryStore.setHistoryDateRange(filters.fromDate, filters.toDate)
     deliveryStore.setHistoryPage(1)
-    await loadHistory()
+    await loadHistoryModal()
 }
 
 // ─── En ruta ─────────────────────────────────────────────────
 
 const handleOrderDelivered = async () => {
-    await loadHistory()
+    await loadRouteAssigned()
+    if (showHistoryModal.value) {
+        await loadHistoryModal()
+    }
     routeOrders.value = [...deliveryStore.ordersOnTheWay]
 }
 
@@ -354,6 +378,15 @@ onMounted(async () => {
     }
 
     await loadAvailableOrders()
+    await loadRouteAssigned()
+    // Precarga conteo/lista del día para el badge "Mi historial" (mismo rango que el modal)
+    if (authStore.user?.id) {
+        try {
+            await deliveryStore.loadHistory(authStore.user.id)
+        } catch {
+            /* badge sin datos si falla */
+        }
+    }
     on('OrderReady', handleOrderReady)
     on('OrderAssigned', handleOrderAssigned)
 })

@@ -7,24 +7,28 @@
 
             <!-- Filtros en desktop -->
             <div class="hidden md:flex items-center gap-3">
-                <NeighborhoodFilter :model-value="filters.neighborhoodId"
-                    @update:model-value="handleFilterChange('neighborhoodId', $event)" />
+                <NeighborhoodFilter :model-value="neighborhoodId"
+                    @update:model-value="onNeighborhoodChange" />
 
                 <div class="flex items-center gap-2">
-                    <BaseInput v-model="filters.fromDate" type="date" placeholder="Desde" class="w-40" />
+                    <BaseInput :model-value="fromDate" type="date" placeholder="Desde" class="w-40"
+                        @update:model-value="onFromDate" />
                     <span class="text-gray-500">-</span>
-                    <BaseInput v-model="filters.toDate" type="date" placeholder="Hasta" class="w-40" />
+                    <BaseInput :model-value="toDate" type="date" placeholder="Hasta" class="w-40"
+                        @update:model-value="onToDate" />
                 </div>
             </div>
 
             <!-- Filtros en mobile: apilados -->
             <div class="md:hidden space-y-2">
-                <NeighborhoodFilter :model-value="filters.neighborhoodId"
-                    @update:model-value="handleFilterChange('neighborhoodId', $event)" />
+                <NeighborhoodFilter :model-value="neighborhoodId"
+                    @update:model-value="onNeighborhoodChange" />
                 <div class="flex items-center gap-2">
-                    <BaseInput v-model="filters.fromDate" type="date" placeholder="Desde" class="text-sm" />
+                    <BaseInput :model-value="fromDate" type="date" placeholder="Desde" class="text-sm"
+                        @update:model-value="onFromDate" />
                     <span class="text-gray-500">-</span>
-                    <BaseInput v-model="filters.toDate" type="date" placeholder="Hasta" class="text-sm" />
+                    <BaseInput :model-value="toDate" type="date" placeholder="Hasta" class="text-sm"
+                        @update:model-value="onToDate" />
                 </div>
             </div>
         </div>
@@ -50,7 +54,7 @@
                         </tr>
                     </thead>
                     <tbody class="bg-white divide-y divide-gray-200">
-                        <tr v-for="order in orders" :key="order.id" class="hover:bg-gray-50">
+                        <tr v-for="order in displayedOrders" :key="order.id" class="hover:bg-gray-50">
                             <td class="px-6 py-4 whitespace-nowrap">
                                 <span class="font-bold text-gray-900">#{{ order.id }}</span>
                             </td>
@@ -100,13 +104,13 @@
                                 Totales:
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap text-sm font-bold text-emerald-600">
-                                {{ formatCurrency(totals.cashTotal) }}
+                                {{ formatCurrency(displayedTotals.cashTotal) }}
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap text-sm font-bold text-emerald-600">
-                                {{ formatCurrency(totals.deliveryFeeTotal) }}
+                                {{ formatCurrency(displayedTotals.deliveryFeeTotal) }}
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap text-sm font-bold text-emerald-600">
-                                {{ formatCurrency(totals.grandTotal) }}
+                                {{ formatCurrency(displayedTotals.grandTotal) }}
                             </td>
                             <td colspan="2" class="px-6 py-4"></td>
                         </tr>
@@ -114,7 +118,7 @@
                 </table>
             </div>
 
-            <div v-if="orders.length === 0" class="text-center py-12">
+            <div v-if="displayedOrders.length === 0" class="text-center py-12">
                 <ClockIcon class="w-16 h-16 text-gray-300 mx-auto mb-4" />
                 <p class="text-gray-500">No hay entregas en este período</p>
             </div>
@@ -122,7 +126,7 @@
 
         <!-- Mobile: Vista de Cards -->
         <div class="md:hidden space-y-3">
-            <div v-for="order in orders" :key="order.id"
+            <div v-for="order in displayedOrders" :key="order.id"
                 class="bg-white rounded-lg border border-gray-200 p-3 space-y-2">
                 <div class="flex items-center justify-between">
                     <span class="text-lg font-bold text-gray-900">#{{ order.id }}</span>
@@ -168,7 +172,7 @@
                 </BaseButton>
             </div>
 
-            <div v-if="orders.length === 0" class="text-center py-12">
+            <div v-if="displayedOrders.length === 0" class="text-center py-12">
                 <ClockIcon class="w-16 h-16 text-gray-300 mx-auto mb-4" />
                 <p class="text-gray-500">No hay entregas en este período</p>
             </div>
@@ -216,7 +220,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, ref } from 'vue'
 import type { OrderListItem } from '@/types/order'
 import { DeliveryService } from '@/services/domain/DeliveryService'
 import { useFormatting } from '@/composables/useFormatting'
@@ -236,25 +240,57 @@ interface Props {
     totalCount: number
     page: number
     pageSize: number
+    /** YYYY-MM-DD — sincronizado con el store (por defecto hoy local) */
+    fromDate: string
+    toDate: string
 }
 
-interface Filters {
+interface HistoryFiltersPayload {
     fromDate: string
     toDate: string
     neighborhoodId: number | null
 }
 
 const props = defineProps<Props>()
-const emit = defineEmits<{ 'page-change': [page: number], 'filter-change': [filters: Filters], 'order-delivered': [] }>()
+const emit = defineEmits<{
+    'page-change': [page: number]
+    'filter-change': [filters: HistoryFiltersPayload]
+    'order-delivered': []
+}>()
 
 const { formatCurrency } = useFormatting()
-const filters = ref<Filters>({
-    fromDate: new Date().toISOString().split('T')[0],
-    toDate: new Date().toISOString().split('T')[0],
-    neighborhoodId: null
+/** Filtro local por barrio (la API del historial aún no filtra por barrio) */
+const neighborhoodId = ref<number | null>(null)
+
+const displayedOrders = computed(() => {
+    let list = props.orders
+    if (neighborhoodId.value != null) {
+        list = list.filter((o) => o.neighborhoodId === neighborhoodId.value)
+    }
+    return list
 })
 
-const totals = computed(() => DeliveryService.calculateTotals(props.orders))
+const displayedTotals = computed(() => DeliveryService.calculateTotals(displayedOrders.value))
+
+const emitDateFilterChange = (fromDate: string, toDate: string) => {
+    emit('filter-change', {
+        fromDate,
+        toDate,
+        neighborhoodId: neighborhoodId.value,
+    })
+}
+
+const onFromDate = (v: string | number | null) => {
+    emitDateFilterChange(String(v ?? ''), props.toDate)
+}
+
+const onToDate = (v: string | number | null) => {
+    emitDateFilterChange(props.fromDate, String(v ?? ''))
+}
+
+const onNeighborhoodChange = (id: number | null) => {
+    neighborhoodId.value = id
+}
 
 const formatDeliveryTime = (order: OrderListItem): string => {
     const time = DeliveryService.getDeliveryTime(order)
@@ -311,14 +347,4 @@ const handleConfirmDelivery = async () => {
 const handlePageChange = (newPage: number) => {
     emit('page-change', newPage)
 }
-
-const handleFilterChange = <K extends keyof Filters>(key: K, value: Filters[K]) => {
-    filters.value[key] = value
-    emit('filter-change', { ...filters.value })
-}
-
-// Watch para detectar cambios en los filtros y emitir
-watch(() => [filters.value.fromDate, filters.value.toDate, filters.value.neighborhoodId], () => {
-    emit('filter-change', { ...filters.value })
-}, { deep: true })
 </script>

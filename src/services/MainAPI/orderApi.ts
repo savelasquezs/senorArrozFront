@@ -165,11 +165,16 @@ class OrderApi extends BaseApi {
         return this.post<PagedResult<OrderListItem>>('/orders/search', filters);
     }
 
-    // 21. Obtener pedidos asignados a un domiciliario
-    async fetchAssignedOrders(deliveryManId: number, filters?: { page?: number; pageSize?: number }): Promise<PagedResult<OrderListItem>> {
-        const params: any = {};
-        if (filters?.page) params.page = filters.page;
-        if (filters?.pageSize) params.pageSize = filters.pageSize;
+    // 21. Obtener pedidos asignados a un domiciliario (opcional: FromDate/ToDate yyyy-MM-DD para filtrar por CreatedAt)
+    async fetchAssignedOrders(
+        deliveryManId: number,
+        filters?: { page?: number; pageSize?: number; fromDate?: string; toDate?: string }
+    ): Promise<PagedResult<OrderListItem>> {
+        const params: Record<string, string | number> = {};
+        if (filters?.page) params.Page = filters.page;
+        if (filters?.pageSize) params.PageSize = filters.pageSize;
+        if (filters?.fromDate) params.FromDate = filters.fromDate;
+        if (filters?.toDate) params.ToDate = filters.toDate;
 
         return this.get<PagedResult<OrderListItem>>(`/orders/delivery/assigned/${deliveryManId}`, { params });
     }

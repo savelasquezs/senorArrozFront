@@ -4,6 +4,14 @@ import { ref, computed } from 'vue'
 import { orderApi } from '@/services/MainAPI/orderApi'
 import type { OrderListItem } from '@/types/order'
 
+/** Fecha local YYYY-MM-DD (no UTC) para alinear con el calendario del domiciliario */
+function localDateString(d = new Date()): string {
+    const y = d.getFullYear()
+    const m = String(d.getMonth() + 1).padStart(2, '0')
+    const day = String(d.getDate()).padStart(2, '0')
+    return `${y}-${m}-${day}`
+}
+
 export const useDeliveryStore = defineStore('delivery', () => {
     // ===== Estado separado para cada vista =====
     const availableOrders = ref<OrderListItem[]>([])
@@ -20,6 +28,12 @@ export const useDeliveryStore = defineStore('delivery', () => {
     const historyTotalCount = ref(0)
     const historyPage = ref(1)
     const historyPageSize = ref(100)
+    /** Rango del modal "Mi historial" (por defecto: hoy local) */
+    const historyFromDate = ref(localDateString())
+    const historyToDate = ref(localDateString())
+
+    /** Pedidos asignados sin filtro de fecha — para "En ruta" y contadores */
+    const routeAssignedOrders = ref<OrderListItem[]>([])
 
     const isLoading = ref(false)
     const error = ref<string | null>(null)
@@ -71,19 +85,37 @@ export const useDeliveryStore = defineStore('delivery', () => {
         }
     }
 
-    // Cargar historial (TODOS los estados asignados: ready, on_the_way, delivered)
+    // Historial del modal: filtrado por historyFromDate / historyToDate (default hoy)
     const loadHistory = async (deliveryManId: number) => {
         isLoading.value = true
         error.value = null
         try {
-            // Usar fetchAssignedOrders que trae TODOS los estados
             const response = await orderApi.fetchAssignedOrders(deliveryManId, {
                 page: historyPage.value,
-                pageSize: historyPageSize.value
+                pageSize: historyPageSize.value,
+                fromDate: historyFromDate.value,
+                toDate: historyToDate.value,
             })
-            // API devuelve CreatedAt desc; mantener id desc como respaldo dentro de la página
             historyOrders.value = [...response.items].sort((a, b) => b.id - a.id)
             historyTotalCount.value = response.totalCount
+        } catch (err: any) {
+            error.value = err.message
+            throw err
+        } finally {
+            isLoading.value = false
+        }
+    }
+
+    /** Sin rango de fechas: incluye pedidos en ruta aunque CreatedAt sea de otro día */
+    const loadRouteAssignedOrders = async (deliveryManId: number) => {
+        isLoading.value = true
+        error.value = null
+        try {
+            const response = await orderApi.fetchAssignedOrders(deliveryManId, {
+                page: 1,
+                pageSize: 200,
+            })
+            routeAssignedOrders.value = [...response.items].sort((a, b) => b.id - a.id)
         } catch (err: any) {
             error.value = err.message
             throw err
@@ -117,6 +149,11 @@ export const useDeliveryStore = defineStore('delivery', () => {
         historyPage.value = page
     }
 
+    const setHistoryDateRange = (from: string, to: string) => {
+        historyFromDate.value = from
+        historyToDate.value = to
+    }
+
     // Limpiar estado
     const clear = () => {
         availableOrders.value = []
@@ -125,12 +162,15 @@ export const useDeliveryStore = defineStore('delivery', () => {
         preparationTotalCount.value = 0
         historyOrders.value = []
         historyTotalCount.value = 0
+        routeAssignedOrders.value = []
+        historyFromDate.value = localDateString()
+        historyToDate.value = localDateString()
         error.value = null
     }
 
-    // Computed: pedidos en camino (aceptar ambas variantes provenientes del backend)
+    // Pedidos en camino (lista sin filtro de fecha)
     const ordersOnTheWay = computed(() =>
-        historyOrders.value.filter((o) => o.status === 'on_the_way' || (o as any).status === 'onTheWay')
+        routeAssignedOrders.value.filter((o) => o.status === 'on_the_way' || (o as any).status === 'onTheWay')
     )
 
     return {
@@ -143,6 +183,9 @@ export const useDeliveryStore = defineStore('delivery', () => {
         historyTotalCount,
         historyPage,
         historyPageSize,
+        historyFromDate,
+        historyToDate,
+        routeAssignedOrders,
         isLoading,
         error,
 
@@ -150,8 +193,10 @@ export const useDeliveryStore = defineStore('delivery', () => {
         loadAvailableOrders,
         loadPreparationOrders,
         loadHistory,
+        loadRouteAssignedOrders,
         assignOrders,
         setHistoryPage,
+        setHistoryDateRange,
         clear,
         ordersOnTheWay
     }

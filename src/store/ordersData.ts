@@ -235,7 +235,10 @@ export const useOrdersDataStore = defineStore('ordersData', () => {
     }
 
     // Obtener pedidos asignados a un domiciliario
-    const fetchAssignedOrders = async (deliveryManId: number, filters?: { page?: number; pageSize?: number }) => {
+    const fetchAssignedOrders = async (
+        deliveryManId: number,
+        filters?: { page?: number; pageSize?: number; fromDate?: string; toDate?: string }
+    ) => {
         isLoading.value = true
         error.value = null
         try {
