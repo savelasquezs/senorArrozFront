@@ -327,7 +327,6 @@ const load = async () => {
             active: filters.value.active,
             minPrice: filters.value.minPrice,
             maxPrice: filters.value.maxPrice,
-            branchId: auth.isSuperadmin ? undefined : (auth.branchId || undefined),
             page: filters.value.page || 1,
             pageSize: filters.value.pageSize || 10
         }
@@ -418,7 +417,6 @@ onMounted(async () => {
         await productCategoriesStore.fetch({
             page: 1,
             pageSize: 100,
-            branchId: auth.isSuperadmin ? undefined : (auth.branchId || undefined)
         })
 
         await load()

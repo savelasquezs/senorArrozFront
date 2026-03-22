@@ -288,13 +288,8 @@ const canAccessProduct = computed(() => {
     if (!product.value) return false
 
     const userRole = authStore.user?.role
-    const userBranchId = authStore.user?.branchId
-
-    // Superadmin can access all products
-    if (userRole === 'Superadmin') return true
-
-    // Admin can only access products from their own branch
-    if (userRole === 'Admin') return userBranchId === product.value.branchId
+    // Catálogo compartido: Admin y Superadmin ven cualquier producto
+    if (userRole === 'Superadmin' || userRole === 'Admin') return true
 
     return false
 })

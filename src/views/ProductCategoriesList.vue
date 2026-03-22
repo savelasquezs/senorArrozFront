@@ -18,7 +18,7 @@
                 <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
                     <BaseInput v-model="filters.name" label="Nombre" placeholder="Buscar por nombre"
                         :icon="MagnifyingGlassIcon" />
-                    <BaseSelect v-if="auth.isSuperadmin" v-model="filters.branchId" :options="branchOptions"
+                    <BaseSelect v-if="auth.isSuperadmin || auth.isAdmin" v-model="filters.branchId" :options="branchOptions"
                         label="Sucursal" placeholder="Todas las sucursales" value-key="value" display-key="label" />
                     <div class="flex items-end">
                         <BaseButton @click="load" variant="primary" size="md" :icon="MagnifyingGlassIcon" full-width>
@@ -279,7 +279,7 @@ const load = async () => {
     try {
         const filtersToSend: ProductCategoryFilters = {
             name: filters.value.name || undefined,
-            branchId: auth.isSuperadmin ? filters.value.branchId : (auth.branchId || undefined),
+            branchId: filters.value.branchId,
             page: filters.value.page || 1,
             pageSize: filters.value.pageSize || 10
         }
@@ -293,7 +293,7 @@ const load = async () => {
 const clearFilters = async () => {
     filters.value = {
         name: '',
-        branchId: auth.isSuperadmin ? undefined : (auth.branchId || undefined),
+        branchId: undefined,
         page: 1,
         pageSize: 10
     }
@@ -365,8 +365,7 @@ const nextPage = async () => {
 
 onMounted(async () => {
     try {
-        // Load branches for superadmin filter
-        if (auth.isSuperadmin) {
+        if (auth.isSuperadmin || auth.isAdmin) {
             await branchesStore.fetchAll()
         }
 

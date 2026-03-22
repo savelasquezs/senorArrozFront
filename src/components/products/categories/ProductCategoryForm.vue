@@ -11,8 +11,8 @@
             </BaseInput>
         </div>
 
-        <!-- Branch Selection (only for superadmin) -->
-        <div v-if="authStore.isSuperadmin">
+        <!-- Sucursal de la categoría (Admin elige; por defecto la suya) -->
+        <div v-if="authStore.isSuperadmin || authStore.isAdmin">
             <BaseSelect v-model="form.branchId" :options="branchOptions" label="Sucursal"
                 placeholder="Seleccionar sucursal..." :error="errors.branchId" @update:model-value="validateForm"
                 value-key="value" display-key="label">
@@ -84,10 +84,12 @@ const branchOptions = computed(() => {
     }))
 })
 
+const needsBranchPick = computed(() => authStore.isSuperadmin || authStore.isAdmin)
+
 const isFormValid = computed(() => {
     const basicValidation = form.name.trim().length >= 3 && !errors.name
 
-    if (authStore.isSuperadmin) {
+    if (needsBranchPick.value) {
         return basicValidation && form.branchId > 0 && !errors.branchId
     }
 
@@ -107,8 +109,7 @@ const validateForm = () => {
         errors.name = ''
     }
 
-    // Validate branch (only for superadmin)
-    if (authStore.isSuperadmin && form.branchId <= 0) {
+    if (needsBranchPick.value && form.branchId <= 0) {
         errors.branchId = 'Selecciona una sucursal'
     } else {
         errors.branchId = ''
@@ -121,7 +122,7 @@ const handleSubmit = () => {
 
     const formData: ProductCategoryFormData & { branchId?: number } = {
         name: form.name.trim(),
-        ...(authStore.isSuperadmin && { branchId: form.branchId })
+        ...(needsBranchPick.value && { branchId: form.branchId })
     }
 
     emit('submit', formData)
@@ -143,10 +144,9 @@ watch(() => props.category, (newCategory) => {
     errors.branchId = ''
 }, { immediate: true })
 
-// Load branches on mount (only for superadmin)
 onMounted(async () => {
     try {
-        if (authStore.isSuperadmin) {
+        if (needsBranchPick.value) {
             await branchesStore.fetchAll()
         }
     } catch (error) {
