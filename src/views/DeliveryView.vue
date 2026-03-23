@@ -51,6 +51,8 @@
                 </button>
             </div>
 
+            <DeliveryBranchContactCard v-if="authStore.isDeliveryman" />
+
             <!-- Tabs: Disponibles y En preparación (ocultos en vista de ruta) -->
             <template v-if="activeTab !== 'route'">
                 <!-- Mobile -->
@@ -181,6 +183,7 @@ import DeliveryCardGrid from '@/components/delivery/DeliveryCardGrid.vue'
 import DeliveryHistoryTable from '@/components/delivery/DeliveryHistoryTable.vue'
 import ConfirmAssignmentModal from '@/components/delivery/ConfirmAssignmentModal.vue'
 import RouteOrderManager from '@/components/delivery/RouteOrderManager.vue'
+import DeliveryBranchContactCard from '@/components/delivery/DeliveryBranchContactCard.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseDialog from '@/components/ui/BaseDialog.vue'
 import {

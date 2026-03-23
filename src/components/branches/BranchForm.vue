@@ -1,4 +1,4 @@
-<!-- src/components/BranchForm.vue -->
+<!-- src/components/branches/BranchForm.vue -->
 <template>
     <form @submit.prevent="handleSubmit" class="space-y-6">
         <!-- Branch Name -->
@@ -14,11 +14,20 @@
         <!-- Address -->
         <div>
             <BaseInput v-model="form.address" label="Dirección" placeholder="Ej: Calle 50 # 45-67, Centro" required
-                :error="errors.address" :maxlength="200">
+                :error="errors.address" :maxlength="200" @blur="handleAddressBlur">
                 <template #icon>
                     <MapPinIcon class="w-4 h-4" />
                 </template>
             </BaseInput>
+        </div>
+
+        <!-- Map (mismo flujo que dirección de cliente) -->
+        <div v-if="form.address.trim().length >= 10 && showMapsSelector" class="space-y-2">
+            <p class="text-sm font-medium text-gray-700">Ubicación en mapa</p>
+            <GoogleMapsSelector v-model="selectedLocation"
+                :error="errors.latitude || errors.longitude || undefined"
+                :initial-address="form.address" :key="`branch-maps-${props.branch?.id ?? 'new'}`"
+                @location-confirmed="handleLocationConfirmed" />
         </div>
 
         <!-- Phone Numbers -->
@@ -47,6 +56,7 @@
                     <li>El nombre debe ser único en el sistema</li>
                     <li>Los teléfonos deben ser números válidos de 10 dígitos (celular con 3 o fijo con 6)</li>
                     <li>La dirección debe ser completa y específica</li>
+                    <li>Debes buscar o colocar el pin en el mapa y pulsar «Confirmar ubicación»</li>
                 </ul>
             </div>
         </BaseAlert>
@@ -70,6 +80,7 @@ import type { Branch } from '@/types/common'
 import BaseInput from '@/components/ui/BaseInput.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseAlert from '@/components/ui/BaseAlert.vue'
+import GoogleMapsSelector from '@/components/ui/GoogleMapsSelector.vue'
 import {
     BuildingOffice2Icon,
     MapPinIcon,
@@ -86,56 +97,70 @@ const props = withDefaults(defineProps<Props>(), {
     loading: false
 })
 
-const emit = defineEmits<{
-    submit: [data: BranchFormData]
-    cancel: []
-}>()
-
 interface BranchFormData {
     name: string
     address: string
     phone1: string
     phone2?: string
+    latitude: number
+    longitude: number
 }
+
+const emit = defineEmits<{
+    submit: [data: BranchFormData]
+    cancel: []
+}>()
 
 const form = reactive({
     name: '',
     address: '',
     phone1: '',
-    phone2: ''
+    phone2: '',
+    latitude: 0,
+    longitude: 0,
 })
 
 const errors = reactive({
     name: '',
     address: '',
     phone1: '',
-    phone2: ''
+    phone2: '',
+    latitude: '',
+    longitude: '',
 })
 
 const showValidationInfo = ref(false)
+const selectedLocation = ref<{ lat: number; lng: number } | null>(null)
+const showMapsSelector = ref(false)
+const isLocationConfirmed = ref(false)
 
 const isFormValid = computed(() => {
-    return form.name.trim() &&
+    return (
+        form.name.trim() &&
         form.address.trim() &&
         form.phone1.trim() &&
+        form.latitude !== 0 &&
+        form.longitude !== 0 &&
+        isLocationConfirmed.value &&
         !errors.name &&
         !errors.address &&
         !errors.phone1 &&
-        !errors.phone2
+        !errors.phone2 &&
+        !errors.latitude &&
+        !errors.longitude
+    )
 })
 
 const validatePhone = (field: 'phone1' | 'phone2') => {
     const phone = form[field].trim()
 
-    // phone1 is required, phone2 is optional
     if (field === 'phone1' && !phone) {
         errors[field] = 'El teléfono principal es requerido'
         return
     }
 
-    // If phone exists, validate format
-    if (phone && !/\d{10}$/.test(phone)) {
-        errors[field] = 'Debe ser un número celular válido (10 dígitos)'
+    if (phone && !/^\d{10}$/.test(phone)) {
+        errors[field] = 'Debe ser un número válido (10 dígitos)'
         return
     }
 
@@ -143,7 +168,6 @@ const validatePhone = (field: 'phone1' | 'phone2') => {
 }
 
 const validateForm = () => {
-    // Validate name
     if (!form.name.trim()) {
         errors.name = 'El nombre de la sucursal es requerido'
     } else if (form.name.length < 2) {
@@ -154,7 +178,6 @@ const validateForm = () => {
         errors.name = ''
     }
 
-    // Validate address
     if (!form.address.trim()) {
         errors.address = 'La dirección es requerida'
     } else if (form.address.length < 10) {
@@ -165,12 +188,27 @@ const validateForm = () => {
         errors.address = ''
     }
 
-    // Validate phones
     validatePhone('phone1')
     if (form.phone2) {
         validatePhone('phone2')
     } else {
         errors.phone2 = ''
+    }
+
+    if (form.latitude === 0) {
+        errors.latitude = 'La latitud es requerida (confirma la ubicación en el mapa)'
+    } else if (form.latitude < -90 || form.latitude > 90) {
+        errors.latitude = 'La latitud debe estar entre -90 y 90'
+    } else {
+        errors.latitude = ''
+    }
+
+    if (form.longitude === 0) {
+        errors.longitude = 'La longitud es requerida (confirma la ubicación en el mapa)'
+    } else if (form.longitude < -180 || form.longitude > 180) {
+        errors.longitude = 'La longitud debe estar entre -180 y 180'
+    } else {
+        errors.longitude = ''
     }
 }
 
@@ -185,41 +223,84 @@ const handleSubmit = () => {
         name: form.name.trim(),
         address: form.address.trim(),
         phone1: form.phone1.trim(),
-        phone2: form.phone2.trim() || undefined
+        phone2: form.phone2.trim() || undefined,
+        latitude: form.latitude,
+        longitude: form.longitude,
     }
 
     emit('submit', formData)
 }
 
-// Watch for branch prop changes to populate form
-watch(() => props.branch, (newBranch) => {
-    if (newBranch) {
-        form.name = newBranch.name
-        form.address = newBranch.address
-        form.phone1 = newBranch.phone1
-        form.phone2 = newBranch.phone2 || ''
-        showValidationInfo.value = false
-    } else {
-        // Reset form for new branch
-        form.name = ''
-        form.address = ''
-        form.phone1 = ''
-        form.phone2 = ''
-        showValidationInfo.value = true
+const handleLocationConfirmed = () => {
+    isLocationConfirmed.value = true
+    errors.latitude = ''
+    errors.longitude = ''
+}
+
+const handleAddressBlur = () => {
+    if (form.address.trim().length >= 10) {
+        showMapsSelector.value = true
     }
+}
 
-    // Clear errors
-    Object.keys(errors).forEach(key => {
-        errors[key as keyof typeof errors] = ''
-    })
-}, { immediate: true })
-
-// Show validation info for new branches after a short delay
-watch(() => props.branch, (newBranch) => {
-    if (!newBranch) {
-        setTimeout(() => {
-            showValidationInfo.value = true
-        }, 1000)
+watch(selectedLocation, (newLocation) => {
+    if (newLocation) {
+        form.latitude = newLocation.lat
+        form.longitude = newLocation.lng
     }
 })
+
+function resetMapState() {
+    selectedLocation.value = null
+    showMapsSelector.value = false
+    isLocationConfirmed.value = false
+    form.latitude = 0
+    form.longitude = 0
+}
+
+watch(
+    () => props.branch,
+    (newBranch) => {
+        if (newBranch) {
+            form.name = newBranch.name
+            form.address = newBranch.address
+            form.phone1 = newBranch.phone1
+            form.phone2 = newBranch.phone2 || ''
+            showValidationInfo.value = false
+
+            const lat = newBranch.latitude
+            const lng = newBranch.longitude
+            if (lat != null && lng != null && lat !== 0 && lng !== 0) {
+                form.latitude = Number(lat)
+                form.longitude = Number(lng)
+                selectedLocation.value = { lat: form.latitude, lng: form.longitude }
+                showMapsSelector.value = true
+                isLocationConfirmed.value = true
+            } else {
+                resetMapState()
+                if (newBranch.address?.trim().length >= 10) {
+                    showMapsSelector.value = true
+                }
+            }
+        } else {
+            form.name = ''
+            form.address = ''
+            form.phone1 = ''
+            form.phone2 = ''
+            showValidationInfo.value = true
+            resetMapState()
+            setTimeout(() => {
+                showValidationInfo.value = true
+            }, 1000)
+        }
+
+        errors.name = ''
+        errors.address = ''
+        errors.phone1 = ''
+        errors.phone2 = ''
+        errors.latitude = ''
+        errors.longitude = ''
+    },
+    { immediate: true }
+)
 </script>

@@ -183,24 +183,9 @@
         </div>
 
         <!-- Create Branch Dialog -->
-        <BaseDialog v-model="showCreate" title="Nueva Sucursal" :icon="PlusIcon" size="lg">
-            <div class="space-y-4">
-                <BaseInput v-model="formName" label="Nombre de la sucursal" placeholder="Ej: Sucursal Centro"
-                    required />
-                <BaseInput v-model="formAddress" label="Dirección" placeholder="Ej: Calle 123 #45-67" required />
-                <BaseInput v-model="formPhone1" label="Teléfono principal" placeholder="Ej: (601) 234-5678" required />
-                <BaseInput v-model="formPhone2" label="Teléfono secundario" placeholder="Ej: (601) 234-5679" />
-
-                <div class="flex justify-end space-x-3 pt-4">
-                    <BaseButton @click="showCreate = false" variant="secondary">
-                        Cancelar
-                    </BaseButton>
-                    <BaseButton :disabled="!formName || !formAddress || !formPhone1" :loading="creating"
-                        variant="primary" @click="submitCreate">
-                        Crear Sucursal
-                    </BaseButton>
-                </div>
-            </div>
+        <BaseDialog v-model="showCreate" title="Nueva Sucursal" :icon="PlusIcon" size="xl">
+            <BranchForm v-if="showCreate" :branch="null" :loading="creating" @submit="submitCreate"
+                @cancel="showCreate = false" />
         </BaseDialog>
     </MainLayout>
 </template>
@@ -218,6 +203,7 @@ import BaseInput from '@/components/ui/BaseInput.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseLoading from '@/components/ui/BaseLoading.vue'
 import BaseDialog from '@/components/ui/BaseDialog.vue'
+import BranchForm from '@/components/branches/BranchForm.vue'
 import BaseBadge from '@/components/ui/BaseBadge.vue'
 import StatsCard from '@/components/ui/StatsCard.vue'
 
@@ -252,10 +238,6 @@ const pageSize = ref(10)
 
 // Create dialog
 const showCreate = ref(false)
-const formName = ref('')
-const formAddress = ref('')
-const formPhone1 = ref('')
-const formPhone2 = ref('')
 const creating = ref(false)
 
 // Computed stats
@@ -297,24 +279,29 @@ const clearFilters = async () => {
 const goDetail = (id: number) => router.push({ name: 'BranchDetail', params: { id } })
 
 const openCreate = () => {
-    formName.value = ''
-    formAddress.value = ''
-    formPhone1.value = ''
-    formPhone2.value = ''
     showCreate.value = true
 }
 
-const submitCreate = async () => {
+const submitCreate = async (data: {
+    name: string
+    address: string
+    phone1: string
+    phone2?: string
+    latitude: number
+    longitude: number
+}) => {
     try {
         creating.value = true
         await store.create({
-            name: formName.value,
-            address: formAddress.value,
-            phone1: formPhone1.value,
-            phone2: formPhone2.value
+            name: data.name,
+            address: data.address,
+            phone1: data.phone1,
+            ...(data.phone2 ? { phone2: data.phone2 } : {}),
+            latitude: data.latitude,
+            longitude: data.longitude,
         })
         showCreate.value = false
-        success('Sucursal creada', 3000, `La sucursal "${formName.value}" se ha creado correctamente`)
+        success('Sucursal creada', 3000, `La sucursal "${data.name}" se ha creado correctamente`)
         await load()
     } catch (e) {
         showError('Error al crear', store.error || 'No se pudo crear la sucursal')

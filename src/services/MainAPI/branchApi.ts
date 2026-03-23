@@ -31,14 +31,14 @@ class BranchApi extends BaseApi {
 	}
 
 	async createBranch(
-		payload: Pick<Branch, 'name' | 'address' | 'phone1' | 'phone2'>
+		payload: Pick<Branch, 'name' | 'address' | 'phone1' | 'phone2' | 'latitude' | 'longitude'>
 	): Promise<ApiResponse<Branch>> {
 		return this.post<ApiResponse<Branch>>('/Branches', payload);
 	}
 
 	async updateBranch(
 		id: number,
-		payload: Pick<Branch, 'name' | 'address' | 'phone1' | 'phone2'>
+		payload: Pick<Branch, 'name' | 'address' | 'phone1' | 'phone2' | 'latitude' | 'longitude'>
 	): Promise<ApiResponse<Branch>> {
 		return this.put<ApiResponse<Branch>>(`/Branches/${id}`, payload);
 	}

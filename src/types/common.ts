@@ -99,7 +99,9 @@ export interface Branch {
   name: string;
   address: string;
   phone1: string;
-  phone2: string;
+  phone2?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
   createdAt: string;
   updatedAt: string;
   totalUsers: number;

@@ -20,6 +20,12 @@ export interface User {
 	role: UserRoleType;
 	branchId: number;
 	branchName: string;
+	/** Datos de la sucursal (login/refresh) para contacto y mapa en domiciliario */
+	branchAddress?: string;
+	branchPhone1?: string;
+	branchPhone2?: string | null;
+	branchLatitude?: number | null;
+	branchLongitude?: number | null;
 	profileImageUrl?: string;
 }
 
