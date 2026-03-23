@@ -32,12 +32,14 @@
                                 </div>
                             </div>
 
-                            <!-- Actions (Only for Superadmin) -->
-                            <div v-if="authStore.user?.role === 'Superadmin'" class="flex space-x-2">
-                                <BaseButton @click="openEditDialog" variant="secondary" :icon="PencilIcon">
+                            <!-- Editar: superadmin o admin de esta sucursal; eliminar: solo superadmin -->
+                            <div class="flex flex-wrap gap-2">
+                                <BaseButton v-if="canEditBranchProfile" @click="openEditDialog" variant="secondary"
+                                    :icon="PencilIcon">
                                     Editar
                                 </BaseButton>
-                                <BaseButton @click="confirmDelete" variant="danger" :icon="TrashIcon">
+                                <BaseButton v-if="authStore.isSuperadmin" @click="confirmDelete" variant="danger"
+                                    :icon="TrashIcon">
                                     Eliminar
                                 </BaseButton>
                             </div>
@@ -505,8 +507,9 @@
             </div>
 
             <!-- Edit Branch Dialog -->
-            <BaseDialog v-model="showEditDialog" title="Editar Sucursal" :icon="PencilIcon" size="lg">
-                <BranchForm :branch="branch" @submit="handleEditSubmit" @cancel="showEditDialog = false"
+            <BaseDialog v-model="showEditDialog" title="Editar Sucursal" :icon="PencilIcon" size="xl">
+                <BranchForm :branch="branch" :lock-branch-name="authStore.isAdmin && !authStore.isSuperadmin"
+                    @submit="handleEditSubmit" @cancel="showEditDialog = false"
                     :loading="branchesStore.isLoading" />
             </BaseDialog>
 
@@ -703,6 +706,11 @@ const canAccessBranch = computed(() => {
     return false
 })
 
+/** Datos de sucursal (dirección, teléfonos, mapa): admin de la sucursal o superadmin */
+const canEditBranchProfile = computed(
+    () => authStore.isSuperadmin || (authStore.isAdmin && canAccessBranch.value)
+)
+
 const canManageBanks = computed(() => {
     const userRole = authStore.user?.role
     return userRole === 'Superadmin' || userRole === 'Admin'
@@ -842,6 +850,20 @@ const handleEditSubmit = async (formData: any) => {
         await branchesStore.update(branchId.value, formData)
         showEditDialog.value = false
         success('Sucursal actualizada', 5000, 'La sucursal se ha actualizado correctamente')
+
+        // Admin: sincronizar datos de sucursal en sesión (domiciliarios / UI sin re-login)
+        if (authStore.isAdmin && !authStore.isSuperadmin) {
+            const b = branchesStore.current
+            if (b) {
+                authStore.updateUserData({
+                    branchAddress: b.address,
+                    branchPhone1: b.phone1,
+                    branchPhone2: b.phone2 ?? null,
+                    branchLatitude: b.latitude ?? null,
+                    branchLongitude: b.longitude ?? null,
+                })
+            }
+        }
     } catch (error: any) {
         console.error('Error updating branch:', error)
         showError('Error al actualizar', error.message || 'No se pudo actualizar la sucursal')

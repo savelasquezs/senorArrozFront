@@ -4,11 +4,14 @@
         <!-- Branch Name -->
         <div>
             <BaseInput v-model="form.name" label="Nombre de la Sucursal" placeholder="Ej: Sucursal Centro" required
-                :error="errors.name" :maxlength="100">
+                :error="errors.name" :maxlength="100" :disabled="lockBranchName">
                 <template #icon>
                     <BuildingOffice2Icon class="w-4 h-4" />
                 </template>
             </BaseInput>
+            <p v-if="lockBranchName" class="mt-1 text-xs text-gray-500">
+                Solo un superadmin puede cambiar el nombre de la sucursal.
+            </p>
         </div>
 
         <!-- Address -->
@@ -91,10 +94,13 @@ import {
 interface Props {
     branch?: Branch | null
     loading?: boolean
+    /** Admin de sucursal: no puede renombrar (validado también en API). */
+    lockBranchName?: boolean
 }
 
 const props = withDefaults(defineProps<Props>(), {
-    loading: false
+    loading: false,
+    lockBranchName: false,
 })
 
 interface BranchFormData {
