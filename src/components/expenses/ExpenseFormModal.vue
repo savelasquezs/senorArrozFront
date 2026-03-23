@@ -101,7 +101,7 @@
 
                             <!-- Cantidad -->
                             <div class="w-20">
-                                <BaseInput v-model.number="detail.quantity" type="number" :min="1" required
+                                <BaseInput v-model.number="detail.quantity" type="number" :min="0.01" step="0.01" required
                                     @input="updateUnitPrice(index)" />
                             </div>
 
@@ -109,7 +109,7 @@
                             <div class="w-28">
                                 <BaseInput :model-value="detail.total || 0"
                                     @update:model-value="(val) => { detail.total = Number(val) || 0; updateUnitPrice(index) }"
-                                    type="number" :min="0" step="100" required />
+                                    type="number" :min="0" step="0.01" required />
                             </div>
 
                             <!-- Precio Unitario (calculado) -->
@@ -512,7 +512,7 @@ const initializeForm = async () => {
     if (props.editingExpense) {
         const details = await Promise.all(
             props.editingExpense.expenseDetails.map(async (detail) => {
-                const total = detail.amount * detail.quantity
+            const total = Number(detail.total ?? (detail.amount * detail.quantity))
                 let expenseUnit = detail.expenseUnit
                 let expenseName = detail.expenseName
 
@@ -574,8 +574,11 @@ const toggleExpenseOptionMode = () => {
 }
 
 // Computed
+const lineTotal = (detail: { quantity: number; amount: number; total?: number }) =>
+    Number(detail.total ?? (detail.quantity * detail.amount))
+
 const totalExpenses = computed(() => {
-    return formData.value.expenseDetails.reduce((sum, detail) => sum + (detail.quantity * detail.amount), 0)
+    return formData.value.expenseDetails.reduce((sum, detail) => sum + lineTotal(detail), 0)
 })
 
 const totalBankPayments = computed(() => {
@@ -589,7 +592,7 @@ const cashDifference = computed(() => {
 const isFormValid = computed(() => {
     return formData.value.supplierId !== null &&
         formData.value.expenseDetails.length > 0 &&
-        formData.value.expenseDetails.every(d => d.expenseId > 0 && d.quantity > 0 && (d.total || 0) > 0) &&
+        formData.value.expenseDetails.every(d => d.expenseId > 0 && d.quantity > 0 && lineTotal(d) > 0) &&
         cashDifference.value >= 0
 })
 
@@ -802,7 +805,7 @@ const calculateUnitPrice = (detail: typeof formData.value.expenseDetails[0]) => 
     if (!detail.total || !detail.quantity || detail.quantity === 0) {
         return 0
     }
-    return Math.round(detail.total / detail.quantity)
+    return Number((detail.total / detail.quantity).toFixed(2))
 }
 
 const updateUnitPrice = (index: number) => {
@@ -855,6 +858,7 @@ const handleSubmit = async () => {
                 expenseId: d.expenseId,
                 quantity: d.quantity,
                 amount: d.amount,
+                total: Number(d.total ?? (d.quantity * d.amount)),
             })),
             expenseBankPayments: formData.value.expenseBankPayments.length > 0
                 ? formData.value.expenseBankPayments.map(p => ({

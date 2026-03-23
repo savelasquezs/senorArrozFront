@@ -1,21 +1,13 @@
 <template>
-    <div
-        class="rounded-xl border border-gray-200 bg-white p-4 shadow-sm space-y-3"
-        v-if="authStore.user"
-    >
-        <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
-            <div class="min-w-0">
-                <h2 class="text-sm font-semibold text-gray-900">Tu sucursal</h2>
-                <p class="text-sm text-gray-600 truncate">{{ authStore.user.branchName }}</p>
-                <p v-if="authStore.user.branchAddress" class="text-xs text-gray-500 mt-1 line-clamp-2">
-                    {{ authStore.user.branchAddress }}
-                </p>
-            </div>
+    <div class="rounded-xl border border-gray-200 bg-white p-3 shadow-sm space-y-2" v-if="authStore.user">
+        <div class="flex flex-wrap items-center gap-2 text-sm">
+            <span class="font-semibold text-gray-900">Tu sucursal:</span>
+            <span class="text-gray-700">{{ authStore.user.branchName }}</span>
             <BaseButton
                 type="button"
-                variant="outline"
+                variant="ghost"
                 size="sm"
-                class="shrink-0 inline-flex items-center gap-1.5"
+                class="inline-flex items-center gap-1 text-blue-600 hover:text-blue-700"
                 :disabled="!canOpenMaps"
                 :title="mapsButtonTitle"
                 @click="openMapsToBranch"
@@ -25,8 +17,7 @@
             </BaseButton>
         </div>
 
-        <div v-if="phoneLines.length" class="space-y-2 pt-1 border-t border-gray-100">
-            <p class="text-xs font-medium text-gray-500 uppercase tracking-wide">Contacto del local</p>
+        <div v-if="phoneLines.length" class="space-y-1 pt-1 border-t border-gray-100">
             <PhoneNumberItem v-for="(num, idx) in phoneLines" :key="idx" :phone-number="num" />
         </div>
         <p v-else class="text-xs text-amber-700 bg-amber-50 rounded-lg px-3 py-2">

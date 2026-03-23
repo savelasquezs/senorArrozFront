@@ -69,7 +69,7 @@
 
                         <!-- Acciones (solo en modo edición) -->
                         <td v-if="editing" class="px-4 py-3 text-center">
-                            <button class="text-red-600 hover:text-red-700 p-1" title="Eliminar producto"
+                            <button type="button" class="text-red-600 hover:text-red-700 p-1" title="Eliminar producto"
                                 @click="removeProduct(index)">
                                 <TrashIcon class="w-4 h-4" />
                             </button>
@@ -127,6 +127,20 @@
         <!-- Modal para agregar producto -->
         <AddProductModal :open="showAddProductModal" :existing-product-ids="existingProductIds"
             @close="showAddProductModal = false" @product-added="handleProductAdded" />
+
+        <BaseDialog v-model="showLastProductWarningModal" title="Ultimo producto del pedido" size="md">
+            <p class="text-sm text-gray-700">
+                Este es el ultimo producto del pedido. Te recomendamos cancelar el pedido para que no sume en el total del dia.
+            </p>
+            <template #footer>
+                <BaseButton variant="secondary" @click="showLastProductWarningModal = false">
+                    Volver
+                </BaseButton>
+                <BaseButton variant="danger" @click="handleCancelOrderRequest">
+                    Cancelar pedido
+                </BaseButton>
+            </template>
+        </BaseDialog>
     </div>
 </template>
 
@@ -137,6 +151,7 @@ import { useFormatting } from '@/composables/useFormatting'
 import { useToast } from '@/composables/useToast'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseInput from '@/components/ui/BaseInput.vue'
+import BaseDialog from '@/components/ui/BaseDialog.vue'
 import AddProductModal from './AddProductModal.vue'
 import { PencilIcon, PlusIcon, TrashIcon } from '@heroicons/vue/24/outline'
 
@@ -151,6 +166,7 @@ const props = defineProps<Props>()
 
 const emit = defineEmits<{
     save: [products: UpdateOrderDetailDto[]]
+    requestCancelOrder: []
 }>()
 
 const { formatCurrency } = useFormatting()
@@ -160,6 +176,7 @@ const { error } = useToast()
 const editing = ref(false)
 const saving = ref(false)
 const showAddProductModal = ref(false)
+const showLastProductWarningModal = ref(false)
 const localProducts = ref<OrderDetailItem[]>([])
 const originalProducts = ref<OrderDetailItem[]>([])
 
@@ -198,7 +215,16 @@ const cancelEdit = () => {
 }
 
 const removeProduct = (index: number) => {
+    if (localProducts.value.length === 1) {
+        showLastProductWarningModal.value = true
+        return
+    }
     localProducts.value.splice(index, 1)
+}
+
+const handleCancelOrderRequest = () => {
+    showLastProductWarningModal.value = false
+    emit('requestCancelOrder')
 }
 
 const handleProductAdded = (newProduct: any) => {

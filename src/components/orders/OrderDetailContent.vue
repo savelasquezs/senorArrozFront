@@ -214,7 +214,8 @@
                 <div v-if="activeTab === 'products'">
                     <OrderDetailProductsList v-if="order" :products="order?.orderDetails"
                         :delivery-fee="order?.deliveryFee || 0" :can-edit="permissions.canEditProducts(order)"
-                        :saving="savingProducts" @save="handleProductsUpdate" />
+                        :saving="savingProducts" @save="handleProductsUpdate"
+                        @request-cancel-order="handleRequestCancelOrderFromProducts" />
                 </div>
 
                 <!-- Tab: Pagos -->
@@ -532,6 +533,11 @@ const handleProductsUpdate = async (products: UpdateOrderDetailDto[]) => {
     } finally {
         savingProducts.value = false
     }
+}
+
+const handleRequestCancelOrderFromProducts = () => {
+    if (!order.value || !permissions.canCancel(order.value)) return
+    showCancelModal.value = true
 }
 
 const handlePaymentUpdated = (updates: Partial<OrderDetailView>) => {

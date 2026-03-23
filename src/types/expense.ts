@@ -53,6 +53,7 @@ export interface CreateExpenseDetailDto {
     expenseId: number
     quantity: number
     amount: number
+    total?: number
 }
 
 export interface CreateExpenseBankPaymentDto {
@@ -71,6 +72,7 @@ export interface UpdateExpenseDetailDto {
     expenseId: number
     quantity: number
     amount: number
+    total?: number
 }
 
 export interface ExpenseHeaderFilters {
