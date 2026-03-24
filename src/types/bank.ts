@@ -34,6 +34,27 @@ export interface BankDetail extends Bank {
     balanceBreakdown: BankBalanceBreakdown
 }
 
+/** Línea de pago de gasto imputada al banco (movimientos por período). */
+export interface ExpenseBankPaymentLine {
+    id: number
+    amount: number
+    createdAt: string
+    expenseHeaderId: number
+    branchId: number
+    supplierName: string
+}
+
+/** Abono domiciliario por transferencia al banco (movimientos por período). */
+export interface DeliverymanBankAdvanceLine {
+    id: number
+    amount: number
+    createdAt: string
+    deliverymanId: number
+    deliverymanName: string
+    branchId: number
+    notes?: string
+}
+
 export interface BankFilters {
     name?: string
     branchId?: number

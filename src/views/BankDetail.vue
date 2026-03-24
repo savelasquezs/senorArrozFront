@@ -144,6 +144,8 @@
                     </div>
                 </BaseCard>
 
+                <BankMovementsPanel v-if="bank" :bank-id="bank.id" :branch-id="bank.branchId" />
+
                 <!-- Apps Section -->
                 <BaseCard>
                     <template #header>
@@ -359,6 +361,7 @@ import BaseDialog from '@/components/ui/BaseDialog.vue'
 import BaseLoading from '@/components/ui/BaseLoading.vue'
 import BaseAlert from '@/components/ui/BaseAlert.vue'
 import BankForm from '@/components/payments/banks/BankForm.vue'
+import BankMovementsPanel from '@/components/payments/banks/BankMovementsPanel.vue'
 import AppForm from '@/components/payments/apps/AppForm.vue'
 
 // Icons

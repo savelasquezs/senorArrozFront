@@ -5,9 +5,12 @@ import type {
 } from '@/types/common';
 import type {
     Bank,
+    BankBalanceBreakdown,
     BankDetail,
     BankFilters,
     CreateBankDto,
+    DeliverymanBankAdvanceLine,
+    ExpenseBankPaymentLine,
     UpdateBankDto,
 } from '@/types/bank';
 
@@ -61,6 +64,55 @@ class BankApi extends BaseApi {
     // 6. Eliminar banco
     async deleteBank(id: number): Promise<string> {
         return this.delete<string>(`/banks/${id}`);
+    }
+
+    /** Desglose neto del banco en rango de fechas (calendario Colombia en API). */
+    async getBankLedgerPeriod(
+        bankId: number,
+        fromDate: string,
+        toDate: string
+    ): Promise<BankBalanceBreakdown> {
+        return this.get<BankBalanceBreakdown>(`/banks/${bankId}/movements/period-summary`, {
+            params: { FromDate: fromDate, ToDate: toDate },
+        });
+    }
+
+    async getBankExpensePaymentsPaged(
+        bankId: number,
+        fromDate: string,
+        toDate: string,
+        options?: { branchId?: number; page?: number; pageSize?: number }
+    ): Promise<PagedResult<ExpenseBankPaymentLine>> {
+        const params: Record<string, unknown> = {
+            FromDate: fromDate,
+            ToDate: toDate,
+            Page: options?.page ?? 1,
+            PageSize: options?.pageSize ?? 20,
+        };
+        if (options?.branchId != null) params.BranchId = options.branchId;
+        return this.get<PagedResult<ExpenseBankPaymentLine>>(
+            `/banks/${bankId}/movements/expense-payments`,
+            { params }
+        );
+    }
+
+    async getBankDeliverymanTransfersPaged(
+        bankId: number,
+        fromDate: string,
+        toDate: string,
+        options?: { branchId?: number; page?: number; pageSize?: number }
+    ): Promise<PagedResult<DeliverymanBankAdvanceLine>> {
+        const params: Record<string, unknown> = {
+            FromDate: fromDate,
+            ToDate: toDate,
+            Page: options?.page ?? 1,
+            PageSize: options?.pageSize ?? 20,
+        };
+        if (options?.branchId != null) params.BranchId = options.branchId;
+        return this.get<PagedResult<DeliverymanBankAdvanceLine>>(
+            `/banks/${bankId}/movements/deliveryman-transfers`,
+            { params }
+        );
     }
 }
 
