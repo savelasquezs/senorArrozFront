@@ -19,7 +19,7 @@ export function useNotifications() {
         const n = new Notification(title, {
             body: options?.body,
             tag: options?.tag,
-            icon: options?.icon || '/vite.svg'
+            icon: options?.icon || '/favicon.png'
         })
 
         n.onclick = () => {
