@@ -260,26 +260,6 @@ const routes: RouteRecordRaw[] = [
             title: 'Gastos'
         }
     },
-    //   {
-    //     path: '/users',
-    //     name: 'Users',
-    //     component: () => import('@/views/Users.vue'),
-    //     meta: {
-    //       requiresAuth: true,
-    //       requiresRole: ['Superadmin', 'Admin'],
-    //       title: 'Usuarios'
-    //     }
-    //   },
-    //   {
-    //     path: '/reports',
-    //     name: 'Reports',
-    //     component: () => import('@/views/Reports.vue'),
-    //     meta: {
-    //       requiresAuth: true,
-    //       requiresRole: ['Superadmin', 'Admin', 'Cashier'],
-    //       title: 'Reportes'
-    //     }
-    //   },
     {
         path: '/cash-register',
         name: 'CashRegister',

@@ -50,8 +50,6 @@ import {
 	UsersIcon,
 	CubeIcon,
 	CurrencyDollarIcon,
-	UserGroupIcon,
-	ChartBarIcon,
 	CogIcon,
 	TruckIcon,
 	UserIcon,
@@ -149,18 +147,6 @@ const navigationItems = computed(() => [
 		to: '/expenses',
 		icon: CurrencyDollarIcon,
 		roles: ['Superadmin', 'Admin'],
-	},
-	{
-		name: 'Usuarios',
-		to: '/users',
-		icon: UserGroupIcon,
-		roles: ['Superadmin', 'Admin'],
-	},
-	{
-		name: 'Reportes',
-		to: '/reports',
-		icon: ChartBarIcon,
-		roles: ['Superadmin', 'Admin', 'Cashier'],
 	},
 	{
 		name: 'Cuadre de Caja',
