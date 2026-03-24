@@ -49,11 +49,18 @@ class DeliverymanApi extends BaseApi {
         deliverymanId: number,
         params?: { date?: string; fromDate?: string; toDate?: string; baseAmount?: number }
     ): Promise<DeliverymanDetail> {
-        const res = await this.get<{ stats: DeliverymanStats; orders: OrderListItem[] }>(
-            `/deliverymen/${deliverymanId}/day-summary`,
-            { params }
-        )
-        return { ...res.stats, orders: res.orders }
+        const res = await this.get<{
+            stats: DeliverymanStats
+            orders: OrderListItem[]
+            fullDayStats?: DeliverymanStats
+            fullDayOrders?: OrderListItem[]
+        }>(`/deliverymen/${deliverymanId}/day-summary`, { params })
+        return {
+            ...res.stats,
+            orders: res.orders,
+            fullDayStats: res.fullDayStats,
+            fullDayOrders: res.fullDayOrders,
+        }
     }
 
     async settleDay(deliverymanId: number, payload: SettleDeliverymanDayDto): Promise<SettleDeliverymanDayResultDto> {

@@ -12,9 +12,16 @@
                     <span>{{ formatCurrency(detail.baseAmount) }}</span>
                 </div>
                 <div class="flex justify-between font-semibold border-t border-gray-200 pt-2">
-                    <span>Excedente a liquidar</span>
-                    <span class="text-emerald-700">{{ formatCurrency(expectedSurplus) }}</span>
+                    <span>Total a liquidar</span>
+                    <span class="text-emerald-700">{{ formatCurrency(expectedTotalToSettle) }}</span>
                 </div>
+            </div>
+
+            <div v-if="pendingOnTheWayCount > 0"
+                class="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+                <p class="font-medium">Hay {{ pendingOnTheWayCount }} pedido(s) en camino sin entregar.</p>
+                <p class="mt-1 text-xs">La liquidación solo incluye pedidos ya entregados. Debes entregarlos o
+                    reasignarlos antes de liquidar.</p>
             </div>
 
             <div>
@@ -73,20 +80,24 @@
                 <div class="flex justify-between">
                     <span>Diferencia</span>
                     <span :class="isBalanced ? 'text-emerald-700' : 'text-amber-800'">
-                        {{ formatCurrency(totalApplied - expectedSurplus) }}
+                        {{ formatCurrency(totalApplied - expectedTotalToSettle) }}
                     </span>
                 </div>
                 <p v-if="!isBalanced" class="text-xs text-amber-900 pt-1">
                     Ajusta efectivo, transferencias o gastos hasta que la diferencia sea 0.
                 </p>
+                <p v-else-if="!canSubmitReturnBase && canSubmitFull" class="text-xs text-gray-600 pt-1">
+                    Para <strong>Liquidar y devolver base</strong> el efectivo contado debe ser al menos la base
+                    ({{ formatCurrency(detail?.baseAmount ?? 0) }}). Usa liquidación total si llevas menos efectivo.
+                </p>
             </div>
 
             <div class="flex flex-col sm:flex-row gap-2">
-                <BaseButton type="button" variant="success" class="flex-1" :disabled="!canSubmit" :loading="submitting"
+                <BaseButton type="button" variant="success" class="flex-1" :disabled="!canSubmitFull" :loading="submitting"
                     @click="submit(1)">
                     Liquidar totalmente (bloquear tarjeta)
                 </BaseButton>
-                <BaseButton type="button" variant="secondary" class="flex-1" :disabled="!canSubmit" :loading="submitting"
+                <BaseButton type="button" variant="secondary" class="flex-1" :disabled="!canSubmitReturnBase" :loading="submitting"
                     @click="submit(2)">
                     Liquidar y devolver base
                 </BaseButton>
@@ -157,10 +168,13 @@ function parseCashFormula(raw: string): number {
 
 const cashCounted = computed(() => parseCashFormula(cashFormula.value))
 
-const expectedSurplus = computed(() => {
+/** Debe coincidir con el backend: totalCash + base - advances (currentBalance). */
+const expectedTotalToSettle = computed(() => {
     if (!props.detail) return 0
-    return Math.max(0, props.detail.currentBalance - props.detail.baseAmount)
+    return Math.max(0, props.detail.currentBalance)
 })
+
+const pendingOnTheWayCount = computed(() => props.detail?.ordersOnTheWayCount ?? 0)
 
 const bankSum = computed(() =>
     bankRows.value.reduce((s, r) => s + (Number(r.amount) || 0), 0)
@@ -170,15 +184,22 @@ const expenseSum = computed(() => expenseRows.value.reduce((s, e) => s + e.amoun
 
 const totalApplied = computed(() => cashCounted.value + bankSum.value + expenseSum.value)
 
-const isBalanced = computed(() => Math.abs(totalApplied.value - expectedSurplus.value) < 1)
+const isBalanced = computed(() => Math.abs(totalApplied.value - expectedTotalToSettle.value) < 1)
 
-const canSubmit = computed(
+const canSubmitFull = computed(
     () =>
         !!props.detail &&
-        expectedSurplus.value > 0 &&
+        expectedTotalToSettle.value > 0 &&
+        pendingOnTheWayCount.value === 0 &&
         isBalanced.value &&
         bankRows.value.every((r) => r.bankId > 0 && r.amount > 0) &&
         !submitting.value
+)
+
+const canSubmitReturnBase = computed(
+    () =>
+        canSubmitFull.value &&
+        cashCounted.value + 1e-6 >= (props.detail?.baseAmount ?? 0)
 )
 
 watch(
@@ -208,7 +229,9 @@ function onExpenseCreated(expense: ExpenseHeader) {
 }
 
 async function submit(mode: 1 | 2) {
-    if (!props.detail || !canSubmit.value) return
+    if (!props.detail) return
+    if (mode === 2 && !canSubmitReturnBase.value) return
+    if (mode === 1 && !canSubmitFull.value) return
     submitting.value = true
     try {
         const transfers = bankRows.value
