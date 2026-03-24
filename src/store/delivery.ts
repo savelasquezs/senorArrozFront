@@ -2,7 +2,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { orderApi } from '@/services/MainAPI/orderApi'
-import type { OrderListItem } from '@/types/order'
+import type { DeliverymanHistoryBranchSummary, OrderListItem } from '@/types/order'
 
 /** Fecha local YYYY-MM-DD (no UTC) para alinear con el calendario del domiciliario */
 function localDateString(d = new Date()): string {
@@ -31,6 +31,10 @@ export const useDeliveryStore = defineStore('delivery', () => {
     /** Rango del modal "Mi historial" (por defecto: hoy local) */
     const historyFromDate = ref(localDateString())
     const historyToDate = ref(localDateString())
+
+    /** Pestañas por sucursal (historial con fechas) */
+    const historyBranchSummaries = ref<DeliverymanHistoryBranchSummary[]>([])
+    const historySelectedBranchId = ref<number | null>(null)
 
     /** Pedidos asignados sin filtro de fecha — para "En ruta" y contadores */
     const routeAssignedOrders = ref<OrderListItem[]>([])
@@ -85,8 +89,35 @@ export const useDeliveryStore = defineStore('delivery', () => {
         }
     }
 
-    // Historial del modal: filtrado por historyFromDate / historyToDate (default hoy)
-    const loadHistory = async (deliveryManId: number) => {
+    const historyBadgeCount = computed(() =>
+        historyBranchSummaries.value.reduce((acc, s) => acc + s.orderCount, 0)
+    )
+
+    /** Resumen por sucursal para el mismo rango de fechas del historial */
+    const loadHistoryBranchSummaries = async (deliveryManId: number) => {
+        const rows = await orderApi.fetchAssignedOrdersBranchSummary(deliveryManId, {
+            fromDate: historyFromDate.value,
+            toDate: historyToDate.value,
+        })
+        historyBranchSummaries.value = rows
+    }
+
+    function resolveHistoryBranchId(userBranchId: number, resetTab: boolean): number {
+        const summaries = historyBranchSummaries.value
+        if (
+            !resetTab &&
+            historySelectedBranchId.value != null &&
+            summaries.some((s) => s.branchId === historySelectedBranchId.value)
+        ) {
+            return historySelectedBranchId.value
+        }
+        if (summaries.some((s) => s.branchId === userBranchId)) return userBranchId
+        if (summaries.length > 0) return summaries[0].branchId
+        return userBranchId
+    }
+
+    /** Lista paginada del historial para la sucursal activa en pestaña */
+    const loadHistoryOrders = async (deliveryManId: number, branchId: number) => {
         isLoading.value = true
         error.value = null
         try {
@@ -95,7 +126,9 @@ export const useDeliveryStore = defineStore('delivery', () => {
                 pageSize: historyPageSize.value,
                 fromDate: historyFromDate.value,
                 toDate: historyToDate.value,
+                branchId,
             })
+            historySelectedBranchId.value = branchId
             historyOrders.value = [...response.items].sort((a, b) => b.id - a.id)
             historyTotalCount.value = response.totalCount
         } catch (err: any) {
@@ -104,6 +137,27 @@ export const useDeliveryStore = defineStore('delivery', () => {
         } finally {
             isLoading.value = false
         }
+    }
+
+    /**
+     * Carga resumen + listado del historial.
+     * @param resetTab Si true (cambio de fechas), vuelve a la sucursal de trabajo si tiene datos; si no, a la primera con datos.
+     */
+    const loadHistory = async (deliveryManId: number, userBranchId: number, resetTab = false) => {
+        error.value = null
+        try {
+            await loadHistoryBranchSummaries(deliveryManId)
+            const branchId = resolveHistoryBranchId(userBranchId, resetTab)
+            await loadHistoryOrders(deliveryManId, branchId)
+        } catch (err: any) {
+            error.value = err.message
+            throw err
+        }
+    }
+
+    /** Solo cambiar sucursal (pestaña); mantiene fechas y reinicia a página 1 antes de llamar desde la vista */
+    const loadHistoryForBranch = async (deliveryManId: number, branchId: number) => {
+        await loadHistoryOrders(deliveryManId, branchId)
     }
 
     /** Sin rango de fechas: incluye pedidos en ruta aunque CreatedAt sea de otro día */
@@ -162,6 +216,8 @@ export const useDeliveryStore = defineStore('delivery', () => {
         preparationTotalCount.value = 0
         historyOrders.value = []
         historyTotalCount.value = 0
+        historyBranchSummaries.value = []
+        historySelectedBranchId.value = null
         routeAssignedOrders.value = []
         historyFromDate.value = localDateString()
         historyToDate.value = localDateString()
@@ -185,6 +241,9 @@ export const useDeliveryStore = defineStore('delivery', () => {
         historyPageSize,
         historyFromDate,
         historyToDate,
+        historyBranchSummaries,
+        historySelectedBranchId,
+        historyBadgeCount,
         routeAssignedOrders,
         isLoading,
         error,
@@ -193,6 +252,8 @@ export const useDeliveryStore = defineStore('delivery', () => {
         loadAvailableOrders,
         loadPreparationOrders,
         loadHistory,
+        loadHistoryOrders,
+        loadHistoryForBranch,
         loadRouteAssignedOrders,
         assignOrders,
         setHistoryPage,

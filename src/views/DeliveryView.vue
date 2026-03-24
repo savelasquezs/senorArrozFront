@@ -32,9 +32,9 @@
                 >
                     <ClipboardDocumentListIcon class="w-4 h-4" />
                     Mi historial
-                    <span v-if="deliveryStore.historyTotalCount > 0"
+                    <span v-if="deliveryStore.historyBadgeCount > 0"
                         class="py-0.5 px-1.5 rounded-full text-xs bg-blue-200 text-blue-800">
-                        {{ deliveryStore.historyTotalCount }}
+                        {{ deliveryStore.historyBadgeCount }}
                     </span>
                 </button>
 
@@ -148,6 +148,31 @@
 
         <!-- Modal: Mi historial -->
         <BaseDialog v-model="showHistoryModal" title="Mi Historial" size="xl">
+            <div v-if="deliveryStore.historyBranchSummaries.length > 1"
+                class="flex flex-wrap gap-2 mb-3 pb-3 border-b border-gray-100 shrink-0">
+                <button
+                    v-for="b in deliveryStore.historyBranchSummaries"
+                    :key="b.branchId"
+                    type="button"
+                    @click="selectHistoryBranch(b.branchId)"
+                    :class="[
+                        'px-3 py-1.5 rounded-lg text-sm font-medium transition-colors',
+                        deliveryStore.historySelectedBranchId === b.branchId
+                            ? 'bg-emerald-600 text-white'
+                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200',
+                    ]"
+                >
+                    {{ b.branchName }}
+                    <span
+                        :class="[
+                            'ml-1.5 text-xs rounded-full px-1.5 py-0.5',
+                            deliveryStore.historySelectedBranchId === b.branchId
+                                ? 'bg-white/20 text-white'
+                                : 'bg-white text-gray-600',
+                        ]"
+                    >{{ b.orderCount }}</span>
+                </button>
+            </div>
             <DeliveryHistoryTable
                 :orders="deliveryStore.historyOrders"
                 :total-count="deliveryStore.historyTotalCount"
@@ -210,6 +235,8 @@ const routeOrders = ref<OrderListItem[]>([])
 
 const cardGridRef = ref<InstanceType<typeof DeliveryCardGrid> | null>(null)
 
+const userBranchId = () => authStore.user?.branchId ?? 0
+
 // ─── Carga de datos ───────────────────────────────────────────
 
 const loadAvailableOrders = async () => {
@@ -234,12 +261,25 @@ const loadPreparationOrders = async () => {
     }
 }
 
-/** Historial del modal (filtrado por fechas en el store) */
-const loadHistoryModal = async () => {
+/** Historial del modal (resumen por sucursal + listado de la pestaña activa) */
+const loadHistoryModal = async (resetTabToLaborBranch = false) => {
     if (!authStore.user?.id) return
     try {
         isLoading.value = true
-        await deliveryStore.loadHistory(authStore.user.id)
+        await deliveryStore.loadHistory(authStore.user.id, userBranchId(), resetTabToLaborBranch)
+    } catch (err: any) {
+        error('Error al cargar historial', err.message)
+    } finally {
+        isLoading.value = false
+    }
+}
+
+const selectHistoryBranch = async (branchId: number) => {
+    if (!authStore.user?.id || deliveryStore.historySelectedBranchId === branchId) return
+    try {
+        isLoading.value = true
+        deliveryStore.setHistoryPage(1)
+        await deliveryStore.loadHistoryForBranch(authStore.user.id, branchId)
     } catch (err: any) {
         error('Error al cargar historial', err.message)
     } finally {
@@ -261,7 +301,7 @@ const loadRouteAssigned = async () => {
 
 const openHistoryModal = async () => {
     showHistoryModal.value = true
-    await loadHistoryModal()
+    await loadHistoryModal(false)
 }
 
 const goToRoute = async () => {
@@ -323,8 +363,17 @@ const refreshData = async () => {
 // ─── Historial ────────────────────────────────────────────────
 
 const handleHistoryPageChange = async (page: number) => {
+    if (!authStore.user?.id) return
     deliveryStore.setHistoryPage(page)
-    await loadHistoryModal()
+    const branchId = deliveryStore.historySelectedBranchId ?? userBranchId()
+    try {
+        isLoading.value = true
+        await deliveryStore.loadHistoryOrders(authStore.user.id, branchId)
+    } catch (err: any) {
+        error('Error al cargar historial', err.message)
+    } finally {
+        isLoading.value = false
+    }
 }
 
 const handleHistoryFilterChange = async (filters: {
@@ -334,7 +383,7 @@ const handleHistoryFilterChange = async (filters: {
 }) => {
     deliveryStore.setHistoryDateRange(filters.fromDate, filters.toDate)
     deliveryStore.setHistoryPage(1)
-    await loadHistoryModal()
+    await loadHistoryModal(true)
 }
 
 // ─── En ruta ─────────────────────────────────────────────────
@@ -385,7 +434,7 @@ onMounted(async () => {
     // Precarga conteo/lista del día para el badge "Mi historial" (mismo rango que el modal)
     if (authStore.user?.id) {
         try {
-            await deliveryStore.loadHistory(authStore.user.id)
+            await deliveryStore.loadHistory(authStore.user.id, userBranchId(), true)
         } catch {
             /* badge sin datos si falla */
         }

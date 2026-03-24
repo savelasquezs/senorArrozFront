@@ -11,6 +11,7 @@ import type {
     OrderListItem,
     OrderDetailView,
     OrderStatus,
+    DeliverymanHistoryBranchSummary,
 } from '@/types/order';
 
 class OrderApi extends BaseApi {
@@ -168,15 +169,36 @@ class OrderApi extends BaseApi {
     // 21. Obtener pedidos asignados a un domiciliario (opcional: FromDate/ToDate yyyy-MM-DD para filtrar por CreatedAt)
     async fetchAssignedOrders(
         deliveryManId: number,
-        filters?: { page?: number; pageSize?: number; fromDate?: string; toDate?: string }
+        filters?: {
+            page?: number
+            pageSize?: number
+            fromDate?: string
+            toDate?: string
+            branchId?: number
+        }
     ): Promise<PagedResult<OrderListItem>> {
         const params: Record<string, string | number> = {};
         if (filters?.page) params.Page = filters.page;
         if (filters?.pageSize) params.PageSize = filters.pageSize;
         if (filters?.fromDate) params.FromDate = filters.fromDate;
         if (filters?.toDate) params.ToDate = filters.toDate;
+        if (filters?.branchId != null && filters.branchId > 0) params.BranchId = filters.branchId;
 
         return this.get<PagedResult<OrderListItem>>(`/orders/delivery/assigned/${deliveryManId}`, { params });
+    }
+
+    /** Conteos por sucursal para pestañas del historial (mismo rango de fechas que el listado) */
+    async fetchAssignedOrdersBranchSummary(
+        deliveryManId: number,
+        filters?: { fromDate?: string; toDate?: string }
+    ): Promise<DeliverymanHistoryBranchSummary[]> {
+        const params: Record<string, string> = {};
+        if (filters?.fromDate) params.FromDate = filters.fromDate;
+        if (filters?.toDate) params.ToDate = filters.toDate;
+        return this.get<DeliverymanHistoryBranchSummary[]>(
+            `/orders/delivery/assigned/${deliveryManId}/branch-summary`,
+            { params }
+        );
     }
 }
 

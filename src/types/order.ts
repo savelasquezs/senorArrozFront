@@ -202,6 +202,13 @@ export interface OrderFilters {
 }
 
 // ===== TIPOS PARA VISTA DE LISTA =====
+/** Resumen de pedidos asignados por sucursal (historial domiciliario) */
+export interface DeliverymanHistoryBranchSummary {
+    branchId: number
+    branchName: string
+    orderCount: number
+}
+
 export interface OrderListItem {
     id: number
     branchId: number
