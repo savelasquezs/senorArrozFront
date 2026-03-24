@@ -1,5 +1,8 @@
 import type { OrderListItem } from './order'
 
+/** Alineado con backend DeliverymanDayLiquidationMode */
+export type DeliverymanDayLiquidationMode = 0 | 1 | 2
+
 export interface DeliverymanStats {
     deliverymanId: number
     deliverymanName: string
@@ -10,6 +13,8 @@ export interface DeliverymanStats {
     totalAdvances: number
     baseAmount: number
     currentBalance: number // cash + base - advances
+    dayBlocked?: boolean
+    liquidationMode?: DeliverymanDayLiquidationMode
 }
 
 export interface DeliverymanAdvance {
@@ -17,6 +22,11 @@ export interface DeliverymanAdvance {
     deliverymanId: number
     deliverymanName: string
     amount: number
+    /** 0 cash, 1 bankTransfer, 2 expenseOffset */
+    paymentMethod?: number
+    bankId?: number | null
+    bankName?: string | null
+    expenseHeaderId?: number | null
     notes: string | null
     createdAt: string
     createdBy: number
@@ -33,7 +43,35 @@ export interface DeliverymanDetail extends DeliverymanStats {
 export interface CreateDeliverymanAdvanceDto {
     deliverymanId: number
     amount: number
+    paymentMethod?: number
+    bankId?: number | null
+    expenseHeaderId?: number | null
     notes?: string
+}
+
+export interface SettleDeliverymanBankLineDto {
+    bankId: number
+    amount: number
+}
+
+export interface SettleDeliverymanExpenseLineDto {
+    expenseHeaderId: number
+    amount: number
+}
+
+export interface SettleDeliverymanDayDto {
+    date: string
+    baseAmount: number
+    cashAmount: number
+    bankTransfers: SettleDeliverymanBankLineDto[]
+    expenseOffsets: SettleDeliverymanExpenseLineDto[]
+    /** 1 full, 2 return base */
+    mode: 1 | 2
+}
+
+export interface SettleDeliverymanDayResultDto {
+    advances: DeliverymanAdvance[]
+    surplusApplied: number
 }
 
 export interface UpdateDeliverymanAdvanceDto {

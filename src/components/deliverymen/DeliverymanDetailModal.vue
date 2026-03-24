@@ -66,10 +66,13 @@
             <BaseButton @click="$emit('close')" variant="secondary">
                 Cerrar
             </BaseButton>
-            <BaseButton v-if="detail && detail.currentBalance > detail.baseAmount" @click="handleLiquidate"
-                variant="success" :loading="loading">
+            <BaseButton v-if="detail && detail.currentBalance > detail.baseAmount && !detail.dayBlocked"
+                type="button" @click="emit('open-liquidation')" variant="success" :loading="loading">
                 Liquidar ({{ formatCurrency(detail.currentBalance - detail.baseAmount) }})
             </BaseButton>
+            <p v-else-if="detail?.dayBlocked" class="text-xs text-amber-800 mr-auto">
+                Domiciliario liquidado hoy. Desbloquea desde la tarjeta si necesitas operar de nuevo.
+            </p>
         </template>
     </BaseDialog>
 </template>
@@ -91,18 +94,9 @@ interface Props {
 const props = defineProps<Props>()
 const emit = defineEmits<{
     'close': []
-    'liquidate': [deliverymanId: number, amount: number]
+    'open-liquidation': []
 }>()
 
 const { formatCurrency } = useFormatting()
 
-const handleLiquidate = () => {
-    if (!props.detail) return
-
-    const liquidationAmount = props.detail.currentBalance - props.detail.baseAmount
-
-    if (confirm(`¿Confirmas liquidar a ${props.detail.deliverymanName} con un abono de ${formatCurrency(liquidationAmount)}?`)) {
-        emit('liquidate', props.detail.deliverymanId, liquidationAmount)
-    }
-}
 </script>

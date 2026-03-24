@@ -7,6 +7,8 @@ export interface ExpenseHeader {
     supplierId: number
     supplierName: string
     supplierPhone?: string
+    deliverymanId?: number | null
+    deliverymanName?: string | null
     total?: number
     createdById: number
     createdByName: string
@@ -45,6 +47,7 @@ export interface ExpenseBankPayment {
 
 export interface CreateExpenseHeaderDto {
     supplierId: number
+    deliverymanId?: number | null
     expenseDetails: CreateExpenseDetailDto[]
     expenseBankPayments?: CreateExpenseBankPaymentDto[]
 }

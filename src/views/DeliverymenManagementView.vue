@@ -42,6 +42,7 @@
                             @view-detail="handleViewDetail"
                             @orders-click="handleOrdersClick"
                             @base-amount-changed="handleBaseAmountChanged"
+                            @unlock-day="handleUnlockDay"
                         />
                     </div>
 
@@ -78,7 +79,15 @@
             :detail="selectedDeliverymanDetail"
             :loading="loadingDetail"
             @close="closeDetailModal"
-            @liquidate="handleLiquidate"
+            @open-liquidation="openLiquidationWizard"
+        />
+
+        <LiquidationWizardModal
+            v-model="showLiquidationWizard"
+            :detail="selectedDeliverymanDetail"
+            :selected-date="selectedDate"
+            :bank-options="bankOptions"
+            @success="handleSettleSuccess"
         />
 
         <LiquidationConfirmModal
@@ -106,7 +115,8 @@ import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/store/auth'
 import { useToast } from '@/composables/useToast'
 import { deliverymanApi } from '@/services/MainAPI/deliverymanApi'
-import type { DeliverymanStats, DeliverymanAdvance, DeliverymanDetail } from '@/types/deliveryman'
+import type { DeliverymanStats, DeliverymanAdvance, DeliverymanDetail, SettleDeliverymanDayResultDto } from '@/types/deliveryman'
+import { useOrdersDraftsStore } from '@/store/ordersDrafts'
 import MainLayout from '@/components/layout/MainLayout.vue'
 import BaseInput from '@/components/ui/BaseInput.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
@@ -114,6 +124,7 @@ import DeliverymanCard from '@/components/deliverymen/DeliverymanCard.vue'
 import AdvancesTable from '@/components/deliverymen/AdvancesTable.vue'
 import AdvanceForm from '@/components/deliverymen/AdvanceForm.vue'
 import DeliverymanDetailModal from '@/components/deliverymen/DeliverymanDetailModal.vue'
+import LiquidationWizardModal from '@/components/deliverymen/LiquidationWizardModal.vue'
 import LiquidationConfirmModal from '@/components/deliverymen/LiquidationConfirmModal.vue'
 import DeliverymanOrdersModal from '@/components/deliverymen/DeliverymanOrdersModal.vue'
 import { ArrowPathIcon, TruckIcon } from '@heroicons/vue/24/outline'
@@ -138,10 +149,19 @@ const showAdvanceForm = ref(false)
 const showDetailModal = ref(false)
 const showOrdersModal = ref(false)
 const showLiquidationModal = ref(false)
+const showLiquidationWizard = ref(false)
 const ordersModalDeliveryman = ref<{ id: number; name: string } | null>(null)
 const editingAdvance = ref<DeliverymanAdvance | null>(null)
 const selectedDeliverymanDetail = ref<DeliverymanDetail | null>(null)
 const liquidatedDeliveryman = ref<{ name: string; amount: number; baseAmount: number } | null>(null)
+
+const ordersDraftsStore = useOrdersDraftsStore()
+
+const bankOptions = computed(() =>
+    ordersDraftsStore.banks
+        .filter((b) => b.active)
+        .map((b) => ({ value: b.id, label: b.name }))
+)
 
 // Computed: aplicar overrides de baseAmount locales
 const deliverymenStats = computed((): DeliverymanStats[] => {
@@ -175,8 +195,10 @@ const handleViewDetail = async (deliverymanId: number) => {
     loadingDetail.value = true
     showDetailModal.value = true
     try {
+        const overrideBase = baseAmounts.value.get(deliverymanId)
         const detail = await deliverymanApi.getDaySummary(deliverymanId, {
-            date: selectedDate.value
+            date: selectedDate.value,
+            ...(overrideBase != null ? { baseAmount: overrideBase } : {}),
         })
         selectedDeliverymanDetail.value = detail
     } catch (err: any) {
@@ -184,6 +206,35 @@ const handleViewDetail = async (deliverymanId: number) => {
         showDetailModal.value = false
     } finally {
         loadingDetail.value = false
+    }
+}
+
+const openLiquidationWizard = () => {
+    if (!selectedDeliverymanDetail.value) return
+    showLiquidationWizard.value = true
+}
+
+const handleSettleSuccess = async (result: SettleDeliverymanDayResultDto) => {
+    const d = selectedDeliverymanDetail.value
+    liquidatedDeliveryman.value = d
+        ? {
+              name: d.deliverymanName,
+              amount: result.surplusApplied,
+              baseAmount: d.baseAmount,
+          }
+        : null
+    showLiquidationModal.value = true
+    closeDetailModal()
+    await loadData()
+}
+
+const handleUnlockDay = async (deliverymanId: number) => {
+    try {
+        await deliverymanApi.unlockDay(deliverymanId, selectedDate.value)
+        success('Día desbloqueado', 5000, 'Ya puedes operar de nuevo con este domiciliario.')
+        await loadData()
+    } catch (err: any) {
+        error('Error al desbloquear', err.message)
     }
 }
 
@@ -250,35 +301,6 @@ const handleDeleteAdvance = async (advance: DeliverymanAdvance) => {
     }
 }
 
-// Handler de liquidación
-const handleLiquidate = async (deliverymanId: number, amount: number) => {
-    submitting.value = true
-    try {
-        const stat = deliverymenStats.value.find(s => s.deliverymanId === deliverymanId)
-        if (!stat) return
-
-        await deliverymanApi.createAdvance(deliverymanId, {
-            deliverymanId,
-            amount,
-            notes: 'Liquidación automática'
-        })
-
-        liquidatedDeliveryman.value = {
-            name: stat.deliverymanName,
-            amount,
-            baseAmount: stat.baseAmount
-        }
-
-        closeDetailModal()
-        showLiquidationModal.value = true
-        await loadData()
-    } catch (err: any) {
-        error('Error al liquidar', err.message)
-    } finally {
-        submitting.value = false
-    }
-}
-
 const closeDetailModal = () => {
     showDetailModal.value = false
     selectedDeliverymanDetail.value = null
@@ -301,6 +323,7 @@ onMounted(() => {
         return
     }
 
+    ordersDraftsStore.loadBanks()
     loadData()
 })
 </script>

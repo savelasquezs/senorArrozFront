@@ -4,6 +4,8 @@ import type {
     DeliverymanDetail,
     CreateDeliverymanAdvanceDto,
     UpdateDeliverymanAdvanceDto,
+    SettleDeliverymanDayDto,
+    SettleDeliverymanDayResultDto,
 } from '@/types/deliveryman'
 import type { PagedResult } from '@/types/common'
 import type { OrderListItem } from '@/types/order'
@@ -45,13 +47,23 @@ class DeliverymanApi extends BaseApi {
      */
     async getDaySummary(
         deliverymanId: number,
-        params?: { date?: string; fromDate?: string; toDate?: string }
+        params?: { date?: string; fromDate?: string; toDate?: string; baseAmount?: number }
     ): Promise<DeliverymanDetail> {
         const res = await this.get<{ stats: DeliverymanStats; orders: OrderListItem[] }>(
             `/deliverymen/${deliverymanId}/day-summary`,
             { params }
         )
         return { ...res.stats, orders: res.orders }
+    }
+
+    async settleDay(deliverymanId: number, payload: SettleDeliverymanDayDto): Promise<SettleDeliverymanDayResultDto> {
+        return this.post<SettleDeliverymanDayResultDto>(`/deliverymen/${deliverymanId}/settle-day`, payload)
+    }
+
+    async unlockDay(deliverymanId: number, date: string): Promise<void> {
+        await this.post<void>(`/deliverymen/${deliverymanId}/unlock-day`, {}, {
+            params: { date },
+        })
     }
 
     /**

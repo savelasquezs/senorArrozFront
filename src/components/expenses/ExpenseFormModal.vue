@@ -190,7 +190,12 @@
             </div>
 
             <!-- Abono a domiciliario -->
-            <div class="mt-4 border-t border-gray-200 pt-4 space-y-2">
+            <div v-if="skipAutoAdvance && presetDeliverymanId" class="mt-4 border-t border-gray-200 pt-4">
+                <p class="text-xs text-blue-900 bg-blue-50 border border-blue-100 rounded-lg p-3">
+                    Gasto imputado al domiciliario en liquidación. El abono contable se registra al confirmar la liquidación.
+                </p>
+            </div>
+            <div v-else class="mt-4 border-t border-gray-200 pt-4 space-y-2">
                 <label class="inline-flex items-center gap-2 text-sm text-gray-700">
                     <input type="checkbox" v-model="isDeliverymanAdvance">
                     <span>Es abono de domiciliario</span>
@@ -276,11 +281,17 @@ interface Props {
     isOpen: boolean
     editingExpense?: ExpenseHeader | null
     loading?: boolean
+    /** Pre-asigna domiciliario (p. ej. liquidación). */
+    presetDeliverymanId?: number | null
+    /** No crear abono automático al guardar (el abono va en la liquidación). */
+    skipAutoAdvance?: boolean
 }
 
 const props = withDefaults(defineProps<Props>(), {
     editingExpense: null,
-    loading: false
+    loading: false,
+    presetDeliverymanId: null,
+    skipAutoAdvance: false,
 })
 
 const emit = defineEmits<{
@@ -558,6 +569,13 @@ const initializeForm = async () => {
         }
         if (supplierOptions.value.length === 0) {
             await loadSuppliers()
+        }
+        if (props.presetDeliverymanId) {
+            selectedDeliverymanId.value = props.presetDeliverymanId
+            isDeliverymanAdvance.value = true
+        } else {
+            selectedDeliverymanId.value = null
+            isDeliverymanAdvance.value = false
         }
     }
 }
@@ -852,8 +870,13 @@ const handleSubmit = async () => {
     }
 
     try {
+        const deliverymanForHeader =
+            props.presetDeliverymanId ??
+            (isDeliverymanAdvance.value ? selectedDeliverymanId.value : null)
+
         const payload: CreateExpenseHeaderDto | UpdateExpenseHeaderDto = {
             supplierId: formData.value.supplierId!,
+            ...(deliverymanForHeader ? { deliverymanId: deliverymanForHeader } : {}),
             expenseDetails: formData.value.expenseDetails.map(d => ({
                 expenseId: d.expenseId,
                 quantity: d.quantity,
@@ -876,7 +899,7 @@ const handleSubmit = async () => {
         }
 
         // Crear abono de domiciliario si corresponde (al crear o al actualizar, si está marcado)
-        if (isDeliverymanAdvance.value && selectedDeliverymanId.value) {
+        if (!props.skipAutoAdvance && isDeliverymanAdvance.value && selectedDeliverymanId.value) {
             const amount = totalExpenses.value
             try {
                 await deliverymanApi.createAdvance(selectedDeliverymanId.value, {

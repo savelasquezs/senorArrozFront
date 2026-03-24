@@ -1,5 +1,10 @@
 <template>
-    <div class="bg-white rounded-lg shadow p-3 hover:shadow-md transition-shadow">
+    <div class="bg-white rounded-lg shadow p-3 transition-shadow relative"
+        :class="stats.dayBlocked ? 'ring-2 ring-amber-300 opacity-95' : 'hover:shadow-md'">
+        <div v-if="stats.dayBlocked"
+            class="absolute top-2 right-2 px-2 py-0.5 rounded text-[10px] font-semibold bg-amber-100 text-amber-900">
+            Liquidado
+        </div>
         <div class="flex items-start justify-between mb-2">
             <div>
                 <h3 class="text-base font-semibold text-gray-900">{{ stats.deliverymanName }}</h3>
@@ -43,10 +48,16 @@
                 min="0" step="1000" />
         </div>
 
-        <BaseButton @click="$emit('view-detail', stats.deliverymanId)" variant="outline" size="sm"
-            class="w-full text-xs">
-            Ver detalle
-        </BaseButton>
+        <div class="flex flex-col gap-2">
+            <BaseButton @click="$emit('view-detail', stats.deliverymanId)" variant="outline" size="sm"
+                class="w-full text-xs">
+                Ver detalle
+            </BaseButton>
+            <BaseButton v-if="stats.dayBlocked" type="button" variant="secondary" size="sm" class="w-full text-xs"
+                @click="$emit('unlock-day', stats.deliverymanId)">
+                Desbloquear día
+            </BaseButton>
+        </div>
     </div>
 </template>
 
@@ -65,6 +76,7 @@ const emit = defineEmits<{
     'view-detail': [deliverymanId: number]
     'orders-click': [deliverymanId: number]
     'base-amount-changed': [deliverymanId: number, amount: number]
+    'unlock-day': [deliverymanId: number]
 }>()
 
 const { formatCurrency } = useFormatting()
