@@ -823,7 +823,8 @@ const calculateUnitPrice = (detail: typeof formData.value.expenseDetails[0]) => 
     if (!detail.total || !detail.quantity || detail.quantity === 0) {
         return 0
     }
-    return Number((detail.total / detail.quantity).toFixed(2))
+    // Backend espera amount como entero (precio unitario en pesos)
+    return Math.round(Number(detail.total) / Number(detail.quantity))
 }
 
 const updateUnitPrice = (index: number) => {
@@ -877,12 +878,15 @@ const handleSubmit = async () => {
         const payload: CreateExpenseHeaderDto | UpdateExpenseHeaderDto = {
             supplierId: formData.value.supplierId!,
             ...(deliverymanForHeader ? { deliverymanId: deliverymanForHeader } : {}),
-            expenseDetails: formData.value.expenseDetails.map(d => ({
-                expenseId: d.expenseId,
-                quantity: d.quantity,
-                amount: d.amount,
-                total: Number(d.total ?? (d.quantity * d.amount)),
-            })),
+            expenseDetails: formData.value.expenseDetails.map(d => {
+                const lineTotal = Number(d.total ?? (d.quantity * d.amount))
+                return {
+                    expenseId: d.expenseId,
+                    quantity: d.quantity,
+                    amount: Math.round(Number(d.amount)),
+                    total: Math.round(lineTotal * 100) / 100,
+                }
+            }),
             expenseBankPayments: formData.value.expenseBankPayments.length > 0
                 ? formData.value.expenseBankPayments.map(p => ({
                     bankId: p.bankId,
