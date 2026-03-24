@@ -101,16 +101,18 @@
         <!-- Create/Edit User Dialog -->
         <BaseDialog v-model="showDialog" :title="editingUser ? 'Editar Usuario' : 'Nuevo Usuario'"
             :icon="editingUser ? PencilIcon : PlusIcon" size="lg">
-            <UserForm :user="editingUser" :branch-id="branchId" @submit="handleSubmit" @cancel="closeDialog"
-                :loading="usersStore.isLoading" />
+            <UserForm :user="editingUser" :branch-id="branchId" :branch-options="branchSelectOptions"
+                @submit="handleSubmit" @cancel="closeDialog" :loading="usersStore.isLoading" />
         </BaseDialog>
     </div>
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, onMounted } from 'vue'
 import { useUsersStore } from '@/store/users'
 import { useAuthStore } from '@/store/auth'
+import { useBranchesStore } from '@/store/branches'
+import { branchApi } from '@/services/MainAPI/branchApi'
 import type { User, UserRole } from '@/types/user'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseDialog from '@/components/ui/BaseDialog.vue'
@@ -142,6 +144,20 @@ const emit = defineEmits<{
 
 const usersStore = useUsersStore()
 const authStore = useAuthStore()
+const branchesStore = useBranchesStore()
+
+const branchSelectOptions = ref<Array<{ value: number; label: string }>>([])
+
+onMounted(async () => {
+    if (authStore.user?.role !== 'Superadmin') return
+    try {
+        const res = await branchApi.getAllBranches({ Page: 1, PageSize: 200 })
+        const items = res.data?.items ?? []
+        branchSelectOptions.value = items.map(b => ({ value: b.id, label: b.name }))
+    } catch (e) {
+        console.error('Error cargando sucursales para selector de usuario', e)
+    }
+})
 
 // Dialog state
 const showDialog = ref(false)
@@ -212,9 +228,14 @@ const closeDialog = () => {
 const handleSubmit = async (userData: any) => {
     try {
         if (editingUser.value) {
-
-
             const updatedUser = await usersStore.updateUser(editingUser.value.id, userData)
+            if (updatedUser.branchId !== props.branchId) {
+                const list = branchesStore.current?.users
+                if (list) {
+                    const i = list.findIndex(u => u.id === updatedUser.id)
+                    if (i >= 0) list.splice(i, 1)
+                }
+            }
             emit('userUpdated', updatedUser)
         } else {
             const newUser = await usersStore.createUser({

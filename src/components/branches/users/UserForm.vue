@@ -36,6 +36,17 @@
             </BaseSelect>
         </div>
 
+        <!-- Sucursal (solo superadmin al editar; mueve al usuario entre sedes) -->
+        <div v-if="showBranchSelector" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <BaseSelect v-model="form.branchId" :options="branchOptionsNormalized" label="Sucursal"
+                placeholder="Seleccionar sucursal..." required :error="errors.branchId" value-key="value"
+                display-key="label" @change="errors.branchId = ''">
+                <template #icon>
+                    <BuildingOffice2Icon class="w-4 h-4" />
+                </template>
+            </BaseSelect>
+        </div>
+
         <!-- Role Constraints Alert -->
         <BaseAlert v-if="roleConstraintMessage" variant="warning">
             {{ roleConstraintMessage }}
@@ -115,6 +126,7 @@
 <script setup lang="ts">
 import { reactive, computed, watch } from 'vue'
 import { useUsersStore } from '@/store/users'
+import { useAuthStore } from '@/store/auth'
 import type { UserRole } from '@/types/user'
 import BaseInput from '@/components/ui/BaseInput.vue'
 import BaseSelect from '@/components/ui/BaseSelect.vue'
@@ -127,13 +139,16 @@ import {
     PhoneIcon,
     ShieldCheckIcon,
     CheckIcon,
-    XMarkIcon
+    XMarkIcon,
+    BuildingOffice2Icon
 } from '@heroicons/vue/24/outline'
 import type { BranchUserSummary } from '@/types/common'
 
 interface Props {
     user?: BranchUserSummary | null
     branchId: number
+    /** Lista de sucursales para selector (superadmin al editar) */
+    branchOptions?: Array<{ value: number; label: string }>
     loading?: boolean
 }
 
@@ -147,12 +162,14 @@ const emit = defineEmits<{
 }>()
 
 const usersStore = useUsersStore()
+const authStore = useAuthStore()
 
 const form = reactive({
     name: '',
     email: '',
     phone: '',
     role: '' as UserRole | '',
+    branchId: 0,
     password: '',
     confirmPassword: ''
 })
@@ -162,6 +179,7 @@ const errors = reactive({
     email: '',
     phone: '',
     role: '',
+    branchId: '',
     password: '',
     confirmPassword: ''
 })
@@ -200,15 +218,28 @@ const roleConstraintMessage = computed(() => {
     return ''
 })
 
+const showBranchSelector = computed(
+    () =>
+        authStore.isSuperadmin &&
+        !!props.user &&
+        (props.branchOptions?.length ?? 0) > 0
+)
+
+const branchOptionsNormalized = computed(() => props.branchOptions ?? [])
+
 const isFormValid = computed(() => {
+    const branchOk = !showBranchSelector.value || form.branchId > 0
+
     const basicValidation = form.name.trim() &&
         form.email.trim() &&
         form.phone.trim() &&
         form.role &&
+        branchOk &&
         !errors.name &&
         !errors.email &&
         !errors.phone &&
         !errors.role &&
+        !errors.branchId &&
         !roleConstraintMessage.value
 
     if (!props.user) {
@@ -325,6 +356,14 @@ const validateForm = () => {
     validatePhone()
     validateRole()
 
+    if (showBranchSelector.value) {
+        if (!form.branchId || form.branchId <= 0) {
+            errors.branchId = 'Selecciona una sucursal'
+        } else {
+            errors.branchId = ''
+        }
+    }
+
     // Validate passwords for new users
     if (!props.user) {
         validatePassword()
@@ -339,7 +378,7 @@ const handleSubmit = () => {
         return
     }
 
-    const formData = {
+    const formData: Record<string, unknown> = {
         name: form.name.trim(),
         email: form.email.trim(),
         phone: form.phone.trim(),
@@ -347,8 +386,12 @@ const handleSubmit = () => {
     }
 
     if (!props.user) {
-        // Adding password for new users
         (formData as any).password = form.password
+    } else {
+        formData.active = props.user.active
+        if (showBranchSelector.value && form.branchId > 0) {
+            formData.branchId = form.branchId
+        }
     }
 
     emit('submit', formData)
@@ -361,6 +404,7 @@ watch(() => props.user, (newUser) => {
         form.email = newUser.email
         form.phone = newUser.phone || ''
         form.role = newUser.role
+        form.branchId = newUser.branchId
         form.password = ''
         form.confirmPassword = ''
     } else {
@@ -369,6 +413,7 @@ watch(() => props.user, (newUser) => {
         form.email = ''
         form.phone = ''
         form.role = '' as UserRole | ''
+        form.branchId = props.branchId
         form.password = ''
         form.confirmPassword = ''
     }

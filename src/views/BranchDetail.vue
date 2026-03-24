@@ -888,8 +888,14 @@ const handleUserCreated = (user: User) => {
 }
 
 const handleUserUpdated = (user: User) => {
-    // User is already updated in the store by the users table component
-    success('Usuario actualizado', 5000, `El usuario ${user.name} se ha actualizado correctamente`)
+    const moved = user.branchId !== branch.value?.id
+    success(
+        'Usuario actualizado',
+        5000,
+        moved && user.branchName
+            ? `${user.name} pasó a la sucursal «${user.branchName}» y ya no aparece en esta lista.`
+            : `El usuario ${user.name} se ha actualizado correctamente`
+    )
 }
 
 const handleUserStatusToggled = (user: User) => {

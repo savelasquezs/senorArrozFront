@@ -4,6 +4,7 @@ export type UserRole = 'Superadmin' | 'Admin' | 'Cashier' | 'Kitchen' | 'Deliver
 export interface User {
     id: number
     branchId: number
+    branchName?: string
     role: UserRole
     name: string
     email: string
@@ -28,6 +29,9 @@ export interface UpdateUserRequest {
     email?: string
     phone?: string
     role?: UserRole
+    active?: boolean
+    /** Solo superadmin; cambia la sucursal del usuario */
+    branchId?: number
 }
 
 export interface UserFilters {
