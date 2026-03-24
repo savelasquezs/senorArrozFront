@@ -523,7 +523,13 @@ const initializeForm = async () => {
     if (props.editingExpense) {
         const details = await Promise.all(
             props.editingExpense.expenseDetails.map(async (detail) => {
-            const total = Number(detail.total ?? (detail.amount * detail.quantity))
+                // Preferir total persistido; solo si falta (null/undefined), reconstruir una vez desde amount×qty
+                const total = Number(
+                    detail.total != null ? detail.total : detail.amount * detail.quantity
+                )
+                const qty = Number(detail.quantity)
+                const amount =
+                    qty > 0 && total > 0 ? Math.round(total / qty) : Math.round(Number(detail.amount))
                 let expenseUnit = detail.expenseUnit
                 let expenseName = detail.expenseName
 
@@ -542,7 +548,7 @@ const initializeForm = async () => {
                 return {
                     expenseId: detail.expenseId,
                     quantity: detail.quantity,
-                    amount: detail.amount,
+                    amount,
                     total,
                     tempId: `detail-${detail.id}`,
                     expenseName,
@@ -591,9 +597,8 @@ const toggleExpenseOptionMode = () => {
     showAllSupplierExpenses.value = !showAllSupplierExpenses.value
 }
 
-// Computed
-const lineTotal = (detail: { quantity: number; amount: number; total?: number }) =>
-    Number(detail.total ?? (detail.quantity * detail.amount))
+// Total de línea = solo lo que ingresa el usuario (amount es derivado, no se usa aquí)
+const lineTotal = (detail: { total?: number }) => Number(detail.total ?? 0)
 
 const totalExpenses = computed(() => {
     return formData.value.expenseDetails.reduce((sum, detail) => sum + lineTotal(detail), 0)
@@ -879,12 +884,14 @@ const handleSubmit = async () => {
             supplierId: formData.value.supplierId!,
             ...(deliverymanForHeader ? { deliverymanId: deliverymanForHeader } : {}),
             expenseDetails: formData.value.expenseDetails.map(d => {
-                const lineTotal = Number(d.total ?? (d.quantity * d.amount))
+                const userTotal = Number(d.total ?? 0)
+                const qty = Number(d.quantity)
+                const unitAmount = qty > 0 ? Math.round(userTotal / qty) : 0
                 return {
                     expenseId: d.expenseId,
                     quantity: d.quantity,
-                    amount: Math.round(Number(d.amount)),
-                    total: Math.round(lineTotal * 100) / 100,
+                    amount: unitAmount,
+                    total: userTotal,
                 }
             }),
             expenseBankPayments: formData.value.expenseBankPayments.length > 0
