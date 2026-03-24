@@ -4,6 +4,9 @@ import { ref, computed } from 'vue'
 import { orderApi } from '@/services/MainAPI/orderApi'
 import type { DeliverymanHistoryBranchSummary, OrderListItem } from '@/types/order'
 
+/** Historial del modal: solo pedidos entregados (enum API .NET) */
+const HISTORY_STATUS_DELIVERED = 'Delivered'
+
 /** Fecha local YYYY-MM-DD (no UTC) para alinear con el calendario del domiciliario */
 function localDateString(d = new Date()): string {
     const y = d.getFullYear()
@@ -127,6 +130,7 @@ export const useDeliveryStore = defineStore('delivery', () => {
                 fromDate: historyFromDate.value,
                 toDate: historyToDate.value,
                 branchId,
+                status: HISTORY_STATUS_DELIVERED,
             })
             historySelectedBranchId.value = branchId
             historyOrders.value = [...response.items].sort((a, b) => b.id - a.id)

@@ -175,6 +175,8 @@ class OrderApi extends BaseApi {
             fromDate?: string
             toDate?: string
             branchId?: number
+            /** Estado del pedido en la API (p. ej. Delivered para historial de entregas) */
+            status?: string
         }
     ): Promise<PagedResult<OrderListItem>> {
         const params: Record<string, string | number> = {};
@@ -183,6 +185,7 @@ class OrderApi extends BaseApi {
         if (filters?.fromDate) params.FromDate = filters.fromDate;
         if (filters?.toDate) params.ToDate = filters.toDate;
         if (filters?.branchId != null && filters.branchId > 0) params.BranchId = filters.branchId;
+        if (filters?.status) params.Status = filters.status;
 
         return this.get<PagedResult<OrderListItem>>(`/orders/delivery/assigned/${deliveryManId}`, { params });
     }
@@ -190,11 +193,12 @@ class OrderApi extends BaseApi {
     /** Conteos por sucursal para pestañas del historial (mismo rango de fechas que el listado) */
     async fetchAssignedOrdersBranchSummary(
         deliveryManId: number,
-        filters?: { fromDate?: string; toDate?: string }
+        filters?: { fromDate?: string; toDate?: string; status?: string }
     ): Promise<DeliverymanHistoryBranchSummary[]> {
         const params: Record<string, string> = {};
         if (filters?.fromDate) params.FromDate = filters.fromDate;
         if (filters?.toDate) params.ToDate = filters.toDate;
+        if (filters?.status) params.Status = filters.status;
         return this.get<DeliverymanHistoryBranchSummary[]>(
             `/orders/delivery/assigned/${deliveryManId}/branch-summary`,
             { params }

@@ -148,10 +148,13 @@
 
         <!-- Modal: Mi historial -->
         <BaseDialog v-model="showHistoryModal" title="Mi Historial" size="xl">
-            <div v-if="deliveryStore.historyBranchSummaries.length > 1"
+            <p class="text-xs text-gray-500 mb-2">
+                Pedidos <span class="font-medium text-gray-700">entregados</span> en el rango de fechas (por sucursal).
+            </p>
+            <div v-if="historyModalBranchTabs.length > 0"
                 class="flex flex-wrap gap-2 mb-3 pb-3 border-b border-gray-100 shrink-0">
                 <button
-                    v-for="b in deliveryStore.historyBranchSummaries"
+                    v-for="b in historyModalBranchTabs"
                     :key="b.branchId"
                     type="button"
                     @click="selectHistoryBranch(b.branchId)"
@@ -196,13 +199,13 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/store/auth'
 import { useDeliveryStore } from '@/store/delivery'
 import { useSignalR } from '@/composables/useSignalR'
 import { useToast } from '@/composables/useToast'
-import type { OrderListItem } from '@/types/order'
+import type { DeliverymanHistoryBranchSummary, OrderListItem } from '@/types/order'
 import MainLayout from '@/components/layout/MainLayout.vue'
 import DeliveryCardGrid from '@/components/delivery/DeliveryCardGrid.vue'
 import DeliveryHistoryTable from '@/components/delivery/DeliveryHistoryTable.vue'
@@ -236,6 +239,25 @@ const routeOrders = ref<OrderListItem[]>([])
 const cardGridRef = ref<InstanceType<typeof DeliveryCardGrid> | null>(null)
 
 const userBranchId = () => authStore.user?.branchId ?? 0
+
+/**
+ * Pestañas por nombre de sucursal. Incluye la sucursal actual del domiciliario aunque no tenga entregas en el rango
+ * (para ver lista vacía y mantener la tab por defecto coherente).
+ */
+const historyModalBranchTabs = computed((): DeliverymanHistoryBranchSummary[] => {
+    const summaries = deliveryStore.historyBranchSummaries
+    const uid = userBranchId()
+    const uname = (authStore.branchName || '').trim() || (uid > 0 ? `Sucursal #${uid}` : '')
+    const sorted = [...summaries].sort((a, b) =>
+        a.branchName.localeCompare(b.branchName, 'es', { sensitivity: 'base' })
+    )
+    if (uid > 0 && uname && !sorted.some((s) => s.branchId === uid)) {
+        return [{ branchId: uid, branchName: uname, orderCount: 0 }, ...sorted]
+    }
+    if (sorted.length > 0) return sorted
+    if (uid > 0 && uname) return [{ branchId: uid, branchName: uname, orderCount: 0 }]
+    return []
+})
 
 // ─── Carga de datos ───────────────────────────────────────────
 
