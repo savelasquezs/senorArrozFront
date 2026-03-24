@@ -8,6 +8,9 @@ export interface Bank {
     name: string
     imageUrl?: string
     active: boolean
+    /** Tipo de banco (enum en snake_case desde la API). */
+    type?: string
+    isHidden?: boolean
     createdAt: string
     updatedAt: string
     totalApps: number
@@ -15,9 +18,20 @@ export interface Bank {
     currentBalance: number
 }
 
+/** Desglose del saldo acumulado (misma fórmula que el backend). */
+export interface BankBalanceBreakdown {
+    bankPaymentsIn: number
+    expenseBankPaymentsOut: number
+    outgoingTransfers: number
+    incomingTransfers: number
+    deliverymanBankTransferIn: number
+    netBalance: number
+}
+
 export interface BankDetail extends Bank {
     totalBankPayments: number
     totalExpenseBankPayments: number
+    balanceBreakdown: BankBalanceBreakdown
 }
 
 export interface BankFilters {
