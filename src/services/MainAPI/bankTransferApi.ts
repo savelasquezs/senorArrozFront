@@ -17,11 +17,11 @@ class BankTransferApi extends BaseApi {
       if (filters.sortBy) params.SortBy = filters.sortBy
       if (filters.sortOrder) params.SortOrder = filters.sortOrder
     }
-    return this.get<PagedResult<BankTransfer>>('/bank-transfers', { params })
+    return this.get<PagedResult<BankTransfer>>('/BankTransfers', { params })
   }
 
   async createBankTransfer(dto: CreateBankTransferDto): Promise<BankTransfer> {
-    return this.post<BankTransfer>('/bank-transfers', dto)
+    return this.post<BankTransfer>('/BankTransfers', dto)
   }
 }
 

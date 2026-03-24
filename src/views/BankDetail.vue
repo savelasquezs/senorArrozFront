@@ -22,6 +22,9 @@
                         <div class="flex items-center space-x-3">
                             <BaseBadge :type="bank?.active ? 'success' : 'danger'"
                                 :text="bank?.active ? 'Activo' : 'Inactivo'" />
+                            <span v-if="bank?.isHidden" class="ml-1 inline-flex">
+                                <BaseBadge variant="warning" size="sm">Banco interno</BaseBadge>
+                            </span>
                             <BaseButton v-if="canManageBank" @click="openEditBank" variant="outline" size="sm">
                                 <PencilIcon class="w-4 h-4 mr-2" />
                                 Editar
@@ -69,6 +72,79 @@
                         </div>
                     </div>
                 </BaseCard>
+
+                <!-- Saldo y movimientos acumulados -->
+                <BaseCard v-if="bank && detailStats">
+                    <template #header>
+                        <div class="flex items-center space-x-2">
+                            <ChartBarIcon class="w-5 h-5 text-emerald-600" />
+                            <h2 class="text-lg font-semibold text-gray-900">Saldo y movimientos (histórico)</h2>
+                        </div>
+                    </template>
+                    <p class="text-sm text-gray-500 mb-4">
+                        Totales acumulados en el tiempo para este banco. El saldo coincide con la suma del desglose.
+                    </p>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+                        <div class="rounded-lg bg-gray-50 p-4 border border-gray-100">
+                            <p class="text-xs font-medium text-gray-500 uppercase tracking-wide">Apps</p>
+                            <p class="mt-1 text-lg font-semibold text-gray-900">{{ detailStats.totalApps }} total · {{
+                                detailStats.activeApps }} activas</p>
+                        </div>
+                        <div class="rounded-lg bg-gray-50 p-4 border border-gray-100">
+                            <p class="text-xs font-medium text-gray-500 uppercase tracking-wide">Pagos de pedidos</p>
+                            <p class="mt-1 text-lg font-semibold text-emerald-700">{{
+                                formatCurrency(detailStats.totalBankPayments) }}</p>
+                        </div>
+                        <div class="rounded-lg bg-gray-50 p-4 border border-gray-100">
+                            <p class="text-xs font-medium text-gray-500 uppercase tracking-wide">Pagos de gastos</p>
+                            <p class="mt-1 text-lg font-semibold text-rose-700">{{
+                                formatCurrency(detailStats.totalExpenseBankPayments) }}</p>
+                        </div>
+                        <div class="rounded-lg bg-emerald-50 p-4 border border-emerald-100">
+                            <p class="text-xs font-medium text-emerald-800 uppercase tracking-wide">Saldo neto</p>
+                            <p class="mt-1 text-xl font-bold text-emerald-900">{{
+                                formatCurrency(detailStats.currentBalance) }}</p>
+                        </div>
+                    </div>
+                    <div v-if="detailStats.balanceBreakdown" class="border-t border-gray-200 pt-4">
+                        <h3 class="text-sm font-semibold text-gray-800 mb-3">Desglose del saldo</h3>
+                        <dl class="space-y-2 text-sm">
+                            <div class="flex justify-between gap-4">
+                                <dt class="text-gray-600">+ Pagos bancarios (órdenes)</dt>
+                                <dd class="font-medium text-gray-900 tabular-nums">{{
+                                    formatCurrency(detailStats.balanceBreakdown.bankPaymentsIn) }}</dd>
+                            </div>
+                            <div class="flex justify-between gap-4">
+                                <dt class="text-gray-600">− Pagos de gastos</dt>
+                                <dd class="font-medium text-rose-700 tabular-nums">{{
+                                    formatCurrency(detailStats.balanceBreakdown.expenseBankPaymentsOut) }}</dd>
+                            </div>
+                            <div class="flex justify-between gap-4">
+                                <dt class="text-gray-600">− Transferencias salientes</dt>
+                                <dd class="font-medium text-rose-700 tabular-nums">{{
+                                    formatCurrency(detailStats.balanceBreakdown.outgoingTransfers) }}</dd>
+                            </div>
+                            <div class="flex justify-between gap-4">
+                                <dt class="text-gray-600">+ Transferencias entrantes</dt>
+                                <dd class="font-medium text-emerald-700 tabular-nums">{{
+                                    formatCurrency(detailStats.balanceBreakdown.incomingTransfers) }}</dd>
+                            </div>
+                            <div class="flex justify-between gap-4">
+                                <dt class="text-gray-600">+ Abonos domiciliarios (transferencia)</dt>
+                                <dd class="font-medium text-emerald-700 tabular-nums">{{
+                                    formatCurrency(detailStats.balanceBreakdown.deliverymanBankTransferIn) }}</dd>
+                            </div>
+                            <div
+                                class="flex justify-between gap-4 pt-2 mt-2 border-t border-gray-200 font-semibold text-base">
+                                <dt class="text-gray-900">= Saldo neto</dt>
+                                <dd class="text-emerald-800 tabular-nums">{{
+                                    formatCurrency(detailStats.balanceBreakdown.netBalance) }}</dd>
+                            </div>
+                        </dl>
+                    </div>
+                </BaseCard>
+
+                <BankMovementsPanel v-if="bank" :bank-id="bank.id" :branch-id="bank.branchId" />
 
                 <!-- Apps Section -->
                 <BaseCard>
@@ -274,7 +350,7 @@ import { useAppsStore } from '@/store/apps'
 import { useBankPaymentsStore } from '@/store/bankPayments'
 import { useAuthStore } from '@/store/auth'
 import { useToast } from '@/composables/useToast'
-import type { App, BankPayment } from '@/types/bank'
+import type { App, BankDetail, BankPayment } from '@/types/bank'
 import type { CreateAppDto, UpdateAppDto } from '@/types/bank'
 
 // Components
@@ -285,6 +361,7 @@ import BaseDialog from '@/components/ui/BaseDialog.vue'
 import BaseLoading from '@/components/ui/BaseLoading.vue'
 import BaseAlert from '@/components/ui/BaseAlert.vue'
 import BankForm from '@/components/payments/banks/BankForm.vue'
+import BankMovementsPanel from '@/components/payments/banks/BankMovementsPanel.vue'
 import AppForm from '@/components/payments/apps/AppForm.vue'
 
 // Icons
@@ -296,6 +373,7 @@ import {
     PlusIcon,
     PencilIcon,
     ArrowPathIcon,
+    ChartBarIcon,
 } from '@heroicons/vue/24/outline'
 
 // Composables
@@ -314,7 +392,12 @@ const bankApps = ref<App[]>([])
 const bankPayments = ref<BankPayment[]>([])
 
 // Computed
-const bank = computed(() => banksStore.current)
+const bank = computed(() => banksStore.currentDetail as BankDetail | null)
+const detailStats = computed(() => {
+    const b = bank.value
+    if (!b?.balanceBreakdown) return null
+    return b
+})
 const canManageBank = computed(() => authStore.isAdmin || authStore.isSuperadmin)
 const canManageApps = computed(() => authStore.isAdmin || authStore.isSuperadmin)
 const canManageBankPayments = computed(() => authStore.isAdmin || authStore.isSuperadmin)
@@ -341,7 +424,7 @@ const formatDate = (date: string) => {
 const fetchBankData = async () => {
     const bankId = Number(route.params.id)
     if (bankId) {
-        await banksStore.fetchById(bankId)
+        await banksStore.fetchDetail(bankId)
         await fetchBankApps(bankId)
         await fetchBankPayments()
     }
@@ -424,7 +507,9 @@ const closeBankForm = () => {
 const handleBankSubmit = async (formData: any) => {
     try {
         if (bank.value) {
-            await banksStore.update(bank.value.id, formData)
+            const id = bank.value.id
+            await banksStore.update(id, formData)
+            await banksStore.fetchDetail(id)
             success('Banco actualizado', 3000, 'El banco se ha actualizado correctamente')
             closeBankForm()
         }
@@ -433,11 +518,17 @@ const handleBankSubmit = async (formData: any) => {
     }
 }
 
+const refreshBankDetail = async () => {
+    const id = bank.value?.id ?? Number(route.params.id)
+    if (id) await banksStore.fetchDetail(id)
+}
+
 const verifyPayment = async (paymentId: number) => {
     try {
         await bankPaymentsStore.verify(paymentId)
         success('Pago verificado', 3000, 'El pago bancario se ha verificado correctamente')
         await fetchBankPayments()
+        await refreshBankDetail()
     } catch (error: any) {
         showError('Error', error.message || 'No se pudo verificar el pago')
     }
@@ -448,6 +539,7 @@ const unverifyPayment = async (paymentId: number) => {
         await bankPaymentsStore.unverify(paymentId)
         success('Pago desverificado', 3000, 'El pago bancario se ha desverificado correctamente')
         await fetchBankPayments()
+        await refreshBankDetail()
     } catch (error: any) {
         showError('Error', error.message || 'No se pudo desverificar el pago')
     }
@@ -459,6 +551,7 @@ const deleteBankPayment = async (paymentId: number) => {
             await bankPaymentsStore.remove(paymentId)
             success('Pago eliminado', 3000, 'El pago bancario se ha eliminado correctamente')
             await fetchBankPayments()
+            await refreshBankDetail()
         } catch (error: any) {
             showError('Error', error.message || 'No se pudo eliminar el pago')
         }

@@ -186,7 +186,7 @@
                     {{ formatCurrency(recon.actualBalance - recon.expectedBalance) }}
                   </p>
                 </div>
-                <div class="col-span-1 text-center">
+                <div class="col-span-1 flex flex-col items-center gap-1">
                   <CheckCircleIcon
                     v-if="recon.actualBalance - recon.expectedBalance === 0"
                     class="w-6 h-6 text-green-500 mx-auto"
@@ -195,8 +195,23 @@
                     v-else
                     class="w-6 h-6 text-red-500 mx-auto"
                   />
+                  <BaseButton variant="outline" size="sm" class="text-xs px-2 py-0.5" @click="toggleMovements(recon.bankId)">
+                    {{ movementsBankId === recon.bankId ? 'Ocultar' : 'Ver' }} movimientos
+                  </BaseButton>
                 </div>
               </div>
+            </div>
+
+            <div v-if="movementsBankId != null && expected" class="mt-4">
+              <BankMovementsPanel
+                :key="movementsBankId"
+                :bank-id="movementsBankId"
+                :branch-id="authStore.branchId ?? undefined"
+                embedded
+                lock-date-range
+                :initial-from-date="closureFromYmd"
+                :initial-to-date="closureToYmd"
+              />
             </div>
           </div>
         </div>
@@ -235,6 +250,9 @@
 import { ref, computed, onMounted } from 'vue'
 import MainLayout from '@/components/layout/MainLayout.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
+import BankMovementsPanel from '@/components/payments/banks/BankMovementsPanel.vue'
+import { useAuthStore } from '@/store/auth'
+import { formatYmdBogota } from '@/utils/colombiaDate'
 import {
   ArrowPathIcon,
   BanknotesIcon,
@@ -253,6 +271,8 @@ import type {
 } from '@/types/cashRegister'
 import { DENOMINATIONS } from '@/types/cashRegister'
 
+const authStore = useAuthStore()
+
 // ===== STATE =====
 const loading = ref(false)
 const saving = ref(false)
@@ -268,6 +288,8 @@ const informalLoans = ref<CloseInformalLoanDto[]>([])
 const bankReconciliations = ref<
   Array<CloseBankReconciliationDto & { bankName: string }>
 >([])
+
+const movementsBankId = ref<number | null>(null)
 
 // ===== COMPUTED =====
 const cashDifference = computed(() => closingCash.value - (expected.value?.expectedCash ?? 0))
@@ -287,7 +309,24 @@ const saveBlockReason = computed(() => {
   return ''
 })
 
+const closureFromYmd = computed(() => {
+  if (!expected.value) return ''
+  const d = expected.value.lastClosureAt
+    ? new Date(expected.value.lastClosureAt)
+    : new Date(expected.value.asOf)
+  return formatYmdBogota(d)
+})
+
+const closureToYmd = computed(() => {
+  if (!expected.value) return ''
+  return formatYmdBogota(new Date(expected.value.asOf))
+})
+
 // ===== METHODS =====
+function toggleMovements(bankId: number) {
+  movementsBankId.value = movementsBankId.value === bankId ? null : bankId
+}
+
 function formatCurrency(value: number): string {
   return new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(
     value ?? 0
@@ -320,6 +359,7 @@ async function loadData() {
   loading.value = true
   try {
     expected.value = await cashRegisterApi.getExpected()
+    movementsBankId.value = null
 
     // Inicializar conciliaciones con valores del sistema
     bankReconciliations.value = expected.value.banks.map((b) => ({

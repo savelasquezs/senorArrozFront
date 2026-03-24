@@ -13,6 +13,8 @@ export interface DeliverymanStats {
     totalAdvances: number
     baseAmount: number
     currentBalance: number // cash + base - advances
+    /** Pedidos delivery en estado "en camino" (no entregados). */
+    ordersOnTheWayCount?: number
     dayBlocked?: boolean
     liquidationMode?: DeliverymanDayLiquidationMode
 }
@@ -38,6 +40,9 @@ export interface DeliverymanAdvance {
 
 export interface DeliverymanDetail extends DeliverymanStats {
     orders: OrderListItem[]
+    /** Agregado del día (o rango) sin filtro de ciclo; solo lectura en UI. */
+    fullDayStats?: DeliverymanStats
+    fullDayOrders?: OrderListItem[]
 }
 
 export interface CreateDeliverymanAdvanceDto {
