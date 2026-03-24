@@ -434,9 +434,14 @@ const handleViewDetail = async (expense: ExpenseHeader) => {
     }
 }
 
-const handleEdit = (expense: ExpenseHeader) => {
-    editingExpense.value = expense
-    showFormModal.value = true
+const handleEdit = async (expense: ExpenseHeader) => {
+    try {
+        const fresh = await expenseHeaderApi.getExpenseHeaderById(expense.id)
+        editingExpense.value = normalizeExpense(fresh)
+        showFormModal.value = true
+    } catch (err: any) {
+        error('Error al cargar el gasto', err.message)
+    }
 }
 
 const handleEditFromDetail = () => {

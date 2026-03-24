@@ -19,6 +19,9 @@ export interface DailyOverviewResponse {
 export interface CreateAdvanceBody {
     amount: number
     notes?: string
+    paymentMethod?: number | 'cash' | 'bank_transfer' | 'expense_offset'
+    bankId?: number | null
+    expenseHeaderId?: number | null
 }
 
 /** Respuesta de GET /deliverymen/with-orders-today */
@@ -111,11 +114,15 @@ class DeliverymanApi extends BaseApi {
      * Crea un nuevo abono para un domiciliario
      */
     async createAdvance(deliverymanId: number, data: CreateDeliverymanAdvanceDto | CreateAdvanceBody): Promise<DeliverymanAdvance> {
-        return this.post<DeliverymanAdvance>(`/deliverymen/${deliverymanId}/advances`, {
+        const body: Record<string, unknown> = {
             deliverymanId,
             amount: data.amount,
-            notes: data.notes,
-        })
+            notes: data.notes ?? undefined,
+        }
+        if (data.paymentMethod !== undefined) body.paymentMethod = data.paymentMethod
+        if (data.bankId !== undefined) body.bankId = data.bankId
+        if (data.expenseHeaderId !== undefined) body.expenseHeaderId = data.expenseHeaderId
+        return this.post<DeliverymanAdvance>(`/deliverymen/${deliverymanId}/advances`, body)
     }
 
     /**

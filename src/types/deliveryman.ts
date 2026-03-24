@@ -45,10 +45,17 @@ export interface DeliverymanDetail extends DeliverymanStats {
     fullDayOrders?: OrderListItem[]
 }
 
+/** Alineado con API JSON (enum en snake_case) o valor numérico del enum */
+export type DeliverymanAdvancePaymentMethodInput =
+    | number
+    | 'cash'
+    | 'bank_transfer'
+    | 'expense_offset'
+
 export interface CreateDeliverymanAdvanceDto {
     deliverymanId: number
     amount: number
-    paymentMethod?: number
+    paymentMethod?: DeliverymanAdvancePaymentMethodInput
     bankId?: number | null
     expenseHeaderId?: number | null
     notes?: string

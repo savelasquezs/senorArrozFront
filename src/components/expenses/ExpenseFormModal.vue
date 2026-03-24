@@ -195,6 +195,26 @@
                     Gasto imputado al domiciliario en liquidación. El abono contable se registra al confirmar la liquidación.
                 </p>
             </div>
+            <div v-else-if="editingExpense?.deliverymanId" class="mt-4 border-t border-gray-200 pt-4 space-y-2">
+                <p class="text-sm font-semibold text-gray-800">Abono de domiciliario</p>
+                <div class="rounded-lg border border-emerald-100 bg-emerald-50/80 px-3 py-2 text-sm text-gray-800">
+                    <span class="font-medium">{{ editingExpense.deliverymanName || `Domiciliario #${editingExpense.deliverymanId}` }}</span>
+                    <template v-if="editingExpense.linkedDeliverymanAdvanceId">
+                        <span class="block text-xs text-gray-600 mt-1">
+                            Abono vinculado #{{ editingExpense.linkedDeliverymanAdvanceId }} ·
+                            {{ formatCurrency(Number(editingExpense.linkedDeliverymanAdvanceAmount ?? 0)) }}
+                        </span>
+                    </template>
+                    <p v-else class="text-xs text-amber-800 mt-1">
+                        Este gasto tiene domiciliario asociado. Si el abono se creó antes del vínculo automático,
+                        revísalo en domiciliarios si cambias el total.
+                    </p>
+                </div>
+                <p v-if="willSyncLinkedAdvanceOnSave" class="text-xs text-amber-900 bg-amber-50 border border-amber-200 rounded-lg p-2">
+                    Al guardar se actualizará el abono vinculado para igualar el nuevo total del gasto
+                    ({{ formatCurrency(totalExpenses) }}).
+                </p>
+            </div>
             <div v-else class="mt-4 border-t border-gray-200 pt-4 space-y-2">
                 <label class="inline-flex items-center gap-2 text-sm text-gray-700">
                     <input type="checkbox" v-model="isDeliverymanAdvance">
@@ -567,6 +587,22 @@ const initializeForm = async () => {
             })),
         }
         await ensureSupplierOption(formData.value.supplierId)
+
+        const dmId = props.editingExpense.deliverymanId
+        if (dmId != null && dmId > 0) {
+            isDeliverymanAdvance.value = true
+            selectedDeliverymanId.value = dmId
+            const name = props.editingExpense.deliverymanName ?? `Domiciliario #${dmId}`
+            if (!deliverymenOptions.value.some((o) => o.value === dmId)) {
+                deliverymenOptions.value = [
+                    { value: dmId, label: name, ordersCount: 0 },
+                    ...deliverymenOptions.value,
+                ]
+            }
+        } else {
+            isDeliverymanAdvance.value = false
+            selectedDeliverymanId.value = null
+        }
     } else {
         formData.value = {
             supplierId: null,
@@ -602,6 +638,14 @@ const lineTotal = (detail: { total?: number }) => Number(detail.total ?? 0)
 
 const totalExpenses = computed(() => {
     return formData.value.expenseDetails.reduce((sum, detail) => sum + lineTotal(detail), 0)
+})
+
+/** Edición: hay abono ExpenseOffset ligado y el total del formulario difiere del monto del abono */
+const willSyncLinkedAdvanceOnSave = computed(() => {
+    const e = props.editingExpense
+    if (!e?.linkedDeliverymanAdvanceId) return false
+    const prev = Number(e.linkedDeliverymanAdvanceAmount ?? 0)
+    return Math.abs(totalExpenses.value - prev) > 0.01
 })
 
 const totalBankPayments = computed(() => {
@@ -909,14 +953,23 @@ const handleSubmit = async () => {
             result = await expenseHeaderApi.createExpenseHeader(payload as CreateExpenseHeaderDto)
         }
 
-        // Crear abono de domiciliario si corresponde (al crear o al actualizar, si está marcado)
-        if (!props.skipAutoAdvance && isDeliverymanAdvance.value && selectedDeliverymanId.value) {
+        // Nuevo gasto: crear abono vinculado (ExpenseOffset + expenseHeaderId). En edición el backend ajusta el abono si aplica.
+        if (!props.skipAutoAdvance && !props.editingExpense && isDeliverymanAdvance.value && selectedDeliverymanId.value) {
             const amount = totalExpenses.value
             try {
-                await deliverymanApi.createAdvance(selectedDeliverymanId.value, {
+                const advance = await deliverymanApi.createAdvance(selectedDeliverymanId.value, {
                     amount,
                     notes: `gasto #${result.id} - ${result.supplierName}`,
+                    paymentMethod: 'expense_offset',
+                    expenseHeaderId: result.id,
                 })
+                result = {
+                    ...result,
+                    linkedDeliverymanAdvanceId: advance.id,
+                    linkedDeliverymanAdvanceAmount: Number(advance.amount),
+                    deliverymanId: selectedDeliverymanId.value,
+                    deliverymanName: advance.deliverymanName ?? result.deliverymanName,
+                }
             } catch (advanceError: any) {
                 console.error('Error creating deliveryman advance from expense:', advanceError)
                 error('Gasto guardado, pero falló el abono', advanceError.message || 'Revisa el módulo de domiciliarios')

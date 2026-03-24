@@ -22,6 +22,19 @@
                     <p class="text-lg font-semibold text-gray-900">{{ formatDate(expense.createdAt) }}</p>
                     <p class="text-sm text-gray-500">{{ formatTime(expense.createdAt) }}</p>
                 </div>
+                <div v-if="expense.deliverymanId" class="bg-gray-50 rounded-lg p-4 md:col-span-2">
+                    <p class="text-sm text-gray-600 font-medium">Abono de domiciliario</p>
+                    <p class="text-lg font-semibold text-gray-900">
+                        {{ expense.deliverymanName || `Domiciliario #${expense.deliverymanId}` }}
+                    </p>
+                    <p v-if="expense.linkedDeliverymanAdvanceId" class="text-sm text-gray-600 mt-1">
+                        Abono vinculado #{{ expense.linkedDeliverymanAdvanceId }} ·
+                        {{ formatCurrency(Number(expense.linkedDeliverymanAdvanceAmount ?? 0)) }}
+                    </p>
+                    <p v-else class="text-xs text-amber-800 mt-1">
+                        Sin vínculo automático al abono; si aplica, revisa el módulo de domiciliarios.
+                    </p>
+                </div>
             </div>
 
             <!-- Lista de Detalles -->

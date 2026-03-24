@@ -9,6 +9,9 @@ export interface ExpenseHeader {
     supplierPhone?: string
     deliverymanId?: number | null
     deliverymanName?: string | null
+    /** Abono tipo descuento por gasto (ExpenseOffset) ligado a este encabezado */
+    linkedDeliverymanAdvanceId?: number | null
+    linkedDeliverymanAdvanceAmount?: number | null
     total?: number
     createdById: number
     createdByName: string
