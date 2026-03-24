@@ -2,7 +2,7 @@
 	<div :class="sidebarClasses">
 		<div class="flex flex-col h-full">
 			<div class="p-4">
-				<div class="flex items-center gap-3 mb-6">
+				<div class="flex items-center gap-3 mb-4">
 					<div class="w-10 h-10 bg-emerald-100 rounded-full flex items-center justify-center">
 						<component :is="roleIcon" class="h-5 w-5 text-emerald-700" />
 					</div>
@@ -14,8 +14,27 @@
 					</div>
 				</div>
 
-				<!-- Datos adicionales del usuario -->
-				<div class="text-sm mb-4">
+				<!-- Domiciliario: sucursal + historial (mobile-first) -->
+				<div v-if="authStore.isDeliveryman" class="space-y-3 mb-4">
+					<DeliverymanBranchSidebarBlock />
+					<button
+						type="button"
+						class="w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl text-sm font-medium bg-blue-50 text-blue-700 hover:bg-blue-100 transition-colors"
+						@click="onDeliverymanMiHistorial"
+					>
+						<ClipboardDocumentListIcon class="w-4 h-4 shrink-0" />
+						Mi historial
+						<span
+							v-if="deliveryStore.historyBadgeCount > 0"
+							class="py-0.5 px-1.5 rounded-full text-xs bg-blue-200 text-blue-800"
+						>
+							{{ deliveryStore.historyBadgeCount }}
+						</span>
+					</button>
+				</div>
+
+				<!-- Datos adicionales del usuario (no duplicar sucursal del domiciliario) -->
+				<div v-else class="text-sm mb-4">
 					<p v-if="authStore.branchName" class="text-xs text-gray-500">
 						{{ authStore.branchName }}
 					</p>
@@ -43,8 +62,11 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, nextTick } from 'vue';
+import { useRouter } from 'vue-router';
 import { useAuthStore } from '@/store/auth';
+import { useDeliveryStore } from '@/store/delivery';
+import DeliverymanBranchSidebarBlock from '@/components/delivery/DeliverymanBranchSidebarBlock.vue';
 import {
 	HomeIcon,
 	UsersIcon,
@@ -58,15 +80,27 @@ import {
 	ShoppingBagIcon,
 	BanknotesIcon,
 	ArrowsRightLeftIcon,
+	ClipboardDocumentListIcon,
 } from '@heroicons/vue/24/outline';
 import { UserRole } from '@/types/auth';
 
 interface Props {
 	isOpen: boolean;
 }
-defineEmits<{ close: [] }>();
+const emit = defineEmits<{ close: [] }>();
 const props = defineProps<Props>();
 const authStore = useAuthStore();
+const deliveryStore = useDeliveryStore();
+const router = useRouter();
+
+async function onDeliverymanMiHistorial() {
+	emit('close');
+	if (router.currentRoute.value.path !== '/delivery') {
+		await router.push('/delivery');
+		await nextTick();
+	}
+	deliveryStore.requestHistoryModalFromSidebar();
+}
 
 const sidebarClasses = computed(() => [
 	'fixed inset-y-0 left-0 z-50 w-64 h-screen bg-white border-r shadow-lg overflow-y-auto',

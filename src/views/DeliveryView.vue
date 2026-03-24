@@ -24,20 +24,8 @@
                 </div>
             </div>
 
-            <!-- Accesos rápidos debajo del título -->
+            <!-- Acceso rápido: historial vive en el menú lateral (domiciliario) -->
             <div class="flex gap-2 flex-wrap">
-                <button
-                    @click="openHistoryModal"
-                    class="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium bg-blue-50 text-blue-700 hover:bg-blue-100 transition-colors"
-                >
-                    <ClipboardDocumentListIcon class="w-4 h-4" />
-                    Mi historial
-                    <span v-if="deliveryStore.historyBadgeCount > 0"
-                        class="py-0.5 px-1.5 rounded-full text-xs bg-blue-200 text-blue-800">
-                        {{ deliveryStore.historyBadgeCount }}
-                    </span>
-                </button>
-
                 <button
                     @click="goToRoute"
                     class="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition-colors"
@@ -50,8 +38,6 @@
                     </span>
                 </button>
             </div>
-
-            <DeliveryBranchContactCard v-if="authStore.isDeliveryman" />
 
             <!-- Tabs: Disponibles y En preparación (ocultos en vista de ruta) -->
             <template v-if="activeTab !== 'route'">
@@ -200,7 +186,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/store/auth'
 import { useDeliveryStore } from '@/store/delivery'
 import { useSignalR } from '@/composables/useSignalR'
@@ -211,17 +197,16 @@ import DeliveryCardGrid from '@/components/delivery/DeliveryCardGrid.vue'
 import DeliveryHistoryTable from '@/components/delivery/DeliveryHistoryTable.vue'
 import ConfirmAssignmentModal from '@/components/delivery/ConfirmAssignmentModal.vue'
 import RouteOrderManager from '@/components/delivery/RouteOrderManager.vue'
-import DeliveryBranchContactCard from '@/components/delivery/DeliveryBranchContactCard.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseDialog from '@/components/ui/BaseDialog.vue'
 import {
     ArrowPathIcon,
     ArrowLeftIcon,
-    ClipboardDocumentListIcon,
     TruckIcon,
 } from '@heroicons/vue/24/outline'
 
 const router = useRouter()
+const route = useRoute()
 const authStore = useAuthStore()
 const deliveryStore = useDeliveryStore()
 const { success, error } = useToast()
@@ -440,6 +425,17 @@ watch(activeTab, async (newTab) => {
         await loadPreparationOrders()
     }
 })
+
+/** Abrir historial desde el sidebar (incluye montaje en /delivery con id ya incrementado). */
+watch(
+    () => deliveryStore.historyModalRequestId,
+    async () => {
+        if (!authStore.isDeliveryman || route.path !== '/delivery') return
+        if (deliveryStore.historyModalRequestId === 0) return
+        await openHistoryModal()
+    },
+    { immediate: true }
+)
 
 onMounted(async () => {
     if (

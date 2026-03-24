@@ -42,6 +42,9 @@ export const useDeliveryStore = defineStore('delivery', () => {
     /** Pedidos asignados sin filtro de fecha — para "En ruta" y contadores */
     const routeAssignedOrders = ref<OrderListItem[]>([])
 
+    /** Incrementa al pedir "Mi historial" desde el sidebar (DeliveryView reacciona y abre el modal). */
+    const historyModalRequestId = ref(0)
+
     const isLoading = ref(false)
     const error = ref<string | null>(null)
 
@@ -212,6 +215,10 @@ export const useDeliveryStore = defineStore('delivery', () => {
         historyToDate.value = to
     }
 
+    const requestHistoryModalFromSidebar = () => {
+        historyModalRequestId.value += 1
+    }
+
     // Limpiar estado
     const clear = () => {
         availableOrders.value = []
@@ -222,6 +229,7 @@ export const useDeliveryStore = defineStore('delivery', () => {
         historyTotalCount.value = 0
         historyBranchSummaries.value = []
         historySelectedBranchId.value = null
+        historyModalRequestId.value = 0
         routeAssignedOrders.value = []
         historyFromDate.value = localDateString()
         historyToDate.value = localDateString()
@@ -248,6 +256,7 @@ export const useDeliveryStore = defineStore('delivery', () => {
         historyBranchSummaries,
         historySelectedBranchId,
         historyBadgeCount,
+        historyModalRequestId,
         routeAssignedOrders,
         isLoading,
         error,
@@ -262,6 +271,7 @@ export const useDeliveryStore = defineStore('delivery', () => {
         assignOrders,
         setHistoryPage,
         setHistoryDateRange,
+        requestHistoryModalFromSidebar,
         clear,
         ordersOnTheWay
     }

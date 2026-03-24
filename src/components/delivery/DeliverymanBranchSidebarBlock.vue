@@ -1,27 +1,26 @@
 <template>
-    <div class="rounded-xl border border-gray-200 bg-white p-3 shadow-sm space-y-2" v-if="authStore.user">
-        <div class="flex flex-wrap items-center gap-2 text-sm">
-            <span class="font-semibold text-gray-900">Tu sucursal:</span>
-            <span class="text-gray-700">{{ authStore.user.branchName }}</span>
-            <BaseButton
-                type="button"
-                variant="ghost"
-                size="sm"
-                class="inline-flex items-center gap-1 text-blue-600 hover:text-blue-700"
-                :disabled="!canOpenMaps"
-                :title="mapsButtonTitle"
-                @click="openMapsToBranch"
-            >
-                <MapIcon class="w-4 h-4" />
-                Volver al local
-            </BaseButton>
-        </div>
+    <div v-if="authStore.user" class="rounded-xl border border-gray-200 bg-gray-50/80 p-3 space-y-2 text-left">
+        <p class="text-xs font-semibold uppercase tracking-wide text-gray-500">Mi sucursal</p>
+        <p class="text-sm font-medium text-gray-900">{{ authStore.user.branchName || '—' }}</p>
 
-        <div v-if="phoneLines.length" class="space-y-1 pt-1 border-t border-gray-100">
+        <BaseButton
+            type="button"
+            variant="ghost"
+            size="sm"
+            class="!justify-start w-full px-0 text-blue-600 hover:text-blue-700 hover:bg-transparent"
+            :disabled="!canOpenMaps"
+            :title="mapsButtonTitle"
+            @click="openMapsToBranch"
+        >
+            <MapIcon class="w-4 h-4 shrink-0 mr-1.5" />
+            Volver al local
+        </BaseButton>
+
+        <div v-if="phoneLines.length" class="space-y-1 pt-1 border-t border-gray-200">
             <PhoneNumberItem v-for="(num, idx) in phoneLines" :key="idx" :phone-number="num" />
         </div>
-        <p v-else class="text-xs text-amber-700 bg-amber-50 rounded-lg px-3 py-2">
-            No hay teléfonos de sucursal en tu perfil. Pide a un administrador que actualice la sucursal.
+        <p v-else class="text-xs text-amber-800 bg-amber-50 rounded-lg px-2 py-1.5">
+            Sin teléfonos de sucursal. Pide a un administrador que actualice la sucursal.
         </p>
     </div>
 </template>
@@ -59,7 +58,7 @@ const canOpenMaps = computed(() => {
 const mapsButtonTitle = computed(() =>
     canOpenMaps.value
         ? 'Abrir Google Maps con ruta al local'
-        : 'La sucursal aún no tiene coordenadas. Un administrador debe marcarla en el mapa al editar la sucursal.'
+        : 'La sucursal aún no tiene coordenadas en el mapa.'
 )
 
 function openMapsToBranch() {
