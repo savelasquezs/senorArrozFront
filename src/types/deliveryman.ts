@@ -3,7 +3,15 @@ import type { OrderListItem } from './order'
 export interface DeliverymanRouteSummaryItem {
     id: number
     totalDistanceMeters: number
+    /** Inicio operativo planeado (UTC ISO). */
+    routeStartedAtUtc?: string | null
+    /** route_started_at + meta (UTC ISO). */
+    plannedEndAtUtc?: string | null
     completedAtUtc?: string | null
+    actualDurationSeconds?: number | null
+    metaDurationSeconds?: number | null
+    /** Positivo = más lento que la meta. */
+    varianceSeconds?: number | null
 }
 
 export interface DeliverymanRouteDayStats {

@@ -108,9 +108,15 @@
                         </template>
                         <template v-else>
                             <div v-for="block in cycleOrderBlocks" :key="block.key" class="border-b border-gray-100 last:border-b-0">
-                                <div class="px-3 py-2 bg-gray-50 text-xs font-semibold text-gray-700 flex flex-wrap gap-x-3 gap-y-1">
-                                    <span>{{ block.title }}</span>
-                                    <span v-if="block.subtitle" class="font-normal text-gray-600">{{ block.subtitle }}</span>
+                                <div class="px-3 py-2 bg-gray-50 text-xs font-semibold text-gray-700">
+                                    <div class="flex flex-wrap gap-x-3 gap-y-1">
+                                        <span>{{ block.title }}</span>
+                                        <span v-if="block.subtitle" class="font-normal text-gray-600">{{ block.subtitle }}</span>
+                                    </div>
+                                    <ul v-if="block.scheduleLines?.length"
+                                        class="mt-1.5 space-y-0.5 text-[11px] font-normal text-gray-600 leading-snug list-none pl-0">
+                                        <li v-for="(line, idx) in block.scheduleLines" :key="idx">{{ line }}</li>
+                                    </ul>
                                 </div>
                                 <OrdersTable :orders="block.orders" :loading="false" />
                             </div>
@@ -204,9 +210,15 @@
                         </template>
                         <template v-else>
                             <div v-for="block in fullDayOrderBlocks" :key="block.key" class="border-b border-gray-100 last:border-b-0">
-                                <div class="px-3 py-2 bg-slate-50 text-xs font-semibold text-gray-700 flex flex-wrap gap-x-3 gap-y-1">
-                                    <span>{{ block.title }}</span>
-                                    <span v-if="block.subtitle" class="font-normal text-gray-600">{{ block.subtitle }}</span>
+                                <div class="px-3 py-2 bg-slate-50 text-xs font-semibold text-gray-700">
+                                    <div class="flex flex-wrap gap-x-3 gap-y-1">
+                                        <span>{{ block.title }}</span>
+                                        <span v-if="block.subtitle" class="font-normal text-gray-600">{{ block.subtitle }}</span>
+                                    </div>
+                                    <ul v-if="block.scheduleLines?.length"
+                                        class="mt-1.5 space-y-0.5 text-[11px] font-normal text-gray-600 leading-snug list-none pl-0">
+                                        <li v-for="(line, idx) in block.scheduleLines" :key="idx">{{ line }}</li>
+                                    </ul>
                                 </div>
                                 <OrdersTable :orders="block.orders" :loading="false" />
                             </div>
@@ -288,10 +300,41 @@ function formatRouteKm(meters: number): string {
     return `${(meters / 1000).toFixed(1)} km`
 }
 
+const colTimeFmt: Intl.DateTimeFormatOptions = { timeStyle: 'short' }
+
+/** Solo hora (el modal ya está filtrado por fecha). */
+function formatColTime(iso: string | null | undefined): string {
+    if (!iso) return '—'
+    return new Date(iso).toLocaleString('es-CO', colTimeFmt)
+}
+
+/** Diferencia real vs meta (segundos). */
+function formatVarianceLine(sec: number | null | undefined): string {
+    if (sec == null) return 'Diferencia vs plan: —'
+    if (sec === 0) return 'Diferencia vs plan: en tiempo con la meta'
+    const sign = sec > 0 ? '+' : '−'
+    const totalSec = Math.abs(sec)
+    const m = Math.floor(totalSec / 60)
+    const s = totalSec % 60
+    const qty =
+        m > 0 ? (s ? `${sign}${m} min ${s} s` : `${sign}${m} min`) : `${sign}${s} s`
+    const tail = sec > 0 ? ' (más lento que lo planeado)' : ' (más rápido que lo planeado)'
+    return `Diferencia vs plan: ${qty}${tail}`
+}
+
+function buildRouteScheduleLines(s: DeliverymanRouteSummaryItem): string[] {
+    return [
+        `Salida: ${formatColTime(s.routeStartedAtUtc)}`,
+        `Fin de ruta (plan): ${formatColTime(s.plannedEndAtUtc)}`,
+        `Finalización real: ${formatColTime(s.completedAtUtc)}`,
+        formatVarianceLine(s.varianceSeconds),
+    ]
+}
+
 function buildRouteOrderBlocks(
     orders: OrderListItem[],
     routeStats: DeliverymanRouteDayStats | undefined
-): { key: string; title: string; subtitle: string; orders: OrderListItem[] }[] {
+): { key: string; title: string; subtitle: string; scheduleLines?: string[]; orders: OrderListItem[] }[] {
     const summaryById = new Map<number, DeliverymanRouteSummaryItem>(
         (routeStats?.routes ?? []).map((r) => [r.id, r])
     )
@@ -305,7 +348,13 @@ function buildRouteOrderBlocks(
         buckets.get(k)!.push(o)
     }
 
-    const blocks: { key: string; title: string; subtitle: string; orders: OrderListItem[] }[] = []
+    const blocks: {
+        key: string
+        title: string
+        subtitle: string
+        scheduleLines?: string[]
+        orders: OrderListItem[]
+    }[] = []
     const keys = [...buckets.keys()].sort((a, b) => {
         if (a === 'none') return 1
         if (b === 'none') return -1
@@ -327,15 +376,14 @@ function buildRouteOrderBlocks(
             const id = Number(k.slice(2))
             const s = summaryById.get(id)
             const km = s ? formatRouteKm(s.totalDistanceMeters) : null
-            const when = s?.completedAtUtc
-                ? new Date(s.completedAtUtc).toLocaleString('es-CO', { dateStyle: 'short', timeStyle: 'short' })
-                : null
+            const when = s?.completedAtUtc ? formatColTime(s.completedAtUtc) : null
             blocks.push({
                 key: k,
                 title: `Ruta #${id}`,
                 subtitle: [km ? `${km} (planeada + regreso)` : null, when ? `Cerrada ${when}` : null]
                     .filter(Boolean)
                     .join(' · '),
+                scheduleLines: s ? buildRouteScheduleLines(s) : undefined,
                 orders: ords,
             })
         }
