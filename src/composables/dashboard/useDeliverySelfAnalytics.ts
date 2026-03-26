@@ -15,6 +15,7 @@ function emptyDeliveryPayload(): DeliveryDashboardPayload {
 		evolutionFees: [],
 		evolutionSalesTotals: [],
 		periodFeeToSalesPercent: 0,
+		routeMetrics: null,
 	};
 }
 

@@ -17,6 +17,8 @@ import {
 	dashboardApi,
 	type DashboardMainApiResponse,
 	type DashboardDeliveryApiResponse,
+	type DashboardDeliveryRouteMetricsApi,
+	type DashboardDeliveryRouteHistoryApiItem,
 	type DashboardSalesComparisonApiResponse,
 	type DashboardSalesEvolutionApiResponse,
 	type DashboardSalesProductsApiResponse,
@@ -102,6 +104,37 @@ export function encodeDashboardRangeToApi(range: [Date, Date]): { from: string; 
 	return { from: from.toISOString(), to: to.toISOString() };
 }
 
+/** Historial reciente de rutas cerradas (mismo rango / filtros que el dashboard). */
+export type DashboardRouteHistoryItem = {
+	id: number;
+	deliverymanId: number;
+	deliverymanName: string;
+	completedAtUtc: string | null;
+	actualDurationSeconds: number | null;
+	metaDurationSeconds: number | null;
+	varianceSeconds: number | null;
+	metSla: boolean | null;
+	totalDistanceMeters: number;
+};
+
+/** Métricas `delivery_route`: SLA, tiempos, distancias y series alineadas a `evolutionLabels`. */
+export type DeliveryRouteDashboardMetrics = {
+	completedRoutesCount: number;
+	routesWithSlaDataCount: number;
+	periodOnTimePercent: number;
+	periodDelayedPercent: number;
+	avgActualRouteMinutes: number;
+	avgMetaRouteMinutes: number;
+	avgDelayMinutesWhenDelayed: number;
+	totalDistanceKm: number;
+	evolutionRoutesCompleted: number[];
+	evolutionOnTimePercent: (number | null)[];
+	evolutionDelayedPercent: (number | null)[];
+	evolutionAvgDelayMinutes: (number | null)[];
+	evolutionAvgActualRouteMinutes: (number | null)[];
+	recentRoutes: DashboardRouteHistoryItem[];
+};
+
 /** Con `deliveryManId` filtrado, ventas por bucket son solo de los pedidos entregados por ese repartidor (coherente con fees). */
 export type DeliveryDashboardPayload = {
 	avgPrepMinutes: number;
@@ -112,7 +145,42 @@ export type DeliveryDashboardPayload = {
 	evolutionFees: number[];
 	evolutionSalesTotals: number[];
 	periodFeeToSalesPercent: number;
+	routeMetrics: DeliveryRouteDashboardMetrics | null;
 };
+
+function mapRouteHistoryItem(x: DashboardDeliveryRouteHistoryApiItem): DashboardRouteHistoryItem {
+	return {
+		id: x.id,
+		deliverymanId: x.deliverymanId,
+		deliverymanName: x.deliverymanName,
+		completedAtUtc: x.completedAtUtc,
+		actualDurationSeconds: x.actualDurationSeconds,
+		metaDurationSeconds: x.metaDurationSeconds,
+		varianceSeconds: x.varianceSeconds,
+		metSla: x.metSla,
+		totalDistanceMeters: x.totalDistanceMeters,
+	};
+}
+
+function mapRouteMetrics(raw: DashboardDeliveryRouteMetricsApi | null | undefined): DeliveryRouteDashboardMetrics | null {
+	if (raw == null) return null;
+	return {
+		completedRoutesCount: raw.completedRoutesCount,
+		routesWithSlaDataCount: raw.routesWithSlaDataCount,
+		periodOnTimePercent: raw.periodOnTimePercent,
+		periodDelayedPercent: raw.periodDelayedPercent,
+		avgActualRouteMinutes: raw.avgActualRouteMinutes,
+		avgMetaRouteMinutes: raw.avgMetaRouteMinutes,
+		avgDelayMinutesWhenDelayed: raw.avgDelayMinutesWhenDelayed,
+		totalDistanceKm: raw.totalDistanceKm,
+		evolutionRoutesCompleted: [...raw.evolutionRoutesCompleted],
+		evolutionOnTimePercent: [...raw.evolutionOnTimePercent],
+		evolutionDelayedPercent: [...raw.evolutionDelayedPercent],
+		evolutionAvgDelayMinutes: [...raw.evolutionAvgDelayMinutes],
+		evolutionAvgActualRouteMinutes: [...raw.evolutionAvgActualRouteMinutes],
+		recentRoutes: (raw.recentRoutes ?? []).map(mapRouteHistoryItem),
+	};
+}
 
 function mapDeliveryFromApi(raw: DashboardDeliveryApiResponse): DeliveryDashboardPayload {
 	return {
@@ -125,12 +193,16 @@ function mapDeliveryFromApi(raw: DashboardDeliveryApiResponse): DeliveryDashboar
 			deliveredCount: d.deliveredCount,
 			avgDeliveryMinutes: d.avgDeliveryMinutes,
 			deliveryFeeTotal: d.deliveryFeeTotal,
+			routeCompletedCount: d.routeCompletedCount ?? 0,
+			routeOnTimePercent: d.routeOnTimePercent ?? null,
+			avgRouteActualMinutes: d.avgRouteActualMinutes ?? 0,
 		})),
 		evolutionLabels: raw.evolutionLabels,
 		evolutionDeliveries: raw.evolutionDeliveries,
 		evolutionFees: raw.evolutionFees,
 		evolutionSalesTotals: (raw.evolutionSalesTotals ?? []).map((x) => Number(x)),
 		periodFeeToSalesPercent: raw.periodFeeToSalesPercent ?? 0,
+		routeMetrics: mapRouteMetrics(raw.routeMetrics),
 	};
 }
 

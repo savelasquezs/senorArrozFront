@@ -12,6 +12,7 @@ export interface DeliverymanRouteSummaryItem {
     metaDurationSeconds?: number | null
     /** Positivo = más lento que la meta. */
     varianceSeconds?: number | null
+    metSla?: boolean | null
 }
 
 export interface DeliverymanRouteDayStats {

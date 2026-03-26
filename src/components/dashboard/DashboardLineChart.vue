@@ -47,6 +47,7 @@ const chartData = computed<ChartData<'line'>>(() => ({
 			backgroundColor: props.variant === 'area' ? fillBg : 'rgba(0,0,0,0)',
 			fill: props.variant === 'area',
 			tension: props.curveTension,
+			spanGaps: true,
 			pointBackgroundColor: border,
 			pointRadius: props.variant === 'area' ? 2 : 3,
 			pointHoverRadius: 5,

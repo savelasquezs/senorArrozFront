@@ -35,6 +35,35 @@ export type DashboardMainApiResponse = {
 	avgDeliveryMinutes: number;
 };
 
+export type DashboardDeliveryRouteHistoryApiItem = {
+	id: number;
+	deliverymanId: number;
+	deliverymanName: string;
+	completedAtUtc: string | null;
+	actualDurationSeconds: number | null;
+	metaDurationSeconds: number | null;
+	varianceSeconds: number | null;
+	metSla: boolean | null;
+	totalDistanceMeters: number;
+};
+
+export type DashboardDeliveryRouteMetricsApi = {
+	completedRoutesCount: number;
+	routesWithSlaDataCount: number;
+	periodOnTimePercent: number;
+	periodDelayedPercent: number;
+	avgActualRouteMinutes: number;
+	avgMetaRouteMinutes: number;
+	avgDelayMinutesWhenDelayed: number;
+	totalDistanceKm: number;
+	evolutionRoutesCompleted: number[];
+	evolutionOnTimePercent: (number | null)[];
+	evolutionDelayedPercent: (number | null)[];
+	evolutionAvgDelayMinutes: (number | null)[];
+	evolutionAvgActualRouteMinutes: (number | null)[];
+	recentRoutes: DashboardDeliveryRouteHistoryApiItem[];
+};
+
 export type DashboardDeliveryApiResponse = {
 	avgPrepMinutes: number;
 	avgDeliveryMinutes: number;
@@ -45,6 +74,9 @@ export type DashboardDeliveryApiResponse = {
 		deliveredCount: number;
 		avgDeliveryMinutes: number;
 		deliveryFeeTotal: number;
+		routeCompletedCount: number;
+		routeOnTimePercent: number | null;
+		avgRouteActualMinutes: number;
 	}>;
 	evolutionLabels: string[];
 	evolutionDeliveries: number[];
@@ -53,6 +85,7 @@ export type DashboardDeliveryApiResponse = {
 	evolutionSalesTotals: number[];
 	/** 100 × sum(fees domicilio) / sum(ventas entregadas) en el periodo (0–100). */
 	periodFeeToSalesPercent: number;
+	routeMetrics: DashboardDeliveryRouteMetricsApi | null;
 };
 
 export type DashboardMainQueryParams = {

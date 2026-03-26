@@ -71,6 +71,7 @@
                     :evolution-fee-data="deliveryEvolutionFeesScaled"
                     :evolution-sales-totals="deliveryEvolutionBundle.salesTotals"
                     :period-fee-to-sales-percent="deliveryPeriodFeeToSalesPercent"
+                    :route-metrics="deliveryRouteMetrics"
                 />
                 <DashboardMapaEntregasSection
                     v-else-if="activeSection === 'mapa_entregas'"
@@ -158,6 +159,8 @@ const ventasError = ventasSection.error
 
 const domiciliosLoading = domiciliosSection.loading
 const domiciliosError = domiciliosSection.error
+
+const deliveryRouteMetrics = computed(() => domiciliosSection.deliveryPayload.value?.routeMetrics ?? null)
 
 const ventasComparisonRows = computed(() => {
     if (activeSection.value !== 'ventas') {

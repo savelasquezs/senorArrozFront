@@ -27,6 +27,7 @@
 				:evolution-fee-data="evolutionFeeData"
 				:evolution-sales-totals="evolutionSalesTotals"
 				:period-fee-to-sales-percent="periodFeeToSalesPercent"
+				:route-metrics="routeMetrics"
 			/>
 		</template>
 	</div>
@@ -36,24 +37,29 @@
 import { computed } from 'vue';
 import { OperationOverviewPanel } from '@/components/dashboard';
 import type { DeliveryBranchOption, DeliverymanEfficiencyRow } from '@/components/dashboard';
-const props = defineProps<{
-	loading: boolean;
-	error: string | null;
-	/** Mismo rango que el filtro “Periodo” del sidebar. */
-	dateRange: [Date, Date];
-	showBranchFilter: boolean;
-	branchOptions: DeliveryBranchOption[];
-	avgPrepMinutes: number;
-	avgDeliveryMinutes: number;
-	deliverymen: DeliverymanEfficiencyRow[];
-	evolutionLabels: string[];
-	evolutionData: number[];
-	evolutionFeeData: number[];
-	evolutionSalesTotals: number[];
-	periodFeeToSalesPercent: number;
-	branchId: number | null;
-	deliveryEvolutionDriverId: number | 'all';
-}>();
+import type { DeliveryRouteDashboardMetrics } from '@/services/MainAPI/dashboardSectionApi';
+const props = withDefaults(
+	defineProps<{
+		loading: boolean;
+		error: string | null;
+		/** Mismo rango que el filtro “Periodo” del sidebar. */
+		dateRange: [Date, Date];
+		showBranchFilter: boolean;
+		branchOptions: DeliveryBranchOption[];
+		avgPrepMinutes: number;
+		avgDeliveryMinutes: number;
+		deliverymen: DeliverymanEfficiencyRow[];
+		evolutionLabels: string[];
+		evolutionData: number[];
+		evolutionFeeData: number[];
+		evolutionSalesTotals: number[];
+		periodFeeToSalesPercent: number;
+		branchId: number | null;
+		deliveryEvolutionDriverId: number | 'all';
+		routeMetrics?: DeliveryRouteDashboardMetrics | null;
+	}>(),
+	{ routeMetrics: null },
+);
 
 const emit = defineEmits<{
 	'update:branchId': [value: number | null];

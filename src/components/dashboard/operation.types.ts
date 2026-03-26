@@ -23,6 +23,12 @@ export interface DeliverymanEfficiencyRow {
 	avgDeliveryMinutes: number;
 	/** Recaudo por costo de domicilio (delivery fee) en el periodo, COP */
 	deliveryFeeTotal: number;
+	/** Rutas completadas en el periodo (mismos filtros). */
+	routeCompletedCount?: number;
+	/** % rutas dentro de SLA entre las que tienen dato `metSla`. */
+	routeOnTimePercent?: number | null;
+	/** Duración real media por ruta (min). */
+	avgRouteActualMinutes?: number;
 }
 
 /** Punto para gráfico scatter: X = tiempo (min), Y = entregas */

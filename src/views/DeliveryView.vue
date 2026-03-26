@@ -181,6 +181,7 @@
                     :evolution-fee-data="deliveryAnalyticsResolved.evolutionFees"
                     :evolution-sales-totals="deliveryAnalyticsResolved.evolutionSalesTotals"
                     :period-fee-to-sales-percent="deliveryAnalyticsResolved.periodFeeToSalesPercent"
+                    :route-metrics="deliveryAnalyticsResolved.routeMetrics"
                 />
             </div>
 

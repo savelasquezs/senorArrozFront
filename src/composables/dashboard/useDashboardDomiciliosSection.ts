@@ -45,7 +45,11 @@ export function useDashboardDomiciliosSection(
 				deliveryPayload.value = null;
 				return;
 			}
-			deliveryPayload.value = await fetchDeliveryDashboard(branchId.value, dateRange.value);
+			deliveryPayload.value = await fetchDeliveryDashboard(
+				branchId.value,
+				dateRange.value,
+				deliveryManId.value,
+			);
 		} catch (e) {
 			error.value = e instanceof Error ? e.message : 'Error al cargar Domicilios';
 			if (!hadData) deliveryPayload.value = null;

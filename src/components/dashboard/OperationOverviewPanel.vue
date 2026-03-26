@@ -14,12 +14,14 @@
 		:evolution-fee-data="evolutionFeeData"
 		:evolution-sales-totals="evolutionSalesTotals"
 		:period-fee-to-sales-percent="periodFeeToSalesPercent"
+		:route-metrics="routeMetrics"
 	/>
 </template>
 
 <script setup lang="ts">
 import DeliveryPerformancePanel from './DeliveryPerformancePanel.vue';
 import type { DeliveryBranchOption, DeliverymanEfficiencyRow } from './operation.types';
+import type { DeliveryRouteDashboardMetrics } from '@/services/MainAPI/dashboardSectionApi';
 
 const branchId = defineModel<number | null>('branchId', { required: true });
 const deliveryEvolutionDriverId = defineModel<number | 'all'>('deliveryEvolutionDriverId', {
@@ -40,7 +42,8 @@ withDefaults(
 		evolutionFeeData: number[];
 		evolutionSalesTotals: number[];
 		periodFeeToSalesPercent: number;
+		routeMetrics?: DeliveryRouteDashboardMetrics | null;
 	}>(),
-	{ showBranchFilter: true, showPrepTimeGauge: false },
+	{ showBranchFilter: true, showPrepTimeGauge: false, routeMetrics: null },
 );
 </script>

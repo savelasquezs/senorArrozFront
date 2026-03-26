@@ -257,6 +257,190 @@
 				</div>
 			</template>
 		</BaseCard>
+
+		<BaseCard
+			v-if="routeMetrics != null"
+			title="Rutas y SLA"
+			:padding="'md'"
+			class="border-t border-gray-100 pt-2"
+		>
+			<p class="text-xs text-gray-500 mb-4">
+				Métricas por <strong class="text-gray-700">ruta cerrada</strong> (consolidación Google + buffers vs tiempo
+				real). Misma escala temporal que la evolución de entregas arriba. Respeta sucursal y filtro de domiciliario.
+			</p>
+
+			<div
+				v-if="routeMetrics.completedRoutesCount === 0"
+				class="rounded-lg border border-gray-100 bg-gray-50 px-4 py-6 text-center text-sm text-gray-600"
+			>
+				No hay rutas completadas en este periodo con los filtros actuales.
+			</div>
+
+			<template v-else>
+				<div class="grid grid-cols-2 gap-3 lg:grid-cols-4 mb-6">
+					<div class="rounded-xl border border-gray-100 bg-white px-4 py-3 shadow-sm" role="status">
+						<p class="text-xs font-medium text-gray-500">Rutas cerradas</p>
+						<p class="mt-1 text-lg font-semibold tabular-nums text-slate-900">
+							{{ formatInt(routeMetrics.completedRoutesCount) }}
+						</p>
+					</div>
+					<div class="rounded-xl border border-gray-100 bg-white px-4 py-3 shadow-sm" role="status">
+						<p class="text-xs font-medium text-gray-500">A tiempo (SLA)</p>
+						<p class="mt-1 text-lg font-semibold tabular-nums text-emerald-800">
+							{{
+								routeMetrics.routesWithSlaDataCount > 0
+									? formatPercentValue(routeMetrics.periodOnTimePercent)
+									: '—'
+							}}
+						</p>
+						<p class="text-[10px] text-gray-400 mt-0.5">
+							{{ formatInt(routeMetrics.routesWithSlaDataCount) }} con dato
+						</p>
+					</div>
+					<div class="rounded-xl border border-gray-100 bg-white px-4 py-3 shadow-sm" role="status">
+						<p class="text-xs font-medium text-gray-500">Retraso (% rutas)</p>
+						<p class="mt-1 text-lg font-semibold tabular-nums text-rose-800">
+							{{
+								routeMetrics.routesWithSlaDataCount > 0
+									? formatPercentValue(routeMetrics.periodDelayedPercent)
+									: '—'
+							}}
+						</p>
+					</div>
+					<div class="rounded-xl border border-gray-100 bg-white px-4 py-3 shadow-sm" role="status">
+						<p class="text-xs font-medium text-gray-500">Distancia acum.</p>
+						<p class="mt-1 text-lg font-semibold tabular-nums text-cyan-900">
+							{{ formatKm(routeMetrics.totalDistanceKm) }}
+						</p>
+						<p class="text-[10px] text-gray-400 mt-0.5">
+							Prom. real {{ formatMinutes1(routeMetrics.avgActualRouteMinutes) }} · meta
+							{{ formatMinutes1(routeMetrics.avgMetaRouteMinutes) }}
+						</p>
+					</div>
+				</div>
+
+				<p
+					v-if="routeMetrics.avgDelayMinutesWhenDelayed > 0"
+					class="text-xs text-amber-800 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2 mb-4"
+				>
+					Retraso medio cuando hubo demora:
+					<strong class="tabular-nums">{{ formatMinutes1(routeMetrics.avgDelayMinutesWhenDelayed) }} min</strong>
+					(solo rutas con tiempo &gt; meta).
+				</p>
+
+				<div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+					<div class="min-h-[200px] sm:min-h-[240px]">
+						<p class="text-xs font-medium text-gray-700 mb-2">Rutas completadas por bucket</p>
+						<DashboardLineChart
+							:labels="routeChartLabels"
+							:datasets="routeCountDatasets"
+							y-format="number"
+							variant="area"
+						/>
+					</div>
+					<div class="min-h-[200px] sm:min-h-[240px]">
+						<p class="text-xs font-medium text-gray-700 mb-2">Evolución % dentro de SLA / retrasos</p>
+						<DashboardLineChart
+							:labels="routeChartLabels"
+							:datasets="routeSlaPercentDatasets"
+							y-format="percent"
+							variant="area"
+						/>
+					</div>
+					<div class="min-h-[200px] sm:min-h-[240px]">
+						<p class="text-xs font-medium text-gray-700 mb-2">Tiempo real medio por ruta (min)</p>
+						<DashboardLineChart
+							:labels="routeChartLabels"
+							:datasets="routeActualMinutesDatasets"
+							y-format="number"
+							variant="area"
+						/>
+					</div>
+					<div class="min-h-[200px] sm:min-h-[240px]">
+						<p class="text-xs font-medium text-gray-700 mb-2">Retraso medio en bucket (min, solo demoradas)</p>
+						<DashboardLineChart
+							:labels="routeChartLabels"
+							:datasets="routeDelayMinutesDatasets"
+							y-format="number"
+							variant="area"
+						/>
+					</div>
+				</div>
+
+				<div v-if="showRouteSlaByDriver" class="mb-8 pb-6 border-b border-gray-100">
+					<p class="text-xs text-gray-500 mb-2 max-w-xl">
+						<strong>SLA por domiciliario:</strong> % de rutas cerradas dentro de meta en el periodo (solo quien
+						completó al menos una ruta).
+					</p>
+					<DashboardHorizontalBarChart
+						:labels="routeSlaBarLabels"
+						:datasets="routeSlaBarDatasets"
+						y-format="number"
+					/>
+				</div>
+
+				<div>
+					<h3 class="text-sm font-semibold text-gray-800 mb-1">Historial reciente de rutas</h3>
+					<p class="text-xs text-gray-500 mb-3">Últimas {{ routeHistoryRows.length }} cerradas en el periodo.</p>
+					<div class="overflow-x-auto max-h-[min(24rem,50vh)] overflow-y-auto rounded-lg border border-gray-200">
+						<table class="min-w-full text-xs text-left">
+							<thead class="sticky top-0 bg-gray-50 text-gray-600 font-medium border-b border-gray-200">
+								<tr>
+									<th class="px-3 py-2">Cierre</th>
+									<th class="px-3 py-2">Domiciliario</th>
+									<th class="px-3 py-2 text-right">Real</th>
+									<th class="px-3 py-2 text-right">Meta</th>
+									<th class="px-3 py-2 text-right">Δ min</th>
+									<th class="px-3 py-2 text-center">SLA</th>
+									<th class="px-3 py-2 text-right">Dist km</th>
+								</tr>
+							</thead>
+							<tbody class="divide-y divide-gray-100 bg-white">
+								<tr v-for="row in routeHistoryRows" :key="row.id" class="hover:bg-gray-50/80">
+									<td class="px-3 py-2 tabular-nums text-gray-800 whitespace-nowrap">
+										{{ formatRouteClosedAt(row.completedAtUtc) }}
+									</td>
+									<td class="px-3 py-2 text-gray-700">{{ row.deliverymanName }}</td>
+									<td class="px-3 py-2 text-right tabular-nums text-gray-800">
+										{{ formatSecondsAsMin(row.actualDurationSeconds) }}
+									</td>
+									<td class="px-3 py-2 text-right tabular-nums text-gray-600">
+										{{ formatSecondsAsMin(row.metaDurationSeconds) }}
+									</td>
+									<td class="px-3 py-2 text-right tabular-nums">
+										<span
+											v-if="row.varianceSeconds != null && row.varianceSeconds > 0"
+											class="text-rose-700"
+											>+{{ formatMinutes1(row.varianceSeconds / 60) }}</span
+										>
+										<span v-else-if="row.varianceSeconds != null && row.varianceSeconds <= 0" class="text-emerald-700"
+											>{{ formatMinutes1(row.varianceSeconds / 60) }}</span
+										>
+										<span v-else class="text-gray-400">—</span>
+									</td>
+									<td class="px-3 py-2 text-center">
+										<span
+											v-if="row.metSla === true"
+											class="inline-flex rounded-full bg-emerald-100 px-2 py-0.5 text-emerald-800 font-medium"
+											>Sí</span
+										>
+										<span
+											v-else-if="row.metSla === false"
+											class="inline-flex rounded-full bg-rose-100 px-2 py-0.5 text-rose-800 font-medium"
+											>No</span
+										>
+										<span v-else class="text-gray-400">—</span>
+									</td>
+									<td class="px-3 py-2 text-right tabular-nums text-gray-700">
+										{{ formatKm(row.totalDistanceMeters / 1000) }}
+									</td>
+								</tr>
+							</tbody>
+						</table>
+					</div>
+				</div>
+			</template>
+		</BaseCard>
 	</div>
 </template>
 
@@ -272,6 +456,7 @@ import { formatTooltipCurrency } from './chartFormat';
 import { getBranchSeriesColor } from './chartColors';
 import type { DeliveryBranchOption, DeliverymanEfficiencyRow } from './operation.types';
 import { DELIVERY_FEE_DRIVER_SHARE } from '@/constants/deliveryFeeShare';
+import type { DeliveryRouteDashboardMetrics } from '@/services/MainAPI/dashboardSectionApi';
 
 const branchId = defineModel<number | null>('branchId', { required: true });
 const deliveryEvolutionDriverId = defineModel<number | 'all'>('deliveryEvolutionDriverId', {
@@ -301,6 +486,8 @@ const props = withDefaults(
 		evolutionFeeData: number[];
 		evolutionSalesTotals: number[];
 		periodFeeToSalesPercent: number;
+		/** Métricas de rutas cerradas (`delivery_route`); null si el API no las envía. */
+		routeMetrics?: DeliveryRouteDashboardMetrics | null;
 	}>(),
 	{
 		showBranchFilter: true,
@@ -310,6 +497,7 @@ const props = withDefaults(
 		dateRangeFromSidebar: true,
 		cardTitle: 'Eficiencia por domiciliario',
 		showTeamComparisonCharts: true,
+		routeMetrics: null,
 	},
 );
 
@@ -510,4 +698,127 @@ const scatterPoints = computed(() =>
 		deliveryFeeTotal: d.deliveryFeeTotal,
 	})),
 );
+
+function formatPercentValue(n: number): string {
+	if (!Number.isFinite(n)) return '—';
+	return `${new Intl.NumberFormat('es-CO', { maximumFractionDigits: 1 }).format(n)} %`;
+}
+
+function formatKm(k: number): string {
+	if (!Number.isFinite(k)) return '—';
+	return `${new Intl.NumberFormat('es-CO', { maximumFractionDigits: 2 }).format(k)} km`;
+}
+
+function formatMinutes1(n: number): string {
+	if (!Number.isFinite(n)) return '—';
+	return new Intl.NumberFormat('es-CO', { maximumFractionDigits: 1 }).format(n);
+}
+
+function formatRouteClosedAt(iso: string | null): string {
+	if (!iso) return '—';
+	try {
+		return new Date(iso).toLocaleString('es-CO', { dateStyle: 'short', timeStyle: 'short' });
+	} catch {
+		return iso;
+	}
+}
+
+function formatSecondsAsMin(sec: number | null): string {
+	if (sec == null) return '—';
+	return formatMinutes1(sec / 60);
+}
+
+const routeChartLabels = computed(() => {
+	const rm = props.routeMetrics;
+	if (!rm) return [];
+	const n = rm.evolutionRoutesCompleted.length;
+	const L = props.evolutionLabels;
+	if (L.length >= n) return L.slice(0, n);
+	return [...L, ...Array.from({ length: n - L.length }, (_, i) => `·${i + 1}`)];
+});
+
+const routeCountDatasets = computed(() => {
+	const rm = props.routeMetrics;
+	if (!rm) return [];
+	const pal = getBranchSeriesColor(4);
+	return [
+		{
+			label: 'Rutas cerradas',
+			data: rm.evolutionRoutesCompleted.map((x) => x),
+			borderColor: pal.border,
+			backgroundColor: pal.area,
+		},
+	];
+});
+
+const routeSlaPercentDatasets = computed(() => {
+	const rm = props.routeMetrics;
+	if (!rm) return [];
+	const pal1 = getBranchSeriesColor(0);
+	const pal2 = getBranchSeriesColor(1);
+	return [
+		{
+			label: '% dentro de SLA',
+			data: rm.evolutionOnTimePercent.map((x) => x),
+			borderColor: pal1.border,
+			backgroundColor: pal1.area,
+		},
+		{
+			label: '% con retraso',
+			data: rm.evolutionDelayedPercent.map((x) => x),
+			borderColor: pal2.border,
+			backgroundColor: pal2.area,
+		},
+	];
+});
+
+const routeActualMinutesDatasets = computed(() => {
+	const rm = props.routeMetrics;
+	if (!rm) return [];
+	const pal = getBranchSeriesColor(5);
+	return [
+		{
+			label: 'Min. reales (prom.)',
+			data: rm.evolutionAvgActualRouteMinutes.map((x) => x),
+			borderColor: pal.border,
+			backgroundColor: pal.area,
+		},
+	];
+});
+
+const routeDelayMinutesDatasets = computed(() => {
+	const rm = props.routeMetrics;
+	if (!rm) return [];
+	const pal = getBranchSeriesColor(2);
+	return [
+		{
+			label: 'Retraso prom. (min)',
+			data: rm.evolutionAvgDelayMinutes.map((x) => x),
+			borderColor: pal.border,
+			backgroundColor: pal.area,
+		},
+	];
+});
+
+const routeSlaDrivers = computed(() =>
+	sortedDeliverymen.value.filter(
+		(d) => (d.routeCompletedCount ?? 0) > 0 && d.routeOnTimePercent != null,
+	),
+);
+
+const showRouteSlaByDriver = computed(
+	() => props.showTeamComparisonCharts && routeSlaDrivers.value.length > 0,
+);
+
+const routeSlaBarLabels = computed(() => routeSlaDrivers.value.map((d) => d.name));
+
+const routeSlaBarDatasets = computed(() => [
+	{
+		label: '% rutas a tiempo',
+		data: routeSlaDrivers.value.map((d) => d.routeOnTimePercent ?? 0),
+		backgroundColor: 'rgba(5, 120, 90, 0.88)',
+	},
+]);
+
+const routeHistoryRows = computed(() => props.routeMetrics?.recentRoutes ?? []);
 </script>
