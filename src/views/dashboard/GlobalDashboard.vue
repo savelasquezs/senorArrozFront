@@ -114,6 +114,9 @@ const globalDashboardDateRange = ref<[Date, Date]>(defaultDateRangeToday())
 const globalTimeGranularity = ref<DashboardTimeGranularity>('day')
 const ventasProductsGroupBy = ref<VentasProductsGroupBy>('product')
 
+/** Filtro domiciliario: mismo ref para el API y las series del shell. */
+const deliveryEvolutionDriverId = ref<number | 'all'>('all')
+
 const principalSection = useDashboardPrincipalSection(
 	activeSection,
 	globalDashboardBranchId,
@@ -129,6 +132,7 @@ const domiciliosSection = useDashboardDomiciliosSection(
 	activeSection,
 	globalDashboardBranchId,
 	globalDashboardDateRange,
+	deliveryEvolutionDriverId,
 )
 const gastosSection = useDashboardGastosSection(
 	activeSection,
@@ -167,7 +171,6 @@ const ventasComparisonRows = computed(() => {
 const ventasProducts = computed(() => ventasSection.data.value?.products ?? null)
 
 const {
-    deliveryEvolutionDriverId,
     deliveryBranchOptions,
     deliveryEvolutionBundle,
     filteredDeliverymenEfficiency,
@@ -194,6 +197,7 @@ const {
     deliveryFromApi: domiciliosSection.deliveryPayload,
     activeSection,
     evolutionDateRange: globalDashboardDateRange,
+    deliveryEvolutionDriverId,
 })
 
 const salesByDay = computed(

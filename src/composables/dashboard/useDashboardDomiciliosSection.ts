@@ -15,10 +15,15 @@ function rangeKey(range: [Date, Date]) {
 	return `${a.getTime()}-${b.getTime()}`;
 }
 
+function driverKey(driver: number | 'all') {
+	return driver === 'all' ? 'all' : String(driver);
+}
+
 export function useDashboardDomiciliosSection(
 	activeSection: Ref<DashboardSectionId>,
 	branchId: Ref<number | null>,
 	dateRange: Ref<[Date, Date]>,
+	deliveryManId: Ref<number | 'all'>,
 ) {
 	const deliveryPayload = ref<DeliveryDashboardPayload | null>(null);
 	const loading = ref(false);
@@ -52,7 +57,7 @@ export function useDashboardDomiciliosSection(
 	}
 
 	watch(
-		[isActive, branchId, () => rangeKey(dateRange.value)],
+		[isActive, branchId, () => rangeKey(dateRange.value), () => driverKey(deliveryManId.value)],
 		() => void load(),
 		{ immediate: true },
 	);

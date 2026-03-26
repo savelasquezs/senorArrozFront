@@ -7,6 +7,7 @@ export { default as BranchComparisonPanel } from './BranchComparisonPanel.vue';
 export { default as DashboardLineChart } from './DashboardLineChart.vue';
 export { default as TimeEvolutionPanel } from './TimeEvolutionPanel.vue';
 export { default as DashboardDateRangeFilter } from './DashboardDateRangeFilter.vue';
+export { default as DashboardPeriodPanel } from './DashboardPeriodPanel.vue';
 export { default as DashboardPeriodFilter } from './DashboardPeriodFilter.vue';
 export { default as DashboardOrderStatusKanban } from './DashboardOrderStatusKanban.vue';
 export { default as DashboardGaugeDoughnut } from './DashboardGaugeDoughnut.vue';
@@ -17,6 +18,7 @@ export { default as DashboardWeightShareDonut } from './DashboardWeightShareDonu
 export { default as CategoryWeightAnalyticsPanel } from './CategoryWeightAnalyticsPanel.vue';
 export { default as DashboardDeliveryScatterChart } from './DashboardDeliveryScatterChart.vue';
 export { default as OperationOverviewPanel } from './OperationOverviewPanel.vue';
+export { default as DeliveryPerformancePanel } from './DeliveryPerformancePanel.vue';
 export { default as DashboardRightNav } from './DashboardRightNav.vue';
 
 export { getBranchSeriesColor, branchSeriesColors } from './chartColors';

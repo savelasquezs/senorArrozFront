@@ -42,7 +42,7 @@
             <!-- Tabs: Disponibles y En preparación (ocultos en vista de ruta) -->
             <template v-if="activeTab !== 'route'">
                 <!-- Mobile -->
-                <div class="grid grid-cols-2 gap-2 md:hidden">
+                <div class="grid grid-cols-3 gap-2 md:hidden">
                     <button @click="activeTab = 'available'" :class="[
                         'py-3 px-4 rounded-lg font-medium text-sm transition-colors text-center',
                         activeTab === 'available' ? 'bg-emerald-500 text-white' : 'bg-gray-100 text-gray-600'
@@ -56,21 +56,27 @@
                     </button>
 
                     <button @click="activeTab = 'preparation'" :class="[
-                        'py-3 px-4 rounded-lg font-medium text-sm transition-colors text-center',
+                        'py-3 px-2 rounded-lg font-medium text-sm transition-colors text-center',
                         activeTab === 'preparation' ? 'bg-emerald-500 text-white' : 'bg-gray-100 text-gray-600'
                     ]">
-                        En preparación
+                        Prep.
                         <span v-if="deliveryStore.preparationOrders.length > 0"
-                            class="ml-1.5 py-0.5 px-1.5 rounded-full text-xs"
+                            class="ml-1 py-0.5 px-1 rounded-full text-[10px] leading-none"
                             :class="activeTab === 'preparation' ? 'bg-white/30 text-white' : 'bg-gray-200 text-gray-600'">
                             {{ deliveryStore.preparationOrders.length }}
                         </span>
+                    </button>
+                    <button type="button" @click="activeTab = 'analytics'" :class="[
+                        'py-3 px-2 rounded-lg font-medium text-sm transition-colors text-center',
+                        activeTab === 'analytics' ? 'bg-emerald-500 text-white' : 'bg-gray-100 text-gray-600'
+                    ]">
+                        Métricas
                     </button>
                 </div>
 
                 <!-- Desktop -->
                 <div class="hidden md:block border-b border-gray-200">
-                    <nav class="-mb-px flex space-x-8">
+                    <nav class="-mb-px flex flex-wrap gap-x-8 gap-y-2">
                         <button @click="activeTab = 'available'" :class="[
                             'py-4 px-1 border-b-2 font-medium text-sm transition-colors',
                             activeTab === 'available'
@@ -96,6 +102,14 @@
                                 {{ deliveryStore.preparationOrders.length }}
                             </span>
                         </button>
+                        <button type="button" @click="activeTab = 'analytics'" :class="[
+                            'py-4 px-1 border-b-2 font-medium text-sm transition-colors',
+                            activeTab === 'analytics'
+                                ? 'border-emerald-500 text-emerald-600'
+                                : 'border-transparent text-gray-500 hover:text-gray-700'
+                        ]">
+                            Rendimiento
+                        </button>
                     </nav>
                 </div>
             </template>
@@ -107,6 +121,67 @@
 
             <div v-else-if="activeTab === 'preparation'">
                 <DeliveryCardGrid :orders="deliveryStore.preparationOrders" :allow-assignment="false" />
+            </div>
+
+            <div v-else-if="activeTab === 'analytics'" class="space-y-4">
+                <div class="rounded-xl border border-gray-200 bg-white p-4 shadow-sm space-y-3">
+                    <DashboardPeriodPanel v-model="analyticsDateRange" />
+                    <div class="max-w-xs">
+                        <label class="block text-xs font-medium text-gray-600 mb-1" for="analytics-branch-filter"
+                            >Sucursal (opcional)</label
+                        >
+                        <select
+                            id="analytics-branch-filter"
+                            class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-emerald-600 focus:outline-none focus:ring-1 focus:ring-emerald-600"
+                            :value="analyticsBranchId === null ? '' : String(analyticsBranchId)"
+                            @change="onAnalyticsBranchChange"
+                        >
+                            <option value="">Todas las sucursales</option>
+                            <option
+                                v-for="b in historyModalBranchTabs"
+                                :key="b.branchId"
+                                :value="String(b.branchId)"
+                            >
+                                {{ b.branchName }}
+                            </option>
+                        </select>
+                        <p class="mt-1 text-[11px] text-gray-500">
+                            Mismos atajos de fecha que el dashboard administrativo. Datos solo de tus entregas.
+                        </p>
+                    </div>
+                </div>
+                <div
+                    v-if="deliveryAnalyticsLoading"
+                    class="rounded-xl border border-gray-200 bg-white p-10 text-center text-sm text-gray-500"
+                >
+                    Cargando métricas…
+                </div>
+                <div
+                    v-else-if="deliveryAnalyticsError"
+                    class="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800"
+                >
+                    {{ deliveryAnalyticsError }}
+                </div>
+                <DeliveryPerformancePanel
+                    v-else
+                    v-model:branch-id="analyticsBranchId"
+                    v-model:delivery-evolution-driver-id="analyticsDriverId"
+                    :show-branch-filter="false"
+                    :show-driver-filter="false"
+                    :show-prep-time-gauge="true"
+                    :date-range-from-sidebar="false"
+                    :card-title="'Tu rendimiento'"
+                    :branch-options="analyticsBranchOptions"
+                    :date-range="analyticsDateRange"
+                    :avg-prep-minutes="deliveryAnalyticsResolved.avgPrepMinutes"
+                    :avg-delivery-minutes="deliveryAnalyticsResolved.avgDeliveryMinutes"
+                    :deliverymen="deliveryAnalyticsResolved.deliverymen"
+                    :evolution-labels="deliveryAnalyticsResolved.evolutionLabels"
+                    :evolution-data="deliveryAnalyticsResolved.evolutionDeliveries"
+                    :evolution-fee-data="deliveryAnalyticsResolved.evolutionFees"
+                    :evolution-sales-totals="deliveryAnalyticsResolved.evolutionSalesTotals"
+                    :period-fee-to-sales-percent="deliveryAnalyticsResolved.periodFeeToSalesPercent"
+                />
             </div>
 
             <!-- Vista "En ruta" (scroll vertical si hay muchos pedidos) -->
@@ -204,6 +279,13 @@ import {
     ArrowLeftIcon,
     TruckIcon,
 } from '@heroicons/vue/24/outline'
+import {
+    defaultDateRangeToday,
+    DashboardPeriodPanel,
+    DeliveryPerformancePanel,
+    type DeliveryBranchOption,
+} from '@/components/dashboard'
+import { useDeliverySelfAnalytics } from '@/composables/dashboard/useDeliverySelfAnalytics'
 
 const router = useRouter()
 const route = useRoute()
@@ -214,7 +296,7 @@ const { success, error } = useToast()
 const SIGNALR_HUB_URL = import.meta.env.VITE_SIGNALR_HUB_URL || 'http://localhost:5000/hubs/orders'
 const { isConnected, on } = useSignalR(SIGNALR_HUB_URL)
 
-const activeTab = ref<'available' | 'preparation' | 'route'>('available')
+const activeTab = ref<'available' | 'preparation' | 'analytics' | 'route'>('available')
 const isLoading = ref(false)
 const showConfirmModal = ref(false)
 const showHistoryModal = ref(false)
@@ -243,6 +325,23 @@ const historyModalBranchTabs = computed((): DeliverymanHistoryBranchSummary[] =>
     if (uid > 0 && uname) return [{ branchId: uid, branchName: uname, orderCount: 0 }]
     return []
 })
+
+const analyticsDateRange = ref<[Date, Date]>(defaultDateRangeToday())
+const analyticsBranchId = ref<number | null>(null)
+const analyticsDriverId = ref<number | 'all'>('all')
+const deliveryAnalytics = useDeliverySelfAnalytics(analyticsDateRange, analyticsBranchId)
+const deliveryAnalyticsLoading = deliveryAnalytics.loading
+const deliveryAnalyticsError = deliveryAnalytics.error
+const deliveryAnalyticsResolved = deliveryAnalytics.resolvedPayload
+
+const analyticsBranchOptions = computed((): DeliveryBranchOption[] =>
+    historyModalBranchTabs.value.map((b) => ({ id: b.branchId, name: b.branchName })),
+)
+
+function onAnalyticsBranchChange(e: Event) {
+    const v = (e.target as HTMLSelectElement).value
+    analyticsBranchId.value = v === '' ? null : Number(v)
+}
 
 // ─── Carga de datos ───────────────────────────────────────────
 
@@ -361,6 +460,8 @@ const refreshData = async () => {
         await loadAvailableOrders()
     } else if (activeTab.value === 'preparation') {
         await loadPreparationOrders()
+    } else if (activeTab.value === 'analytics') {
+        await deliveryAnalytics.refresh()
     } else if (activeTab.value === 'route') {
         await loadRouteAssigned()
         routeOrders.value = [...deliveryStore.ordersOnTheWay]
@@ -423,6 +524,8 @@ watch(activeTab, async (newTab) => {
         await loadAvailableOrders()
     } else if (newTab === 'preparation') {
         await loadPreparationOrders()
+    } else if (newTab === 'analytics') {
+        await deliveryAnalytics.refresh()
     }
 })
 

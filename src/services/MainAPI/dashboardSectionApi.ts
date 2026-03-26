@@ -102,6 +102,7 @@ export function encodeDashboardRangeToApi(range: [Date, Date]): { from: string; 
 	return { from: from.toISOString(), to: to.toISOString() };
 }
 
+/** Con `deliveryManId` filtrado, ventas por bucket son solo de los pedidos entregados por ese repartidor (coherente con fees). */
 export type DeliveryDashboardPayload = {
 	avgPrepMinutes: number;
 	avgDeliveryMinutes: number;
@@ -136,9 +137,21 @@ function mapDeliveryFromApi(raw: DashboardDeliveryApiResponse): DeliveryDashboar
 export async function fetchDeliveryDashboard(
 	branchId: number | null,
 	periodRange: [Date, Date],
+	deliveryManId: number | 'all' = 'all',
 ): Promise<DeliveryDashboardPayload> {
 	const { from, to } = encodeDashboardRangeToApi(periodRange);
-	const raw = await dashboardApi.getDelivery(branchId, from, to);
+	const dm = deliveryManId === 'all' ? null : deliveryManId;
+	const raw = await dashboardApi.getDelivery(branchId, from, to, { deliveryManId: dm });
+	return mapDeliveryFromApi(raw);
+}
+
+/** Solo rol domiciliario: mismas series filtradas al usuario del token. */
+export async function fetchDeliveryDashboardForSelf(
+	periodRange: [Date, Date],
+	branchId?: number | null,
+): Promise<DeliveryDashboardPayload> {
+	const { from, to } = encodeDashboardRangeToApi(periodRange);
+	const raw = await dashboardApi.getDeliveryMe(from, to, branchId ?? null);
 	return mapDeliveryFromApi(raw);
 }
 

@@ -78,10 +78,23 @@ class DashboardApi extends BaseApi {
 		branchId: number | null,
 		fromIso: string,
 		toIso: string,
+		opts?: { deliveryManId?: number | null },
 	): Promise<DashboardDeliveryApiResponse> {
 		const params: Record<string, string | number> = { from: fromIso, to: toIso };
 		if (branchId != null) params.branchId = branchId;
+		if (opts?.deliveryManId != null) params.deliveryManId = opts.deliveryManId;
 		return this.get<DashboardDeliveryApiResponse>('/dashboard/delivery', { params });
+	}
+
+	/** Métricas del domiciliario autenticado (`GET /api/dashboard/delivery/me`). */
+	async getDeliveryMe(
+		fromIso: string,
+		toIso: string,
+		branchId?: number | null,
+	): Promise<DashboardDeliveryApiResponse> {
+		const params: Record<string, string | number> = { from: fromIso, to: toIso };
+		if (branchId != null && branchId !== undefined) params.branchId = branchId;
+		return this.get<DashboardDeliveryApiResponse>('/dashboard/delivery/me', { params });
 	}
 
 	/** Ventas — comparativa sucursales. */

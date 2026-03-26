@@ -36,6 +36,8 @@ export interface UseDashboardShellMockStateOptions {
 	activeSection?: Ref<DashboardSectionId>;
 	/** Rango del `TimeEvolutionPanel` (Ventas); compartido con `useDashboardVentasSection`. */
 	evolutionDateRange?: Ref<[Date, Date]>;
+	/** Compartido con `useDashboardDomiciliosSection` para que el fetch use el mismo filtro. */
+	deliveryEvolutionDriverId?: Ref<number | 'all'>;
 }
 
 function scopeSalesBlock(
@@ -95,13 +97,16 @@ export function useDashboardShellMockState(options: UseDashboardShellMockStateOp
 		deliveryFromApi,
 		activeSection,
 		evolutionDateRange: evolutionDateRangeOption,
+		deliveryEvolutionDriverId: deliveryEvolutionDriverIdOption,
 	} = options;
 
 	const internalEvolutionDateRange = ref<[Date, Date]>(defaultDateRangeLastDays(7));
 	const evolutionDateRange = evolutionDateRangeOption ?? internalEvolutionDateRange;
 	const internalDeliveryDateRange = ref<[Date, Date]>(defaultDashboardPeriodThisMonth().range);
 	const deliveryDateRange = deliveryDateRangeOption ?? internalDeliveryDateRange;
-	const deliveryEvolutionDriverId = ref<number | 'all'>('all');
+	const internalDeliveryEvolutionDriverId = ref<number | 'all'>('all');
+	const deliveryEvolutionDriverId =
+		deliveryEvolutionDriverIdOption ?? internalDeliveryEvolutionDriverId;
 
 	/** Datos de domicilios del API solo en la sección correspondiente. */
 	const domiciliosApiPayload = computed((): DeliveryDashboardPayload | null => {
