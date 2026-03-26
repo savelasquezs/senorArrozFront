@@ -62,10 +62,12 @@
 			<div class="mb-6">
 				<h3 class="text-sm font-semibold text-gray-800 mb-1">Evolución en el periodo</h3>
 				<p class="text-xs text-gray-500 mb-3">
-					Misma granularidad (horas, días, semanas o meses) para volumen de entregas y recaudo por
-					costo de domicilio. Los totales en el título suman todos los puntos del periodo mostrado.
+					Misma granularidad (horas, días, semanas o meses) para entregas, recaudo por costo de
+					domicilio y el porcentaje fees / ventas totales (todos los pedidos entregados por bucket).
+					Los totales en el título suman los puntos mostrados salvo el % del periodo, que usa el
+					criterio del API (suma fees domicilio / suma ventas en el rango).
 				</p>
-				<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+				<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
 					<div class="min-h-[200px] sm:min-h-[240px]">
 						<div class="mb-2 space-y-2">
 							<div class="w-full sm:max-w-xs">
@@ -119,6 +121,26 @@
 							:labels="evolutionLabels"
 							:datasets="evolutionFeeLineDatasets"
 							y-format="currency"
+							variant="area"
+						/>
+					</div>
+					<div class="min-h-[200px] sm:min-h-[240px] lg:col-span-1">
+						<p class="text-xs font-medium text-gray-700 mb-2 leading-snug">
+							Fees envío vs ventas totales — Periodo:
+							<span class="text-violet-900 font-semibold tabular-nums">{{
+								formatFeeToSalesPercent(periodFeeToSalesPercent)
+							}}</span>
+							<span class="text-gray-500 font-normal"> (histórico por bucket)</span>
+						</p>
+						<p v-if="!hasFeeToSalesEvolution" class="text-xs text-gray-500 italic py-6">
+							No hay ventas por bucket para calcular el histórico (respuesta sin
+							<span class="font-mono text-[11px]">evolutionSalesTotals</span> o todo en cero).
+						</p>
+						<DashboardLineChart
+							v-else
+							:labels="evolutionLabels"
+							:datasets="evolutionFeeToSalesPercentDatasets"
+							y-format="percent"
 							variant="area"
 						/>
 					</div>
@@ -233,6 +255,10 @@ const props = withDefaults(
 		evolutionLabels: string[];
 		evolutionData: number[];
 		evolutionFeeData: number[];
+		/** Ventas totales (COP) por bucket; misma longitud que fees / labels cuando hay datos. */
+		evolutionSalesTotals: number[];
+		/** % periodo (fees domicilio / ventas entregadas, 0–100). */
+		periodFeeToSalesPercent: number;
 	}>(),
 	{ showBranchFilter: true, showPrepTimeGauge: false },
 );
@@ -288,6 +314,43 @@ function formatInt(n: number): string {
 function formatCop(n: number): string {
 	return formatTooltipCurrency(n);
 }
+
+function formatFeeToSalesPercent(p: number): string {
+	if (!Number.isFinite(p)) return '—';
+	return `${new Intl.NumberFormat('es-CO', { maximumFractionDigits: 2 }).format(p)} %`;
+}
+
+const hasFeeToSalesEvolution = computed(() => {
+	const sales = props.evolutionSalesTotals;
+	if (!sales.length) return false;
+	const n = Math.min(sales.length, props.evolutionFeeData.length, props.evolutionLabels.length);
+	for (let i = 0; i < n; i++) {
+		if ((sales[i] ?? 0) > 0) return true;
+	}
+	return false;
+});
+
+const evolutionFeeToSalesPercentDatasets = computed(() => {
+	const fees = props.evolutionFeeData;
+	const sales = props.evolutionSalesTotals;
+	const n = Math.min(fees.length, sales.length, props.evolutionLabels.length);
+	const data: (number | null)[] = [];
+	for (let i = 0; i < n; i++) {
+		const s = sales[i] ?? 0;
+		const f = fees[i] ?? 0;
+		if (s <= 0) data.push(null);
+		else data.push(Math.round((10000 * f) / s) / 100);
+	}
+	const pal = getBranchSeriesColor(3);
+	return [
+		{
+			label: '% Fees / ventas',
+			data,
+			borderColor: pal.border,
+			backgroundColor: pal.area,
+		},
+	];
+});
 
 /** Parte del domiciliario sobre el total de fees (redondeo por peso). */
 function driverShareFromTotal(totalFees: number): number {

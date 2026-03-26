@@ -49,6 +49,10 @@ export type DashboardDeliveryApiResponse = {
 	evolutionLabels: string[];
 	evolutionDeliveries: number[];
 	evolutionFees: number[];
+	/** Ventas totales (COP) por bucket: todos los pedidos entregados en el periodo, misma granularidad. */
+	evolutionSalesTotals: number[];
+	/** 100 × sum(fees domicilio) / sum(ventas entregadas) en el periodo (0–100). */
+	periodFeeToSalesPercent: number;
 };
 
 export type DashboardMainQueryParams = {

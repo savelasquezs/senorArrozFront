@@ -25,6 +25,8 @@
 				:evolution-labels="evolutionLabels"
 				:evolution-data="evolutionData"
 				:evolution-fee-data="evolutionFeeData"
+				:evolution-sales-totals="evolutionSalesTotals"
+				:period-fee-to-sales-percent="periodFeeToSalesPercent"
 			/>
 		</template>
 	</div>
@@ -47,6 +49,8 @@ const props = defineProps<{
 	evolutionLabels: string[];
 	evolutionData: number[];
 	evolutionFeeData: number[];
+	evolutionSalesTotals: number[];
+	periodFeeToSalesPercent: number;
 	branchId: number | null;
 	deliveryEvolutionDriverId: number | 'all';
 }>();

@@ -1,6 +1,6 @@
 export interface LineChartDataset {
 	label: string;
-	data: number[];
+	data: (number | null)[];
 	borderColor?: string;
 	backgroundColor?: string;
 }

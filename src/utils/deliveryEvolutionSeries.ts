@@ -21,6 +21,8 @@ export interface DeliveryEvolutionBundle {
 	deliveries: number[];
 	/** Recaudo por costo de domicilio (fees) en el bucket, COP */
 	feesTotal: number[];
+	/** Ventas totales (COP) en el bucket (todos los pedidos entregados); mock alineado a la misma granularidad. */
+	salesTotals: number[];
 }
 
 function pseudoRandom(seed: number, i: number): number {
@@ -96,8 +98,12 @@ export function buildDeliveryEvolutionBundle(range: [Date, Date]): DeliveryEvolu
 	}
 
 	const feesTotal = deliveries.map((d, i) => d * feePerDeliveryForBucket(seed, i));
+	/** COP vendidos en el bucket (mock); fees suelen ser ~3–6 % de esto. */
+	const salesTotals = feesTotal.map((fee, i) =>
+		Math.max(1, Math.round(fee * (20 + pseudoRandom(seed, i + 900) * 14))),
+	);
 
-	return { labels, deliveries, feesTotal };
+	return { labels, deliveries, feesTotal, salesTotals };
 }
 
 /**

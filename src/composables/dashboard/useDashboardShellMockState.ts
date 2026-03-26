@@ -124,6 +124,7 @@ export function useDashboardShellMockState(options: UseDashboardShellMockStateOp
 				labels: api.evolutionLabels,
 				deliveries: api.evolutionDeliveries,
 				feesTotal: api.evolutionFees,
+				salesTotals: api.evolutionSalesTotals,
 			};
 		}
 		return buildDeliveryEvolutionBundle(deliveryDateRange.value);
@@ -202,6 +203,22 @@ export function useDashboardShellMockState(options: UseDashboardShellMockStateOp
 			deliveryEvolutionBundle.value.feesTotal,
 			deliveryEvolutionFeesTargetSum.value,
 		);
+	});
+
+	/** % del periodo: fees domicilio vs ventas totales entregadas (API o mock coherente con series). */
+	const deliveryPeriodFeeToSalesPercent = computed(() => {
+		const api = domiciliosApiPayload.value;
+		if (api) return api.periodFeeToSalesPercent;
+		const fees = deliveryEvolutionFeesScaled.value;
+		const sales = deliveryEvolutionBundle.value.salesTotals;
+		const n = Math.min(fees.length, sales.length);
+		let sf = 0;
+		let ss = 0;
+		for (let i = 0; i < n; i++) {
+			sf += fees[i] ?? 0;
+			ss += sales[i] ?? 0;
+		}
+		return ss > 0 ? Math.round((10000 * sf) / ss) / 100 : 0;
 	});
 
 	/** Solo sección Domicilios; datos reales vía `deliveryFromApi`. Sin API (mock o carga): 0. */
@@ -418,6 +435,7 @@ export function useDashboardShellMockState(options: UseDashboardShellMockStateOp
 		filteredDeliverymenEfficiency,
 		deliveryEvolutionDeliveriesScaled,
 		deliveryEvolutionFeesScaled,
+		deliveryPeriodFeeToSalesPercent,
 		avgPrepMinutes,
 		avgDeliveryMinutes,
 		salesByDay,

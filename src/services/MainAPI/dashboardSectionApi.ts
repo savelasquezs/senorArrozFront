@@ -109,6 +109,8 @@ export type DeliveryDashboardPayload = {
 	evolutionLabels: string[];
 	evolutionDeliveries: number[];
 	evolutionFees: number[];
+	evolutionSalesTotals: number[];
+	periodFeeToSalesPercent: number;
 };
 
 function mapDeliveryFromApi(raw: DashboardDeliveryApiResponse): DeliveryDashboardPayload {
@@ -126,6 +128,8 @@ function mapDeliveryFromApi(raw: DashboardDeliveryApiResponse): DeliveryDashboar
 		evolutionLabels: raw.evolutionLabels,
 		evolutionDeliveries: raw.evolutionDeliveries,
 		evolutionFees: raw.evolutionFees,
+		evolutionSalesTotals: (raw.evolutionSalesTotals ?? []).map((x) => Number(x)),
+		periodFeeToSalesPercent: raw.periodFeeToSalesPercent ?? 0,
 	};
 }
 

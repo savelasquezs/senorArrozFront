@@ -19,7 +19,7 @@ const props = withDefaults(
 	defineProps<{
 		labels: string[];
 		datasets: LineChartDataset[];
-		yFormat?: 'currency' | 'number';
+		yFormat?: 'currency' | 'number' | 'percent';
 		/**
 		 * `line`: solo trazo.
 		 * `area`: relleno bajo la línea (útil para una serie o pocas).
@@ -74,6 +74,9 @@ const chartOptions = computed<ChartOptions<'line'>>(() => {
 						if (v == null) return '';
 						const raw = ctx.dataset.label ? `${ctx.dataset.label}: ` : '';
 						if (yFormat === 'currency') return `${raw}${formatTooltipCurrency(v)}`;
+						if (yFormat === 'percent') {
+							return `${raw}${new Intl.NumberFormat('es-CO', { maximumFractionDigits: 2 }).format(v)} %`;
+						}
 						return `${raw}${new Intl.NumberFormat('es-CO').format(v)}`;
 					},
 				},
@@ -91,6 +94,9 @@ const chartOptions = computed<ChartOptions<'line'>>(() => {
 					callback: (val) => {
 						const n = Number(val);
 						if (yFormat === 'currency') return formatAxisCurrency(n);
+						if (yFormat === 'percent') {
+							return `${new Intl.NumberFormat('es-CO', { maximumFractionDigits: 1 }).format(n)} %`;
+						}
 						return new Intl.NumberFormat('es-CO', { maximumFractionDigits: 0 }).format(n);
 					},
 				},

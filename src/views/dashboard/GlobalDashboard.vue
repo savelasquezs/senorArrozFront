@@ -69,6 +69,8 @@
                     :evolution-labels="deliveryEvolutionBundle.labels"
                     :evolution-data="deliveryEvolutionDeliveriesScaled"
                     :evolution-fee-data="deliveryEvolutionFeesScaled"
+                    :evolution-sales-totals="deliveryEvolutionBundle.salesTotals"
+                    :period-fee-to-sales-percent="deliveryPeriodFeeToSalesPercent"
                 />
                 <DashboardMapaEntregasSection
                     v-else-if="activeSection === 'mapa_entregas'"
@@ -171,6 +173,7 @@ const {
     filteredDeliverymenEfficiency,
     deliveryEvolutionDeliveriesScaled,
     deliveryEvolutionFeesScaled,
+    deliveryPeriodFeeToSalesPercent,
     avgPrepMinutes,
     avgDeliveryMinutes,
     salesByDay: shellSalesByDay,
