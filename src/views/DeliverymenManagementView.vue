@@ -78,6 +78,7 @@
             :is-open="showDetailModal"
             :detail="selectedDeliverymanDetail"
             :loading="loadingDetail"
+            :liquidation-allowed-for-selected-date="isSelectedDateToday"
             @close="closeDetailModal"
             @open-liquidation="openLiquidationWizard"
         />
@@ -157,6 +158,12 @@ const liquidatedDeliveryman = ref<{ name: string; amount: number; baseAmount: nu
 
 const ordersDraftsStore = useOrdersDraftsStore()
 
+/** Solo el día calendario actual en Colombia puede liquidarse desde esta vista. */
+const isSelectedDateToday = computed(() => {
+    const today = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Bogota' })
+    return selectedDate.value === today
+})
+
 const bankOptions = computed(() =>
     ordersDraftsStore.banks
         .filter((b) => b.active)
@@ -210,7 +217,7 @@ const handleViewDetail = async (deliverymanId: number) => {
 }
 
 const openLiquidationWizard = () => {
-    if (!selectedDeliverymanDetail.value) return
+    if (!selectedDeliverymanDetail.value || !isSelectedDateToday.value) return
     showLiquidationWizard.value = true
 }
 

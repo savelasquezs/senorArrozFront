@@ -58,7 +58,7 @@
                             </div>
                         </div>
 
-                        <div class="px-4 py-3 bg-gray-50 flex items-center justify-between gap-3">
+                        <div class="px-4 py-3 bg-gray-50 flex flex-wrap items-center justify-between gap-3">
                             <div class="text-sm text-gray-600 min-w-0">
                                 <span v-if="!loading && filteredOrders.length > 0">
                                     Mostrando <span class="font-medium">{{ filteredOrders.length }}</span>
@@ -67,22 +67,54 @@
                                 <span v-else-if="!loading" class="text-gray-400">No hay pedidos</span>
                                 <span v-else class="text-gray-400">Cargando...</span>
                             </div>
-                            <BaseButton variant="secondary" size="sm" class="shrink-0" :loading="loading"
-                                @click="fetchOrders">
-                                <ArrowPathIcon class="w-4 h-4" />
-                            </BaseButton>
+                            <div class="flex items-center gap-2 shrink-0">
+                                <BaseButton
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    class="shrink-0"
+                                    :class="groupByRoute
+                                        ? 'border-emerald-600 bg-emerald-50 text-emerald-800'
+                                        : ''"
+                                    @click="groupByRoute = !groupByRoute">
+                                    {{ groupByRoute ? 'Ver lista plana' : 'Agrupar por ruta' }}
+                                </BaseButton>
+                                <BaseButton variant="secondary" size="sm" class="shrink-0" :loading="loading"
+                                    @click="fetchOrders">
+                                    <ArrowPathIcon class="w-4 h-4" />
+                                </BaseButton>
+                            </div>
                         </div>
                     </div>
 
                     <div class="bg-white rounded-lg shadow overflow-hidden min-w-0 flex flex-col max-h-[min(75vh,42rem)]">
                         <div class="overflow-y-auto overflow-x-auto min-h-0 min-w-0 flex-1">
-                            <OrdersTable :orders="filteredOrders" :loading="loading" :sort-by="sortBy"
-                                :sort-order="sortOrder" :quick-banks="quickBanks"
-                                @edit-customer="handleEditCustomer" @edit-address="handleEditAddress"
-                                @change-status="handleChangeStatus" @assign-delivery="handleAssignDelivery"
-                                @edit-type="handleEditType" @verify-bank-payment="handleVerifyBankPayment"
-                                @quick-bank-transfer="handleQuickBankTransfer" @add-deposit="handleOpenDeposit"
-                                @sort="handleSort" />
+                            <template v-if="!groupByRoute">
+                                <OrdersTable :orders="filteredOrders" :loading="loading" :sort-by="sortBy"
+                                    :sort-order="sortOrder" :quick-banks="quickBanks"
+                                    @edit-customer="handleEditCustomer" @edit-address="handleEditAddress"
+                                    @change-status="handleChangeStatus" @assign-delivery="handleAssignDelivery"
+                                    @edit-type="handleEditType" @verify-bank-payment="handleVerifyBankPayment"
+                                    @quick-bank-transfer="handleQuickBankTransfer" @add-deposit="handleOpenDeposit"
+                                    @sort="handleSort" />
+                            </template>
+                            <template v-else>
+                                <div v-for="block in orderRouteBlocks" :key="block.key"
+                                    class="border-b border-gray-100 last:border-b-0">
+                                    <div
+                                        class="px-3 py-2 bg-gray-50 text-xs font-semibold text-gray-700 flex flex-wrap gap-x-3 gap-y-1 sticky top-0 z-10 border-b border-gray-100">
+                                        <span>{{ block.title }}</span>
+                                        <span v-if="block.subtitle" class="font-normal text-gray-600">{{ block.subtitle }}</span>
+                                    </div>
+                                    <OrdersTable :orders="block.orders" :loading="loading" :sort-by="sortBy"
+                                        :sort-order="sortOrder" :quick-banks="quickBanks"
+                                        @edit-customer="handleEditCustomer" @edit-address="handleEditAddress"
+                                        @change-status="handleChangeStatus" @assign-delivery="handleAssignDelivery"
+                                        @edit-type="handleEditType" @verify-bank-payment="handleVerifyBankPayment"
+                                        @quick-bank-transfer="handleQuickBankTransfer"
+                                        @add-deposit="handleOpenDeposit" @sort="handleSort" />
+                                </div>
+                            </template>
                         </div>
 
                         <div v-if="!loading" class="bg-gray-50 px-4 py-3 border-t border-gray-200 sm:px-6 space-y-3">
@@ -359,6 +391,8 @@ const filters = ref<OrderFilterState>({
 /** Filtro servidor: pedidos con pago en este banco */
 const bankFilterId = ref<number | null>(null)
 
+const groupByRoute = ref(false)
+
 const dateFilters = ref({
     fromDate: new Date().toLocaleDateString('en-CA', { timeZone: 'America/Bogota' }), // Fecha Colombia en formato YYYY-MM-DD
     toDate: '',
@@ -405,6 +439,46 @@ const bankFilterOptions = computed(() => {
 const filteredOrders = computed(() => {
     let filtered = applyAllFilters(orders.value, filters.value)
     return sortOrders(filtered, sortBy.value, sortOrder.value)
+})
+
+/** Bloques por deliveryRouteId para vista agrupada (mismo criterio que en detalle domiciliario). */
+const orderRouteBlocks = computed(() => {
+    const list = filteredOrders.value
+    const buckets = new Map<string, OrderListItem[]>()
+    const keyFor = (o: OrderListItem) =>
+        o.deliveryRouteId != null ? `r:${o.deliveryRouteId}` : 'none'
+
+    for (const o of list) {
+        const k = keyFor(o)
+        if (!buckets.has(k)) buckets.set(k, [])
+        buckets.get(k)!.push(o)
+    }
+
+    const keys = [...buckets.keys()].sort((a, b) => {
+        if (a === 'none') return 1
+        if (b === 'none') return -1
+        return Number(a.slice(2)) - Number(b.slice(2))
+    })
+
+    return keys.map((k) => {
+        const ords = buckets.get(k)!
+        if (k === 'none') {
+            return {
+                key: k,
+                title: 'Sin ruta asignada',
+                subtitle: '' as string,
+                orders: ords,
+            }
+        }
+        const id = Number(k.slice(2))
+        const dmName = ords.find((o) => o.deliveryManName)?.deliveryManName ?? null
+        return {
+            key: k,
+            title: `Ruta #${id}`,
+            subtitle: dmName ? `Domiciliario: ${dmName}` : 'Sin domiciliario',
+            orders: ords,
+        }
+    })
 })
 
 const totalPages = computed(() => Math.ceil(totalCount.value / pageSize.value))

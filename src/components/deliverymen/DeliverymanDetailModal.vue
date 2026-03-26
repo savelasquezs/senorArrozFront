@@ -236,13 +236,17 @@
             <BaseButton @click="$emit('close')" variant="secondary">
                 Cerrar
             </BaseButton>
-            <BaseButton v-if="canOpenLiquidation && activeTab === 'cycle'"
+            <BaseButton v-if="showLiquidationButton"
                 type="button" @click="emit('open-liquidation')" variant="success" :loading="loading">
                 Liquidar ({{ formatCurrency(detail!.currentBalance) }})
             </BaseButton>
             <p v-else-if="activeTab === 'cycle' && detail && detail.ordersOnTheWayCount && detail.ordersOnTheWayCount > 0"
                 class="text-xs text-amber-800 mr-auto max-w-md">
                 No se puede liquidar: hay {{ detail.ordersOnTheWayCount }} pedido(s) en camino. Entréguelos primero.
+            </p>
+            <p v-else-if="activeTab === 'cycle' && detail && !liquidationAllowedForSelectedDate"
+                class="text-xs text-gray-600 mr-auto max-w-md">
+                La liquidación solo está disponible cuando consultas el día de hoy.
             </p>
             <p v-else-if="activeTab === 'cycle' && detail?.dayBlocked" class="text-xs text-amber-800 mr-auto">
                 Domiciliario liquidado hoy. Desbloquea desde la tarjeta si necesitas operar de nuevo.
@@ -270,9 +274,13 @@ interface Props {
     isOpen: boolean
     detail: DeliverymanDetail | null
     loading?: boolean
+    /** False si la fecha seleccionada en la vista no es “hoy” (Colombia): no se debe liquidar desde ese detalle. */
+    liquidationAllowedForSelectedDate?: boolean
 }
 
-const props = defineProps<Props>()
+const props = withDefaults(defineProps<Props>(), {
+    liquidationAllowedForSelectedDate: true,
+})
 const emit = defineEmits<{
     'close': []
     'open-liquidation': []
@@ -431,5 +439,12 @@ const canOpenLiquidation = computed(() => {
     const onTheWay = d.ordersOnTheWayCount ?? 0
     return d.currentBalance > 0 && onTheWay === 0
 })
+
+const showLiquidationButton = computed(
+    () =>
+        canOpenLiquidation.value &&
+        props.liquidationAllowedForSelectedDate &&
+        activeTab.value === 'cycle'
+)
 
 </script>
