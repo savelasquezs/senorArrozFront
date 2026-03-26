@@ -225,6 +225,8 @@ export interface OrderListItem {
     neighborhoodId: number | null
     neighborhoodName: string | null
     deliveryManId: number | null
+    /** Ruta de domicilio (backend); null si no aplica o legado. */
+    deliveryRouteId?: number | null
     deliveryManName: string | null
     guestName: string | null
     type: OrderType

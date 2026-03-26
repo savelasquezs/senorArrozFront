@@ -1,5 +1,17 @@
 import type { OrderListItem } from './order'
 
+export interface DeliverymanRouteSummaryItem {
+    id: number
+    totalDistanceMeters: number
+    completedAtUtc?: string | null
+}
+
+export interface DeliverymanRouteDayStats {
+    completedRoutesCount: number
+    totalDistanceMeters: number
+    routes: DeliverymanRouteSummaryItem[]
+}
+
 /** Alineado con backend DeliverymanDayLiquidationMode */
 export type DeliverymanDayLiquidationMode = 0 | 1 | 2
 
@@ -43,6 +55,8 @@ export interface DeliverymanDetail extends DeliverymanStats {
     /** Agregado del día (o rango) sin filtro de ciclo; solo lectura en UI. */
     fullDayStats?: DeliverymanStats
     fullDayOrders?: OrderListItem[]
+    routeDayStats?: DeliverymanRouteDayStats
+    fullDayRouteDayStats?: DeliverymanRouteDayStats
 }
 
 /** Alineado con API JSON (enum en snake_case) o valor numérico del enum */

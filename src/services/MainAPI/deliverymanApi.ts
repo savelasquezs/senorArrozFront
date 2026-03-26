@@ -2,6 +2,7 @@ import type {
     DeliverymanAdvance,
     DeliverymanStats,
     DeliverymanDetail,
+    DeliverymanRouteDayStats,
     CreateDeliverymanAdvanceDto,
     UpdateDeliverymanAdvanceDto,
     SettleDeliverymanDayDto,
@@ -57,12 +58,16 @@ class DeliverymanApi extends BaseApi {
             orders: OrderListItem[]
             fullDayStats?: DeliverymanStats
             fullDayOrders?: OrderListItem[]
+            routeDayStats?: DeliverymanRouteDayStats
+            fullDayRouteDayStats?: DeliverymanRouteDayStats
         }>(`/deliverymen/${deliverymanId}/day-summary`, { params })
         return {
             ...res.stats,
             orders: res.orders,
             fullDayStats: res.fullDayStats,
             fullDayOrders: res.fullDayOrders,
+            routeDayStats: res.routeDayStats,
+            fullDayRouteDayStats: res.fullDayRouteDayStats,
         }
     }
 
