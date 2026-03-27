@@ -457,7 +457,7 @@ const orderRouteBlocks = computed(() => {
     const keys = [...buckets.keys()].sort((a, b) => {
         if (a === 'none') return 1
         if (b === 'none') return -1
-        return Number(a.slice(2)) - Number(b.slice(2))
+        return Number(b.slice(2)) - Number(a.slice(2))
     })
 
     return keys.map((k) => {

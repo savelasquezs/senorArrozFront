@@ -1,5 +1,19 @@
 <template>
     <div class="space-y-3">
+        <div
+            v-if="planningWarningLines.length > 0"
+            class="rounded-xl border border-amber-200 bg-amber-50 px-3 py-3 text-sm text-amber-950"
+            role="alert"
+        >
+            <p class="font-semibold text-amber-900 mb-1.5">Atención: plan de ruta incompleto</p>
+            <ul class="list-disc pl-5 space-y-1 text-amber-900/95">
+                <li v-for="(line, i) in planningWarningLines" :key="i">{{ line }}</li>
+            </ul>
+            <p class="mt-2 text-xs text-amber-800/90">
+                Revisa coordenadas de la sucursal y de cada dirección en el detalle del pedido (mapa).
+            </p>
+        </div>
+
         <div class="flex items-center justify-between">
             <h3 class="font-semibold text-gray-900">Orden de Entrega</h3>
             <button
@@ -53,9 +67,19 @@ import { MapIcon } from '@heroicons/vue/24/outline'
 
 interface Props {
     orders: OrderListItem[]
+    /** Texto multilínea (API: deliveryRoutePlanningWarnings). */
+    planningWarningsText?: string | null
 }
 
-const props = defineProps<Props>()
+const props = withDefaults(defineProps<Props>(), {
+    planningWarningsText: null,
+})
+
+const planningWarningLines = computed(() => {
+    const t = props.planningWarningsText?.trim()
+    if (!t) return []
+    return t.split('\n').map((s) => s.trim()).filter(Boolean)
+})
 const emit = defineEmits<{
     'route-optimized': [orderIds: number[]]
     'delivered': [orderId: number]

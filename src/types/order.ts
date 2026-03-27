@@ -227,6 +227,8 @@ export interface OrderListItem {
     deliveryManId: number | null
     /** Ruta de domicilio (backend); null si no aplica o legado. */
     deliveryRouteId?: number | null
+    /** Avisos al consolidar la ruta (saltos de línea), desde delivery_route.planning_warnings. */
+    deliveryRoutePlanningWarnings?: string | null
     deliveryManName: string | null
     guestName: string | null
     type: OrderType

@@ -201,6 +201,7 @@
                 <div class="max-h-[min(75vh,42rem)] overflow-y-auto overflow-x-hidden min-w-0 pr-1">
                     <RouteOrderManager
                         :orders="routeOrders"
+                        :planning-warnings-text="routePlanningWarningsText"
                         @route-optimized="handleRouteOptimized"
                         @delivered="handleOrderDelivered"
                     />
@@ -303,6 +304,12 @@ const showConfirmModal = ref(false)
 const showHistoryModal = ref(false)
 const ordersToAssign = ref<OrderListItem[]>([])
 const routeOrders = ref<OrderListItem[]>([])
+
+/** Misma ruta para todos los pedidos en ruta: un solo bloque de avisos del API. */
+const routePlanningWarningsText = computed(
+    () =>
+        routeOrders.value.find((o) => o.deliveryRoutePlanningWarnings)?.deliveryRoutePlanningWarnings ?? null
+)
 
 const cardGridRef = ref<InstanceType<typeof DeliveryCardGrid> | null>(null)
 
