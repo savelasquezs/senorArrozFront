@@ -381,7 +381,10 @@
 
 				<div>
 					<h3 class="text-sm font-semibold text-gray-800 mb-1">Historial reciente de rutas</h3>
-					<p class="text-xs text-gray-500 mb-3">Últimas {{ routeHistoryRows.length }} cerradas en el periodo.</p>
+					<p class="text-xs text-gray-500 mb-3">
+						Últimas {{ routeHistoryRows.length }} cerradas en el periodo.
+						<span class="text-gray-400"> · Clic en una fila para ver direcciones.</span>
+					</p>
 					<div class="overflow-x-auto max-h-[min(24rem,50vh)] overflow-y-auto rounded-lg border border-gray-200">
 						<table class="min-w-full text-xs text-left">
 							<thead class="sticky top-0 bg-gray-50 text-gray-600 font-medium border-b border-gray-200">
@@ -396,7 +399,15 @@
 								</tr>
 							</thead>
 							<tbody class="divide-y divide-gray-100 bg-white">
-								<tr v-for="row in routeHistoryRows" :key="row.id" class="hover:bg-gray-50/80">
+								<tr
+									v-for="row in routeHistoryRows"
+									:key="row.id"
+									role="button"
+									tabindex="0"
+									class="hover:bg-emerald-50/80 cursor-pointer select-none"
+									@click="openRouteStopsModal(row)"
+									@keydown.enter.prevent="openRouteStopsModal(row)"
+								>
 									<td class="px-3 py-2 tabular-nums text-gray-800 whitespace-nowrap">
 										{{ formatRouteClosedAt(row.completedAtUtc) }}
 									</td>
@@ -439,6 +450,48 @@
 						</table>
 					</div>
 				</div>
+
+				<BaseDialog
+					:model-value="routeStopsModalOpen"
+					:title="routeStopsModalTitle"
+					size="lg"
+					@update:model-value="onRouteStopsDialogToggle"
+				>
+					<div v-if="routeStopsSelectedRow" class="space-y-3 text-sm text-gray-700">
+						<p class="text-xs text-gray-500">
+							{{ routeStopsSelectedRow.deliverymanName }} ·
+							{{ formatRouteClosedAt(routeStopsSelectedRow.completedAtUtc) }}
+						</p>
+						<div v-if="routeStopsLoading" class="py-6 text-center text-gray-500">Cargando paradas…</div>
+						<p v-else-if="routeStopsError" class="text-red-600 text-sm">{{ routeStopsError }}</p>
+						<ul v-else-if="routeStopsList.length" class="space-y-3 border border-gray-100 rounded-lg divide-y divide-gray-100 bg-white">
+							<li
+								v-for="s in routeStopsList"
+								:key="`${s.orderId}-${s.stopSequence}`"
+								class="px-3 py-2.5"
+							>
+								<div class="flex items-baseline justify-between gap-2">
+									<span class="font-semibold text-gray-900">Pedido #{{ s.orderId }}</span>
+									<span class="text-xs text-gray-400 tabular-nums">Parada {{ s.stopSequence }}</span>
+								</div>
+								<p v-if="s.customerName" class="text-xs text-gray-600 mt-0.5">{{ s.customerName }}</p>
+								<p class="text-sm text-gray-800 mt-1">{{ formatStopAddress(s) }}</p>
+							</li>
+						</ul>
+						<p v-else class="text-gray-500 text-sm py-2">No hay paradas registradas para esta ruta.</p>
+					</div>
+					<template #footer>
+						<div class="flex justify-end">
+							<button
+								type="button"
+								class="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+								@click="closeRouteStopsModal"
+							>
+								Cerrar
+							</button>
+						</div>
+					</template>
+				</BaseDialog>
 			</template>
 		</BaseCard>
 	</div>
@@ -447,6 +500,9 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
 import BaseCard from '@/components/ui/BaseCard.vue';
+import BaseDialog from '@/components/ui/BaseDialog.vue';
+import { dashboardApi } from '@/services/MainAPI/dashboardApi';
+import type { DashboardDeliveryRouteStopsApiResponse } from '@/services/MainAPI/dashboardApi';
 import DashboardGaugeCard from './DashboardGaugeCard.vue';
 import DashboardHorizontalBarChart from './DashboardHorizontalBarChart.vue';
 import DashboardDeliveryScatterChart from './DashboardDeliveryScatterChart.vue';
@@ -456,7 +512,10 @@ import { formatTooltipCurrency } from './chartFormat';
 import { getBranchSeriesColor } from './chartColors';
 import type { DeliveryBranchOption, DeliverymanEfficiencyRow } from './operation.types';
 import { DELIVERY_FEE_DRIVER_SHARE } from '@/constants/deliveryFeeShare';
-import type { DeliveryRouteDashboardMetrics } from '@/services/MainAPI/dashboardSectionApi';
+import type {
+	DashboardRouteHistoryItem,
+	DeliveryRouteDashboardMetrics,
+} from '@/services/MainAPI/dashboardSectionApi';
 
 const branchId = defineModel<number | null>('branchId', { required: true });
 const deliveryEvolutionDriverId = defineModel<number | 'all'>('deliveryEvolutionDriverId', {
@@ -726,6 +785,53 @@ function formatRouteClosedAt(iso: string | null): string {
 function formatSecondsAsMin(sec: number | null): string {
 	if (sec == null) return '—';
 	return formatMinutes1(sec / 60);
+}
+
+const routeStopsModalOpen = ref(false);
+const routeStopsSelectedRow = ref<DashboardRouteHistoryItem | null>(null);
+const routeStopsLoading = ref(false);
+const routeStopsError = ref('');
+const routeStopsList = ref<DashboardDeliveryRouteStopsApiResponse['stops']>([]);
+
+const routeStopsModalTitle = computed(() =>
+	routeStopsSelectedRow.value ? `Ruta #${routeStopsSelectedRow.value.id}` : 'Ruta',
+);
+
+function formatStopAddress(s: DashboardDeliveryRouteStopsApiResponse['stops'][0]): string {
+	const t = (s.addressText || '').trim();
+	const snap = (s.addressSnapshotText || '').trim();
+	if (t) return t;
+	if (snap) return snap;
+	return '—';
+}
+
+function closeRouteStopsModal() {
+	routeStopsModalOpen.value = false;
+	routeStopsSelectedRow.value = null;
+	routeStopsList.value = [];
+	routeStopsError.value = '';
+	routeStopsLoading.value = false;
+}
+
+function onRouteStopsDialogToggle(open: boolean) {
+	if (!open) closeRouteStopsModal();
+}
+
+async function openRouteStopsModal(row: DashboardRouteHistoryItem) {
+	routeStopsSelectedRow.value = row;
+	routeStopsModalOpen.value = true;
+	routeStopsError.value = '';
+	routeStopsList.value = [];
+	routeStopsLoading.value = true;
+	try {
+		const res = await dashboardApi.getDeliveryRouteStops(row.id, branchId.value);
+		routeStopsList.value = res.stops ?? [];
+	} catch (e: unknown) {
+		const msg = e instanceof Error ? e.message : 'No se pudieron cargar las paradas';
+		routeStopsError.value = msg;
+	} finally {
+		routeStopsLoading.value = false;
+	}
 }
 
 const routeChartLabels = computed(() => {

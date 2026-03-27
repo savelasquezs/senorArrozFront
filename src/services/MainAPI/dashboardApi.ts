@@ -64,6 +64,17 @@ export type DashboardDeliveryRouteMetricsApi = {
 	recentRoutes: DashboardDeliveryRouteHistoryApiItem[];
 };
 
+export type DashboardDeliveryRouteStopsApiResponse = {
+	routeId: number;
+	stops: Array<{
+		orderId: number;
+		stopSequence: number;
+		addressSnapshotText: string | null;
+		customerName: string | null;
+		addressText: string | null;
+	}>;
+};
+
 export type DashboardDeliveryApiResponse = {
 	avgPrepMinutes: number;
 	avgDeliveryMinutes: number;
@@ -128,6 +139,19 @@ class DashboardApi extends BaseApi {
 		const params: Record<string, string | number> = { from: fromIso, to: toIso };
 		if (branchId != null && branchId !== undefined) params.branchId = branchId;
 		return this.get<DashboardDeliveryApiResponse>('/dashboard/delivery/me', { params });
+	}
+
+	/** Paradas de una ruta cerrada (direcciones / pedidos). */
+	async getDeliveryRouteStops(
+		routeId: number,
+		branchId?: number | null,
+	): Promise<DashboardDeliveryRouteStopsApiResponse> {
+		const params: Record<string, number> = {};
+		if (branchId != null && branchId !== undefined) params.branchId = branchId;
+		return this.get<DashboardDeliveryRouteStopsApiResponse>(
+			`/dashboard/delivery/routes/${routeId}/stops`,
+			{ params },
+		);
 	}
 
 	/** Ventas — comparativa sucursales. */
