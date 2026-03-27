@@ -88,5 +88,39 @@ export class KitchenService {
         const items = products.map(p => `${p.quantity}x ${p.name}`).join(', ')
         return `Pedido #${order.id}: ${items}`
     }
+
+    /** Notificación en pantalla cuando un pedido ya en cocina se modifica (horario, notas, productos). */
+    static generateOrderModifiedNotificationText(
+        order: OrderListItem,
+        products: Array<{ name: string; quantity: number }>,
+        kind: string
+    ): string {
+        const items = products.length ? products.map(p => `${p.quantity}x ${p.name}`).join(', ') : 'revisa el pedido'
+        const prefix =
+            kind === 'schedule' ? 'Cambio de horario. ' : kind === 'content' ? 'Cambios en el pedido. ' : 'Actualización. '
+        return `${prefix}#${order.id}: ${items}`
+    }
+
+    /** Texto para TTS en pedido modificado (taken / in_preparation). */
+    static generateOrderModifiedSpeechText(
+        order: OrderListItem,
+        products: Array<{ name: string; quantity: number }>,
+        kind: string
+    ): string {
+        const items = products.map((p, index) => {
+            const quantity = p.quantity === 1 ? 'una' : p.quantity === 2 ? 'dos' : p.quantity === 3 ? 'tres' : `${p.quantity}`
+            const isLast = index === products.length - 1
+            const connector = isLast && products.length > 1 ? ' y ' : ', '
+            return `${quantity} ${p.name}${!isLast ? connector : ''}`
+        })
+        const intro =
+            kind === 'schedule'
+                ? 'Atención cocina. Cambio de horario en el pedido número'
+                : kind === 'content'
+                  ? 'Atención cocina. Pedido número'
+                  : 'Atención cocina. Actualización del pedido número'
+        const tail = items.length ? `: ${items.join('')}` : ''
+        return `${intro} ${order.id}${tail}`
+    }
 }
 

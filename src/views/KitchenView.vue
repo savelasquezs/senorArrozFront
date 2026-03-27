@@ -204,6 +204,44 @@ const handleReservationReady = async (orderData: any) => {
     await notifyOrderShownInKitchen(orderData, true)
 }
 
+const notifyKitchenOrderModified = async (orderData: any, modificationKind: string) => {
+    const order = allOrders.value.find((o) => o.id === orderData.id)
+    if (!order || (order.status !== 'taken' && order.status !== 'in_preparation')) return
+
+    try {
+        await ordersStore.fetchById(order.id)
+        if (!ordersStore.current) return
+
+        const products = ordersStore.current.orderDetails.map((item) => ({
+            name: item.productName,
+            quantity: item.quantity,
+        }))
+        const title =
+            modificationKind === 'schedule'
+                ? `Cambio de horario #${order.id}`
+                : `Pedido #${order.id} actualizado`
+        const bodyText = KitchenService.generateOrderModifiedNotificationText(order, products, modificationKind)
+        const speechText = KitchenService.generateOrderModifiedSpeechText(order, products, modificationKind)
+
+        if (soundEnabled.value) {
+            if (permission.value === 'granted') {
+                notify(title, { body: bodyText, tag: `order-mod-${order.id}-${Date.now()}` })
+            }
+            speak(speechText)
+        }
+    } catch (err) {
+        console.error('Error notificación pedido modificado:', err)
+    }
+}
+
+const handleOrderModified = async (payload: any) => {
+    const data = payload?.order ?? payload
+    const kind = typeof payload?.modificationKind === 'string' ? payload.modificationKind : 'content'
+    if (!data?.id) return
+    await loadOrders()
+    await notifyKitchenOrderModified(data, kind)
+}
+
 const handleChangeStatus = (orderIds: number[], newStatus: OrderStatus) => {
     const selectedOrders = allOrders.value.filter(o => orderIds.includes(o.id))
 
@@ -280,5 +318,6 @@ onMounted(async () => {
 
     on('NewOrder', handleNewOrder)
     on('ReservationReady', handleReservationReady)
+    on('OrderModified', handleOrderModified)
 })
 </script>

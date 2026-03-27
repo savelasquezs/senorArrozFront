@@ -167,21 +167,64 @@
                             </div>
                         </div>
 
-                        <!-- Fecha de reserva - SOLO SI RESERVATION -->
-                        <div v-if="order.type === 'reservation' && order.reservedFor" class="space-y-2">
-                            <label class="text-xs sm:text-sm font-medium text-gray-700">Tener listo a esta hora</label>
-                            <div class="bg-gray-50 rounded-lg p-2 sm:p-3">
-                                <p class="text-xs sm:text-sm text-gray-900">{{ formatDateTime(order.reservedFor) }}</p>
+                        <!-- Horarios de reserva / programación (edición admin/cajero) -->
+                        <div
+                            v-if="showScheduleEditor"
+                            class="space-y-3 rounded-lg border border-amber-100 bg-amber-50/40 p-3 sm:p-4"
+                        >
+                            <p class="text-xs font-medium text-amber-900">Horarios de entrega y preparación</p>
+                            <div class="space-y-1.5">
+                                <label class="text-xs font-medium text-gray-700" for="order-reserved-for-local"
+                                    >Tener listo (entrega al cliente)</label
+                                >
+                                <input
+                                    id="order-reserved-for-local"
+                                    v-model="editableReservedForLocal"
+                                    type="datetime-local"
+                                    class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-emerald-600 focus:outline-none focus:ring-1 focus:ring-emerald-600"
+                                />
                             </div>
+                            <div class="space-y-1.5">
+                                <label class="text-xs font-medium text-gray-700" for="order-prepare-at-local"
+                                    >Inicio de preparación (opcional)</label
+                                >
+                                <input
+                                    id="order-prepare-at-local"
+                                    v-model="editablePrepareAtLocal"
+                                    type="datetime-local"
+                                    class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-emerald-600 focus:outline-none focus:ring-1 focus:ring-emerald-600"
+                                />
+                                <p class="text-[11px] text-gray-500">
+                                    Si lo dejas vacío, el sistema usa una hora antes de la entrega. Debe haber al menos
+                                    40 minutos entre preparación y entrega.
+                                </p>
+                            </div>
+                            <BaseButton
+                                size="sm"
+                                variant="secondary"
+                                class="w-full sm:w-auto"
+                                :loading="savingSchedule"
+                                @click="saveSchedule"
+                            >
+                                Guardar horarios
+                            </BaseButton>
                         </div>
 
-                        <!-- Hora de preparación - cuando existe prepareAt -->
-                        <div v-if="order.prepareAt" class="space-y-2">
-                            <label class="text-xs sm:text-sm font-medium text-gray-700">Preparar a esta hora</label>
-                            <div class="bg-gray-50 rounded-lg p-2 sm:p-3">
-                                <p class="text-xs sm:text-sm text-gray-900">{{ formatDateTime(order.prepareAt) }}</p>
+                        <!-- Solo lectura si el usuario no puede editar pero hay fechas -->
+                        <template v-else>
+                            <div v-if="order.type === 'reservation' && order.reservedFor" class="space-y-2">
+                                <label class="text-xs sm:text-sm font-medium text-gray-700">Tener listo a esta hora</label>
+                                <div class="bg-gray-50 rounded-lg p-2 sm:p-3">
+                                    <p class="text-xs sm:text-sm text-gray-900">{{ formatDateTime(order.reservedFor) }}</p>
+                                </div>
                             </div>
-                        </div>
+                            <div v-if="order.prepareAt" class="space-y-2">
+                                <label class="text-xs sm:text-sm font-medium text-gray-700">Preparar a esta hora</label>
+                                <div class="bg-gray-50 rounded-lg p-2 sm:p-3">
+                                    <p class="text-xs sm:text-sm text-gray-900">{{ formatDateTime(order.prepareAt) }}</p>
+                                </div>
+                            </div>
+                        </template>
 
                         <!-- Tomado por -->
                         <div class="space-y-2">
@@ -329,6 +372,22 @@ const editableGuestName = ref('')
 const editableNotes = ref('')
 const editableDeliveryFee = ref<number | null>(null)
 const savingDeliveryFee = ref(false)
+const editableReservedForLocal = ref('')
+const editablePrepareAtLocal = ref('')
+const savingSchedule = ref(false)
+
+function isoToDatetimeLocalValue(iso: string | Date | undefined | null): string {
+    if (iso === undefined || iso === null || iso === '') return ''
+    const d = typeof iso === 'string' ? new Date(iso) : iso
+    if (Number.isNaN(d.getTime())) return ''
+    const y = d.getFullYear()
+    const m = String(d.getMonth() + 1).padStart(2, '0')
+    const day = String(d.getDate()).padStart(2, '0')
+    const h = String(d.getHours()).padStart(2, '0')
+    const min = String(d.getMinutes()).padStart(2, '0')
+    return `${y}-${m}-${day}T${h}:${min}`
+}
+
 const customer = ref<Customer | null>(null)
 const customerLoading = ref(false)
 const customerError = ref<string | null>(null)
@@ -340,9 +399,15 @@ const props = defineProps<{
 const emit = defineEmits<{
     (e: 'delivered', orderId: number): void
 }>()
+
 const order = ref<OrderDetailView | null>(null)
 
-
+const showScheduleEditor = computed(() => {
+    const o = order.value
+    if (!o || isDeliveryman.value) return false
+    if (!permissions.canEditOrder(o)) return false
+    return o.type === 'reservation' || !!o.reservedFor || !!o.prepareAt
+})
 
 const { formatDateTime, formatCurrency } = useFormatting()
 const activeTab = ref('info')
@@ -428,6 +493,8 @@ watch(ordersDataStoreCurrent, (newOrder) => {
             newOrder.deliveryFee !== null && newOrder.deliveryFee !== undefined
                 ? Number(newOrder.deliveryFee)
                 : 0
+        editableReservedForLocal.value = isoToDatetimeLocalValue(newOrder.reservedFor as string | Date | undefined)
+        editablePrepareAtLocal.value = isoToDatetimeLocalValue(newOrder.prepareAt as string | Date | undefined)
         // Cargar cliente completo si hay customerId
         if (newOrder.customerId) {
             loadCustomer(newOrder.customerId)
@@ -487,6 +554,29 @@ const updateNotes = async () => {
         // ✅ No necesita recargar
     } catch (err: any) {
         error('Error', err.message)
+    }
+}
+
+const saveSchedule = async () => {
+    if (!order.value || !showScheduleEditor.value) return
+    if (!editableReservedForLocal.value?.trim()) {
+        error('Horarios', 'Indica fecha y hora de entrega (tener listo).')
+        return
+    }
+
+    savingSchedule.value = true
+    try {
+        const reservedIso = new Date(editableReservedForLocal.value).toISOString()
+        const payload: { reservedFor: string; prepareAt?: string } = { reservedFor: reservedIso }
+        if (editablePrepareAtLocal.value?.trim()) {
+            payload.prepareAt = new Date(editablePrepareAtLocal.value).toISOString()
+        }
+        await ordersDataStore.update(order.value.id, payload as any)
+        success('Horarios actualizados', 5000, 'Cocina y domiciliario recibirán aviso si aplica.')
+    } catch (err: any) {
+        error('Error al guardar horarios', err.message)
+    } finally {
+        savingSchedule.value = false
     }
 }
 

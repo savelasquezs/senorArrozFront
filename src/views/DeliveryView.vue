@@ -436,6 +436,24 @@ const handleOrderAssigned = async (_orderData: any) => {
     await loadAvailableOrders()
 }
 
+const handleOrderModifiedSignalR = async (payload: any) => {
+    const data = payload?.order ?? payload
+    const uid = authStore.user?.id
+    if (!data?.id || data.deliveryManId == null || uid == null || Number(data.deliveryManId) !== Number(uid)) return
+
+    await loadRouteAssigned()
+    if (activeTab.value === 'route') {
+        routeOrders.value = [...deliveryStore.ordersOnTheWay]
+    }
+    const kindLabel =
+        payload?.modificationKind === 'schedule'
+            ? 'Cambio de horario'
+            : payload?.modificationKind === 'content'
+              ? 'Cambios en el pedido'
+              : 'Actualización'
+    success(`${kindLabel}`, 6000, `Pedido #${data.id} — revisa detalles y total`)
+}
+
 // ─── Asignación ───────────────────────────────────────────────
 
 const handleAssign = (orderIds: number[]) => {
@@ -571,5 +589,6 @@ onMounted(async () => {
     }
     on('OrderReady', handleOrderReady)
     on('OrderAssigned', handleOrderAssigned)
+    on('OrderModified', handleOrderModifiedSignalR)
 })
 </script>
