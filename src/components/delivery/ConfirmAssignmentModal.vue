@@ -21,6 +21,10 @@
                 </div>
             </div>
 
+            <p v-if="assignmentError" class="text-sm text-red-600 bg-red-50 border border-red-100 rounded-md px-3 py-2">
+                {{ assignmentError }}
+            </p>
+
             <div class="space-y-2">
                 <PasswordInput v-model="password" label="Contraseña" placeholder="Ingresa tu contraseña"
                     :error="passwordError" />
@@ -67,9 +71,11 @@ const { success, error } = useToast()
 const isLoading = ref(false)
 const password = ref('')
 const passwordError = ref('')
+const assignmentError = ref('')
 
 const handleConfirm = async () => {
     passwordError.value = ''
+    assignmentError.value = ''
 
     if (!password.value) {
         passwordError.value = 'La contraseña es requerida'
@@ -93,8 +99,9 @@ const handleConfirm = async () => {
         // Limpiar password
         password.value = ''
     } catch (err: any) {
-        passwordError.value = err.message || 'Error al asignar pedidos'
-        error('Error al asignar', err.message)
+        const msg = err.message || 'Error al asignar pedidos'
+        assignmentError.value = msg
+        error('No se pudo asignar', msg)
     } finally {
         isLoading.value = false
     }
