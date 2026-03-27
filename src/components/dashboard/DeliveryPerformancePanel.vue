@@ -2,7 +2,10 @@
 	<div class="space-y-6">
 		<div
 			v-if="showKpiStrip"
-			class="grid grid-cols-2 gap-3 lg:grid-cols-4"
+			class="grid gap-3"
+			:class="
+				showFinancialDeliveryMetrics ? 'grid-cols-2 lg:grid-cols-4' : 'grid-cols-1 sm:max-w-xs'
+			"
 		>
 			<div
 				class="rounded-xl border border-gray-100 bg-white px-4 py-3 shadow-sm"
@@ -13,19 +16,31 @@
 					{{ formatInt(totalEvolutionDeliveries) }}
 				</p>
 			</div>
-			<div class="rounded-xl border border-gray-100 bg-white px-4 py-3 shadow-sm" role="status">
+			<div
+				v-if="showFinancialDeliveryMetrics"
+				class="rounded-xl border border-gray-100 bg-white px-4 py-3 shadow-sm"
+				role="status"
+			>
 				<p class="text-xs font-medium text-gray-500">Recaudo fees</p>
 				<p class="mt-1 text-lg font-semibold tabular-nums text-amber-900">
 					{{ formatCop(totalEvolutionFees) }}
 				</p>
 			</div>
-			<div class="rounded-xl border border-gray-100 bg-white px-4 py-3 shadow-sm" role="status">
+			<div
+				v-if="showFinancialDeliveryMetrics"
+				class="rounded-xl border border-gray-100 bg-white px-4 py-3 shadow-sm"
+				role="status"
+			>
 				<p class="text-xs font-medium text-gray-500">Fees / ventas</p>
 				<p class="mt-1 text-lg font-semibold tabular-nums text-violet-900">
 					{{ formatFeeToSalesPercent(periodFeeToSalesPercent) }}
 				</p>
 			</div>
-			<div class="rounded-xl border border-gray-100 bg-white px-4 py-3 shadow-sm" role="status">
+			<div
+				v-if="showFinancialDeliveryMetrics"
+				class="rounded-xl border border-gray-100 bg-white px-4 py-3 shadow-sm"
+				role="status"
+			>
 				<p class="text-xs font-medium text-gray-500">Ticket medio (seriación)</p>
 				<p class="mt-1 text-lg font-semibold tabular-nums text-gray-900">
 					{{ formatCop(avgTicketFromEvolution) }}
@@ -76,8 +91,14 @@
 					</div>
 				</div>
 				<p v-if="showBranchFilter" class="text-xs text-gray-500">
-					<strong>Sucursal:</strong> filtra todo el bloque (domiciliarios visibles, medidores, evolución
-					de fees, barras y dispersión).
+					<strong>Sucursal:</strong>
+					<template v-if="showFinancialDeliveryMetrics">
+						filtra todo el bloque (domiciliarios visibles, medidores, evolución de fees, barras y
+						dispersión).
+					</template>
+					<template v-else>
+						filtra todo el bloque (domiciliarios visibles, medidores y evolución de entregas).
+					</template>
 					<strong v-if="showDriverFilter" class="ml-1">Domiciliario</strong>
 					<template v-if="showDriverFilter">
 						(solo entregas): filtra datos al repartidor elegido; la lista depende de la sucursal.
@@ -101,12 +122,18 @@
 
 			<div class="mb-6">
 				<h3 class="text-sm font-semibold text-gray-800 mb-1">Evolución en el periodo</h3>
-				<p class="text-xs text-gray-500 mb-3">
+				<p v-if="showFinancialDeliveryMetrics" class="text-xs text-gray-500 mb-3">
 					Misma granularidad (horas, días, semanas o meses) para entregas, recaudo por costo de
 					domicilio y el porcentaje fees / ventas (ventas = total pedidos en el bucket, alineado al
 					filtro del API). El % del periodo usa suma fees / suma ventas del rango según el servidor.
 				</p>
-				<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+				<p v-else class="text-xs text-gray-500 mb-3">
+					Misma granularidad (horas, días, semanas o meses) para entregas completadas en el periodo.
+				</p>
+				<div
+					class="grid grid-cols-1 gap-6"
+					:class="showFinancialDeliveryMetrics ? 'lg:grid-cols-3' : ''"
+				>
 					<div class="min-h-[200px] sm:min-h-[240px]">
 						<div class="mb-2 space-y-2">
 							<div v-if="showDriverFilter" class="w-full sm:max-w-xs">
@@ -145,44 +172,46 @@
 							variant="area"
 						/>
 					</div>
-					<div class="min-h-[200px] sm:min-h-[240px]">
-						<p class="text-xs font-medium text-gray-700 mb-2 leading-snug">
-							Recaudo fees de envío (COP) — Total:
-							<span class="text-amber-900 font-semibold tabular-nums">{{
-								formatCop(totalEvolutionFees)
-							}}</span>,
-							{{ feeDriverPercentLabel }}:
-							<span class="text-amber-900 font-semibold tabular-nums">{{
-								formatCop(driverShareFromTotal(totalEvolutionFees))
-							}}</span>
-						</p>
-						<DashboardLineChart
-							:labels="evolutionLabels"
-							:datasets="evolutionFeeLineDatasets"
-							y-format="currency"
-							variant="area"
-						/>
-					</div>
-					<div class="min-h-[200px] sm:min-h-[240px] lg:col-span-1">
-						<p class="text-xs font-medium text-gray-700 mb-2 leading-snug">
-							Fees envío vs ventas — Periodo:
-							<span class="text-violet-900 font-semibold tabular-nums">{{
-								formatFeeToSalesPercent(periodFeeToSalesPercent)
-							}}</span>
-							<span class="text-gray-500 font-normal"> (histórico por bucket)</span>
-						</p>
-						<p v-if="!hasFeeToSalesEvolution" class="text-xs text-gray-500 italic py-6">
-							No hay ventas por bucket para calcular el histórico (respuesta sin
-							<span class="font-mono text-[11px]">evolutionSalesTotals</span> o todo en cero).
-						</p>
-						<DashboardLineChart
-							v-else
-							:labels="evolutionLabels"
-							:datasets="evolutionFeeToSalesPercentDatasets"
-							y-format="percent"
-							variant="area"
-						/>
-					</div>
+					<template v-if="showFinancialDeliveryMetrics">
+						<div class="min-h-[200px] sm:min-h-[240px]">
+							<p class="text-xs font-medium text-gray-700 mb-2 leading-snug">
+								Recaudo fees de envío (COP) — Total:
+								<span class="text-amber-900 font-semibold tabular-nums">{{
+									formatCop(totalEvolutionFees)
+								}}</span>,
+								{{ feeDriverPercentLabel }}:
+								<span class="text-amber-900 font-semibold tabular-nums">{{
+									formatCop(driverShareFromTotal(totalEvolutionFees))
+								}}</span>
+							</p>
+							<DashboardLineChart
+								:labels="evolutionLabels"
+								:datasets="evolutionFeeLineDatasets"
+								y-format="currency"
+								variant="area"
+							/>
+						</div>
+						<div class="min-h-[200px] sm:min-h-[240px] lg:col-span-1">
+							<p class="text-xs font-medium text-gray-700 mb-2 leading-snug">
+								Fees envío vs ventas — Periodo:
+								<span class="text-violet-900 font-semibold tabular-nums">{{
+									formatFeeToSalesPercent(periodFeeToSalesPercent)
+								}}</span>
+								<span class="text-gray-500 font-normal"> (histórico por bucket)</span>
+							</p>
+							<p v-if="!hasFeeToSalesEvolution" class="text-xs text-gray-500 italic py-6">
+								No hay ventas por bucket para calcular el histórico (respuesta sin
+								<span class="font-mono text-[11px]">evolutionSalesTotals</span> o todo en cero).
+							</p>
+							<DashboardLineChart
+								v-else
+								:labels="evolutionLabels"
+								:datasets="evolutionFeeToSalesPercentDatasets"
+								y-format="percent"
+								variant="area"
+							/>
+						</div>
+					</template>
 				</div>
 			</div>
 
@@ -535,6 +564,8 @@ const props = withDefaults(
 		cardTitle?: string;
 		/** Barras y dispersión entre domiciliarios (se ocultan con un solo repartidor o si es false). */
 		showTeamComparisonCharts?: boolean;
+		/** Recaudo, fees/ventas, ticket medio, gráficos de fees y comparativa con fees (vista admin). */
+		showFinancialDeliveryMetrics?: boolean;
 		branchOptions: DeliveryBranchOption[];
 		dateRange: [Date, Date];
 		avgPrepMinutes: number;
@@ -556,6 +587,7 @@ const props = withDefaults(
 		dateRangeFromSidebar: true,
 		cardTitle: 'Eficiencia por domiciliario',
 		showTeamComparisonCharts: true,
+		showFinancialDeliveryMetrics: true,
 		routeMetrics: null,
 	},
 );
@@ -669,7 +701,10 @@ const sortedDeliverymen = computed(() =>
 );
 
 const showTeamBlock = computed(
-	() => props.showTeamComparisonCharts && sortedDeliverymen.value.length > 1,
+	() =>
+		props.showFinancialDeliveryMetrics &&
+		props.showTeamComparisonCharts &&
+		sortedDeliverymen.value.length > 1,
 );
 
 const totalBarDeliveries = computed(() =>
