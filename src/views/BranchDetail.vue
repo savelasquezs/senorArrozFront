@@ -583,7 +583,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useBranchesStore } from '@/store/branches'
 import { useBanksStore } from '@/store/banks'
@@ -1172,12 +1172,26 @@ const loadExpenses = async () => {
     }
 }
 
-const openCreateExpense = () => {
+const openCreateExpense = async () => {
+    try {
+        if (allExpenseCategories.value.length === 0) {
+            await loadAllExpenseCategories()
+        }
+    } catch {
+        /* loadAllExpenseCategories ya registra en consola */
+    }
     editingExpense.value = null
     showExpenseForm.value = true
 }
 
-const openEditExpense = (expense: Expense) => {
+const openEditExpense = async (expense: Expense) => {
+    try {
+        if (allExpenseCategories.value.length === 0) {
+            await loadAllExpenseCategories()
+        }
+    } catch {
+        /* idem */
+    }
     editingExpense.value = expense
     showExpenseForm.value = true
 }
@@ -1241,45 +1255,107 @@ const nextExpensePage = async () => {
     }
 }
 
-// Lifecycle
-onMounted(async () => {
+/** Evita disparar todas las APIs de gastos al abrir la vista; cada pestaña carga bajo demanda */
+const expensesTabLoaded = ref<Record<'categories' | 'expenses' | 'suppliers', boolean>>({
+    categories: false,
+    expenses: false,
+    suppliers: false
+})
+
+function resetExpenseSectionState() {
+    expensesTabLoaded.value = { categories: false, expenses: false, suppliers: false }
+    expenseCategoriesList.value = null
+    allExpenseCategories.value = []
+    expensesList.value = null
+    suppliersList.value = null
+}
+
+async function syncExpensesTabData(tab: 'categories' | 'expenses' | 'suppliers') {
+    if (expensesTabLoaded.value[tab]) return
     try {
-        // Check if user has access before making API calls
-        const userRole = authStore.user?.role
-        const userBranchId = authStore.user?.branchId
-
-        const hasAccess = userRole === 'Superadmin' || (userRole === 'Admin' && userBranchId === branchId.value)
-
-        if (!hasAccess) {
-            return
+        if (tab === 'categories') {
+            await loadExpenseCategories()
+        } else if (tab === 'expenses') {
+            if (!expenseCategoriesList.value) await loadExpenseCategories()
+            await loadAllExpenseCategories()
+            await loadExpenses()
+        } else {
+            await loadSuppliers()
         }
+        expensesTabLoaded.value[tab] = true
+    } catch (error: any) {
+        console.error(`Error loading expenses section tab '${tab}':`, error)
+        const labels: Record<typeof tab, string> = {
+            categories: 'las categorías de gastos',
+            expenses: 'los gastos',
+            suppliers: 'los proveedores'
+        }
+        showError(
+            'Error al cargar datos',
+            error.message || `No se pudieron cargar ${labels[tab]}. Verifica tu conexión.`
+        )
+    }
+}
 
-        // Fetch branch details
+async function loadBranchPageData() {
+    const userRole = authStore.user?.role
+    const userBranchId = authStore.user?.branchId
+    const hasAccess =
+        userRole === 'Superadmin' || (userRole === 'Admin' && userBranchId === branchId.value)
+    if (!hasAccess) return
+
+    try {
         await branchesStore.fetchById(branchId.value)
+    } catch (error: any) {
+        console.error('Error loading branch:', error)
+        showError(
+            'Error al cargar datos',
+            error.message || 'No se pudo conectar con el servidor. Verifica tu conexión.'
+        )
+        return
+    }
 
-        // Fetch banks for this branch
+    try {
         await banksStore.fetch({
             page: 1,
             pageSize: 100,
             branchId: branchId.value
         })
+    } catch (error: any) {
+        console.error('Error loading banks:', error)
+        showError(
+            'Error al cargar bancos',
+            error.message || 'No se pudieron cargar los bancos de esta sucursal.'
+        )
+    }
 
-        // Fetch apps for this branch
+    try {
         await appsStore.fetch({
             page: 1,
             pageSize: 100,
             branchId: branchId.value
         })
-
-        await loadExpenseCategories()
-        await loadAllExpenseCategories()
-        await loadExpenses()
-        await loadSuppliers()
-
     } catch (error: any) {
-        console.error('Error loading branch data:', error)
-        showError("Error al  cargar datos", error.message || "Error al cargas las sucursales")
-        // Could redirect to branches list or show error
+        console.error('Error loading apps:', error)
+        showError(
+            'Error al cargar apps de pago',
+            error.message || 'No se pudieron cargar las apps de esta sucursal.'
+        )
     }
+
+    resetExpenseSectionState()
+    await syncExpensesTabData(expensesActiveTab.value)
+}
+
+watch(branchId, () => {
+    void loadBranchPageData()
+})
+
+watch(expensesActiveTab, (tab) => {
+    void syncExpensesTabData(tab)
+})
+
+onMounted(() => {
+    void loadBranchPageData()
 })
 </script>
