@@ -122,6 +122,22 @@ export type ExpenseCategoryListResult = PagedResult<ExpenseCategory>
 // Expense types
 export type ExpenseUnit = 'Unit' | 'Kilo' | 'Package' | 'Pound' | 'Gallon'
 
+/** 0 = categoría de producto, 1 = producto (alineado al enum del API). */
+export type ExpenseMenuTargetType = 0 | 1
+
+export interface ExpenseMenuTargetInput {
+    targetType: ExpenseMenuTargetType
+    targetId: number
+}
+
+export interface ExpenseMenuTarget {
+    /** API puede devolver entero o string según serialización del enum. */
+    targetType: ExpenseMenuTargetType | string
+    targetId: number
+    targetName: string
+    productMissingWeight: boolean
+}
+
 export interface Expense {
     id: number
     name: string
@@ -131,18 +147,40 @@ export interface Expense {
     unitDisplay: string
     createdAt: string
     updatedAt: string
+    menuTargets?: ExpenseMenuTarget[]
 }
 
 export interface CreateExpenseDto {
     name: string
     categoryId: number
     unit: ExpenseUnit
+    menuTargets: ExpenseMenuTargetInput[]
 }
 
 export interface UpdateExpenseDto {
     name: string
     categoryId: number
     unit: ExpenseUnit
+    menuTargets: ExpenseMenuTargetInput[]
+}
+
+export interface ExpenseMenuAttributionLine {
+    expenseId: number
+    expenseName: string
+    totalExpenseInPeriodCop: number
+    targetType: ExpenseMenuTargetType | string
+    targetId: number
+    targetName: string
+    allocatedCop: number
+    totalWeightGramsSold: number
+    costPerGramCop: number | null
+}
+
+export interface ExpenseMenuAttributionResponse {
+    fromUtc: string
+    toUtc: string
+    branchId: number | null
+    lines: ExpenseMenuAttributionLine[]
 }
 
 export interface ExpenseFilters {

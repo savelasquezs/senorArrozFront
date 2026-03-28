@@ -564,8 +564,8 @@
             <!-- Expense Form Dialog -->
             <BaseDialog v-model="showExpenseForm" :title="editingExpense ? 'Editar Gasto' : 'Nuevo Gasto'"
                 :icon="CurrencyDollarIcon" size="lg">
-                <ExpenseForm :expense="editingExpense" :categories="allExpenseCategories" :loading="expenseFormLoading"
-                    @submit="handleExpenseSubmit" @cancel="showExpenseForm = false" />
+                <ExpenseForm :expense="editingExpense" :branch-id="branchId" :categories="allExpenseCategories"
+                    :loading="expenseFormLoading" @submit="handleExpenseSubmit" @cancel="showExpenseForm = false" />
             </BaseDialog>
 
             <!-- Supplier Form Dialog -->

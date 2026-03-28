@@ -261,6 +261,16 @@ const routes: RouteRecordRaw[] = [
         }
     },
     {
+        path: '/expenses/menu-attribution',
+        name: 'ExpenseMenuAttribution',
+        component: () => import('@/views/ExpenseMenuAttributionView.vue'),
+        meta: {
+            requiresAuth: true,
+            requiresRole: [UserRole.SUPERADMIN, UserRole.ADMIN],
+            title: 'Imputación gastos — menú'
+        }
+    },
+    {
         path: '/cash-register',
         name: 'CashRegister',
         component: () => import('@/views/CashRegisterView.vue'),

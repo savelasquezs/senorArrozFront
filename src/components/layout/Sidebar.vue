@@ -47,7 +47,7 @@
 			<nav class="flex-1 px-2 space-y-1">
 				<template v-for="item in navigationItems" :key="item.name">
 					<router-link v-if="hasPermission(item.roles)" :to="item.to" :class="[
-						$route.path === item.to || $route.path.startsWith(item.to + '/')
+						navItemActive(item)
 							? 'bg-emerald-600 text-white hover:bg-emerald-700'
 							: 'text-gray-600 hover:text-gray-900 hover:bg-gray-100',
 						'group flex items-center px-3 py-2 text-sm font-medium rounded-xl transition-colors gap-3',
@@ -63,7 +63,7 @@
 
 <script setup lang="ts">
 import { computed, nextTick } from 'vue';
-import { useRouter } from 'vue-router';
+import { useRouter, useRoute } from 'vue-router';
 import { useAuthStore } from '@/store/auth';
 import { useDeliveryStore } from '@/store/delivery';
 import DeliverymanBranchSidebarBlock from '@/components/delivery/DeliverymanBranchSidebarBlock.vue';
@@ -90,6 +90,22 @@ interface Props {
 const emit = defineEmits<{ close: [] }>();
 const props = defineProps<Props>();
 const authStore = useAuthStore();
+const route = useRoute();
+
+type NavItem = {
+	name: string;
+	to: string;
+	icon: typeof HomeIcon;
+	roles: string[];
+	/** Si true, solo activo en ruta exacta (evita marcar "Gastos" en /expenses/menu-attribution). */
+	exactPath?: boolean;
+};
+
+function navItemActive(item: NavItem): boolean {
+	const p = route.path;
+	if (item.exactPath) return p === item.to;
+	return p === item.to || p.startsWith(item.to + '/');
+}
 const deliveryStore = useDeliveryStore();
 const router = useRouter();
 
@@ -126,7 +142,7 @@ const roleIcon = computed(() => {
 	}
 });
 
-const navigationItems = computed(() => [
+const navigationItems = computed((): NavItem[] => [
 	{
 		name: 'Dashboard',
 		to: '/dashboard',
@@ -179,6 +195,13 @@ const navigationItems = computed(() => [
 	{
 		name: 'Gastos',
 		to: '/expenses',
+		icon: CurrencyDollarIcon,
+		roles: ['Superadmin', 'Admin'],
+		exactPath: true,
+	},
+	{
+		name: 'Imputación menú',
+		to: '/expenses/menu-attribution',
 		icon: CurrencyDollarIcon,
 		roles: ['Superadmin', 'Admin'],
 	},

@@ -9,6 +9,7 @@ import type {
     ExpenseFilters,
     CreateExpenseDto,
     UpdateExpenseDto,
+    ExpenseMenuAttributionResponse,
 } from '@/types/expense';
 
 class ExpenseApi extends BaseApi {
@@ -60,6 +61,24 @@ class ExpenseApi extends BaseApi {
     // 6. Eliminar gasto
     async deleteExpense(id: number): Promise<ApiResponse<string>> {
         return this.delete<ApiResponse<string>>(`/expenses/${id}`);
+    }
+
+    /** Imputación de gastos de catálogo a menú por gramos vendidos (Admin/Superadmin). */
+    async getMenuAttribution(params: {
+        fromUtc: string
+        toUtc: string
+        branchId?: number | null
+    }): Promise<ApiResponse<ExpenseMenuAttributionResponse>> {
+        const q: Record<string, string | number> = {
+            FromUtc: params.fromUtc,
+            ToUtc: params.toUtc,
+        };
+        if (params.branchId != null && params.branchId > 0) {
+            q.BranchId = params.branchId;
+        }
+        return this.get<ApiResponse<ExpenseMenuAttributionResponse>>('/ExpenseMenuAttribution', {
+            params: q,
+        });
     }
 }
 
