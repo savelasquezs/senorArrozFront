@@ -77,7 +77,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch, onMounted } from 'vue'
+import { ref, watch, onMounted, onUnmounted } from 'vue'
 import { useCustomersStore } from '@/store/customers'
 import { useToast } from '@/composables/useToast'
 import type { Customer } from '@/types/customer'
@@ -117,6 +117,11 @@ const emit = defineEmits<{
 const customersStore = useCustomersStore()
 const { success, error: showError } = useToast()
 
+/** Debounce para GET /customers/by-phone (coincidencia exacta en API). */
+const PHONE_SEARCH_DEBOUNCE_MS = 400
+/** Mínimo de dígitos para considerar búsqueda por teléfono y llamar a la API (ej. 10 en CO). */
+const MIN_PHONE_DIGITS_FOR_API = 10
+
 // State
 const searchQuery = ref('')
 const searchResults = ref<Customer[]>([])
@@ -125,24 +130,119 @@ const isCreating = ref(false)
 const createdCustomer = ref<Customer | null>(null)
 const error = ref('')
 
+let phoneDebounceTimer: ReturnType<typeof setTimeout> | null = null
+let phoneSearchGeneration = 0
+
+const normalizePhone = (value: string) => {
+    return value.replace(/\D/g, '')
+}
+
+/** Quita prefijo país 57 si el número tiene longitud típica celular CO (12 dígitos). */
+const normalizePhoneForApi = (raw: string) => {
+    let digits = normalizePhone(raw)
+    if (digits.length >= 12 && digits.startsWith('57')) {
+        digits = digits.slice(2)
+    }
+    return digits
+}
+
+const hasLetters = (s: string) => /[a-zA-ZáéíóúÁÉÍÓÚñÑüÜ]/.test(s)
+
+const isPhoneLikeQuery = (raw: string) => {
+    const trimmed = raw.trim()
+    if (!trimmed || hasLetters(trimmed)) {
+        return false
+    }
+    return normalizePhoneForApi(trimmed).length >= MIN_PHONE_DIGITS_FOR_API
+}
+
+const filterLocalCustomers = (raw: string): Customer[] => {
+    const qLower = raw.toLowerCase().trim()
+    const qDigits = normalizePhone(raw)
+    const allCustomers = customersStore.list?.items || []
+    return allCustomers.filter((customer) => {
+        if (customer.name.toLowerCase().includes(qLower)) {
+            return true
+        }
+        const p1 = customer.phone1?.toLowerCase() ?? ''
+        const p2 = customer.phone2?.toLowerCase() ?? ''
+        if (p1.includes(qLower) || p2.includes(qLower)) {
+            return true
+        }
+        if (qDigits.length >= 3) {
+            const n1 = normalizePhone(customer.phone1 ?? '')
+            const n2 = normalizePhone(customer.phone2 ?? '')
+            if (n1.includes(qDigits) || n2.includes(qDigits)) {
+                return true
+            }
+        }
+        return false
+    })
+}
+
+const mergePhoneSearchResults = (remote: Customer | null, local: Customer[]): Customer[] => {
+    if (!remote) {
+        return local
+    }
+    const rest = local.filter((c) => c.id !== remote.id)
+    return [remote, ...rest]
+}
+
+const cancelPendingPhoneSearch = () => {
+    if (phoneDebounceTimer !== null) {
+        clearTimeout(phoneDebounceTimer)
+        phoneDebounceTimer = null
+    }
+    phoneSearchGeneration++
+}
+
+const isPhoneNotFoundError = (message: string) =>
+    message.includes('Cliente no encontrado') ||
+    message.includes('no encontrado') ||
+    message.includes('404')
+
 // Methods
 const handleSearch = () => {
     if (!searchQuery.value.trim()) {
+        cancelPendingPhoneSearch()
         searchResults.value = []
         return
     }
 
-    const query = searchQuery.value.toLowerCase()
-    const allCustomers = customersStore.list?.items || []
-    searchResults.value = allCustomers.filter(customer =>
-        customer.name.toLowerCase().includes(query) ||
-        customer.phone1?.toLowerCase().includes(query) ||
-        customer.phone2?.toLowerCase().includes(query)
-    )
-}
+    const raw = searchQuery.value
+    const local = filterLocalCustomers(raw)
+    searchResults.value = local
 
-const normalizePhone = (value: string) => {
-    return value.replace(/\D/g, '')
+    cancelPendingPhoneSearch()
+
+    if (!isPhoneLikeQuery(raw)) {
+        return
+    }
+
+    const phoneForApi = normalizePhoneForApi(raw)
+    const generation = phoneSearchGeneration
+    phoneDebounceTimer = setTimeout(async () => {
+        phoneDebounceTimer = null
+        if (generation !== phoneSearchGeneration) {
+            return
+        }
+        try {
+            const remote = await customersStore.searchByPhone(phoneForApi)
+            if (generation !== phoneSearchGeneration) {
+                return
+            }
+            const latestLocal = filterLocalCustomers(searchQuery.value)
+            searchResults.value = mergePhoneSearchResults(remote, latestLocal)
+        } catch (e: unknown) {
+            if (generation !== phoneSearchGeneration) {
+                return
+            }
+            const msg = e instanceof Error ? e.message : String(e)
+            if (!isPhoneNotFoundError(msg)) {
+                showError('Búsqueda por teléfono', msg || 'No se pudo buscar el cliente')
+            }
+        }
+    }, PHONE_SEARCH_DEBOUNCE_MS)
 }
 
 const handlePaste = (event: ClipboardEvent) => {
@@ -161,6 +261,7 @@ const handlePaste = (event: ClipboardEvent) => {
 }
 
 const selectCustomer = (customer: Customer) => {
+    cancelPendingPhoneSearch()
     emit('customerSelected', customer)
     searchQuery.value = ''
     searchResults.value = []
@@ -217,9 +318,13 @@ onMounted(async () => {
     }
 })
 
-// Watch for search query changes
+onUnmounted(() => {
+    cancelPendingPhoneSearch()
+})
+
 watch(searchQuery, () => {
     if (!searchQuery.value.trim()) {
+        cancelPendingPhoneSearch()
         searchResults.value = []
     }
 })
