@@ -108,7 +108,9 @@ const saving = ref(false)
 const selectedCustomerId = ref<number | null>(props.order.customerId)
 const selectedAddressId = ref<number | null>(props.order.addressId)
 const selectedGuestName = ref<string | null>(props.order.guestName || props.order.customerName || null)
-const { deliveryFee, autoCompleteFromAddress, markAsManuallyEdited, isSuggestedValue } = useDeliveryFee(props.order.deliveryFee || 0)
+const { deliveryFee, autoCompleteFromAddress, markAsManuallyEdited, isSuggestedValue } = useDeliveryFee(
+    props.order.deliveryFee == null ? 0 : Number(props.order.deliveryFee)
+)
 const showCustomerDetail = ref(false)
 const selectedCustomer = computed(() => {
     if (!selectedCustomerId.value) return null
@@ -126,8 +128,8 @@ const canSave = computed(() => {
     // Si no se puede editar, no se puede guardar
     if (!canEdit.value) return false
 
-    // Si es delivery y no hay deliveryFee válido, no se puede guardar
-    if (props.order.type === 'delivery' && (!deliveryFee.value || deliveryFee.value < 0)) {
+    // Si es delivery, tarifa debe ser un número >= 0
+    if (props.order.type === 'delivery' && (deliveryFee.value == null || Number.isNaN(Number(deliveryFee.value)) || deliveryFee.value < 0)) {
         return false
     }
 
@@ -150,7 +152,9 @@ const canSave = computed(() => {
     const hasCustomerChange = selectedCustomerId.value !== props.order.customerId
     const hasAddressChange = selectedAddressId.value !== props.order.addressId
     const hasGuestNameChange = selectedGuestName.value !== props.order.guestName
-    const hasDeliveryFeeChange = deliveryFee.value !== props.order.deliveryFee
+    const prevFee = props.order.deliveryFee == null ? 0 : Math.round(Number(props.order.deliveryFee))
+    const hasDeliveryFeeChange =
+        props.order.type === 'delivery' && Math.round(Number(deliveryFee.value)) !== prevFee
 
     return hasCustomerChange || hasAddressChange || hasGuestNameChange || hasDeliveryFeeChange
 })
@@ -164,8 +168,8 @@ const guestNameError = computed(() => {
 })
 
 const deliveryFeeError = computed(() => {
-    if (props.order.type === 'delivery' && (!deliveryFee.value || deliveryFee.value < 0)) {
-        return 'La tarifa de domicilio es obligatoria'
+    if (props.order.type === 'delivery' && (deliveryFee.value == null || Number.isNaN(Number(deliveryFee.value)) || deliveryFee.value < 0)) {
+        return 'Indica una tarifa de domicilio válida (0 o más)'
     }
     return ''
 })
@@ -224,9 +228,11 @@ const handleSave = async () => {
             updateData.guestName = selectedGuestName.value || undefined
         }
 
-        // Incluir deliveryFee si cambió y es delivery
-        if (props.order.type === 'delivery' && deliveryFee.value !== props.order.deliveryFee) {
-            updateData.deliveryFee = deliveryFee.value
+        // Incluir deliveryFee si cambió y es delivery (0 es válido)
+        const prevFee = props.order.deliveryFee == null ? 0 : Math.round(Number(props.order.deliveryFee))
+        const nextFee = Math.round(Number(deliveryFee.value))
+        if (props.order.type === 'delivery' && nextFee !== prevFee) {
+            updateData.deliveryFee = nextFee
         }
 
         // Manejar addressId según el tipo

@@ -104,7 +104,7 @@
                 <span class="text-gray-600">Descuentos:</span>
                 <span class="font-medium text-red-600">-{{ formatCurrency(discountTotal) }}</span>
             </div>
-            <div v-if="deliveryFee > 0" class="flex justify-between text-sm">
+            <div v-if="showDeliveryFeeLine" class="flex justify-between text-sm">
                 <span class="text-gray-600">Domicilio:</span>
                 <span class="font-medium text-gray-900">{{ formatCurrency(deliveryFee) }}</span>
             </div>
@@ -158,11 +158,15 @@ import { PencilIcon, PlusIcon, TrashIcon } from '@heroicons/vue/24/outline'
 interface Props {
     products: OrderDetailItem[]
     deliveryFee: number
+    /** Mostrar fila de domicilio (incluye tarifa $0) */
+    showDeliveryFeeLine?: boolean
     canEdit: boolean
     saving?: boolean
 }
 
-const props = defineProps<Props>()
+const props = withDefaults(defineProps<Props>(), {
+    showDeliveryFeeLine: false,
+})
 
 const emit = defineEmits<{
     save: [products: UpdateOrderDetailDto[]]

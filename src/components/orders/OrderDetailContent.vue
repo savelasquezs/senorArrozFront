@@ -256,7 +256,9 @@
                 <!-- Tab: Productos -->
                 <div v-if="activeTab === 'products'">
                     <OrderDetailProductsList v-if="order" :products="order?.orderDetails"
-                        :delivery-fee="order?.deliveryFee || 0" :can-edit="permissions.canEditProducts(order)"
+                        :delivery-fee="order?.deliveryFee ?? 0"
+                        :show-delivery-fee-line="order.type === 'delivery' || order.type === 'reservation'"
+                        :can-edit="permissions.canEditProducts(order)"
                         :saving="savingProducts" @save="handleProductsUpdate"
                         @request-cancel-order="handleRequestCancelOrderFromProducts" />
                 </div>

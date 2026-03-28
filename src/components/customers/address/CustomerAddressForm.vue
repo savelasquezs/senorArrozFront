@@ -144,7 +144,7 @@ const isFormValid = computed(() => {
         localForm.address.trim() &&
         localForm.latitude !== 0 &&
         localForm.longitude !== 0 &&
-        Number(localForm.deliveryFee) > 0 &&
+        Number(localForm.deliveryFee) >= 0 &&
         !errors.neighborhoodId &&
         !errors.address &&
         !errors.latitude &&
@@ -207,8 +207,9 @@ const validateForm = () => {
         errors.longitude = ""
     }
 
-    if (Number(localForm.deliveryFee) <= 0) {
-        errors.deliveryFee = "La tarifa de domicilio es requerida"
+    const feeNum = Number(localForm.deliveryFee)
+    if (Number.isNaN(feeNum) || feeNum < 0) {
+        errors.deliveryFee = "La tarifa de domicilio no es válida"
     } else {
         errors.deliveryFee = ""
     }

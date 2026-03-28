@@ -68,8 +68,8 @@ export function useOrderSubmission() {
             dto.addressId = draft.addressId
         }
 
-        if (draft.deliveryFee && draft.type === 'delivery') {
-            dto.deliveryFee = draft.deliveryFee
+        if (draft.type === 'delivery') {
+            dto.deliveryFee = draft.deliveryFee ?? 0
         }
 
         // reservedFor y prepareAt para todos los tipos (pedidos programados)

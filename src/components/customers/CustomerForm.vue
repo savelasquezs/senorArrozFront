@@ -242,7 +242,7 @@ const isFormValid = computed(() => {
                 addr.address.trim().length >= 10 &&
                 addr.latitude !== 0 &&
                 addr.longitude !== 0 &&
-                addr.deliveryFee > 0
+                addr.deliveryFee >= 0
             return !!basicValidation && addressValid
         }
     }
