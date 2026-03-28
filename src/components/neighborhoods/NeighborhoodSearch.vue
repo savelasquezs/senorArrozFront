@@ -25,16 +25,25 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, onMounted } from 'vue'
 import BaseSelect from '@/components/ui/BaseSelect.vue'
 import BaseDialog from '@/components/ui/BaseDialog.vue'
 import NeighborhoodForm from '@/components/neighborhoods/NeighborhoodForm.vue'
 import { useBranchesStore } from '@/store/branches'
+import { useCustomersStore } from '@/store/customers'
 import { useToast } from '@/composables/useToast'
 import { MapPinIcon, PlusIcon } from '@heroicons/vue/24/outline'
 import type { NeighborhoodFormData } from '@/types/customer'
 
 import { useAuthStore } from '@/store/auth'
+
+function toSelectOptions(items: Array<{ id: number; name: string; deliveryFee: number }>) {
+    return items.map((n) => ({
+        id: n.id,
+        name: n.name,
+        description: `Tarifa: $${n.deliveryFee.toLocaleString()}`,
+    }))
+}
 
 interface Props {
     modelValue?: number | null
@@ -50,6 +59,7 @@ const emit = defineEmits<{
     'update:modelValue': [value: number | null]
 }>()
 const branchesStore = useBranchesStore()
+const customersStore = useCustomersStore()
 const { success, error: showError } = useToast()
 
 // Reactive state
@@ -59,30 +69,36 @@ const showCreateForm = ref(false)
 const createLoading = ref(false)
 const createFormData = ref<NeighborhoodFormData | null>(null)
 
-// Computed
+// Barrios: GET /customers/neighborhoods (todos los roles con sucursal). Fallback a sucursal cargada en branchesStore.
 const neighborhoodOptions = computed(() => {
-    if (!branchesStore.currentNeighborhoods) {
-        branchesStore.fetchById(branchId.value || 0)
-
+    const fromApi = customersStore.neighborhoods
+    if (fromApi.length > 0) {
+        return toSelectOptions(fromApi)
     }
-    if (!branchesStore.currentNeighborhoods) return []
 
-    return branchesStore.currentNeighborhoods
-        .filter(neighborhood => {
-            // Filter by branch if provided
-            if (branchId.value && neighborhood.branchId !== branchId.value) return false
-            return true
-        })
-        .map(neighborhood => ({
-            id: neighborhood.id,
-            name: neighborhood.name,
-            description: `Tarifa: $${neighborhood.deliveryFee.toLocaleString()}`
-        }))
+    const branchList = branchesStore.currentNeighborhoods
+    if (!branchList?.length) return []
+
+    return toSelectOptions(
+        branchList.filter((n) => !branchId.value || n.branchId === branchId.value)
+    )
 })
 
 const selectedNeighborhood = computed(() => {
-    if (!selectedNeighborhoodId.value || !branchesStore.currentNeighborhoods) return null
-    return branchesStore.currentNeighborhoods.find(n => n.id === selectedNeighborhoodId.value) || null
+    if (!selectedNeighborhoodId.value) return null
+    const id = selectedNeighborhoodId.value
+    const fromCustomers = customersStore.neighborhoods.find((n) => n.id === id)
+    if (fromCustomers) return fromCustomers
+    return branchesStore.currentNeighborhoods?.find((n) => n.id === id) ?? null
+})
+
+onMounted(() => {
+    if (customersStore.neighborhoods.length === 0) {
+        customersStore.fetchNeighborhoods().catch((err) => {
+            console.error('Error loading neighborhoods:', err)
+            showError('Error de carga', 'No se pudieron cargar los barrios.')
+        })
+    }
 })
 
 // Methods
@@ -104,11 +120,26 @@ const handleCreateNeighborhood = async (data: NeighborhoodFormData) => {
     try {
         createLoading.value = true
 
-        // Create neighborhood with current branch
-        const newNeighborhood = await branchesStore.createNeighborhood({
+        const newNeighborhood = await customersStore.createNeighborhood({
             ...data,
-            branchId: branchId.value || 0
+            branchId: branchId.value || 0,
         })
+
+        if (branchesStore.current?.neighborhoods) {
+            const exists = branchesStore.current.neighborhoods.some((n) => n.id === newNeighborhood.id)
+            if (!exists) {
+                branchesStore.current.neighborhoods.push({
+                    id: newNeighborhood.id,
+                    branchId: newNeighborhood.branchId ?? branchId.value ?? 0,
+                    name: newNeighborhood.name,
+                    deliveryFee: newNeighborhood.deliveryFee,
+                    createdAt: newNeighborhood.createdAt ?? '',
+                    updatedAt: newNeighborhood.updatedAt ?? '',
+                    totalCustomers: 0,
+                    totalAddresses: 0,
+                })
+            }
+        }
 
         // Select the newly created neighborhood
         selectedNeighborhoodId.value = newNeighborhood.id
