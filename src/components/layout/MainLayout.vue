@@ -104,16 +104,30 @@ const navigateToNewOrder = () => {
 	router.push('/orders/new');
 };
 
-// Catálogo estable para toma de pedidos: precarga una vez por sesión (evita repetir GET al volver a /orders/new).
-onMounted(() => {
-	if (!authStore.isAuthenticated || !canTakeOrders.value) {
-		return;
-	}
+// Catálogo para pedidos: precarga una vez por sesión. En detalle de sucursal no compite con GET /Branches/:id.
+function isBranchDetailPath(path: string) {
+	return /^\/branches\/\d+(\/|$)/.test(path);
+}
+
+function prefetchOrderCatalog() {
+	if (!authStore.isAuthenticated || !canTakeOrders.value) return;
 	void Promise.all([
 		useProductsStore().ensureCatalogLoaded(),
 		useBanksStore().ensureListLoaded(),
 		useAppsStore().ensureListLoaded(),
 		useCustomersStore().ensureNeighborhoodsLoaded(),
 	]).catch((err) => console.error('Prefetch catálogo pedidos:', err));
+}
+
+onMounted(() => {
+	if (!authStore.isAuthenticated || !canTakeOrders.value) {
+		return;
+	}
+	// En detalle de sucursal, el GET /Branches/:id es pesado; retrasar el prefetch evita competir por red/DB.
+	if (isBranchDetailPath(route.path)) {
+		window.setTimeout(() => prefetchOrderCatalog(), 2000);
+		return;
+	}
+	prefetchOrderCatalog();
 });
 </script>
