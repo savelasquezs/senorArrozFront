@@ -51,6 +51,31 @@
 				/>
 			</div>
 
+			<BaseCard title="Ventas vs gastos" :padding="'md'">
+				<p class="text-xs text-gray-500 mb-4">
+					Mismo rango de fechas y escala temporal que el panel lateral (día, mes o año). La barra de
+					ventas se compara con los gastos apilados por categoría (hasta 8 categorías + «Otros»).
+				</p>
+				<div
+					v-if="salesVsExpensesLoading"
+					class="flex min-h-[200px] items-center justify-center text-sm text-gray-500"
+				>
+					Cargando gráfico…
+				</div>
+				<div
+					v-else-if="salesVsExpensesError"
+					class="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900"
+				>
+					{{ salesVsExpensesError }}
+				</div>
+				<DashboardSalesVsExpensesBarChart
+					v-else
+					:labels="salesVsExpenses?.labels ?? []"
+					:sales-cop="salesVsExpenses?.salesCop ?? []"
+					:expense-categories="salesVsExpenses?.expenseCategories ?? []"
+				/>
+			</BaseCard>
+
 			<div class="grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-4">
 				<DashboardGaugeCard
 					title="Tiempo preparación (prom.)"
@@ -116,8 +141,10 @@ import {
 	DashboardKpiCard,
 	DashboardOrderStatusKanban,
 } from '@/components/dashboard';
+import DashboardSalesVsExpensesBarChart from '@/components/dashboard/DashboardSalesVsExpensesBarChart.vue';
 import type { OrderPipelineStatusCounts } from '@/components/dashboard/operation.types';
 import type { KpiState, ActivityItem } from '@/views/dashboard/mock/dashboardMockCore';
+import type { DashboardPrincipalSalesVsExpensesApiResponse } from '@/services/MainAPI/dashboardApi';
 
 const emptyPipelineCounts: OrderPipelineStatusCounts = {
 	taken: 0,
@@ -137,5 +164,8 @@ defineProps<{
 	recentActivity: ActivityItem[];
 	getActivityIcon: (type: string) => Component;
 	formatDate: (date: Date) => string;
+	salesVsExpensesLoading: boolean;
+	salesVsExpensesError: string | null;
+	salesVsExpenses: DashboardPrincipalSalesVsExpensesApiResponse | null;
 }>();
 </script>

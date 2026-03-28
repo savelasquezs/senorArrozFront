@@ -22,6 +22,9 @@
                     :recent-activity="principalData?.recentActivity ?? []"
                     :get-activity-icon="getActivityIcon"
                     :format-date="formatDate"
+                    :sales-vs-expenses-loading="principalSalesVsExpensesLoading"
+                    :sales-vs-expenses-error="principalSalesVsExpensesError"
+                    :sales-vs-expenses="principalSalesVsExpensesData"
                 />
                 <DashboardVentasSection
                     v-else-if="activeSection === 'ventas'"
@@ -90,6 +93,7 @@ import { BASE_BRANCH_COMPARISON_ROWS } from '@/views/dashboard/mock/dashboardMoc
 import { useAuthStore } from '@/store/auth'
 import type { DashboardSectionId } from '@/views/dashboard/dashboardSectionIds'
 import { useDashboardPrincipalSection } from '@/composables/dashboard/useDashboardPrincipalSection'
+import { useDashboardPrincipalSalesVsExpenses } from '@/composables/dashboard/useDashboardPrincipalSalesVsExpenses'
 import { useDashboardVentasSection } from '@/composables/dashboard/useDashboardVentasSection'
 import { useDashboardGastosSection } from '@/composables/dashboard/useDashboardGastosSection'
 import { useDashboardDomiciliosSection } from '@/composables/dashboard/useDashboardDomiciliosSection'
@@ -123,6 +127,15 @@ const principalSection = useDashboardPrincipalSection(
 	globalDashboardBranchId,
 	globalDashboardDateRange,
 )
+const principalSalesVsExpenses = useDashboardPrincipalSalesVsExpenses(
+	activeSection,
+	globalDashboardBranchId,
+	globalDashboardDateRange,
+	globalTimeGranularity,
+)
+const principalSalesVsExpensesLoading = principalSalesVsExpenses.loading
+const principalSalesVsExpensesError = principalSalesVsExpenses.error
+const principalSalesVsExpensesData = principalSalesVsExpenses.data
 const ventasSection = useDashboardVentasSection(
 	activeSection,
 	globalDashboardBranchId,

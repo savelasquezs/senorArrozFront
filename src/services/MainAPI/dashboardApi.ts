@@ -244,6 +244,21 @@ class DashboardApi extends BaseApi {
 		if (opts?.granularity && opts.granularity !== 'auto') params.granularity = opts.granularity;
 		return this.get<DashboardExpenseTimeSeriesApiResponse>('/dashboard/expenses/timeseries', { params });
 	}
+
+	/** Principal — ventas vs gastos (gastos apilados por categoría). */
+	async getPrincipalSalesVsExpenses(
+		branchId: number | null,
+		fromIso: string,
+		toIso: string,
+		granularity: 'day' | 'month' | 'year',
+	): Promise<DashboardPrincipalSalesVsExpensesApiResponse> {
+		const params: Record<string, string> = { from: fromIso, to: toIso, granularity };
+		if (branchId != null) params.branchId = String(branchId);
+		return this.get<DashboardPrincipalSalesVsExpensesApiResponse>(
+			'/dashboard/principal/sales-vs-expenses',
+			{ params },
+		);
+	}
 }
 
 export type DashboardSalesComparisonApiResponse = {
@@ -344,6 +359,17 @@ export type DashboardExpenseTimeSeriesApiResponse = {
 	amountsCop: number[];
 	granularity: string;
 	seriesLabel: string;
+};
+
+export type DashboardPrincipalSalesVsExpensesApiResponse = {
+	granularity: string;
+	labels: string[];
+	salesCop: number[];
+	expenseCategories: Array<{
+		categoryId: number;
+		name: string;
+		amountsCop: number[];
+	}>;
 };
 
 export const dashboardApi = new DashboardApi();

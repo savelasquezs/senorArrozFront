@@ -32,3 +32,13 @@ export function expenseTimeSeriesGranularity(
 	if (g === 'month') return 'month';
 	return 'month';
 }
+
+/** Escala del gráfico ventas vs gastos en la sección Principal (sin hora). */
+export function principalSalesVsExpensesGranularity(
+	g: DashboardTimeGranularity,
+): 'day' | 'month' | 'year' {
+	if (g === 'hour') return 'day';
+	if (g === 'year') return 'year';
+	if (g === 'month') return 'month';
+	return 'day';
+}
