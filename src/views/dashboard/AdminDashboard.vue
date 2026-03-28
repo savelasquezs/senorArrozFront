@@ -44,11 +44,11 @@
                     :comparison-rows="ventasComparisonRows"
                     :date-range="globalDashboardDateRange"
                     :sales-by-day="salesByDay"
-                    :sales-by-hour="salesByHour"
+                    :sales-by-fortnight="salesByFortnight"
                     :sales-by-month="salesByMonth"
                     :sales-by-year="salesByYear"
                     :orders-by-day="ordersByDay"
-                    :orders-by-hour="ordersByHour"
+                    :orders-by-fortnight="ordersByFortnight"
                     :orders-by-month="ordersByMonth"
                     :orders-by-year="ordersByYear"
                     :products-payload="ventasProducts"
@@ -108,6 +108,11 @@ import { useDashboardDomiciliosSection } from '@/composables/dashboard/useDashbo
 import { useDashboardShellMockState } from '@/composables/dashboard/useDashboardShellMockState'
 import type { VentasProductsGroupBy } from '@/services/MainAPI/dashboardSectionApi'
 import type { DashboardTimeGranularity } from '@/views/dashboard/dashboardGlobalFilters'
+import {
+	aggregateSalesBlockByFortnight,
+	aggregateOrdersBlockByFortnight,
+	coerceGranularityToAllowed,
+} from '@/views/dashboard/dashboardGranularityBuckets'
 import DashboardPrincipalSection from '@/views/dashboard/sections/DashboardPrincipalSection.vue'
 import DashboardVentasSection from '@/views/dashboard/sections/DashboardVentasSection.vue'
 import DashboardGastosSection from '@/views/dashboard/sections/DashboardGastosSection.vue'
@@ -136,6 +141,19 @@ const activeSection = ref<DashboardSectionId>('principal')
 
 const globalDashboardDateRange = ref<[Date, Date]>(defaultDateRangeToday())
 const globalTimeGranularity = ref<DashboardTimeGranularity>('day')
+
+watch(
+	globalDashboardDateRange,
+	() => {
+		const next = coerceGranularityToAllowed(
+			globalTimeGranularity.value,
+			globalDashboardDateRange.value,
+		)
+		if (next !== globalTimeGranularity.value) globalTimeGranularity.value = next
+	},
+	{ deep: true },
+)
+
 const ventasProductsGroupBy = ref<VentasProductsGroupBy>('product')
 
 /** Filtro domiciliario: mismo ref para el API y las series del shell. */
@@ -215,11 +233,9 @@ const {
     avgPrepMinutes,
     avgDeliveryMinutes,
     salesByDay: shellSalesByDay,
-    salesByHour: shellSalesByHour,
     salesByMonth: shellSalesByMonth,
     salesByYear: shellSalesByYear,
     ordersByDay: shellOrdersByDay,
-    ordersByHour: shellOrdersByHour,
     ordersByMonth: shellOrdersByMonth,
     ordersByYear: shellOrdersByYear,
     getActivityIcon,
@@ -238,25 +254,25 @@ const {
 const salesByDay = computed(
 	() => ventasSection.data.value?.evolution?.salesByDay ?? shellSalesByDay.value,
 )
-const salesByHour = computed(
-	() => ventasSection.data.value?.evolution?.salesByHour ?? shellSalesByHour.value,
-)
 const salesByMonth = computed(
 	() => ventasSection.data.value?.evolution?.salesByMonth ?? shellSalesByMonth.value,
 )
 const salesByYear = computed(
 	() => ventasSection.data.value?.evolution?.salesByYear ?? shellSalesByYear.value,
 )
+const salesByFortnight = computed(() =>
+	aggregateSalesBlockByFortnight(salesByDay.value, globalDashboardDateRange.value),
+)
 const ordersByDay = computed(
 	() => ventasSection.data.value?.evolution?.ordersByDay ?? shellOrdersByDay.value,
-)
-const ordersByHour = computed(
-	() => ventasSection.data.value?.evolution?.ordersByHour ?? shellOrdersByHour.value,
 )
 const ordersByMonth = computed(
 	() => ventasSection.data.value?.evolution?.ordersByMonth ?? shellOrdersByMonth.value,
 )
 const ordersByYear = computed(
 	() => ventasSection.data.value?.evolution?.ordersByYear ?? shellOrdersByYear.value,
+)
+const ordersByFortnight = computed(() =>
+	aggregateOrdersBlockByFortnight(ordersByDay.value, globalDashboardDateRange.value),
 )
 </script>

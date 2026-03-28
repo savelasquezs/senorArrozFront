@@ -18,11 +18,11 @@
 			<TimeEvolutionPanel
 				v-model:time-granularity="timeGranularity"
 				:sales-by-day="salesByDay"
-				:sales-by-hour="salesByHour"
+				:sales-by-fortnight="salesByFortnight"
 				:sales-by-month="salesByMonth"
 				:sales-by-year="salesByYear"
 				:orders-by-day="ordersByDay"
-				:orders-by-hour="ordersByHour"
+				:orders-by-fortnight="ordersByFortnight"
 				:orders-by-month="ordersByMonth"
 				:orders-by-year="ordersByYear"
 			/>
@@ -124,11 +124,11 @@ const props = withDefaults(
 		comparisonRows: BranchComparisonRow[];
 		dateRange: [Date, Date];
 		salesByDay: SalesTimeSeriesBlock;
-		salesByHour: SalesTimeSeriesBlock;
+		salesByFortnight: SalesTimeSeriesBlock;
 		salesByMonth: SalesTimeSeriesBlock;
 		salesByYear: SalesTimeSeriesBlock;
 		ordersByDay: OrdersPerHourBlock;
-		ordersByHour: OrdersPerHourBlock;
+		ordersByFortnight: OrdersPerHourBlock;
 		ordersByMonth: OrdersPerHourBlock;
 		ordersByYear: OrdersPerHourBlock;
 		/** Desde API; null con mock o sin ventas. */

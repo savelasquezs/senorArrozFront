@@ -6,6 +6,7 @@ import {
 	principalSalesVsExpensesGranularity,
 	type DashboardTimeGranularity,
 } from '@/views/dashboard/dashboardGlobalFilters';
+import { aggregatePrincipalSalesVsExpensesByFortnight } from '@/views/dashboard/dashboardGranularityBuckets';
 
 function rangeKey(range: [Date, Date]) {
 	const [a, b] = range;
@@ -14,6 +15,7 @@ function rangeKey(range: [Date, Date]) {
 
 /**
  * Gráfico ventas vs gastos (principal): mismo rango y granularidad global que el sidebar.
+ * Quincena: API en modo día y agregación por quincena en cliente.
  */
 export function useDashboardPrincipalSalesVsExpenses(
 	activeSection: Ref<DashboardSectionId>,
@@ -21,11 +23,20 @@ export function useDashboardPrincipalSalesVsExpenses(
 	dateRange: Ref<[Date, Date]>,
 	timeGranularity: Ref<DashboardTimeGranularity>,
 ) {
-	const data = ref<DashboardPrincipalSalesVsExpensesApiResponse | null>(null);
+	const rawData = ref<DashboardPrincipalSalesVsExpensesApiResponse | null>(null);
 	const loading = ref(false);
 	const error = ref<string | null>(null);
 
 	const isActive = computed(() => activeSection.value === 'principal');
+
+	const data = computed((): DashboardPrincipalSalesVsExpensesApiResponse | null => {
+		const r = rawData.value;
+		if (!r) return null;
+		if (timeGranularity.value === 'fortnight' && r.granularity === 'day') {
+			return aggregatePrincipalSalesVsExpensesByFortnight(r, dateRange.value);
+		}
+		return r;
+	});
 
 	async function load() {
 		if (!isActive.value) return;
@@ -34,10 +45,10 @@ export function useDashboardPrincipalSalesVsExpenses(
 		try {
 			const { from, to } = encodeDashboardRangeToApi(dateRange.value);
 			const gran = principalSalesVsExpensesGranularity(timeGranularity.value);
-			data.value = await dashboardApi.getPrincipalSalesVsExpenses(branchId.value, from, to, gran);
+			rawData.value = await dashboardApi.getPrincipalSalesVsExpenses(branchId.value, from, to, gran);
 		} catch (e) {
 			error.value = e instanceof Error ? e.message : 'Error al cargar ventas vs gastos';
-			data.value = null;
+			rawData.value = null;
 		} finally {
 			loading.value = false;
 		}

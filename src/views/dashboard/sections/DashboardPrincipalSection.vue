@@ -53,7 +53,7 @@
 
 			<BaseCard title="Ventas vs gastos" :padding="'md'">
 				<p class="text-xs text-gray-500 mb-4">
-					Mismo rango de fechas y escala temporal que el panel lateral (día, mes o año). La barra de
+					Mismo rango de fechas y escala que el panel lateral (día, quincena, mes o año). La barra de
 					ventas se compara con los gastos apilados por categoría (hasta 8 categorías + «Otros»).
 				</p>
 				<div

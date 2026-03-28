@@ -1,23 +1,13 @@
 /**
  * Escala temporal global del dashboard (sidebar).
- * - Ventas / evolución: incluye hora.
- * - Peso por categoría: `hour` se trata como `day` en el API.
- * - Gastos: se mapea a la granularidad del API de series.
+ * La lista visible de pestañas depende del periodo (`getAllowedGranularityTabs` en `dashboardGranularityBuckets`).
  */
-export type DashboardTimeGranularity = 'day' | 'hour' | 'month' | 'year';
+export type DashboardTimeGranularity = 'day' | 'fortnight' | 'month' | 'year';
 
-export const DASHBOARD_TIME_GRANULARITY_TABS = [
-	{ value: 'day', label: 'Día' },
-	{ value: 'hour', label: 'Hora' },
-	{ value: 'month', label: 'Mes' },
-	{ value: 'year', label: 'Año' },
-] as const;
-
-/** Granularidad del API de peso por categoría (sin hora). */
+/** Granularidad del API de peso por categoría (sin quincena en servidor → día y agregamos en cliente si aplica). */
 export function weightApiGranularity(
 	g: DashboardTimeGranularity,
 ): 'day' | 'month' | 'year' {
-	if (g === 'hour') return 'day';
 	if (g === 'year') return 'year';
 	if (g === 'month') return 'month';
 	return 'day';
@@ -27,17 +17,15 @@ export function weightApiGranularity(
 export function expenseTimeSeriesGranularity(
 	g: DashboardTimeGranularity,
 ): 'auto' | 'day' | 'month' | undefined {
-	if (g === 'hour') return undefined;
-	if (g === 'day') return 'day';
+	if (g === 'day' || g === 'fortnight') return 'day';
 	if (g === 'month') return 'month';
 	return 'month';
 }
 
-/** Escala del gráfico ventas vs gastos en la sección Principal (sin hora). */
+/** Escala pedida al API de ventas vs gastos (Principal); quincena se agrega en cliente desde serie diaria. */
 export function principalSalesVsExpensesGranularity(
 	g: DashboardTimeGranularity,
 ): 'day' | 'month' | 'year' {
-	if (g === 'hour') return 'day';
 	if (g === 'year') return 'year';
 	if (g === 'month') return 'month';
 	return 'day';

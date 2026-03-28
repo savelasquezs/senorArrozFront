@@ -2,8 +2,8 @@
 	<BaseCard :padding="'md'" :shadow="'sm'">
 		<div class="space-y-8">
 			<p class="text-[11px] text-gray-500 pb-2 border-b border-gray-100 leading-relaxed">
-				Periodo y escala se controlan en el <strong>panel lateral</strong>.
-				<strong class="ml-1">Hora:</strong> último día del rango; pedidos: área o barras.
+				Periodo y escala se controlan en el <strong>panel lateral</strong>
+				(día, quincena, mes o año según el rango).
 			</p>
 
 			<section class="space-y-3">
@@ -23,32 +23,13 @@
 			</section>
 
 			<section class="space-y-3 pt-2 border-t border-gray-100">
-				<div
-					class="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between"
-				>
-					<div>
-						<h3 class="text-base font-semibold text-gray-900">{{ ordersSectionTitle }}</h3>
-						<p class="text-xs text-gray-500 mt-0.5">
-							{{ ordersSectionHint }}
-						</p>
-					</div>
-					<DashboardSegmentedTabs
-						v-if="timeGranularity === 'hour'"
-						v-model="ordersDisplay"
-						:options="ordersDisplayTabs"
-						aria-label="Tipo de gráfico pedidos por hora"
-					/>
+				<div>
+					<h3 class="text-base font-semibold text-gray-900">{{ ordersSectionTitle }}</h3>
+					<p class="text-xs text-gray-500 mt-0.5">
+						{{ ordersSectionHint }}
+					</p>
 				</div>
-				<DashboardLineChart
-					v-if="timeGranularity === 'hour' && ordersDisplay === 'area'"
-					:labels="activeOrdersBlock.labels"
-					:datasets="ordersAreaDatasets"
-					y-format="number"
-					variant="area"
-					:curve-tension="0.4"
-				/>
 				<DashboardBarChart
-					v-else
 					:labels="activeOrdersBlock.labels"
 					:datasets="ordersBarDatasets"
 					y-format="number"
@@ -59,36 +40,30 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { computed } from 'vue';
 import BaseCard from '@/components/ui/BaseCard.vue';
 import DashboardLineChart from './DashboardLineChart.vue';
 import DashboardBarChart from './DashboardBarChart.vue';
-import DashboardSegmentedTabs from './DashboardSegmentedTabs.vue';
 import type { OrdersPerHourBlock, SalesTimeSeriesBlock } from './timeEvolution.types';
+import type { BarChartDataset } from './barChart.types';
 
 const props = defineProps<{
 	salesByDay: SalesTimeSeriesBlock;
-	salesByHour: SalesTimeSeriesBlock;
+	salesByFortnight: SalesTimeSeriesBlock;
 	salesByMonth: SalesTimeSeriesBlock;
 	salesByYear: SalesTimeSeriesBlock;
 	ordersByDay: OrdersPerHourBlock;
-	ordersByHour: OrdersPerHourBlock;
+	ordersByFortnight: OrdersPerHourBlock;
 	ordersByMonth: OrdersPerHourBlock;
 	ordersByYear: OrdersPerHourBlock;
 }>();
 
 const timeGranularity = defineModel<string>('timeGranularity', { default: 'day' });
-const ordersDisplay = ref<string>('area');
-
-const ordersDisplayTabs = [
-	{ value: 'area', label: 'Área' },
-	{ value: 'bar', label: 'Barras' },
-];
 
 const activeSalesBlock = computed((): SalesTimeSeriesBlock => {
 	switch (timeGranularity.value as string) {
-		case 'hour':
-			return props.salesByHour;
+		case 'fortnight':
+			return props.salesByFortnight;
 		case 'month':
 			return props.salesByMonth;
 		case 'year':
@@ -100,8 +75,8 @@ const activeSalesBlock = computed((): SalesTimeSeriesBlock => {
 
 const activeOrdersBlock = computed((): OrdersPerHourBlock => {
 	switch (timeGranularity.value as string) {
-		case 'hour':
-			return props.ordersByHour;
+		case 'fortnight':
+			return props.ordersByFortnight;
 		case 'month':
 			return props.ordersByMonth;
 		case 'year':
@@ -111,10 +86,18 @@ const activeOrdersBlock = computed((): OrdersPerHourBlock => {
 	}
 });
 
+const ordersBarDatasets = computed((): BarChartDataset[] => [
+	{
+		label: 'Pedidos',
+		data: activeOrdersBlock.value.counts.map((v) => Number(v)),
+		backgroundColor: 'rgba(5, 120, 90, 0.82)',
+	},
+]);
+
 const ordersSectionTitle = computed(() => {
 	switch (timeGranularity.value as string) {
-		case 'hour':
-			return 'Pedidos por hora';
+		case 'fortnight':
+			return 'Pedidos por quincena';
 		case 'month':
 			return 'Pedidos por mes';
 		case 'year':
@@ -126,10 +109,10 @@ const ordersSectionTitle = computed(() => {
 
 const ordersSectionHint = computed(() => {
 	switch (timeGranularity.value as string) {
-		case 'hour':
-			return 'Agregado de todas las sucursales; último día del rango.';
 		case 'day':
 			return 'Total de pedidos por día en el rango (todas las sucursales).';
+		case 'fortnight':
+			return 'Agregado por quincenas calendario (1–15 y 16–fin de mes).';
 		case 'month':
 			return 'Total de pedidos por mes en el rango (todas las sucursales).';
 		case 'year':
@@ -138,19 +121,4 @@ const ordersSectionHint = computed(() => {
 			return '';
 	}
 });
-
-const ordersAreaDatasets = computed(() => [
-	{
-		label: 'Pedidos',
-		data: [...activeOrdersBlock.value.counts],
-	},
-]);
-
-const ordersBarDatasets = computed(() => [
-	{
-		label: 'Pedidos',
-		data: [...activeOrdersBlock.value.counts],
-		backgroundColor: 'rgba(5, 120, 90, 0.75)',
-	},
-]);
 </script>

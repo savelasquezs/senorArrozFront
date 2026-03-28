@@ -34,8 +34,9 @@
 				/>
 			</div>
 			<p class="text-[10px] leading-snug text-gray-500">
-				Aplica a <strong>Principal</strong> (KPIs y tiempos), ventas, peso por categoría y gastos.
-				<strong>Hora</strong>: último día del rango en ventas. Sin recargar la página.
+				Las opciones dependen del <strong>periodo</strong> (p. ej. un solo día: día y año; quincena
+				preset: sin mes). <strong>Año</strong> siempre está disponible. <strong>Quincena</strong> agrupa
+				1–15 y 16–fin de mes.
 			</p>
 		</div>
 		<div v-if="showBranchFilter" class="mt-auto border-t border-gray-100 p-3">
@@ -67,10 +68,8 @@ import type { DashboardSectionId } from '@/views/dashboard/dashboardSectionIds';
 import type { DeliveryBranchOption } from './operation.types';
 import DashboardPeriodPanel from './DashboardPeriodPanel.vue';
 import DashboardSegmentedTabs from './DashboardSegmentedTabs.vue';
-import {
-	DASHBOARD_TIME_GRANULARITY_TABS,
-	type DashboardTimeGranularity,
-} from '@/views/dashboard/dashboardGlobalFilters';
+import { getAllowedGranularityTabs } from '@/views/dashboard/dashboardGranularityBuckets';
+import type { DashboardTimeGranularity } from '@/views/dashboard/dashboardGlobalFilters';
 
 const props = withDefaults(
 	defineProps<{
@@ -98,19 +97,16 @@ const dateRangeModel = computed({
 	set: (v: [Date, Date]) => emit('update:dateRange', v),
 });
 
+const granularityTabs = computed(() => getAllowedGranularityTabs(props.dateRange));
+
 const timeGranularityModel = computed({
 	get: () => props.timeGranularity,
 	set: (v: string) => {
-		if (v === 'day' || v === 'hour' || v === 'month' || v === 'year') {
+		if (v === 'day' || v === 'fortnight' || v === 'month' || v === 'year') {
 			emit('update:timeGranularity', v);
 		}
 	},
 });
-
-const granularityTabs = DASHBOARD_TIME_GRANULARITY_TABS.map((x) => ({
-	value: x.value,
-	label: x.label,
-}));
 
 function onBranchChange(e: Event) {
 	const v = (e.target as HTMLSelectElement).value;

@@ -100,7 +100,14 @@
 					<p class="text-xs text-gray-500 mb-2">
 						{{ payload?.timeSeries?.seriesLabel ?? 'Serie' }}
 						<span v-if="payload?.timeSeries" class="text-gray-400">
-							· {{ payload.timeSeries.granularity === 'month' ? 'por mes' : 'por día' }}
+							·
+							{{
+								payload.timeSeries.granularity === 'month'
+									? 'por mes'
+									: payload.timeSeries.granularity === 'fortnight'
+										? 'por quincena'
+										: 'por día'
+							}}
 						</span>
 					</p>
 					<div

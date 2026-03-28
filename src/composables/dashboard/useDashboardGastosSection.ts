@@ -6,6 +6,7 @@ import {
 	expenseTimeSeriesGranularity,
 	type DashboardTimeGranularity,
 } from '@/views/dashboard/dashboardGlobalFilters';
+import { aggregateExpenseTimeSeriesByFortnight } from '@/views/dashboard/dashboardGranularityBuckets';
 
 export type GastosSummaryPayload = {
 	totalCop: number;
@@ -119,6 +120,24 @@ export function useDashboardGastosSection(
 				}),
 			]);
 			if (seq !== coreSeq) return;
+			let ts = mapTimeSeries(tsRaw);
+			if (
+				timeGranularity.value === 'fortnight' &&
+				ts.granularity === 'day' &&
+				ts.labels.length > 0
+			) {
+				const agg = aggregateExpenseTimeSeriesByFortnight(
+					ts.labels,
+					ts.amountsCop,
+					dateRange.value,
+				);
+				ts = {
+					...ts,
+					labels: agg.labels,
+					amountsCop: agg.amountsCop,
+					granularity: 'fortnight',
+				};
+			}
 			data.value = {
 				summary: mapSummary(summaryRaw),
 				byCategory: catRaw.slices.map((s) => ({
@@ -127,7 +146,7 @@ export function useDashboardGastosSection(
 					totalCop: s.totalCop,
 					percent: s.percent,
 				})),
-				timeSeries: mapTimeSeries(tsRaw),
+				timeSeries: ts,
 			};
 		} catch (e) {
 			if (seq !== coreSeq) return;
@@ -152,9 +171,27 @@ export function useDashboardGastosSection(
 			});
 			if (seq !== seriesSeq) return;
 			if (!data.value) return;
+			let ts = mapTimeSeries(tsRaw);
+			if (
+				timeGranularity.value === 'fortnight' &&
+				ts.granularity === 'day' &&
+				ts.labels.length > 0
+			) {
+				const agg = aggregateExpenseTimeSeriesByFortnight(
+					ts.labels,
+					ts.amountsCop,
+					dateRange.value,
+				);
+				ts = {
+					...ts,
+					labels: agg.labels,
+					amountsCop: agg.amountsCop,
+					granularity: 'fortnight',
+				};
+			}
 			data.value = {
 				...data.value,
-				timeSeries: mapTimeSeries(tsRaw),
+				timeSeries: ts,
 			};
 		} catch {
 			// mantener serie anterior

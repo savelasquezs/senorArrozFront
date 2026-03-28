@@ -113,6 +113,10 @@ import {
 	weightApiGranularity,
 	type DashboardTimeGranularity,
 } from '@/views/dashboard/dashboardGlobalFilters';
+import {
+	aggregateCategoryEvolutionPointsByFortnight,
+	fortnightLabelForDate,
+} from '@/views/dashboard/dashboardGranularityBuckets';
 
 const props = defineProps<{
 	branchId: number | null;
@@ -137,6 +141,7 @@ const selectedCategoryModel = computed({
 const weightEvolutionGranularity = computed(() => weightApiGranularity(props.timeGranularity));
 
 const granularityLabel = computed(() => {
+	if (props.timeGranularity === 'fortnight') return 'quincena';
 	switch (weightEvolutionGranularity.value) {
 		case 'month':
 			return 'mes';
@@ -179,6 +184,7 @@ function mergeAlignedCategoryWeightSeries(
 		points: Array<{ bucketStartUtc: string; totalWeightGrams: number }>;
 	}>,
 	g: 'day' | 'month' | 'year',
+	labelFormatter?: (iso: string) => string,
 ): { labelStrings: string[]; datasets: LineChartDataset[] } {
 	const bucketSet = new Set<string>();
 	for (const s of series) {
@@ -187,7 +193,9 @@ function mergeAlignedCategoryWeightSeries(
 		}
 	}
 	const sorted = [...bucketSet].sort((a, b) => new Date(a).getTime() - new Date(b).getTime());
-	const labelStrings = sorted.map((iso) => formatBucketLabel(iso, g));
+	const labelStrings = sorted.map((iso) =>
+		labelFormatter ? labelFormatter(iso) : formatBucketLabel(iso, g),
+	);
 	const idx = new Map<string, number>();
 	sorted.forEach((iso, i) => idx.set(iso, i));
 	const datasets: LineChartDataset[] = series.map((s) => {
@@ -203,28 +211,54 @@ function mergeAlignedCategoryWeightSeries(
 
 const evolutionLabels = computed(() => {
 	const g = weightEvolutionGranularity.value;
+	const fortnight = props.timeGranularity === 'fortnight';
+	const labelFn = fortnight
+		? (iso: string) => fortnightLabelForDate(new Date(iso))
+		: undefined;
+
 	if (selectedCategoryId.value != null) {
-		return (payload.value?.evolution ?? []).map((e) => formatBucketLabel(e.bucketStartUtc, g));
+		const raw = payload.value?.evolution ?? [];
+		const pts = fortnight ? aggregateCategoryEvolutionPointsByFortnight(raw) : raw;
+		return pts.map((e) =>
+			labelFn ? labelFn(e.bucketStartUtc) : formatBucketLabel(e.bucketStartUtc, g),
+		);
 	}
-	const multi = payload.value?.evolutionsByCategory ?? [];
-	return mergeAlignedCategoryWeightSeries(multi, g).labelStrings;
+	const multi = (payload.value?.evolutionsByCategory ?? []).map((s) => ({
+		...s,
+		points: fortnight
+			? aggregateCategoryEvolutionPointsByFortnight(s.points ?? [])
+			: (s.points ?? []),
+	}));
+	return mergeAlignedCategoryWeightSeries(multi, g, labelFn).labelStrings;
 });
 
 const evolutionDatasets = computed((): LineChartDataset[] => {
 	const g = weightEvolutionGranularity.value;
+	const fortnight = props.timeGranularity === 'fortnight';
+	const labelFn = fortnight
+		? (iso: string) => fortnightLabelForDate(new Date(iso))
+		: undefined;
+
 	if (selectedCategoryId.value != null) {
 		const id = selectedCategoryId.value;
 		const name =
 			(payload.value?.byCategory ?? []).find((c) => c.categoryId === id)?.name ?? 'Categoría';
+		const raw = payload.value?.evolution ?? [];
+		const pts = fortnight ? aggregateCategoryEvolutionPointsByFortnight(raw) : raw;
 		return [
 			{
 				label: `Gramos (${name})`,
-				data: (payload.value?.evolution ?? []).map((e) => e.totalWeightGrams),
+				data: pts.map((e) => e.totalWeightGrams),
 			},
 		];
 	}
-	const multi = payload.value?.evolutionsByCategory ?? [];
-	return mergeAlignedCategoryWeightSeries(multi, g).datasets;
+	const multi = (payload.value?.evolutionsByCategory ?? []).map((s) => ({
+		...s,
+		points: fortnight
+			? aggregateCategoryEvolutionPointsByFortnight(s.points ?? [])
+			: (s.points ?? []),
+	}));
+	return mergeAlignedCategoryWeightSeries(multi, g, labelFn).datasets;
 });
 
 const hasEvolution = computed(() => {
