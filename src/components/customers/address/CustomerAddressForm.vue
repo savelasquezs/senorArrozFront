@@ -162,10 +162,11 @@ const validateNeighborhood = () => {
     // Al CREAR: solo pre-llenar deliveryFee si está en 0 (primera vez). No sobrescribir si el usuario ya lo modificó.
     // Al editar: nunca sobrescribir.
     if (!props.addressId && Number(localForm.deliveryFee) === 0) {
-        localForm.deliveryFee =
-            branchesStore.currentNeighborhoods?.find(
-                (n) => n.id === localForm.neighborhoodId
-            )?.deliveryFee || 0
+        const id = localForm.neighborhoodId
+        const n =
+            customersStore.neighborhoods.find((x) => x.id === id) ??
+            branchesStore.currentNeighborhoods?.find((x) => x.id === id)
+        localForm.deliveryFee = n?.deliveryFee ?? 0
     }
     errors.neighborhoodId = ""
 }
