@@ -210,8 +210,8 @@
                         revísalo en domiciliarios si cambias el total.
                     </p>
                 </div>
-                <p v-if="willSyncLinkedAdvanceOnSave" class="text-xs text-amber-900 bg-amber-50 border border-amber-200 rounded-lg p-2">
-                    Al guardar se actualizará el abono vinculado para igualar el nuevo total del gasto
+                    <p v-if="willSyncLinkedAdvanceOnSave" class="text-xs text-amber-900 bg-amber-50 border border-amber-200 rounded-lg p-2">
+                    Al guardar se pedirá confirmación para actualizar el abono vinculado al nuevo total
                     ({{ formatCurrency(totalExpenses) }}).
                 </p>
             </div>
@@ -239,7 +239,7 @@
             <BaseButton @click="$emit('close')" variant="secondary">
                 Cancelar
             </BaseButton>
-            <BaseButton @click="handleSubmit" variant="primary" :loading="loading" :disabled="!isFormValid">
+            <BaseButton @click="handleSubmit" variant="primary" :loading="loading || savingExpense" :disabled="!isFormValid">
                 {{ editingExpense ? 'Actualizar' : 'Crear' }} Gasto
             </BaseButton>
         </template>
@@ -274,6 +274,43 @@
         <ExpenseForm :expense="null" :categories="allExpenseCategories" :loading="expenseFormLoading"
             @submit="handleExpenseSubmit" @cancel="showExpenseForm = false" />
     </BaseDialog>
+
+    <BaseDialog
+        :model-value="showExpenseBankSyncModal"
+        title="Ajustar pagos bancarios"
+        size="md"
+        @update:model-value="(v) => { if (!v) showExpenseBankSyncModal = false }"
+    >
+        <p class="text-sm text-gray-700">
+            Este gasto estaba pagado solo con transferencias y el total ya no coincide con la suma en banco.
+            ¿Repartir el nuevo total ({{ formatCurrency(totalExpenses) }}) entre las cuentas registradas de forma proporcional?
+        </p>
+        <template #footer>
+            <BaseButton variant="secondary" @click="onDismissExpenseBankSync">No, guardar así</BaseButton>
+            <BaseButton variant="primary" @click="onConfirmExpenseBankSync">Sí, ajustar y continuar</BaseButton>
+        </template>
+    </BaseDialog>
+
+    <BaseDialog
+        :model-value="showExpenseAdvanceConfirmModal"
+        title="Actualizar abono de domiciliario"
+        size="md"
+        @update:model-value="(v) => { if (!v) showExpenseAdvanceConfirmModal = false }"
+    >
+        <p class="text-sm text-gray-700 space-y-2">
+            <span class="block">
+                Se actualizará el abono #{{ editingExpense?.linkedDeliverymanAdvanceId }} para igualar el total del gasto
+                ({{ formatCurrency(totalExpenses) }}).
+            </span>
+            <span class="block text-amber-900 text-xs">
+                Solo aplica automáticamente si el abono es del día actual; si no, debes corregirlo en el módulo de domiciliarios.
+            </span>
+        </p>
+        <template #footer>
+            <BaseButton variant="secondary" @click="showExpenseAdvanceConfirmModal = false">Cancelar</BaseButton>
+            <BaseButton variant="primary" :loading="savingExpense" @click="onConfirmExpenseAdvanceSync">Confirmar y guardar</BaseButton>
+        </template>
+    </BaseDialog>
 </template>
 
 <script setup lang="ts">
@@ -296,6 +333,7 @@ import BaseSelect from '@/components/ui/BaseSelect.vue'
 import ExpenseCategoryFormModal from '@/components/expenses/ExpenseCategoryFormModal.vue'
 import ExpenseForm from '@/components/expenses/ExpenseForm.vue'
 import { PlusIcon, TrashIcon, SparklesIcon } from '@heroicons/vue/24/outline'
+import { distributeExpenseBankPaymentsProportionally } from '@/utils/expenseBankDistribution'
 
 interface Props {
     isOpen: boolean
@@ -376,6 +414,12 @@ const isDeliverymanAdvance = ref(false)
 const selectedDeliverymanId = ref<number | null>(null)
 const deliverymenOptions = ref<Array<{ value: number; label: string; ordersCount: number }>>([])
 const loadingDeliverymen = ref(false)
+
+/** Al abrir edición: el gasto cargaba 100 % por banco (suma bancos = total líneas) */
+const editExpensePaymentSnapshot = ref<{ wasFullyBank: boolean } | null>(null)
+const showExpenseBankSyncModal = ref(false)
+const showExpenseAdvanceConfirmModal = ref(false)
+const savingExpense = ref(false)
 
 const formatLastUsedAt = (value?: string | null) => {
     if (!value) return ''
@@ -586,6 +630,16 @@ const initializeForm = async () => {
                 tempId: `payment-${payment.id}`,
             })),
         }
+        const initialLineTotal = details.reduce((sum, d) => sum + Number(d.total ?? 0), 0)
+        const initialBankSum = props.editingExpense.expenseBankPayments.reduce(
+            (s, p) => s + Number(p.amount),
+            0,
+        )
+        editExpensePaymentSnapshot.value = {
+            wasFullyBank:
+                props.editingExpense.expenseBankPayments.length > 0 &&
+                Math.round(initialBankSum) === Math.round(initialLineTotal),
+        }
         await ensureSupplierOption(formData.value.supplierId)
 
         const dmId = props.editingExpense.deliverymanId
@@ -604,6 +658,7 @@ const initializeForm = async () => {
             selectedDeliverymanId.value = null
         }
     } else {
+        editExpensePaymentSnapshot.value = null
         formData.value = {
             supplierId: null,
             expenseDetails: [],
@@ -650,6 +705,13 @@ const willSyncLinkedAdvanceOnSave = computed(() => {
 
 const totalBankPayments = computed(() => {
     return formData.value.expenseBankPayments.reduce((sum, payment) => sum + Number(payment.amount || 0), 0)
+})
+
+/** Edición: al cargar era 100 % banco y ahora suma bancos ≠ total del formulario */
+const expenseBankAdjustNeeded = computed(() => {
+    if (!props.editingExpense || !editExpensePaymentSnapshot.value?.wasFullyBank) return false
+    if (formData.value.expenseBankPayments.length === 0) return false
+    return Math.round(totalBankPayments.value) !== Math.round(totalExpenses.value)
 })
 
 const cashDifference = computed(() => {
@@ -913,12 +975,63 @@ const removeBankPayment = (index: number) => {
     formData.value.expenseBankPayments.splice(index, 1)
 }
 
+function applyProportionalBankPaymentsToTotal() {
+    const target = Math.round(totalExpenses.value)
+    const payments = formData.value.expenseBankPayments
+    if (payments.length === 0) return
+    const distributed = distributeExpenseBankPaymentsProportionally(
+        payments.map((p) => ({ bankId: p.bankId, amount: Number(p.amount || 0) })),
+        target,
+    )
+    distributed.forEach((d, i) => {
+        if (payments[i]) payments[i].amount = d.amount
+    })
+}
+
+function continueAfterBankSyncPrompt() {
+    showExpenseBankSyncModal.value = false
+    if (props.editingExpense && willSyncLinkedAdvanceOnSave.value) {
+        showExpenseAdvanceConfirmModal.value = true
+        return
+    }
+    void executeExpenseSave()
+}
+
+function onConfirmExpenseBankSync() {
+    applyProportionalBankPaymentsToTotal()
+    continueAfterBankSyncPrompt()
+}
+
+function onDismissExpenseBankSync() {
+    continueAfterBankSyncPrompt()
+}
+
+async function onConfirmExpenseAdvanceSync() {
+    showExpenseAdvanceConfirmModal.value = false
+    await executeExpenseSave()
+}
+
 const handleSubmit = async () => {
     if (!isFormValid.value) {
         error('Formulario inválido', 'Por favor completa todos los campos requeridos')
         return
     }
 
+    if (props.editingExpense && expenseBankAdjustNeeded.value) {
+        showExpenseBankSyncModal.value = true
+        return
+    }
+
+    if (props.editingExpense && willSyncLinkedAdvanceOnSave.value) {
+        showExpenseAdvanceConfirmModal.value = true
+        return
+    }
+
+    await executeExpenseSave()
+}
+
+async function executeExpenseSave() {
+    savingExpense.value = true
     try {
         const deliverymanForHeader =
             props.presetDeliverymanId ??
@@ -953,7 +1066,6 @@ const handleSubmit = async () => {
             result = await expenseHeaderApi.createExpenseHeader(payload as CreateExpenseHeaderDto)
         }
 
-        // Nuevo gasto: crear abono vinculado (ExpenseOffset + expenseHeaderId). En edición el backend ajusta el abono si aplica.
         if (!props.skipAutoAdvance && !props.editingExpense && isDeliverymanAdvance.value && selectedDeliverymanId.value) {
             const amount = totalExpenses.value
             try {
@@ -978,7 +1090,20 @@ const handleSubmit = async () => {
 
         emit('submit', result)
     } catch (err: any) {
-        error('Error al guardar', err.message)
+        const msg = err.message || ''
+        if (
+            props.editingExpense &&
+            (msg.includes('mismo día') || msg.includes('domiciliarios'))
+        ) {
+            error(
+                'No se pudo actualizar el abono automáticamente',
+                'Si el abono no es del día actual, corrígelo en el módulo de domiciliarios. Detalle: ' + msg,
+            )
+        } else {
+            error('Error al guardar', msg)
+        }
+    } finally {
+        savingExpense.value = false
     }
 }
 </script>

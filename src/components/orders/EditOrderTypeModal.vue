@@ -85,6 +85,7 @@ import { useToast } from '@/composables/useToast'
 import BaseDialog from '@/components/ui/BaseDialog.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseRadioGroup from '@/components/ui/BaseRadioGroup.vue'
+import { toPaymentSnapshot, type OrderPaymentSnapshot } from '@/utils/orderPaymentCoverage'
 
 interface Props {
     open: boolean
@@ -95,7 +96,7 @@ const props = defineProps<Props>()
 
 const emit = defineEmits<{
     close: []
-    updated: [order?: Order]
+    updated: [order?: Order, paymentSnapshotBefore?: OrderPaymentSnapshot]
     'type-changed-pending': [newType: 'onsite' | 'delivery' | 'reservation']
     'open-customer-modal': []
 }>()
@@ -245,10 +246,11 @@ const handleSave = async () => {
             updateData.addressId = null
         }
 
+        const paymentSnapshotBefore = toPaymentSnapshot(props.order)
         const updatedOrder = await ordersStore.update(props.order.id, updateData)
 
         success('Tipo de pedido actualizado', 5000)
-        emit('updated', updatedOrder)
+        emit('updated', updatedOrder, paymentSnapshotBefore)
         emit('close')
     } catch (err: any) {
         error('Error al actualizar tipo', err.message)

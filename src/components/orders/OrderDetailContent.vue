@@ -262,7 +262,7 @@
                 </div>
 
                 <!-- Tab: Pagos -->
-                <div v-if="activeTab === 'payments'">
+                <div v-if="activeTab === 'payments'" ref="paymentsSectionRef">
                     <div class="mb-6">
                         <h3 class="text-base sm:text-lg font-medium text-gray-900 mb-3 sm:mb-4">Gestión de Pagos</h3>
                         <p class="text-xs sm:text-sm text-gray-600 mb-3 sm:mb-4">
@@ -303,7 +303,7 @@
 
     <!-- Modales -->
     <EditCustomerModal v-if="showEditCustomerModal && order" :open="showEditCustomerModal" :order="order"
-        @close="handleCustomerModalClose" @updated="handleCustomerUpdated" />
+        @close="handleCustomerModalClose" @updated="(o, snap) => handleCustomerUpdated(o, snap)" />
 
     <SelectAddressModal v-if="showSelectAddressModal && order" :open="showSelectAddressModal" :order="order"
         @close="showSelectAddressModal = false" @updated="handleAddressUpdated" />
@@ -317,8 +317,17 @@
 
     <!-- Modal de cambio de tipo -->
     <EditOrderTypeModal v-if="showEditOrderTypeModal && order" :open="showEditOrderTypeModal" :order="order"
-        @close="showEditOrderTypeModal = false" @updated="handleOrderTypeUpdated"
+        @close="showEditOrderTypeModal = false" @updated="(o, snap) => handleOrderTypeUpdated(o, snap)"
         @type-changed-pending="handleTypePendingChange" @open-customer-modal="handleOpenCustomerModalFromType" />
+
+    <OrderBankPaymentSyncDialog
+        :open="showBankSyncDialog"
+        :prompt="bankSyncPrompt"
+        :adjusting="bankSyncAdjusting"
+        @close="showBankSyncDialog = false"
+        @confirm-adjust="onConfirmBankPaymentAdjust"
+        @go-to-payments="scrollToPaymentsTab"
+    />
 </template>
 
 <script setup lang="ts">
@@ -330,6 +339,7 @@ import SelectAddressModal from '@/components/orders/SelectAddressModal.vue'
 import AssignDeliveryModal from '@/components/orders/AssignDeliveryModal.vue'
 import CancelOrderModal from '@/components/orders/CancelOrderModal.vue'
 import EditOrderTypeModal from '@/components/orders/EditOrderTypeModal.vue'
+import OrderBankPaymentSyncDialog from '@/components/orders/OrderBankPaymentSyncDialog.vue'
 import BaseInput from '@/components/ui/BaseInput.vue'
 import PersistedPaymentSelector from '@/components/payments/PersistedPaymentSelector.vue'
 import PhoneNumberItem from '@/components/customers/PhoneNumberItem.vue'
@@ -345,6 +355,13 @@ import { useOrdersDraftsStore } from '@/store/ordersDrafts'
 import { useOrdersDataStore } from '@/store/ordersData'
 import { useAuthStore } from '@/store/auth'
 import { customerApi } from '@/services/MainAPI/customerApi'
+import { bankPaymentApi } from '@/services/MainAPI/bankPaymentApi'
+import {
+    toPaymentSnapshot,
+    evaluateBankSyncAfterTotalChange,
+    type OrderPaymentSnapshot,
+    type BankSyncPrompt,
+} from '@/utils/orderPaymentCoverage'
 
 import type { OrderListItem } from '@/types/order'
 
@@ -361,7 +378,7 @@ import {
     CreditCardIcon,
     CheckCircleIcon,
 } from '@heroicons/vue/24/outline'
-import { ref, computed, watch, onMounted } from 'vue'
+import { ref, computed, watch, onMounted, nextTick } from 'vue'
 const permissions = useOrderPermissions()
 const authStore = useAuthStore()
 const isDeliveryman = computed(() => authStore.userRole === 'Deliveryman')
@@ -442,6 +459,54 @@ const showSelectAddressModal = ref(false)
 const showCancelModal = ref(false)
 const showEditOrderTypeModal = ref(false)
 
+const paymentsSectionRef = ref<HTMLElement | null>(null)
+const showBankSyncDialog = ref(false)
+const bankSyncPrompt = ref<BankSyncPrompt>({ kind: 'none' })
+const bankSyncAdjusting = ref(false)
+
+function captureOrderPaymentSnapshot(): OrderPaymentSnapshot | null {
+    if (!order.value) return null
+    return toPaymentSnapshot(order.value)
+}
+
+async function promptBankSyncIfNeeded(snapshot: OrderPaymentSnapshot | null) {
+    await nextTick()
+    const current = ordersDataStore.current
+    if (!snapshot || !current) return
+    if (!permissions.canEditPayments(current)) return
+    const prompt = evaluateBankSyncAfterTotalChange(snapshot, current)
+    if (prompt.kind === 'none') return
+    bankSyncPrompt.value = prompt
+    showBankSyncDialog.value = true
+}
+
+function scrollToPaymentsTab() {
+    activeTab.value = 'payments'
+    void nextTick(() => {
+        paymentsSectionRef.value?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    })
+    showBankSyncDialog.value = false
+}
+
+async function onConfirmBankPaymentAdjust() {
+    const p = bankSyncPrompt.value
+    if (p.kind !== 'adjust' || !order.value) return
+    bankSyncAdjusting.value = true
+    try {
+        const updated = await bankPaymentApi.updateBankPayment(p.paymentId, p.newTotal)
+        const newPayments = order.value.bankPayments.map((bp) =>
+            bp.id === p.paymentId ? { ...bp, ...(updated as object) } : bp,
+        ) as OrderDetailView['bankPayments']
+        handlePaymentUpdated({ bankPayments: newPayments })
+        success('Pago actualizado', 4000, 'El monto bancario coincide con el nuevo total')
+        showBankSyncDialog.value = false
+        bankSyncPrompt.value = { kind: 'none' }
+    } catch (err: any) {
+        error('Error al actualizar pago', err.message)
+    } finally {
+        bankSyncAdjusting.value = false
+    }
+}
 
 // Tabs
 const tabs = [
@@ -597,9 +662,11 @@ const updateDeliveryFee = async () => {
     }
 
     savingDeliveryFee.value = true
+    const paymentSnapshotBefore = captureOrderPaymentSnapshot()
     try {
         await ordersDataStore.update(order.value.id, { deliveryFee: next })
         success('Tarifa actualizada', 4000, 'Se recalculó el total del pedido')
+        await promptBankSyncIfNeeded(paymentSnapshotBefore)
     } catch (err: any) {
         error('Error al guardar tarifa', err.message)
         editableDeliveryFee.value = current
@@ -613,11 +680,13 @@ const handleProductsUpdate = async (products: UpdateOrderDetailDto[]) => {
     if (!order.value) return
 
     savingProducts.value = true
+    const paymentSnapshotBefore = captureOrderPaymentSnapshot()
     try {
         await ordersDataStore.update(order.value.id, {
             orderDetails: products,
         })
         success('Productos actualizados', 5000, 'Los productos del pedido han sido actualizados')
+        await promptBankSyncIfNeeded(paymentSnapshotBefore)
     } catch (err: any) {
         error('Error al actualizar productos', err.message)
     } finally {
@@ -660,25 +729,33 @@ const handleOrderCancelled = () => {
 }
 
 // Handlers optimistas para actualización sin recarga
-const handleOrderTypeUpdated = (updatedOrder?: any) => {
+const handleOrderTypeUpdated = (updatedOrder?: any, paymentSnapshotBefore?: OrderPaymentSnapshot | null) => {
     if (!updatedOrder) return
 
     const orderAny = updatedOrder as any
+    const snapshot = paymentSnapshotBefore ?? captureOrderPaymentSnapshot()
     handleModalUpdated({
         type: orderAny.type,
-        typeDisplayName: orderAny.typeDisplayName,
-        deliveryFee: orderAny.deliveryFee || null,
+        typeDisplayName: orderAny.typeDisplayName ?? getOrderTypeDisplayName(orderAny.type),
+        deliveryFee: orderAny.deliveryFee ?? null,
         reservedFor: orderAny.reservedFor || null,
         prepareAt: orderAny.prepareAt || null,
-        addressId: orderAny.addressId || null,
+        addressId: orderAny.addressId ?? null,
         addressDescription: orderAny.addressDescription || null,
         addressAdditionalInfo: orderAny.addressAdditionalInfo ?? null,
-        updatedAt: orderAny.updatedAt
+        updatedAt: orderAny.updatedAt,
+        ...(typeof orderAny.total === 'number'
+            ? {
+                  total: orderAny.total,
+                  ...(typeof orderAny.subtotal === 'number' ? { subtotal: orderAny.subtotal } : {}),
+                  ...(typeof orderAny.discountTotal === 'number' ? { discountTotal: orderAny.discountTotal } : {}),
+              }
+            : {}),
     })
 
-    // Limpiar estado temporal
     pendingOrderType.value = null
     originalOrderType.value = null
+    void promptBankSyncIfNeeded(snapshot)
 }
 
 const handleTypePendingChange = (newType: 'onsite' | 'delivery' | 'reservation') => {
@@ -735,9 +812,13 @@ const updateOrderType = (newType: 'onsite' | 'delivery' | 'reservation') => {
         typeDisplayName: getOrderTypeDisplayName(newType)
     })
 }
-const handleCustomerUpdated = async (updatedOrder?: any) => {
+const handleCustomerUpdated = async (
+    updatedOrder?: any,
+    paymentSnapshotBefore?: OrderPaymentSnapshot | null,
+) => {
     if (!updatedOrder) return
     const orderAny = updatedOrder as any
+    const snapshot = paymentSnapshotBefore ?? captureOrderPaymentSnapshot()
 
     // Si había un cambio de tipo pendiente, guardarlo junto con los datos del cliente
     if (pendingOrderType.value) {
@@ -757,6 +838,7 @@ const handleCustomerUpdated = async (updatedOrder?: any) => {
             // Limpiar estado temporal
             pendingOrderType.value = null
             originalOrderType.value = null
+            await promptBankSyncIfNeeded(snapshot)
         } catch (err: any) {
             error('Error al actualizar pedido', err.message)
         }
@@ -768,8 +850,16 @@ const handleCustomerUpdated = async (updatedOrder?: any) => {
             customerPhone: orderAny.customerPhone,
             guestName: orderAny.guestName,
             deliveryFee: orderAny.deliveryFee || order.value?.deliveryFee || 0,
-            updatedAt: orderAny.updatedAt
+            updatedAt: orderAny.updatedAt,
+            ...(typeof orderAny.total === 'number'
+                ? {
+                      total: orderAny.total,
+                      ...(typeof orderAny.subtotal === 'number' ? { subtotal: orderAny.subtotal } : {}),
+                      ...(typeof orderAny.discountTotal === 'number' ? { discountTotal: orderAny.discountTotal } : {}),
+                  }
+                : {}),
         })
+        await promptBankSyncIfNeeded(snapshot)
     }
 
     // Recargar cliente completo si hay customerId nuevo o cambiado
@@ -810,8 +900,15 @@ const updateOrderCustomer = (updatedOrder: any) => {
         addressDescription: orderAny.addressDescription || null,
         addressAdditionalInfo: orderAny.addressAdditionalInfo ?? null,
         guestName: orderAny.guestName || null,
-        deliveryFee: orderAny.deliveryFee || null,
-        updatedAt: orderAny.updatedAt
+        deliveryFee: orderAny.deliveryFee ?? null,
+        updatedAt: orderAny.updatedAt,
+        ...(typeof orderAny.total === 'number'
+            ? {
+                  total: orderAny.total,
+                  ...(typeof orderAny.subtotal === 'number' ? { subtotal: orderAny.subtotal } : {}),
+                  ...(typeof orderAny.discountTotal === 'number' ? { discountTotal: orderAny.discountTotal } : {}),
+              }
+            : {}),
     })
 }
 

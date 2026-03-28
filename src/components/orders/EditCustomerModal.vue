@@ -85,6 +85,7 @@ import BaseButton from '@/components/ui/BaseButton.vue'
 import CustomerSection from '@/components/customers/CustomerSection.vue'
 import CustomerDetailModal from '@/components/customers/CustomerDetailModal.vue'
 import BaseInput from '@/components/ui/BaseInput.vue'
+import { toPaymentSnapshot, type OrderPaymentSnapshot } from '@/utils/orderPaymentCoverage'
 
 interface Props {
     open: boolean
@@ -95,7 +96,7 @@ const props = defineProps<Props>()
 
 const emit = defineEmits<{
     close: []
-    updated: [order?: Order]
+    updated: [order?: Order, paymentSnapshotBefore?: OrderPaymentSnapshot]
 }>()
 
 const { success: showSuccess, error: showError } = useToast()
@@ -239,12 +240,13 @@ const handleSave = async () => {
             updateData.addressId = null
         }
 
+        const paymentSnapshotBefore = toPaymentSnapshot(props.order)
         const updatedOrder = await ordersStore.update(props.order.id, updateData)
 
         showSuccess('Cliente actualizado', 5000)
 
         // ✅ Emitir el pedido actualizado para actualización optimista
-        emit('updated', updatedOrder)
+        emit('updated', updatedOrder, paymentSnapshotBefore)
         emit('close')
     } catch (error: any) {
         showError('Error al actualizar pedido', error.message)
