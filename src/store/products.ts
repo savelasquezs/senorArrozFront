@@ -11,6 +11,8 @@ import type {
 } from '@/types/product';
 import type { PagedResult } from '@/types/common';
 
+let catalogLoadInFlight: Promise<void> | null = null;
+
 export const useProductsStore = defineStore('products', () => {
     const list = ref<PagedResult<Product> | null>(null);
     const current = ref<Product | null>(null);
@@ -35,6 +37,24 @@ export const useProductsStore = defineStore('products', () => {
         } finally {
             isLoading.value = false;
         }
+    };
+
+    /** Catálogo para toma de pedidos: una sola carga por sesión salvo mutación explícita (create/update/delete). */
+    const ensureCatalogLoaded = async () => {
+        if (list.value?.items && list.value.items.length > 0) {
+            return;
+        }
+        if (catalogLoadInFlight) {
+            return catalogLoadInFlight;
+        }
+        catalogLoadInFlight = (async () => {
+            try {
+                await fetch({ page: 1, pageSize: 1000, active: true });
+            } finally {
+                catalogLoadInFlight = null;
+            }
+        })();
+        return catalogLoadInFlight;
     };
 
     // Fetch product by ID
@@ -192,6 +212,7 @@ export const useProductsStore = defineStore('products', () => {
 
         // Actions
         fetch,
+        ensureCatalogLoaded,
         fetchById,
         fetchDetail,
         create,

@@ -49,8 +49,6 @@
 import { onMounted, onUnmounted, computed } from 'vue'
 import { useOrdersDraftsStore } from '@/store/ordersDrafts'
 import { useProductsStore } from '@/store/products'
-import { useToast } from '@/composables/useToast'
-
 // Components
 import BaseInput from '@/components/ui/BaseInput.vue'
 import MainLayout from '@/components/layout/MainLayout.vue'
@@ -70,7 +68,6 @@ import {
 // Composables
 const ordersStore = useOrdersDraftsStore()
 const productsStore = useProductsStore()
-const { success } = useToast()
 
 // Computed
 const categories = computed(() => {
@@ -90,18 +87,16 @@ const categories = computed(() => {
     return Array.from(categoryMap.values())
 })
 
-// Methods
-const refreshData = async () => {
+// Sincroniza bancos/apps al draft (desde Pinia; sin red si MainLayout ya precargó). Productos: misma política.
+const ensureOrderPageData = async () => {
     try {
         await Promise.all([
-            productsStore.fetch({ page: 1, pageSize: 1000, active: true }),
-            ordersStore.loadCustomers(),
+            productsStore.ensureCatalogLoaded(),
             ordersStore.loadBanks(),
             ordersStore.loadApps(),
         ])
-        success('Datos actualizados', 2000, 'Todos los datos se han actualizado correctamente')
     } catch (error) {
-        console.error('Error refreshing data:', error)
+        console.error('Error cargando datos de pedidos:', error)
     }
 }
 
@@ -115,14 +110,8 @@ const refreshTotals = () => {
     // No necesita hacer nada adicional
 }
 
-// Initialize data
 const initializeData = async () => {
-    try {
-        // Load all necessary data
-        await refreshData()
-    } catch (error) {
-        console.error('Error initializing orders view:', error)
-    }
+    await ensureOrderPageData()
 }
 
 // Lifecycle

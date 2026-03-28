@@ -9,6 +9,8 @@ import type {
 } from '@/types/bank'
 import type { PagedResult } from '@/types/common'
 
+let appsListEnsureInFlight: Promise<void> | null = null
+
 interface AppsState {
     list: PagedResult<App> | null
     current: App | null
@@ -43,6 +45,19 @@ export const useAppsStore = defineStore('apps', {
             } finally {
                 this.isLoading = false
             }
+        },
+
+        async ensureListLoaded() {
+            if (this.list?.items?.length) {
+                return
+            }
+            if (appsListEnsureInFlight) {
+                return appsListEnsureInFlight
+            }
+            appsListEnsureInFlight = this.fetch({ page: 1, pageSize: 100 }).finally(() => {
+                appsListEnsureInFlight = null
+            })
+            return appsListEnsureInFlight
         },
 
         async fetchById(id: number) {

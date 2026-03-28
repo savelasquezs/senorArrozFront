@@ -10,6 +10,8 @@ import type {
 } from '@/types/bank'
 import type { PagedResult } from '@/types/common'
 
+let banksListEnsureInFlight: Promise<void> | null = null
+
 interface BanksState {
     list: PagedResult<Bank> | null
     current: Bank | null
@@ -44,6 +46,19 @@ export const useBanksStore = defineStore('banks', {
             } finally {
                 this.isLoading = false
             }
+        },
+
+        async ensureListLoaded() {
+            if (this.list?.items?.length) {
+                return
+            }
+            if (banksListEnsureInFlight) {
+                return banksListEnsureInFlight
+            }
+            banksListEnsureInFlight = this.fetch({ page: 1, pageSize: 100 }).finally(() => {
+                banksListEnsureInFlight = null
+            })
+            return banksListEnsureInFlight
         },
 
         async fetchById(id: number) {

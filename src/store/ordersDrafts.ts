@@ -3,8 +3,8 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { useProductsStore } from './products'
 import { useCustomersStore } from './customers'
-import { bankApi } from '@/services/MainAPI/bankApi'
-import { appApi } from '@/services/MainAPI/appApi'
+import { useBanksStore } from './banks'
+import { useAppsStore } from './apps'
 import { orderApi } from '@/services/MainAPI/orderApi'
 import type {
     DraftOrder,
@@ -382,8 +382,9 @@ export const useOrdersDraftsStore = defineStore('ordersDrafts', () => {
 
     const loadBanks = async () => {
         try {
-            const response = await bankApi.getBanks({ page: 1, pageSize: 100 })
-            banks.value = response.items || []
+            const banksStore = useBanksStore()
+            await banksStore.ensureListLoaded()
+            banks.value = banksStore.list?.items ?? []
         } catch (error) {
             console.error('Error loading banks:', error)
         }
@@ -391,8 +392,9 @@ export const useOrdersDraftsStore = defineStore('ordersDrafts', () => {
 
     const loadApps = async () => {
         try {
-            const response = await appApi.getApps({ page: 1, pageSize: 100 })
-            apps.value = response.items || []
+            const appsStore = useAppsStore()
+            await appsStore.ensureListLoaded()
+            apps.value = appsStore.list?.items ?? []
         } catch (error) {
             console.error('Error loading apps:', error)
         }

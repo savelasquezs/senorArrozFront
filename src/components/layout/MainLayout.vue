@@ -52,9 +52,13 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue';
+import { ref, computed, onMounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useAuthStore } from '@/store/auth';
+import { useProductsStore } from '@/store/products';
+import { useBanksStore } from '@/store/banks';
+import { useAppsStore } from '@/store/apps';
+import { useCustomersStore } from '@/store/customers';
 import { UserRole } from '@/types/auth';
 import Sidebar from '@/components/layout/Sidebar.vue';
 import TopNavigation from '@/components/layout/TopNavigation.vue';
@@ -99,4 +103,17 @@ const isOrdersPage = computed(() => {
 const navigateToNewOrder = () => {
 	router.push('/orders/new');
 };
+
+// Catálogo estable para toma de pedidos: precarga una vez por sesión (evita repetir GET al volver a /orders/new).
+onMounted(() => {
+	if (!authStore.isAuthenticated || !canTakeOrders.value) {
+		return;
+	}
+	void Promise.all([
+		useProductsStore().ensureCatalogLoaded(),
+		useBanksStore().ensureListLoaded(),
+		useAppsStore().ensureListLoaded(),
+		useCustomersStore().ensureNeighborhoodsLoaded(),
+	]).catch((err) => console.error('Prefetch catálogo pedidos:', err));
+});
 </script>

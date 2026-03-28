@@ -77,7 +77,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch, onMounted, onUnmounted } from 'vue'
+import { ref, watch, onUnmounted } from 'vue'
 import { useCustomersStore } from '@/store/customers'
 import { useToast } from '@/composables/useToast'
 import type { Customer } from '@/types/customer'
@@ -132,6 +132,8 @@ const error = ref('')
 
 let phoneDebounceTimer: ReturnType<typeof setTimeout> | null = null
 let phoneSearchGeneration = 0
+let nameDebounceTimer: ReturnType<typeof setTimeout> | null = null
+let nameSearchGeneration = 0
 
 const normalizePhone = (value: string) => {
     return value.replace(/\D/g, '')
@@ -188,12 +190,31 @@ const mergePhoneSearchResults = (remote: Customer | null, local: Customer[]): Cu
     return [remote, ...rest]
 }
 
+const mergeUniqueById = (primary: Customer[], secondary: Customer[]): Customer[] => {
+    const map = new Map<number, Customer>()
+    for (const c of secondary) {
+        map.set(c.id, c)
+    }
+    for (const c of primary) {
+        map.set(c.id, c)
+    }
+    return Array.from(map.values())
+}
+
 const cancelPendingPhoneSearch = () => {
     if (phoneDebounceTimer !== null) {
         clearTimeout(phoneDebounceTimer)
         phoneDebounceTimer = null
     }
     phoneSearchGeneration++
+}
+
+const cancelPendingNameSearch = () => {
+    if (nameDebounceTimer !== null) {
+        clearTimeout(nameDebounceTimer)
+        nameDebounceTimer = null
+    }
+    nameSearchGeneration++
 }
 
 const isPhoneNotFoundError = (message: string) =>
@@ -205,44 +226,83 @@ const isPhoneNotFoundError = (message: string) =>
 const handleSearch = () => {
     if (!searchQuery.value.trim()) {
         cancelPendingPhoneSearch()
+        cancelPendingNameSearch()
         searchResults.value = []
         return
     }
 
     const raw = searchQuery.value
-    const local = filterLocalCustomers(raw)
-    searchResults.value = local
 
-    cancelPendingPhoneSearch()
+    if (isPhoneLikeQuery(raw)) {
+        cancelPendingNameSearch()
+        const local = filterLocalCustomers(raw)
+        searchResults.value = local
 
-    if (!isPhoneLikeQuery(raw)) {
+        cancelPendingPhoneSearch()
+
+        const phoneForApi = normalizePhoneForApi(raw)
+        const generation = phoneSearchGeneration
+        phoneDebounceTimer = setTimeout(async () => {
+            phoneDebounceTimer = null
+            if (generation !== phoneSearchGeneration) {
+                return
+            }
+            try {
+                const remote = await customersStore.searchByPhone(phoneForApi)
+                if (generation !== phoneSearchGeneration) {
+                    return
+                }
+                const latestLocal = filterLocalCustomers(searchQuery.value)
+                searchResults.value = mergePhoneSearchResults(remote, latestLocal)
+            } catch (e: unknown) {
+                if (generation !== phoneSearchGeneration) {
+                    return
+                }
+                const msg = e instanceof Error ? e.message : String(e)
+                if (!isPhoneNotFoundError(msg)) {
+                    showError('Búsqueda por teléfono', msg || 'No se pudo buscar el cliente')
+                }
+            }
+        }, PHONE_SEARCH_DEBOUNCE_MS)
         return
     }
 
-    const phoneForApi = normalizePhoneForApi(raw)
-    const generation = phoneSearchGeneration
-    phoneDebounceTimer = setTimeout(async () => {
-        phoneDebounceTimer = null
-        if (generation !== phoneSearchGeneration) {
-            return
-        }
-        try {
-            const remote = await customersStore.searchByPhone(phoneForApi)
-            if (generation !== phoneSearchGeneration) {
+    cancelPendingPhoneSearch()
+
+    const trimmed = raw.trim()
+    if (hasLetters(trimmed) && trimmed.length >= 2) {
+        cancelPendingNameSearch()
+        searchResults.value = filterLocalCustomers(raw)
+        const generation = nameSearchGeneration
+        nameDebounceTimer = setTimeout(async () => {
+            nameDebounceTimer = null
+            if (generation !== nameSearchGeneration) {
                 return
             }
-            const latestLocal = filterLocalCustomers(searchQuery.value)
-            searchResults.value = mergePhoneSearchResults(remote, latestLocal)
-        } catch (e: unknown) {
-            if (generation !== phoneSearchGeneration) {
+            const q = searchQuery.value.trim()
+            if (!hasLetters(q) || q.length < 2) {
                 return
             }
-            const msg = e instanceof Error ? e.message : String(e)
-            if (!isPhoneNotFoundError(msg)) {
-                showError('Búsqueda por teléfono', msg || 'No se pudo buscar el cliente')
+            try {
+                const apiRows = await customersStore.searchCustomersByName(q)
+                if (generation !== nameSearchGeneration) {
+                    return
+                }
+                const latestLocal = filterLocalCustomers(searchQuery.value)
+                searchResults.value = mergeUniqueById(apiRows, latestLocal)
+            } catch (e: unknown) {
+                if (generation !== nameSearchGeneration) {
+                    return
+                }
+                const msg = e instanceof Error ? e.message : String(e)
+                showError('Búsqueda por nombre', msg || 'No se pudo buscar clientes')
             }
-        }
-    }, PHONE_SEARCH_DEBOUNCE_MS)
+        }, PHONE_SEARCH_DEBOUNCE_MS)
+        return
+    }
+
+    cancelPendingNameSearch()
+    searchResults.value = filterLocalCustomers(raw)
 }
 
 const handlePaste = (event: ClipboardEvent) => {
@@ -262,6 +322,7 @@ const handlePaste = (event: ClipboardEvent) => {
 
 const selectCustomer = (customer: Customer) => {
     cancelPendingPhoneSearch()
+    cancelPendingNameSearch()
     emit('customerSelected', customer)
     searchQuery.value = ''
     searchResults.value = []
@@ -310,21 +371,15 @@ const closeCreateModal = () => {
     createdCustomer.value = null
 }
 
-// Lifecycle
-onMounted(async () => {
-    // Cargar clientes si no están cargados
-    if (!customersStore.list || customersStore.list.items.length === 0) {
-        await customersStore.fetch({ page: 1, pageSize: 1000 })
-    }
-})
-
 onUnmounted(() => {
     cancelPendingPhoneSearch()
+    cancelPendingNameSearch()
 })
 
 watch(searchQuery, () => {
     if (!searchQuery.value.trim()) {
         cancelPendingPhoneSearch()
+        cancelPendingNameSearch()
         searchResults.value = []
     }
 })

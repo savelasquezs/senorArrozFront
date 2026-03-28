@@ -13,6 +13,8 @@ import type {
 } from '@/types/customer';
 import type { PagedResult } from '@/types/common';
 
+let neighborhoodsLoadInFlight: Promise<void> | null = null;
+
 export const useCustomersStore = defineStore('customers', () => {
     const list = ref<PagedResult<Customer> | null>(null);
     const current = ref<Customer | null>(null);
@@ -263,6 +265,38 @@ export const useCustomersStore = defineStore('customers', () => {
         }
     };
 
+    const ensureNeighborhoodsLoaded = async () => {
+        if (neighborhoods.value.length > 0) {
+            return;
+        }
+        if (neighborhoodsLoadInFlight) {
+            return neighborhoodsLoadInFlight;
+        }
+        neighborhoodsLoadInFlight = (async () => {
+            try {
+                await fetchNeighborhoods();
+            } finally {
+                neighborhoodsLoadInFlight = null;
+            }
+        })();
+        return neighborhoodsLoadInFlight;
+    };
+
+    /** Búsqueda por nombre para el selector de pedidos (no reemplaza `list` ni precarga 1000 clientes). */
+    const searchCustomersByName = async (name: string): Promise<Customer[]> => {
+        const trimmed = name.trim();
+        if (trimmed.length < 2) {
+            return [];
+        }
+        const res = await customerApi.getCustomers({
+            name: trimmed,
+            page: 1,
+            pageSize: 100,
+            active: true,
+        });
+        return res.data?.items ?? [];
+    };
+
     // Create neighborhood
     const createNeighborhood = async (payload: { name: string; deliveryFee: number; branchId: number }) => {
         try {
@@ -319,6 +353,8 @@ export const useCustomersStore = defineStore('customers', () => {
         removeAddress,
         setPrimaryAddress,
         fetchNeighborhoods,
+        ensureNeighborhoodsLoaded,
+        searchCustomersByName,
         createNeighborhood,
         clear,
         clearList
