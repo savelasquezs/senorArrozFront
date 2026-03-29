@@ -49,7 +49,7 @@
             <template v-else-if="product">
                 <div class="rounded-lg border border-gray-200 bg-white overflow-hidden">
                     <div class="px-4 py-3 border-b border-gray-100">
-                        <div class="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+                        <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 text-sm">
                             <div class="flex items-center gap-2">
                                 <TagIcon class="w-4 h-4 text-gray-400 shrink-0" />
                                 <div>
@@ -79,6 +79,13 @@
                                         }">
                                         {{ product.stock }}
                                     </p>
+                                </div>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <ScaleIcon class="w-4 h-4 text-gray-400 shrink-0" />
+                                <div>
+                                    <p class="text-xs font-medium text-gray-900">Peso unitario</p>
+                                    <p class="text-xs text-gray-600">{{ formatWeightGrams(product.weightGrams) }}</p>
                                 </div>
                             </div>
                             <div class="flex items-center gap-2">
@@ -156,6 +163,29 @@
                     </BaseCard>
                 </div>
 
+                <BaseCard>
+                    <div class="space-y-2">
+                        <h3 class="text-sm font-semibold text-gray-900">Historial de ventas (unidades)</h3>
+                        <p class="text-xs text-gray-500">
+                            Últimos 90 días, suma de cantidades por día. Pedidos cancelados no cuentan. Día según fecha de
+                            reserva si aplica; si no, fecha del pedido.
+                        </p>
+                        <div
+                            v-if="!salesUnitsEvolutionSeries.length"
+                            class="h-48 flex items-center justify-center text-sm text-gray-500 border border-dashed border-gray-200 rounded-lg">
+                            Sin datos de historial.
+                        </div>
+                        <div v-else class="relative min-h-[12rem]">
+                            <DashboardLineChart
+                                :labels="salesUnitsChartLabels"
+                                :datasets="salesUnitsChartDatasets"
+                                y-format="number"
+                                variant="area"
+                                :curve-tension="0.35" />
+                        </div>
+                    </div>
+                </BaseCard>
+
                 <BaseCard v-if="authStore.user?.role === 'Superadmin'">
                     <div class="space-y-4">
                         <h3 class="text-base font-semibold text-gray-900">Ajuste de stock</h3>
@@ -210,6 +240,8 @@
 
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
+import DashboardLineChart from '@/components/dashboard/DashboardLineChart.vue'
+import type { LineChartDataset } from '@/components/dashboard/lineChart.types'
 import { useProductsStore } from '@/store/products'
 import { useAuthStore } from '@/store/auth'
 import { useToast } from '@/composables/useToast'
@@ -234,6 +266,7 @@ import {
     UserGroupIcon,
     CalendarIcon,
     ClockIcon,
+    ScaleIcon,
 } from '@heroicons/vue/24/outline'
 import type { ProductFormData } from '@/types/product'
 
@@ -264,6 +297,21 @@ const adjustingStock = ref(false)
 const product = computed(() => store.current)
 const productDetail = computed(() => store.currentDetail)
 
+const salesUnitsEvolutionSeries = computed(() => productDetail.value?.salesUnitsEvolution ?? [])
+
+const salesUnitsChartLabels = computed(() =>
+    salesUnitsEvolutionSeries.value.map(p =>
+        new Date(p.bucketStart).toLocaleDateString('es-CO', { day: 'numeric', month: 'short' }),
+    ),
+)
+
+const salesUnitsChartDatasets = computed<LineChartDataset[]>(() => [
+    {
+        label: 'Unidades vendidas',
+        data: salesUnitsEvolutionSeries.value.map(p => p.unitsSold),
+    },
+])
+
 const canAccessProduct = computed(() => {
     if (!product.value) return false
     const role = authStore.user?.role
@@ -273,6 +321,11 @@ const canAccessProduct = computed(() => {
 
 const formatDate = (dateString: string) =>
     new Date(dateString).toLocaleDateString('es-CO', { year: 'numeric', month: 'long', day: 'numeric' })
+
+const formatWeightGrams = (grams: number | null | undefined) => {
+    if (grams == null || grams <= 0) return 'Sin definir'
+    return `${new Intl.NumberFormat('es-CO').format(grams)} g`
+}
 
 const resetLocalState = () => {
     loadError.value = ''
