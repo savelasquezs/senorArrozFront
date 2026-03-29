@@ -194,6 +194,7 @@ export interface MenuProductCostingRow {
     revenueCop: number
     gramsSold: number
     avgPricePerGramCop: number | null
+    allocatedCostPerGramCop: number | null
     allocatedCostCop: number
     marginPercent: number | null
 }

@@ -1,9 +1,9 @@
 <template>
 	<BaseCard title="Costeo por categoría de menú" :padding="'md'">
 		<p class="text-[11px] text-gray-500 pb-3 border-b border-gray-100 leading-relaxed">
-			Mismo <strong>periodo</strong> que el panel lateral. Suma gastos de catálogo imputados a cada
-			<strong>categoría de producto</strong> (ventas) y reparte el costo a productos por gramos; si no hay gramos,
-			por ingresos. El margen es <code class="text-[10px]">(ingreso − costo) / ingreso</code> en el periodo.
+			Mismo <strong>periodo</strong> que el panel lateral. Solo categorías y productos con <strong>gramos vendidos</strong>
+			(productos con peso en catálogo). El costo de categoría se reparte entre esos productos por proporción de gramos.
+			El margen es <code class="text-[10px]">(ingreso − costo) / ingreso</code> en el periodo.
 		</p>
 
 		<div v-if="error" class="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
@@ -18,8 +18,8 @@
 		</div>
 
 		<div v-else-if="payload && !payload.categories.length" class="text-sm text-gray-500 py-4">
-			No hay categorías con ventas o peso en este rango. Configura destinos de menú en los gastos de catálogo para
-			ver imputaciones.
+			No hay categorías con gramos vendidos en este rango (productos sin peso configurado no entran). Configura
+			destinos de menú en los gastos de catálogo para ver imputaciones cuando haya ventas con peso.
 		</div>
 
 		<div v-else-if="payload" class="space-y-6 mt-4">
@@ -88,6 +88,13 @@
 								<td class="py-2 pr-3 text-right tabular-nums">{{ p.gramsSold > 0 ? formatGrams(p.gramsSold) : '—' }}</td>
 								<td class="py-2 pr-3 text-right tabular-nums">
 									{{ p.avgPricePerGramCop != null ? formatCop(Math.round(p.avgPricePerGramCop)) : '—' }}
+								</td>
+								<td class="py-2 pr-3 text-right tabular-nums">
+									{{
+										p.allocatedCostPerGramCop != null
+											? formatCop(Math.round(p.allocatedCostPerGramCop))
+											: '—'
+									}}
 								</td>
 								<td class="py-2 pr-3 text-right tabular-nums">{{ formatCop(p.allocatedCostCop) }}</td>
 								<td class="py-2 text-right tabular-nums font-medium">
