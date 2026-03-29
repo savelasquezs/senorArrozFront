@@ -45,6 +45,9 @@
                                 <div class="text-xs text-green-600">
                                     Costo envío: {{ formatCurrency(selectedAddress.deliveryFee) }}
                                 </div>
+                                <p v-if="!hasMapCoordinates(selectedAddress)" class="text-xs text-red-600 mt-1">
+                                    Sin ubicación en mapa
+                                </p>
                             </div>
                         </div>
                     </div>
@@ -241,6 +244,14 @@ const formatCurrency = (amount: number): string => {
         currency: 'COP',
         minimumFractionDigits: 0,
     }).format(amount)
+}
+
+function hasMapCoordinates(addr: CustomerAddress): boolean {
+    const lat = addr.latitude
+    const lng = addr.longitude
+    if (lat == null || lng == null) return false
+    if (lat === 0 && lng === 0) return false
+    return true
 }
 
 const loadCustomerAddresses = async (options?: { skipAutoSelect?: boolean }) => {
