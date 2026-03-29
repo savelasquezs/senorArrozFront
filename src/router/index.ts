@@ -89,14 +89,11 @@ const routes: RouteRecordRaw[] = [
         }
     },
     {
-        path: '/customers/:id',
-        name: 'CustomerDetail',
-        component: () => import('@/views/CustomerDetail.vue'),
-        meta: {
-            requiresAuth: true,
-            requiresRole: [UserRole.SUPERADMIN, UserRole.ADMIN, UserRole.CASHIER],
-            title: 'Detalle Cliente'
-        }
+        path: '/customers/:id(\\d+)',
+        redirect: to => ({
+            path: '/customers',
+            query: { ...to.query, detail: String(to.params.id) }
+        })
     },
     {
         path: '/products',
