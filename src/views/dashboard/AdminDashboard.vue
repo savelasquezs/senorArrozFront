@@ -63,6 +63,8 @@
                     :series-busy="gastosSeriesBusy"
                     :error="gastosError"
                     :payload="gastosData"
+                    :branch-id="adminBranchId"
+                    :date-range="globalDashboardDateRange"
                 />
                 <DashboardDomiciliosSection
                     v-else-if="activeSection === 'domicilios'"

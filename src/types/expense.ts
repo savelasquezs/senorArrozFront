@@ -183,6 +183,39 @@ export interface ExpenseMenuAttributionResponse {
     lines: ExpenseMenuAttributionLine[]
 }
 
+export interface MenuCategoryExpenseBreakdown {
+    expenseName: string
+    allocatedCop: number
+}
+
+export interface MenuProductCostingRow {
+    productId: number
+    productName: string
+    revenueCop: number
+    gramsSold: number
+    avgPricePerGramCop: number | null
+    allocatedCostCop: number
+    marginPercent: number | null
+}
+
+export interface MenuCategoryCostingBlock {
+    categoryId: number
+    categoryName: string
+    totalAllocatedCostCop: number
+    totalWeightGramsSold: number
+    blendedCostPerGramCop: number | null
+    totalRevenueCop: number
+    expenseBreakdown: MenuCategoryExpenseBreakdown[]
+    products: MenuProductCostingRow[]
+}
+
+export interface MenuCategoryCostingDashboardResponse {
+    fromUtc: string
+    toUtc: string
+    branchId: number | null
+    categories: MenuCategoryCostingBlock[]
+}
+
 export interface ExpenseFilters {
     categoryId?: number
     name?: string

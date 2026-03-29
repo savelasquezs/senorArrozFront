@@ -130,6 +130,10 @@
 					</div>
 				</BaseCard>
 			</div>
+
+			<div class="mt-8">
+				<MenuCategoryCostingPanel :branch-id="branchId" :date-range="dateRange" />
+			</div>
 		</template>
 	</div>
 </template>
@@ -138,6 +142,7 @@
 import { computed, ref, watch } from 'vue';
 import BaseCard from '@/components/ui/BaseCard.vue';
 import { DashboardLineChart, DashboardRevenueShareDonut } from '@/components/dashboard';
+import MenuCategoryCostingPanel from '@/components/dashboard/MenuCategoryCostingPanel.vue';
 import type { LineChartDataset } from '@/components/dashboard';
 import { expenseCategoryApi } from '@/services/MainAPI/expenseCategoryApi';
 import { expenseApi } from '@/services/MainAPI/expenseApi';
@@ -150,7 +155,12 @@ const props = defineProps<{
 	error: string | null | undefined;
 	/** `null` hasta la primera carga exitosa. */
 	payload: GastosDashboardPayload | null | undefined;
+	branchId: number | null;
+	dateRange: [Date, Date];
 }>();
+
+const branchId = computed(() => props.branchId);
+const dateRange = computed(() => props.dateRange);
 
 const filterCategoryId = defineModel<number | null>('filterCategoryId', { default: null });
 const filterExpenseId = defineModel<number | null>('filterExpenseId', { default: null });

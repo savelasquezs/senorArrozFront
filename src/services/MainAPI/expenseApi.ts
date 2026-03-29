@@ -10,6 +10,7 @@ import type {
     CreateExpenseDto,
     UpdateExpenseDto,
     ExpenseMenuAttributionResponse,
+    MenuCategoryCostingDashboardResponse,
 } from '@/types/expense';
 
 class ExpenseApi extends BaseApi {
@@ -79,6 +80,28 @@ class ExpenseApi extends BaseApi {
         return this.get<ApiResponse<ExpenseMenuAttributionResponse>>('/ExpenseMenuAttribution', {
             params: q,
         });
+    }
+
+    /** Costeo por categoría de menú (dashboard): gastos imputados, gramos, $/g, margen por producto. */
+    async getMenuCategoryCostingDashboard(params: {
+        fromUtc: string
+        toUtc: string
+        branchId?: number | null
+    }): Promise<ApiResponse<MenuCategoryCostingDashboardResponse>> {
+        const q: Record<string, string | number> = {
+            FromUtc: params.fromUtc,
+            ToUtc: params.toUtc,
+        };
+        if (params.branchId != null && params.branchId > 0) {
+            q.BranchId = params.branchId;
+        }
+        return this.get<ApiResponse<MenuCategoryCostingDashboardResponse>>(
+            '/ExpenseMenuAttribution/category-costing-dashboard',
+            {
+                params: q,
+                timeout: 90000,
+            },
+        );
     }
 }
 
