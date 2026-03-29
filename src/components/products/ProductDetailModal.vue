@@ -165,13 +165,46 @@
 
                 <BaseCard>
                     <div class="space-y-2">
-                        <h3 class="text-sm font-semibold text-gray-900">Historial de ventas (unidades)</h3>
+                        <div class="flex flex-wrap items-center justify-between gap-2">
+                            <h3 class="text-sm font-semibold text-gray-900">Historial de ventas (unidades)</h3>
+                            <div
+                                class="inline-flex rounded-lg border border-gray-200 bg-gray-50 p-0.5 text-[11px] font-medium">
+                                <button
+                                    type="button"
+                                    class="rounded-md px-2.5 py-1 transition-colors"
+                                    :class="
+                                        salesHistoryGroupBy === 'day'
+                                            ? 'bg-white text-gray-900 shadow-sm'
+                                            : 'text-gray-600 hover:text-gray-900'
+                                    "
+                                    @click="salesHistoryGroupBy = 'day'">
+                                    Por día
+                                </button>
+                                <button
+                                    type="button"
+                                    class="rounded-md px-2.5 py-1 transition-colors"
+                                    :class="
+                                        salesHistoryGroupBy === 'month'
+                                            ? 'bg-white text-gray-900 shadow-sm'
+                                            : 'text-gray-600 hover:text-gray-900'
+                                    "
+                                    @click="salesHistoryGroupBy = 'month'">
+                                    Por mes
+                                </button>
+                            </div>
+                        </div>
                         <p class="text-xs text-gray-500">
-                            Últimos 90 días, suma de cantidades por día. Pedidos cancelados no cuentan. Día según fecha de
-                            reserva si aplica; si no, fecha del pedido.
+                            <template v-if="salesHistoryGroupBy === 'day'">
+                                Últimos 90 días, suma de cantidades por día. Pedidos cancelados no cuentan. Día según fecha
+                                de reserva si aplica; si no, fecha del pedido.
+                            </template>
+                            <template v-else>
+                                Misma ventana de 90 días agrupada por mes calendario (suma de unidades). Pedidos cancelados
+                                excluidos. Mes según calendario de Colombia.
+                            </template>
                         </p>
                         <div
-                            v-if="!salesUnitsEvolutionSeries.length"
+                            v-if="!salesUnitsChartSeries.length"
                             class="h-48 flex items-center justify-center text-sm text-gray-500 border border-dashed border-gray-200 rounded-lg">
                             Sin datos de historial.
                         </div>
@@ -268,7 +301,7 @@ import {
     ClockIcon,
     ScaleIcon,
 } from '@heroicons/vue/24/outline'
-import type { ProductFormData } from '@/types/product'
+import type { ProductFormData, ProductSalesUnitsEvolutionPoint } from '@/types/product'
 
 const props = defineProps<{
     open: boolean
@@ -293,22 +326,65 @@ const showDeleteDialog = ref(false)
 const stockAdjustment = ref(0)
 const stockError = ref('')
 const adjustingStock = ref(false)
+const salesHistoryGroupBy = ref<'day' | 'month'>('day')
 
 const product = computed(() => store.current)
 const productDetail = computed(() => store.currentDetail)
 
 const salesUnitsEvolutionSeries = computed(() => productDetail.value?.salesUnitsEvolution ?? [])
 
-const salesUnitsChartLabels = computed(() =>
-    salesUnitsEvolutionSeries.value.map(p =>
-        new Date(p.bucketStart).toLocaleDateString('es-CO', { day: 'numeric', month: 'short' }),
-    ),
-)
+/** Clave YYYY-MM en zona horaria América/Bogotá (alineado con operación en Colombia). */
+function monthKeyColombia(iso: string): string {
+    const parts = new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'America/Bogota',
+        year: 'numeric',
+        month: '2-digit',
+    }).formatToParts(new Date(iso))
+    const y = parts.find(p => p.type === 'year')?.value ?? '0'
+    const m = parts.find(p => p.type === 'month')?.value ?? '01'
+    return `${y}-${m}`
+}
+
+function aggregateSalesByMonth(points: ProductSalesUnitsEvolutionPoint[]): ProductSalesUnitsEvolutionPoint[] {
+    const totals = new Map<string, number>()
+    for (const p of points) {
+        const key = monthKeyColombia(p.bucketStart)
+        totals.set(key, (totals.get(key) ?? 0) + p.unitsSold)
+    }
+    const keys = [...totals.keys()].sort()
+    return keys.map(key => {
+        const [ys, ms] = key.split('-').map(Number)
+        return {
+            bucketStart: new Date(ys, ms - 1, 1).toISOString(),
+            unitsSold: totals.get(key) ?? 0,
+        }
+    })
+}
+
+const salesUnitsChartSeries = computed(() => {
+    const raw = salesUnitsEvolutionSeries.value
+    if (salesHistoryGroupBy.value === 'month') {
+        return aggregateSalesByMonth(raw)
+    }
+    return raw
+})
+
+const salesUnitsChartLabels = computed(() => {
+    if (salesHistoryGroupBy.value === 'day') {
+        return salesUnitsChartSeries.value.map(p =>
+            new Date(p.bucketStart).toLocaleDateString('es-CO', { day: 'numeric', month: 'short' }),
+        )
+    }
+    return salesUnitsChartSeries.value.map(p => {
+        const d = new Date(p.bucketStart)
+        return d.toLocaleDateString('es-CO', { month: 'short', year: 'numeric' })
+    })
+})
 
 const salesUnitsChartDatasets = computed<LineChartDataset[]>(() => [
     {
-        label: 'Unidades vendidas',
-        data: salesUnitsEvolutionSeries.value.map(p => p.unitsSold),
+        label: salesHistoryGroupBy.value === 'month' ? 'Unidades por mes' : 'Unidades vendidas',
+        data: salesUnitsChartSeries.value.map(p => p.unitsSold),
     },
 ])
 
@@ -333,6 +409,7 @@ const resetLocalState = () => {
     stockError.value = ''
     showEditDialog.value = false
     showDeleteDialog.value = false
+    salesHistoryGroupBy.value = 'day'
 }
 
 const loadDetail = async (id: number) => {
