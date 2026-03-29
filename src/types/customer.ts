@@ -11,7 +11,11 @@ export interface Customer {
     createdAt: string;
     updatedAt: string;
     totalOrders?: number;
+    /** Primer pedido no cancelado. */
+    firstOrderDate?: string;
     lastOrderDate?: string;
+    /** Suma de totales de pedidos no cancelados. */
+    totalAccumulated?: number;
     addresses?: CustomerAddress[];
 }
 
