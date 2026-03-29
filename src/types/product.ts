@@ -16,12 +16,20 @@ export interface Product {
     updatedAt: string;
 }
 
+/** Punto diario de unidades vendidas (respuesta de detalle de producto). */
+export interface ProductSalesUnitsEvolutionPoint {
+    bucketStart: string;
+    unitsSold: number;
+}
+
 export interface ProductDetail extends Product {
     totalSales: number;
     totalRevenue: number;
     totalOrders: number;
     totalCustomers: number;
     lastSoldAt?: string;
+    /** Últimos 90 días, unidades por día (pedidos no cancelados). */
+    salesUnitsEvolution?: ProductSalesUnitsEvolutionPoint[];
 }
 
 export interface ProductCategory {

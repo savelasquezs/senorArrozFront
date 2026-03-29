@@ -32,14 +32,11 @@
             <div v-if="currentCustomer" class="space-y-6">
 
 
-                <!-- Customer Information Grid -->
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-
-
-                    <!-- Order Statistics -->
-                    <CustomerStatsCard :customer="currentCustomer" :show-actions="showActions"
-                        @view-orders="handleViewOrders" />
-                </div>
+                <!-- Estadísticas a ancho completo del modal -->
+                <CustomerStatsCard
+                    :customer="currentCustomer"
+                    :show-actions="showActions"
+                    @view-orders="handleViewOrders" />
 
                 <!-- Addresses Section -->
                 <CustomerAddressesList :customer="currentCustomer" :show-actions="showActions" />
@@ -65,6 +62,11 @@
         </div>
 
     </BaseDialog>
+
+    <CustomerOrdersHistoryModal
+        :open="showOrdersHistory"
+        :customer="currentCustomer ?? null"
+        @close="showOrdersHistory = false" />
 
     <!-- Customer Edit Modal -->
     <BaseDialog v-model="showEditModal" size="lg">
@@ -111,6 +113,7 @@ import BaseLoading from '@/components/ui/BaseLoading.vue'
 
 
 import CustomerStatsCard from '@/components/customers/CustomerStatsCard.vue'
+import CustomerOrdersHistoryModal from '@/components/customers/CustomerOrdersHistoryModal.vue'
 import CustomerAddressesList from '@/components/customers/CustomerAddressesList.vue'
 import CustomerForm from '@/components/customers/CustomerForm.vue'
 
@@ -143,6 +146,7 @@ const internalShow = ref(show)
 // State for edit modal
 const showEditModal = ref(false)
 const editLoading = ref(false)
+const showOrdersHistory = ref(false)
 
 
 
@@ -166,12 +170,8 @@ const currentCustomer = computed(() => {
     return props.customer
 })
 
-// Debug logs
-console.log('CustomerDetailModal - props received:', { show, customer, loading, showActions })
-
 // Methods
 const handleClose = () => {
-    console.log('CustomerDetailModal - handleClose called')
     emit('close')
 }
 
@@ -179,10 +179,9 @@ const loadCustomerAddresses = async () => {
     if (!currentCustomer.value) return
 
     try {
-        await customersStore.fetchAddresses(currentCustomer.value.id)
-        console.log('CustomerDetailModal - Addresses loaded for customer:', currentCustomer.value.id)
-    } catch (error) {
-        console.error('CustomerDetailModal - Error loading addresses:', error)
+        await customersStore.fetchAddresses(currentCustomer.value.id, { silent: true })
+    } catch {
+        /* direcciones ya pueden venir en GET cliente */
     }
 }
 
@@ -223,10 +222,8 @@ const handleCustomerSubmit = async (formData: any) => {
 }
 
 
-const handleViewOrders = (customer: Customer) => {
-    // This would typically navigate to orders view filtered by customer
-    console.log('View orders for customer:', customer.id)
-    success('Funcionalidad de pedidos', 2000, 'La vista de pedidos estará disponible próximamente')
+const handleViewOrders = (_customer: Customer) => {
+    showOrdersHistory.value = true
 }
 
 
@@ -234,9 +231,9 @@ const handleViewOrders = (customer: Customer) => {
 // Watch for prop changes to sync internal state
 watch(() => props.show, (newShow) => {
     internalShow.value = newShow
-    if (newShow && currentCustomer.value) {
-        // Load customer addresses when modal opens
-        loadCustomerAddresses()
+    if (newShow && props.customer?.id) {
+        showOrdersHistory.value = false
+        void customersStore.fetchById(props.customer.id, { silent: true }).then(() => loadCustomerAddresses())
     }
 }, { immediate: true })
 

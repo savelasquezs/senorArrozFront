@@ -49,6 +49,9 @@
 import { onMounted, onUnmounted, computed } from 'vue'
 import { useOrdersDraftsStore } from '@/store/ordersDrafts'
 import { useProductsStore } from '@/store/products'
+import { useProductCategoriesStore } from '@/store/productCategories'
+import { useAuthStore } from '@/store/auth'
+import { bootstrapOrderCatalog } from '@/utils/orderCatalogBootstrap'
 // Components
 import BaseInput from '@/components/ui/BaseInput.vue'
 import MainLayout from '@/components/layout/MainLayout.vue'
@@ -68,33 +71,35 @@ import {
 // Composables
 const ordersStore = useOrdersDraftsStore()
 const productsStore = useProductsStore()
+const productCategoriesStore = useProductCategoriesStore()
+const authStore = useAuthStore()
 
-// Computed
+// Categorías transversales desde el store; respaldo por productos cargados en catálogo.
 const categories = computed(() => {
+    const fromCatalog = productCategoriesStore.list?.items
+    if (fromCatalog?.length) {
+        return fromCatalog.map((c) => ({ id: c.id, name: c.name }))
+    }
     if (!productsStore.list?.items) return []
 
-    const categoryMap = new Map<number, { id: number, name: string }>()
-
-    productsStore.list.items.forEach(product => {
+    const categoryMap = new Map<number, { id: number; name: string }>()
+    productsStore.list.items.forEach((product) => {
         if (product.categoryId && !categoryMap.has(product.categoryId)) {
             categoryMap.set(product.categoryId, {
                 id: product.categoryId,
-                name: product.categoryName || 'Sin categoría'
+                name: product.categoryName || 'Sin categoría',
             })
         }
     })
-
     return Array.from(categoryMap.values())
 })
 
-// Sincroniza bancos/apps al draft (desde Pinia; sin red si MainLayout ya precargó). Productos: misma política.
+// Catálogo ya en bootstrap (login / layout); aquí solo sincronizamos draft con Pinia.
 const ensureOrderPageData = async () => {
     try {
-        await Promise.all([
-            productsStore.ensureCatalogLoaded(),
-            ordersStore.loadBanks(),
-            ordersStore.loadApps(),
-        ])
+        await bootstrapOrderCatalog(authStore.userRole)
+        await ordersStore.loadBanks()
+        await ordersStore.loadApps()
     } catch (error) {
         console.error('Error cargando datos de pedidos:', error)
     }

@@ -30,7 +30,7 @@
 			<!-- Dropdown -->
 			<Transition name="dropdown">
 				<div v-if="isOpen"
-					class="absolute z-10 w-full mt-1 bg-white shadow-lg max-h-60 rounded-md py-1 text-base ring-1 ring-black ring-opacity-5 overflow-auto focus:outline-none sm:text-sm">
+					class="absolute z-30 w-full mt-1 bg-white shadow-lg max-h-60 rounded-md py-1 text-base ring-1 ring-black ring-opacity-5 overflow-auto focus:outline-none sm:text-sm">
 					<!-- Search Input -->
 					<div v-if="searchable" class="p-2">
 						<input ref="searchInput" v-model="searchQuery" type="text"

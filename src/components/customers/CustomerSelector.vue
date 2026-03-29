@@ -158,49 +158,6 @@ const isPhoneLikeQuery = (raw: string) => {
     return normalizePhoneForApi(trimmed).length >= MIN_PHONE_DIGITS_FOR_API
 }
 
-const filterLocalCustomers = (raw: string): Customer[] => {
-    const qLower = raw.toLowerCase().trim()
-    const qDigits = normalizePhone(raw)
-    const allCustomers = customersStore.list?.items || []
-    return allCustomers.filter((customer) => {
-        if (customer.name.toLowerCase().includes(qLower)) {
-            return true
-        }
-        const p1 = customer.phone1?.toLowerCase() ?? ''
-        const p2 = customer.phone2?.toLowerCase() ?? ''
-        if (p1.includes(qLower) || p2.includes(qLower)) {
-            return true
-        }
-        if (qDigits.length >= 3) {
-            const n1 = normalizePhone(customer.phone1 ?? '')
-            const n2 = normalizePhone(customer.phone2 ?? '')
-            if (n1.includes(qDigits) || n2.includes(qDigits)) {
-                return true
-            }
-        }
-        return false
-    })
-}
-
-const mergePhoneSearchResults = (remote: Customer | null, local: Customer[]): Customer[] => {
-    if (!remote) {
-        return local
-    }
-    const rest = local.filter((c) => c.id !== remote.id)
-    return [remote, ...rest]
-}
-
-const mergeUniqueById = (primary: Customer[], secondary: Customer[]): Customer[] => {
-    const map = new Map<number, Customer>()
-    for (const c of secondary) {
-        map.set(c.id, c)
-    }
-    for (const c of primary) {
-        map.set(c.id, c)
-    }
-    return Array.from(map.values())
-}
-
 const cancelPendingPhoneSearch = () => {
     if (phoneDebounceTimer !== null) {
         clearTimeout(phoneDebounceTimer)
@@ -235,8 +192,7 @@ const handleSearch = () => {
 
     if (isPhoneLikeQuery(raw)) {
         cancelPendingNameSearch()
-        const local = filterLocalCustomers(raw)
-        searchResults.value = local
+        searchResults.value = []
 
         cancelPendingPhoneSearch()
 
@@ -252,8 +208,7 @@ const handleSearch = () => {
                 if (generation !== phoneSearchGeneration) {
                     return
                 }
-                const latestLocal = filterLocalCustomers(searchQuery.value)
-                searchResults.value = mergePhoneSearchResults(remote, latestLocal)
+                searchResults.value = remote ? [remote] : []
             } catch (e: unknown) {
                 if (generation !== phoneSearchGeneration) {
                     return
@@ -272,7 +227,7 @@ const handleSearch = () => {
     const trimmed = raw.trim()
     if (hasLetters(trimmed) && trimmed.length >= 2) {
         cancelPendingNameSearch()
-        searchResults.value = filterLocalCustomers(raw)
+        searchResults.value = []
         const generation = nameSearchGeneration
         nameDebounceTimer = setTimeout(async () => {
             nameDebounceTimer = null
@@ -288,8 +243,7 @@ const handleSearch = () => {
                 if (generation !== nameSearchGeneration) {
                     return
                 }
-                const latestLocal = filterLocalCustomers(searchQuery.value)
-                searchResults.value = mergeUniqueById(apiRows, latestLocal)
+                searchResults.value = apiRows
             } catch (e: unknown) {
                 if (generation !== nameSearchGeneration) {
                     return
@@ -302,7 +256,7 @@ const handleSearch = () => {
     }
 
     cancelPendingNameSearch()
-    searchResults.value = filterLocalCustomers(raw)
+    searchResults.value = []
 }
 
 const handlePaste = (event: ClipboardEvent) => {

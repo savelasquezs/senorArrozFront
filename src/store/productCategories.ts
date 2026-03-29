@@ -9,6 +9,11 @@ import type {
   ProductCategoryFilters
 } from '@/types/product'
 
+/** Categorías de menú compartidas entre sucursales (no enviar branchId en catálogo de pedidos). */
+export const ORDER_CATALOG_CATEGORY_PAGE_SIZE = 100
+
+let categoriesCatalogLoadInFlight: Promise<void> | null = null
+
 export const useProductCategoriesStore = defineStore('productCategories', () => {
   // State - CRUD
   const list = ref<PagedResult<ProductCategory> | null>(null)
@@ -86,6 +91,28 @@ export const useProductCategoriesStore = defineStore('productCategories', () => 
     } finally {
       isLoading.value = false
     }
+  }
+
+  const ensureCatalogLoaded = async () => {
+    if (list.value?.items && list.value.items.length > 0) {
+      return
+    }
+    if (categoriesCatalogLoadInFlight) {
+      return categoriesCatalogLoadInFlight
+    }
+    categoriesCatalogLoadInFlight = (async () => {
+      try {
+        await fetch({
+          page: 1,
+          pageSize: ORDER_CATALOG_CATEGORY_PAGE_SIZE,
+          sortBy: 'name',
+          sortOrder: 'asc',
+        })
+      } finally {
+        categoriesCatalogLoadInFlight = null
+      }
+    })()
+    return categoriesCatalogLoadInFlight
   }
 
   const fetchById = async (id: number) => {
@@ -413,6 +440,7 @@ export const useProductCategoriesStore = defineStore('productCategories', () => 
 
     // Actions - CRUD
     fetch,
+    ensureCatalogLoaded,
     fetchById,
     create,
     update,

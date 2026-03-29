@@ -28,7 +28,7 @@
                                 @change="toggleTarget(0, c.id, ($event.target as HTMLInputElement).checked)" />
                             <span>{{ c.name }}</span>
                         </label>
-                        <p v-if="!productCategories.length" class="text-xs text-gray-400">Sin categorías en esta sucursal.</p>
+                        <p v-if="!productCategories.length" class="text-xs text-gray-400">Sin categorías en el catálogo.</p>
                     </div>
                 </div>
                 <div>
@@ -45,7 +45,7 @@
                                     class="text-amber-600 text-xs"> (sin peso)</span>
                             </span>
                         </label>
-                        <p v-if="!products.length" class="text-xs text-gray-400">Sin productos en esta sucursal.</p>
+                        <p v-if="!products.length" class="text-xs text-gray-400">Sin productos en el catálogo.</p>
                     </div>
                 </div>
             </template>
@@ -74,6 +74,8 @@ import BaseSelect from '@/components/ui/BaseSelect.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import { productCategoryApi } from '@/services/MainAPI/productCategoryApi'
 import { productApi } from '@/services/MainAPI/productApi'
+import { ORDER_CATALOG_PRODUCT_PAGE_SIZE } from '@/store/products'
+import { ORDER_CATALOG_CATEGORY_PAGE_SIZE } from '@/store/productCategories'
 
 interface Props {
     expense?: Expense | null
@@ -150,16 +152,15 @@ async function loadMenuCatalog() {
     try {
         const [catRes, prodRes] = await Promise.all([
             productCategoryApi.getProductCategories({
-                branchId: bid,
                 page: 1,
-                pageSize: 500,
+                pageSize: ORDER_CATALOG_CATEGORY_PAGE_SIZE,
                 sortBy: 'name',
                 sortOrder: 'asc',
             }),
             productApi.getProducts({
-                branchId: bid,
                 page: 1,
-                pageSize: 500,
+                pageSize: ORDER_CATALOG_PRODUCT_PAGE_SIZE,
+                active: true,
                 sortBy: 'name',
                 sortOrder: 'asc',
             }),

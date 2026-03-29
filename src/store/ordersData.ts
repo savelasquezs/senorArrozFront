@@ -1,7 +1,6 @@
 // src/store/ordersData.ts
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-import { useCustomersStore } from './customers'
 import { orderApi } from '@/services/MainAPI/orderApi'
 import { getOrderStatusDisplayName } from '@/composables/useFormatting'
 import type {
@@ -11,9 +10,6 @@ import type {
     OrderStatus,
     OrderListItem,
 } from '@/types/order'
-import type {
-    Customer,
-} from '@/types/customer'
 import type {
     User,
 } from '@/types/user'
@@ -27,7 +23,6 @@ export const useOrdersDataStore = defineStore('ordersData', () => {
     const current = ref<OrderDetailView | null>(null)
     const isLoading = ref(false)
     const error = ref<string | null>(null)
-    const customers = ref<Customer[]>([])
     const users = ref<User[]>([])
 
     // ===== Acciones (COPIAR EXACTO) =====
@@ -179,13 +174,6 @@ export const useOrdersDataStore = defineStore('ordersData', () => {
         error.value = null
     }
 
-    // Load data - ADAPTAR
-    const loadCustomers = async () => {
-        const customersStore = useCustomersStore()
-        await customersStore.fetch({ page: 1, pageSize: 1000 })
-        customers.value = customersStore.list?.items || []
-    }
-
     const loadUsers = async () => {
         // Implementar si existe userApi
         try {
@@ -286,7 +274,6 @@ export const useOrdersDataStore = defineStore('ordersData', () => {
         current,
         isLoading,
         error,
-        customers,
         users,
         // Acciones
         fetch,
@@ -296,7 +283,6 @@ export const useOrdersDataStore = defineStore('ordersData', () => {
         updateStatus,
         remove,
         clear,
-        loadCustomers,
         loadUsers,
         // Métodos delivery
         fetchDeliveryReady,

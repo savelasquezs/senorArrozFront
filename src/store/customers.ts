@@ -43,9 +43,9 @@ export const useCustomersStore = defineStore('customers', () => {
     };
 
     // Fetch customer by ID
-    const fetchById = async (id: number) => {
+    const fetchById = async (id: number, opts?: { silent?: boolean }) => {
         try {
-            isLoading.value = true;
+            if (!opts?.silent) isLoading.value = true;
             error.value = null;
             const res = await customerApi.getCustomerById(id);
             current.value = res.data;
@@ -53,7 +53,7 @@ export const useCustomersStore = defineStore('customers', () => {
             error.value = err.message || 'Error al cargar el cliente';
             throw err;
         } finally {
-            isLoading.value = false;
+            if (!opts?.silent) isLoading.value = false;
         }
     };
 
@@ -143,9 +143,9 @@ export const useCustomersStore = defineStore('customers', () => {
     };
 
     // Fetch customer addresses
-    const fetchAddresses = async (customerId: number) => {
+    const fetchAddresses = async (customerId: number, opts?: { silent?: boolean }) => {
         try {
-            isLoading.value = true;
+            if (!opts?.silent) isLoading.value = true;
             error.value = null;
             const res = await customerApi.getCustomerAddresses(customerId);
             addresses.value = res.data;
@@ -153,7 +153,7 @@ export const useCustomersStore = defineStore('customers', () => {
             error.value = err.message || 'Error al cargar direcciones';
             throw err;
         } finally {
-            isLoading.value = false;
+            if (!opts?.silent) isLoading.value = false;
         }
     };
 

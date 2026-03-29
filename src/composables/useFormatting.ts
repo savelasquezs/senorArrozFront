@@ -60,8 +60,32 @@ export const formatTime = (date: string | Date): string => {
 }
 
 /**
+ * Tiempo relativo con meses/años (útil para “desde primer pedido”).
+ */
+export const formatTimeAgoCalendar = (dateString: string | undefined | null): string => {
+    if (!dateString) return '—'
+    const date = new Date(dateString)
+    const days = Math.floor((Date.now() - date.getTime()) / 86400000)
+    if (days < 0) return '—'
+    if (days === 0) return 'hoy'
+    if (days === 1) return 'ayer'
+    if (days < 7) return `hace ${days} ${days === 1 ? 'día' : 'días'}`
+    if (days < 30) {
+        const w = Math.floor(days / 7)
+        return `hace ${w} ${w === 1 ? 'semana' : 'semanas'}`
+    }
+    if (days < 365) {
+        const months = Math.floor(days / 30)
+        return `hace ${months} ${months === 1 ? 'mes' : 'meses'}`
+    }
+    const years = Math.floor(days / 365)
+    return `hace ${years} ${years === 1 ? 'año' : 'años'}`
+}
+
+/**
  * Formatea una fecha a tiempo relativo humanizado ("hace X tiempo")
  */
+
 export const formatTimeAgo = (dateString: string): string => {
     const date = new Date(dateString)
     const now = new Date()
@@ -136,6 +160,7 @@ export const useFormatting = () => {
         formatDateShort,
         formatTime,
         formatTimeAgo,
+        formatTimeAgoCalendar,
         truncateText,
         capitalizeFirst,
         getOrderStatusDisplayName,

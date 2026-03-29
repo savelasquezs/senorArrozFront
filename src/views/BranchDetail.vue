@@ -635,12 +635,14 @@ import {
 import type { User } from '@/types/user'
 import type { Bank, BankFormData } from '@/types/bank'
 import type { App, AppFormData } from '@/types/bank'
+import { useExpenseCategoriesCatalogStore } from '@/store/expenseCategoriesCatalog'
 
 const route = useRoute()
 const router = useRouter()
 const branchesStore = useBranchesStore()
 const banksStore = useBanksStore()
 const appsStore = useAppsStore()
+const expenseCategoriesCatalogStore = useExpenseCategoriesCatalogStore()
 const authStore = useAuthStore()
 const { success, error: showError } = useToast()
 
@@ -1068,6 +1070,13 @@ const nextSupplierPage = async () => {
 const loadExpenseCategories = async () => {
     try {
         expenseCategoriesLoading.value = true
+        if (expenseCategoriesPage.value === 1) {
+            await expenseCategoriesCatalogStore.ensureFirstPage(expenseCategoriesPageSize.value)
+            if (expenseCategoriesCatalogStore.firstPage) {
+                expenseCategoriesList.value = expenseCategoriesCatalogStore.firstPage
+                return
+            }
+        }
         const response = await expenseCategoryApi.getExpenseCategories({
             page: expenseCategoriesPage.value,
             pageSize: expenseCategoriesPageSize.value
@@ -1115,6 +1124,7 @@ const handleExpenseCategorySubmit = async (data: CreateExpenseCategoryDto) => {
         }
         showExpenseCategoryForm.value = false
         editingExpenseCategory.value = null
+        expenseCategoriesCatalogStore.invalidate()
         await loadExpenseCategories()
         await loadAllExpenseCategories()
     } catch (error: any) {
@@ -1131,6 +1141,7 @@ const deleteExpenseCategory = async (category: ExpenseCategory) => {
     try {
         await expenseCategoryApi.deleteExpenseCategory(category.id)
         success('Categoría eliminada', 3000, `La categoría "${category.name}" se ha eliminado correctamente`)
+        expenseCategoriesCatalogStore.invalidate()
         await loadExpenseCategories()
         await loadAllExpenseCategories()
     } catch (error: any) {
@@ -1316,11 +1327,16 @@ async function loadBranchPageData() {
     }
 
     try {
-        await banksStore.fetch({
-            page: 1,
-            pageSize: 100,
-            branchId: branchId.value
-        })
+        if (userRole === 'Superadmin') {
+            await banksStore.fetch({
+                page: 1,
+                pageSize: 100,
+                branchId: branchId.value,
+            })
+        } else {
+            // Admin en su sucursal: mismo alcance que el token y el bootstrap; evita GET duplicado.
+            await banksStore.ensureListLoaded()
+        }
     } catch (error: any) {
         console.error('Error loading banks:', error)
         showError(
@@ -1330,11 +1346,15 @@ async function loadBranchPageData() {
     }
 
     try {
-        await appsStore.fetch({
-            page: 1,
-            pageSize: 100,
-            branchId: branchId.value
-        })
+        if (userRole === 'Superadmin') {
+            await appsStore.fetch({
+                page: 1,
+                pageSize: 100,
+                branchId: branchId.value,
+            })
+        } else {
+            await appsStore.ensureListLoaded()
+        }
     } catch (error: any) {
         console.error('Error loading apps:', error)
         showError(

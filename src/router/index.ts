@@ -89,14 +89,11 @@ const routes: RouteRecordRaw[] = [
         }
     },
     {
-        path: '/customers/:id',
-        name: 'CustomerDetail',
-        component: () => import('@/views/CustomerDetail.vue'),
-        meta: {
-            requiresAuth: true,
-            requiresRole: [UserRole.SUPERADMIN, UserRole.ADMIN, UserRole.CASHIER],
-            title: 'Detalle Cliente'
-        }
+        path: '/customers/:id(\\d+)',
+        redirect: to => ({
+            path: '/customers',
+            query: { ...to.query, detail: String(to.params.id) }
+        })
     },
     {
         path: '/products',
@@ -109,14 +106,11 @@ const routes: RouteRecordRaw[] = [
         }
     },
     {
-        path: '/products/:id',
-        name: 'ProductDetail',
-        component: () => import('@/views/ProductDetail.vue'),
-        meta: {
-            requiresAuth: true,
-            requiresRole: [UserRole.SUPERADMIN, UserRole.ADMIN],
-            title: 'Detalle Producto'
-        }
+        path: '/products/:id(\\d+)',
+        redirect: to => ({
+            path: '/products',
+            query: { detail: String(to.params.id) }
+        })
     },
     {
         path: '/product-categories',

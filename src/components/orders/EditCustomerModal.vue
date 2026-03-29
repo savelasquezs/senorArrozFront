@@ -73,10 +73,11 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, watch } from 'vue'
 import type { OrderListItem, Order } from '@/types/order'
 import type { Customer, CustomerAddress } from '@/types/customer'
 import { useOrdersDataStore } from '@/store/ordersData'
+import { useCustomersStore } from '@/store/customers'
 import { useToast } from '@/composables/useToast'
 import { useDeliveryFee } from '@/composables/useDeliveryFee'
 import { useOrderPermissions } from '@/composables/useOrderPermissions'
@@ -101,7 +102,11 @@ const emit = defineEmits<{
 
 const { success: showSuccess, error: showError } = useToast()
 const ordersStore = useOrdersDataStore()
+const customersStore = useCustomersStore()
 const permissions = useOrderPermissions()
+
+/** Cliente en edición (una sola ficha + direcciones; sin listados masivos). */
+const displayCustomer = ref<Customer | null>(null)
 
 // Estado
 const saving = ref(false)
@@ -114,7 +119,8 @@ const { deliveryFee, autoCompleteFromAddress, markAsManuallyEdited, isSuggestedV
 const showCustomerDetail = ref(false)
 const selectedCustomer = computed(() => {
     if (!selectedCustomerId.value) return null
-    return ordersStore.customers.find(c => c.id === selectedCustomerId.value) || null
+    if (displayCustomer.value?.id !== selectedCustomerId.value) return null
+    return displayCustomer.value
 })
 
 const selectedAddress = computed(() => {
@@ -174,36 +180,85 @@ const deliveryFeeError = computed(() => {
     return ''
 })
 
-// Lifecycle
-onMounted(async () => {
-    if (ordersStore.customers.length === 0) {
-        await ordersStore.loadCustomers()
-    }
-})
-
-// Métodos
-const handleCustomerSelected = (customer: Customer | null) => {
-    selectedCustomerId.value = customer?.id || null
-
-    // Auto-fill guestName with customer name if not already set
-    if (customer && customer.name && !selectedGuestName.value?.trim()) {
-        selectedGuestName.value = customer.name
-    } else if (!customer) {
-        // Customer removed, clear guestName
-        selectedGuestName.value = null
-    }
-
-    // Si se limpia el cliente, también limpiar la dirección
-    if (!customer) {
-        selectedAddressId.value = null
+async function hydrateCustomerWithAddresses(customer: Customer): Promise<void> {
+    try {
+        await customersStore.fetchAddresses(customer.id)
+        displayCustomer.value = {
+            ...customer,
+            addresses: [...customersStore.addresses],
+        }
+    } catch (e: unknown) {
+        const msg = e instanceof Error ? e.message : String(e)
+        showError('Direcciones', msg || 'No se pudieron cargar las direcciones')
+        displayCustomer.value = { ...customer, addresses: customer.addresses ?? [] }
     }
 }
 
-const handleAddressSelected = (address: CustomerAddress | null) => {
-    selectedAddressId.value = address?.id || null
+async function loadCustomerProfileForModal() {
+    selectedCustomerId.value = props.order.customerId ?? null
+    selectedAddressId.value = props.order.addressId ?? null
+    selectedGuestName.value = props.order.guestName || props.order.customerName || null
 
-    // ✅ Auto-completar deliveryFee usando el composable
-    autoCompleteFromAddress(address)
+    if (!props.order.customerId) {
+        displayCustomer.value = null
+        return
+    }
+    try {
+        await customersStore.fetchById(props.order.customerId)
+        const c = customersStore.current
+        if (!c) {
+            displayCustomer.value = null
+            return
+        }
+        await hydrateCustomerWithAddresses(c)
+    } catch (e: unknown) {
+        const msg = e instanceof Error ? e.message : String(e)
+        showError('Cliente', msg || 'No se pudo cargar el cliente')
+        displayCustomer.value = null
+    }
+}
+
+watch(
+    () => props.open,
+    (open) => {
+        if (open) {
+            void loadCustomerProfileForModal()
+        }
+    },
+    { immediate: true }
+)
+
+// Métodos
+const handleCustomerSelected = async (customer: Customer | null) => {
+    selectedCustomerId.value = customer?.id ?? null
+
+    if (customer && customer.name && !selectedGuestName.value?.trim()) {
+        selectedGuestName.value = customer.name
+    } else if (!customer) {
+        selectedGuestName.value = null
+    }
+
+    if (!customer) {
+        displayCustomer.value = null
+        selectedAddressId.value = null
+        return
+    }
+
+    await hydrateCustomerWithAddresses(customer)
+}
+
+const handleAddressSelected = (address: CustomerAddress | null | undefined) => {
+    selectedAddressId.value = address?.id ?? null
+
+    if (address && displayCustomer.value && !displayCustomer.value.addresses?.some((a) => a.id === address.id)) {
+        const prev = displayCustomer.value.addresses ?? []
+        displayCustomer.value = {
+            ...displayCustomer.value,
+            addresses: [...prev, address],
+        }
+    }
+
+    autoCompleteFromAddress(address ?? null)
 }
 
 const handleViewCustomerDetail = () => {

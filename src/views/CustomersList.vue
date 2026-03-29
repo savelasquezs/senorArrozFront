@@ -1,188 +1,170 @@
 <!-- src/views/CustomersList.vue -->
 <template>
     <MainLayout page-title="Clientes">
-        <!-- Loading State -->
-        <BaseLoading v-if="store.isLoading" text="Cargando clientes..." />
+        <BaseLoading v-if="store.isLoading && !store.list" text="Cargando clientes..." />
 
-        <!-- Content -->
-        <div v-else class="space-y-6">
-            <!-- Filters Card -->
-            <BaseCard class="p-6">
-                <div class="flex items-center justify-between mb-4">
-                    <h3 class="text-lg font-semibold text-gray-900">Filtros de búsqueda</h3>
-                    <BaseButton @click="clearFilters" variant="outline" size="sm" :icon="XMarkIcon">
-                        Limpiar filtros
+        <div v-else class="flex flex-col gap-2 min-h-0 -mx-2 sm:mx-0">
+            <form
+                class="flex flex-wrap items-end gap-x-3 gap-y-2 px-3 py-2 bg-white border border-gray-200 rounded-lg shadow-sm text-xs"
+                @submit.prevent="runSearch">
+                <BaseInput
+                    v-model="filters.name"
+                    placeholder="Nombre…"
+                    class="min-w-[8rem] flex-1 sm:max-w-[11rem] [&_input]:py-1.5 [&_input]:text-xs"
+                    @enter="runSearch">
+                    <template #icon>
+                        <MagnifyingGlassIcon class="w-4 h-4" />
+                    </template>
+                </BaseInput>
+                <BaseInput
+                    v-model="filters.phone"
+                    placeholder="Teléfono…"
+                    class="min-w-[8rem] flex-1 sm:max-w-[11rem] [&_input]:py-1.5 [&_input]:text-xs"
+                    @enter="runSearch">
+                    <template #icon>
+                        <PhoneIcon class="w-4 h-4" />
+                    </template>
+                </BaseInput>
+                <BaseSelect
+                    v-model="filters.active"
+                    :options="statusOptions"
+                    placeholder="Estado"
+                    value-key="value"
+                    display-key="label"
+                    class="min-w-[7.5rem] max-w-[11rem] [&_button]:py-1.5 [&_button]:text-xs" />
+                <BaseSelect
+                    v-if="auth.isSuperadmin"
+                    v-model="filters.branchId"
+                    :options="branchOptions"
+                    placeholder="Sucursal"
+                    value-key="value"
+                    display-key="label"
+                    class="min-w-[9rem] max-w-[13rem] [&_button]:py-1.5 [&_button]:text-xs" />
+                <div class="flex flex-wrap gap-1.5">
+                    <BaseButton type="submit" variant="primary" size="sm" :icon="MagnifyingGlassIcon">
+                        Buscar
+                    </BaseButton>
+                    <BaseButton type="button" @click="clearFilters" variant="outline" size="sm" :icon="XMarkIcon">
+                        Limpiar
                     </BaseButton>
                 </div>
+                <div class="flex-1 min-w-[4rem]" />
+                <BaseButton type="button" @click="openCreate" variant="primary" size="sm" :icon="PlusIcon">
+                    Nuevo
+                </BaseButton>
+            </form>
 
-                <div class="grid grid-cols-1 md:grid-cols-5 gap-4">
-                    <BaseInput v-model="filters.name" label="Nombre" placeholder="Buscar por nombre"
-                        :icon="MagnifyingGlassIcon" />
-                    <BaseInput v-model="filters.phone" label="Teléfono" placeholder="Buscar por teléfono"
-                        :icon="PhoneIcon" />
-                    <BaseSelect v-model="filters.active" :options="statusOptions" label="Estado"
-                        placeholder="Todos los estados" value-key="value" display-key="label" />
-                    <BaseSelect v-if="auth.isSuperadmin" v-model="filters.branchId" :options="branchOptions"
-                        label="Sucursal" placeholder="Todas las sucursales" value-key="value" display-key="label" />
-                    <div class="flex items-end">
-                        <BaseButton @click="load" variant="primary" size="md" :icon="MagnifyingGlassIcon" full-width>
-                            Buscar
-                        </BaseButton>
-                    </div>
-                </div>
-            </BaseCard>
-
-            <!-- Stats Cards -->
-            <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
-                <StatsCard title="Total Clientes" :value="store.list?.totalCount || 0" icon="users" />
-                <StatsCard title="Clientes Activos" :value="activeCustomers" icon="users" />
-                <StatsCard title="Clientes Inactivos" :value="inactiveCustomers" icon="users" />
-                <StatsCard title="Con Direcciones" :value="customersWithAddresses" icon="clipboard" />
+            <div
+                class="flex flex-wrap items-center gap-x-4 gap-y-1 px-3 py-1.5 text-xs text-gray-600 bg-gray-50/90 border border-gray-100 rounded-md">
+                <span>
+                    En esta página: <strong class="text-gray-900">{{ store.list?.items?.length ?? 0 }}</strong> · Total
+                    con filtros:
+                    <strong class="text-gray-900">{{ store.list?.totalCount ?? 0 }}</strong>
+                </span>
+                <span class="hidden sm:inline text-gray-300">|</span>
+                <span>Activos <strong class="text-gray-900">{{ activeCustomers }}</strong> (en página)</span>
+                <span>Inactivos <strong class="text-gray-900">{{ inactiveCustomers }}</strong></span>
+                <span>Con direcciones <strong class="text-gray-900">{{ customersWithAddresses }}</strong></span>
             </div>
 
-            <!-- Customers Table -->
-            <BaseCard class="p-6">
-                <div class="flex items-center justify-between mb-6">
-                    <h3 class="text-lg font-semibold text-gray-900">
-                        Lista de Clientes
-                        <span class="text-sm font-normal text-gray-500">
-                            ({{ store.list?.items?.length || 0 }} de {{ store.list?.totalCount || 0 }})
-                        </span>
-                    </h3>
-
-                    <BaseButton @click="openCreate" variant="primary" size="sm" :icon="PlusIcon">
-                        Nuevo Cliente
-                    </BaseButton>
-                </div>
-
-                <div class="overflow-hidden bg-white shadow ring-1 ring-black ring-opacity-5 rounded-lg">
-                    <table class="min-w-full divide-y divide-gray-200">
-                        <thead class="bg-gray-50">
+            <BaseCard class="p-0 overflow-hidden flex flex-col flex-1 min-h-0 border border-gray-200">
+                <div class="overflow-auto max-h-[min(calc(100vh-13rem),72vh)]">
+                    <table class="min-w-full divide-y divide-gray-200 text-sm">
+                        <thead class="bg-gray-50 sticky top-0 z-10 shadow-sm">
                             <tr>
-                                <th
-                                    class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                <th class="px-3 py-2 text-left text-[10px] font-semibold text-gray-500 uppercase">
                                     Cliente
                                 </th>
-                                <th
-                                    class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                <th class="px-3 py-2 text-left text-[10px] font-semibold text-gray-500 uppercase">
                                     Contacto
                                 </th>
-                                <th
-                                    class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                <th class="px-3 py-2 text-left text-[10px] font-semibold text-gray-500 uppercase">
                                     Sucursal
                                 </th>
-                                <th
-                                    class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    Direcciones
+                                <th class="px-3 py-2 text-left text-[10px] font-semibold text-gray-500 uppercase">
+                                    Dir.
                                 </th>
-                                <th
-                                    class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                <th class="px-3 py-2 text-left text-[10px] font-semibold text-gray-500 uppercase">
                                     Pedidos
                                 </th>
-                                <th
-                                    class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    Estado
-                                </th>
-                                <th
-                                    class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                <th class="px-3 py-2 text-left text-[10px] font-semibold text-gray-500 uppercase">Estado</th>
+                                <th class="px-3 py-2 text-right text-[10px] font-semibold text-gray-500 uppercase">
                                     Acciones
                                 </th>
                             </tr>
                         </thead>
-                        <tbody class="bg-white divide-y divide-gray-200">
+                        <tbody class="bg-white divide-y divide-gray-100">
                             <tr v-if="(store.list?.items?.length || 0) === 0">
-                                <td colspan="7" class="px-6 py-12 text-center text-gray-500">
-                                    <UserGroupIcon class="mx-auto h-12 w-12 text-gray-400" />
-                                    <p class="mt-2 text-lg font-medium">No hay clientes</p>
-                                    <p class="text-sm">No se encontraron clientes con los filtros aplicados</p>
+                                <td colspan="7" class="px-3 py-10 text-center text-gray-500">
+                                    <UserGroupIcon class="mx-auto h-8 w-8 text-gray-400" />
+                                    <p class="mt-2 text-sm font-medium">Sin resultados</p>
+                                    <p class="text-xs">Ajusta los filtros o busca de nuevo</p>
                                 </td>
                             </tr>
 
-                            <tr v-for="customer in store.list?.items || []" :key="customer.id" class="hover:bg-gray-50">
-                                <!-- Customer Info -->
-                                <td class="px-6 py-4 whitespace-nowrap">
-                                    <div class="flex items-center">
-                                        <div class="flex-shrink-0 h-10 w-10">
-                                            <div
-                                                class="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center">
-                                                <UserIcon class="h-5 w-5 text-blue-600" />
-                                            </div>
+                            <tr
+                                v-for="customer in store.list?.items || []"
+                                :key="customer.id"
+                                class="hover:bg-gray-50/80 align-middle">
+                                <td class="px-3 py-2 whitespace-nowrap">
+                                    <div class="flex items-center gap-2">
+                                        <div class="h-8 w-8 rounded-full bg-blue-100 flex items-center justify-center shrink-0">
+                                            <UserIcon class="h-4 w-4 text-blue-600" />
                                         </div>
-                                        <div class="ml-4">
-                                            <div class="text-sm font-medium text-gray-900">
+                                        <div class="min-w-0">
+                                            <div class="font-medium text-gray-900 truncate max-w-[14rem]">
                                                 {{ customer.name }}
                                             </div>
-                                            <div class="text-sm text-gray-500">
-                                                ID: {{ customer.id }}
-                                            </div>
+                                            <div class="text-[11px] text-gray-500">#{{ customer.id }}</div>
                                         </div>
                                     </div>
                                 </td>
-
-                                <!-- Contact Info -->
-                                <td class="px-6 py-4 whitespace-nowrap">
-                                    <div class="text-sm text-gray-900">
-                                        <div class="flex items-center">
-                                            <PhoneIcon class="h-4 w-4 text-gray-400 mr-1" />
-                                            {{ customer.phone1 }}
-                                        </div>
-                                        <div v-if="customer.phone2" class="flex items-center mt-1">
-                                            <PhoneIcon class="h-4 w-4 text-gray-400 mr-1" />
-                                            {{ customer.phone2 }}
-                                        </div>
+                                <td class="px-3 py-2 text-xs text-gray-800">
+                                    <div class="flex items-center gap-0.5">
+                                        <PhoneIcon class="h-3.5 w-3.5 text-gray-400 shrink-0" />
+                                        {{ customer.phone1 }}
+                                    </div>
+                                    <div v-if="customer.phone2" class="flex items-center gap-0.5 mt-0.5">
+                                        <PhoneIcon class="h-3.5 w-3.5 text-gray-400 shrink-0" />
+                                        {{ customer.phone2 }}
                                     </div>
                                 </td>
-
-                                <!-- Branch Info -->
-                                <td class="px-6 py-4 whitespace-nowrap">
-                                    <div class="text-sm text-gray-900">
-                                        <div class="flex items-center">
-                                            <BuildingOffice2Icon class="h-4 w-4 text-gray-400 mr-1" />
-                                            {{ customer.branchName || getBranchName(customer.branchId) }}
-                                        </div>
+                                <td class="px-3 py-2 text-xs text-gray-800 whitespace-nowrap">
+                                    <span class="inline-flex items-center gap-0.5">
+                                        <BuildingOffice2Icon class="h-3.5 w-3.5 text-gray-400" />
+                                        {{ customer.branchName || getBranchName(customer.branchId) }}
+                                    </span>
+                                </td>
+                                <td class="px-3 py-2 text-xs text-gray-800 whitespace-nowrap tabular-nums">
+                                    {{ customer.addresses?.length || 0 }}
+                                </td>
+                                <td class="px-3 py-2 text-xs text-gray-800 whitespace-nowrap">
+                                    <span class="tabular-nums">{{ customer.totalOrders || 0 }}</span>
+                                    <span v-if="(customer.totalOrders || 0) !== 1" class="text-gray-500"> pedidos</span>
+                                    <span v-else class="text-gray-500"> pedido</span>
+                                    <div v-if="customer.lastOrderDate" class="text-[10px] text-gray-500">
+                                        Últ.: {{ formatDateShort(customer.lastOrderDate) }}
                                     </div>
                                 </td>
-
-                                <!-- Addresses Count -->
-                                <td class="px-6 py-4 whitespace-nowrap">
-                                    <div class="text-sm text-gray-900">
-                                        <div class="flex items-center">
-                                            <MapPinIcon class="h-4 w-4 text-gray-400 mr-1" />
-                                            {{ customer.addresses?.length || 0 }}
-                                        </div>
-                                    </div>
-                                </td>
-
-                                <!-- Orders Count -->
-                                <td class="px-6 py-4 whitespace-nowrap">
-                                    <div class="text-sm text-gray-900">
-                                        {{ customer.totalOrders || 0 }} pedido{{ (customer.totalOrders || 0) !== 1 ? 's'
-                                            : '' }}
-                                    </div>
-                                    <div v-if="customer.lastOrderDate" class="text-xs text-gray-500">
-                                        Último: {{ formatDate(customer.lastOrderDate) }}
-                                    </div>
-                                </td>
-
-                                <!-- Status -->
-                                <td class="px-6 py-4 whitespace-nowrap">
-                                    <BaseBadge :variant="customer.active ? 'success' : 'danger'">
+                                <td class="px-3 py-2 whitespace-nowrap">
+                                    <BaseBadge :variant="customer.active ? 'success' : 'danger'" class="text-[10px]">
                                         {{ customer.active ? 'Activo' : 'Inactivo' }}
                                     </BaseBadge>
                                 </td>
-
-                                <!-- Actions -->
-                                <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                    <div class="flex justify-end space-x-2">
-                                        <BaseButton @click="goDetail(customer.id)" variant="outline" size="sm"
-                                            :icon="EyeIcon" title="Ver detalles">
-                                            Ver
-                                        </BaseButton>
-                                        <BaseButton @click="openEdit(customer)" variant="outline" size="sm"
-                                            :icon="PencilIcon" title="Editar cliente">
-                                            Editar
-                                        </BaseButton>
-
+                                <td class="px-3 py-2 whitespace-nowrap text-right">
+                                    <div class="flex justify-end gap-1">
+                                        <BaseButton
+                                            variant="outline"
+                                            size="sm"
+                                            :icon="EyeIcon"
+                                            title="Ver detalle"
+                                            @click="openCustomerDetail(customer)" />
+                                        <BaseButton
+                                            variant="outline"
+                                            size="sm"
+                                            :icon="PencilIcon"
+                                            title="Editar"
+                                            @click="openEdit(customer)" />
                                     </div>
                                 </td>
                             </tr>
@@ -190,43 +172,52 @@
                     </table>
                 </div>
 
-                <!-- Pagination -->
-                <div v-if="store.list && store.list.totalPages > 1" class="flex items-center justify-between mt-6">
-                    <div class="text-sm text-gray-700">
-                        Mostrando {{ ((store.list.page - 1) * store.list.pageSize) + 1 }} a
-                        {{ Math.min(store.list.page * store.list.pageSize, store.list.totalCount) }} de
-                        {{ store.list.totalCount }} resultados
-                    </div>
-                    <div class="flex space-x-2">
-                        <BaseButton size="sm" variant="outline" :disabled="!store.list.hasPreviousPage"
-                            @click="previousPage" :icon="ChevronLeftIcon">
-                            Anterior
+                <div
+                    v-if="store.list && store.list.totalPages > 1"
+                    class="flex flex-wrap items-center justify-between gap-2 px-3 py-2 border-t border-gray-100 bg-white text-xs text-gray-600">
+                    <span>
+                        {{ ((store.list.page - 1) * store.list.pageSize) + 1 }}–{{
+                            Math.min(store.list.page * store.list.pageSize, store.list.totalCount)
+                        }}
+                        de {{ store.list.totalCount }}
+                    </span>
+                    <div class="flex gap-1">
+                        <BaseButton size="sm" variant="outline" :disabled="!store.list.hasPreviousPage" @click="previousPage">
+                            <ChevronLeftIcon class="w-4 h-4" />
                         </BaseButton>
-                        <BaseButton size="sm" variant="outline" :disabled="!store.list.hasNextPage" @click="nextPage"
-                            :right-icon="ChevronRightIcon">
-                            Siguiente
+                        <BaseButton size="sm" variant="outline" :disabled="!store.list.hasNextPage" @click="nextPage">
+                            <ChevronRightIcon class="w-4 h-4" />
                         </BaseButton>
                     </div>
                 </div>
             </BaseCard>
         </div>
 
-        <!-- Create/Edit Customer Dialog -->
-        <BaseDialog v-model="showForm" :title="editingCustomer ? 'Editar Cliente' : 'Nuevo Cliente'" :icon="PlusIcon"
-            size="lg">
-            <CustomerForm :customer="editingCustomer" :loading="formLoading" :can-select-branch="auth.isSuperadmin"
-                @submit="handleFormSubmit" @cancel="showForm = false" />
+        <BaseDialog v-model="showForm" :title="editingCustomer ? 'Editar Cliente' : 'Nuevo Cliente'" :icon="PlusIcon" size="lg">
+            <CustomerForm
+                :customer="editingCustomer"
+                :loading="formLoading"
+                :can-select-branch="auth.isSuperadmin"
+                @submit="handleFormSubmit"
+                @cancel="showForm = false" />
         </BaseDialog>
+
+        <CustomerDetailModal
+            :show="detailModalOpen"
+            :customer="detailCustomer ?? undefined"
+            :loading="detailModalLoading"
+            @close="closeCustomerDetail"
+            @customer-updated="onCustomerUpdatedFromDetail" />
     </MainLayout>
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref, computed } from 'vue'
+import { onMounted, ref, computed, watch } from 'vue'
 import { useCustomersStore } from '@/store/customers'
 import { useBranchesStore } from '@/store/branches'
 import { useAuthStore } from '@/store/auth'
 import { useToast } from '@/composables/useToast'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 
 import MainLayout from '@/components/layout/MainLayout.vue'
 import BaseCard from '@/components/ui/BaseCard.vue'
@@ -236,23 +227,21 @@ import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseLoading from '@/components/ui/BaseLoading.vue'
 import BaseDialog from '@/components/ui/BaseDialog.vue'
 import BaseBadge from '@/components/ui/BaseBadge.vue'
-import StatsCard from '@/components/ui/StatsCard.vue'
 import CustomerForm from '@/components/customers/CustomerForm.vue'
+import CustomerDetailModal from '@/components/customers/CustomerDetailModal.vue'
 
 import {
     UserGroupIcon,
     UserIcon,
     PhoneIcon,
     BuildingOffice2Icon,
-    MapPinIcon,
     MagnifyingGlassIcon,
     PlusIcon,
     EyeIcon,
     PencilIcon,
-
     ChevronLeftIcon,
     ChevronRightIcon,
-    XMarkIcon
+    XMarkIcon,
 } from '@heroicons/vue/24/outline'
 
 import type { Customer, CustomerFilters, CustomerFormData } from '@/types/customer'
@@ -260,89 +249,136 @@ import type { Customer, CustomerFilters, CustomerFormData } from '@/types/custom
 const store = useCustomersStore()
 const branchesStore = useBranchesStore()
 const auth = useAuthStore()
+const route = useRoute()
 const router = useRouter()
 const { success, error: showError } = useToast()
 
-// Filters
 const filters = ref({
     name: '',
     phone: '',
     active: undefined as boolean | undefined,
     branchId: undefined as number | undefined,
     page: 1,
-    pageSize: 10
+    pageSize: 10,
 })
 
-// Form dialog
 const showForm = ref(false)
 const editingCustomer = ref<Customer | null>(null)
 const formLoading = ref(false)
 
-// Status options
+const detailModalOpen = ref(false)
+const detailModalLoading = ref(false)
+const detailCustomer = ref<Customer | null>(null)
+
 const statusOptions = [
-    { value: undefined, label: 'Todos los estados' },
+    { value: undefined, label: 'Todos' },
     { value: true, label: 'Activos' },
-    { value: false, label: 'Inactivos' }
+    { value: false, label: 'Inactivos' },
 ]
 
-// Branch options
 const branchOptions = computed(() => {
     if (!branchesStore.list?.items) return []
     return [
-        { value: undefined, label: 'Todas las sucursales' },
+        { value: undefined, label: 'Todas' },
         ...branchesStore.list.items.map(branch => ({
             value: branch.id,
-            label: branch.name
-        }))
+            label: branch.name,
+        })),
     ]
 })
 
-// Computed stats
-const activeCustomers = computed(() => {
-    return store.list?.items?.filter(c => c.active).length || 0
-})
+const activeCustomers = computed(() => store.list?.items?.filter(c => c.active).length || 0)
+const inactiveCustomers = computed(() => store.list?.items?.filter(c => !c.active).length || 0)
+const customersWithAddresses = computed(
+    () => store.list?.items?.filter(c => c.addresses && c.addresses.length > 0).length || 0,
+)
 
-const inactiveCustomers = computed(() => {
-    return store.list?.items?.filter(c => !c.active).length || 0
-})
-
-const customersWithAddresses = computed(() => {
-    return store.list?.items?.filter(c => c.addresses && c.addresses.length > 0).length || 0
-})
-
-// Methods
-const getBranchName = (branchId: number) => {
-    // Para superadmin: buscar en la lista de sucursales
+function getBranchName(branchId: number) {
     if (auth.isSuperadmin) {
         const branch = branchesStore.list?.items?.find(b => b.id === branchId)
-        return branch?.name || 'Sucursal no encontrada'
+        return branch?.name || '—'
     }
-
-    // Para usuarios no superadmin: usar la sucursal actual
     if (branchesStore.current && branchesStore.current.id === branchId) {
         return branchesStore.current.name
     }
-
-    return 'Sucursal no encontrada'
+    return '—'
 }
 
-const formatDate = (dateString: string) => {
+function formatDateShort(dateString: string) {
     const date = new Date(dateString)
     const now = new Date()
     const diff = now.getTime() - date.getTime()
     const days = Math.floor(diff / (1000 * 60 * 60 * 24))
-
     if (days === 0) return 'Hoy'
     if (days === 1) return 'Ayer'
     if (days < 7) return `Hace ${days} días`
-    if (days < 30) return `Hace ${Math.floor(days / 7)} semanas`
-
-    return date.toLocaleDateString('es-CO', {
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric'
-    })
+    if (days < 30) return `Hace ${Math.floor(days / 7)} sem.`
+    return date.toLocaleDateString('es-CO', { year: 'numeric', month: 'short', day: 'numeric' })
 }
+
+function canAccessCustomerRow(customer: Customer | null): boolean {
+    if (!customer) return false
+    if (auth.isSuperadmin) return true
+    const bid = auth.branchId
+    if (bid == null) return false
+    return bid === customer.branchId
+}
+
+function stripDetailQuery() {
+    const q = { ...route.query } as Record<string, string | string[] | undefined>
+    delete q.detail
+    router.replace({ path: '/customers', query: q }).catch(() => {})
+}
+
+async function syncDetailFromRoute() {
+    const raw = route.query.detail
+    const q = typeof raw === 'string' ? raw : Array.isArray(raw) ? raw[0] : ''
+    if (!q) {
+        detailModalOpen.value = false
+        detailCustomer.value = null
+        return
+    }
+    const id = Number(q)
+    if (!Number.isFinite(id) || id <= 0) {
+        stripDetailQuery()
+        return
+    }
+
+    if (detailCustomer.value?.id === id && detailModalOpen.value) {
+        return
+    }
+
+    detailModalLoading.value = true
+    try {
+        await store.fetchById(id, { silent: true })
+        const c = store.current
+        if (!c || c.id !== id) {
+            showError('Cliente', 'No se encontró el cliente')
+            stripDetailQuery()
+            return
+        }
+        if (!canAccessCustomerRow(c)) {
+            showError('Acceso denegado', 'No tienes permiso para ver este cliente')
+            stripDetailQuery()
+            return
+        }
+        detailCustomer.value = c
+        detailModalOpen.value = true
+    } catch {
+        showError('Error', 'No se pudo cargar el cliente')
+        stripDetailQuery()
+    } finally {
+        detailModalLoading.value = false
+    }
+}
+
+watch(
+    () => route.query.detail,
+    () => {
+        void syncDetailFromRoute()
+    },
+    { immediate: true },
+)
 
 const load = async () => {
     try {
@@ -350,15 +386,19 @@ const load = async () => {
             name: filters.value.name || undefined,
             phone: filters.value.phone || undefined,
             active: filters.value.active,
-            branchId: auth.isSuperadmin ? filters.value.branchId : (auth.branchId || undefined),
+            branchId: auth.isSuperadmin ? filters.value.branchId : auth.branchId || undefined,
             page: filters.value.page || 1,
-            pageSize: filters.value.pageSize || 10
+            pageSize: filters.value.pageSize || 10,
         }
-
         await store.fetch(filtersToSend)
-    } catch (e) {
+    } catch {
         showError('Error al cargar', 'No se pudieron cargar los clientes')
     }
+}
+
+const runSearch = async () => {
+    filters.value.page = 1
+    await load()
 }
 
 const clearFilters = async () => {
@@ -366,14 +406,34 @@ const clearFilters = async () => {
         name: '',
         phone: '',
         active: undefined,
-        branchId: auth.isSuperadmin ? undefined : (auth.branchId || undefined),
+        branchId: auth.isSuperadmin ? undefined : auth.branchId || undefined,
         page: 1,
-        pageSize: 10
+        pageSize: 10,
     }
     await load()
 }
 
-const goDetail = (id: number) => router.push({ name: 'CustomerDetail', params: { id } })
+function openCustomerDetail(customer: Customer) {
+    detailCustomer.value = customer
+    detailModalOpen.value = true
+    router
+        .replace({
+            path: '/customers',
+            query: { ...route.query, detail: String(customer.id) },
+        })
+        .catch(() => {})
+}
+
+function closeCustomerDetail() {
+    detailModalOpen.value = false
+    detailCustomer.value = null
+    stripDetailQuery()
+}
+
+async function onCustomerUpdatedFromDetail(updated: Customer) {
+    detailCustomer.value = updated
+    await load()
+}
 
 const openCreate = () => {
     editingCustomer.value = null
@@ -388,13 +448,12 @@ const openEdit = (customer: Customer) => {
 const handleFormSubmit = async (data: CustomerFormData) => {
     try {
         formLoading.value = true
-
         if (editingCustomer.value) {
             await store.update(editingCustomer.value.id, {
                 name: data.name,
                 phone1: data.phone1,
                 phone2: data.phone2,
-                active: data.active
+                active: data.active,
             })
             success('Cliente actualizado', 3000, `El cliente "${data.name}" se ha actualizado correctamente`)
         } else {
@@ -405,39 +464,24 @@ const handleFormSubmit = async (data: CustomerFormData) => {
                 branchId: data.branchId,
                 initialAddress: data.initialAddress
                     ? {
-                        neighborhoodId: data.initialAddress.neighborhoodId,
-                        address: data.initialAddress.address,
-                        additionalInfo: data.initialAddress.additionalInfo,
-                        latitude: data.initialAddress.latitude ?? 0,
-                        longitude: data.initialAddress.longitude ?? 0,
-                        isPrimary: data.initialAddress.isPrimary ?? true,
-                        deliveryFee: data.initialAddress.deliveryFee
-                    }
-                    : undefined
+                          neighborhoodId: data.initialAddress.neighborhoodId,
+                          address: data.initialAddress.address,
+                          additionalInfo: data.initialAddress.additionalInfo,
+                          latitude: data.initialAddress.latitude ?? 0,
+                          longitude: data.initialAddress.longitude ?? 0,
+                          isPrimary: data.initialAddress.isPrimary ?? true,
+                          deliveryFee: data.initialAddress.deliveryFee,
+                      }
+                    : undefined,
             })
             success('Cliente creado', 3000, `El cliente "${data.name}" se ha creado correctamente`)
         }
-
         showForm.value = false
         await load()
-    } catch (e) {
+    } catch {
         showError('Error al guardar', store.error || 'No se pudo guardar el cliente')
     } finally {
         formLoading.value = false
-    }
-}
-
-const deleteCustomer = async (customer: Customer) => {
-    if (!confirm(`¿Estás seguro de que quieres eliminar al cliente "${customer.name}"?`)) {
-        return
-    }
-
-    try {
-        await store.remove(customer.id)
-        success('Cliente eliminado', 3000, `El cliente "${customer.name}" se ha eliminado correctamente`)
-        await load()
-    } catch (e) {
-        showError('Error al eliminar', store.error || 'No se pudo eliminar el cliente')
     }
 }
 
@@ -457,15 +501,11 @@ const nextPage = async () => {
 
 onMounted(async () => {
     try {
-
-        // Initialize branch filter based on user role
         if (!auth.isSuperadmin && auth.branchId) {
             filters.value.branchId = auth.branchId
         }
-
-        // Llamar directamente a getCustomers
         await load()
-    } catch (e) {
+    } catch {
         showError('Error al cargar', 'No se pudieron cargar los datos iniciales')
     }
 })

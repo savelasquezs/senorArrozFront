@@ -55,10 +55,7 @@
 import { ref, computed, onMounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useAuthStore } from '@/store/auth';
-import { useProductsStore } from '@/store/products';
-import { useBanksStore } from '@/store/banks';
-import { useAppsStore } from '@/store/apps';
-import { useCustomersStore } from '@/store/customers';
+import { bootstrapOrderCatalog } from '@/utils/orderCatalogBootstrap';
 import { UserRole } from '@/types/auth';
 import Sidebar from '@/components/layout/Sidebar.vue';
 import TopNavigation from '@/components/layout/TopNavigation.vue';
@@ -111,12 +108,7 @@ function isBranchDetailPath(path: string) {
 
 function prefetchOrderCatalog() {
 	if (!authStore.isAuthenticated || !canTakeOrders.value) return;
-	void Promise.all([
-		useProductsStore().ensureCatalogLoaded(),
-		useBanksStore().ensureListLoaded(),
-		useAppsStore().ensureListLoaded(),
-		useCustomersStore().ensureNeighborhoodsLoaded(),
-	]).catch((err) => console.error('Prefetch catálogo pedidos:', err));
+	void bootstrapOrderCatalog(authStore.userRole);
 }
 
 onMounted(() => {
