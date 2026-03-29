@@ -1,190 +1,122 @@
 <!-- src/views/ProductCategoriesList.vue -->
 <template>
     <MainLayout page-title="Categorías de Productos">
-        <!-- Loading State -->
         <BaseLoading v-if="store.isLoading" text="Cargando categorías..." />
 
-        <!-- Content -->
-        <div v-else class="space-y-6">
-            <!-- Filters Card -->
-            <BaseCard class="p-6">
-                <div class="flex items-center justify-between mb-4">
-                    <h3 class="text-lg font-semibold text-gray-900">Filtros de búsqueda</h3>
-                    <BaseButton @click="clearFilters" variant="outline" size="sm" :icon="XMarkIcon">
-                        Limpiar filtros
-                    </BaseButton>
-                </div>
-
-                <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
-                    <BaseInput v-model="filters.name" label="Nombre" placeholder="Buscar por nombre"
-                        :icon="MagnifyingGlassIcon" />
-                    <BaseSelect v-if="auth.isSuperadmin || auth.isAdmin" v-model="filters.branchId" :options="branchOptions"
-                        label="Sucursal" placeholder="Todas las sucursales" value-key="value" display-key="label" />
-                    <div class="flex items-end">
-                        <BaseButton @click="load" variant="primary" size="md" :icon="MagnifyingGlassIcon" full-width>
-                            Buscar
-                        </BaseButton>
-                    </div>
-                </div>
-            </BaseCard>
-
-            <!-- Stats Cards -->
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <StatsCard title="Total Categorías" :value="store.list?.totalCount || 0" icon="clipboard" />
-                <StatsCard title="Con Productos" :value="categoriesWithProducts" icon="store" />
-                <StatsCard title="Sin Productos" :value="categoriesWithoutProducts" icon="clipboard" />
+        <div v-else class="flex flex-col gap-2 min-h-0 -mx-2 sm:mx-0">
+            <!-- Filtros compactos -->
+            <div
+                class="flex flex-wrap items-end gap-x-3 gap-y-2 px-3 py-2 bg-white border border-gray-200 rounded-lg shadow-sm text-xs">
+                <BaseInput v-model="filters.name" placeholder="Nombre…"
+                    class="min-w-[8rem] flex-1 sm:max-w-[14rem] [&_input]:py-1.5 [&_input]:text-xs">
+                    <template #icon>
+                        <MagnifyingGlassIcon class="w-4 h-4" />
+                    </template>
+                </BaseInput>
+                <BaseSelect v-if="auth.isSuperadmin || auth.isAdmin" v-model="filters.branchId" :options="branchOptions"
+                    placeholder="Sucursal" value-key="value" display-key="label"
+                    class="min-w-[9rem] max-w-[14rem] [&_button]:py-1.5 [&_button]:text-xs" />
+                <BaseButton @click="clearFilters" variant="outline" size="sm" :icon="XMarkIcon">
+                    Limpiar
+                </BaseButton>
+                <div class="flex-1 min-w-[6rem]" />
+                <BaseButton @click="goToProducts" variant="outline" size="sm" :icon="CubeIcon">
+                    Productos
+                </BaseButton>
+                <BaseButton @click="openCreate" variant="primary" size="sm" :icon="PlusIcon">
+                    Nueva
+                </BaseButton>
             </div>
 
-            <!-- Categories Table -->
-            <BaseCard class="p-6">
-                <div class="flex items-center justify-between mb-6">
-                    <div class="flex items-center space-x-4">
-                        <h3 class="text-lg font-semibold text-gray-900">
-                            Lista de Categorías
-                            <span class="text-sm font-normal text-gray-500">
-                                ({{ store.list?.items?.length || 0 }} de {{ store.list?.totalCount || 0 }})
-                            </span>
-                        </h3>
+            <!-- KPIs compactos -->
+            <div
+                class="flex flex-wrap items-center gap-x-4 gap-y-1 px-3 py-1.5 text-xs text-gray-600 bg-gray-50/90 border border-gray-100 rounded-md">
+                <span>Mostrando <strong class="text-gray-900">{{ filteredCategories.length }}</strong> de <strong
+                        class="text-gray-900">{{ loadedCount }}</strong></span>
+                <span class="hidden sm:inline text-gray-300">|</span>
+                <span>Con productos <strong class="text-gray-900">{{ categoriesWithProducts }}</strong></span>
+                <span>Sin productos <strong class="text-gray-900">{{ categoriesWithoutProducts }}</strong></span>
+            </div>
 
-                        <!-- Link to Products -->
-                        <BaseButton @click="goToProducts" variant="outline" size="sm" :icon="CubeIcon">
-                            Ver Productos
-                        </BaseButton>
-                    </div>
-
-                    <BaseButton @click="openCreate" variant="primary" size="sm" :icon="PlusIcon">
-                        Nueva Categoría
-                    </BaseButton>
-                </div>
-
-                <div class="overflow-hidden bg-white shadow ring-1 ring-black ring-opacity-5 rounded-lg">
-                    <table class="min-w-full divide-y divide-gray-200">
-                        <thead class="bg-gray-50">
+            <!-- Tabla con scroll -->
+            <BaseCard class="p-0 overflow-hidden flex flex-col flex-1 min-h-0 border border-gray-200">
+                <div class="overflow-auto max-h-[min(calc(100vh-13rem),72vh)]">
+                    <table class="min-w-full divide-y divide-gray-200 text-sm">
+                        <thead class="bg-gray-50 sticky top-0 z-10 shadow-sm">
                             <tr>
-                                <th
-                                    class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                <th class="px-3 py-2 text-left text-[10px] font-semibold text-gray-500 uppercase">
                                     Categoría
                                 </th>
-                                <th
-                                    class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                <th class="px-3 py-2 text-left text-[10px] font-semibold text-gray-500 uppercase">
                                     Sucursal
                                 </th>
-                                <th
-                                    class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                <th class="px-3 py-2 text-left text-[10px] font-semibold text-gray-500 uppercase">
                                     Productos
                                 </th>
-                                <th
-                                    class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    Fecha Creación
+                                <th class="px-3 py-2 text-left text-[10px] font-semibold text-gray-500 uppercase">
+                                    Creada
                                 </th>
-                                <th
-                                    class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                <th class="px-3 py-2 text-right text-[10px] font-semibold text-gray-500 uppercase">
                                     Acciones
                                 </th>
                             </tr>
                         </thead>
-                        <tbody class="bg-white divide-y divide-gray-200">
-                            <tr v-if="(store.list?.items?.length || 0) === 0">
-                                <td colspan="5" class="px-6 py-12 text-center text-gray-500">
-                                    <TagIcon class="mx-auto h-12 w-12 text-gray-400" />
-                                    <p class="mt-2 text-lg font-medium">No hay categorías</p>
-                                    <p class="text-sm">No se encontraron categorías con los filtros aplicados</p>
+                        <tbody class="bg-white divide-y divide-gray-100">
+                            <tr v-if="filteredCategories.length === 0">
+                                <td colspan="5" class="px-3 py-10 text-center text-gray-500 text-sm">
+                                    <TagIcon class="mx-auto h-8 w-8 text-gray-400" />
+                                    <p class="mt-2 font-medium">Sin resultados</p>
+                                    <p class="text-xs">Ajusta los filtros</p>
                                 </td>
                             </tr>
 
-                            <tr v-for="category in store.list?.items || []" :key="category.id" class="hover:bg-gray-50">
-                                <!-- Category Info -->
-                                <td class="px-6 py-4 whitespace-nowrap">
-                                    <div class="flex items-center">
-                                        <div class="flex-shrink-0 h-10 w-10">
-                                            <div
-                                                class="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center">
-                                                <TagIcon class="h-5 w-5 text-blue-600" />
-                                            </div>
+                            <tr v-for="category in filteredCategories" :key="category.id" class="hover:bg-gray-50/80">
+                                <td class="px-3 py-2 whitespace-nowrap">
+                                    <div class="flex items-center gap-2">
+                                        <div
+                                            class="h-8 w-8 rounded-full bg-blue-100 flex items-center justify-center shrink-0">
+                                            <TagIcon class="h-4 w-4 text-blue-600" />
                                         </div>
-                                        <div class="ml-4">
-                                            <div class="text-sm font-medium text-gray-900">
-                                                {{ category.name }}
-                                            </div>
-                                            <div class="text-sm text-gray-500">
-                                                ID: {{ category.id }}
-                                            </div>
+                                        <div class="min-w-0">
+                                            <div class="font-medium text-gray-900 truncate max-w-[14rem]">{{
+                                                category.name }}</div>
+                                            <div class="text-[11px] text-gray-500">#{{ category.id }}</div>
                                         </div>
                                     </div>
                                 </td>
-
-                                <!-- Branch Info -->
-                                <td class="px-6 py-4 whitespace-nowrap">
-                                    <div class="text-sm text-gray-900">
-                                        <div class="flex items-center">
-                                            <BuildingOffice2Icon class="h-4 w-4 text-gray-400 mr-1" />
-                                            {{ category.branchName }}
-                                        </div>
-                                    </div>
+                                <td class="px-3 py-2 whitespace-nowrap text-gray-800">
+                                    <span class="inline-flex items-center gap-0.5">
+                                        <BuildingOffice2Icon class="h-3.5 w-3.5 text-gray-400" />
+                                        {{ category.branchName }}
+                                    </span>
                                 </td>
-
-                                <!-- Products Count -->
-                                <td class="px-6 py-4 whitespace-nowrap">
-                                    <div class="text-sm text-gray-900">
-                                        <div class="flex items-center">
-                                            <CubeIcon class="h-4 w-4 text-gray-400 mr-1" />
-                                            {{ category.totalProducts }} total
-                                        </div>
-                                        <div class="text-xs text-gray-500">
-                                            {{ category.activeProducts }} activos
-                                        </div>
-                                    </div>
+                                <td class="px-3 py-2 whitespace-nowrap text-gray-800">
+                                    <span class="inline-flex items-center gap-0.5">
+                                        <CubeIcon class="h-3.5 w-3.5 text-gray-400" />
+                                        {{ category.totalProducts }} total
+                                    </span>
+                                    <div class="text-[11px] text-gray-500">{{ category.activeProducts }} activos</div>
                                 </td>
-
-                                <!-- Created Date -->
-                                <td class="px-6 py-4 whitespace-nowrap">
-                                    <div class="text-sm text-gray-900">
-                                        {{ formatDate(category.createdAt) }}
-                                    </div>
+                                <td class="px-3 py-2 whitespace-nowrap text-xs text-gray-700">
+                                    {{ formatDate(category.createdAt) }}
                                 </td>
-
-                                <!-- Actions -->
-                                <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                    <div class="flex justify-end space-x-2">
+                                <td class="px-3 py-2 whitespace-nowrap text-right">
+                                    <div class="flex justify-end gap-1">
                                         <BaseButton @click="openEdit(category)" variant="outline" size="sm"
-                                            :icon="PencilIcon" title="Editar categoría">
-                                            Editar
-                                        </BaseButton>
+                                            :icon="PencilIcon" title="Editar" />
                                         <BaseButton v-if="auth.isSuperadmin || auth.isAdmin"
                                             @click="deleteCategory(category)" variant="outline" size="sm"
-                                            :icon="TrashIcon" title="Eliminar categoría"
-                                            class="text-red-600 hover:text-red-700">
-                                            Eliminar
-                                        </BaseButton>
+                                            :icon="TrashIcon" title="Eliminar"
+                                            class="text-red-600 hover:text-red-700 border-red-200" />
                                     </div>
                                 </td>
                             </tr>
                         </tbody>
                     </table>
                 </div>
-
-                <!-- Pagination -->
-                <div v-if="store.list && store.list.totalPages > 1" class="flex items-center justify-between mt-6">
-                    <div class="text-sm text-gray-700">
-                        Mostrando {{ ((store.list.page - 1) * store.list.pageSize) + 1 }} a
-                        {{ Math.min(store.list.page * store.list.pageSize, store.list.totalCount) }} de
-                        {{ store.list.totalCount }} resultados
-                    </div>
-                    <div class="flex space-x-2">
-                        <BaseButton size="sm" variant="outline" :disabled="!store.list.hasPreviousPage"
-                            @click="previousPage" :icon="ChevronLeftIcon">
-                            Anterior
-                        </BaseButton>
-                        <BaseButton size="sm" variant="outline" :disabled="!store.list.hasNextPage" @click="nextPage"
-                            :right-icon="ChevronRightIcon">
-                            Siguiente
-                        </BaseButton>
-                    </div>
-                </div>
             </BaseCard>
         </div>
 
-        <!-- Create/Edit Category Dialog -->
         <BaseDialog v-model="showForm" :title="editingCategory ? 'Editar Categoría' : 'Nueva Categoría'"
             :icon="PlusIcon" size="md">
             <ProductCategoryForm :category="editingCategory" :loading="formLoading" @submit="handleFormSubmit"
@@ -208,7 +140,6 @@ import BaseSelect from '@/components/ui/BaseSelect.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseLoading from '@/components/ui/BaseLoading.vue'
 import BaseDialog from '@/components/ui/BaseDialog.vue'
-import StatsCard from '@/components/ui/StatsCard.vue'
 import ProductCategoryForm from '@/components/products/categories/ProductCategoryForm.vue'
 
 import {
@@ -219,12 +150,12 @@ import {
     PlusIcon,
     PencilIcon,
     TrashIcon,
-    ChevronLeftIcon,
-    ChevronRightIcon,
     XMarkIcon
 } from '@heroicons/vue/24/outline'
 
-import type { ProductCategory, ProductCategoryFilters, ProductCategoryFormData } from '@/types/product'
+import type { ProductCategory, ProductCategoryFormData } from '@/types/product'
+
+const CATEGORIES_PAGE_SIZE = 50
 
 const router = useRouter()
 const store = useProductCategoriesStore()
@@ -232,24 +163,19 @@ const branchesStore = useBranchesStore()
 const auth = useAuthStore()
 const { success, error: showError } = useToast()
 
-// Filters
 const filters = ref({
     name: '',
     branchId: undefined as number | undefined,
-    page: 1,
-    pageSize: 10
 })
 
-// Form dialog
 const showForm = ref(false)
 const editingCategory = ref<ProductCategory | null>(null)
 const formLoading = ref(false)
 
-// Branch options
 const branchOptions = computed(() => {
     if (!branchesStore.list?.items) return []
     return [
-        { value: undefined, label: 'Todas las sucursales' },
+        { value: undefined, label: 'Todas' },
         ...branchesStore.list.items.map(branch => ({
             value: branch.id,
             label: branch.name
@@ -257,16 +183,30 @@ const branchOptions = computed(() => {
     ]
 })
 
-// Computed stats
-const categoriesWithProducts = computed(() => {
-    return store.list?.items?.filter(c => c.totalProducts > 0).length || 0
+const loadedItems = computed(() => store.list?.items || [])
+
+const loadedCount = computed(() => loadedItems.value.length)
+
+const filteredCategories = computed(() => {
+    let items = [...loadedItems.value]
+    const q = filters.value.name?.trim().toLowerCase()
+    if (q) {
+        items = items.filter(c => c.name.toLowerCase().includes(q))
+    }
+    if (filters.value.branchId != null) {
+        items = items.filter(c => c.branchId === filters.value.branchId)
+    }
+    return items
 })
 
-const categoriesWithoutProducts = computed(() => {
-    return store.list?.items?.filter(c => c.totalProducts === 0).length || 0
-})
+const categoriesWithProducts = computed(() =>
+    loadedItems.value.filter(c => c.totalProducts > 0).length
+)
 
-// Methods
+const categoriesWithoutProducts = computed(() =>
+    loadedItems.value.filter(c => c.totalProducts === 0).length
+)
+
 const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('es-CO', {
         year: 'numeric',
@@ -275,29 +215,22 @@ const formatDate = (dateString: string) => {
     })
 }
 
-const load = async () => {
+const loadAll = async () => {
     try {
-        const filtersToSend: ProductCategoryFilters = {
-            name: filters.value.name || undefined,
-            branchId: filters.value.branchId,
-            page: filters.value.page || 1,
-            pageSize: filters.value.pageSize || 10
-        }
-
-        await store.fetch(filtersToSend)
+        await store.fetch({
+            page: 1,
+            pageSize: CATEGORIES_PAGE_SIZE,
+        })
     } catch (e) {
         showError('Error al cargar', 'No se pudieron cargar las categorías')
     }
 }
 
-const clearFilters = async () => {
+const clearFilters = () => {
     filters.value = {
         name: '',
         branchId: undefined,
-        page: 1,
-        pageSize: 10
     }
-    await load()
 }
 
 const goToProducts = () => {
@@ -327,7 +260,7 @@ const handleFormSubmit = async (data: ProductCategoryFormData & { branchId?: num
         }
 
         showForm.value = false
-        await load()
+        await loadAll()
     } catch (e) {
         showError('Error al guardar', store.error || 'No se pudo guardar la categoría')
     } finally {
@@ -343,23 +276,9 @@ const deleteCategory = async (category: ProductCategory) => {
     try {
         await store.remove(category.id)
         success('Categoría eliminada', 3000, `La categoría "${category.name}" se ha eliminado correctamente`)
-        await load()
+        await loadAll()
     } catch (e) {
         showError('Error al eliminar', store.error || 'No se pudo eliminar la categoría')
-    }
-}
-
-const previousPage = async () => {
-    if (store.list?.hasPreviousPage) {
-        filters.value.page = (filters.value.page || 1) - 1
-        await load()
-    }
-}
-
-const nextPage = async () => {
-    if (store.list?.hasNextPage) {
-        filters.value.page = (filters.value.page || 1) + 1
-        await load()
     }
 }
 
@@ -369,7 +288,7 @@ onMounted(async () => {
             await branchesStore.fetchAll()
         }
 
-        await load()
+        await loadAll()
     } catch (e) {
         showError('Error al cargar', 'No se pudieron cargar los datos iniciales')
     }

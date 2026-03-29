@@ -1,221 +1,144 @@
 <!-- src/views/ProductsList.vue -->
 <template>
     <MainLayout page-title="Productos">
-        <!-- Loading State -->
         <BaseLoading v-if="store.isLoading" text="Cargando productos..." />
 
-        <!-- Content -->
-        <div v-else class="space-y-6">
-            <!-- Filters Card -->
-            <BaseCard class="p-6">
-                <div class="flex items-center justify-between mb-4">
-                    <h3 class="text-lg font-semibold text-gray-900">Filtros de búsqueda</h3>
-                    <BaseButton @click="clearFilters" variant="outline" size="sm" :icon="XMarkIcon">
-                        Limpiar filtros
-                    </BaseButton>
-                </div>
-
-                <div class="grid grid-cols-1 md:grid-cols-6 gap-4">
-                    <BaseInput v-model="filters.name" label="Nombre" placeholder="Buscar por nombre"
-                        :icon="MagnifyingGlassIcon" />
-                    <BaseSelect v-model="filters.categoryId" :options="categoryOptions" label="Categoría"
-                        placeholder="Todas las categorías" value-key="value" display-key="label" />
-                    <BaseSelect v-model="filters.active" :options="statusOptions" label="Estado"
-                        placeholder="Todos los estados" value-key="value" display-key="label" />
-                    <BaseInput :model-value="filters.minPrice?.toString() || ''" label="Precio Mín" type="number"
-                        :min="0" placeholder="0"
-                        @update:model-value="filters.minPrice = $event ? Number($event) : undefined" />
-                    <BaseInput :model-value="filters.maxPrice?.toString() || ''" label="Precio Máx" type="number"
-                        :min="0" placeholder="999999"
-                        @update:model-value="filters.maxPrice = $event ? Number($event) : undefined" />
-                    <div class="flex items-end">
-                        <BaseButton @click="load" variant="primary" size="md" :icon="MagnifyingGlassIcon" full-width>
-                            Buscar
-                        </BaseButton>
-                    </div>
-                </div>
-            </BaseCard>
-
-            <!-- Stats Cards -->
-            <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
-                <StatsCard title="Total Productos" :value="store.list?.totalCount || 0" icon="store" />
-                <StatsCard title="Productos Activos" :value="activeProducts" icon="store" />
-                <StatsCard title="Productos Inactivos" :value="inactiveProducts" icon="store" />
-                <StatsCard title="Stock Bajo" :value="lowStockProducts" icon="clipboard" />
+        <div v-else class="flex flex-col gap-2 min-h-0 -mx-2 sm:mx-0">
+            <!-- Filtros compactos -->
+            <div
+                class="flex flex-wrap items-end gap-x-3 gap-y-2 px-3 py-2 bg-white border border-gray-200 rounded-lg shadow-sm text-xs">
+                <BaseInput v-model="filters.name" placeholder="Nombre…"
+                    class="min-w-[8rem] flex-1 sm:max-w-[11rem] [&_input]:py-1.5 [&_input]:text-xs">
+                    <template #icon>
+                        <MagnifyingGlassIcon class="w-4 h-4" />
+                    </template>
+                </BaseInput>
+                <BaseSelect v-model="filters.categoryId" :options="categoryOptions" placeholder="Categoría"
+                    value-key="value" display-key="label" class="min-w-[9rem] max-w-[13rem] [&_button]:py-1.5 [&_button]:text-xs" />
+                <BaseSelect v-model="filters.active" :options="statusOptions" placeholder="Estado" value-key="value"
+                    display-key="label" class="min-w-[7rem] max-w-[10rem] [&_button]:py-1.5 [&_button]:text-xs" />
+                <BaseInput :model-value="filters.minPrice?.toString() || ''" placeholder="Precio min" type="number"
+                    :min="0" class="w-24 [&_input]:py-1.5 [&_input]:text-xs"
+                    @update:model-value="filters.minPrice = $event ? Number($event) : undefined" />
+                <BaseInput :model-value="filters.maxPrice?.toString() || ''" placeholder="Precio max" type="number"
+                    :min="0" class="w-24 [&_input]:py-1.5 [&_input]:text-xs"
+                    @update:model-value="filters.maxPrice = $event ? Number($event) : undefined" />
+                <BaseButton @click="clearFilters" variant="outline" size="sm" :icon="XMarkIcon">
+                    Limpiar
+                </BaseButton>
+                <div class="flex-1 min-w-[8rem]" />
+                <BaseButton @click="goToCategories" variant="outline" size="sm" :icon="TagIcon">
+                    Categorías
+                </BaseButton>
+                <BaseButton @click="openCreate" variant="primary" size="sm" :icon="PlusIcon">
+                    Nuevo
+                </BaseButton>
             </div>
 
-            <!-- Products Table -->
-            <BaseCard class="p-6">
-                <div class="flex items-center justify-between mb-6">
-                    <div class="flex items-center space-x-4">
-                        <h3 class="text-lg font-semibold text-gray-900">
-                            Lista de Productos
-                            <span class="text-sm font-normal text-gray-500">
-                                ({{ store.list?.items?.length || 0 }} de {{ store.list?.totalCount || 0 }})
-                            </span>
-                        </h3>
+            <!-- KPIs compactos -->
+            <div
+                class="flex flex-wrap items-center gap-x-4 gap-y-1 px-3 py-1.5 text-xs text-gray-600 bg-gray-50/90 border border-gray-100 rounded-md">
+                <span>Mostrando <strong class="text-gray-900">{{ filteredProducts.length }}</strong> de <strong
+                        class="text-gray-900">{{ loadedCount }}</strong></span>
+                <span class="hidden sm:inline text-gray-300">|</span>
+                <span>Activos <strong class="text-gray-900">{{ activeProducts }}</strong></span>
+                <span>Inactivos <strong class="text-gray-900">{{ inactiveProducts }}</strong></span>
+                <span>Stock bajo <strong class="text-amber-700">{{ lowStockProducts }}</strong></span>
+            </div>
 
-                        <!-- Link to Categories -->
-                        <BaseButton @click="goToCategories" variant="outline" size="sm" :icon="TagIcon">
-                            Ver Categorías
-                        </BaseButton>
-                    </div>
-
-                    <BaseButton @click="openCreate" variant="primary" size="sm" :icon="PlusIcon">
-                        Nuevo Producto
-                    </BaseButton>
-                </div>
-
-                <div class="overflow-hidden bg-white shadow ring-1 ring-black ring-opacity-5 rounded-lg">
-                    <table class="min-w-full divide-y divide-gray-200">
-                        <thead class="bg-gray-50">
+            <!-- Tabla con scroll -->
+            <BaseCard class="p-0 overflow-hidden flex flex-col flex-1 min-h-0 border border-gray-200">
+                <div class="overflow-auto max-h-[min(calc(100vh-13rem),72vh)]">
+                    <table class="min-w-full divide-y divide-gray-200 text-sm">
+                        <thead class="bg-gray-50 sticky top-0 z-10 shadow-sm">
                             <tr>
-                                <th
-                                    class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                <th class="px-3 py-2 text-left text-[10px] font-semibold text-gray-500 uppercase">
                                     Producto
                                 </th>
-                                <th
-                                    class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                <th class="px-3 py-2 text-left text-[10px] font-semibold text-gray-500 uppercase">
                                     Categoría
                                 </th>
-                                <th
-                                    class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                <th class="px-3 py-2 text-left text-[10px] font-semibold text-gray-500 uppercase">
                                     Precio
                                 </th>
-                                <th
-                                    class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                <th class="px-3 py-2 text-left text-[10px] font-semibold text-gray-500 uppercase">
                                     Stock
                                 </th>
-                                <th
-                                    class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                <th class="px-3 py-2 text-left text-[10px] font-semibold text-gray-500 uppercase">
                                     Estado
                                 </th>
-                                <th
-                                    class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                <th class="px-3 py-2 text-right text-[10px] font-semibold text-gray-500 uppercase">
                                     Acciones
                                 </th>
                             </tr>
                         </thead>
-                        <tbody class="bg-white divide-y divide-gray-200">
-                            <tr v-if="(store.list?.items?.length || 0) === 0">
-                                <td colspan="6" class="px-6 py-12 text-center text-gray-500">
-                                    <CubeIcon class="mx-auto h-12 w-12 text-gray-400" />
-                                    <p class="mt-2 text-lg font-medium">No hay productos</p>
-                                    <p class="text-sm">No se encontraron productos con los filtros aplicados</p>
+                        <tbody class="bg-white divide-y divide-gray-100">
+                            <tr v-if="filteredProducts.length === 0">
+                                <td colspan="6" class="px-3 py-10 text-center text-gray-500 text-sm">
+                                    <CubeIcon class="mx-auto h-8 w-8 text-gray-400" />
+                                    <p class="mt-2 font-medium">Sin resultados</p>
+                                    <p class="text-xs">Ajusta los filtros o carga productos</p>
                                 </td>
                             </tr>
 
-                            <tr v-for="product in store.list?.items || []" :key="product.id" class="hover:bg-gray-50">
-                                <!-- Product Info -->
-                                <td class="px-6 py-4 whitespace-nowrap">
-                                    <div class="flex items-center">
-                                        <div class="flex-shrink-0 h-10 w-10">
-                                            <div
-                                                class="h-10 w-10 rounded-full bg-green-100 flex items-center justify-center">
-                                                <CubeIcon class="h-5 w-5 text-green-600" />
-                                            </div>
+                            <tr v-for="product in filteredProducts" :key="product.id" class="hover:bg-gray-50/80">
+                                <td class="px-3 py-2 whitespace-nowrap">
+                                    <div class="flex items-center gap-2">
+                                        <div
+                                            class="h-8 w-8 rounded-full bg-green-100 flex items-center justify-center shrink-0">
+                                            <CubeIcon class="h-4 w-4 text-green-600" />
                                         </div>
-                                        <div class="ml-4">
-                                            <div class="text-sm font-medium text-gray-900">
-                                                {{ product.name }}
-                                            </div>
-                                            <div class="text-sm text-gray-500">
-                                                ID: {{ product.id }}
-                                            </div>
+                                        <div class="min-w-0">
+                                            <div class="font-medium text-gray-900 truncate max-w-[14rem]">{{
+                                                product.name }}</div>
+                                            <div class="text-[11px] text-gray-500">#{{ product.id }}</div>
                                         </div>
                                     </div>
                                 </td>
-
-                                <!-- Category Info -->
-                                <td class="px-6 py-4 whitespace-nowrap">
-                                    <div class="text-sm text-gray-900">
-                                        <div class="flex items-center">
-                                            <TagIcon class="h-4 w-4 text-gray-400 mr-1" />
-                                            {{ product.categoryName }}
-                                        </div>
-                                    </div>
+                                <td class="px-3 py-2 whitespace-nowrap text-gray-800">
+                                    <span class="inline-flex items-center gap-0.5">
+                                        <TagIcon class="h-3.5 w-3.5 text-gray-400" />
+                                        {{ product.categoryName }}
+                                    </span>
                                 </td>
-
-                                <!-- Price -->
-                                <td class="px-6 py-4 whitespace-nowrap">
-                                    <div class="text-sm text-gray-900">
-                                        <div class="flex items-center">
-                                            <CurrencyDollarIcon class="h-4 w-4 text-gray-400 mr-1" />
-                                            ${{ product.price.toLocaleString() }}
-                                        </div>
-                                    </div>
+                                <td class="px-3 py-2 whitespace-nowrap text-gray-800">
+                                    <span class="inline-flex items-center gap-0.5">
+                                        <CurrencyDollarIcon class="h-3.5 w-3.5 text-gray-400" />
+                                        {{ product.price.toLocaleString() }}
+                                    </span>
                                 </td>
-
-                                <!-- Stock -->
-                                <td class="px-6 py-4 whitespace-nowrap">
-                                    <div class="text-sm text-gray-900">
-                                        <div class="flex items-center">
-                                            <ArchiveBoxIcon class="h-4 w-4 text-gray-400 mr-1" />
-                                            <span v-if="product.stock === null" class="text-emerald-600 font-medium">∞</span>
-                                            <span v-else :class="{
-                                                'text-red-600 font-semibold': product.stock <= 5,
-                                                'text-yellow-600 font-medium': product.stock <= 10 && product.stock > 5,
-                                                'text-green-600': product.stock > 10
-                                            }">
-                                                {{ product.stock }}
-                                            </span>
-                                        </div>
-                                    </div>
+                                <td class="px-3 py-2 whitespace-nowrap">
+                                    <span v-if="product.stock === null" class="text-emerald-600 font-medium">∞</span>
+                                    <span v-else :class="{
+                                        'text-red-600 font-semibold': product.stock <= 5,
+                                        'text-yellow-600': product.stock <= 10 && product.stock > 5,
+                                        'text-green-600': product.stock > 10
+                                    }">{{ product.stock }}</span>
                                 </td>
-
-                                <!-- Status -->
-                                <td class="px-6 py-4 whitespace-nowrap">
-                                    <BaseBadge :variant="product.active ? 'success' : 'danger'">
+                                <td class="px-3 py-2 whitespace-nowrap">
+                                    <BaseBadge :variant="product.active ? 'success' : 'danger'" class="text-[10px]">
                                         {{ product.active ? 'Activo' : 'Inactivo' }}
                                     </BaseBadge>
                                 </td>
-
-                                <!-- Actions -->
-                                <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                    <div class="flex justify-end space-x-2">
+                                <td class="px-3 py-2 whitespace-nowrap text-right">
+                                    <div class="flex justify-end gap-1">
                                         <BaseButton @click="goDetail(product.id)" variant="outline" size="sm"
-                                            :icon="EyeIcon" title="Ver detalles">
-                                            Ver
-                                        </BaseButton>
+                                            :icon="EyeIcon" title="Ver" />
                                         <BaseButton @click="openEdit(product)" variant="outline" size="sm"
-                                            :icon="PencilIcon" title="Editar producto">
-                                            Editar
-                                        </BaseButton>
+                                            :icon="PencilIcon" title="Editar" />
                                         <BaseButton v-if="auth.isSuperadmin || auth.isAdmin"
                                             @click="deleteProduct(product)" variant="outline" size="sm"
-                                            :icon="TrashIcon" title="Eliminar producto"
-                                            class="text-red-600 hover:text-red-700">
-                                            Eliminar
-                                        </BaseButton>
+                                            :icon="TrashIcon" title="Eliminar"
+                                            class="text-red-600 hover:text-red-700 border-red-200" />
                                     </div>
                                 </td>
                             </tr>
                         </tbody>
                     </table>
                 </div>
-
-                <!-- Pagination -->
-                <div v-if="store.list && store.list.totalPages > 1" class="flex items-center justify-between mt-6">
-                    <div class="text-sm text-gray-700">
-                        Mostrando {{ ((store.list.page - 1) * store.list.pageSize) + 1 }} a
-                        {{ Math.min(store.list.page * store.list.pageSize, store.list.totalCount) }} de
-                        {{ store.list.totalCount }} resultados
-                    </div>
-                    <div class="flex space-x-2">
-                        <BaseButton size="sm" variant="outline" :disabled="!store.list.hasPreviousPage"
-                            @click="previousPage" :icon="ChevronLeftIcon">
-                            Anterior
-                        </BaseButton>
-                        <BaseButton size="sm" variant="outline" :disabled="!store.list.hasNextPage" @click="nextPage"
-                            :right-icon="ChevronRightIcon">
-                            Siguiente
-                        </BaseButton>
-                    </div>
-                </div>
             </BaseCard>
         </div>
 
-        <!-- Create/Edit Product Dialog -->
         <BaseDialog v-model="showForm" :title="editingProduct ? 'Editar Producto' : 'Nuevo Producto'" :icon="PlusIcon"
             size="lg">
             <ProductForm :product="editingProduct" :loading="formLoading" @submit="handleFormSubmit"
@@ -240,25 +163,24 @@ import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseLoading from '@/components/ui/BaseLoading.vue'
 import BaseDialog from '@/components/ui/BaseDialog.vue'
 import BaseBadge from '@/components/ui/BaseBadge.vue'
-import StatsCard from '@/components/ui/StatsCard.vue'
 import ProductForm from '@/components/products/ProductForm.vue'
 
 import {
     CubeIcon,
     TagIcon,
     CurrencyDollarIcon,
-    ArchiveBoxIcon,
     MagnifyingGlassIcon,
     PlusIcon,
     EyeIcon,
     PencilIcon,
     TrashIcon,
-    ChevronLeftIcon,
-    ChevronRightIcon,
     XMarkIcon
 } from '@heroicons/vue/24/outline'
 
-import type { Product, ProductFilters, ProductFormData } from '@/types/product'
+import type { Product, ProductFormData } from '@/types/product'
+
+const PRODUCTS_PAGE_SIZE = 150
+const CATEGORIES_PAGE_SIZE = 50
 
 const store = useProductsStore()
 const productCategoriesStore = useProductCategoriesStore()
@@ -266,34 +188,28 @@ const auth = useAuthStore()
 const router = useRouter()
 const { success, error: showError } = useToast()
 
-// Filters
 const filters = ref({
     name: '',
     categoryId: undefined as number | undefined,
     active: undefined as boolean | undefined,
     minPrice: undefined as number | undefined,
     maxPrice: undefined as number | undefined,
-    page: 1,
-    pageSize: 10
 })
 
-// Form dialog
 const showForm = ref(false)
 const editingProduct = ref<Product | null>(null)
 const formLoading = ref(false)
 
-// Status options
 const statusOptions = [
-    { value: undefined, label: 'Todos los estados' },
+    { value: undefined, label: 'Todos' },
     { value: true, label: 'Activos' },
     { value: false, label: 'Inactivos' }
 ]
 
-// Category options
 const categoryOptions = computed(() => {
     if (!productCategoriesStore.list?.items) return []
     return [
-        { value: undefined, label: 'Todas las categorías' },
+        { value: undefined, label: 'Todas' },
         ...productCategoriesStore.list.items.map(category => ({
             value: category.id,
             label: category.name
@@ -301,53 +217,62 @@ const categoryOptions = computed(() => {
     ]
 })
 
-// Computed stats
-const activeProducts = computed(() => {
-    return store.list?.items?.filter(p => p.active).length || 0
+const loadedItems = computed(() => store.list?.items || [])
+
+const loadedCount = computed(() => loadedItems.value.length)
+
+const filteredProducts = computed(() => {
+    let items = [...loadedItems.value]
+    const q = filters.value.name?.trim().toLowerCase()
+    if (q) {
+        items = items.filter(p => p.name.toLowerCase().includes(q))
+    }
+    if (filters.value.categoryId != null) {
+        items = items.filter(p => p.categoryId === filters.value.categoryId)
+    }
+    if (filters.value.active !== undefined) {
+        items = items.filter(p => p.active === filters.value.active)
+    }
+    if (filters.value.minPrice != null && !Number.isNaN(filters.value.minPrice)) {
+        items = items.filter(p => p.price >= filters.value.minPrice!)
+    }
+    if (filters.value.maxPrice != null && !Number.isNaN(filters.value.maxPrice)) {
+        items = items.filter(p => p.price <= filters.value.maxPrice!)
+    }
+    return items
 })
 
-const inactiveProducts = computed(() => {
-    return store.list?.items?.filter(p => !p.active).length || 0
-})
+const activeProducts = computed(() => loadedItems.value.filter(p => p.active).length)
 
-const lowStockProducts = computed(() => {
-    return store.list?.items?.filter(p => p.stock !== null && p.stock <= 5).length || 0
-})
+const inactiveProducts = computed(() => loadedItems.value.filter(p => !p.active).length)
 
-// Methods
-const goToCategories = () => {
-    router.push({ name: 'ProductCategoriesList' })
-}
+const lowStockProducts = computed(() =>
+    loadedItems.value.filter(p => p.stock !== null && p.stock <= 5).length
+)
 
-const load = async () => {
+const loadAll = async () => {
     try {
-        const filtersToSend: ProductFilters = {
-            name: filters.value.name || undefined,
-            categoryId: filters.value.categoryId,
-            active: filters.value.active,
-            minPrice: filters.value.minPrice,
-            maxPrice: filters.value.maxPrice,
-            page: filters.value.page || 1,
-            pageSize: filters.value.pageSize || 10
-        }
-
-        await store.fetch(filtersToSend)
+        await store.fetch({
+            page: 1,
+            pageSize: PRODUCTS_PAGE_SIZE,
+        })
     } catch (e) {
         showError('Error al cargar', 'No se pudieron cargar los productos')
     }
 }
 
-const clearFilters = async () => {
+const clearFilters = () => {
     filters.value = {
         name: '',
         categoryId: undefined,
         active: undefined,
         minPrice: undefined,
         maxPrice: undefined,
-        page: 1,
-        pageSize: 10
     }
-    await load()
+}
+
+const goToCategories = () => {
+    router.push({ name: 'ProductCategoriesList' })
 }
 
 const goDetail = (id: number) => router.push({ name: 'ProductDetail', params: { id } })
@@ -375,7 +300,7 @@ const handleFormSubmit = async (data: ProductFormData) => {
         }
 
         showForm.value = false
-        await load()
+        await loadAll()
     } catch (e) {
         showError('Error al guardar', store.error || 'No se pudo guardar el producto')
     } finally {
@@ -391,35 +316,19 @@ const deleteProduct = async (product: Product) => {
     try {
         await store.remove(product.id)
         success('Producto eliminado', 3000, `El producto "${product.name}" se ha eliminado correctamente`)
-        await load()
+        await loadAll()
     } catch (e) {
         showError('Error al eliminar', store.error || 'No se pudo eliminar el producto')
     }
 }
 
-const previousPage = async () => {
-    if (store.list?.hasPreviousPage) {
-        filters.value.page = (filters.value.page || 1) - 1
-        await load()
-    }
-}
-
-const nextPage = async () => {
-    if (store.list?.hasNextPage) {
-        filters.value.page = (filters.value.page || 1) + 1
-        await load()
-    }
-}
-
 onMounted(async () => {
     try {
-        // Load categories for the filter
         await productCategoriesStore.fetch({
             page: 1,
-            pageSize: 100,
+            pageSize: CATEGORIES_PAGE_SIZE,
         })
-
-        await load()
+        await loadAll()
     } catch (e) {
         showError('Error al cargar', 'No se pudieron cargar los datos iniciales')
     }
