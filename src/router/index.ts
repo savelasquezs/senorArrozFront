@@ -109,14 +109,11 @@ const routes: RouteRecordRaw[] = [
         }
     },
     {
-        path: '/products/:id',
-        name: 'ProductDetail',
-        component: () => import('@/views/ProductDetail.vue'),
-        meta: {
-            requiresAuth: true,
-            requiresRole: [UserRole.SUPERADMIN, UserRole.ADMIN],
-            title: 'Detalle Producto'
-        }
+        path: '/products/:id(\\d+)',
+        redirect: to => ({
+            path: '/products',
+            query: { detail: String(to.params.id) }
+        })
     },
     {
         path: '/product-categories',

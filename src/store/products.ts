@@ -16,6 +16,8 @@ export const ORDER_CATALOG_PRODUCT_PAGE_SIZE = 150;
 
 let catalogLoadInFlight: Promise<void> | null = null;
 
+type FetchOpts = { silent?: boolean };
+
 export const useProductsStore = defineStore('products', () => {
     const list = ref<PagedResult<Product> | null>(null);
     const current = ref<Product | null>(null);
@@ -28,9 +30,9 @@ export const useProductsStore = defineStore('products', () => {
     const totalProducts = computed(() => list.value?.totalCount || 0);
 
     // Fetch products with filters
-    const fetch = async (filters?: ProductFilters) => {
+    const fetch = async (filters?: ProductFilters, opts?: FetchOpts) => {
         try {
-            isLoading.value = true;
+            if (!opts?.silent) isLoading.value = true;
             error.value = null;
             const res = await productApi.getProducts(filters);
             list.value = res.data;
@@ -38,7 +40,7 @@ export const useProductsStore = defineStore('products', () => {
             error.value = err.message || 'Error al cargar productos';
             throw err;
         } finally {
-            isLoading.value = false;
+            if (!opts?.silent) isLoading.value = false;
         }
     };
 
@@ -65,9 +67,9 @@ export const useProductsStore = defineStore('products', () => {
     };
 
     // Fetch product by ID
-    const fetchById = async (id: number) => {
+    const fetchById = async (id: number, opts?: FetchOpts) => {
         try {
-            isLoading.value = true;
+            if (!opts?.silent) isLoading.value = true;
             error.value = null;
             const res = await productApi.getProductById(id);
             current.value = res.data;
@@ -75,14 +77,14 @@ export const useProductsStore = defineStore('products', () => {
             error.value = err.message || 'Error al cargar el producto';
             throw err;
         } finally {
-            isLoading.value = false;
+            if (!opts?.silent) isLoading.value = false;
         }
     };
 
     // Fetch product detail with statistics
-    const fetchDetail = async (id: number) => {
+    const fetchDetail = async (id: number, opts?: FetchOpts) => {
         try {
-            isLoading.value = true;
+            if (!opts?.silent) isLoading.value = true;
             error.value = null;
             const res = await productApi.getProductDetail(id);
             currentDetail.value = res.data;
@@ -90,14 +92,14 @@ export const useProductsStore = defineStore('products', () => {
             error.value = err.message || 'Error al cargar los detalles del producto';
             throw err;
         } finally {
-            isLoading.value = false;
+            if (!opts?.silent) isLoading.value = false;
         }
     };
 
     // Create product
-    const create = async (payload: CreateProductDto) => {
+    const create = async (payload: CreateProductDto, opts?: FetchOpts) => {
         try {
-            isLoading.value = true;
+            if (!opts?.silent) isLoading.value = true;
             error.value = null;
             const res = await productApi.createProduct(payload);
             // Add to local list if it exists
@@ -110,14 +112,14 @@ export const useProductsStore = defineStore('products', () => {
             error.value = err.message || 'Error al crear el producto';
             throw err;
         } finally {
-            isLoading.value = false;
+            if (!opts?.silent) isLoading.value = false;
         }
     };
 
     // Update product
-    const update = async (id: number, payload: UpdateProductDto) => {
+    const update = async (id: number, payload: UpdateProductDto, opts?: FetchOpts) => {
         try {
-            isLoading.value = true;
+            if (!opts?.silent) isLoading.value = true;
             error.value = null;
             const res = await productApi.updateProduct(id, payload);
             current.value = res.data;
@@ -135,14 +137,14 @@ export const useProductsStore = defineStore('products', () => {
             error.value = err.message || 'Error al actualizar el producto';
             throw err;
         } finally {
-            isLoading.value = false;
+            if (!opts?.silent) isLoading.value = false;
         }
     };
 
     // Delete product
-    const remove = async (id: number) => {
+    const remove = async (id: number, opts?: FetchOpts) => {
         try {
-            isLoading.value = true;
+            if (!opts?.silent) isLoading.value = true;
             error.value = null;
             await productApi.deleteProduct(id);
 
@@ -155,19 +157,20 @@ export const useProductsStore = defineStore('products', () => {
             // Clear current if it's the deleted product
             if (current.value && current.value.id === id) {
                 current.value = null;
+                currentDetail.value = null;
             }
         } catch (err: any) {
             error.value = err.message || 'Error al eliminar el producto';
             throw err;
         } finally {
-            isLoading.value = false;
+            if (!opts?.silent) isLoading.value = false;
         }
     };
 
     // Adjust stock
-    const adjustStock = async (id: number, payload: StockAdjustmentDto) => {
+    const adjustStock = async (id: number, payload: StockAdjustmentDto, opts?: FetchOpts) => {
         try {
-            isLoading.value = true;
+            if (!opts?.silent) isLoading.value = true;
             error.value = null;
             const res = await productApi.adjustStock(id, payload);
 
@@ -189,7 +192,7 @@ export const useProductsStore = defineStore('products', () => {
             error.value = err.message || 'Error al ajustar el stock';
             throw err;
         } finally {
-            isLoading.value = false;
+            if (!opts?.silent) isLoading.value = false;
         }
     };
 

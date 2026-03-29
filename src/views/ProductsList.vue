@@ -1,7 +1,7 @@
 <!-- src/views/ProductsList.vue -->
 <template>
     <MainLayout page-title="Productos">
-        <BaseLoading v-if="store.isLoading" text="Cargando productos..." />
+        <BaseLoading v-if="listLoading" text="Cargando productos..." />
 
         <div v-else class="flex flex-col gap-2 min-h-0 -mx-2 sm:mx-0">
             <!-- Filtros compactos -->
@@ -144,16 +144,22 @@
             <ProductForm :product="editingProduct" :loading="formLoading" @submit="handleFormSubmit"
                 @cancel="showForm = false" />
         </BaseDialog>
+
+        <ProductDetailModal
+            :open="detailOpen"
+            :product-id="detailProductId"
+            @close="closeProductDetail"
+            @refresh="loadAll" />
     </MainLayout>
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref, computed } from 'vue'
+import { onMounted, ref, computed, watch } from 'vue'
 import { useProductsStore } from '@/store/products'
 import { useProductCategoriesStore } from '@/store/productCategories'
 import { useAuthStore } from '@/store/auth'
 import { useToast } from '@/composables/useToast'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 
 import MainLayout from '@/components/layout/MainLayout.vue'
 import BaseCard from '@/components/ui/BaseCard.vue'
@@ -164,6 +170,7 @@ import BaseLoading from '@/components/ui/BaseLoading.vue'
 import BaseDialog from '@/components/ui/BaseDialog.vue'
 import BaseBadge from '@/components/ui/BaseBadge.vue'
 import ProductForm from '@/components/products/ProductForm.vue'
+import ProductDetailModal from '@/components/products/ProductDetailModal.vue'
 
 import {
     CubeIcon,
@@ -185,8 +192,13 @@ const CATEGORIES_PAGE_SIZE = 50
 const store = useProductsStore()
 const productCategoriesStore = useProductCategoriesStore()
 const auth = useAuthStore()
+const route = useRoute()
 const router = useRouter()
 const { success, error: showError } = useToast()
+
+const listLoading = ref(true)
+const detailOpen = ref(false)
+const detailProductId = ref<number | null>(null)
 
 const filters = ref({
     name: '',
@@ -251,15 +263,47 @@ const lowStockProducts = computed(() =>
 )
 
 const loadAll = async () => {
+    listLoading.value = true
     try {
-        await store.fetch({
-            page: 1,
-            pageSize: PRODUCTS_PAGE_SIZE,
-        })
+        await store.fetch(
+            {
+                page: 1,
+                pageSize: PRODUCTS_PAGE_SIZE,
+            },
+            { silent: true },
+        )
     } catch (e) {
         showError('Error al cargar', 'No se pudieron cargar los productos')
+    } finally {
+        listLoading.value = false
     }
 }
+
+const openProductDetail = (id: number) => {
+    detailProductId.value = id
+    detailOpen.value = true
+    router.replace({ query: { ...route.query, detail: String(id) } }).catch(() => {})
+}
+
+const closeProductDetail = () => {
+    detailOpen.value = false
+    detailProductId.value = null
+    const nextQuery = { ...route.query }
+    delete (nextQuery as Record<string, unknown>).detail
+    router.replace({ query: nextQuery }).catch(() => {})
+}
+
+watch(
+    () => route.query.detail,
+    q => {
+        if (typeof q !== 'string') return
+        const id = Number(q)
+        if (!Number.isFinite(id) || id <= 0) return
+        detailProductId.value = id
+        detailOpen.value = true
+    },
+    { immediate: true },
+)
 
 const clearFilters = () => {
     filters.value = {
@@ -275,7 +319,7 @@ const goToCategories = () => {
     router.push({ name: 'ProductCategoriesList' })
 }
 
-const goDetail = (id: number) => router.push({ name: 'ProductDetail', params: { id } })
+const goDetail = (id: number) => openProductDetail(id)
 
 const openCreate = () => {
     editingProduct.value = null
@@ -292,10 +336,10 @@ const handleFormSubmit = async (data: ProductFormData) => {
         formLoading.value = true
 
         if (editingProduct.value) {
-            await store.update(editingProduct.value.id, data)
+            await store.update(editingProduct.value.id, data, { silent: true })
             success('Producto actualizado', 3000, `El producto "${data.name}" se ha actualizado correctamente`)
         } else {
-            await store.create(data)
+            await store.create(data, { silent: true })
             success('Producto creado', 3000, `El producto "${data.name}" se ha creado correctamente`)
         }
 
@@ -314,7 +358,7 @@ const deleteProduct = async (product: Product) => {
     }
 
     try {
-        await store.remove(product.id)
+        await store.remove(product.id, { silent: true })
         success('Producto eliminado', 3000, `El producto "${product.name}" se ha eliminado correctamente`)
         await loadAll()
     } catch (e) {
@@ -330,6 +374,7 @@ onMounted(async () => {
         })
         await loadAll()
     } catch (e) {
+        listLoading.value = false
         showError('Error al cargar', 'No se pudieron cargar los datos iniciales')
     }
 })
