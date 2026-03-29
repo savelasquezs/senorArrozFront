@@ -36,6 +36,7 @@ import type { Product, ProductCategory, ProductFilters } from '@/types/product'
 
 // Store
 import { useProductSearchStore } from '@/store/productSearch'
+import { ORDER_CATALOG_PRODUCT_PAGE_SIZE } from '@/store/products'
 
 // Components
 import SearchInput from './ProductSearch/SearchInput.vue'
@@ -179,7 +180,7 @@ const emitFilters = () => {
         maxPrice: searchStore.maxPrice || undefined,
         active: true, // Default to active products
         page: 1,
-        pageSize: 1000
+        pageSize: ORDER_CATALOG_PRODUCT_PAGE_SIZE,
     }
     emit('filter', filters)
 }

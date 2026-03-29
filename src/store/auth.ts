@@ -9,6 +9,7 @@ import type {
 	resetPasswordCredentials,
 } from '@/types/auth';
 import { authApi } from '@/services/MainAPI/authApi';
+import { bootstrapOrderCatalog } from '@/utils/orderCatalogBootstrap';
 
 export const useAuthStore = defineStore('auth', () => {
 	// State
@@ -94,6 +95,8 @@ export const useAuthStore = defineStore('auth', () => {
 		localStorage.setItem('auth_token', data.token);
 		localStorage.setItem('refresh_token', data.refreshToken);
 		localStorage.setItem('user_data', JSON.stringify(data.user));
+
+		void bootstrapOrderCatalog(data.user.role);
 	};
 
 	const clearAuthData = (): void => {
@@ -162,6 +165,9 @@ export const useAuthStore = defineStore('auth', () => {
 			try {
 				token.value = storedToken;
 				user.value = JSON.parse(storedUser);
+				if (user.value) {
+					void bootstrapOrderCatalog(user.value.role);
+				}
 			} catch (err) {
 				console.error('Error parsing stored user data:', err);
 				clearAuthData();

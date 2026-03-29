@@ -256,20 +256,10 @@ const addProduct = () => {
 // Lifecycle
 onMounted(async () => {
     try {
-        // Cargar productos y categorías si no están cargados
-        if (products.value.length === 0) {
-            await productsStore.fetch({
-                active: true,
-                page: 1,
-                pageSize: 1000
-            })
-        }
-        if (categories.value.length === 0) {
-            await categoriesStore.fetch({
-                page: 1,
-                pageSize: 1000
-            })
-        }
+        await Promise.all([
+            productsStore.ensureCatalogLoaded(),
+            categoriesStore.ensureCatalogLoaded(),
+        ])
 
         // Auto-seleccionar categoría "Arroces"
         const arrocesCategory = categories.value.find(c =>

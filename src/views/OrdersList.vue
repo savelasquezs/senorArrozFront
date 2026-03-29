@@ -1087,9 +1087,6 @@ const handleCancelReservation = async (order: OrderListItem) => {
 
 // Lifecycle
 onMounted(async () => {
-    await Promise.all([
-        fetchOrders(),
-        banksStore.fetch({ page: 1, pageSize: 100, active: true }),
-    ])
+    await Promise.all([fetchOrders(), banksStore.ensureListLoaded()])
 })
 </script>

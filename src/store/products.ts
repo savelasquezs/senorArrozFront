@@ -11,6 +11,9 @@ import type {
 } from '@/types/product';
 import type { PagedResult } from '@/types/common';
 
+/** Catálogo para pedidos: activos, transversal a sucursales (no enviar branchId). */
+export const ORDER_CATALOG_PRODUCT_PAGE_SIZE = 150;
+
 let catalogLoadInFlight: Promise<void> | null = null;
 
 export const useProductsStore = defineStore('products', () => {
@@ -39,7 +42,7 @@ export const useProductsStore = defineStore('products', () => {
         }
     };
 
-    /** Catálogo para toma de pedidos: una sola carga por sesión salvo mutación explícita (create/update/delete). */
+    /** Catálogo para toma de pedidos: una sola carga por sesión salvo `clearList` / mutación explícita. */
     const ensureCatalogLoaded = async () => {
         if (list.value?.items && list.value.items.length > 0) {
             return;
@@ -49,7 +52,11 @@ export const useProductsStore = defineStore('products', () => {
         }
         catalogLoadInFlight = (async () => {
             try {
-                await fetch({ page: 1, pageSize: 1000, active: true });
+                await fetch({
+                    page: 1,
+                    pageSize: ORDER_CATALOG_PRODUCT_PAGE_SIZE,
+                    active: true,
+                });
             } finally {
                 catalogLoadInFlight = null;
             }
