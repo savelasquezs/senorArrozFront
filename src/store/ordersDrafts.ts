@@ -373,13 +373,6 @@ export const useOrdersDraftsStore = defineStore('ordersDrafts', () => {
         }
     }
 
-    // Load data - ADAPTAR
-    const loadCustomers = async () => {
-        const customersStore = useCustomersStore()
-        await customersStore.fetch({ page: 1, pageSize: 1000 })
-        customers.value = customersStore.list?.items || []
-    }
-
     const loadBanks = async () => {
         try {
             const banksStore = useBanksStore()
@@ -466,7 +459,6 @@ export const useOrdersDraftsStore = defineStore('ordersDrafts', () => {
         autoAdjustSinglePayment,
         saveToLocalStorage,
         loadFromLocalStorage,
-        loadCustomers,
         loadBanks,
         loadApps,
         setSearchQuery,
