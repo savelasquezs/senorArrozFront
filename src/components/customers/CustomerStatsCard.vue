@@ -1,53 +1,60 @@
 <template>
-    <div class="bg-white rounded-lg border border-gray-200 p-4">
-        <h4 class="text-sm font-medium text-gray-900 mb-3 flex items-center gap-2">
-            <ChartBarIcon class="w-4 h-4" />
+    <div class="bg-white rounded-lg border border-gray-200 p-3 sm:p-4 w-full">
+        <h4 class="text-xs font-medium text-gray-900 mb-2 flex items-center gap-2">
+            <ChartBarIcon class="w-3.5 h-3.5" />
             Estadísticas de pedidos
         </h4>
-        <p class="text-[11px] text-gray-500 mb-3">
-            Totales y fechas consideran solo pedidos <strong>no cancelados</strong>. El valor acumulado es la suma del total de
-            esos pedidos.
+        <p class="text-[10px] text-gray-500 mb-3 leading-relaxed">
+            Totales y fechas: solo pedidos <strong>no cancelados</strong>. Valor acumulado = suma de <strong>Total</strong> de esos pedidos.
         </p>
-        <div class="space-y-2">
-            <div class="flex justify-between gap-2">
-                <span class="text-sm text-gray-500">Total pedidos</span>
-                <span class="text-sm font-medium text-gray-900 tabular-nums">{{ customer.totalOrders ?? 0 }}</span>
+
+        <div class="grid grid-cols-2 lg:grid-cols-6 gap-3 lg:gap-4 items-start">
+            <!-- Destacados -->
+            <div class="col-span-1 lg:col-span-2 rounded-lg border border-emerald-100 bg-emerald-50/40 px-3 py-2">
+                <div class="text-[10px] font-medium uppercase tracking-wide text-emerald-800/90">Total pedidos</div>
+                <div class="text-xl font-semibold tabular-nums text-gray-900 leading-tight mt-0.5">
+                    {{ customer.totalOrders ?? 0 }}
+                </div>
             </div>
-            <div class="flex justify-between gap-2">
-                <span class="text-sm text-gray-500">Valor acumulado</span>
-                <span class="text-sm font-medium text-gray-900 tabular-nums">{{ formatCurrencyAccumulated }}</span>
+            <div class="col-span-1 lg:col-span-2 rounded-lg border border-emerald-100 bg-emerald-50/40 px-3 py-2">
+                <div class="text-[10px] font-medium uppercase tracking-wide text-emerald-800/90">Valor acumulado</div>
+                <div class="text-lg sm:text-xl font-semibold tabular-nums text-gray-900 leading-tight mt-0.5">
+                    {{ formatCurrencyAccumulated }}
+                </div>
             </div>
-            <div class="flex justify-between gap-2 items-start">
-                <span class="text-sm text-gray-500 shrink-0">Desde primer pedido</span>
-                <span class="text-sm font-medium text-gray-900 text-right">
+
+            <!-- Compactos -->
+            <div class="col-span-2 lg:col-span-2 grid grid-cols-2 sm:grid-cols-2 gap-x-3 gap-y-2 text-[11px]">
+                <div>
+                    <div class="text-gray-500">Desde primer pedido</div>
                     <template v-if="customer.firstOrderDate">
-                        <span class="block">{{ formatTimeAgoCalendar(customer.firstOrderDate) }}</span>
-                        <span class="block text-xs font-normal text-gray-500">{{ formatDateShort(customer.firstOrderDate) }}</span>
+                        <div class="font-medium text-gray-800 leading-tight">{{ formatTimeAgoCalendar(customer.firstOrderDate) }}</div>
+                        <div class="text-[10px] text-gray-500">{{ formatDateShort(customer.firstOrderDate) }}</div>
                     </template>
-                    <template v-else>Sin pedidos</template>
-                </span>
-            </div>
-            <div class="flex justify-between gap-2 items-start">
-                <span class="text-sm text-gray-500 shrink-0">Desde último pedido</span>
-                <span class="text-sm font-medium text-gray-900 text-right">
+                    <div v-else class="text-gray-400">Sin pedidos</div>
+                </div>
+                <div>
+                    <div class="text-gray-500">Desde último pedido</div>
                     <template v-if="customer.lastOrderDate">
-                        <span class="block">{{ formatTimeAgoCalendar(customer.lastOrderDate) }}</span>
-                        <span class="block text-xs font-normal text-gray-500">{{ formatDateShort(customer.lastOrderDate) }}</span>
+                        <div class="font-medium text-gray-800 leading-tight">{{ formatTimeAgoCalendar(customer.lastOrderDate) }}</div>
+                        <div class="text-[10px] text-gray-500">{{ formatDateShort(customer.lastOrderDate) }}</div>
                     </template>
-                    <template v-else>Sin pedidos</template>
-                </span>
-            </div>
-            <div class="flex justify-between gap-2">
-                <span class="text-sm text-gray-500">Registro del cliente</span>
-                <span class="text-sm font-medium text-gray-900">{{ formatDateShort(customer.createdAt) }}</span>
-            </div>
-            <div class="flex justify-between gap-2">
-                <span class="text-sm text-gray-500">Datos actualizados</span>
-                <span class="text-sm font-medium text-gray-900">{{ formatDateShort(customer.updatedAt) }}</span>
+                    <div v-else class="text-gray-400">Sin pedidos</div>
+                </div>
+                <div>
+                    <div class="text-gray-500">Registro cliente</div>
+                    <div class="font-medium text-gray-800">{{ formatDateShort(customer.createdAt) }}</div>
+                </div>
+                <div>
+                    <div class="text-gray-500">Datos actualizados</div>
+                    <div class="font-medium text-gray-800">{{ formatDateShort(customer.updatedAt) }}</div>
+                </div>
             </div>
         </div>
 
-        <div v-if="showActions" class="flex gap-2 mt-4 pt-3 border-t border-gray-200">
+        <div
+            v-if="showActions && (customer.totalOrders ?? 0) > 0"
+            class="flex gap-2 mt-3 pt-3 border-t border-gray-200">
             <BaseButton variant="outline" size="sm" class="flex-1" @click="handleViewOrders">
                 <span class="flex items-center justify-center">
                     <ShoppingBagIcon class="w-4 h-4 mr-2" />
@@ -80,10 +87,7 @@ const emit = defineEmits<{
 
 const { formatCurrency, formatDateShort, formatTimeAgoCalendar } = useFormatting()
 
-const formatCurrencyAccumulated = computed(() => {
-    const n = props.customer.totalAccumulated ?? 0
-    return formatCurrency(n)
-})
+const formatCurrencyAccumulated = computed(() => formatCurrency(props.customer.totalAccumulated ?? 0))
 
 const handleViewOrders = () => {
     emit('viewOrders', props.customer)

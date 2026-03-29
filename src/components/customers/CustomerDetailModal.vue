@@ -32,14 +32,11 @@
             <div v-if="currentCustomer" class="space-y-6">
 
 
-                <!-- Customer Information Grid -->
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-
-
-                    <!-- Order Statistics -->
-                    <CustomerStatsCard :customer="currentCustomer" :show-actions="showActions"
-                        @view-orders="handleViewOrders" />
-                </div>
+                <!-- Estadísticas a ancho completo del modal -->
+                <CustomerStatsCard
+                    :customer="currentCustomer"
+                    :show-actions="showActions"
+                    @view-orders="handleViewOrders" />
 
                 <!-- Addresses Section -->
                 <CustomerAddressesList :customer="currentCustomer" :show-actions="showActions" />

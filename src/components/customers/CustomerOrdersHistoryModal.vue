@@ -1,5 +1,5 @@
 <template>
-    <BaseDialog :model-value="open" title="Historial de pedidos" size="4xl" @update:model-value="onOpenChange">
+    <BaseDialog :model-value="open" title="Historial de pedidos" size="6xl" @update:model-value="onOpenChange">
         <div class="space-y-3">
             <p v-if="customer" class="text-xs text-gray-600">
                 Cliente: <strong class="text-gray-900">{{ customer.name }}</strong>
@@ -24,30 +24,12 @@
                 <p class="text-xs text-gray-500">
                     Mostrando {{ orders.length }} de {{ totalCount }} pedido(s). Incluye todos los estados.
                 </p>
-                <div class="overflow-x-auto border border-gray-200 rounded-lg max-h-[min(60vh,28rem)] overflow-y-auto">
-                    <table class="min-w-full text-sm">
-                        <thead class="bg-gray-50 sticky top-0 z-10 text-left text-[10px] font-semibold uppercase text-gray-500">
-                            <tr>
-                                <th class="px-3 py-2">#</th>
-                                <th class="px-3 py-2">Fecha</th>
-                                <th class="px-3 py-2">Tipo</th>
-                                <th class="px-3 py-2">Estado</th>
-                                <th class="px-3 py-2 text-right">Total</th>
-                            </tr>
-                        </thead>
-                        <tbody class="divide-y divide-gray-100">
-                            <tr v-if="orders.length === 0">
-                                <td colspan="5" class="px-3 py-8 text-center text-gray-500">No hay pedidos en este criterio.</td>
-                            </tr>
-                            <tr v-for="o in orders" :key="o.id" class="hover:bg-gray-50/80">
-                                <td class="px-3 py-2 font-medium text-gray-900">{{ o.id }}</td>
-                                <td class="px-3 py-2 whitespace-nowrap text-gray-700">{{ formatDateShort(o.createdAt) }}</td>
-                                <td class="px-3 py-2">{{ getOrderTypeDisplayName(o.type) }}</td>
-                                <td class="px-3 py-2">{{ getOrderStatusDisplayName(o.status) }}</td>
-                                <td class="px-3 py-2 text-right tabular-nums">${{ o.total.toLocaleString('es-CO') }}</td>
-                            </tr>
-                        </tbody>
-                    </table>
+                <div class="border border-gray-200 rounded-lg max-h-[min(70vh,36rem)] overflow-y-auto overflow-x-auto">
+                    <CustomerOrdersHistoryTable
+                        :orders="orders"
+                        :order-lines-by-id="orderLinesById"
+                        :loading="loading"
+                        :loading-details="loadingDetails" />
                 </div>
 
                 <div v-if="totalPages > 1" class="flex justify-center gap-2 pt-2">
@@ -63,12 +45,12 @@
 <script setup lang="ts">
 import { ref, watch, computed } from 'vue'
 import type { Customer } from '@/types/customer'
-import type { OrderListItem } from '@/types/order'
+import type { OrderListItem, OrderDetailItem } from '@/types/order'
 import { orderApi } from '@/services/MainAPI/orderApi'
 import BaseDialog from '@/components/ui/BaseDialog.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseLoading from '@/components/ui/BaseLoading.vue'
-import { useFormatting } from '@/composables/useFormatting'
+import CustomerOrdersHistoryTable from '@/components/customers/CustomerOrdersHistoryTable.vue'
 
 const props = defineProps<{
     open: boolean
@@ -77,11 +59,11 @@ const props = defineProps<{
 
 const emit = defineEmits<{ close: [] }>()
 
-const { formatDateShort, getOrderTypeDisplayName, getOrderStatusDisplayName } = useFormatting()
-
 const loading = ref(false)
+const loadingDetails = ref(false)
 const loadError = ref('')
 const orders = ref<OrderListItem[]>([])
+const orderLinesById = ref<Record<number, OrderDetailItem[] | undefined>>({})
 const totalCount = ref(0)
 const totalPages = ref(0)
 const page = ref(1)
@@ -103,6 +85,33 @@ function onOpenChange(val: boolean) {
 function onRangeToggle() {
     page.value = 1
     if (props.open && props.customer) void fetchOrders()
+}
+
+async function fetchOrderLinesForOrders(items: OrderListItem[]) {
+    if (items.length === 0) {
+        orderLinesById.value = {}
+        return
+    }
+    loadingDetails.value = true
+    try {
+        const entries = await Promise.all(
+            items.map(async (o) => {
+                try {
+                    const detail = await orderApi.fetchDetail(o.id)
+                    return [o.id, detail.orderDetails] as const
+                } catch {
+                    return [o.id, undefined] as const
+                }
+            }),
+        )
+        const map: Record<number, OrderDetailItem[] | undefined> = {}
+        for (const [id, lines] of entries) {
+            map[id] = lines
+        }
+        orderLinesById.value = map
+    } finally {
+        loadingDetails.value = false
+    }
 }
 
 async function fetchOrders() {
@@ -130,9 +139,11 @@ async function fetchOrders() {
         orders.value = res.items ?? []
         totalCount.value = res.totalCount ?? 0
         totalPages.value = Math.max(1, res.totalPages ?? 1)
+        void fetchOrderLinesForOrders(orders.value)
     } catch (e: unknown) {
         loadError.value = e instanceof Error ? e.message : 'Error al cargar pedidos'
         orders.value = []
+        orderLinesById.value = {}
         totalCount.value = 0
         totalPages.value = 0
     } finally {
@@ -154,6 +165,7 @@ watch(
             void fetchOrders()
         } else if (!open) {
             orders.value = []
+            orderLinesById.value = {}
             loadError.value = ''
         }
     },
