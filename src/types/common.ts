@@ -94,6 +94,56 @@ export interface NeighborhoodSummary {
   totalAddresses: number;
 }
 
+/** Configuración térmica / agente (api/Branches/{id} → printSettings). */
+export interface BranchPrintSettings {
+  branchId: number;
+  kitchenHeaderLine1?: string | null;
+  kitchenHeaderLine2?: string | null;
+  showKitchenOrderNumber: boolean;
+  showKitchenTime: boolean;
+  showKitchenNotes: boolean;
+  deliveryShowLineSubtotals: boolean;
+  deliveryShowPayments: boolean;
+  deliveryShowLoyaltyFooter: boolean;
+  cashierMirrorDeliveryLayout: boolean;
+  footerMessageKitchen?: string | null;
+  footerMessageDelivery?: string | null;
+  footerMessageCashier?: string | null;
+  paperWidthMm: number;
+  enableKitchenJobs: boolean;
+  enableDeliveryJobs: boolean;
+  enableCashierJobs: boolean;
+  printerQueueKitchen?: string | null;
+  printerQueueDelivery?: string | null;
+  printerQueueCashier?: string | null;
+  agentTokenConfigured: boolean;
+  agentTokenUpdatedAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface UpdateBranchPrintSettingsPayload {
+  kitchenHeaderLine1?: string | null;
+  kitchenHeaderLine2?: string | null;
+  showKitchenOrderNumber: boolean;
+  showKitchenTime: boolean;
+  showKitchenNotes: boolean;
+  deliveryShowLineSubtotals: boolean;
+  deliveryShowPayments: boolean;
+  deliveryShowLoyaltyFooter: boolean;
+  cashierMirrorDeliveryLayout: boolean;
+  footerMessageKitchen?: string | null;
+  footerMessageDelivery?: string | null;
+  footerMessageCashier?: string | null;
+  paperWidthMm: number;
+  enableKitchenJobs: boolean;
+  enableDeliveryJobs: boolean;
+  enableCashierJobs: boolean;
+  printerQueueKitchen?: string | null;
+  printerQueueDelivery?: string | null;
+  printerQueueCashier?: string | null;
+}
+
 export interface Branch {
   id: number;
   name: string;
@@ -111,6 +161,7 @@ export interface Branch {
   activeCustomers: number;
   neighborhoods: NeighborhoodSummary[];
   users: BranchUserSummary[];
+  printSettings?: BranchPrintSettings | null;
 }
 
 export interface BranchFilters {

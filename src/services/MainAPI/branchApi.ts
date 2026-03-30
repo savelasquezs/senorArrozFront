@@ -5,6 +5,8 @@ import type {
 	PagedResult,
 	Branch,
 	BranchFilters,
+	BranchPrintSettings,
+	UpdateBranchPrintSettingsPayload,
 	NeighborhoodSummary,
 } from '@/types/common';
 import type { NeighborhoodFormData } from '@/types/customer';
@@ -71,6 +73,23 @@ class BranchApi extends BaseApi {
 	): Promise<ApiResponse<string>> {
 		return this.delete<ApiResponse<string>>(
 			`/Branches/${branchId}/neighborhoods/${neighborhoodId}`
+		);
+	}
+
+	async updateBranchPrintSettings(
+		branchId: number,
+		payload: UpdateBranchPrintSettingsPayload
+	): Promise<ApiResponse<BranchPrintSettings>> {
+		return this.put<ApiResponse<BranchPrintSettings>>(
+			`/Branches/${branchId}/print-settings`,
+			payload
+		);
+	}
+
+	async rotateBranchAgentToken(branchId: number): Promise<ApiResponse<{ plainToken: string }>> {
+		return this.post<ApiResponse<{ plainToken: string }>>(
+			`/Branches/${branchId}/print-settings/rotate-agent-token`,
+			{}
 		);
 	}
 }
