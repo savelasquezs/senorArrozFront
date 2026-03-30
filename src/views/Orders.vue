@@ -7,7 +7,8 @@
                 <div class="flex-1 bg-white border-r border-gray-200 overflow-hidden flex flex-col min-h-0">
                     <!-- Categories Bar -->
                     <div class="px-4 border-b border-gray-200 bg-gray-50">
-                        <CategoriesBar :categories="categories as any" @category-selected="onCategorySelected" />
+                        <CategoriesBar :rice-tabs="posTabs.rice" :other-tabs="posTabs.other"
+                            @category-selected="onCategorySelected" />
                     </div>
 
                     <!-- Products Grid -->
@@ -40,6 +41,7 @@ import { useProductsStore } from '@/store/products'
 import { useProductCategoriesStore } from '@/store/productCategories'
 import { useAuthStore } from '@/store/auth'
 import { bootstrapOrderCatalog } from '@/utils/orderCatalogBootstrap'
+import { buildOrderPosTabs } from '@/config/orderPosCategories'
 // Components
 import MainLayout from '@/components/layout/MainLayout.vue'
 import BaseLoading from '@/components/ui/BaseLoading.vue'
@@ -75,6 +77,8 @@ const categories = computed(() => {
     return Array.from(categoryMap.values())
 })
 
+const posTabs = computed(() => buildOrderPosTabs(categories.value))
+
 // Catálogo ya en bootstrap (login / layout); aquí solo sincronizamos draft con Pinia.
 const ensureOrderPageData = async () => {
     try {
@@ -103,6 +107,7 @@ const initializeData = async () => {
 // Lifecycle
 onMounted(() => {
     ordersStore.setSearchQuery('')
+    ordersStore.setSelectedCategoryIds(null)
     initializeData()
 })
 

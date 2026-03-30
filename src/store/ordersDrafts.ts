@@ -21,6 +21,11 @@ import type {
     Bank,
     App,
 } from '@/types/bank'
+import { useProductCategoriesStore } from './productCategories'
+import {
+    getRiceCategoryIdSet,
+    sortProductsByPortionOrder,
+} from '@/config/orderPosCategories'
 
 /** Si falla la API al rehidratar, reconstruye un cliente mínimo desde el borrador persistido. */
 function buildFallbackCustomerForDraft(customerId: number, drafts: DraftOrder[]): Customer | null {
@@ -61,7 +66,8 @@ export const useOrdersDraftsStore = defineStore('ordersDrafts', () => {
     const isLoading = ref(false)
     const error = ref<string | null>(null)
     const searchQuery = ref('')
-    const selectedCategory = ref<number | null>(null)
+    /** null = mostrar todas las categorías; array = unión de categoryId permitidos */
+    const selectedCategoryIds = ref<number[] | null>(null)
     const customers = ref<Customer[]>([])
     const banks = ref<Bank[]>([])
     const apps = ref<App[]>([])
@@ -108,12 +114,30 @@ export const useOrdersDraftsStore = defineStore('ordersDrafts', () => {
             )
         }
 
-        // Aplicar filtro de categoría
-        if (selectedCategory.value) {
-            filtered = filtered.filter(p => p.categoryId === selectedCategory.value)
+        // Aplicar filtro de categoría (uno o varios ids, p. ej. Paisa + Paisa Chich)
+        if (selectedCategoryIds.value?.length) {
+            const allowed = new Set(selectedCategoryIds.value)
+            filtered = filtered.filter((p) => allowed.has(p.categoryId))
+        }
+
+        const catStore = useProductCategoriesStore()
+        const catalog =
+            catStore.list?.items?.map((c) => ({ id: c.id, name: c.name ?? '' })) ?? []
+        const riceIds = getRiceCategoryIdSet(catalog)
+        if (
+            selectedCategoryIds.value?.length &&
+            selectedCategoryIds.value.every((id) => riceIds.has(id))
+        ) {
+            filtered = sortProductsByPortionOrder(filtered)
         }
 
         return filtered
+    })
+
+    const selectedCategory = computed(() => {
+        const ids = selectedCategoryIds.value
+        if (!ids || ids.length !== 1) return null
+        return ids[0]
     })
 
     const bankOptions = computed(() =>
@@ -473,8 +497,12 @@ export const useOrdersDraftsStore = defineStore('ordersDrafts', () => {
         searchQuery.value = query || ''
     }
 
+    const setSelectedCategoryIds = (ids: number[] | null) => {
+        selectedCategoryIds.value = !ids?.length ? null : [...ids]
+    }
+
     const setSelectedCategory = (categoryId: number | null) => {
-        selectedCategory.value = categoryId
+        selectedCategoryIds.value = categoryId == null ? null : [categoryId]
     }
 
     // Clear - COPIAR líneas 357-360
@@ -506,6 +534,7 @@ export const useOrdersDraftsStore = defineStore('ordersDrafts', () => {
         isLoading,
         error,
         searchQuery,
+        selectedCategoryIds,
         selectedCategory,
         customers,
         banks,
@@ -538,6 +567,7 @@ export const useOrdersDraftsStore = defineStore('ordersDrafts', () => {
         loadBanks,
         loadApps,
         setSearchQuery,
+        setSelectedCategoryIds,
         setSelectedCategory,
         clear,
         create
