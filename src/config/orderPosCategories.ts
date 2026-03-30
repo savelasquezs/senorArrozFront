@@ -99,6 +99,28 @@ export function getRiceCategoryIdSet(catalog: { id: number; name: string }[]): S
     return s
 }
 
+/**
+ * Pestaña del POS con una o varias categorías del mismo grupo arroz Paisa o Ropa vieja
+ * (incluye el caso “Paisa + Paisa con chicharrón” con varios categoryId).
+ */
+export function selectedTabIsPaisaOrRopaVieja(
+    catalog: { id: number; name: string }[],
+    selectedCategoryIds: number[] | null,
+): boolean {
+    if (!selectedCategoryIds?.length) return false
+    const catById = new Map(catalog.map(c => [c.id, c]))
+    let group: RiceGroupKey | null = null
+    for (const id of selectedCategoryIds) {
+        const c = catById.get(id)
+        if (!c) return false
+        const g = riceGroupKeyForCategoryName(c.name)
+        if (!g) return false
+        if (group === null) group = g
+        else if (g !== group) return false
+    }
+    return group === 'paisa' || group === 'ropa_vieja'
+}
+
 /** Súper → Familiar → Trío → Dúo → Personal (índice menor = antes). Texto ya sin acentos. */
 const PORTION_ENDINGS: { rank: number; pattern: RegExp }[] = [
     { rank: 0, pattern: /\bsuper\s*$/i },

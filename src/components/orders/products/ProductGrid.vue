@@ -53,6 +53,8 @@
 <script setup lang="ts">
 import { computed, watch } from 'vue'
 import { useOrdersDraftsStore } from '@/store/ordersDrafts'
+import { useProductCategoriesStore } from '@/store/productCategories'
+import { selectedTabIsPaisaOrRopaVieja } from '@/config/orderPosCategories'
 import type { Product } from '@/types/order'
 
 // Components
@@ -100,21 +102,23 @@ const emit = defineEmits<{
 
 // Composables
 const ordersStore = useOrdersDraftsStore()
+const productCategoriesStore = useProductCategoriesStore()
 
 // Computed
 const products = computed(() => {
     return props.products.length > 0 ? props.products : ordersStore.filteredProducts
 })
 
-const SPECIAL_CATEGORY_KEYWORDS = ['paisa', 'ropa vieja']
+const posCatalog = computed(() =>
+    productCategoriesStore.list?.items?.map(c => ({ id: c.id, name: c.name ?? '' })) ?? [],
+)
+
 const chichRegex = /chich/i
 
+/** Paisa o Ropa vieja (una o varias categorías en la pestaña) y hay al menos un producto con chicharrón en el nombre. */
 const isSpecialCategory = computed(() => {
-    if (!ordersStore.selectedCategory) return false
-    const sampleProduct = products.value.find(product => product.categoryId === ordersStore.selectedCategory)
-    const categoryName = sampleProduct?.categoryName?.toLowerCase().trim()
-    if (!categoryName) return false
-    return SPECIAL_CATEGORY_KEYWORDS.some(keyword => categoryName.includes(keyword))
+    if (!selectedTabIsPaisaOrRopaVieja(posCatalog.value, ordersStore.selectedCategoryIds)) return false
+    return products.value.some(p => chichRegex.test(p.name))
 })
 
 const productsWithoutChich = computed(() => {
