@@ -2,13 +2,19 @@
 <template>
   <div
     class="min-h-screen flex items-center justify-center bg-gradient-to-br from-orange-50 to-orange-100 px-4 sm:px-6 lg:px-8">
+    <BaseLoading
+      v-if="authStore.isLoading"
+      fullscreen
+      size="lg"
+      text="Iniciando sesión..."
+    />
     <div class="max-w-md w-full space-y-8">
-      <!-- Brand logo or image can go here -->
       <div class="text-center mb-8">
-        <img v-if="logoUrl" :src="logoUrl" alt="Señor Arroz" class="mx-auto h-16 w-auto" />
-        <div v-else class="mx-auto h-16 w-16 bg-orange-600 rounded-full flex items-center justify-center mb-4">
-          <span class="text-2xl font-bold text-white">🍚</span>
-        </div>
+        <img
+          :src="displayLogoUrl"
+          alt="Señor Arroz"
+          class="mx-auto h-16 w-auto object-contain"
+        />
         <h1 class="mt-4 text-3xl font-bold text-gray-900">Sistema Señor Arroz</h1>
         <p class="mt-2 text-gray-600">Gestión integral de restaurantes</p>
       </div>
@@ -31,12 +37,15 @@ import { computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/store/auth'
 import LoginForm from '@/components/auth/LoginForm.vue'
+import BaseLoading from '@/components/ui/BaseLoading.vue'
 
 const router = useRouter()
 const authStore = useAuthStore()
 
 const currentYear = computed(() => new Date().getFullYear())
-const logoUrl = computed(() => import.meta.env.VITE_LOGO_URL || null)
+const displayLogoUrl = computed(
+  () => (import.meta.env.VITE_LOGO_URL as string | undefined) || '/favicon.png'
+)
 
 onMounted(async () => {
   // If user is already authenticated, redirect to dashboard
