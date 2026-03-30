@@ -21,29 +21,6 @@
                 </span>
             </BaseButton>
         </div>
-
-        <!-- Selected Category Info -->
-        <div v-if="selectedCategoryName" class="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
-            <div class="flex items-center justify-between">
-                <div class="flex items-center">
-                    <TagIcon class="w-5 h-5 text-blue-600 mr-2" />
-                    <span class="text-sm font-medium text-blue-900">
-                        Mostrando: {{ selectedCategoryName }}
-                    </span>
-
-                </div>
-                <div class="mt-2 text-xs text-blue-700 ">
-                    {{ productsCount }} productos en esta categoría
-                </div>
-                <BaseButton @click="clearSelection" variant="outline" size="sm">
-                    <span class="flex items-center">
-                        <XMarkIcon class="w-3 h-3 mr-1" />
-                        Limpiar
-                    </span>
-                </BaseButton>
-            </div>
-
-        </div>
     </div>
 </template>
 
@@ -60,18 +37,15 @@ import BaseButton from '@/components/ui/BaseButton.vue'
 import {
     TagIcon,
     SparklesIcon,
-    XMarkIcon,
 } from '@heroicons/vue/24/outline'
 
 // Props
 interface Props {
     categories?: ProductCategory[]
-    productsCount?: number
 }
 
 const props = withDefaults(defineProps<Props>(), {
     categories: () => [],
-    productsCount: 0
 })
 
 // Emits
@@ -89,19 +63,6 @@ const selectedCategory = computed(() => ordersStore.selectedCategory)
 const categories = computed(() =>
 	props.categories.length > 0 ? props.categories : categoriesStore.currentCategories,
 )
-
-const selectedCategoryName = computed(() => {
-    if (!selectedCategory.value) return null
-
-    const category = categories.value.find((c) => c.id === selectedCategory.value)
-    return category?.name || null
-})
-
-const productsCount = computed(() => {
-    if (!selectedCategory.value) return ordersStore.products.length
-
-    return ordersStore.products.filter(p => p.categoryId === selectedCategory.value).length
-})
 
 // Methods
 const selectCategory = (categoryId: number) => {

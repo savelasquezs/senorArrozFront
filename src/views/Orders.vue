@@ -7,20 +7,8 @@
                 <div class="flex-1 bg-white border-r border-gray-200 overflow-hidden flex flex-col min-h-0">
                     <!-- Categories Bar -->
                     <div class="px-4 border-b border-gray-200 bg-gray-50">
-                        <CategoriesBar :categories="categories as any"
-                            :products-count="ordersStore.filteredProducts.length"
-                            @category-selected="onCategorySelected" />
+                        <CategoriesBar :categories="categories as any" @category-selected="onCategorySelected" />
                     </div>
-                    <!-- Search Bar -->
-                    <div class="p-4 border-b border-gray-200">
-                        <BaseInput v-model="ordersStore.searchQuery" placeholder="Buscar productos..."
-                            @input="ordersStore.setSearchQuery" size="lg">
-                            <template #prepend>
-                                <MagnifyingGlassIcon class="w-5 h-5 text-gray-400" />
-                            </template>
-                        </BaseInput>
-                    </div>
-
 
                     <!-- Products Grid -->
                     <div class="flex-1 overflow-y-auto p-4">
@@ -53,7 +41,6 @@ import { useProductCategoriesStore } from '@/store/productCategories'
 import { useAuthStore } from '@/store/auth'
 import { bootstrapOrderCatalog } from '@/utils/orderCatalogBootstrap'
 // Components
-import BaseInput from '@/components/ui/BaseInput.vue'
 import MainLayout from '@/components/layout/MainLayout.vue'
 import BaseLoading from '@/components/ui/BaseLoading.vue'
 import BaseAlert from '@/components/ui/BaseAlert.vue'
@@ -61,12 +48,6 @@ import ProductsGrid from '@/components/orders/products/ProductGrid.vue'
 import CategoriesBar from '@/components/products/CategoriesBar.vue'
 import OrderSidebar from '@/components/orders/OrderSidebar.vue'
 // Toast is handled automatically by useToast composable
-
-// Icons
-import {
-    MagnifyingGlassIcon,
-
-} from '@heroicons/vue/24/outline'
 
 // Composables
 const ordersStore = useOrdersDraftsStore()
@@ -121,6 +102,7 @@ const initializeData = async () => {
 
 // Lifecycle
 onMounted(() => {
+    ordersStore.setSearchQuery('')
     initializeData()
 })
 
