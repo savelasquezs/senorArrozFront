@@ -129,6 +129,7 @@ import { ref, computed } from 'vue'
 import { useOrdersDraftsStore } from '@/store/ordersDrafts'
 import { useOrderPayments } from '@/composables/useOrderPayments'
 import type { DraftOrder } from '@/types/order'
+import { orderCashToCollect, sumOrderNonCashPayments } from '@/utils/orderCashToCollect'
 
 // Components
 import BaseButton from '@/components/ui/BaseButton.vue'
@@ -193,16 +194,23 @@ const hasPayments = computed(() => {
     return props.order.appPayment !== null || props.order.bankPayments.length > 0
 })
 
-const totalPayments = computed(() => {
-    const appTotal = props.order.appPayment ? props.order.appPayment.amount : 0
-    const bankTotal = props.order.bankPayments.reduce((sum, p) => sum + p.amount, 0)
-    return appTotal + bankTotal
-})
+const totalPayments = computed(() =>
+    sumOrderNonCashPayments({
+        bankPayments: props.order.bankPayments,
+        appPayment: props.order.appPayment,
+    })
+)
 
-const cashAmount = computed(() => {
-    const remaining = props.order.total - totalPayments.value
-    return Math.max(0, remaining) // Solo valores positivos
-})
+const cashAmount = computed(() =>
+    orderCashToCollect(
+        props.order.total,
+        {
+            bankPayments: props.order.bankPayments,
+            appPayment: props.order.appPayment,
+        },
+        { floorAtZero: true }
+    )
+)
 
 const canAddPayments = computed(() => {
     return cashAmount.value > 0

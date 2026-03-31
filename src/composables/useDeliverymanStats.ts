@@ -1,5 +1,6 @@
 import type { OrderListItem } from '@/types/order'
 import type { DeliverymanStats } from '@/types/deliveryman'
+import { orderCashToCollect } from '@/utils/orderCashToCollect'
 
 export function useDeliverymanStats() {
     /**
@@ -12,12 +13,15 @@ export function useDeliverymanStats() {
         totalAdvances: number,
         baseAmount: number = 55000
     ): DeliverymanStats => {
-        // Total de efectivo
-        const totalCash = orders.reduce((sum, order) => {
-            const bankPaymentsTotal = order.bankPayments?.reduce((s, p) => s + p.amount, 0) || 0
-            const appPaymentsTotal = order.appPayments?.reduce((s, p) => s + p.amount, 0) || 0
-            return sum + (order.total - bankPaymentsTotal - appPaymentsTotal)
-        }, 0)
+        const totalCash = orders.reduce(
+            (sum, order) =>
+                sum +
+                orderCashToCollect(order.total, {
+                    bankPayments: order.bankPayments,
+                    appPayments: order.appPayments,
+                }),
+            0
+        )
 
         // Total de delivery fees
         const totalDeliveryFee = orders.reduce((sum, o) => sum + (o.deliveryFee || 0), 0)

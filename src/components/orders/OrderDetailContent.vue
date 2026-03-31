@@ -364,6 +364,7 @@ import {
     type OrderPaymentSnapshot,
     type BankSyncPrompt,
 } from '@/utils/orderPaymentCoverage'
+import { orderCashToCollect } from '@/utils/orderCashToCollect'
 
 import type { OrderListItem } from '@/types/order'
 
@@ -541,12 +542,16 @@ const loadCustomer = async (customerId: number) => {
     }
 }
 
-// Computed para calcular efectivo a cobrar
 const cashAmount = computed(() => {
     if (!order.value) return 0
-    const totalPayments = (order.value.bankPayments?.reduce((sum, p) => sum + p.amount, 0) || 0) +
-        (order.value.appPayments?.reduce((sum, p) => sum + p.amount, 0) || 0)
-    return Math.max(0, order.value.total - totalPayments)
+    return orderCashToCollect(
+        order.value.total,
+        {
+            bankPayments: order.value.bankPayments,
+            appPayments: order.value.appPayments,
+        },
+        { floorAtZero: true }
+    )
 })
 
 // Sincronizar order del store

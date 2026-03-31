@@ -2,6 +2,7 @@
 import { computed } from 'vue'
 import { useOrdersDraftsStore } from '@/store/ordersDrafts'
 import type { DraftOrder, ValidationResult } from '@/types/order'
+import { sumOrderNonCashPayments } from '@/utils/orderCashToCollect'
 
 export function useOrderValidation(order?: DraftOrder) {
     const ordersStore = useOrdersDraftsStore()
@@ -50,11 +51,11 @@ export function useOrderValidation(order?: DraftOrder) {
         }
     }
 
-    const calculateTotalPayments = (order: DraftOrder): number => {
-        const bankTotal = order.bankPayments.reduce((sum, payment) => sum + payment.amount, 0)
-        const appTotal = order.appPayment ? order.appPayment.amount : 0
-        return bankTotal + appTotal
-    }
+    const calculateTotalPayments = (order: DraftOrder): number =>
+        sumOrderNonCashPayments({
+            bankPayments: order.bankPayments,
+            appPayment: order.appPayment,
+        })
 
     const isOrderValid = computed(() => {
         if (!currentOrder.value) return false

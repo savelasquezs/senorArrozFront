@@ -1,4 +1,5 @@
 import type { OrderListItem } from '@/types/order'
+import { orderCashToCollect } from '@/utils/orderCashToCollect'
 
 export class DeliveryService {
     // Calcular tiempo de entrega (desde que salió hasta que entregó)
@@ -25,11 +26,12 @@ export class DeliveryService {
         return `${hours}h ${minutes}min`
     }
 
-    // Calcular efectivo cobrado (total - bank - app payments)
+    /** Efectivo del pedido (puede ser negativo si hubo sobrepago). */
     static getCashCollected(order: OrderListItem): number {
-        const bankTotal = order.bankPayments?.reduce((sum, p) => sum + p.amount, 0) || 0
-        const appTotal = order.appPayments?.reduce((sum, p) => sum + p.amount, 0) || 0
-        return order.total - bankTotal - appTotal
+        return orderCashToCollect(order.total, {
+            bankPayments: order.bankPayments,
+            appPayments: order.appPayments,
+        })
     }
 
     // Calcular totales para historial

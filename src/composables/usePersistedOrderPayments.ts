@@ -4,6 +4,7 @@ import { bankPaymentApi } from '@/services/MainAPI/bankPaymentApi'
 import { appPaymentApi } from '@/services/MainAPI/appPaymentApi'
 import { useToast } from '@/composables/useToast'
 import type { OrderDetailView } from '@/types/order'
+import { orderCashToCollect, sumPaymentsAmounts } from '@/utils/orderCashToCollect'
 
 export function usePersistedOrderPayments(
     order: Ref<OrderDetailView | null>,
@@ -12,21 +13,26 @@ export function usePersistedOrderPayments(
     const { success, error } = useToast()
 
     // Computed - Calcular totales
-    const totalBankPayments = computed(() => {
-        if (!order.value) return 0
-        return order.value.bankPayments.reduce((sum, p) => sum + p.amount, 0)
-    })
+    const totalBankPayments = computed(() =>
+        order.value ? sumPaymentsAmounts(order.value.bankPayments) : 0
+    )
 
-    const totalAppPayments = computed(() => {
-        if (!order.value) return 0
-        return order.value.appPayments.reduce((sum, p) => sum + p.amount, 0)
-    })
+    const totalAppPayments = computed(() =>
+        order.value ? sumPaymentsAmounts(order.value.appPayments) : 0
+    )
 
     const totalPayments = computed(() => totalBankPayments.value + totalAppPayments.value)
 
     const cashAmount = computed(() => {
         if (!order.value) return 0
-        return Math.max(0, order.value.total - totalPayments.value)
+        return orderCashToCollect(
+            order.value.total,
+            {
+                bankPayments: order.value.bankPayments,
+                appPayments: order.value.appPayments,
+            },
+            { floorAtZero: true }
+        )
     })
 
     const canAddPayments = computed(() => cashAmount.value > 0)
