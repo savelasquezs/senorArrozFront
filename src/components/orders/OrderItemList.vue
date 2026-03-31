@@ -59,6 +59,13 @@
                     <span class="text-sm font-bold">Total:</span>
                     <span class="text-sm font-bold text-emerald-600">{{ formatCurrency(total) }}</span>
                 </div>
+                <BaseButton v-if="isDeliveryOrder" type="button" variant="outline" size="sm"
+                    class="w-full mt-1.5 justify-center" @click="copyDeliverySummaryText">
+                    <span class="flex items-center justify-center gap-1.5">
+                        <ClipboardDocumentIcon class="w-4 h-4" />
+                        Copiar mensaje domicilio
+                    </span>
+                </BaseButton>
             </div>
         </div>
     </div>
@@ -79,7 +86,8 @@ import OrderItem from '@/components/orders/OrderItem.vue'
 // Icons
 import {
     ShoppingCartIcon,
-    TrashIcon
+    TrashIcon,
+    ClipboardDocumentIcon,
 } from '@heroicons/vue/24/outline'
 
 interface Props {
@@ -110,6 +118,10 @@ const subtotal = computed(() => currentOrder.value?.subtotal || 0)
 const discountTotal = computed(() => currentOrder.value?.discountTotal || 0)
 const deliveryFee = computed(() => currentOrder.value?.deliveryFee || 0)
 const total = computed(() => currentOrder.value?.total || 0)
+const isDeliveryOrder = computed(() => currentOrder.value?.type === 'delivery')
+
+/** Texto fijo de tiempo de entrega para el mensaje copiable (WhatsApp, etc.). */
+const DELIVERY_ETA_PHRASE = '30-40 min'
 
 // Local state
 const localDeliveryFee = ref(deliveryFee.value)
@@ -158,6 +170,19 @@ const handleDeliveryFeeChange = () => {
         ordersStore.updateDeliveryFee(localDeliveryFee.value || 0)
     } catch (error: any) {
         showError('Error al actualizar envío', error.message || 'No se pudo actualizar el costo de envío')
+    }
+}
+
+async function copyDeliverySummaryText() {
+    if (!isDeliveryOrder.value) return
+    const fee = deliveryFee.value
+    const t = total.value
+    const msg = `El domicilio tiene un costo de ${formatCurrency(fee)}, serían en total ${formatCurrency(t)}, y llega en ${DELIVERY_ETA_PHRASE}`
+    try {
+        await navigator.clipboard.writeText(msg)
+        success('Copiado', 2500, 'Mensaje de domicilio listo para pegar.')
+    } catch {
+        showError('No se pudo copiar', 'Permite el portapapeles en el navegador o copia manualmente.')
     }
 }
 

@@ -30,6 +30,16 @@
                         :selected-address="getAddress(currentOrder.addressId, getCustomer(currentOrder.customerId))"
                         :order-type="currentOrder.type" mode="draft" @view-customer-detail="handleViewCustomerDetail" />
 
+                    <div v-if="showCopyAddressesButton" class="py-1">
+                        <BaseButton type="button" variant="outline" size="sm" class="w-full"
+                            @click="copyDeliveryAddressesText">
+                            <span class="flex items-center justify-center gap-1.5">
+                                <ClipboardDocumentIcon class="w-4 h-4" />
+                                Copiar direcciones
+                            </span>
+                        </BaseButton>
+                    </div>
+
                     <!-- Guest Name / Recipient Name -->
                     <div class="py-3 border-b border-gray-200">
                         <label class="block text-sm font-medium text-gray-700 mb-2">
@@ -136,7 +146,8 @@ import PaymentSelector from '@/components/payments/PaymentSelector.vue'
 import {
     ShoppingCartIcon,
     PlusIcon,
-    PaperAirplaneIcon
+    PaperAirplaneIcon,
+    ClipboardDocumentIcon,
 } from '@heroicons/vue/24/outline'
 import type { LocalHour } from '@/types/common'
 import { DateTimeService } from '@/services/domain/DateTimeService'
@@ -164,6 +175,47 @@ const reservedForDateLocal = ref<Date | null>(null)
 const currentOrder = computed(() => ordersStore.currentOrder)
 const currentTabId = computed(() => ordersStore.currentTabId)
 const { canSubmitOrder, orderErrors } = useOrderValidation(currentOrder.value || undefined)
+
+const showCopyAddressesButton = computed(() => {
+    const o = currentOrder.value
+    if (!o || (o.type !== 'delivery' && o.type !== 'reservation')) return false
+    const c = getCustomer(o.customerId)
+    const n = c?.addresses?.filter((a) => a.address?.trim())?.length ?? 0
+    return n > 0
+})
+
+function formatAddressLineForCopy(a: CustomerAddress): string {
+    const street = (a.address || '').trim()
+    const extra = (a.additionalInfo || '').trim()
+    const hood = (a.neighborhoodName || a.neighborhood?.name || '').trim()
+    const mid = [street, extra].filter(Boolean).join(', ')
+    return hood ? `${mid}, ${hood}` : mid
+}
+
+async function copyDeliveryAddressesText() {
+    const o = currentOrder.value
+    if (!o) return
+    const customer = getCustomer(o.customerId)
+    const addrs = customer?.addresses?.filter((a) => a.address?.trim()) ?? []
+    if (addrs.length === 0) {
+        showError('Sin direcciones', 'El cliente no tiene direcciones guardadas.')
+        return
+    }
+    let body: string
+    if (addrs.length === 1) {
+        body = `¿Entregamos en esta dirección?\n${formatAddressLineForCopy(addrs[0])}`
+    } else {
+        body =
+            `¿Dónde entregamos?\n` +
+            addrs.map((a, i) => `${i + 1}- ${formatAddressLineForCopy(a)}`).join('\n')
+    }
+    try {
+        await navigator.clipboard.writeText(body)
+        success('Copiado', 2500, 'Texto de direcciones listo para pegar.')
+    } catch {
+        showError('No se pudo copiar', 'Permite el portapapeles en el navegador o copia manualmente.')
+    }
+}
 
 const guestNameError = computed(() => {
     if (!currentOrder.value) return ''
