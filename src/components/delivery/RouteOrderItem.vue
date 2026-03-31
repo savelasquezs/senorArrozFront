@@ -15,25 +15,32 @@
 
             <div class="flex gap-1 flex-wrap justify-end">
                 <BaseButton size="sm" variant="outline" class="px-2" @click="onToggleDetail(true)">Ver</BaseButton>
-                <BaseButton
-                    size="sm"
-                    variant="outline"
-                    class="px-2"
-                    :loading="reprintLoading"
-                    title="Reimprimir ticket de domicilio"
-                    @click="onReprint"
-                >
-                    <PrinterIcon class="w-4 h-4" />
-                </BaseButton>
-                <BaseButton size="sm" variant="success" class="px-2" @click="openConfirmDelivered = true">✓</BaseButton>
-                <BaseButton size="sm" variant="outline" class="px-2" @click="openAddress = true">Dir</BaseButton>
             </div>
         </div>
 
         <!-- Detalle (solo lectura, compacto para mobile) -->
         <BaseDialog :model-value="openDetail" title="Detalle del pedido" @update:model-value="onToggleDetail">
-
             <OrderDetailContent v-if="order" :flat-order="order" @delivered="openConfirmDelivered = true" />
+            <template #footer>
+                <div class="flex flex-wrap justify-end gap-2">
+                    <BaseButton
+                        size="sm"
+                        variant="outline"
+                        :loading="reprintLoading"
+                        title="Reimprimir ticket de domicilio"
+                        @click="onReprint"
+                    >
+                        <PrinterIcon class="w-4 h-4 mr-1" />
+                        Imprimir
+                    </BaseButton>
+                    <BaseButton size="sm" variant="outline" @click="openAddress = true">
+                        Editar dirección
+                    </BaseButton>
+                    <BaseButton size="sm" variant="secondary" @click="onToggleDetail(false)">
+                        Cerrar
+                    </BaseButton>
+                </div>
+            </template>
         </BaseDialog>
 
         <!-- Confirmar entregado -->
@@ -51,6 +58,7 @@
         <!-- Editar dirección -->
         <BaseDialog :model-value="openAddress" title="Editar dirección" @update:model-value="openAddress = $event">
             <CustomerAddressForm v-model="addressForm" :addressId="order.addressId || undefined"
+                :can-edit-delivery-fee="false"
                 @submit="handleAddressSaved" @cancel="openAddress = false" />
         </BaseDialog>
 

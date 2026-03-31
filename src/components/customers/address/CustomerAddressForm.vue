@@ -22,8 +22,17 @@
                 </template>
             </BaseInput>
 
-            <BaseInput v-model="localForm.deliveryFee" label="Tarifa de Domicilio" type="number" :min="0" :step="100"
-                placeholder="5000" required :error="errors.deliveryFee">
+            <BaseInput
+                v-if="props.canEditDeliveryFee !== false"
+                v-model="localForm.deliveryFee"
+                label="Tarifa de Domicilio"
+                type="number"
+                :min="0"
+                :step="100"
+                placeholder="5000"
+                required
+                :error="errors.deliveryFee"
+            >
                 <template #icon>
                     <CurrencyDollarIcon class="w-4 h-4" />
                 </template>
@@ -83,6 +92,8 @@ import {
 interface Props {
     addressId?: number
     modelValue: CustomerAddressFormData
+    /** Si false, oculta / deshabilita la tarifa (domiciliario no la edita). */
+    canEditDeliveryFee?: boolean
 }
 
 
@@ -139,12 +150,13 @@ const showMapsSelector = ref(false)
 const isLocationConfirmed = ref(false)
 
 const isFormValid = computed(() => {
+    const feeOk = props.canEditDeliveryFee === false ? true : Number(localForm.deliveryFee) >= 0
     return (
         localForm.neighborhoodId > 0 &&
         localForm.address.trim() &&
         localForm.latitude !== 0 &&
         localForm.longitude !== 0 &&
-        Number(localForm.deliveryFee) >= 0 &&
+        feeOk &&
         !errors.neighborhoodId &&
         !errors.address &&
         !errors.latitude &&
@@ -207,11 +219,15 @@ const validateForm = () => {
         errors.longitude = ""
     }
 
-    const feeNum = Number(localForm.deliveryFee)
-    if (Number.isNaN(feeNum) || feeNum < 0) {
-        errors.deliveryFee = "La tarifa de domicilio no es válida"
-    } else {
+    if (props.canEditDeliveryFee === false) {
         errors.deliveryFee = ""
+    } else {
+        const feeNum = Number(localForm.deliveryFee)
+        if (Number.isNaN(feeNum) || feeNum < 0) {
+            errors.deliveryFee = "La tarifa de domicilio no es válida"
+        } else {
+            errors.deliveryFee = ""
+        }
     }
 }
 
