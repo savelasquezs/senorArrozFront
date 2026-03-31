@@ -26,16 +26,16 @@ export function useOrderPermissions() {
      * Verifica si el usuario puede editar datos básicos del pedido
      */
     const canEditOrder = (order: OrderListItem | OrderDetailView): boolean => {
-        const { userRole } = authStore
+        const role = authStore.userRole
 
         // Superadmin puede todo
-        if (userRole === 'Superadmin') return true
+        if (role === 'Superadmin') return true
 
         // Pedidos cancelados: solo Superadmin
         if (order.status === 'cancelled') return false
 
         // Admin: puede editar si es mismo día cuando está entregado
-        if (userRole === 'Admin') {
+        if (role === 'Admin') {
             if (order.status === 'delivered') {
                 return isSameDay(order.createdAt)
             }
@@ -43,7 +43,7 @@ export function useOrderPermissions() {
         }
 
         // Cashier: solo puede editar pedidos NO entregados
-        if (userRole === 'Cashier') {
+        if (role === 'Cashier') {
             return order.status !== 'delivered'
         }
 
@@ -55,11 +55,11 @@ export function useOrderPermissions() {
      * Mismas reglas de “mismo día” que canEditOrder para pedidos entregados.
      */
     const canEditDeliveryFee = (order: OrderListItem | OrderDetailView): boolean => {
-        const { userRole } = authStore
-        if (userRole !== 'Admin' && userRole !== 'Superadmin') return false
+        const role = authStore.userRole
+        if (role !== 'Admin' && role !== 'Superadmin') return false
         if (order.type !== 'delivery') return false
-        if (order.status === 'cancelled') return userRole === 'Superadmin'
-        if (userRole === 'Superadmin') return true
+        if (order.status === 'cancelled') return role === 'Superadmin'
+        if (role === 'Superadmin') return true
         if (order.status === 'delivered') return isSameDay(order.createdAt)
         return true
     }
@@ -68,16 +68,16 @@ export function useOrderPermissions() {
      * Verifica si el usuario puede editar productos del pedido
      */
     const canEditProducts = (order: OrderListItem | OrderDetailView): boolean => {
-        const { userRole } = authStore
+        const role = authStore.userRole
 
         // Superadmin puede todo
-        if (userRole === 'Superadmin') return true
+        if (role === 'Superadmin') return true
 
         // Pedidos cancelados: solo Superadmin
         if (order.status === 'cancelled') return false
 
         // Admin: puede editar productos si es mismo día cuando está entregado
-        if (userRole === 'Admin') {
+        if (role === 'Admin') {
             if (order.status === 'delivered') {
                 return isSameDay(order.createdAt)
             }
@@ -85,7 +85,7 @@ export function useOrderPermissions() {
         }
 
         // Cashier: NO puede modificar productos si está entregado
-        if (userRole === 'Cashier') {
+        if (role === 'Cashier') {
             return order.status !== 'delivered'
         }
 
@@ -96,13 +96,13 @@ export function useOrderPermissions() {
      * Verifica si el usuario puede editar pagos del pedido
      */
     const canEditPayments = (order: OrderListItem | OrderDetailView): boolean => {
-        const { userRole } = authStore
+        const role = authStore.userRole
 
         // Superadmin puede modificar pagos sin restricciones
-        if (userRole === 'Superadmin') return true
+        if (role === 'Superadmin') return true
 
         // Admin y Cashier: solo pueden modificar pagos del mismo día
-        if (userRole === 'Admin' || userRole === 'Cashier') {
+        if (role === 'Admin' || role === 'Cashier') {
             return isSameDay(order.createdAt)
         }
 
@@ -113,26 +113,26 @@ export function useOrderPermissions() {
      * Verifica si el usuario puede verificar pagos bancarios
      */
     const canVerifyPayments = (): boolean => {
-        const { userRole } = authStore
-        return userRole === 'Superadmin' || userRole === 'Admin'
+        const role = authStore.userRole
+        return role === 'Superadmin' || role === 'Admin'
     }
 
     /**
      * Verifica si el usuario puede liquidar app payments
      */
     const canSettleAppPayments = (): boolean => {
-        const { userRole } = authStore
-        return userRole === 'Superadmin' || userRole === 'Admin'
+        const role = authStore.userRole
+        return role === 'Superadmin' || role === 'Admin'
     }
 
     /**
      * Verifica si el usuario puede cancelar el pedido
      */
     const canCancel = (order: OrderListItem | OrderDetailView): boolean => {
-        const { userRole } = authStore
+        const role = authStore.userRole
 
         // Solo Admin y Superadmin pueden cancelar
-        if (userRole !== 'Admin' && userRole !== 'Superadmin') return false
+        if (role !== 'Admin' && role !== 'Superadmin') return false
 
         // Solo se pueden cancelar pedidos del mismo día
         return isSameDay(order.createdAt)
@@ -146,7 +146,7 @@ export function useOrderPermissions() {
         currentStatus: OrderStatus,
         orderType: OrderType
     ): OrderStatus | null => {
-        const { userRole } = authStore
+        const role = authStore.userRole
 
         // Pedidos cancelados o entregados no pueden avanzar
         if (currentStatus === 'cancelled' || currentStatus === 'delivered') {
@@ -167,7 +167,7 @@ export function useOrderPermissions() {
         if (!nextStatus) return null
 
         // Kitchen solo puede avanzar hasta ready
-        if (userRole === 'Kitchen') {
+        if (role === 'Kitchen') {
             if (currentStatus === 'in_preparation') {
                 return 'ready' // Kitchen solo: in_preparation -> ready
             }
@@ -175,7 +175,7 @@ export function useOrderPermissions() {
         }
 
         // Deliveryman solo puede cambiar ready->on_the_way y on_the_way->delivered
-        if (userRole === 'Deliveryman') {
+        if (role === 'Deliveryman') {
             if (currentStatus === 'ready' && nextStatus === 'on_the_way') {
                 return 'on_the_way'
             }
@@ -195,11 +195,11 @@ export function useOrderPermissions() {
      * Verifica si el usuario puede cambiar el pedido a un nuevo estado
      */
     const canChangeStatus = (order: OrderListItem | OrderDetailView, newStatus: OrderStatus): boolean => {
-        const { userRole } = authStore
+        const role = authStore.userRole
         const currentStatus = order.status
 
         // Superadmin puede cambiar a cualquier estado (incluso retroceder)
-        if (userRole === 'Superadmin') return true
+        if (role === 'Superadmin') return true
 
         // No se puede cambiar desde cancelled o delivered (excepto Superadmin)
         if (currentStatus === 'cancelled' || currentStatus === 'delivered') {
@@ -207,10 +207,10 @@ export function useOrderPermissions() {
         }
 
         // Admin puede cambiar a cualquier estado (excepto desde cancelled/delivered)
-        if (userRole === 'Admin') return true
+        if (role === 'Admin') return true
 
         // Kitchen solo puede cambiar entre taken, in_preparation y ready
-        if (userRole === 'Kitchen') {
+        if (role === 'Kitchen') {
             const allowedTransitions = [
                 ['taken', 'in_preparation'],
                 ['in_preparation', 'ready'],
@@ -221,7 +221,7 @@ export function useOrderPermissions() {
         }
 
         // Deliveryman solo puede cambiar ready->on_the_way y on_the_way->delivered
-        if (userRole === 'Deliveryman') {
+        if (role === 'Deliveryman') {
             const allowedTransitions = [
                 ['ready', 'on_the_way'],
                 ['on_the_way', 'delivered'],
@@ -232,7 +232,7 @@ export function useOrderPermissions() {
         }
 
         // Cashier solo puede avanzar hacia adelante (no retroceder)
-        if (userRole === 'Cashier') {
+        if (role === 'Cashier') {
             const statusOrder: OrderStatus[] = [
                 'taken',
                 'in_preparation',
@@ -254,7 +254,7 @@ export function useOrderPermissions() {
      * Obtiene todos los estados a los que se puede transicionar desde el estado actual
      */
     const getAllowedStatusTransitions = (currentStatus: OrderStatus): OrderStatus[] => {
-        const { userRole } = authStore
+        const role = authStore.userRole
         const allStatuses: OrderStatus[] = [
             'taken',
             'in_preparation',
@@ -264,7 +264,7 @@ export function useOrderPermissions() {
         ]
 
         // Superadmin puede ir a cualquier estado
-        if (userRole === 'Superadmin') {
+        if (role === 'Superadmin') {
             return allStatuses.filter((s) => s !== currentStatus)
         }
 
@@ -274,19 +274,19 @@ export function useOrderPermissions() {
         }
 
         // Admin puede ir a cualquier estado (excepto desde cancelled/delivered)
-        if (userRole === 'Admin') {
+        if (role === 'Admin') {
             return allStatuses.filter((s) => s !== currentStatus)
         }
 
         // Kitchen solo puede ir a in_preparation y ready
-        if (userRole === 'Kitchen') {
+        if (role === 'Kitchen') {
             if (currentStatus === 'taken') return ['in_preparation']
             if (currentStatus === 'in_preparation') return ['ready']
             return []
         }
 
         // Cashier solo puede avanzar hacia adelante
-        if (userRole === 'Cashier') {
+        if (role === 'Cashier') {
             const statusOrder: OrderStatus[] = [
                 'taken',
                 'in_preparation',
