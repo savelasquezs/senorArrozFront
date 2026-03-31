@@ -13,6 +13,7 @@ export interface ExpenseHeader {
     linkedDeliverymanAdvanceId?: number | null
     linkedDeliverymanAdvanceAmount?: number | null
     total?: number
+    vatAmount?: number
     createdById: number
     createdByName: string
     createdAt: string
@@ -53,6 +54,8 @@ export interface CreateExpenseHeaderDto {
     deliverymanId?: number | null
     expenseDetails: CreateExpenseDetailDto[]
     expenseBankPayments?: CreateExpenseBankPaymentDto[]
+    /** IVA 19 % sobre subtotal de líneas */
+    includeVat?: boolean
 }
 
 export interface CreateExpenseDetailDto {
@@ -71,6 +74,7 @@ export interface UpdateExpenseHeaderDto {
     supplierId?: number
     expenseDetails?: UpdateExpenseDetailDto[]
     expenseBankPayments?: CreateExpenseBankPaymentDto[]
+    includeVat?: boolean
 }
 
 export interface UpdateExpenseDetailDto {

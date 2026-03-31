@@ -132,6 +132,18 @@
                 </div>
             </div>
 
+            <div class="rounded-lg border border-gray-200 bg-amber-50/50 px-3 py-3">
+                <label class="inline-flex items-start gap-2 text-sm text-gray-800 cursor-pointer">
+                    <input v-model="applyVat" type="checkbox" class="rounded border-gray-300 mt-0.5" />
+                    <span>
+                        <span class="font-medium">Aplicar IVA 19%</span>
+                        <span class="block text-xs text-gray-600 mt-0.5">
+                            Se calcula sobre el subtotal de las líneas (importes sin IVA). El total factura y los pagos usan subtotal + IVA.
+                        </span>
+                    </span>
+                </label>
+            </div>
+
             <!-- Métodos de Pago -->
             <div>
                 <div class="flex items-center justify-between mb-3">
@@ -153,11 +165,12 @@
                         class="flex items-center gap-3 border rounded-lg p-3 bg-blue-50">
                         <div class="flex-1">
                             <BaseSelect v-model="payment.bankId" :options="bankOptions"
-                                placeholder="Seleccionar banco..." value-key="value" display-key="label" />
+                                placeholder="Seleccionar banco..." value-key="value" display-key="label"
+                                @update:model-value="onBankPaymentBankSelected(index)" />
                         </div>
                         <div class="w-32">
                             <BaseInput v-model.number="payment.amount" type="number" :min="0" step="1000"
-                                placeholder="Monto" />
+                                placeholder="Monto" @input="clearBankPaymentSync(index)" />
                         </div>
                         <BaseButton type="button" variant="ghost" size="sm" @click="removeBankPayment(index)">
                             <TrashIcon class="w-4 h-4 text-red-600" />
@@ -168,8 +181,16 @@
                 <!-- Resumen de Pagos (siempre visible) -->
                 <div class="mt-3 p-3 bg-gray-50 rounded-lg">
                     <div class="flex justify-between text-sm">
-                        <span class="font-medium text-gray-700">Total Gastos:</span>
+                        <span class="font-medium text-gray-700">Subtotal de líneas:</span>
                         <span class="font-semibold text-gray-900">{{ formatCurrency(totalExpenses) }}</span>
+                    </div>
+                    <div v-if="applyVat" class="flex justify-between text-sm mt-1">
+                        <span class="font-medium text-gray-700">IVA (19%):</span>
+                        <span class="font-semibold text-gray-800">{{ formatCurrency(invoiceVatAmount) }}</span>
+                    </div>
+                    <div class="flex justify-between text-sm mt-1 pt-1 border-t border-gray-200">
+                        <span class="font-medium text-gray-900">Total factura:</span>
+                        <span class="font-semibold text-indigo-700">{{ formatCurrency(invoiceGrossTotal) }}</span>
                     </div>
                     <div v-if="formData.expenseBankPayments.length > 0" class="flex justify-between text-sm mt-2">
                         <span class="font-medium text-gray-700">Total Pagos Bancarios:</span>
@@ -212,7 +233,7 @@
                 </div>
                     <p v-if="willSyncLinkedAdvanceOnSave" class="text-xs text-amber-900 bg-amber-50 border border-amber-200 rounded-lg p-2">
                     Al guardar se pedirá confirmación para actualizar el abono vinculado al nuevo total
-                    ({{ formatCurrency(totalExpenses) }}).
+                    ({{ formatCurrency(invoiceGrossTotal) }}).
                 </p>
             </div>
             <div v-else class="mt-4 border-t border-gray-200 pt-4 space-y-2">
@@ -283,7 +304,7 @@
     >
         <p class="text-sm text-gray-700">
             Este gasto estaba pagado solo con transferencias y el total ya no coincide con la suma en banco.
-            ¿Repartir el nuevo total ({{ formatCurrency(totalExpenses) }}) entre las cuentas registradas de forma proporcional?
+            ¿Repartir el nuevo total ({{ formatCurrency(invoiceGrossTotal) }}) entre las cuentas registradas de forma proporcional?
         </p>
         <template #footer>
             <BaseButton variant="secondary" @click="onDismissExpenseBankSync">No, guardar así</BaseButton>
@@ -300,7 +321,7 @@
         <p class="text-sm text-gray-700 space-y-2">
             <span class="block">
                 Se actualizará el abono #{{ editingExpense?.linkedDeliverymanAdvanceId }} para igualar el total del gasto
-                ({{ formatCurrency(totalExpenses) }}).
+                ({{ formatCurrency(invoiceGrossTotal) }}).
             </span>
             <span class="block text-amber-900 text-xs">
                 Solo aplica automáticamente si el abono es del día actual; si no, debes corregirlo en el módulo de domiciliarios.
@@ -361,6 +382,8 @@ const { formatCurrency } = useFormatting()
 const { error, success } = useToast()
 const authStore = useAuthStore()
 
+const EXPENSE_VAT_RATE = 0.19
+
 // Estado del formulario
 const formData = ref<{
     supplierId: number | null
@@ -370,7 +393,7 @@ const formData = ref<{
         expenseUnit?: string
         total?: number  // Total ingresado por el usuario
     }>
-    expenseBankPayments: Array<CreateExpenseBankPaymentDto & { tempId: string }>
+    expenseBankPayments: Array<CreateExpenseBankPaymentDto & { tempId: string; syncAmount?: boolean }>
 }>({
     supplierId: null,
     expenseDetails: [],
@@ -414,6 +437,9 @@ const isDeliverymanAdvance = ref(false)
 const selectedDeliverymanId = ref<number | null>(null)
 const deliverymenOptions = ref<Array<{ value: number; label: string; ordersCount: number }>>([])
 const loadingDeliverymen = ref(false)
+
+/** IVA sobre subtotal de líneas; total factura = subtotal + IVA. */
+const applyVat = ref(false)
 
 /** Al abrir edición: el gasto cargaba 100 % por banco (suma bancos = total líneas) */
 const editExpensePaymentSnapshot = ref<{ wasFullyBank: boolean } | null>(null)
@@ -621,6 +647,8 @@ const initializeForm = async () => {
             })
         )
 
+        applyVat.value = Number(props.editingExpense.vatAmount ?? 0) > 0.01
+
         formData.value = {
             supplierId: props.editingExpense.supplierId,
             expenseDetails: details,
@@ -628,9 +656,12 @@ const initializeForm = async () => {
                 bankId: payment.bankId,
                 amount: payment.amount,
                 tempId: `payment-${payment.id}`,
+                syncAmount: false,
             })),
         }
         const initialLineTotal = details.reduce((sum, d) => sum + Number(d.total ?? 0), 0)
+        const initialVat = Number(props.editingExpense.vatAmount ?? 0)
+        const initialGross = initialLineTotal + initialVat
         const initialBankSum = props.editingExpense.expenseBankPayments.reduce(
             (s, p) => s + Number(p.amount),
             0,
@@ -638,7 +669,7 @@ const initializeForm = async () => {
         editExpensePaymentSnapshot.value = {
             wasFullyBank:
                 props.editingExpense.expenseBankPayments.length > 0 &&
-                Math.round(initialBankSum) === Math.round(initialLineTotal),
+                Math.round(initialBankSum) === Math.round(initialGross),
         }
         await ensureSupplierOption(formData.value.supplierId)
 
@@ -658,6 +689,7 @@ const initializeForm = async () => {
             selectedDeliverymanId.value = null
         }
     } else {
+        applyVat.value = false
         editExpensePaymentSnapshot.value = null
         formData.value = {
             supplierId: null,
@@ -695,12 +727,19 @@ const totalExpenses = computed(() => {
     return formData.value.expenseDetails.reduce((sum, detail) => sum + lineTotal(detail), 0)
 })
 
+const invoiceVatAmount = computed(() => {
+    if (!applyVat.value) return 0
+    return Math.round(totalExpenses.value * EXPENSE_VAT_RATE)
+})
+
+const invoiceGrossTotal = computed(() => totalExpenses.value + invoiceVatAmount.value)
+
 /** Edición: hay abono ExpenseOffset ligado y el total del formulario difiere del monto del abono */
 const willSyncLinkedAdvanceOnSave = computed(() => {
     const e = props.editingExpense
     if (!e?.linkedDeliverymanAdvanceId) return false
     const prev = Number(e.linkedDeliverymanAdvanceAmount ?? 0)
-    return Math.abs(totalExpenses.value - prev) > 0.01
+    return Math.abs(invoiceGrossTotal.value - prev) > 0.01
 })
 
 const totalBankPayments = computed(() => {
@@ -711,11 +750,11 @@ const totalBankPayments = computed(() => {
 const expenseBankAdjustNeeded = computed(() => {
     if (!props.editingExpense || !editExpensePaymentSnapshot.value?.wasFullyBank) return false
     if (formData.value.expenseBankPayments.length === 0) return false
-    return Math.round(totalBankPayments.value) !== Math.round(totalExpenses.value)
+    return Math.round(totalBankPayments.value) !== Math.round(invoiceGrossTotal.value)
 })
 
 const cashDifference = computed(() => {
-    return totalExpenses.value - totalBankPayments.value
+    return invoiceGrossTotal.value - totalBankPayments.value
 })
 
 const isFormValid = computed(() => {
@@ -723,6 +762,12 @@ const isFormValid = computed(() => {
         formData.value.expenseDetails.length > 0 &&
         formData.value.expenseDetails.every(d => d.expenseId > 0 && d.quantity > 0 && lineTotal(d) > 0) &&
         cashDifference.value >= 0
+})
+
+watch(invoiceGrossTotal, (gross) => {
+    for (const p of formData.value.expenseBankPayments) {
+        if (p.syncAmount) p.amount = gross
+    }
 })
 
 const canManageSuppliers = computed(() => {
@@ -966,9 +1011,20 @@ const removeDetail = (index: number) => {
 const addBankPayment = () => {
     formData.value.expenseBankPayments.push({
         bankId: 0,
-        amount: 0,
+        amount: invoiceGrossTotal.value,
         tempId: `temp-${Date.now()}-${Math.random()}`,
+        syncAmount: true,
     })
+}
+
+function clearBankPaymentSync(index: number) {
+    const p = formData.value.expenseBankPayments[index]
+    if (p) p.syncAmount = false
+}
+
+function onBankPaymentBankSelected(index: number) {
+    const p = formData.value.expenseBankPayments[index]
+    if (p?.syncAmount) p.amount = invoiceGrossTotal.value
 }
 
 const removeBankPayment = (index: number) => {
@@ -976,7 +1032,7 @@ const removeBankPayment = (index: number) => {
 }
 
 function applyProportionalBankPaymentsToTotal() {
-    const target = Math.round(totalExpenses.value)
+    const target = Math.round(invoiceGrossTotal.value)
     const payments = formData.value.expenseBankPayments
     if (payments.length === 0) return
     const distributed = distributeExpenseBankPaymentsProportionally(
@@ -984,7 +1040,10 @@ function applyProportionalBankPaymentsToTotal() {
         target,
     )
     distributed.forEach((d, i) => {
-        if (payments[i]) payments[i].amount = d.amount
+        if (payments[i]) {
+            payments[i].amount = d.amount
+            payments[i].syncAmount = false
+        }
     })
 }
 
@@ -1040,6 +1099,7 @@ async function executeExpenseSave() {
         const payload: CreateExpenseHeaderDto | UpdateExpenseHeaderDto = {
             supplierId: formData.value.supplierId!,
             ...(deliverymanForHeader ? { deliverymanId: deliverymanForHeader } : {}),
+            includeVat: applyVat.value,
             expenseDetails: formData.value.expenseDetails.map(d => {
                 const userTotal = Number(d.total ?? 0)
                 const qty = Number(d.quantity)
@@ -1067,7 +1127,7 @@ async function executeExpenseSave() {
         }
 
         if (!props.skipAutoAdvance && !props.editingExpense && isDeliverymanAdvance.value && selectedDeliverymanId.value) {
-            const amount = totalExpenses.value
+            const amount = invoiceGrossTotal.value
             try {
                 const advance = await deliverymanApi.createAdvance(selectedDeliverymanId.value, {
                     amount,
