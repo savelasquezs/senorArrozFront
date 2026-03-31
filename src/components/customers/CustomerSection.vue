@@ -41,6 +41,11 @@
                 </div>
             </div>
 
+            <div v-if="props.selectedCustomer.loyaltyNextRewardMessage"
+                class="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950">
+                {{ props.selectedCustomer.loyaltyNextRewardMessage }}
+            </div>
+
             <!-- Address Selection (for delivery and reservation) -->
             <div v-if="orderType === 'delivery' || orderType === 'reservation'" class="space-y-2">
                 <div class="flex items-center justify-between mb-1">

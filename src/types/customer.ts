@@ -16,6 +16,12 @@ export interface Customer {
     lastOrderDate?: string;
     /** Suma de totales de pedidos no cancelados. */
     totalAccumulated?: number;
+    /** Pedidos entregados con cliente (derivado en API). */
+    loyaltyDeliveredCount?: number;
+    loyaltyNextStepIndex?: number | null;
+    loyaltyNextRewardLabel?: string | null;
+    /** Mensaje listo para mostrar al tomar pedido. */
+    loyaltyNextRewardMessage?: string | null;
     addresses?: CustomerAddress[];
 }
 
