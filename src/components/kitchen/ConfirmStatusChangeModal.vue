@@ -69,8 +69,6 @@ const confirmAndUpdate = async () => {
 
         success(`${props.orders.length} pedido(s) marcado(s) como listos`, 5000)
 
-        console.log('TODO: Imprimir facturas para pedidos:', props.orders.map(o => o.id))
-
         emit('updated')
         emit('close')
     } catch (err: any) {

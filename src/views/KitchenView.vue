@@ -103,6 +103,7 @@ import { useTextToSpeech } from '@/composables/useTextToSpeech'
 import { useNotifications } from '@/composables/useNotifications'
 import { useToast } from '@/composables/useToast'
 import { KitchenService } from '@/services/domain/KitchenService'
+import { printJobsApi } from '@/services/MainAPI/printJobsApi'
 import type { OrderListItem, OrderDetailItem, OrderStatus } from '@/types/order'
 import MainLayout from '@/components/layout/MainLayout.vue'
 import OrderCardGrid from '@/components/kitchen/OrderCardGrid.vue'
@@ -299,9 +300,23 @@ const toggleSound = () => {
     }
 }
 
-const handleReprint = (orderId: number) => {
-    console.log('TODO: Reimprimir pedido:', orderId)
-    success('Función de impresión pendiente de configuración', 5000)
+const handleReprint = async (orderId: number) => {
+    const branchId = authStore.user?.branchId
+    if (!branchId) {
+        error('Sin sucursal', 'Tu usuario no tiene sucursal asignada.')
+        return
+    }
+    try {
+        const res = await printJobsApi.enqueueKitchenJob(branchId, [orderId])
+        if (!res.isSuccess) {
+            error('Reimpresión', res.message || 'No se pudo encolar la comanda.')
+            return
+        }
+        success('Comanda en cola', 3500, 'El agente de impresión la emitirá en breve.')
+    } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : 'No se pudo encolar la reimpresión.'
+        error('Reimpresión', msg)
+    }
 }
 
 onMounted(async () => {
