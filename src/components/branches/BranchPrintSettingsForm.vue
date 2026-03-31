@@ -104,7 +104,14 @@
         </div>
 
         <div class="max-w-xs">
-            <BaseInput v-model.number="form.paperWidthMm" label="Ancho papel (mm)" type="number" :min="40" :max="120" />
+            <BaseSelect
+                v-model="form.paperWidthMm"
+                :options="paperWidthOptions"
+                label="Ancho papel (mm)"
+                value-key="value"
+                display-key="label"
+                placeholder="Seleccionar ancho"
+            />
         </div>
 
         <div class="border-t border-gray-200 pt-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
@@ -175,6 +182,7 @@ import { reactive, ref, watch, computed } from 'vue'
 import type { BranchPrintSettings, UpdateBranchPrintSettingsPayload } from '@/types/common'
 import { apiStaticOrigin, branchApi } from '@/services/MainAPI/branchApi'
 import BaseInput from '@/components/ui/BaseInput.vue'
+import BaseSelect from '@/components/ui/BaseSelect.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseAlert from '@/components/ui/BaseAlert.vue'
 import BaseDialog from '@/components/ui/BaseDialog.vue'
@@ -198,6 +206,10 @@ const uploadingLogo = ref(false)
 const deletingLogo = ref(false)
 const pickedFile = ref<File | null>(null)
 const fileInput = ref<HTMLInputElement | null>(null)
+const paperWidthOptions = [
+    { value: 58, label: '58 mm' },
+    { value: 80, label: '80 mm' },
+]
 
 const logoPreviewSrc = computed(() => {
     const p = props.initial?.receiptLogoPath
