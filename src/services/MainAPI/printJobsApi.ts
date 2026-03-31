@@ -15,6 +15,16 @@ class PrintJobsApi extends BaseApi {
 			orderIds,
 		})
 	}
+
+	async enqueueDeliveryJob(
+		branchId: number,
+		orderIds: number[]
+	): Promise<ApiResponse<EnqueuePrintJobResponse>> {
+		return this.post<ApiResponse<EnqueuePrintJobResponse>>(`/branches/${branchId}/print-jobs`, {
+			kind: 'delivery',
+			orderIds,
+		})
+	}
 }
 
 export const printJobsApi = new PrintJobsApi()

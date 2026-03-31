@@ -13,8 +13,18 @@
                 <div class="text-xs text-gray-500 truncate">{{ order.neighborhoodName || order.branchName }}</div>
             </div>
 
-            <div class="flex gap-1">
+            <div class="flex gap-1 flex-wrap justify-end">
                 <BaseButton size="sm" variant="outline" class="px-2" @click="onToggleDetail(true)">Ver</BaseButton>
+                <BaseButton
+                    size="sm"
+                    variant="outline"
+                    class="px-2"
+                    :loading="reprintLoading"
+                    title="Reimprimir ticket de domicilio"
+                    @click="onReprint"
+                >
+                    <PrinterIcon class="w-4 h-4" />
+                </BaseButton>
                 <BaseButton size="sm" variant="success" class="px-2" @click="openConfirmDelivered = true">✓</BaseButton>
                 <BaseButton size="sm" variant="outline" class="px-2" @click="openAddress = true">Dir</BaseButton>
             </div>
@@ -67,12 +77,16 @@ import CustomerAddressForm from '@/components/customers/address/CustomerAddressF
 import { useGeolocation } from '@/composables/useGeolocation'
 
 import { useOrdersDataStore } from '@/store/ordersData'
+import { useAuthStore } from '@/store/auth'
+import { printJobsApi } from '@/services/MainAPI/printJobsApi'
 import type { CustomerAddressFormData } from '@/types/customer'
 import OrderDetailContent from '@/components/orders/OrderDetailContent.vue'
 import type { OrderListItem } from '@/types/order'
 import { useToast } from '@/composables/useToast'
+import { PrinterIcon } from '@heroicons/vue/24/outline'
 
-const { success } = useToast()
+const { success, error: showError } = useToast()
+const authStore = useAuthStore()
 interface Props { order: OrderListItem }
 const props = defineProps<Props>()
 const emit = defineEmits<{
@@ -85,6 +99,29 @@ const openDetail = ref(false)
 const openConfirmDelivered = ref(false)
 const openAddress = ref(false)
 const openCoordsPrompt = ref(false)
+const reprintLoading = ref(false)
+
+const onReprint = async () => {
+    const branchId = authStore.user?.branchId
+    if (!branchId) {
+        showError('Sin sucursal', 'Tu usuario no tiene sucursal asignada.')
+        return
+    }
+    reprintLoading.value = true
+    try {
+        const res = await printJobsApi.enqueueDeliveryJob(branchId, [props.order.id])
+        if (!res.isSuccess) {
+            showError('Reimpresión', res.message || 'No se pudo encolar el ticket.')
+            return
+        }
+        success('Ticket en cola', 3500, 'El agente lo imprimirá en breve.')
+    } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : 'No se pudo encolar la reimpresión.'
+        showError('Reimpresión', msg)
+    } finally {
+        reprintLoading.value = false
+    }
+}
 
 const { requestLocation } = useGeolocation()
 
