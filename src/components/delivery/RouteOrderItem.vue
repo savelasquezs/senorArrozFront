@@ -77,7 +77,6 @@ import CustomerAddressForm from '@/components/customers/address/CustomerAddressF
 import { useGeolocation } from '@/composables/useGeolocation'
 
 import { useOrdersDataStore } from '@/store/ordersData'
-import { useAuthStore } from '@/store/auth'
 import { printJobsApi } from '@/services/MainAPI/printJobsApi'
 import type { CustomerAddressFormData } from '@/types/customer'
 import OrderDetailContent from '@/components/orders/OrderDetailContent.vue'
@@ -86,7 +85,6 @@ import { useToast } from '@/composables/useToast'
 import { PrinterIcon } from '@heroicons/vue/24/outline'
 
 const { success, error: showError } = useToast()
-const authStore = useAuthStore()
 interface Props { order: OrderListItem }
 const props = defineProps<Props>()
 const emit = defineEmits<{
@@ -102,9 +100,9 @@ const openCoordsPrompt = ref(false)
 const reprintLoading = ref(false)
 
 const onReprint = async () => {
-    const branchId = authStore.user?.branchId
+    const branchId = props.order.branchId
     if (!branchId) {
-        showError('Sin sucursal', 'Tu usuario no tiene sucursal asignada.')
+        showError('Sin sucursal', 'El pedido no tiene sucursal asociada.')
         return
     }
     reprintLoading.value = true
