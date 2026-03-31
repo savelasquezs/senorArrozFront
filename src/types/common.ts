@@ -123,8 +123,8 @@ export interface BranchPrintSettings {
 }
 
 export interface UpdateBranchPrintSettingsPayload {
-  kitchenHeaderLine1?: string | null;
-  kitchenHeaderLine2?: string | null;
+  kitchenHeaderLine1: string;
+  kitchenHeaderLine2: string;
   showKitchenOrderNumber: boolean;
   showKitchenTime: boolean;
   showKitchenNotes: boolean;
@@ -132,16 +132,16 @@ export interface UpdateBranchPrintSettingsPayload {
   deliveryShowPayments: boolean;
   deliveryShowLoyaltyFooter: boolean;
   cashierMirrorDeliveryLayout: boolean;
-  footerMessageKitchen?: string | null;
-  footerMessageDelivery?: string | null;
-  footerMessageCashier?: string | null;
+  footerMessageKitchen: string;
+  footerMessageDelivery: string;
+  footerMessageCashier: string;
   paperWidthMm: number;
   enableKitchenJobs: boolean;
   enableDeliveryJobs: boolean;
   enableCashierJobs: boolean;
-  printerQueueKitchen?: string | null;
-  printerQueueDelivery?: string | null;
-  printerQueueCashier?: string | null;
+  printerQueueKitchen: string;
+  printerQueueDelivery: string;
+  printerQueueCashier: string;
 }
 
 export interface Branch {

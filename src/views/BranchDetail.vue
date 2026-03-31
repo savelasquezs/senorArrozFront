@@ -128,6 +128,22 @@
                     </BaseCard>
                 </div>
 
+                <!-- Impresión térmica (agente local) -->
+                <BaseCard v-if="canEditBranchProfile">
+                    <div class="space-y-4">
+                        <h3 class="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                            <PrinterIcon class="w-6 h-6 text-gray-600" />
+                            Impresión térmica
+                        </h3>
+                        <p class="text-sm text-gray-600">
+                            Nombres de cola Windows, reglas de encolado y token del agente que consulta la API en cada
+                            sucursal.
+                        </p>
+                        <BranchPrintSettingsForm :branch-id="branchId" :initial="branch.printSettings"
+                            @saved="handlePrintSettingsSaved" />
+                    </div>
+                </BaseCard>
+
                 <!-- Users Section -->
                 <BaseCard>
                     <BranchUsersTable :users="branch.users" :branch-id="branch.id" @user-created="handleUserCreated"
@@ -599,6 +615,7 @@ import BaseLoading from '@/components/ui/BaseLoading.vue'
 import BaseBadge from '@/components/ui/BaseBadge.vue'
 import PhoneNumberItem from '@/components/customers/PhoneNumberItem.vue'
 import BranchUsersTable from '@/components/branches/BranchUsersTable.vue'
+import BranchPrintSettingsForm from '@/components/branches/BranchPrintSettingsForm.vue'
 import BranchForm from '@/components/branches/BranchForm.vue'
 import NeighborhoodForm from '@/components/neighborhoods/NeighborhoodForm.vue'
 import BankForm from '@/components/payments/banks/BankForm.vue'
@@ -630,7 +647,8 @@ import {
     PlusIcon,
     BuildingLibraryIcon,
     DevicePhoneMobileIcon,
-    CurrencyDollarIcon
+    CurrencyDollarIcon,
+    PrinterIcon
 } from '@heroicons/vue/24/outline'
 import type { User } from '@/types/user'
 import type { Bank, BankFormData } from '@/types/bank'
@@ -690,6 +708,10 @@ const editingSupplier = ref<Supplier | null>(null)
 const supplierFormLoading = ref(false)
 
 const branchId = computed(() => Number(route.params.id))
+
+const handlePrintSettingsSaved = () => {
+    void branchesStore.fetchById(branchId.value)
+}
 
 const branch = computed(() => branchesStore.current)
 

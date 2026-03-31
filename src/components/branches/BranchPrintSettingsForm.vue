@@ -1,18 +1,18 @@
 <template>
     <div class="space-y-6">
-        <BaseAlert v-if="!initial" variant="info" class="text-sm">
-            No hay datos de impresión cargados. Guarda la sucursal desde el servidor o recarga la página.
+        <BaseAlert v-if="!initial" type="info">
+            <span class="text-sm">Sin datos de impresión en memoria. Recarga la página si acabas de crear la sucursal.</span>
         </BaseAlert>
 
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
             <BaseInput v-model="form.printerQueueKitchen" label="Cola Windows — Cocina"
-                placeholder="Exactamente como en Panel de impresión" :maxlength="128" />
+                placeholder="Nombre exacto en Panel de impresión" :maxlength="128" />
             <BaseInput v-model="form.printerQueueDelivery" label="Cola Windows — Domicilio" :maxlength="128" />
             <BaseInput v-model="form.printerQueueCashier" label="Cola Windows — Caja (opcional)" :maxlength="128" />
         </div>
 
         <p class="text-xs text-gray-500">
-            El agente en cada PC usa estos nombres si están configurados aquí; si un campo queda vacío, el agente puede usar su archivo local como respaldo.
+            Si un campo queda vacío, el agente puede usar el valor de su archivo local como respaldo.
         </p>
 
         <div class="border-t border-gray-200 pt-4 space-y-3">
@@ -82,7 +82,7 @@
         </div>
 
         <div class="max-w-xs">
-            <BaseInput v-model.number="form.paperWidthMm" label="Ancho papel (mm)" type="number" min="40" max="120" />
+            <BaseInput v-model.number="form.paperWidthMm" label="Ancho papel (mm)" type="number" :min="40" :max="120" />
         </div>
 
         <div class="border-t border-gray-200 pt-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
@@ -98,7 +98,7 @@
                     </span>
                 </p>
             </div>
-            <BaseButton type="button" variant="outline" size="sm" :loading="rotating" @click="openTokenDialog">
+            <BaseButton type="button" variant="outline" size="sm" :loading="rotating" @click="onRotateClick">
                 Regenerar token
             </BaseButton>
         </div>
@@ -109,12 +109,162 @@
             </BaseButton>
         </div>
 
-        <BaseDialog v-model="showTokenModal @update:modelValue=onTokenModalClose" title="Nuevo token del agente">
-            <div class="space-y-3 text-sm">
-                <BaseAlert variant="warn\> ??">
-
-                </BaseAlert>
-            </div>
+        <BaseDialog v-model="showTokenModal" title="Nuevo token del agente" size="2xl">
+            <BaseAlert type="warning" class="mb-3">
+                <span class="text-sm">Copie el token ahora. No se volverá a mostrar. Actualice User Secrets o appsettings en cada PC del agente.</span>
+            </BaseAlert>
+            <pre
+                class="bg-gray-100 p-4 rounded-lg text-xs overflow-x-auto break-all border border-gray-200">{{ revealedToken }}</pre>
+            <template #footer>
+                <BaseButton variant="secondary" type="button" @click="copyToken">Copiar</BaseButton>
+                <BaseButton variant="primary" type="button" @click="closeTokenModal">Cerrar</BaseButton>
+            </template>
         </BaseDialog>
     </div>
 </template>
+
+<script setup lang="ts">
+import { reactive, ref, watch } from 'vue'
+import type { BranchPrintSettings, UpdateBranchPrintSettingsPayload } from '@/types/common'
+import { branchApi } from '@/services/MainAPI/branchApi'
+import BaseInput from '@/components/ui/BaseInput.vue'
+import BaseButton from '@/components/ui/BaseButton.vue'
+import BaseAlert from '@/components/ui/BaseAlert.vue'
+import BaseDialog from '@/components/ui/BaseDialog.vue'
+import { useToast } from '@/composables/useToast'
+
+const props = defineProps<{
+    branchId: number
+    initial: BranchPrintSettings | null | undefined
+}>()
+
+const emit = defineEmits<{
+    saved: []
+}>()
+
+const { success, error: showError } = useToast()
+const saving = ref(false)
+const rotating = ref(false)
+const showTokenModal = ref(false)
+const revealedToken = ref('')
+
+function emptyForm(): UpdateBranchPrintSettingsPayload {
+    return {
+        kitchenHeaderLine1: '',
+        kitchenHeaderLine2: '',
+        showKitchenOrderNumber: true,
+        showKitchenTime: true,
+        showKitchenNotes: true,
+        deliveryShowLineSubtotals: true,
+        deliveryShowPayments: true,
+        deliveryShowLoyaltyFooter: true,
+        cashierMirrorDeliveryLayout: false,
+        footerMessageKitchen: '',
+        footerMessageDelivery: '',
+        footerMessageCashier: '',
+        paperWidthMm: 57,
+        enableKitchenJobs: true,
+        enableDeliveryJobs: true,
+        enableCashierJobs: false,
+        printerQueueKitchen: '',
+        printerQueueDelivery: '',
+        printerQueueCashier: '',
+    }
+}
+
+function fromSettings(p: BranchPrintSettings): UpdateBranchPrintSettingsPayload {
+    return {
+        kitchenHeaderLine1: p.kitchenHeaderLine1 ?? '',
+        kitchenHeaderLine2: p.kitchenHeaderLine2 ?? '',
+        showKitchenOrderNumber: p.showKitchenOrderNumber,
+        showKitchenTime: p.showKitchenTime,
+        showKitchenNotes: p.showKitchenNotes,
+        deliveryShowLineSubtotals: p.deliveryShowLineSubtotals,
+        deliveryShowPayments: p.deliveryShowPayments,
+        deliveryShowLoyaltyFooter: p.deliveryShowLoyaltyFooter,
+        cashierMirrorDeliveryLayout: p.cashierMirrorDeliveryLayout,
+        footerMessageKitchen: p.footerMessageKitchen ?? '',
+        footerMessageDelivery: p.footerMessageDelivery ?? '',
+        footerMessageCashier: p.footerMessageCashier ?? '',
+        paperWidthMm: p.paperWidthMm,
+        enableKitchenJobs: p.enableKitchenJobs,
+        enableDeliveryJobs: p.enableDeliveryJobs,
+        enableCashierJobs: p.enableCashierJobs,
+        printerQueueKitchen: p.printerQueueKitchen ?? '',
+        printerQueueDelivery: p.printerQueueDelivery ?? '',
+        printerQueueCashier: p.printerQueueCashier ?? '',
+    }
+}
+
+const form = reactive<UpdateBranchPrintSettingsPayload>(emptyForm())
+
+function syncFromProps() {
+    if (props.initial) Object.assign(form, fromSettings(props.initial))
+    else Object.assign(form, emptyForm())
+}
+
+watch(
+    () => props.initial,
+    () => syncFromProps(),
+    { immediate: true }
+)
+
+function formatDt(iso: string) {
+    try {
+        return new Date(iso).toLocaleString()
+    } catch {
+        return iso
+    }
+}
+
+async function submit() {
+    saving.value = true
+    try {
+        await branchApi.updateBranchPrintSettings(props.branchId, { ...form })
+        success('Impresión actualizada', 3500, 'La configuración de comandas se guardó correctamente.')
+        emit('saved')
+    } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : 'No se pudo guardar.'
+        showError('Error', msg)
+    } finally {
+        saving.value = false
+    }
+}
+
+async function onRotateClick() {
+    if (
+        !confirm(
+            '¿Generar un nuevo token? Los equipos que usen el token anterior dejarán de conectarse hasta actualizarlo.'
+        )
+    ) {
+        return
+    }
+    rotating.value = true
+    try {
+        const res = await branchApi.rotateBranchAgentToken(props.branchId)
+        revealedToken.value = res.data.plainToken
+        showTokenModal.value = true
+        success('Token generado', 3000, 'Actualice el agente en cada PC.')
+        emit('saved')
+    } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : 'No se pudo rotar el token.'
+        showError('Error', msg)
+    } finally {
+        rotating.value = false
+    }
+}
+
+async function copyToken() {
+    try {
+        await navigator.clipboard.writeText(revealedToken.value)
+        success('Copiado', 2000, 'Token copiado al portapapeles.')
+    } catch {
+        showError('No se pudo copiar', 'Seleccione el texto manualmente.')
+    }
+}
+
+function closeTokenModal() {
+    showTokenModal.value = false
+    revealedToken.value = ''
+}
+</script>
