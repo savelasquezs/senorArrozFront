@@ -710,7 +710,7 @@ const supplierFormLoading = ref(false)
 const branchId = computed(() => Number(route.params.id))
 
 const handlePrintSettingsSaved = () => {
-    void branchesStore.fetchById(branchId.value)
+    void branchesStore.fetchById(branchId.value, { silent: true })
 }
 
 const branch = computed(() => branchesStore.current)

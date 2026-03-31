@@ -102,6 +102,10 @@
                 Regenerar token
             </BaseButton>
         </div>
+        <p class="text-xs text-gray-500 -mt-1">
+            El agente es un servicio/consola sin pantalla: el token solo vive en cada PC (archivo de configuración junto al ejecutable,
+            User Secrets en desarrollo, o variable de entorno). Aquí solo se guarda el hash en el servidor.
+        </p>
 
         <div class="flex justify-end pt-2">
             <BaseButton type="button" variant="primary" :loading="saving" @click="submit">
@@ -111,8 +115,29 @@
 
         <BaseDialog v-model="showTokenModal" title="Nuevo token del agente" size="2xl">
             <BaseAlert type="warning" class="mb-3">
-                <span class="text-sm">Copie el token ahora. No se volverá a mostrar. Actualice User Secrets o appsettings en cada PC del agente.</span>
+                <span class="text-sm">Copie el token ahora: no se volverá a mostrar en esta aplicación.</span>
             </BaseAlert>
+            <p class="text-sm text-gray-700 mb-3">
+                En cada equipo donde corre el agente (sin interfaz gráfica), pegue el valor en la configuración local del ejecutable
+                <code class="text-xs bg-gray-100 px-1 rounded">SenorArrozPrintAgent</code>, por ejemplo:
+            </p>
+            <ul class="text-sm text-gray-700 list-disc pl-5 space-y-2 mb-4">
+                <li>
+                    Archivo <code class="text-xs bg-gray-100 px-1 rounded">appsettings.json</code> o
+                    <code class="text-xs bg-gray-100 px-1 rounded">appsettings.Production.json</code> en la misma carpeta que el .exe,
+                    sección <code class="text-xs bg-gray-100 px-1 rounded">PrintAgent</code> → propiedad
+                    <code class="text-xs bg-gray-100 px-1 rounded">AgentToken</code>.
+                </li>
+                <li>
+                    Variable de entorno (Windows/servicio):
+                    <code class="text-xs bg-gray-100 px-1 rounded">PrintAgent__AgentToken</code> = el token copiado.
+                </li>
+                <li>
+                    En desarrollo:
+                    <code class="text-xs bg-gray-100 px-1 rounded">dotnet user-secrets set "PrintAgent:AgentToken" "…"</code> en el proyecto del agente.
+                </li>
+            </ul>
+            <p class="text-xs text-gray-500 mb-2">Reinicie el agente o el servicio después de cambiar el token.</p>
             <pre
                 class="bg-gray-100 p-4 rounded-lg text-xs overflow-x-auto break-all border border-gray-200">{{ revealedToken }}</pre>
             <template #footer>

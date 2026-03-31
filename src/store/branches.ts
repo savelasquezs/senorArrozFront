@@ -41,9 +41,10 @@ export const useBranchesStore = defineStore('branches', () => {
 		}
 	};
 
-	const fetchById = async (id: number) => {
+	const fetchById = async (id: number, options?: { silent?: boolean }) => {
+		const silent = options?.silent === true;
 		try {
-			isLoading.value = true;
+			if (!silent) isLoading.value = true;
 			error.value = null;
 			const res = await branchApi.getBranchById(id);
 			current.value = res.data;
@@ -51,7 +52,7 @@ export const useBranchesStore = defineStore('branches', () => {
 			error.value = err.message || 'Error al cargar la sucursal';
 			throw err;
 		} finally {
-			isLoading.value = false;
+			if (!silent) isLoading.value = false;
 		}
 	};
 
