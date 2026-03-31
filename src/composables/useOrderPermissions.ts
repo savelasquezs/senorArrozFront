@@ -125,17 +125,26 @@ export function useOrderPermissions() {
         return role === 'Superadmin' || role === 'Admin'
     }
 
+    /** Reserva con horario de preparación y entrega (misma regla de “mismo día” que el backend). */
+    const isScheduledReservationOrder = (order: OrderListItem | OrderDetailView): boolean =>
+        order.type === 'reservation' &&
+        order.prepareAt != null &&
+        order.prepareAt !== '' &&
+        order.reservedFor != null &&
+        order.reservedFor !== ''
+
     /**
      * Verifica si el usuario puede cancelar el pedido
      */
     const canCancel = (order: OrderListItem | OrderDetailView): boolean => {
         const role = authStore.userRole
 
-        // Solo Admin y Superadmin pueden cancelar
         if (role !== 'Admin' && role !== 'Superadmin') return false
+        if (order.status === 'cancelled') return false
 
-        // Solo se pueden cancelar pedidos del mismo día
-        return isSameDay(order.createdAt)
+        if (isScheduledReservationOrder(order)) return isSameDay(order.createdAt)
+
+        return true
     }
 
     /**
