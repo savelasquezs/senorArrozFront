@@ -4,6 +4,28 @@
             <span class="text-sm">Sin datos de impresión en memoria. Recarga la página si acabas de crear la sucursal.</span>
         </BaseAlert>
 
+        <div class="border-t border-gray-200 pt-4 space-y-3">
+            <p class="text-sm font-medium text-gray-900">Logo en ticket (opcional)</p>
+            <p class="text-xs text-gray-500">
+                PNG, JPEG, WebP o GIF; máximo 1,5 MB. Se guarda en el servidor y se usa en la impresión térmica.
+            </p>
+            <div v-if="logoPreviewSrc" class="flex items-start gap-4">
+                <img :src="logoPreviewSrc" alt="Vista previa logo ticket" class="h-16 w-auto rounded border border-gray-200 bg-white object-contain" />
+            </div>
+            <div class="flex flex-wrap items-center gap-2">
+                <input ref="fileInput" type="file" accept="image/png,image/jpeg,image/webp,image/gif"
+                    class="text-sm text-gray-700" @change="onFilePick" />
+                <BaseButton type="button" variant="primary" size="sm" :loading="uploadingLogo" :disabled="!pickedFile"
+                    @click="uploadLogo">
+                    Subir logo
+                </BaseButton>
+                <BaseButton v-if="initial?.receiptLogoPath" type="button" variant="outline" size="sm"
+                    :loading="deletingLogo" @click="removeLogo">
+                    Quitar logo
+                </BaseButton>
+            </div>
+        </div>
+
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
             <BaseInput v-model="form.printerQueueKitchen" label="Cola Windows — Cocina"
                 placeholder="Nombre exacto en Panel de impresión" :maxlength="128" />
@@ -149,9 +171,9 @@
 </template>
 
 <script setup lang="ts">
-import { reactive, ref, watch } from 'vue'
+import { reactive, ref, watch, computed } from 'vue'
 import type { BranchPrintSettings, UpdateBranchPrintSettingsPayload } from '@/types/common'
-import { branchApi } from '@/services/MainAPI/branchApi'
+import { apiStaticOrigin, branchApi } from '@/services/MainAPI/branchApi'
 import BaseInput from '@/components/ui/BaseInput.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseAlert from '@/components/ui/BaseAlert.vue'
@@ -172,6 +194,17 @@ const saving = ref(false)
 const rotating = ref(false)
 const showTokenModal = ref(false)
 const revealedToken = ref('')
+const uploadingLogo = ref(false)
+const deletingLogo = ref(false)
+const pickedFile = ref<File | null>(null)
+const fileInput = ref<HTMLInputElement | null>(null)
+
+const logoPreviewSrc = computed(() => {
+    const p = props.initial?.receiptLogoPath
+    if (!p) return ''
+    const origin = apiStaticOrigin()
+    return origin + (p.startsWith('/') ? p : '/' + p)
+})
 
 function emptyForm(): UpdateBranchPrintSettingsPayload {
     return {
@@ -291,5 +324,57 @@ async function copyToken() {
 function closeTokenModal() {
     showTokenModal.value = false
     revealedToken.value = ''
+}
+
+function onFilePick(ev: Event) {
+    const input = ev.target as HTMLInputElement
+    const f = input.files?.[0]
+    pickedFile.value = f ?? null
+}
+
+async function uploadLogo() {
+    const f = pickedFile.value
+    if (!f) return
+    if (f.size > 1_572_864) {
+        showError('Archivo grande', 'El logo no puede superar 1,5 MB.')
+        return
+    }
+    uploadingLogo.value = true
+    try {
+        const res = await branchApi.uploadBranchReceiptLogo(props.branchId, f)
+        if (!res.isSuccess) {
+            showError('Error', res.message || 'No se pudo subir el logo.')
+            return
+        }
+        success('Logo actualizado', 3000, 'El ticket usará esta imagen al imprimir.')
+        pickedFile.value = null
+        if (fileInput.value) fileInput.value.value = ''
+        emit('saved')
+    } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : 'No se pudo subir el logo.'
+        showError('Error', msg)
+    } finally {
+        uploadingLogo.value = false
+    }
+}
+
+async function removeLogo() {
+    if (!props.initial?.receiptLogoPath) return
+    if (!confirm('¿Quitar el logo del ticket?')) return
+    deletingLogo.value = true
+    try {
+        const res = await branchApi.deleteBranchReceiptLogo(props.branchId)
+        if (!res.isSuccess) {
+            showError('Error', res.message || 'No se pudo eliminar el logo.')
+            return
+        }
+        success('Logo eliminado', 2500, 'Los tickets seguirán sin imagen hasta subir otra.')
+        emit('saved')
+    } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : 'No se pudo eliminar el logo.'
+        showError('Error', msg)
+    } finally {
+        deletingLogo.value = false
+    }
 }
 </script>

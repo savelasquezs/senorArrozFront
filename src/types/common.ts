@@ -116,6 +116,8 @@ export interface BranchPrintSettings {
   printerQueueKitchen?: string | null;
   printerQueueDelivery?: string | null;
   printerQueueCashier?: string | null;
+  /** Ruta relativa servida bajo la raíz del host API (no /api), p. ej. /uploads/branch-print/1/logo.png */
+  receiptLogoPath?: string | null;
   agentTokenConfigured: boolean;
   agentTokenUpdatedAt?: string | null;
   createdAt: string;
@@ -147,6 +149,10 @@ export interface UpdateBranchPrintSettingsPayload {
 export interface Branch {
   id: number;
   name: string;
+  /** Nombre comercial en ticket (opcional). */
+  businessName?: string | null;
+  /** NIT (opcional). */
+  nit?: string | null;
   address: string;
   phone1: string;
   phone2?: string | null;

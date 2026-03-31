@@ -49,6 +49,22 @@
                     <!-- Branch Info -->
                     <div class="px-6 py-4">
                         <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                            <div v-if="branch.businessName" class="flex items-center md:col-span-3">
+                                <BuildingOffice2Icon class="w-5 h-5 text-gray-400 mr-3 flex-shrink-0" />
+                                <div>
+                                    <p class="text-sm font-medium text-gray-900">Nombre comercial (ticket)</p>
+                                    <p class="text-sm text-gray-600">{{ branch.businessName }}</p>
+                                </div>
+                            </div>
+
+                            <div v-if="branch.nit" class="flex items-center">
+                                <InformationCircleIcon class="w-5 h-5 text-gray-400 mr-3 flex-shrink-0" />
+                                <div>
+                                    <p class="text-sm font-medium text-gray-900">NIT</p>
+                                    <p class="text-sm text-gray-600">{{ branch.nit }}</p>
+                                </div>
+                            </div>
+
                             <div class="flex items-center">
                                 <MapPinIcon class="w-5 h-5 text-gray-400 mr-3" />
                                 <div>
@@ -648,7 +664,8 @@ import {
     BuildingLibraryIcon,
     DevicePhoneMobileIcon,
     CurrencyDollarIcon,
-    PrinterIcon
+    PrinterIcon,
+    InformationCircleIcon
 } from '@heroicons/vue/24/outline'
 import type { User } from '@/types/user'
 import type { Bank, BankFormData } from '@/types/bank'

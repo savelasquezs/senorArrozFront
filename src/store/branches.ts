@@ -57,7 +57,10 @@ export const useBranchesStore = defineStore('branches', () => {
 	};
 
 	const create = async (
-		payload: Pick<Branch, 'name' | 'address' | 'phone1' | 'phone2' | 'latitude' | 'longitude'>
+		payload: Pick<
+			Branch,
+			'name' | 'address' | 'phone1' | 'phone2' | 'latitude' | 'longitude' | 'businessName' | 'nit'
+		>
 	) => {
 		try {
 			isLoading.value = true;
@@ -75,7 +78,10 @@ export const useBranchesStore = defineStore('branches', () => {
 
 	const update = async (
 		id: number,
-		payload: Pick<Branch, 'name' | 'address' | 'phone1' | 'phone2' | 'latitude' | 'longitude'>
+		payload: Pick<
+			Branch,
+			'name' | 'address' | 'phone1' | 'phone2' | 'latitude' | 'longitude' | 'businessName' | 'nit'
+		>
 	) => {
 		try {
 			isLoading.value = true;

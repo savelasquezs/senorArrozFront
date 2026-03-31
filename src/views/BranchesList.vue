@@ -284,6 +284,8 @@ const openCreate = () => {
 
 const submitCreate = async (data: {
     name: string
+    businessName?: string
+    nit?: string
     address: string
     phone1: string
     phone2?: string
@@ -296,6 +298,8 @@ const submitCreate = async (data: {
             name: data.name,
             address: data.address,
             phone1: data.phone1,
+            ...(data.businessName ? { businessName: data.businessName } : {}),
+            ...(data.nit ? { nit: data.nit } : {}),
             ...(data.phone2 ? { phone2: data.phone2 } : {}),
             latitude: data.latitude,
             longitude: data.longitude,

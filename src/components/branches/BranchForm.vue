@@ -14,6 +14,14 @@
             </p>
         </div>
 
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <BaseInput v-model="form.businessName" label="Nombre comercial (ticket)" placeholder="Ej: Restaurante Centro"
+                :maxlength="150" />
+            <BaseInput v-model="form.nit" label="NIT" placeholder="Ej: 900.123.456-7" :maxlength="32"
+                @blur="validateNit" :error="errors.nit" />
+        </div>
+        <p class="text-xs text-gray-500 -mt-2">Opcional. En el ticket térmico se usa el nombre comercial si existe; si no, el nombre de la sucursal.</p>
+
         <!-- Address -->
         <div>
             <BaseInput v-model="form.address" label="Dirección" placeholder="Ej: Calle 50 # 45-67, Centro" required
@@ -105,6 +113,8 @@ const props = withDefaults(defineProps<Props>(), {
 
 interface BranchFormData {
     name: string
+    businessName?: string
+    nit?: string
     address: string
     phone1: string
     phone2?: string
@@ -119,6 +129,8 @@ const emit = defineEmits<{
 
 const form = reactive({
     name: '',
+    businessName: '',
+    nit: '',
     address: '',
     phone1: '',
     phone2: '',
@@ -128,6 +140,7 @@ const form = reactive({
 
 const errors = reactive({
     name: '',
+    nit: '',
     address: '',
     phone1: '',
     phone2: '',
@@ -149,6 +162,7 @@ const isFormValid = computed(() => {
         form.longitude !== 0 &&
         isLocationConfirmed.value &&
         !errors.name &&
+        !errors.nit &&
         !errors.address &&
         !errors.phone1 &&
         !errors.phone2 &&
@@ -156,6 +170,19 @@ const isFormValid = computed(() => {
         !errors.longitude
     )
 })
+
+const validateNit = () => {
+    const t = form.nit.trim()
+    if (!t) {
+        errors.nit = ''
+        return
+    }
+    if (!/^[\d.\-]+$/.test(t)) {
+        errors.nit = 'Solo dígitos, puntos y guiones'
+        return
+    }
+    errors.nit = ''
+}
 
 const validatePhone = (field: 'phone1' | 'phone2') => {
     const phone = form[field].trim()
@@ -195,6 +222,7 @@ const validateForm = () => {
     }
 
     validatePhone('phone1')
+    validateNit()
     if (form.phone2) {
         validatePhone('phone2')
     } else {
@@ -227,6 +255,8 @@ const handleSubmit = () => {
 
     const formData: BranchFormData = {
         name: form.name.trim(),
+        businessName: form.businessName.trim() || undefined,
+        nit: form.nit.trim() || undefined,
         address: form.address.trim(),
         phone1: form.phone1.trim(),
         phone2: form.phone2.trim() || undefined,
@@ -269,6 +299,8 @@ watch(
     (newBranch) => {
         if (newBranch) {
             form.name = newBranch.name
+            form.businessName = newBranch.businessName ?? ''
+            form.nit = newBranch.nit ?? ''
             form.address = newBranch.address
             form.phone1 = newBranch.phone1
             form.phone2 = newBranch.phone2 || ''
@@ -290,6 +322,8 @@ watch(
             }
         } else {
             form.name = ''
+            form.businessName = ''
+            form.nit = ''
             form.address = ''
             form.phone1 = ''
             form.phone2 = ''
@@ -301,6 +335,7 @@ watch(
         }
 
         errors.name = ''
+        errors.nit = ''
         errors.address = ''
         errors.phone1 = ''
         errors.phone2 = ''

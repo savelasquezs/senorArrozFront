@@ -1,5 +1,11 @@
 // src/services/branchApi.ts
 import { BaseApi } from './baseApi';
+
+/** Origen del host API sin sufijo /api (para imágenes en wwwroot). */
+export function apiStaticOrigin(): string {
+	const api = import.meta.env.VITE_API_URL || 'http://localhost:8080/api';
+	return api.replace(/\/?api\/?$/i, '');
+}
 import type {
 	ApiResponse,
 	PagedResult,
@@ -33,14 +39,20 @@ class BranchApi extends BaseApi {
 	}
 
 	async createBranch(
-		payload: Pick<Branch, 'name' | 'address' | 'phone1' | 'phone2' | 'latitude' | 'longitude'>
+		payload: Pick<
+			Branch,
+			'name' | 'address' | 'phone1' | 'phone2' | 'latitude' | 'longitude' | 'businessName' | 'nit'
+		>
 	): Promise<ApiResponse<Branch>> {
 		return this.post<ApiResponse<Branch>>('/Branches', payload);
 	}
 
 	async updateBranch(
 		id: number,
-		payload: Pick<Branch, 'name' | 'address' | 'phone1' | 'phone2' | 'latitude' | 'longitude'>
+		payload: Pick<
+			Branch,
+			'name' | 'address' | 'phone1' | 'phone2' | 'latitude' | 'longitude' | 'businessName' | 'nit'
+		>
 	): Promise<ApiResponse<Branch>> {
 		return this.put<ApiResponse<Branch>>(`/Branches/${id}`, payload);
 	}
@@ -91,6 +103,19 @@ class BranchApi extends BaseApi {
 			`/Branches/${branchId}/print-settings/rotate-agent-token`,
 			{}
 		);
+	}
+
+	async uploadBranchReceiptLogo(branchId: number, file: File): Promise<ApiResponse<BranchPrintSettings>> {
+		const fd = new FormData();
+		fd.append('file', file);
+		return this.post<ApiResponse<BranchPrintSettings>>(
+			`/Branches/${branchId}/print-settings/receipt-logo`,
+			fd
+		);
+	}
+
+	async deleteBranchReceiptLogo(branchId: number): Promise<ApiResponse<BranchPrintSettings>> {
+		return this.delete<ApiResponse<BranchPrintSettings>>(`/Branches/${branchId}/print-settings/receipt-logo`);
 	}
 }
 
