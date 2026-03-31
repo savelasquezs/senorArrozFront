@@ -29,7 +29,8 @@ export interface ActiveOrder {
     takenById: number
     customerId?: number
     addressId?: number
-    loyaltyRuleId?: number
+    /** Texto de premio fidelidad si aplica (p. ej. pedido persistido reabierto). */
+    loyaltyRuleName?: string
     type: OrderType
     deliveryFee?: number
     reservedFor?: Date
@@ -115,8 +116,9 @@ export interface Order {
     addressId?: number
     addressDescription?: string
     addressAdditionalInfo?: string | null
-    loyaltyRuleId?: number
     loyaltyRuleName?: string
+    loyaltyCycleStepId?: number | null
+    loyaltyRewardSnapshot?: string | null
     type: OrderType
     status: OrderStatus
     deliveryFee?: number
@@ -306,7 +308,6 @@ export interface CreateOrderDto {
     takenById: number
     customerId?: number
     addressId?: number
-    loyaltyRuleId?: number
     type: OrderType
     status: OrderStatus
     deliveryFee?: number
@@ -340,7 +341,6 @@ export interface CreateAppPaymentDto {
 export interface UpdateOrderDto {
     customerId?: number
     addressId?: number
-    loyaltyRuleId?: number
     type?: OrderType
     deliveryFee?: number
     reservedFor?: Date
@@ -367,7 +367,6 @@ export interface UpdateOrderDetailDto {
 export interface OrderFormData {
     customerId?: number
     addressId?: number
-    loyaltyRuleId?: number
     type: OrderType
     deliveryFee?: number
     reservedFor?: Date

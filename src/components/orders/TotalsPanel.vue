@@ -15,10 +15,10 @@
                 <span class="font-medium">{{ formatCurrency(order.deliveryFee) }}</span>
             </div>
 
-            <!-- Loyalty Discount (if applicable) -->
-            <div v-if="order.loyaltyRuleId" class="flex justify-between text-sm text-green-600">
-                <span>Descuento lealtad:</span>
-                <span class="font-medium">- {{ formatCurrency(order.discountTotal) }}</span>
+            <!-- Premio / fidelidad aplicado al pedido (si existe) -->
+            <div v-if="order.loyaltyRuleName" class="flex justify-between text-sm text-green-700">
+                <span>Fidelidad:</span>
+                <span class="font-medium text-right">{{ order.loyaltyRuleName }}</span>
             </div>
 
             <!-- Items Count -->
