@@ -109,7 +109,11 @@ export interface BranchPrintSettings {
   footerMessageKitchen?: string | null;
   footerMessageDelivery?: string | null;
   footerMessageCashier?: string | null;
+  /** Espejo de cocina en API; útil si faltan los campos por cola. */
   paperWidthMm: number;
+  paperWidthMmKitchen?: number;
+  paperWidthMmDelivery?: number;
+  paperWidthMmCashier?: number;
   enableKitchenJobs: boolean;
   enableDeliveryJobs: boolean;
   enableCashierJobs: boolean;
@@ -137,7 +141,9 @@ export interface UpdateBranchPrintSettingsPayload {
   footerMessageKitchen: string;
   footerMessageDelivery: string;
   footerMessageCashier: string;
-  paperWidthMm: number;
+  paperWidthMmKitchen: number;
+  paperWidthMmDelivery: number;
+  paperWidthMmCashier: number;
   enableKitchenJobs: boolean;
   enableDeliveryJobs: boolean;
   enableCashierJobs: boolean;

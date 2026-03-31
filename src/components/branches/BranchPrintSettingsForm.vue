@@ -103,15 +103,40 @@
             <BaseInput v-model="form.footerMessageCashier" label="Pie caja" :maxlength="200" />
         </div>
 
-        <div class="max-w-xs">
-            <BaseSelect
-                v-model="form.paperWidthMm"
-                :options="paperWidthOptions"
-                label="Ancho papel (mm)"
-                value-key="value"
-                display-key="label"
-                placeholder="Seleccionar ancho"
-            />
+        <div class="border-t border-gray-200 pt-4 space-y-3">
+            <p class="text-sm font-medium text-gray-900">Ancho de papel por impresora (mm)</p>
+            <p class="text-xs text-gray-500">
+                Una configuración por cada cola: cocina, domicilio y caja pueden usar 58 o 80 mm.
+            </p>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 max-w-4xl">
+                <BaseSelect
+                    v-model="form.paperWidthMmKitchen"
+                    :options="paperWidthOptions"
+                    :searchable="false"
+                    label="Cocina"
+                    value-key="value"
+                    display-key="label"
+                    placeholder="Ancho"
+                />
+                <BaseSelect
+                    v-model="form.paperWidthMmDelivery"
+                    :options="paperWidthOptions"
+                    :searchable="false"
+                    label="Domicilio"
+                    value-key="value"
+                    display-key="label"
+                    placeholder="Ancho"
+                />
+                <BaseSelect
+                    v-model="form.paperWidthMmCashier"
+                    :options="paperWidthOptions"
+                    :searchable="false"
+                    label="Caja"
+                    value-key="value"
+                    display-key="label"
+                    placeholder="Ancho"
+                />
+            </div>
         </div>
 
         <div class="border-t border-gray-200 pt-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
@@ -232,7 +257,9 @@ function emptyForm(): UpdateBranchPrintSettingsPayload {
         footerMessageKitchen: '',
         footerMessageDelivery: '',
         footerMessageCashier: '',
-        paperWidthMm: 57,
+        paperWidthMmKitchen: 58,
+        paperWidthMmDelivery: 58,
+        paperWidthMmCashier: 58,
         enableKitchenJobs: true,
         enableDeliveryJobs: true,
         enableCashierJobs: false,
@@ -256,7 +283,9 @@ function fromSettings(p: BranchPrintSettings): UpdateBranchPrintSettingsPayload 
         footerMessageKitchen: p.footerMessageKitchen ?? '',
         footerMessageDelivery: p.footerMessageDelivery ?? '',
         footerMessageCashier: p.footerMessageCashier ?? '',
-        paperWidthMm: p.paperWidthMm,
+        paperWidthMmKitchen: p.paperWidthMmKitchen ?? p.paperWidthMm ?? 58,
+        paperWidthMmDelivery: p.paperWidthMmDelivery ?? p.paperWidthMm ?? 58,
+        paperWidthMmCashier: p.paperWidthMmCashier ?? p.paperWidthMm ?? 58,
         enableKitchenJobs: p.enableKitchenJobs,
         enableDeliveryJobs: p.enableDeliveryJobs,
         enableCashierJobs: p.enableCashierJobs,
