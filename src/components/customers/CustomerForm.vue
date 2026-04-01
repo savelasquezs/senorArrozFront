@@ -106,7 +106,8 @@ c<!-- src/components/CustomerForm.vue -->
 
     <!-- Address Modal (Dual: Create or Edit) -->
     <BaseDialog v-model="showAddressModal" title="Dirección Inicial" size="lg">
-        <CustomerAddressForm v-model="addressFormData" @submit="handleAddressSubmit" @cancel="closeAddressModal" />
+        <CustomerAddressForm v-model="addressFormData" :can-edit-delivery-fee="true"
+            @submit="handleAddressSubmit" @cancel="closeAddressModal" />
     </BaseDialog>
 </template>
 

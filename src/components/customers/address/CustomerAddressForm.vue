@@ -94,12 +94,13 @@ interface Props {
     modelValue: CustomerAddressFormData
     /** Si false, oculta / deshabilita la tarifa (domiciliario no la edita). */
     canEditDeliveryFee?: boolean
+    /** Absorbidos desde padres (p. ej. CustomerAddressesList). */
+    loading?: boolean
+    customerId?: number
+    branchId?: number
 }
 
-
-
-
-const props = withDefaults(defineProps<Props>(), {})
+const props = defineProps<Props>()
 
 const emit = defineEmits<{
     submit: [data: CustomerAddressFormData]

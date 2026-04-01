@@ -57,8 +57,8 @@
 
             <!-- Address Form -->
             <CustomerAddressForm v-if="customer" :customer-id="customer.id" :model-value="addressFormData"
-                :loading="createLoading" :branch-id="customer.branchId" @submit="handleAddressSubmit"
-                @cancel="closeCreateModal" @update:model-value="updateAddressFormData" />
+                :loading="createLoading" :branch-id="customer.branchId" :can-edit-delivery-fee="true"
+                @submit="handleAddressSubmit" @cancel="closeCreateModal" @update:model-value="updateAddressFormData" />
         </div>
     </BaseDialog>
 
@@ -88,7 +88,7 @@
             <!-- Address Form -->
             <CustomerAddressForm v-if="customer && editingAddress" :customer-id="customer.id"
                 :model-value="editAddressFormData" :loading="editLoading" :branch-id="customer.branchId"
-                @submit="handleEditAddressSubmit" @cancel="closeEditModal"
+                :can-edit-delivery-fee="true" @submit="handleEditAddressSubmit" @cancel="closeEditModal"
                 @update:model-value="updateEditAddressFormData" />
         </div>
     </BaseDialog>

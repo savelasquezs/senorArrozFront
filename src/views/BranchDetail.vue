@@ -157,6 +157,23 @@
                         </p>
                         <BranchPrintSettingsForm :branch-id="branchId" :initial="branch.printSettings"
                             @saved="handlePrintSettingsSaved" />
+                        <div
+                            v-if="branch.printSettings && (branch.printSettings.enableKitchenJobs || branch.printSettings.enableDeliveryJobs)"
+                            class="pt-4 mt-4 border-t border-gray-100 space-y-3">
+                            <p class="text-sm text-gray-600">
+                                Encola un ticket de prueba (datos ficticios) para verificar la impresora y el agente, sin pedido real.
+                            </p>
+                            <div class="flex flex-wrap gap-2">
+                                <BaseButton v-if="branch.printSettings.enableKitchenJobs" variant="outline" size="sm"
+                                    :loading="testPrintLoading === 'kitchen'" @click="enqueueTestPrint('kitchen')">
+                                    Impresión prueba (cocina)
+                                </BaseButton>
+                                <BaseButton v-if="branch.printSettings.enableDeliveryJobs" variant="outline" size="sm"
+                                    :loading="testPrintLoading === 'delivery'" @click="enqueueTestPrint('delivery')">
+                                    Impresión prueba (domicilio)
+                                </BaseButton>
+                            </div>
+                        </div>
                     </div>
                 </BaseCard>
 
@@ -645,6 +662,7 @@ import SupplierFormModal from '@/components/suppliers/SupplierFormModal.vue'
 import { expenseCategoryApi } from '@/services/MainAPI/expenseCategoryApi'
 import { expenseApi } from '@/services/MainAPI/expenseApi'
 import { supplierApi } from '@/services/MainAPI/supplierApi'
+import { printJobsApi } from '@/services/MainAPI/printJobsApi'
 import type { ExpenseCategory, CreateExpenseCategoryDto, Expense, CreateExpenseDto, UpdateExpenseDto } from '@/types/expense'
 import type { Supplier, CreateSupplierDto, UpdateSupplierDto } from '@/types/supplier'
 import type { NeighborhoodSummary, PagedResult } from '@/types/common'
@@ -728,6 +746,25 @@ const branchId = computed(() => Number(route.params.id))
 
 const handlePrintSettingsSaved = () => {
     void branchesStore.fetchById(branchId.value, { silent: true })
+}
+
+const testPrintLoading = ref<'kitchen' | 'delivery' | null>(null)
+
+const enqueueTestPrint = async (kind: 'kitchen' | 'delivery') => {
+    testPrintLoading.value = kind
+    try {
+        const res = await printJobsApi.enqueueTestPrintJob(branchId.value, kind)
+        if (res.isSuccess) {
+            success('Impresión de prueba', 4000, res.message || 'Trabajo encolado. Revisa la cola del agente.')
+        } else {
+            showError('Impresión de prueba', res.message || 'No se pudo encolar el trabajo.')
+        }
+    } catch (e: unknown) {
+        const msg = e instanceof Error ? e.message : 'Error al encolar la impresión de prueba.'
+        showError('Impresión de prueba', msg)
+    } finally {
+        testPrintLoading.value = null
+    }
 }
 
 const branch = computed(() => branchesStore.current)

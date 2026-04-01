@@ -125,13 +125,14 @@
 
         <!-- Create Address Modal -->
         <BaseDialog v-model="showCreateModal" title="Agregar Nueva Dirección" size="lg">
-            <CustomerAddressForm v-model="addressFormData" @submit="createAddress" @cancel="closeCreateModal" />
+            <CustomerAddressForm v-model="addressFormData" :can-edit-delivery-fee="true" @submit="createAddress"
+                @cancel="closeCreateModal" />
         </BaseDialog>
 
         <!-- Edit Address Modal -->
         <BaseDialog v-model="showEditModal" title="Editar Dirección" size="lg">
             <CustomerAddressForm v-if="editingAddress" v-model="editFormData" :addressId="editingAddress.id"
-                @submit="updateAddress" @cancel="closeEditModal" />
+                :can-edit-delivery-fee="true" @submit="updateAddress" @cancel="closeEditModal" />
         </BaseDialog>
     </div>
 </template>
