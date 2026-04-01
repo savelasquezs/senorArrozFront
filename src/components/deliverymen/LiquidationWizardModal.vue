@@ -109,7 +109,7 @@
         </template>
 
         <ExpenseFormModal :is-open="showExpenseModal" :preset-deliveryman-id="detail?.deliverymanId ?? null"
-            :skip-auto-advance="true" @close="showExpenseModal = false" @submit="onExpenseCreated" />
+            @close="showExpenseModal = false" @submit="onExpenseCreated" />
     </BaseDialog>
 </template>
 
