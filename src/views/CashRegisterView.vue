@@ -14,9 +14,19 @@
             <span v-else class="text-orange-500">Sin cuadres previos</span>
           </p>
         </div>
-        <BaseButton @click="loadData" variant="outline" size="sm" :loading="loading">
-          <ArrowPathIcon class="w-4 h-4 mr-1" /> Actualizar
-        </BaseButton>
+        <div class="flex items-center gap-2">
+          <BaseButton
+            v-if="canViewClosureHistory"
+            variant="outline"
+            size="sm"
+            @click="showHistoryModal = true"
+          >
+            Historial de cuadres
+          </BaseButton>
+          <BaseButton @click="loadData" variant="outline" size="sm" :loading="loading">
+            <ArrowPathIcon class="w-4 h-4 mr-1" /> Actualizar
+          </BaseButton>
+        </div>
       </div>
 
       <div v-if="loading" class="space-y-4">
@@ -243,6 +253,11 @@
       </div>
 
     </div>
+
+    <CashClosureHistoryModal
+      v-model="showHistoryModal"
+      :branch-id="authStore.branchId"
+    />
   </MainLayout>
 </template>
 
@@ -250,6 +265,7 @@
 import { ref, computed, onMounted } from 'vue'
 import MainLayout from '@/components/layout/MainLayout.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
+import CashClosureHistoryModal from '@/components/cashRegister/CashClosureHistoryModal.vue'
 import BankMovementsPanel from '@/components/payments/banks/BankMovementsPanel.vue'
 import { useAuthStore } from '@/store/auth'
 import { formatYmdBogota } from '@/utils/colombiaDate'
@@ -272,6 +288,9 @@ import type {
 import { DENOMINATIONS } from '@/types/cashRegister'
 
 const authStore = useAuthStore()
+
+const showHistoryModal = ref(false)
+const canViewClosureHistory = computed(() => authStore.isAdmin || authStore.isSuperadmin)
 
 // ===== STATE =====
 const loading = ref(false)
