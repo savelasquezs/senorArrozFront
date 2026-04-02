@@ -18,17 +18,21 @@
                 <BaseRadioGroup v-model="selectedType" :options="orderTypeOptions" name="order-type" size="sm" />
             </div>
 
-            <!-- Campo condicional: Fecha de entrega y preparación (solo si tipo === 'reservation') -->
+            <!-- Fecha de entrega y preparación (solo si tipo === 'reservation') -->
             <div v-if="selectedType === 'reservation'" class="space-y-4">
                 <div class="space-y-2">
                     <label class="block text-sm font-medium text-gray-700">
                         Tener listo a esta hora (entrega)
                         <span class="text-red-500">*</span>
                     </label>
-                    <input v-model="reservedFor" type="datetime-local"
-                        class="w-full rounded-lg border-gray-300 shadow-sm focus:border-emerald-500 focus:ring-emerald-500"
-                        :min="minDateTime"
-                        @change="onReservedForChange" />
+                    <VueDatePicker
+                        :model-value="reservedForDate"
+                        placeholder="Fecha y hora de entrega"
+                        :min-date="new Date()"
+                        auto-apply
+                        class="w-full"
+                        @update:model-value="onReservedForPicker"
+                    />
                     <p class="text-xs text-gray-500">
                         Fecha y hora en que el pedido debe estar listo para el cliente
                     </p>
@@ -37,9 +41,13 @@
                     <label class="block text-sm font-medium text-gray-700">
                         Preparar a esta hora
                     </label>
-                    <input v-model="prepareAt" type="datetime-local"
-                        class="w-full rounded-lg border-gray-300 shadow-sm focus:border-emerald-500 focus:ring-emerald-500"
-                        :min="minDateTime" />
+                    <VueDatePicker
+                        v-model="prepareAtDate"
+                        placeholder="Cuándo aparece en cocina"
+                        :min-date="new Date()"
+                        auto-apply
+                        class="w-full"
+                    />
                     <p class="text-xs text-gray-500">
                         Hora en que debe aparecer en cocina (por defecto 1h antes de la entrega)
                     </p>
@@ -75,6 +83,17 @@
             </BaseButton>
         </template>
     </BaseDialog>
+
+    <BaseDialog v-model="showKitchenReservationWarn" title="Pedido en cocina" size="md">
+        <p class="text-sm text-gray-700">
+            Este pedido está en cocina (tomado o en preparación). Cambiar a reserva o sus fechas puede hacer que salga
+            de la cola y se avisará en cocina. ¿Continuar?
+        </p>
+        <template #footer>
+            <BaseButton variant="secondary" @click="showKitchenReservationWarn = false">Cancelar</BaseButton>
+            <BaseButton variant="primary" :loading="saving" @click="confirmKitchenReservationSave">Continuar</BaseButton>
+        </template>
+    </BaseDialog>
 </template>
 
 <script setup lang="ts">
@@ -85,6 +104,8 @@ import { useToast } from '@/composables/useToast'
 import BaseDialog from '@/components/ui/BaseDialog.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseRadioGroup from '@/components/ui/BaseRadioGroup.vue'
+import { VueDatePicker } from '@vuepic/vue-datepicker'
+import '@vuepic/vue-datepicker/dist/main.css'
 import { toPaymentSnapshot, type OrderPaymentSnapshot } from '@/utils/orderPaymentCoverage'
 
 interface Props {
@@ -104,43 +125,41 @@ const emit = defineEmits<{
 const { success, error } = useToast()
 const ordersStore = useOrdersDataStore()
 
-// Estado
 const saving = ref(false)
 const selectedType = ref<'onsite' | 'delivery' | 'reservation'>(props.order.type)
-const reservedFor = ref<string>('')
-const prepareAt = ref<string>('')
+const reservedForDate = ref<Date | null>(null)
+const prepareAtDate = ref<Date | null>(null)
+const showKitchenReservationWarn = ref(false)
 
-// Cuando reservedFor cambia, preparar prepareAt por defecto (reservedFor - 1h)
-const onReservedForChange = () => {
-    if (reservedFor.value) {
-        const rf = new Date(reservedFor.value)
-        rf.setHours(rf.getHours() - 1)
-        prepareAt.value = rf.toISOString().slice(0, 16)
+function datesCloseEqual(a: Date | null, b: Date | null): boolean {
+    if (!a && !b) return true
+    if (!a || !b) return false
+    return Math.abs(a.getTime() - b.getTime()) < 1000
+}
+
+function onReservedForPicker(value: Date | null) {
+    reservedForDate.value = value
+    if (value) {
+        const pa = new Date(value)
+        pa.setHours(pa.getHours() - 1)
+        prepareAtDate.value = pa
     }
 }
 
-// Options for order type selector
 const orderTypeOptions = [
     { value: 'onsite', label: 'En el Local' },
     { value: 'delivery', label: 'Domicilio' },
     { value: 'reservation', label: 'Reserva' },
 ]
 
-// Computed properties
-const minDateTime = computed(() => {
-    const now = new Date()
-    now.setMinutes(now.getMinutes() - now.getTimezoneOffset())
-    return now.toISOString().slice(0, 16)
-})
-
 const canSave = computed(() => {
-    // Cambio de tipo
     if (selectedType.value !== props.order.type) return true
-    // Mismo tipo reservation: permitir si cambian reservedFor o prepareAt
     if (selectedType.value === 'reservation') {
-        const currentRf = props.order.reservedFor ? new Date(props.order.reservedFor).toISOString().slice(0, 16) : ''
-        const currentPa = (props.order as any).prepareAt ? new Date((props.order as any).prepareAt).toISOString().slice(0, 16) : ''
-        return reservedFor.value !== currentRf || prepareAt.value !== currentPa
+        const curRf = props.order.reservedFor ? new Date(props.order.reservedFor) : null
+        const curPa = (props.order as OrderDetailView).prepareAt
+            ? new Date((props.order as OrderDetailView).prepareAt as Date | string)
+            : null
+        return !datesCloseEqual(reservedForDate.value, curRf) || !datesCloseEqual(prepareAtDate.value, curPa)
     }
     return false
 })
@@ -160,7 +179,7 @@ const validationWarning = computed(() => {
     if (selectedType.value === 'reservation') {
         const missingFields = []
         if (!props.order.guestName) missingFields.push('nombre de quien recibe')
-        if (!reservedFor.value) missingFields.push('fecha de reserva')
+        if (!reservedForDate.value) missingFields.push('fecha de reserva')
 
         if (missingFields.length > 0) {
             return `Para cambiar a Reserva, necesitarás completar: ${missingFields.join(', ')}`
@@ -170,100 +189,112 @@ const validationWarning = computed(() => {
     return ''
 })
 
-// Watch for changes in selectedType to reset reservedFor
 watch(selectedType, (newType) => {
     if (newType !== 'reservation') {
-        reservedFor.value = ''
+        reservedForDate.value = null
     } else if (props.order.reservedFor) {
-        // Convert existing reservedFor to datetime-local format
-        const date = new Date(props.order.reservedFor)
-        reservedFor.value = date.toISOString().slice(0, 16)
+        reservedForDate.value = new Date(props.order.reservedFor)
+        if ((props.order as OrderDetailView).prepareAt) {
+            prepareAtDate.value = new Date((props.order as OrderDetailView).prepareAt as Date | string)
+        } else {
+            const pa = new Date(props.order.reservedFor)
+            pa.setHours(pa.getHours() - 1)
+            prepareAtDate.value = pa
+        }
     }
 })
 
-// Initialize reservedFor y prepareAt si el pedido ya es reserva
-watch(() => props.open, (isOpen) => {
-    if (isOpen) {
-        selectedType.value = props.order.type
-        if (props.order.type === 'reservation' && props.order.reservedFor) {
-            const date = new Date(props.order.reservedFor)
-            reservedFor.value = date.toISOString().slice(0, 16)
-            if (props.order.prepareAt) {
-                prepareAt.value = new Date(props.order.prepareAt).toISOString().slice(0, 16)
+watch(
+    () => props.open,
+    (isOpen) => {
+        if (isOpen) {
+            selectedType.value = props.order.type
+            if (props.order.type === 'reservation' && props.order.reservedFor) {
+                reservedForDate.value = new Date(props.order.reservedFor)
+                if ((props.order as OrderDetailView).prepareAt) {
+                    prepareAtDate.value = new Date((props.order as OrderDetailView).prepareAt as Date | string)
+                } else {
+                    const pa = new Date(props.order.reservedFor)
+                    pa.setHours(pa.getHours() - 1)
+                    prepareAtDate.value = pa
+                }
             } else {
-                const pa = new Date(props.order.reservedFor)
-                pa.setHours(pa.getHours() - 1)
-                prepareAt.value = pa.toISOString().slice(0, 16)
+                reservedForDate.value = null
+                prepareAtDate.value = null
             }
-        } else {
-            reservedFor.value = ''
-            prepareAt.value = ''
+        }
+    },
+    { immediate: true },
+)
+
+async function persistTypeChange() {
+    const updateData: Record<string, unknown> = {
+        type: selectedType.value,
+    }
+
+    if (selectedType.value === 'reservation' && reservedForDate.value) {
+        updateData.reservedFor = reservedForDate.value
+        if (prepareAtDate.value) {
+            updateData.prepareAt = prepareAtDate.value
         }
     }
-}, { immediate: true })
 
-// Methods
+    if (props.order.type === 'reservation' && selectedType.value !== 'reservation') {
+        updateData.reservedFor = null
+    }
+
+    if (props.order.type === 'delivery' && selectedType.value !== 'delivery') {
+        updateData.deliveryFee = null
+    }
+
+    if (selectedType.value === 'onsite') {
+        updateData.addressId = null
+    }
+
+    const paymentSnapshotBefore = toPaymentSnapshot(props.order)
+    const updatedOrder = await ordersStore.update(props.order.id, updateData as any)
+
+    success('Tipo de pedido actualizado', 5000)
+    emit('updated', updatedOrder, paymentSnapshotBefore)
+    emit('close')
+}
+
+async function confirmKitchenReservationSave() {
+    showKitchenReservationWarn.value = false
+    saving.value = true
+    try {
+        await persistTypeChange()
+    } catch (err: any) {
+        error('Error al actualizar tipo', err.message)
+    } finally {
+        saving.value = false
+    }
+}
+
 const handleSave = async () => {
     saving.value = true
     try {
-        // Verificar si el nuevo tipo requiere campos adicionales que no están completos
-        const needsCustomerSetup = selectedType.value === 'delivery' &&
+        const needsCustomerSetup =
+            selectedType.value === 'delivery' &&
             (!props.order.customerId || !props.order.addressId || !props.order.guestName)
 
-        const needsReservationSetup = selectedType.value === 'reservation' &&
-            (!props.order.guestName || !reservedFor.value)
+        const needsReservationSetup =
+            selectedType.value === 'reservation' && (!props.order.guestName || !reservedForDate.value)
 
         if (needsCustomerSetup || needsReservationSetup) {
-            // Guardar tipo temporalmente y abrir modal de cliente
             emit('type-changed-pending', selectedType.value)
             emit('open-customer-modal')
             emit('close')
             return
         }
 
-        const inKitchen =
-            props.order.status === 'taken' || props.order.status === 'in_preparation'
+        const inKitchen = props.order.status === 'taken' || props.order.status === 'in_preparation'
         if (inKitchen && selectedType.value === 'reservation') {
-            const ok = confirm(
-                'Este pedido está en cocina (tomado o en preparación). Cambiar a reserva o sus fechas puede hacer que salga de la cola y se avisará en cocina. ¿Continuar?'
-            )
-            if (!ok) return
+            showKitchenReservationWarn.value = true
+            return
         }
 
-        // Si no necesita setup adicional, guardar directamente
-        const updateData: any = {
-            type: selectedType.value
-        }
-
-        // Si cambia a reservation, incluir reservedFor y prepareAt si el usuario lo definió
-        if (selectedType.value === 'reservation') {
-            updateData.reservedFor = new Date(reservedFor.value)
-            if (prepareAt.value?.trim()) {
-                updateData.prepareAt = new Date(prepareAt.value)
-            }
-        }
-
-        // Si cambia desde reservation a otro tipo, limpiar reservedFor
-        if (props.order.type === 'reservation' && selectedType.value !== 'reservation') {
-            updateData.reservedFor = null
-        }
-
-        // Si cambia desde delivery a otro tipo, limpiar deliveryFee
-        if (props.order.type === 'delivery' && selectedType.value !== 'delivery') {
-            updateData.deliveryFee = null
-        }
-
-        // Si cambia a onsite, limpiar addressId
-        if (selectedType.value === 'onsite') {
-            updateData.addressId = null
-        }
-
-        const paymentSnapshotBefore = toPaymentSnapshot(props.order)
-        const updatedOrder = await ordersStore.update(props.order.id, updateData)
-
-        success('Tipo de pedido actualizado', 5000)
-        emit('updated', updatedOrder, paymentSnapshotBefore)
-        emit('close')
+        await persistTypeChange()
     } catch (err: any) {
         error('Error al actualizar tipo', err.message)
     } finally {

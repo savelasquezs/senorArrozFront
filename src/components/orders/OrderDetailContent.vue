@@ -174,40 +174,50 @@
                         >
                             <p class="text-xs font-medium text-amber-900">Horarios de entrega y preparación</p>
                             <div class="space-y-1.5">
-                                <label class="text-xs font-medium text-gray-700" for="order-reserved-for-local"
-                                    >Tener listo (entrega al cliente)</label
-                                >
-                                <input
-                                    id="order-reserved-for-local"
-                                    v-model="editableReservedForLocal"
-                                    type="datetime-local"
-                                    class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-emerald-600 focus:outline-none focus:ring-1 focus:ring-emerald-600"
+                                <label class="text-xs font-medium text-gray-700">Tener listo (entrega al cliente)</label>
+                                <VueDatePicker
+                                    v-model="editableReservedForDate"
+                                    placeholder="Fecha y hora de entrega"
+                                    :min-date="new Date()"
+                                    auto-apply
+                                    class="order-detail-picker w-full"
                                 />
                             </div>
                             <div class="space-y-1.5">
-                                <label class="text-xs font-medium text-gray-700" for="order-prepare-at-local"
-                                    >Inicio de preparación (opcional)</label
-                                >
-                                <input
-                                    id="order-prepare-at-local"
-                                    v-model="editablePrepareAtLocal"
-                                    type="datetime-local"
-                                    class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-emerald-600 focus:outline-none focus:ring-1 focus:ring-emerald-600"
+                                <label class="text-xs font-medium text-gray-700">Inicio de preparación (opcional)</label>
+                                <VueDatePicker
+                                    v-model="editablePrepareAtDate"
+                                    placeholder="Cuándo empezar en cocina"
+                                    :min-date="new Date()"
+                                    auto-apply
+                                    class="order-detail-picker w-full"
                                 />
                                 <p class="text-[11px] text-gray-500">
                                     Si lo dejas vacío, el sistema usa una hora antes de la entrega. Debe haber al menos
                                     40 minutos entre preparación y entrega.
                                 </p>
                             </div>
-                            <BaseButton
-                                size="sm"
-                                variant="secondary"
-                                class="w-full sm:w-auto"
-                                :loading="savingSchedule"
-                                @click="saveSchedule"
-                            >
-                                Guardar horarios
-                            </BaseButton>
+                            <div class="flex flex-col sm:flex-row gap-2 flex-wrap">
+                                <BaseButton
+                                    size="sm"
+                                    variant="secondary"
+                                    class="w-full sm:w-auto"
+                                    :loading="savingSchedule"
+                                    @click="saveSchedule"
+                                >
+                                    Guardar horarios
+                                </BaseButton>
+                                <BaseButton
+                                    v-if="showPrepareNowButton"
+                                    size="sm"
+                                    variant="primary"
+                                    class="w-full sm:w-auto"
+                                    :loading="savingPrepareNow"
+                                    @click="onPrepareNowClick"
+                                >
+                                    Preparar ya
+                                </BaseButton>
+                            </div>
                         </div>
 
                         <!-- Solo lectura si el usuario no puede editar pero hay fechas -->
@@ -330,6 +340,49 @@
         @confirm-adjust="onConfirmBankPaymentAdjust"
         @go-to-payments="scrollToPaymentsTab"
     />
+
+    <BaseDialog
+        v-model="showKitchenScheduleConfirm"
+        title="Pedido en cocina"
+        size="md"
+    >
+        <p class="text-sm text-gray-700">
+            Este pedido está en cocina (tomado o en preparación). Al guardar los horarios puede salir de la cola de
+            cocina y se avisará por notificación. ¿Continuar?
+        </p>
+        <template #footer>
+            <BaseButton variant="secondary" @click="showKitchenScheduleConfirm = false">Cancelar</BaseButton>
+            <BaseButton variant="primary" :loading="savingSchedule" @click="confirmKitchenScheduleSave">Continuar</BaseButton>
+        </template>
+    </BaseDialog>
+
+    <BaseDialog
+        v-model="showPrepareNowConfirm"
+        title="Preparar ya"
+        size="md"
+    >
+        <p class="text-sm text-gray-700 space-y-2">
+            <span class="block">
+                Se fijará la hora de preparación a <strong>ahora</strong> y el pedido pasará a
+                <strong>{{ prepareNowTargetTypeLabel }}</strong
+                >.
+            </span>
+            <span v-if="(order?.addressId)" class="block text-xs text-gray-600">
+                Hay dirección: quedará como domicilio.
+            </span>
+            <span v-else class="block text-xs text-gray-600"> Sin dirección: quedará como en el local (se quitará dirección de entrega). </span>
+            <span
+                v-if="order && (order.status === 'taken' || order.status === 'in_preparation')"
+                class="block text-amber-800 text-xs"
+            >
+                Está en cocina: puede salir de la lista y se notificará.
+            </span>
+        </p>
+        <template #footer>
+            <BaseButton variant="secondary" @click="showPrepareNowConfirm = false">Cancelar</BaseButton>
+            <BaseButton variant="primary" :loading="savingPrepareNow" @click="executePrepareNow">Confirmar</BaseButton>
+        </template>
+    </BaseDialog>
 </template>
 
 <script setup lang="ts">
@@ -342,7 +395,10 @@ import AssignDeliveryModal from '@/components/orders/AssignDeliveryModal.vue'
 import CancelOrderModal from '@/components/orders/CancelOrderModal.vue'
 import EditOrderTypeModal from '@/components/orders/EditOrderTypeModal.vue'
 import OrderBankPaymentSyncDialog from '@/components/orders/OrderBankPaymentSyncDialog.vue'
+import BaseDialog from '@/components/ui/BaseDialog.vue'
 import BaseInput from '@/components/ui/BaseInput.vue'
+import { VueDatePicker } from '@vuepic/vue-datepicker'
+import '@vuepic/vue-datepicker/dist/main.css'
 import PersistedPaymentSelector from '@/components/payments/PersistedPaymentSelector.vue'
 import PhoneNumberItem from '@/components/customers/PhoneNumberItem.vue'
 import { useFormatting } from '@/composables/useFormatting'
@@ -392,20 +448,18 @@ const editableGuestName = ref('')
 const editableNotes = ref('')
 const editableDeliveryFee = ref<number | null>(null)
 const savingDeliveryFee = ref(false)
-const editableReservedForLocal = ref('')
-const editablePrepareAtLocal = ref('')
+const editableReservedForDate = ref<Date | null>(null)
+const editablePrepareAtDate = ref<Date | null>(null)
 const savingSchedule = ref(false)
+const savingPrepareNow = ref(false)
+const showKitchenScheduleConfirm = ref(false)
+const showPrepareNowConfirm = ref(false)
 
-function isoToDatetimeLocalValue(iso: string | Date | undefined | null): string {
-    if (iso === undefined || iso === null || iso === '') return ''
+function parseOrderDate(iso: string | Date | undefined | null): Date | null {
+    if (iso === undefined || iso === null || iso === '') return null
     const d = typeof iso === 'string' ? new Date(iso) : iso
-    if (Number.isNaN(d.getTime())) return ''
-    const y = d.getFullYear()
-    const m = String(d.getMonth() + 1).padStart(2, '0')
-    const day = String(d.getDate()).padStart(2, '0')
-    const h = String(d.getHours()).padStart(2, '0')
-    const min = String(d.getMinutes()).padStart(2, '0')
-    return `${y}-${m}-${day}T${h}:${min}`
+    if (Number.isNaN(d.getTime())) return null
+    return d
 }
 
 const customer = ref<Customer | null>(null)
@@ -429,6 +483,14 @@ const showScheduleEditor = computed(() => {
     if (o.status === 'delivered' || o.status === 'cancelled') return false
     return true
 })
+
+const showPrepareNowButton = computed(() => {
+    const o = order.value
+    if (!o || !showScheduleEditor.value) return false
+    return o.type === 'reservation' || !!o.reservedFor || !!o.prepareAt
+})
+
+const prepareNowTargetTypeLabel = computed(() => (order.value?.addressId ? 'Domicilio' : 'En el local'))
 
 const { formatDateTime, formatCurrency } = useFormatting()
 const activeTab = ref('info')
@@ -566,8 +628,8 @@ watch(ordersDataStoreCurrent, (newOrder) => {
             newOrder.deliveryFee !== null && newOrder.deliveryFee !== undefined
                 ? Number(newOrder.deliveryFee)
                 : 0
-        editableReservedForLocal.value = isoToDatetimeLocalValue(newOrder.reservedFor as string | Date | undefined)
-        editablePrepareAtLocal.value = isoToDatetimeLocalValue(newOrder.prepareAt as string | Date | undefined)
+        editableReservedForDate.value = parseOrderDate(newOrder.reservedFor as string | Date | undefined)
+        editablePrepareAtDate.value = parseOrderDate(newOrder.prepareAt as string | Date | undefined)
         // Cargar cliente completo si hay customerId
         if (newOrder.customerId) {
             loadCustomer(newOrder.customerId)
@@ -630,27 +692,36 @@ const updateNotes = async () => {
     }
 }
 
-const saveSchedule = async () => {
+const saveSchedule = () => {
     if (!order.value || !showScheduleEditor.value) return
-    if (!editableReservedForLocal.value?.trim()) {
+    if (!editableReservedForDate.value) {
         error('Horarios', 'Indica fecha y hora de entrega (tener listo).')
         return
     }
 
     const st = order.value.status
     if (st === 'taken' || st === 'in_preparation') {
-        const ok = confirm(
-            'Este pedido está en cocina (tomado o en preparación). Al guardar los horarios puede salir de la cola de cocina y se avisará por notificación. ¿Continuar?'
-        )
-        if (!ok) return
+        showKitchenScheduleConfirm.value = true
+        return
     }
+
+    void doSaveSchedule()
+}
+
+function confirmKitchenScheduleSave() {
+    showKitchenScheduleConfirm.value = false
+    void doSaveSchedule()
+}
+
+async function doSaveSchedule() {
+    if (!order.value || !showScheduleEditor.value || !editableReservedForDate.value) return
 
     savingSchedule.value = true
     try {
-        const reservedIso = new Date(editableReservedForLocal.value).toISOString()
+        const reservedIso = editableReservedForDate.value.toISOString()
         const payload: { reservedFor: string; prepareAt?: string } = { reservedFor: reservedIso }
-        if (editablePrepareAtLocal.value?.trim()) {
-            payload.prepareAt = new Date(editablePrepareAtLocal.value).toISOString()
+        if (editablePrepareAtDate.value) {
+            payload.prepareAt = editablePrepareAtDate.value.toISOString()
         }
         await ordersDataStore.update(order.value.id, payload as any)
         success('Horarios actualizados', 5000, 'Cocina y domiciliario recibirán aviso si aplica.')
@@ -658,6 +729,50 @@ const saveSchedule = async () => {
         error('Error al guardar horarios', err.message)
     } finally {
         savingSchedule.value = false
+    }
+}
+
+function onPrepareNowClick() {
+    const o = order.value
+    if (!o || !showPrepareNowButton.value) return
+    if (o.addressId) {
+        if (!o.customerId || !o.guestName?.trim()) {
+            error(
+                'Datos incompletos',
+                'Para dejarlo como domicilio se requiere cliente, dirección y nombre de quien recibe.',
+            )
+            return
+        }
+    }
+    showPrepareNowConfirm.value = true
+}
+
+async function executePrepareNow() {
+    const o = order.value
+    if (!o) return
+    showPrepareNowConfirm.value = false
+    savingPrepareNow.value = true
+    try {
+        const useDelivery = !!o.addressId
+        if (useDelivery && (!o.customerId || !o.guestName?.trim())) {
+            error('Datos incompletos', 'Completa cliente, dirección y nombre para domicilio.')
+            return
+        }
+        const now = new Date()
+        await ordersDataStore.update(o.id, {
+            type: useDelivery ? 'delivery' : 'onsite',
+            prepareAt: now,
+            reservedFor: null as unknown as undefined,
+        } as any)
+        success(
+            'Preparar ya',
+            5000,
+            `${useDelivery ? 'Domicilio' : 'En el local'}: preparación desde este momento. Cocina recibirá aviso si aplica.`,
+        )
+    } catch (err: any) {
+        error('Error', err.message)
+    } finally {
+        savingPrepareNow.value = false
     }
 }
 
