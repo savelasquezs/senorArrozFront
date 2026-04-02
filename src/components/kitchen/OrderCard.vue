@@ -36,6 +36,12 @@
                 class="text-[10px] sm:text-xs text-emerald-600 mt-0.5 sm:mt-1 font-medium">
                 Listo para: {{ formattedReadyByTime }}
             </div>
+
+            <div v-if="variant === 'kitchen' && kitchenPickupName"
+                class="flex items-start gap-1 sm:gap-1.5 md:gap-2 text-[11px] sm:text-xs md:text-sm text-gray-700 mt-1">
+                <UserIcon class="w-3 h-3 sm:w-3.5 sm:h-3.5 md:w-4 md:h-4 text-gray-500 flex-shrink-0 mt-0.5" />
+                <span class="font-medium break-words min-w-0">Recoge: {{ kitchenPickupName }}</span>
+            </div>
         </div>
 
         <!-- Contenido según variant -->
@@ -71,10 +77,10 @@
             </div>
 
             <!-- Cliente o Guest -->
-            <div v-if="order.guestName"
+            <div v-if="deliveryRecipientName"
                 class="flex items-start gap-1 sm:gap-1.5 md:gap-2 text-[11px] sm:text-xs md:text-sm">
                 <UserIcon class="w-3 h-3 sm:w-3.5 sm:h-3.5 md:w-4 md:h-4 text-gray-500 flex-shrink-0 mt-0.5" />
-                <span class="text-gray-700 break-words min-w-0">{{ order.guestName }}</span>
+                <span class="text-gray-700 break-words min-w-0">{{ deliveryRecipientName }}</span>
             </div>
 
             <!-- Info adicional -->
@@ -148,6 +154,18 @@ const orderTypeIcon = computed(() => {
 
 const totalItems = computed(() => {
     return props.orderItems?.reduce((sum, item) => sum + item.quantity, 0) || 0
+})
+
+/** Nombre para mostrar en cocina en pedidos "en el local". */
+const kitchenPickupName = computed(() => {
+    if (props.variant !== 'kitchen' || props.order.type !== 'onsite') return ''
+    const n = (props.order.customerName?.trim() || props.order.guestName?.trim()) ?? ''
+    return n
+})
+
+const deliveryRecipientName = computed(() => {
+    const n = (props.order.customerName?.trim() || props.order.guestName?.trim()) ?? ''
+    return n
 })
 
 const vueltosHint = computed(() =>
