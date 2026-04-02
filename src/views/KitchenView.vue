@@ -205,12 +205,14 @@ const handleReservationReady = async (orderData: any) => {
     await notifyOrderShownInKitchen(orderData, true)
 }
 
+/** Notificar antes de recargar la lista: si el pedido deja de venir en forKitchen, ya no estaría en allOrders tras loadOrders. */
 const notifyKitchenOrderModified = async (orderData: any, modificationKind: string) => {
-    const order = allOrders.value.find((o) => o.id === orderData.id)
-    if (!order || (order.status !== 'taken' && order.status !== 'in_preparation')) return
+    if (!orderData?.id) return
+    const prev = allOrders.value.find((o) => o.id === orderData.id)
+    if (!prev || (prev.status !== 'taken' && prev.status !== 'in_preparation')) return
 
     try {
-        await ordersStore.fetchById(order.id)
+        await ordersStore.fetchById(orderData.id)
         if (!ordersStore.current) return
 
         const products = ordersStore.current.orderDetails.map((item) => ({
@@ -219,14 +221,14 @@ const notifyKitchenOrderModified = async (orderData: any, modificationKind: stri
         }))
         const title =
             modificationKind === 'schedule'
-                ? `Cambio de horario #${order.id}`
-                : `Pedido #${order.id} actualizado`
-        const bodyText = KitchenService.generateOrderModifiedNotificationText(order, products, modificationKind)
-        const speechText = KitchenService.generateOrderModifiedSpeechText(order, products, modificationKind)
+                ? `Cambio de horario #${prev.id}`
+                : `Pedido #${prev.id} actualizado`
+        const bodyText = KitchenService.generateOrderModifiedNotificationText(prev, products, modificationKind)
+        const speechText = KitchenService.generateOrderModifiedSpeechText(prev, products, modificationKind)
 
         if (soundEnabled.value) {
             if (permission.value === 'granted') {
-                notify(title, { body: bodyText, tag: `order-mod-${order.id}-${Date.now()}` })
+                notify(title, { body: bodyText, tag: `order-mod-${prev.id}-${Date.now()}` })
             }
             speak(speechText)
         }
@@ -239,8 +241,8 @@ const handleOrderModified = async (payload: any) => {
     const data = payload?.order ?? payload
     const kind = typeof payload?.modificationKind === 'string' ? payload.modificationKind : 'content'
     if (!data?.id) return
-    await loadOrders()
     await notifyKitchenOrderModified(data, kind)
+    await loadOrders()
 }
 
 const handleChangeStatus = (orderIds: number[], newStatus: OrderStatus) => {

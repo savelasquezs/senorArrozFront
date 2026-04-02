@@ -426,7 +426,8 @@ const showScheduleEditor = computed(() => {
     const o = order.value
     if (!o || isDeliveryman.value) return false
     if (!permissions.canEditOrder(o)) return false
-    return o.type === 'reservation' || !!o.reservedFor || !!o.prepareAt
+    if (o.status === 'delivered' || o.status === 'cancelled') return false
+    return true
 })
 
 const { formatDateTime, formatCurrency } = useFormatting()
@@ -634,6 +635,14 @@ const saveSchedule = async () => {
     if (!editableReservedForLocal.value?.trim()) {
         error('Horarios', 'Indica fecha y hora de entrega (tener listo).')
         return
+    }
+
+    const st = order.value.status
+    if (st === 'taken' || st === 'in_preparation') {
+        const ok = confirm(
+            'Este pedido está en cocina (tomado o en preparación). Al guardar los horarios puede salir de la cola de cocina y se avisará por notificación. ¿Continuar?'
+        )
+        if (!ok) return
     }
 
     savingSchedule.value = true

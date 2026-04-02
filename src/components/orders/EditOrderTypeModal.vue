@@ -221,14 +221,26 @@ const handleSave = async () => {
             return
         }
 
+        const inKitchen =
+            props.order.status === 'taken' || props.order.status === 'in_preparation'
+        if (inKitchen && selectedType.value === 'reservation') {
+            const ok = confirm(
+                'Este pedido está en cocina (tomado o en preparación). Cambiar a reserva o sus fechas puede hacer que salga de la cola y se avisará en cocina. ¿Continuar?'
+            )
+            if (!ok) return
+        }
+
         // Si no necesita setup adicional, guardar directamente
         const updateData: any = {
             type: selectedType.value
         }
 
-        // Si cambia a reservation, incluir reservedFor
+        // Si cambia a reservation, incluir reservedFor y prepareAt si el usuario lo definió
         if (selectedType.value === 'reservation') {
             updateData.reservedFor = new Date(reservedFor.value)
+            if (prepareAt.value?.trim()) {
+                updateData.prepareAt = new Date(prepareAt.value)
+            }
         }
 
         // Si cambia desde reservation a otro tipo, limpiar reservedFor
