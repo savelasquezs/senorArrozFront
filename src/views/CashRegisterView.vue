@@ -77,7 +77,8 @@
                 <p class="text-xs text-gray-400 mt-1">
                   Ventas: {{ formatCurrency(expected.cashFromOrders) }} |
                   Abonos reservas: +{{ formatCurrency(expected.cashDeposits) }} |
-                  Gastos: -{{ formatCurrency(expected.cashExpenses) }}
+                  Gastos: -{{ formatCurrency(expected.cashExpenses) }} |
+                  Abonos domic. (transferencia): -{{ formatCurrency(expected.advancesBankTransfer) }}
                 </p>
               </div>
               <div :class="['rounded-lg p-3 text-center', cashDifference === 0 ? 'bg-green-50' : 'bg-red-50']">

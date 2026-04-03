@@ -84,6 +84,8 @@ export interface CashRegisterExpected {
   cashFromOrders: number
   cashDeposits: number
   cashExpenses: number
+  /** Abonos domiciliario por transferencia: restados del efectivo esperado (cuadran en banco). */
+  advancesBankTransfer: number
   asOf: string
   lastClosureAt?: string
   banks: BankExpectedBalance[]
