@@ -99,17 +99,26 @@
 
                     <!-- Cliente (clickeable para editar) -->
                     <td class="px-6 py-4 whitespace-nowrap">
-                        <button type="button" class="text-left hover:text-emerald-600 transition-colors"
-                            @click.stop="$emit('edit-customer', order)">
-                            <div v-if="order.customerName || order.guestName"
-                                class="text-sm font-medium text-gray-900 hover:underline">
-                                {{ order.customerName || order.guestName }}
-                            </div>
-                            <span v-else class="text-sm text-gray-400 italic hover:underline">Sin cliente</span>
-                            <div v-if="order.customerPhone" class="text-sm text-gray-500">
-                                {{ order.customerPhone }}
-                            </div>
-                        </button>
+                        <div class="flex items-start gap-1.5">
+                            <button type="button" class="text-left hover:text-emerald-600 transition-colors min-w-0 flex-1"
+                                @click.stop="$emit('edit-customer', order)">
+                                <div v-if="order.customerName || order.guestName"
+                                    class="text-sm font-medium text-gray-900 hover:underline">
+                                    {{ order.customerName || order.guestName }}
+                                </div>
+                                <span v-else class="text-sm text-gray-400 italic hover:underline">Sin cliente</span>
+                                <div v-if="order.customerPhone" class="text-sm text-gray-500">
+                                    {{ order.customerPhone }}
+                                </div>
+                            </button>
+                            <button v-if="order.customerPhone"
+                                type="button"
+                                class="flex-shrink-0 p-1 rounded text-gray-400 hover:text-emerald-600 hover:bg-emerald-50 transition-colors"
+                                title="Copiar teléfono"
+                                @click.stop="copyCustomerPhone(order)">
+                                <ClipboardDocumentIcon class="w-4 h-4" />
+                            </button>
+                        </div>
                     </td>
 
                     <!-- Dirección (clickeable para cambiar) -->
@@ -228,6 +237,7 @@ import OrderStatusBadge from './OrderStatusBadge.vue'
 import OrderTypeBadge from './OrderTypeBadge.vue'
 import BaseLoading from '@/components/ui/BaseLoading.vue'
 import { useFormatting } from '@/composables/useFormatting'
+import { useToast } from '@/composables/useToast'
 import {
     ArrowsUpDownIcon,
     ChevronUpIcon,
@@ -236,6 +246,7 @@ import {
     DevicePhoneMobileIcon,
     CheckCircleIcon,
     XCircleIcon,
+    ClipboardDocumentIcon,
 } from '@heroicons/vue/24/outline'
 
 interface Props {
@@ -261,6 +272,18 @@ const emit = defineEmits<{
 }>()
 
 const { formatCurrency } = useFormatting()
+const { success, error } = useToast()
+
+async function copyCustomerPhone(order: OrderListItem) {
+    const phone = order.customerPhone?.trim()
+    if (!phone) return
+    try {
+        await navigator.clipboard.writeText(phone)
+        success('Teléfono copiado', 2500, phone)
+    } catch {
+        error('No se pudo copiar', 'Permite el acceso al portapapeles o copia el número manualmente.')
+    }
+}
 
 // Formatear solo fecha
 const formatDate = (dateString: string): string => {
