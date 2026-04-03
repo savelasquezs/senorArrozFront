@@ -29,6 +29,23 @@
         </div>
       </div>
 
+      <div
+        v-if="expected && expected.undeliveredOrdersCount > 0"
+        class="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800 flex items-start gap-2"
+        role="alert"
+      >
+        <ExclamationCircleIcon class="w-5 h-5 shrink-0 text-red-600" />
+        <span>
+          <strong>No puedes guardar el cuadre:</strong>
+          {{
+            expected.undeliveredOrdersCount === 1
+              ? ' hay 1 pedido sin entregar.'
+              : ` hay ${expected.undeliveredOrdersCount} pedidos sin entregar.`
+          }}
+          Entrega o cancela esos pedidos antes de cuadrar caja.
+        </span>
+      </div>
+
       <div v-if="loading" class="space-y-4">
         <div v-for="i in 3" :key="i" class="bg-gray-100 animate-pulse rounded-lg h-40" />
       </div>
@@ -280,6 +297,7 @@ import {
   ExclamationCircleIcon,
 } from '@heroicons/vue/24/outline'
 import { cashRegisterApi } from '@/services/MainAPI/cashRegisterApi'
+import { useToast } from '@/composables/useToast'
 import type {
   CashRegisterExpected,
   CloseBankReconciliationDto,
@@ -288,6 +306,7 @@ import type {
 import { DENOMINATIONS } from '@/types/cashRegister'
 
 const authStore = useAuthStore()
+const { success: toastSuccess, error: toastError } = useToast()
 
 const showHistoryModal = ref(false)
 const canViewClosureHistory = computed(() => authStore.isAdmin || authStore.isSuperadmin)
@@ -319,11 +338,24 @@ const allBanksCuadred = computed(() =>
   bankReconciliations.value.every((r) => r.actualBalance - r.expectedBalance === 0)
 )
 
+const undeliveredCount = computed(() => expected.value?.undeliveredOrdersCount ?? 0)
+
 const canSave = computed(
-  () => !saving.value && allBanksCuadred.value && bankReconciliations.value.length > 0
+  () =>
+    !saving.value &&
+    undeliveredCount.value === 0 &&
+    allBanksCuadred.value &&
+    bankReconciliations.value.length > 0
 )
 
 const saveBlockReason = computed(() => {
+  const n = undeliveredCount.value
+  if (n > 0) {
+    return n === 1
+      ? 'Hay 1 pedido sin entregar; entrégalo o cancélalo antes de guardar.'
+      : `Hay ${n} pedidos sin entregar; entrégalos o cancélalos antes de guardar.`
+  }
+  if (bankReconciliations.value.length === 0) return 'No hay bancos configurados para esta sucursal.'
   if (!allBanksCuadred.value) return 'Hay bancos con diferencia distinta de $0'
   return ''
 })
@@ -377,7 +409,8 @@ function removeLoan(idx: number) {
 async function loadData() {
   loading.value = true
   try {
-    expected.value = await cashRegisterApi.getExpected()
+    const branchId = authStore.branchId ?? undefined
+    expected.value = await cashRegisterApi.getExpected(branchId)
     movementsBankId.value = null
 
     // Inicializar conciliaciones con valores del sistema
@@ -419,8 +452,8 @@ async function saveClosure() {
       informalLoans: informalLoans.value.filter((l) => l.concept && l.amount > 0),
     }
 
-    await cashRegisterApi.closeCashRegister(dto)
-    alert('Cuadre guardado exitosamente')
+    await cashRegisterApi.closeCashRegister(dto, authStore.branchId ?? undefined)
+    toastSuccess('Cuadre guardado', 5000)
     await loadData()
 
     // Resetear conteos
@@ -428,7 +461,7 @@ async function saveClosure() {
     closingCash.value = 0
     informalLoans.value = []
   } catch (e: any) {
-    alert('Error al guardar cuadre: ' + (e.message || 'Error desconocido'))
+    toastError('No se pudo guardar el cuadre', e.message || 'Error desconocido')
   } finally {
     saving.value = false
   }
