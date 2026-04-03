@@ -22,6 +22,18 @@
                 </p>
             </div>
 
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Notas del comprobante (opcional)</label>
+                <textarea
+                    v-model="formData.notes"
+                    rows="2"
+                    maxlength="2000"
+                    class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
+                    placeholder="Ej. referencia de factura, acuerdos con el proveedor…"
+                />
+                <p class="text-xs text-gray-400 mt-1">{{ (formData.notes || '').length }}/2000</p>
+            </div>
+
             <!-- Detalles del Gasto -->
             <div>
                 <div class="flex items-center justify-between mb-3">
@@ -89,9 +101,10 @@
                     </div>
 
                     <!-- Filas de gastos -->
-                    <div class="space-y-1.5">
+                    <div class="space-y-3">
                         <div v-for="(detail, index) in formData.expenseDetails" :key="detail.tempId"
-                            class="flex items-center gap-2 border rounded-md p-2 bg-white hover:bg-gray-50 transition-colors">
+                            class="border rounded-md p-2 bg-white space-y-2">
+                            <div class="flex items-center gap-2 hover:bg-gray-50 transition-colors -m-2 p-2 rounded">
                             <!-- Gasto (más ancho) -->
                             <div class="flex-1 min-w-[220px]">
                                 <BaseSelect v-model="detail.expenseId" :options="prioritizedExpenseOptions"
@@ -127,6 +140,17 @@
                                     class="text-red-600 hover:text-red-700 hover:bg-red-50 p-1.5">
                                     <TrashIcon class="w-4 h-4" />
                                 </BaseButton>
+                            </div>
+                            </div>
+                            <div>
+                                <label class="text-xs font-medium text-gray-500">Notas de la línea (opcional)</label>
+                                <textarea
+                                    v-model="detail.notes"
+                                    rows="1"
+                                    maxlength="1000"
+                                    class="w-full mt-0.5 border border-gray-200 rounded-md px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-indigo-300"
+                                    placeholder="Detalle u observación solo para esta línea"
+                                />
                             </div>
                         </div>
                     </div>
@@ -388,6 +412,8 @@ const EXPENSE_VAT_RATE = 0.19
 // Estado del formulario
 const formData = ref<{
     supplierId: number | null
+    /** Notas globales del comprobante */
+    notes: string
     expenseDetails: Array<CreateExpenseDetailDto & {
         tempId: string
         /** Id de fila en BD al editar (para PUT sin borrar/recrear líneas). */
@@ -395,10 +421,12 @@ const formData = ref<{
         expenseName: string
         expenseUnit?: string
         total?: number  // Total ingresado por el usuario (fuente de verdad)
+        notes?: string
     }>
     expenseBankPayments: Array<CreateExpenseBankPaymentDto & { tempId: string; syncAmount?: boolean }>
 }>({
     supplierId: null,
+    notes: '',
     expenseDetails: [],
     expenseBankPayments: [],
 })
@@ -648,6 +676,7 @@ const initializeForm = async () => {
                     tempId: `detail-${detail.id}`,
                     expenseName,
                     expenseUnit,
+                    notes: detail.notes ?? '',
                 }
             })
         )
@@ -656,6 +685,7 @@ const initializeForm = async () => {
 
         formData.value = {
             supplierId: props.editingExpense.supplierId,
+            notes: props.editingExpense.notes ?? '',
             expenseDetails: details,
             expenseBankPayments: props.editingExpense.expenseBankPayments.map(payment => ({
                 bankId: payment.bankId,
@@ -698,6 +728,7 @@ const initializeForm = async () => {
         editExpensePaymentSnapshot.value = null
         formData.value = {
             supplierId: null,
+            notes: '',
             expenseDetails: [],
             expenseBankPayments: [],
         }
@@ -1030,6 +1061,7 @@ const addDetail = () => {
         quantity: 1,
         amount: 0,
         total: 0,
+        notes: '',
         tempId: `temp-${Date.now()}-${Math.random()}`,
         expenseName: '',
         expenseUnit: undefined,
@@ -1128,18 +1160,22 @@ async function executeExpenseSave() {
             props.presetDeliverymanId ??
             (isDeliverymanAdvance.value ? selectedDeliverymanId.value : null)
 
+        const headerNotes = (formData.value.notes || '').trim()
         const payload: CreateExpenseHeaderDto | UpdateExpenseHeaderDto = {
             supplierId: formData.value.supplierId!,
             ...(deliverymanForHeader ? { deliverymanId: deliverymanForHeader } : {}),
             includeVat: applyVat.value,
+            ...(headerNotes ? { notes: headerNotes.slice(0, 2000) } : { notes: null }),
             expenseDetails: formData.value.expenseDetails.map(d => {
                 const userTotal = roundMoney(Number(d.total ?? 0) || 0)
                 const unitAmount = deriveIntegerUnitAmount(d)
+                const lineNotes = (d.notes || '').trim()
                 const line: CreateExpenseDetailDto & { id?: number } = {
                     expenseId: d.expenseId,
                     quantity: d.quantity,
                     amount: unitAmount,
                     total: userTotal,
+                    ...(lineNotes ? { notes: lineNotes.slice(0, 1000) } : { notes: null }),
                 }
                 if (props.editingExpense && d.detailId != null && d.detailId > 0) {
                     line.id = d.detailId

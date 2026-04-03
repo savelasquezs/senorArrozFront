@@ -22,6 +22,10 @@
                     <p class="text-lg font-semibold text-gray-900">{{ formatDate(expense.createdAt) }}</p>
                     <p class="text-sm text-gray-500">{{ formatTime(expense.createdAt) }}</p>
                 </div>
+                <div v-if="expense.notes" class="bg-amber-50/80 rounded-lg p-4 md:col-span-2 border border-amber-100">
+                    <p class="text-sm text-gray-600 font-medium">Notas del comprobante</p>
+                    <p class="text-sm text-gray-900 whitespace-pre-wrap mt-1">{{ expense.notes }}</p>
+                </div>
                 <div v-if="expense.deliverymanId" class="bg-gray-50 rounded-lg p-4 md:col-span-2">
                     <p class="text-sm text-gray-600 font-medium">Abono de domiciliario</p>
                     <p class="text-lg font-semibold text-gray-900">
@@ -52,6 +56,7 @@
                                 <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Precio Unit.
                                 </th>
                                 <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Total</th>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Notas</th>
                             </tr>
                         </thead>
                         <tbody class="bg-white divide-y divide-gray-200">
@@ -73,6 +78,10 @@
                                 </td>
                                 <td class="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">
                                     {{ formatCurrency((detail.total || detail.quantity * detail.amount)) }}
+                                </td>
+                                <td class="px-4 py-3 text-sm text-gray-700 max-w-xs">
+                                    <span v-if="detail.notes" class="whitespace-pre-wrap">{{ detail.notes }}</span>
+                                    <span v-else class="text-gray-400">—</span>
                                 </td>
                             </tr>
                         </tbody>
