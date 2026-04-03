@@ -84,7 +84,6 @@ export interface CashRegisterExpected {
   cashFromOrders: number
   cashDeposits: number
   cashExpenses: number
-  advances: number
   asOf: string
   lastClosureAt?: string
   banks: BankExpectedBalance[]
