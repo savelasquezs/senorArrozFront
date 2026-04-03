@@ -294,7 +294,10 @@ const normalizedFilters = computed<ExpenseFilterState>(() => ({
 
 const normalizeExpense = (header: ExpenseHeader): ExpenseHeader => {
     const normalizedDetails = header.expenseDetails.map(detail => {
-        const computedTotal = detail.total ?? (detail.amount * detail.quantity)
+        const hasLineTotal = detail.total != null && !Number.isNaN(Number(detail.total))
+        const computedTotal = hasLineTotal
+            ? Number(detail.total)
+            : Number(detail.amount) * Number(detail.quantity)
         return {
             ...detail,
             total: computedTotal,

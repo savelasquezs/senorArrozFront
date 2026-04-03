@@ -102,21 +102,22 @@
                             <!-- Cantidad -->
                             <div class="w-20">
                                 <BaseInput v-model.number="detail.quantity" type="number" :min="0.01" step="0.01" required
-                                    @input="updateUnitPrice(index)" />
+                                    @input="updateDerivedUnitAmount(index)" />
                             </div>
 
                             <!-- Total -->
                             <div class="w-28">
-                                <BaseInput :model-value="detail.total || 0"
-                                    @update:model-value="(val) => { detail.total = Number(val) || 0; updateUnitPrice(index) }"
+                                <BaseInput :model-value="detail.total ?? 0"
+                                    @update:model-value="(val) => { detail.total = parseLineTotal(val); updateDerivedUnitAmount(index) }"
                                     type="number" :min="0" step="0.01" required />
                             </div>
 
-                            <!-- Precio Unitario (calculado) -->
+                            <!-- Precio Unitario (referencia: total ÷ cantidad, no se usa para recalcular el total) -->
                             <div class="w-28">
                                 <div
-                                    class="px-2 py-1.5 bg-gray-100 rounded-md text-xs text-gray-700 border border-gray-300 text-right font-medium">
-                                    {{ formatCurrency(calculateUnitPrice(detail)) }}
+                                    class="px-2 py-1.5 bg-gray-100 rounded-md text-xs text-gray-700 border border-gray-300 text-right font-medium"
+                                    :title="'Referencia: total ÷ cantidad'">
+                                    {{ formatUnitRef(calculateUnitPriceRef(detail)) }}
                                 </div>
                             </div>
 
@@ -389,9 +390,11 @@ const formData = ref<{
     supplierId: number | null
     expenseDetails: Array<CreateExpenseDetailDto & {
         tempId: string
+        /** Id de fila en BD al editar (para PUT sin borrar/recrear líneas). */
+        detailId?: number
         expenseName: string
         expenseUnit?: string
-        total?: number  // Total ingresado por el usuario
+        total?: number  // Total ingresado por el usuario (fuente de verdad)
     }>
     expenseBankPayments: Array<CreateExpenseBankPaymentDto & { tempId: string; syncAmount?: boolean }>
 }>({
@@ -613,10 +616,11 @@ const initializeForm = async () => {
     if (props.editingExpense) {
         const details = await Promise.all(
             props.editingExpense.expenseDetails.map(async (detail) => {
-                // Preferir total persistido; solo si falta (null/undefined), reconstruir una vez desde amount×qty
-                const total = Number(
-                    detail.total != null ? detail.total : detail.amount * detail.quantity
-                )
+                // Fuente de verdad: total persistido en API; solo si no viene, fallback a amount×qty (legado)
+                const hasPersistedTotal = detail.total != null && !Number.isNaN(Number(detail.total))
+                const total = hasPersistedTotal
+                    ? roundMoney(Number(detail.total))
+                    : roundMoney(Number(detail.amount) * Number(detail.quantity))
                 const qty = Number(detail.quantity)
                 const amount =
                     qty > 0 && total > 0 ? Math.round(total / qty) : Math.round(Number(detail.amount))
@@ -636,6 +640,7 @@ const initializeForm = async () => {
                 }
 
                 return {
+                    detailId: detail.id,
                     expenseId: detail.expenseId,
                     quantity: detail.quantity,
                     amount,
@@ -975,20 +980,47 @@ const onExpenseSelected = async (index: number, expenseId: number) => {
     }
 }
 
-const calculateUnitPrice = (detail: typeof formData.value.expenseDetails[0]) => {
-    if (!detail.total || !detail.quantity || detail.quantity === 0) {
-        return 0
-    }
-    // Backend espera amount como entero (precio unitario en pesos)
-    return Math.round(Number(detail.total) / Number(detail.quantity))
+/** Total de línea en pesos (2 decimales). */
+function roundMoney(n: number): number {
+    return Math.round(n * 100) / 100
 }
 
-const updateUnitPrice = (index: number) => {
-    // El precio unitario se calcula automáticamente, no necesitamos hacer nada aquí
-    // Solo asegurarnos de que el cálculo se actualice
+function parseLineTotal(val: unknown): number {
+    const n = typeof val === 'string' ? parseFloat(val.replace(',', '.')) : Number(val)
+    if (!Number.isFinite(n) || n < 0) return 0
+    return roundMoney(n)
+}
+
+/** Referencia visual: total ÷ cantidad (no redondear a entero; el backend sigue usando amount entero solo como referencia). */
+function calculateUnitPriceRef(detail: typeof formData.value.expenseDetails[0]): number {
+    const t = Number(detail.total ?? 0)
+    const q = Number(detail.quantity ?? 0)
+    if (!t || !q) return 0
+    return roundMoney(t / q)
+}
+
+/** Valor unitario entero para API (referencia; el total guardado es el que ingresa el usuario). */
+function deriveIntegerUnitAmount(detail: typeof formData.value.expenseDetails[0]): number {
+    const t = Number(detail.total ?? 0)
+    const q = Number(detail.quantity ?? 0)
+    if (!t || !q || q === 0) return 0
+    return Math.round(t / q)
+}
+
+function formatUnitRef(unit: number): string {
+    if (!unit) return formatCurrency(0)
+    return new Intl.NumberFormat('es-CO', {
+        style: 'currency',
+        currency: 'COP',
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+    }).format(unit)
+}
+
+function updateDerivedUnitAmount(index: number) {
     const detail = formData.value.expenseDetails[index]
-    if (detail && detail.total && detail.quantity && detail.quantity > 0) {
-        detail.amount = calculateUnitPrice(detail)
+    if (detail && detail.total != null && Number(detail.total) > 0 && Number(detail.quantity) > 0) {
+        detail.amount = deriveIntegerUnitAmount(detail)
     }
 }
 
@@ -1101,15 +1133,18 @@ async function executeExpenseSave() {
             ...(deliverymanForHeader ? { deliverymanId: deliverymanForHeader } : {}),
             includeVat: applyVat.value,
             expenseDetails: formData.value.expenseDetails.map(d => {
-                const userTotal = Number(d.total ?? 0)
-                const qty = Number(d.quantity)
-                const unitAmount = qty > 0 ? Math.round(userTotal / qty) : 0
-                return {
+                const userTotal = roundMoney(Number(d.total ?? 0) || 0)
+                const unitAmount = deriveIntegerUnitAmount(d)
+                const line: CreateExpenseDetailDto & { id?: number } = {
                     expenseId: d.expenseId,
                     quantity: d.quantity,
                     amount: unitAmount,
                     total: userTotal,
                 }
+                if (props.editingExpense && d.detailId != null && d.detailId > 0) {
+                    line.id = d.detailId
+                }
+                return line
             }),
             expenseBankPayments: formData.value.expenseBankPayments.length > 0
                 ? formData.value.expenseBankPayments.map(p => ({
