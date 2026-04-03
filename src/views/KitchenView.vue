@@ -50,6 +50,19 @@
 
             <div class="border-b border-gray-200 -mx-3 px-3 sm:mx-0 sm:px-0">
                 <nav class="-mb-px flex space-x-4 sm:space-x-6 md:space-x-8 overflow-x-auto">
+                    <button @click="activeTab = 'scheduled'" :class="[
+                        'py-3 sm:py-4 px-1 border-b-2 font-medium text-xs sm:text-sm transition-colors whitespace-nowrap flex-shrink-0',
+                        activeTab === 'scheduled'
+                            ? 'border-indigo-500 text-indigo-600'
+                            : 'border-transparent text-gray-500 hover:text-gray-700'
+                    ]">
+                        <span>Reservas hoy</span>
+                        <span v-if="scheduledReservationOrders.length > 0"
+                            class="ml-1.5 sm:ml-2 py-0.5 px-1.5 sm:px-2 rounded-full text-[10px] sm:text-xs bg-indigo-100 text-indigo-700">
+                            {{ scheduledReservationOrders.length }}
+                        </span>
+                    </button>
+
                     <button @click="activeTab = 'active'" :class="[
                         'py-3 sm:py-4 px-1 border-b-2 font-medium text-xs sm:text-sm transition-colors whitespace-nowrap flex-shrink-0',
                         activeTab === 'active'
@@ -78,7 +91,15 @@
                 </nav>
             </div>
 
-            <div v-if="activeTab === 'active'">
+            <div v-if="activeTab === 'scheduled'">
+                <p v-if="scheduledReservationOrders.length === 0" class="text-sm text-gray-500 mb-3">
+                    No hay reservas del día en «Tomado». Al pasar una reserva a preparación aparecerá en Pedidos Activos.
+                </p>
+                <OrderCardGrid v-else ref="cardGridRef" :orders="scheduledReservationOrders"
+                    :order-items-map="orderItemsMap" @change-status="handleChangeStatus" />
+            </div>
+
+            <div v-else-if="activeTab === 'active'">
                 <OrderCardGrid ref="cardGridRef" :orders="activeOrders" :order-items-map="orderItemsMap"
                     @change-status="handleChangeStatus" />
             </div>
@@ -122,7 +143,7 @@ const { permission, requestPermission, notify } = useNotifications()
 const SIGNALR_HUB_URL = import.meta.env.VITE_SIGNALR_HUB_URL || 'http://localhost:5000/hubs/orders'
 const { isConnected, on } = useSignalR(SIGNALR_HUB_URL)
 
-const activeTab = ref<'active' | 'ready'>('active')
+const activeTab = ref<'scheduled' | 'active' | 'ready'>('active')
 const soundEnabled = ref(true)
 const isLoading = ref(false)
 const showConfirmModal = ref(false)
@@ -131,7 +152,26 @@ const orderItemsMap = ref(new Map<number, OrderDetailItem[]>())
 const cardGridRef = ref<InstanceType<typeof OrderCardGrid> | null>(null)
 
 const allOrders = computed(() => ordersStore.list?.items || [])
-const activeOrders = computed(() => allOrders.value.filter(o => o.status === 'taken' || o.status === 'in_preparation'))
+
+/** Reservas del día (UTC, mismo criterio que API) en tomado: agenda hasta pasar a preparación. */
+const scheduledReservationOrders = computed(() => {
+    const list = allOrders.value.filter((o) => KitchenService.isReservationTakenSameUtcServiceDay(o))
+    return list.sort((a, b) => {
+        const ta = new Date(a.prepareAt ?? a.reservedFor ?? 0).getTime()
+        const tb = new Date(b.prepareAt ?? b.reservedFor ?? 0).getTime()
+        return ta - tb
+    })
+})
+
+const activeOrders = computed(() => {
+    const skip = new Set(scheduledReservationOrders.value.map((o) => o.id))
+    return allOrders.value.filter(
+        (o) =>
+            (o.status === 'taken' || o.status === 'in_preparation') &&
+            !skip.has(o.id)
+    )
+})
+
 const readyOrders = computed(() => allOrders.value.filter(o => o.status === 'ready'))
 
 const loadOrders = async () => {

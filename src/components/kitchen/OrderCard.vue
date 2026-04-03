@@ -32,6 +32,11 @@
                 <span class="font-medium">Tiempo: {{ formattedElapsedTime }}</span>
             </div>
 
+            <div v-if="variant === 'kitchen' && formattedPrepareAtStart"
+                class="text-[10px] sm:text-xs text-indigo-700 mt-0.5 sm:mt-1 font-medium">
+                Cocina desde: {{ formattedPrepareAtStart }}
+            </div>
+
             <div v-if="variant === 'kitchen' && readyByTime"
                 class="text-[10px] sm:text-xs text-emerald-600 mt-0.5 sm:mt-1 font-medium">
                 Listo para: {{ formattedReadyByTime }}
@@ -142,6 +147,18 @@ const readyByTime = computed(() => KitchenService.getReadyByTime(props.order))
 const formattedReadyByTime = computed(() =>
     readyByTime.value ? KitchenService.formatReadyByTime(readyByTime.value) : ''
 )
+
+const formattedPrepareAtStart = computed(() => {
+    if (props.variant !== 'kitchen' || props.order.type !== 'reservation' || !props.order.prepareAt) return ''
+    const d = new Date(props.order.prepareAt as string)
+    if (Number.isNaN(d.getTime())) return ''
+    return d.toLocaleString('es-CO', {
+        weekday: 'short',
+        hour: '2-digit',
+        minute: '2-digit',
+        timeZone: 'America/Bogota',
+    })
+})
 
 const orderTypeIcon = computed(() => {
     switch (props.order.type) {
