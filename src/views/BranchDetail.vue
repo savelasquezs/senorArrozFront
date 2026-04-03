@@ -607,14 +607,16 @@
 
             <!-- Expense Category Form Dialog -->
             <ExpenseCategoryFormModal :is-open="showExpenseCategoryForm" :editing-category="editingExpenseCategory"
-                :loading="expenseCategoryFormLoading" @close="showExpenseCategoryForm = false"
+                :initial-name="expenseCategoryInitialName"
+                :loading="expenseCategoryFormLoading" @close="closeExpenseCategoryForm"
                 @submit="handleExpenseCategorySubmit" />
 
             <!-- Expense Form Dialog -->
             <BaseDialog v-model="showExpenseForm" :title="editingExpense ? 'Editar Gasto' : 'Nuevo Gasto'"
                 :icon="CurrencyDollarIcon" size="lg">
                 <ExpenseForm :expense="editingExpense" :branch-id="branchId" :categories="allExpenseCategories"
-                    :loading="expenseFormLoading" @submit="handleExpenseSubmit" @cancel="showExpenseForm = false" />
+                    :loading="expenseFormLoading" @submit="handleExpenseSubmit" @cancel="showExpenseForm = false"
+                    @request-create-category="onRequestCreateCategoryFromExpenseForm" />
             </BaseDialog>
 
             <!-- Supplier Form Dialog -->
@@ -720,6 +722,7 @@ const expenseCategoriesPage = ref(1)
 const expenseCategoriesPageSize = ref(10)
 const showExpenseCategoryForm = ref(false)
 const editingExpenseCategory = ref<ExpenseCategory | null>(null)
+const expenseCategoryInitialName = ref('')
 const expenseCategoryFormLoading = ref(false)
 
 const expensesList = ref<PagedResult<Expense> | null>(null)
@@ -1178,13 +1181,27 @@ const loadAllExpenseCategories = async () => {
     }
 }
 
+const closeExpenseCategoryForm = () => {
+    showExpenseCategoryForm.value = false
+    editingExpenseCategory.value = null
+    expenseCategoryInitialName.value = ''
+}
+
 const openCreateExpenseCategory = () => {
     editingExpenseCategory.value = null
+    expenseCategoryInitialName.value = ''
     showExpenseCategoryForm.value = true
 }
 
 const openEditExpenseCategory = (category: ExpenseCategory) => {
     editingExpenseCategory.value = category
+    expenseCategoryInitialName.value = ''
+    showExpenseCategoryForm.value = true
+}
+
+function onRequestCreateCategoryFromExpenseForm(name: string) {
+    editingExpenseCategory.value = null
+    expenseCategoryInitialName.value = name
     showExpenseCategoryForm.value = true
 }
 
@@ -1198,8 +1215,7 @@ const handleExpenseCategorySubmit = async (data: CreateExpenseCategoryDto) => {
             await expenseCategoryApi.createExpenseCategory(data)
             success('Categoría creada', 3000, `La categoría "${data.name}" se ha creado correctamente`)
         }
-        showExpenseCategoryForm.value = false
-        editingExpenseCategory.value = null
+        closeExpenseCategoryForm()
         expenseCategoriesCatalogStore.invalidate()
         await loadExpenseCategories()
         await loadAllExpenseCategories()

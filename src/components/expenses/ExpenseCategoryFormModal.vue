@@ -29,11 +29,14 @@ interface Props {
     isOpen: boolean
     editingCategory?: ExpenseCategory | null
     loading?: boolean
+    /** Nombre sugerido al crear desde búsqueda sin coincidencias */
+    initialName?: string | null
 }
 
 const props = withDefaults(defineProps<Props>(), {
     editingCategory: null,
-    loading: false
+    loading: false,
+    initialName: null,
 })
 
 const emit = defineEmits<{
@@ -52,8 +55,9 @@ watch(() => props.isOpen, (isOpen) => {
                 name: props.editingCategory.name
             }
         } else {
+            const hint = (props.initialName || '').trim()
             formData.value = {
-                name: ''
+                name: hint
             }
         }
     }

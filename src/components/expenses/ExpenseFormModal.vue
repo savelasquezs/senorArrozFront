@@ -14,9 +14,10 @@
                         Nuevo
                     </BaseButton>
                 </div>
-                <BaseSelect v-model="formData.supplierId" :options="supplierOptions" searchable
-                    :placeholder="suppliersLoading ? 'Cargando proveedores...' : 'Seleccionar proveedor...'"
-                    value-key="value" display-key="label" required :disabled="suppliersLoading" />
+                <BaseSelect v-model="formData.supplierId" :options="supplierOptions" searchable allow-create
+                    :placeholder="suppliersLoading ? 'Cargando proveedores...' : 'Buscar o crear proveedor...'"
+                    value-key="value" display-key="label" required :disabled="suppliersLoading"
+                    @create="onSupplierCreateFromSearch" />
                 <p class="text-xs text-gray-500 mt-1">
                     Gestiona tus proveedores desde la vista de sucursal o crea uno al vuelo.
                 </p>
@@ -109,7 +110,8 @@
                             <div class="flex-1 min-w-[220px]">
                                 <BaseSelect v-model="detail.expenseId" :options="prioritizedExpenseOptions"
                                     :placeholder="expenseSelectPlaceholder" value-key="value" display-key="label" searchable
-                                    required @update:model-value="onExpenseSelected(index, $event)" />
+                                    allow-create required @update:model-value="onExpenseSelected(index, $event)"
+                                    @create="onExpenseCreateFromSearch(index, $event)" />
                             </div>
 
                             <!-- Cantidad -->
@@ -142,15 +144,27 @@
                                 </BaseButton>
                             </div>
                             </div>
-                            <div>
-                                <label class="text-xs font-medium text-gray-500">Notas de la línea (opcional)</label>
-                                <textarea
-                                    v-model="detail.notes"
-                                    rows="1"
-                                    maxlength="1000"
-                                    class="w-full mt-0.5 border border-gray-200 rounded-md px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-indigo-300"
-                                    placeholder="Detalle u observación solo para esta línea"
-                                />
+                            <div class="flex items-start gap-2 pt-1 border-t border-gray-100">
+                                <BaseButton
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    class="shrink-0 mt-0.5 p-1.5 text-gray-500 hover:text-indigo-600"
+                                    :title="lineNotesOpen[detail.tempId] ? 'Ocultar nota de línea' : 'Nota en esta línea'"
+                                    @click="toggleLineNotes(detail.tempId)"
+                                >
+                                    <ChatBubbleLeftRightIcon class="w-4 h-4" />
+                                </BaseButton>
+                                <div v-show="lineNotesOpen[detail.tempId]" class="flex-1 min-w-0">
+                                    <label class="text-xs font-medium text-gray-500">Notas de la línea (opcional)</label>
+                                    <textarea
+                                        v-model="detail.notes"
+                                        rows="2"
+                                        maxlength="1000"
+                                        class="w-full mt-0.5 border border-gray-200 rounded-md px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-indigo-300"
+                                        placeholder="Detalle u observación solo para esta línea"
+                                    />
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -312,13 +326,16 @@
 
     <!-- Crear categoría de gasto (reutilizado) -->
     <ExpenseCategoryFormModal :is-open="showExpenseCategoryForm" :editing-category="null"
-        :loading="expenseCategoryFormLoading" @close="showExpenseCategoryForm = false"
+        :initial-name="categorySearchInitialName"
+        :loading="expenseCategoryFormLoading" @close="onCloseExpenseCategoryForm"
         @submit="handleExpenseCategorySubmit" />
 
     <!-- Crear gasto (reutilizado) -->
     <BaseDialog v-model="showExpenseForm" title="Nuevo Gasto" size="lg">
         <ExpenseForm :expense="null" :categories="allExpenseCategories" :loading="expenseFormLoading"
-            @submit="handleExpenseSubmit" @cancel="showExpenseForm = false" />
+            :prefill-name="expensePrefillName"
+            @submit="handleExpenseSubmit" @cancel="onExpenseFormCancel"
+            @request-create-category="onRequestCreateCategoryFromExpenseForm" />
     </BaseDialog>
 
     <BaseDialog
@@ -378,7 +395,7 @@ import BaseInput from '@/components/ui/BaseInput.vue'
 import BaseSelect from '@/components/ui/BaseSelect.vue'
 import ExpenseCategoryFormModal from '@/components/expenses/ExpenseCategoryFormModal.vue'
 import ExpenseForm from '@/components/expenses/ExpenseForm.vue'
-import { PlusIcon, TrashIcon, SparklesIcon } from '@heroicons/vue/24/outline'
+import { PlusIcon, TrashIcon, SparklesIcon, ChatBubbleLeftRightIcon } from '@heroicons/vue/24/outline'
 import { distributeExpenseBankPaymentsProportionally } from '@/utils/expenseBankDistribution'
 
 interface Props {
@@ -443,6 +460,12 @@ const expenseCategoryFormLoading = ref(false)
 const showExpenseForm = ref(false)
 const expenseFormLoading = ref(false)
 const targetDetailIndexForNewExpense = ref<number | null>(null)
+/** Nombre sugerido al abrir "Nuevo gasto" desde el selector (sin coincidencia). */
+const expensePrefillName = ref('')
+/** Nombre sugerido al crear categoría desde el buscador en ExpenseForm. */
+const categorySearchInitialName = ref('')
+/** Notas por línea: textarea solo si el usuario abre con el ícono (o ya hay texto). */
+const lineNotesOpen = ref<Record<string, boolean>>({})
 const supplierExpenseSuggestions = ref<SupplierExpenseSuggestion[]>([])
 const supplierExpensesLoading = ref(false)
 const showAllSupplierExpenses = ref(false)
@@ -477,6 +500,57 @@ const editExpensePaymentSnapshot = ref<{ wasFullyBank: boolean } | null>(null)
 const showExpenseBankSyncModal = ref(false)
 const showExpenseAdvanceConfirmModal = ref(false)
 const savingExpense = ref(false)
+
+function toggleLineNotes(tempId: string) {
+    lineNotesOpen.value = {
+        ...lineNotesOpen.value,
+        [tempId]: !lineNotesOpen.value[tempId],
+    }
+}
+
+function syncLineNotesVisibilityFromDetails() {
+    const next: Record<string, boolean> = { ...lineNotesOpen.value }
+    for (const d of formData.value.expenseDetails) {
+        if ((d.notes || '').trim()) next[d.tempId] = true
+    }
+    lineNotesOpen.value = next
+}
+
+function onSupplierCreateFromSearch(raw: string) {
+    const name = raw.trim()
+    if (name.length < 2) return
+    newSupplier.value = {
+        name,
+        phone: '',
+        address: '',
+        email: '',
+    }
+    showSupplierModal.value = true
+}
+
+function onExpenseCreateFromSearch(index: number, raw: string) {
+    const name = raw.trim()
+    if (name.length < 2) return
+    targetDetailIndexForNewExpense.value = index
+    expensePrefillName.value = name
+    showExpenseForm.value = true
+}
+
+function onCloseExpenseCategoryForm() {
+    showExpenseCategoryForm.value = false
+    categorySearchInitialName.value = ''
+}
+
+function onRequestCreateCategoryFromExpenseForm(name: string) {
+    categorySearchInitialName.value = name
+    showExpenseCategoryForm.value = true
+}
+
+function onExpenseFormCancel() {
+    showExpenseForm.value = false
+    expensePrefillName.value = ''
+    targetDetailIndexForNewExpense.value = null
+}
 
 const formatLastUsedAt = (value?: string | null) => {
     if (!value) return ''
@@ -723,6 +797,7 @@ const initializeForm = async () => {
             isDeliverymanAdvance.value = false
             selectedDeliverymanId.value = null
         }
+        syncLineNotesVisibilityFromDetails()
     } else {
         applyVat.value = false
         editExpensePaymentSnapshot.value = null
@@ -742,6 +817,7 @@ const initializeForm = async () => {
             selectedDeliverymanId.value = null
             isDeliverymanAdvance.value = false
         }
+        syncLineNotesVisibilityFromDetails()
     }
 }
 
@@ -855,6 +931,7 @@ async function loadExpenseCategories() {
 }
 
 const openCreateExpenseCategory = () => {
+    categorySearchInitialName.value = ''
     showExpenseCategoryForm.value = true
 }
 
@@ -862,6 +939,7 @@ const openCreateExpenseForNewDetail = () => {
     // Si el usuario quiere crear un gasto, le creamos la fila y luego asignamos el gasto creado a esa fila.
     addDetail()
     targetDetailIndexForNewExpense.value = formData.value.expenseDetails.length - 1
+    expensePrefillName.value = ''
     showExpenseForm.value = true
 }
 
@@ -874,7 +952,7 @@ const handleExpenseCategorySubmit = async (data: CreateExpenseCategoryDto) => {
             allExpenseCategories.value = [created.data, ...allExpenseCategories.value]
             success('Categoría creada', 4000, created.data.name)
         }
-        showExpenseCategoryForm.value = false
+        onCloseExpenseCategoryForm()
     } catch (err: any) {
         error('Error creando categoría', err?.message || 'No se pudo crear la categoría')
     } finally {
@@ -904,6 +982,7 @@ const handleExpenseSubmit = async (data: CreateExpenseDto) => {
             success('Gasto creado', 4000, exp.name)
         }
         showExpenseForm.value = false
+        expensePrefillName.value = ''
         targetDetailIndexForNewExpense.value = null
     } catch (err: any) {
         error('Error creando gasto', err?.message || 'No se pudo crear el gasto')
@@ -1069,6 +1148,11 @@ const addDetail = () => {
 }
 
 const removeDetail = (index: number) => {
+    const row = formData.value.expenseDetails[index]
+    if (row) {
+        const { [row.tempId]: _removed, ...rest } = lineNotesOpen.value
+        lineNotesOpen.value = rest
+    }
     formData.value.expenseDetails.splice(index, 1)
 }
 

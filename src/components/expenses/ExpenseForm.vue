@@ -5,7 +5,8 @@
             required :disabled="loading" />
 
         <BaseSelect v-model="formData.categoryId" :options="categoryOptions" label="Categoría"
-            placeholder="Seleccionar categoría..." value-key="value" display-key="label" required :disabled="loading" />
+            placeholder="Buscar categoría..." value-key="value" display-key="label" searchable allow-create required
+            :disabled="loading" @create="onCategoryCreateFromSearch" />
 
         <BaseSelect v-model="formData.unit" :options="unitOptions" label="Unidad" placeholder="Seleccionar unidad..."
             value-key="value" display-key="label" required :disabled="loading" />
@@ -83,6 +84,8 @@ interface Props {
     loading?: boolean
     /** Sucursal para cargar categorías/productos de menú (imputación). */
     branchId?: number | null
+    /** Al crear gasto nuevo: prellenar nombre (p. ej. desde búsqueda sin coincidencia). */
+    prefillName?: string | null
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -90,11 +93,13 @@ const props = withDefaults(defineProps<Props>(), {
     categories: () => [],
     loading: false,
     branchId: null,
+    prefillName: null,
 })
 
 const emit = defineEmits<{
     submit: [data: CreateExpenseDto | UpdateExpenseDto]
     cancel: []
+    'request-create-category': [name: string]
 }>()
 
 const editingExpense = computed(() => props.expense !== null)
@@ -116,6 +121,12 @@ const categoryOptions = computed(() => {
         label: cat.name
     }))
 })
+
+function onCategoryCreateFromSearch(raw: string) {
+    const name = raw.trim()
+    if (name.length < 2) return
+    emit('request-create-category', name)
+}
 
 const unitOptions = [
     { value: 'Unit', label: 'Unidad' },
@@ -184,6 +195,16 @@ function normalizeMenuTargetType(t: unknown): ExpenseMenuTargetType {
     return 0
 }
 
+function resetNewExpenseForm() {
+    const hint = (props.prefillName || '').trim()
+    formData.value = {
+        name: hint,
+        categoryId: (props.categories && props.categories.length > 0) ? props.categories[0].id : 0,
+        unit: 'Unit',
+        menuTargets: [],
+    }
+}
+
 watch(() => props.expense, (expense) => {
     if (expense) {
         const mt = (expense.menuTargets || []).map(
@@ -199,14 +220,18 @@ watch(() => props.expense, (expense) => {
             menuTargets: mt,
         }
     } else {
-        formData.value = {
-            name: '',
-            categoryId: (props.categories && props.categories.length > 0) ? props.categories[0].id : 0,
-            unit: 'Unit',
-            menuTargets: [],
-        }
+        resetNewExpenseForm()
     }
 }, { immediate: true })
+
+watch(() => props.prefillName, () => {
+    if (!props.expense) {
+        const hint = (props.prefillName || '').trim()
+        if (hint) {
+            formData.value = { ...formData.value, name: hint }
+        }
+    }
+})
 
 watch(() => props.branchId, () => {
     loadMenuCatalog()
