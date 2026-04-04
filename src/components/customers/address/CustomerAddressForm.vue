@@ -22,6 +22,15 @@
                 </template>
             </BaseInput>
 
+            <button
+                v-if="showChangeCoordsLink"
+                type="button"
+                class="text-sm font-medium text-emerald-700 hover:text-emerald-800 underline underline-offset-2 text-left"
+                @click="openChangeCoordinates"
+            >
+                Cambiar coordenadas en el mapa
+            </button>
+
             <BaseInput
                 v-if="props.canEditDeliveryFee !== false"
                 v-model="localForm.deliveryFee"
@@ -150,6 +159,47 @@ const selectedLocation = ref<{ lat: number; lng: number } | null>(null)
 const showMapsSelector = ref(false)
 const isLocationConfirmed = ref(false)
 
+/** Texto de dirección tal como vino del servidor (edición). */
+const baselineAddress = ref('')
+/** Coordenadas guardadas al cargar (edición). */
+const baselineLat = ref(0)
+const baselineLng = ref(0)
+/** True si al cargar ya había lat/lng válidos (no mostrar mapa hasta que cambie la calle o el usuario pida ajuste). */
+const hasSavedCoordinates = ref(false)
+
+const normAddr = (s: string) => s.trim()
+
+const showChangeCoordsLink = computed(
+    () =>
+        Boolean(props.addressId) &&
+        hasSavedCoordinates.value &&
+        !showMapsSelector.value &&
+        localForm.neighborhoodId > 0
+)
+
+function restoreBaselineCoords() {
+    localForm.latitude = baselineLat.value
+    localForm.longitude = baselineLng.value
+    if (baselineLat.value !== 0 && baselineLng.value !== 0) {
+        selectedLocation.value = { lat: baselineLat.value, lng: baselineLng.value }
+        isLocationConfirmed.value = true
+    } else {
+        selectedLocation.value = null
+        isLocationConfirmed.value = false
+    }
+}
+
+function clearCoordsForRemap() {
+    localForm.latitude = 0
+    localForm.longitude = 0
+    selectedLocation.value = null
+    isLocationConfirmed.value = false
+}
+
+function openChangeCoordinates() {
+    showMapsSelector.value = true
+}
+
 const isFormValid = computed(() => {
     const feeOk = props.canEditDeliveryFee === false ? true : Number(localForm.deliveryFee) >= 0
     return (
@@ -257,9 +307,28 @@ const handleLocationConfirmed = () => {
 
 
 const handleAddressBlur = () => {
-    if (localForm.address.trim()) {
+    if (!normAddr(localForm.address)) return
+
+    // Crear dirección nueva: mismo comportamiento que antes (mostrar mapa al salir del campo).
+    if (!props.addressId) {
         showMapsSelector.value = true
+        return
     }
+
+    // Editar: con coordenadas guardadas solo mapa si la línea de dirección ya no coincide con la original.
+    if (hasSavedCoordinates.value) {
+        if (normAddr(localForm.address) === normAddr(baselineAddress.value)) {
+            showMapsSelector.value = false
+            restoreBaselineCoords()
+        } else {
+            showMapsSelector.value = true
+            clearCoordsForRemap()
+        }
+        return
+    }
+
+    // Editar sin coordenadas previas: requiere mapa al completar la dirección.
+    showMapsSelector.value = true
 }
 
 // Load neighborhoods and address if editing
@@ -278,14 +347,24 @@ onMounted(async () => {
                     localForm.deliveryFee = address.deliveryFee
                     localForm.isPrimary = address.isPrimary
 
-                    // Set location for map if available
-                    if (address.latitude && address.longitude) {
+                    baselineAddress.value = normAddr(address.address)
+                    baselineLat.value = address.latitude ?? 0
+                    baselineLng.value = address.longitude ?? 0
+                    const latOk = baselineLat.value !== 0 && !Number.isNaN(baselineLat.value)
+                    const lngOk = baselineLng.value !== 0 && !Number.isNaN(baselineLng.value)
+                    hasSavedCoordinates.value = latOk && lngOk
+
+                    if (hasSavedCoordinates.value) {
                         selectedLocation.value = {
-                            lat: address.latitude,
-                            lng: address.longitude
+                            lat: baselineLat.value,
+                            lng: baselineLng.value
                         }
-                        showMapsSelector.value = true
+                        showMapsSelector.value = false
                         isLocationConfirmed.value = true
+                    } else {
+                        selectedLocation.value = null
+                        showMapsSelector.value = false
+                        isLocationConfirmed.value = false
                     }
                 }
             } catch (error) {
