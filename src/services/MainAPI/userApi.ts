@@ -2,6 +2,7 @@
 import { BaseApi } from './baseApi';
 import type { ApiResponse, PagedResult } from '@/types/common';
 import type { User, CreateUserRequest, UpdateUserRequest, UserFilters } from '@/types/user';
+import type { UserPayrollInsights, UserPayrollSeriesGranularity } from '@/types/userPayroll';
 
 class UserApi extends BaseApi {
 	// Get all users with optional filters
@@ -54,6 +55,19 @@ class UserApi extends BaseApi {
 		const formData = new FormData();
 		formData.append('file', file);
 		return this.post<User>(`/Users/${id}/profile-image`, formData);
+	}
+
+	async getPayrollInsights(
+		userId: number,
+		params: { from: string; to: string; seriesGranularity: UserPayrollSeriesGranularity }
+	): Promise<UserPayrollInsights> {
+		return this.get<UserPayrollInsights>(`/Users/${userId}/payroll-insights`, {
+			params: {
+				from: params.from,
+				to: params.to,
+				seriesGranularity: params.seriesGranularity,
+			},
+		});
 	}
 }
 

@@ -47,6 +47,16 @@
             </BaseSelect>
         </div>
 
+        <!-- Gasto de nómina (catálogo): préstamos / quincena -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <BaseSelect v-model="form.payrollExpenseId" :options="payrollExpenseOptions" label="Gasto de nómina (catálogo)"
+                placeholder="Sin asignar…" value-key="value" display-key="label">
+                <template #icon>
+                    <BanknotesIcon class="w-4 h-4" />
+                </template>
+            </BaseSelect>
+        </div>
+
         <!-- Role Constraints Alert -->
         <BaseAlert v-if="roleConstraintMessage" variant="warning">
             {{ roleConstraintMessage }}
@@ -124,7 +134,7 @@
 </template>
 
 <script setup lang="ts">
-import { reactive, computed, watch } from 'vue'
+import { reactive, computed, watch, onMounted, ref } from 'vue'
 import { useUsersStore } from '@/store/users'
 import { useAuthStore } from '@/store/auth'
 import type { UserRole } from '@/types/user'
@@ -140,8 +150,10 @@ import {
     ShieldCheckIcon,
     CheckIcon,
     XMarkIcon,
-    BuildingOffice2Icon
+    BuildingOffice2Icon,
+    BanknotesIcon
 } from '@heroicons/vue/24/outline'
+import { expenseApi } from '@/services/MainAPI/expenseApi'
 import type { BranchUserSummary } from '@/types/common'
 
 interface Props {
@@ -171,8 +183,11 @@ const form = reactive({
     role: '' as UserRole | '',
     branchId: 0,
     password: '',
-    confirmPassword: ''
+    confirmPassword: '',
+    payrollExpenseId: 0,
 })
+
+const payrollExpenseOptions = ref<Array<{ value: number; label: string }>>([{ value: 0, label: 'Sin asignar' }])
 
 const errors = reactive({
     name: '',
@@ -394,6 +409,8 @@ const handleSubmit = () => {
         }
     }
 
+    formData.payrollExpenseId = form.payrollExpenseId > 0 ? form.payrollExpenseId : null
+
     emit('submit', formData)
 }
 
@@ -407,6 +424,7 @@ watch(() => props.user, (newUser) => {
         form.branchId = newUser.branchId
         form.password = ''
         form.confirmPassword = ''
+        form.payrollExpenseId = newUser.payrollExpenseId && newUser.payrollExpenseId > 0 ? newUser.payrollExpenseId : 0
     } else {
         // Reset form for new user
         form.name = ''
@@ -416,6 +434,7 @@ watch(() => props.user, (newUser) => {
         form.branchId = props.branchId
         form.password = ''
         form.confirmPassword = ''
+        form.payrollExpenseId = 0
     }
 
     // Clear errors
@@ -429,4 +448,17 @@ watch(() => props.user, (newUser) => {
     passwordChecks.lowercase = false
     passwordChecks.number = false
 }, { immediate: true })
+
+onMounted(async () => {
+    try {
+        const res = await expenseApi.getAllExpenses()
+        const list = res.data ?? []
+        payrollExpenseOptions.value = [
+            { value: 0, label: 'Sin asignar' },
+            ...list.map((ex) => ({ value: ex.id, label: ex.name })),
+        ]
+    } catch {
+        /* catálogo opcional */
+    }
+})
 </script>

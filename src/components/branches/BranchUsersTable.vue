@@ -85,6 +85,14 @@
                         <!-- Actions -->
                         <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                             <div class="flex justify-end space-x-2">
+                                <BaseButton
+                                    v-if="canViewPayroll"
+                                    @click="openPayrollModal(user)"
+                                    variant="outline"
+                                    size="sm"
+                                    :icon="ChartBarIcon"
+                                    title="Nómina / quincena" />
+
                                 <BaseButton @click="openEditDialog(user)" variant="outline" size="sm" :icon="PencilIcon"
                                     title="Editar usuario" />
 
@@ -104,11 +112,19 @@
             <UserForm :user="editingUser" :branch-id="branchId" :branch-options="branchSelectOptions"
                 @submit="handleSubmit" @cancel="closeDialog" :loading="usersStore.isLoading" />
         </BaseDialog>
+
+        <BaseDialog v-model="showPayrollModal" title="Nómina y quincena" :icon="ChartBarIcon" size="6xl">
+            <UserPayrollInsightsPanel
+                v-if="payrollModalUser"
+                :key="payrollModalUser.id"
+                :user-id="payrollModalUser.id"
+                @payroll-saved="onPayrollSaved" />
+        </BaseDialog>
     </div>
 </template>
 
 <script setup lang="ts">
-import { computed, ref, onMounted } from 'vue'
+import { computed, ref, onMounted, watch } from 'vue'
 import { useUsersStore } from '@/store/users'
 import { useAuthStore } from '@/store/auth'
 import { useBranchesStore } from '@/store/branches'
@@ -118,13 +134,15 @@ import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseDialog from '@/components/ui/BaseDialog.vue'
 import BaseBadge from '@/components/ui/BaseBadge.vue'
 import UserForm from '@/components/branches/users/UserForm.vue'
+import UserPayrollInsightsPanel from '@/components/users/UserPayrollInsightsPanel.vue'
 import {
     PlusIcon,
     UserGroupIcon,
     UserIcon,
     PencilIcon,
     EyeIcon,
-    EyeSlashIcon
+    EyeSlashIcon,
+    ChartBarIcon
 } from '@heroicons/vue/24/outline'
 import type { BranchUserSummary } from '@/types/common'
 
@@ -167,6 +185,28 @@ const canManageUsers = computed(() => {
     const role = authStore.user?.role
     return role === 'Superadmin' || role === 'Admin'
 })
+
+const canViewPayroll = computed(() => canManageUsers.value)
+
+const showPayrollModal = ref(false)
+const payrollModalUser = ref<BranchUserSummary | null>(null)
+
+function openPayrollModal(user: BranchUserSummary) {
+    payrollModalUser.value = user
+    showPayrollModal.value = true
+}
+
+watch(showPayrollModal, (open) => {
+    if (!open) payrollModalUser.value = null
+})
+
+async function onPayrollSaved() {
+    try {
+        await branchesStore.fetchById(props.branchId, { silent: true })
+    } catch {
+        /* la tabla sigue mostrando datos previos */
+    }
+}
 
 const getRoleVariant = (role: UserRole) => {
     const variants = {

@@ -64,6 +64,8 @@ export interface BranchUserSummary {
   branchId: number
   active: boolean
   lastLogin?: string
+  payrollExpenseId?: number | null
+  payrollExpenseName?: string | null
 }
 
 // Datos para crear/actualizar usuarios desde el resumen

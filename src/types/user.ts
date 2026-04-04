@@ -13,6 +13,9 @@ export interface User {
     lastLogin?: string
     createdAt: string
     updatedAt: string
+    /** Ítem de catálogo solo para préstamos/gastos de quincena de esta persona */
+    payrollExpenseId?: number | null
+    payrollExpenseName?: string | null
 }
 
 export interface CreateUserRequest {
@@ -22,6 +25,7 @@ export interface CreateUserRequest {
     email: string
     phone: string
     password: string
+    payrollExpenseId?: number | null
 }
 
 export interface UpdateUserRequest {
@@ -32,6 +36,7 @@ export interface UpdateUserRequest {
     active?: boolean
     /** Solo superadmin; cambia la sucursal del usuario */
     branchId?: number
+    payrollExpenseId?: number | null
 }
 
 export interface UserFilters {

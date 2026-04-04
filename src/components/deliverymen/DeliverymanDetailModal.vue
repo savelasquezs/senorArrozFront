@@ -19,14 +19,28 @@
                     @click="activeTab = 'fullday'">
                     Resumen del día
                 </button>
+                <button
+                    v-if="showPayrollTab"
+                    type="button"
+                    class="px-4 py-2 text-sm font-medium rounded-t-lg transition-colors"
+                    :class="activeTab === 'payroll'
+                        ? 'bg-violet-50 text-violet-900 border border-b-0 border-gray-200 -mb-px'
+                        : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'"
+                    @click="activeTab = 'payroll'">
+                    Nómina / quincena
+                </button>
             </nav>
 
             <p v-if="activeTab === 'cycle'" class="text-xs text-gray-500">
                 Datos para cuadrar y liquidar (desde la última liquidación del día, si hubo).
             </p>
-            <p v-else class="text-xs text-gray-500">
+            <p v-else-if="activeTab === 'fullday'" class="text-xs text-gray-500">
                 Totales del día calendario completos (todos los pedidos entregados y abonos del día).
                 Referencia; el monto a liquidar ahora está en <strong>Ciclo actual</strong>.
+            </p>
+            <p v-else-if="activeTab === 'payroll'" class="text-xs text-gray-500">
+                Préstamos y gastos de quincena (líneas del catálogo asignado al domiciliario) y totales de delivery pagables.
+                Por defecto: <strong>quincena actual</strong> o <strong>mes actual</strong> con un clic.
             </p>
 
             <!-- Ciclo actual -->
@@ -226,6 +240,15 @@
                     </div>
                 </div>
             </div>
+
+            <!-- Nómina / quincena -->
+            <div v-show="activeTab === 'payroll' && detail" class="space-y-4 min-h-[200px]">
+                <UserPayrollInsightsPanel
+                    v-if="payrollUserId"
+                    :key="payrollUserId"
+                    :user-id="payrollUserId"
+                    @payroll-saved="emit('payroll-saved')" />
+            </div>
         </div>
 
         <div v-else class="flex justify-center items-center py-12">
@@ -236,7 +259,7 @@
             <BaseButton @click="$emit('close')" variant="secondary">
                 Cerrar
             </BaseButton>
-            <BaseButton v-if="showLiquidationButton"
+            <BaseButton v-if="showLiquidationButton && activeTab !== 'payroll'"
                 type="button" @click="emit('open-liquidation')" variant="success" :loading="loading">
                 Liquidar ({{ formatCurrency(detail!.currentBalance) }})
             </BaseButton>
@@ -269,6 +292,8 @@ import BaseDialog from '@/components/ui/BaseDialog.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseLoading from '@/components/ui/BaseLoading.vue'
 import OrdersTable from '@/components/orders/OrdersTable.vue'
+import UserPayrollInsightsPanel from '@/components/users/UserPayrollInsightsPanel.vue'
+import { useAuthStore } from '@/store/auth'
 
 interface Props {
     isOpen: boolean
@@ -284,11 +309,18 @@ const props = withDefaults(defineProps<Props>(), {
 const emit = defineEmits<{
     'close': []
     'open-liquidation': []
+    'payroll-saved': []
 }>()
+
+const authStore = useAuthStore()
+const showPayrollTab = computed(
+    () => authStore.user?.role === 'Admin' || authStore.user?.role === 'Superadmin'
+)
+const payrollUserId = computed(() => props.detail?.deliverymanId ?? 0)
 
 const { formatCurrency } = useFormatting()
 
-const activeTab = ref<'cycle' | 'fullday'>('cycle')
+const activeTab = ref<'cycle' | 'fullday' | 'payroll'>('cycle')
 const groupByRouteCycle = ref(false)
 const groupByRouteFullDay = ref(false)
 
