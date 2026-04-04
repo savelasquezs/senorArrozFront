@@ -127,7 +127,7 @@
                                     </p>
                                 </div>
                                 <BaseButton v-if="permissions.canEditOrder(order)" size="sm" variant="ghost"
-                                    @click="showSelectAddressModal = true">
+                                    @click="showEditCustomerModal = true">
                                     <PencilIcon class="w-4 h-4" />
                                 </BaseButton>
                             </div>
@@ -317,9 +317,6 @@
     <EditCustomerModal v-if="showEditCustomerModal && order" :open="showEditCustomerModal" :order="order"
         @close="handleCustomerModalClose" @updated="(o, snap) => handleCustomerUpdated(o, snap)" />
 
-    <SelectAddressModal v-if="showSelectAddressModal && order" :open="showSelectAddressModal" :order="order"
-        @close="showSelectAddressModal = false" @updated="handleAddressUpdated" />
-
     <AssignDeliveryModal v-if="showAssignDeliveryModal && order" :open="showAssignDeliveryModal" :order="order"
         :pending-status-change="pendingStatusChange || undefined" @close="handleAssignDeliveryModalClose"
         @updated="handleDeliverymanUpdated" @status-changed="handleStatusChanged" />
@@ -390,7 +387,6 @@ import OrderTypeBadge from '@/components/orders/OrderTypeBadge.vue'
 import OrderProgressBar from '@/components/orders/OrderProgressBar.vue'
 import OrderDetailProductsList from '@/components/orders/OrderDetailProductsList.vue'
 import EditCustomerModal from '@/components/orders/EditCustomerModal.vue'
-import SelectAddressModal from '@/components/orders/SelectAddressModal.vue'
 import AssignDeliveryModal from '@/components/orders/AssignDeliveryModal.vue'
 import CancelOrderModal from '@/components/orders/CancelOrderModal.vue'
 import EditOrderTypeModal from '@/components/orders/EditOrderTypeModal.vue'
@@ -521,7 +517,6 @@ const appOptions = computed(() => {
         .map(app => ({ value: app.id, label: app.name }))
 })
 
-const showSelectAddressModal = ref(false)
 const showCancelModal = ref(false)
 const showEditOrderTypeModal = ref(false)
 
@@ -1004,16 +999,6 @@ const handleCustomerUpdated = async (
     showEditCustomerModal.value = false
 }
 
-const handleAddressUpdated = (updatedOrder?: any) => {
-    if (!updatedOrder) return
-    const orderAny = updatedOrder as any
-    handleModalUpdated({
-        addressId: orderAny.addressId,
-        addressDescription: orderAny.addressDescription,
-        addressAdditionalInfo: orderAny.addressAdditionalInfo ?? null,
-        updatedAt: orderAny.updatedAt
-    })
-}
 // Handler unificado para todos los modales autónomos
 const handleModalUpdated = (updates: Partial<OrderDetailView>) => {
     ordersDataStore.updateCurrent(updates)

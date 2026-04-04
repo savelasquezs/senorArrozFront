@@ -295,9 +295,6 @@
         <EditCustomerModal v-if="showEditCustomerModal && selectedOrder" :open="showEditCustomerModal"
             :order="selectedOrder" @close="handleCustomerModalClose" @updated="handleOrderUpdated" />
 
-        <SelectAddressModal v-if="selectedOrder" :open="showSelectAddressModal" :order="selectedOrder"
-            @close="showSelectAddressModal = false" @updated="handleOrderUpdated" />
-
         <AssignDeliveryModal v-if="selectedOrder" :open="showAssignDeliveryModal" :order="selectedOrder"
             :pending-status-change="pendingStatusChange || undefined" @updated="handleAssignDeliveryUpdated"
             @status-changed="clearPendingStatusChange" @close="handleAssignDeliveryModalClose" />
@@ -331,7 +328,6 @@ import { useBanksStore } from '@/store/banks'
 import MainLayout from '@/components/layout/MainLayout.vue'
 import OrdersTable from '@/components/orders/OrdersTable.vue'
 import EditCustomerModal from '@/components/orders/EditCustomerModal.vue'
-import SelectAddressModal from '@/components/orders/SelectAddressModal.vue'
 import AssignDeliveryModal from '@/components/orders/AssignDeliveryModal.vue'
 import EditOrderTypeModal from '@/components/orders/EditOrderTypeModal.vue'
 import ReservationDepositModal from '@/components/reservations/ReservationDepositModal.vue'
@@ -400,7 +396,6 @@ const dateFilters = ref({
 
 // Modales
 const showEditCustomerModal = ref(false)
-const showSelectAddressModal = ref(false)
 const showAssignDeliveryModal = ref(false)
 const showEditOrderTypeModal = ref(false)
 const selectedOrder = ref<OrderListItem | null>(null)
@@ -606,7 +601,7 @@ const handleEditCustomer = (order: OrderListItem) => {
 
 const handleEditAddress = (order: OrderListItem) => {
     selectedOrder.value = order
-    showSelectAddressModal.value = true
+    showEditCustomerModal.value = true
 }
 
 const handleChangeStatus = async (order: OrderListItem) => {
@@ -835,7 +830,6 @@ const handleOrderUpdated = async (updatedOrder?: Order) => {
 
         // ✅ Cerrar modales después de actualizar exitosamente
         showEditCustomerModal.value = false
-        showSelectAddressModal.value = false
         showAssignDeliveryModal.value = false
     }
     // Solo recargar si no se proporcionó el pedido actualizado

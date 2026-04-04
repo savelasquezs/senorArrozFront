@@ -56,7 +56,7 @@
                     </span>
                 </div>
                 <AddressSelector :customer-id="props.selectedCustomer.id"
-                    :selected-address="props.selectedAddress?.id || undefined"
+                    :selected-address="props.selectedAddress?.id || undefined" :mode="props.mode"
                     @address-selected="handleAddressSelected" />
             </div>
         </div>
