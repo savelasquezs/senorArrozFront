@@ -279,7 +279,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, watch, onMounted } from 'vue'
 import MainLayout from '@/components/layout/MainLayout.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import CashClosureHistoryModal from '@/components/cashRegister/CashClosureHistoryModal.vue'
@@ -311,14 +311,16 @@ const { success: toastSuccess, error: toastError } = useToast()
 const showHistoryModal = ref(false)
 const canViewClosureHistory = computed(() => authStore.isAdmin || authStore.isSuperadmin)
 
+function emptyDenominationCounts(): Record<number, number> {
+  return Object.fromEntries(DENOMINATIONS.map((d) => [d, 0]))
+}
+
 // ===== STATE =====
 const loading = ref(false)
 const saving = ref(false)
 const expected = ref<CashRegisterExpected | null>(null)
 
-const denominationCounts = ref<Record<number, number>>(
-  Object.fromEntries(DENOMINATIONS.map((d) => [d, 0]))
-)
+const denominationCounts = ref<Record<number, number>>(emptyDenominationCounts())
 const closingCash = ref(0)
 
 const informalLoans = ref<CloseInformalLoanDto[]>([])
@@ -328,6 +330,89 @@ const bankReconciliations = ref<
 >([])
 
 const movementsBankId = ref<number | null>(null)
+
+function denomsStorageKey(): string {
+  return `senor-arroz:cash-register-denoms:${authStore.branchId ?? 0}`
+}
+
+/** Identifica el periodo entre el último cuadre y el próximo; si cambia, el borrador guardado no aplica. */
+function closureContext(exp: CashRegisterExpected): string {
+  return exp.lastClosureAt ?? ''
+}
+
+function persistDenominationDraft() {
+  const exp = expected.value
+  if (!exp || typeof localStorage === 'undefined') return
+  try {
+    localStorage.setItem(
+      denomsStorageKey(),
+      JSON.stringify({
+        v: 1,
+        context: closureContext(exp),
+        counts: denominationCounts.value,
+      })
+    )
+  } catch {
+    /* quota u otro error: ignorar */
+  }
+}
+
+function clearDenominationDraft() {
+  if (typeof localStorage === 'undefined') return
+  try {
+    localStorage.removeItem(denomsStorageKey())
+  } catch {
+    /* ignore */
+  }
+}
+
+/** Restaura conteos desde localStorage; sin datos válidos no modifica el estado actual. */
+function hydrateDenominationDraft(exp: CashRegisterExpected) {
+  if (typeof localStorage === 'undefined') return
+  let raw: string | null
+  try {
+    raw = localStorage.getItem(denomsStorageKey())
+  } catch {
+    return
+  }
+  if (!raw) return
+
+  let parsed: { v?: number; context?: string; counts?: Record<string, number> }
+  try {
+    parsed = JSON.parse(raw)
+  } catch {
+    clearDenominationDraft()
+    return
+  }
+
+  const ctx = closureContext(exp)
+  if (parsed.context !== ctx) {
+    clearDenominationDraft()
+    denominationCounts.value = emptyDenominationCounts()
+    recalcClosingCash()
+    return
+  }
+
+  if (!parsed.counts || typeof parsed.counts !== 'object') return
+
+  const next = emptyDenominationCounts()
+  for (const d of DENOMINATIONS) {
+    const v = parsed.counts[String(d)]
+    if (typeof v === 'number' && Number.isFinite(v) && v >= 0) {
+      next[d] = Math.floor(v)
+    }
+  }
+  denominationCounts.value = next
+  recalcClosingCash()
+}
+
+watch(
+  denominationCounts,
+  () => {
+    if (expected.value) persistDenominationDraft()
+  },
+  { deep: true }
+)
 
 // ===== COMPUTED =====
 const cashDifference = computed(() => closingCash.value - (expected.value?.expectedCash ?? 0))
@@ -421,6 +506,8 @@ async function loadData() {
       actualBalance: b.expectedBalance, // Por defecto asumimos que cuadra
       adjustments: '[]',
     }))
+
+    hydrateDenominationDraft(expected.value)
   } catch (e: any) {
     console.error('Error cargando datos del cuadre:', e)
   } finally {
@@ -454,12 +541,11 @@ async function saveClosure() {
 
     await cashRegisterApi.closeCashRegister(dto, authStore.branchId ?? undefined)
     toastSuccess('Cuadre guardado', 5000)
-    await loadData()
-
-    // Resetear conteos
-    denominationCounts.value = Object.fromEntries(DENOMINATIONS.map((d) => [d, 0]))
+    clearDenominationDraft()
+    denominationCounts.value = emptyDenominationCounts()
     closingCash.value = 0
     informalLoans.value = []
+    await loadData()
   } catch (e: any) {
     toastError('No se pudo guardar el cuadre', e.message || 'Error desconocido')
   } finally {
