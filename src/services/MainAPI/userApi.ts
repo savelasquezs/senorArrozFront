@@ -15,9 +15,9 @@ class UserApi extends BaseApi {
 		return this.get<ApiResponse<User[]>>(`/Users/branch/${branchId}`);
 	}
 
-	// Get single user by ID
-	async getUserById(id: number): Promise<ApiResponse<User>> {
-		return this.get<ApiResponse<User>>(`/Users/${id}`);
+	// Get single user by ID (cuerpo plano UserDto, sin envoltorio ApiResponse)
+	async getUserById(id: number): Promise<User> {
+		return this.get<User>(`/Users/${id}`);
 	}
 
 	// Create new user

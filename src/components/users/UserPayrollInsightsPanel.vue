@@ -264,8 +264,7 @@ async function loadExpenseCatalog() {
 async function savePayrollExpense() {
 	savingPayroll.value = true
 	try {
-		const wrapped = await userApi.getUserById(props.userId)
-		const u = wrapped.data
+		const u = await userApi.getUserById(props.userId)
 		await userApi.updateUser(props.userId, {
 			name: u.name,
 			email: u.email,
