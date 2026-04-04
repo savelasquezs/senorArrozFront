@@ -1,6 +1,6 @@
 <template>
     <div class="space-y-4 sm:space-y-6">
-        <div v-if="allOrders.length > 0" class="bg-gray-50 p-3 sm:p-4 rounded-lg space-y-2 sm:space-y-3">
+        <div v-if="allOrders.length > 0 && showStatusActions" class="bg-gray-50 p-3 sm:p-4 rounded-lg space-y-2 sm:space-y-3">
             <!-- Controles de selección y contador -->
             <div class="flex items-center justify-between flex-wrap gap-2">
                 <div class="flex items-center gap-2 sm:gap-3 md:gap-4">
@@ -44,7 +44,7 @@
             <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
                 <OrderCard v-for="order in takenOrders" :key="order.id" :order="order"
                     :order-items="getOrderItems(order.id)" :is-selected="selectedOrders.has(order.id)"
-                    @toggle-select="toggleSelect" />
+                    :selectable="showStatusActions" @toggle-select="toggleSelect" />
             </div>
         </div>
 
@@ -56,7 +56,7 @@
             <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
                 <OrderCard v-for="order in inPreparationOrders" :key="order.id" :order="order"
                     :order-items="getOrderItems(order.id)" :is-selected="selectedOrders.has(order.id)"
-                    @toggle-select="toggleSelect" />
+                    :selectable="showStatusActions" @toggle-select="toggleSelect" />
             </div>
         </div>
 
@@ -78,9 +78,13 @@ import { ArrowRightIcon, CheckIcon, CheckCircleIcon } from '@heroicons/vue/24/ou
 interface Props {
     orders: OrderListItem[]
     orderItemsMap: Map<number, OrderDetailItem[]>
+    /** false en pestaña Reservas: sin selección ni botones de estado. */
+    showStatusActions?: boolean
 }
 
-const props = defineProps<Props>()
+const props = withDefaults(defineProps<Props>(), {
+    showStatusActions: true,
+})
 const emit = defineEmits<{ 'change-status': [orderIds: number[], newStatus: OrderStatus] }>()
 
 const { canChangeStatus } = useOrderPermissions()

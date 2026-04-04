@@ -96,7 +96,8 @@
                     No hay reservas del día en «Tomado». Al pasar una reserva a preparación aparecerá en Pedidos Activos.
                 </p>
                 <OrderCardGrid v-else ref="cardGridRef" :orders="scheduledReservationOrders"
-                    :order-items-map="orderItemsMap" @change-status="handleChangeStatus" />
+                    :order-items-map="orderItemsMap" :show-status-actions="false"
+                    @change-status="handleChangeStatus" />
             </div>
 
             <div v-else-if="activeTab === 'active'">
