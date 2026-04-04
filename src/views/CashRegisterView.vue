@@ -72,7 +72,7 @@
                   type="number"
                   min="0"
                   v-model.number="denominationCounts[denom]"
-                  @input="recalcClosingCash"
+                  @input="onDenominationInput"
                   @blur="onDenominationBlur(denom)"
                   class="w-full text-center border border-gray-300 rounded-lg py-2 px-1 text-sm focus:outline-none focus:ring-2 focus:ring-yellow-400"
                   placeholder="0"
@@ -280,7 +280,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import MainLayout from '@/components/layout/MainLayout.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import CashClosureHistoryModal from '@/components/cashRegister/CashClosureHistoryModal.vue'
@@ -339,6 +339,33 @@ function denomsStorageKey(): string {
 /** Identifica el periodo entre el último cuadre y el próximo; si cambia, el borrador guardado no aplica. */
 function closureContext(exp: CashRegisterExpected): string {
   return exp.lastClosureAt ?? ''
+}
+
+const PERSIST_DENOMS_DEBOUNCE_MS = 250
+let persistDenomsTimer: ReturnType<typeof setTimeout> | null = null
+
+function schedulePersistDenominationDraft() {
+  if (typeof window === 'undefined') return
+  if (persistDenomsTimer !== null) {
+    clearTimeout(persistDenomsTimer)
+    persistDenomsTimer = null
+  }
+  persistDenomsTimer = window.setTimeout(() => {
+    persistDenomsTimer = null
+    persistDenominationDraft()
+  }, PERSIST_DENOMS_DEBOUNCE_MS)
+}
+
+function cancelPersistDenominationDraftTimer() {
+  if (persistDenomsTimer !== null) {
+    clearTimeout(persistDenomsTimer)
+    persistDenomsTimer = null
+  }
+}
+
+function flushPersistDenominationDraft() {
+  cancelPersistDenominationDraftTimer()
+  persistDenominationDraft()
 }
 
 function persistDenominationDraft() {
@@ -411,14 +438,19 @@ function hydrateDenominationDraft(exp: CashRegisterExpected) {
   recalcClosingCash()
 }
 
-/** Normaliza el valor, recalcula total y guarda borrador (disparado en blur de cada denominación). */
+function onDenominationInput() {
+  recalcClosingCash()
+  schedulePersistDenominationDraft()
+}
+
+/** Normaliza el valor al salir del campo y guarda de inmediato (evita perder el último debounce). */
 function onDenominationBlur(denom: number) {
   const raw = denominationCounts.value[denom]
   const n =
     typeof raw === 'number' && Number.isFinite(raw) && raw >= 0 ? Math.floor(raw) : 0
   denominationCounts.value[denom] = n
   recalcClosingCash()
-  persistDenominationDraft()
+  flushPersistDenominationDraft()
 }
 
 // ===== COMPUTED =====
@@ -524,6 +556,7 @@ async function loadData() {
 
 async function saveClosure() {
   if (!canSave.value || !expected.value) return
+  cancelPersistDenominationDraftTimer()
   saving.value = true
   try {
     const dto = {
@@ -561,4 +594,8 @@ async function saveClosure() {
 }
 
 onMounted(loadData)
+
+onBeforeUnmount(() => {
+  flushPersistDenominationDraft()
+})
 </script>
