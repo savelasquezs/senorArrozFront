@@ -73,6 +73,7 @@
                   min="0"
                   v-model.number="denominationCounts[denom]"
                   @input="recalcClosingCash"
+                  @blur="onDenominationBlur(denom)"
                   class="w-full text-center border border-gray-300 rounded-lg py-2 px-1 text-sm focus:outline-none focus:ring-2 focus:ring-yellow-400"
                   placeholder="0"
                 />
@@ -279,7 +280,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import MainLayout from '@/components/layout/MainLayout.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import CashClosureHistoryModal from '@/components/cashRegister/CashClosureHistoryModal.vue'
@@ -343,13 +344,17 @@ function closureContext(exp: CashRegisterExpected): string {
 function persistDenominationDraft() {
   const exp = expected.value
   if (!exp || typeof localStorage === 'undefined') return
+  const counts: Record<string, number> = {}
+  for (const d of DENOMINATIONS) {
+    counts[String(d)] = denominationCounts.value[d] ?? 0
+  }
   try {
     localStorage.setItem(
       denomsStorageKey(),
       JSON.stringify({
         v: 1,
         context: closureContext(exp),
-        counts: denominationCounts.value,
+        counts,
       })
     )
   } catch {
@@ -406,13 +411,15 @@ function hydrateDenominationDraft(exp: CashRegisterExpected) {
   recalcClosingCash()
 }
 
-watch(
-  denominationCounts,
-  () => {
-    if (expected.value) persistDenominationDraft()
-  },
-  { deep: true }
-)
+/** Normaliza el valor, recalcula total y guarda borrador (disparado en blur de cada denominación). */
+function onDenominationBlur(denom: number) {
+  const raw = denominationCounts.value[denom]
+  const n =
+    typeof raw === 'number' && Number.isFinite(raw) && raw >= 0 ? Math.floor(raw) : 0
+  denominationCounts.value[denom] = n
+  recalcClosingCash()
+  persistDenominationDraft()
+}
 
 // ===== COMPUTED =====
 const cashDifference = computed(() => closingCash.value - (expected.value?.expectedCash ?? 0))
