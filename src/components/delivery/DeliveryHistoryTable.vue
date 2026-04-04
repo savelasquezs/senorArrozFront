@@ -59,9 +59,22 @@
                                 <span class="font-bold text-gray-900">#{{ order.id }}</span>
                             </td>
                             <td class="px-6 py-4 text-sm text-gray-900">
-                                <div>{{ order.addressDescription || '-' }}</div>
-                                <div v-if="order.addressAdditionalInfo" class="text-xs text-gray-500 mt-0.5">{{
-                                    order.addressAdditionalInfo }}</div>
+                                <div class="flex items-start gap-2">
+                                    <div class="min-w-0 flex-1">
+                                        <div>{{ order.addressDescription || '-' }}</div>
+                                        <div v-if="order.addressAdditionalInfo" class="text-xs text-gray-500 mt-0.5">{{
+                                            order.addressAdditionalInfo }}</div>
+                                    </div>
+                                    <button
+                                        v-if="canEditOrderAddress(order)"
+                                        type="button"
+                                        class="shrink-0 p-1 rounded-lg text-gray-500 hover:text-emerald-700 hover:bg-emerald-50 transition-colors"
+                                        title="Editar dirección"
+                                        @click="openAddressFlow(order)"
+                                    >
+                                        <PencilSquareIcon class="w-5 h-5" />
+                                    </button>
+                                </div>
                                 <div v-if="orderNotes(order)"
                                     class="text-xs text-amber-900 bg-amber-50 border border-amber-100 rounded px-2 py-1 mt-1.5 whitespace-pre-wrap">
                                     <span class="font-semibold">Notas: </span>{{ orderNotes(order) }}
@@ -140,9 +153,21 @@
                 </div>
 
                 <div class="text-sm text-gray-700 space-y-1">
-                    <div><span class="font-medium">Dirección:</span> {{ order.addressDescription || '-' }}
-                        <span v-if="order.addressAdditionalInfo" class="block text-xs text-gray-500 mt-0.5">{{
-                            order.addressAdditionalInfo }}</span>
+                    <div class="flex items-start gap-2">
+                        <div class="min-w-0 flex-1">
+                            <span class="font-medium">Dirección:</span> {{ order.addressDescription || '-' }}
+                            <span v-if="order.addressAdditionalInfo" class="block text-xs text-gray-500 mt-0.5">{{
+                                order.addressAdditionalInfo }}</span>
+                        </div>
+                        <button
+                            v-if="canEditOrderAddress(order)"
+                            type="button"
+                            class="shrink-0 p-1 rounded-lg text-gray-500 hover:text-emerald-700 hover:bg-emerald-50 transition-colors"
+                            title="Editar dirección"
+                            @click="openAddressFlow(order)"
+                        >
+                            <PencilSquareIcon class="w-5 h-5" />
+                        </button>
                     </div>
                     <div><span class="font-medium">Barrio:</span> {{ order.neighborhoodName || '-' }}</div>
                     <div><span class="font-medium">Cliente:</span> {{ order.customerName || order.guestName || '-' }}
@@ -229,17 +254,24 @@
             </div>
         </template>
     </BaseDialog>
+
+    <EditDeliveryAddressFlow
+        v-model="addressFlowOpen"
+        :order="addressFlowOrder"
+        @address-updated="onAddressFlowUpdated"
+    />
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import type { OrderListItem } from '@/types/order'
 import { DeliveryService } from '@/services/domain/DeliveryService'
 import { useFormatting } from '@/composables/useFormatting'
 import BaseInput from '@/components/ui/BaseInput.vue'
 import BasePagination from '@/components/ui/BasePaginatiopn.vue'
 import NeighborhoodFilter from './NeighborhoodFilter.vue'
-import { ClockIcon, CheckCircleIcon } from '@heroicons/vue/24/outline'
+import { ClockIcon, CheckCircleIcon, PencilSquareIcon } from '@heroicons/vue/24/outline'
+import EditDeliveryAddressFlow from '@/components/delivery/EditDeliveryAddressFlow.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseBadge from '@/components/ui/BaseBadge.vue'
 import BaseDialog from '@/components/ui/BaseDialog.vue'
@@ -265,11 +297,37 @@ const emit = defineEmits<{
     'filter-change': [filters: { fromDate: string; toDate: string }]
     'update:neighborhoodId': [id: number | null]
     'order-delivered': []
+    'address-updated': [payload: { orderId: number; addressDescription?: string; lat?: number; lng?: number }]
 }>()
 
 const { formatCurrency } = useFormatting()
 
 const orderNotes = (order: OrderListItem): string => (order.notes ?? '').trim()
+
+const addressFlowOpen = ref(false)
+const addressFlowOrder = ref<OrderListItem | null>(null)
+
+function canEditOrderAddress(order: OrderListItem): boolean {
+    return Boolean(order.customerId && order.addressId)
+}
+
+function openAddressFlow(order: OrderListItem) {
+    addressFlowOrder.value = order
+    addressFlowOpen.value = true
+}
+
+function onAddressFlowUpdated(payload: {
+    orderId: number
+    addressDescription?: string
+    lat?: number
+    lng?: number
+}) {
+    emit('address-updated', payload)
+}
+
+watch(addressFlowOpen, (open) => {
+    if (!open) addressFlowOrder.value = null
+})
 
 const displayedOrders = computed(() => props.orders)
 

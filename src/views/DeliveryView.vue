@@ -205,6 +205,7 @@
                         :planning-warnings-text="routePlanningWarningsText"
                         @route-optimized="handleRouteOptimized"
                         @delivered="handleOrderDelivered"
+                        @address-updated="handleRouteAddressUpdated"
                     />
                 </div>
             </div>
@@ -252,6 +253,7 @@
                 @page-change="handleHistoryPageChange"
                 @filter-change="handleHistoryFilterChange"
                 @update:neighborhood-id="handleHistoryNeighborhoodChange"
+                @address-updated="handleHistoryAddressUpdated"
                 @order-delivered="handleOrderDelivered"
             />
         </BaseDialog>
@@ -518,6 +520,38 @@ const handleHistoryFilterChange = async (filters: { fromDate: string; toDate: st
     deliveryStore.setHistoryDateRange(filters.fromDate, filters.toDate)
     deliveryStore.setHistoryPage(1)
     await loadHistoryModal(true)
+}
+
+type AddressUpdatedPayload = {
+    orderId: number
+    addressDescription?: string
+    lat?: number
+    lng?: number
+}
+
+const handleRouteAddressUpdated = (payload: AddressUpdatedPayload) => {
+    routeOrders.value = routeOrders.value.map((o) => {
+        if (o.id !== payload.orderId) return o
+        const next = { ...o } as OrderListItem & { latitude?: number; longitude?: number }
+        if (payload.addressDescription !== undefined) {
+            next.addressDescription = payload.addressDescription
+        }
+        if (payload.lat != null && payload.lng != null) {
+            next.latitude = payload.lat
+            next.longitude = payload.lng
+        }
+        return next
+    })
+}
+
+const handleHistoryAddressUpdated = async (_payload: AddressUpdatedPayload) => {
+    if (!authStore.user?.id) return
+    const branchId = deliveryStore.historySelectedBranchId ?? userBranchId()
+    try {
+        await deliveryStore.loadHistoryOrders(authStore.user.id, branchId)
+    } catch {
+        /* silencioso: errores de red ya pueden verse en otras cargas */
+    }
 }
 
 const handleHistoryNeighborhoodChange = async (id: number | null) => {
