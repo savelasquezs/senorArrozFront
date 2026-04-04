@@ -247,8 +247,11 @@
                 :page-size="deliveryStore.historyPageSize"
                 :from-date="deliveryStore.historyFromDate"
                 :to-date="deliveryStore.historyToDate"
+                :neighborhood-id="deliveryStore.historyNeighborhoodId"
+                :neighborhood-options="deliveryStore.historyNeighborhoodOptions"
                 @page-change="handleHistoryPageChange"
                 @filter-change="handleHistoryFilterChange"
+                @update:neighborhood-id="handleHistoryNeighborhoodChange"
                 @order-delivered="handleOrderDelivered"
             />
         </BaseDialog>
@@ -511,14 +514,25 @@ const handleHistoryPageChange = async (page: number) => {
     }
 }
 
-const handleHistoryFilterChange = async (filters: {
-    fromDate: string
-    toDate: string
-    neighborhoodId: number | null
-}) => {
+const handleHistoryFilterChange = async (filters: { fromDate: string; toDate: string }) => {
     deliveryStore.setHistoryDateRange(filters.fromDate, filters.toDate)
     deliveryStore.setHistoryPage(1)
     await loadHistoryModal(true)
+}
+
+const handleHistoryNeighborhoodChange = async (id: number | null) => {
+    if (!authStore.user?.id) return
+    deliveryStore.setHistoryNeighborhoodId(id)
+    deliveryStore.setHistoryPage(1)
+    const branchId = deliveryStore.historySelectedBranchId ?? userBranchId()
+    try {
+        isLoading.value = true
+        await deliveryStore.loadHistoryOrders(authStore.user.id, branchId)
+    } catch (err: any) {
+        error('Error al cargar historial', err.message)
+    } finally {
+        isLoading.value = false
+    }
 }
 
 // ─── En ruta ─────────────────────────────────────────────────

@@ -12,6 +12,7 @@ import type {
     OrderDetailView,
     OrderStatus,
     DeliverymanHistoryBranchSummary,
+    DeliverymanHistoryNeighborhood,
 } from '@/types/order';
 
 class OrderApi extends BaseApi {
@@ -177,6 +178,7 @@ class OrderApi extends BaseApi {
             branchId?: number
             /** Estado del pedido en la API (p. ej. Delivered para historial de entregas) */
             status?: string
+            neighborhoodId?: number
         }
     ): Promise<PagedResult<OrderListItem>> {
         const params: Record<string, string | number> = {};
@@ -186,8 +188,26 @@ class OrderApi extends BaseApi {
         if (filters?.toDate) params.ToDate = filters.toDate;
         if (filters?.branchId != null && filters.branchId > 0) params.BranchId = filters.branchId;
         if (filters?.status) params.Status = filters.status;
+        if (filters?.neighborhoodId != null && filters.neighborhoodId > 0)
+            params.NeighborhoodId = filters.neighborhoodId;
 
         return this.get<PagedResult<OrderListItem>>(`/orders/delivery/assigned/${deliveryManId}`, { params });
+    }
+
+    /** Barrios distintos con pedidos en el historial (mismos filtros de fechas/sucursal/estado que el listado). */
+    async fetchDeliverymanHistoryNeighborhoods(
+        deliveryManId: number,
+        filters?: { fromDate?: string; toDate?: string; branchId?: number; status?: string }
+    ): Promise<DeliverymanHistoryNeighborhood[]> {
+        const params: Record<string, string | number> = {};
+        if (filters?.fromDate) params.FromDate = filters.fromDate;
+        if (filters?.toDate) params.ToDate = filters.toDate;
+        if (filters?.branchId != null && filters.branchId > 0) params.BranchId = filters.branchId;
+        if (filters?.status) params.Status = filters.status;
+        return this.get<DeliverymanHistoryNeighborhood[]>(
+            `/orders/delivery/assigned/${deliveryManId}/neighborhoods`,
+            { params }
+        );
     }
 
     /** Conteos por sucursal para pestañas del historial (mismo rango de fechas que el listado) */

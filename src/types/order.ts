@@ -211,6 +211,12 @@ export interface DeliverymanHistoryBranchSummary {
     orderCount: number
 }
 
+/** Barrios con al menos un pedido en el historial del domiciliario (mismo rango/fecha/sucursal) */
+export interface DeliverymanHistoryNeighborhood {
+    id: number
+    name: string
+}
+
 export interface OrderListItem {
     id: number
     branchId: number

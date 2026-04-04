@@ -2,7 +2,11 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { orderApi } from '@/services/MainAPI/orderApi'
-import type { DeliverymanHistoryBranchSummary, OrderListItem } from '@/types/order'
+import type {
+    DeliverymanHistoryBranchSummary,
+    DeliverymanHistoryNeighborhood,
+    OrderListItem,
+} from '@/types/order'
 
 /** Historial del modal: solo pedidos entregados (enum API .NET) */
 const HISTORY_STATUS_DELIVERED = 'Delivered'
@@ -38,6 +42,9 @@ export const useDeliveryStore = defineStore('delivery', () => {
     /** Pestañas por sucursal (historial con fechas) */
     const historyBranchSummaries = ref<DeliverymanHistoryBranchSummary[]>([])
     const historySelectedBranchId = ref<number | null>(null)
+    /** Filtro y opciones de barrio (historial; alineadas al periodo y sucursal activa) */
+    const historyNeighborhoodId = ref<number | null>(null)
+    const historyNeighborhoodOptions = ref<DeliverymanHistoryNeighborhood[]>([])
 
     /** Pedidos asignados sin filtro de fecha — para "En ruta" y contadores */
     const routeAssignedOrders = ref<OrderListItem[]>([])
@@ -108,6 +115,22 @@ export const useDeliveryStore = defineStore('delivery', () => {
         historyBranchSummaries.value = rows
     }
 
+    const loadHistoryNeighborhoods = async (deliveryManId: number, branchId: number) => {
+        const rows = await orderApi.fetchDeliverymanHistoryNeighborhoods(deliveryManId, {
+            fromDate: historyFromDate.value,
+            toDate: historyToDate.value,
+            branchId,
+            status: HISTORY_STATUS_DELIVERED,
+        })
+        historyNeighborhoodOptions.value = rows
+        if (
+            historyNeighborhoodId.value != null &&
+            !rows.some((r) => r.id === historyNeighborhoodId.value)
+        ) {
+            historyNeighborhoodId.value = null
+        }
+    }
+
     function resolveHistoryBranchId(userBranchId: number, resetTab: boolean): number {
         const summaries = historyBranchSummaries.value
         if (
@@ -134,6 +157,7 @@ export const useDeliveryStore = defineStore('delivery', () => {
                 toDate: historyToDate.value,
                 branchId,
                 status: HISTORY_STATUS_DELIVERED,
+                neighborhoodId: historyNeighborhoodId.value ?? undefined,
             })
             historySelectedBranchId.value = branchId
             historyOrders.value = [...response.items].sort((a, b) => b.id - a.id)
@@ -153,8 +177,10 @@ export const useDeliveryStore = defineStore('delivery', () => {
     const loadHistory = async (deliveryManId: number, userBranchId: number, resetTab = false) => {
         error.value = null
         try {
+            if (resetTab) historyNeighborhoodId.value = null
             await loadHistoryBranchSummaries(deliveryManId)
             const branchId = resolveHistoryBranchId(userBranchId, resetTab)
+            await loadHistoryNeighborhoods(deliveryManId, branchId)
             await loadHistoryOrders(deliveryManId, branchId)
         } catch (err: any) {
             error.value = err.message
@@ -164,6 +190,8 @@ export const useDeliveryStore = defineStore('delivery', () => {
 
     /** Solo cambiar sucursal (pestaña); mantiene fechas y reinicia a página 1 antes de llamar desde la vista */
     const loadHistoryForBranch = async (deliveryManId: number, branchId: number) => {
+        historyNeighborhoodId.value = null
+        await loadHistoryNeighborhoods(deliveryManId, branchId)
         await loadHistoryOrders(deliveryManId, branchId)
     }
 
@@ -215,6 +243,10 @@ export const useDeliveryStore = defineStore('delivery', () => {
         historyToDate.value = to
     }
 
+    const setHistoryNeighborhoodId = (id: number | null) => {
+        historyNeighborhoodId.value = id
+    }
+
     const requestHistoryModalFromSidebar = () => {
         historyModalRequestId.value += 1
     }
@@ -229,6 +261,8 @@ export const useDeliveryStore = defineStore('delivery', () => {
         historyTotalCount.value = 0
         historyBranchSummaries.value = []
         historySelectedBranchId.value = null
+        historyNeighborhoodId.value = null
+        historyNeighborhoodOptions.value = []
         historyModalRequestId.value = 0
         routeAssignedOrders.value = []
         historyFromDate.value = localDateString()
@@ -255,6 +289,8 @@ export const useDeliveryStore = defineStore('delivery', () => {
         historyToDate,
         historyBranchSummaries,
         historySelectedBranchId,
+        historyNeighborhoodId,
+        historyNeighborhoodOptions,
         historyBadgeCount,
         historyModalRequestId,
         routeAssignedOrders,
@@ -266,11 +302,13 @@ export const useDeliveryStore = defineStore('delivery', () => {
         loadPreparationOrders,
         loadHistory,
         loadHistoryOrders,
+        loadHistoryNeighborhoods,
         loadHistoryForBranch,
         loadRouteAssignedOrders,
         assignOrders,
         setHistoryPage,
         setHistoryDateRange,
+        setHistoryNeighborhoodId,
         requestHistoryModalFromSidebar,
         clear,
         ordersOnTheWay

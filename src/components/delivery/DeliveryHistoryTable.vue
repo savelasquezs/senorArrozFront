@@ -7,7 +7,7 @@
 
             <!-- Filtros en desktop -->
             <div class="hidden md:flex items-center gap-3">
-                <NeighborhoodFilter :model-value="neighborhoodId"
+                <NeighborhoodFilter :model-value="neighborhoodId" :options="neighborhoodOptions"
                     @update:model-value="onNeighborhoodChange" />
 
                 <div class="flex items-center gap-2">
@@ -21,7 +21,7 @@
 
             <!-- Filtros en mobile: apilados -->
             <div class="md:hidden space-y-2">
-                <NeighborhoodFilter :model-value="neighborhoodId"
+                <NeighborhoodFilter :model-value="neighborhoodId" :options="neighborhoodOptions"
                     @update:model-value="onNeighborhoodChange" />
                 <div class="flex items-center gap-2">
                     <BaseInput :model-value="fromDate" type="date" placeholder="Desde" class="text-sm"
@@ -255,43 +255,28 @@ interface Props {
     /** YYYY-MM-DD — sincronizado con el store (por defecto hoy local) */
     fromDate: string
     toDate: string
-}
-
-interface HistoryFiltersPayload {
-    fromDate: string
-    toDate: string
     neighborhoodId: number | null
+    neighborhoodOptions: Array<{ id: number; name: string }>
 }
 
 const props = defineProps<Props>()
 const emit = defineEmits<{
     'page-change': [page: number]
-    'filter-change': [filters: HistoryFiltersPayload]
+    'filter-change': [filters: { fromDate: string; toDate: string }]
+    'update:neighborhoodId': [id: number | null]
     'order-delivered': []
 }>()
 
 const { formatCurrency } = useFormatting()
-/** Filtro local por barrio (la API del historial aún no filtra por barrio) */
-const neighborhoodId = ref<number | null>(null)
 
 const orderNotes = (order: OrderListItem): string => (order.notes ?? '').trim()
 
-const displayedOrders = computed(() => {
-    let list = props.orders
-    if (neighborhoodId.value != null) {
-        list = list.filter((o) => o.neighborhoodId === neighborhoodId.value)
-    }
-    return list
-})
+const displayedOrders = computed(() => props.orders)
 
 const displayedTotals = computed(() => DeliveryService.calculateTotals(displayedOrders.value))
 
 const emitDateFilterChange = (fromDate: string, toDate: string) => {
-    emit('filter-change', {
-        fromDate,
-        toDate,
-        neighborhoodId: neighborhoodId.value,
-    })
+    emit('filter-change', { fromDate, toDate })
 }
 
 const onFromDate = (v: string | number | null) => {
@@ -303,7 +288,7 @@ const onToDate = (v: string | number | null) => {
 }
 
 const onNeighborhoodChange = (id: number | null) => {
-    neighborhoodId.value = id
+    emit('update:neighborhoodId', id)
 }
 
 const formatDeliveryTime = (order: OrderListItem): string => {

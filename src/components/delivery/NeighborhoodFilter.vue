@@ -9,22 +9,30 @@
 import { computed } from 'vue'
 import BaseSelect from '@/components/ui/BaseSelect.vue'
 
-interface Props {
-    modelValue: number | null
+export interface NeighborhoodOptionItem {
+    id: number
+    name: string
 }
 
-defineProps<Props>()
+interface Props {
+    modelValue: number | null
+    /** Barrios disponibles (p. ej. solo los que tienen entregas en el periodo). */
+    options?: NeighborhoodOptionItem[]
+}
+
+const props = withDefaults(defineProps<Props>(), {
+    options: () => [],
+})
+
 defineEmits<{ 'update:modelValue': [value: number | null] }>()
 
 const neighborhoodOptions = computed(() => {
-    const options: Array<{ value: number | null; label: string }> = [
-        { value: null, label: 'Todos los barrios' }
+    const opts: Array<{ value: number | null; label: string }> = [
+        { value: null, label: 'Todos los barrios' },
     ]
-
-    // TODO: Obtener barrios de la sucursal del usuario
-    // Por ahora retornamos solo la opción "Todos"
-    // En producción, aquí se debería cargar desde customersStore o neighborhoods store
-
-    return options
+    for (const n of props.options) {
+        opts.push({ value: n.id, label: n.name })
+    }
+    return opts
 })
 </script>
