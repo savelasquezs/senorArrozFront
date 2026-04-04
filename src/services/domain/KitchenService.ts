@@ -5,18 +5,15 @@ const KITCHEN_MAX_TAKEN_TIME = 5 * 60 * 1000 // 5 minutos
 const KITCHEN_MAX_PREPARATION_TIME = 15 * 60 * 1000 // 15 minutos
 
 export class KitchenService {
-    /** Día calendario UTC de reservedFor o prepareAt coincide con hoy UTC (paridad con filtro cocina en API). */
+    /** Día calendario Colombia de reservedFor o prepareAt coincide con hoy en America/Bogotá. */
     static isReservationTakenSameUtcServiceDay(order: OrderListItem): boolean {
         if (order.type !== 'reservation' || order.status !== 'taken') return false
         const anchor = order.reservedFor ?? order.prepareAt
         if (anchor == null) return false
         const d = new Date(anchor as string)
         if (Number.isNaN(d.getTime())) return false
-        const now = new Date()
-        const dayStart = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate())
-        const dayEnd = dayStart + 86400000
-        const t = d.getTime()
-        return t >= dayStart && t < dayEnd
+        const bogotaDay = (x: Date) => x.toLocaleDateString('en-CA', { timeZone: 'America/Bogota' })
+        return bogotaDay(d) === bogotaDay(new Date())
     }
 
     static getElapsedTime(order: OrderListItem): number {

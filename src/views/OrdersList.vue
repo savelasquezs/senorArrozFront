@@ -364,8 +364,8 @@ const tabs = [
 ]
 const switchTab = (tab: TabValue) => {
     activeTab.value = tab
-    if (tab === 'reservations' && reservations.value.length === 0) {
-        fetchReservations()
+    if (tab === 'reservations') {
+        void fetchReservations()
     }
 }
 const { success, error } = useToast()
@@ -951,11 +951,12 @@ const resTotalCount = ref(0)
 const resCurrentPage = ref(1)
 const resPageSize = ref(10)
 const resSortBy = ref('reservedFor')
-const resSortOrder = ref<'asc' | 'desc'>('asc')
+const resSortOrder = ref<'asc' | 'desc'>('desc')
 const resSearch = ref('')
 const resStatus = ref<string | null>(null)
-const resFrom = ref('')
-const resTo = ref('')
+const colombiaDateInput = () => new Date().toLocaleDateString('en-CA', { timeZone: 'America/Bogota' })
+const resFrom = ref(colombiaDateInput())
+const resTo = ref(colombiaDateInput())
 
 const resStatusOptions = [
     { value: null, label: 'Activas (sin canceladas/entregadas)' },
@@ -988,11 +989,16 @@ const resFilteredItems = computed(() => {
     )
 })
 
-const toIsoUtc = (dateStr: string, endOfDay = false): string => {
+/** YYYY-MM-DD como día en Colombia (UTC-5 fijo) → instante en ISO UTC. */
+const reservedColombiaDateToIsoUtc = (dateStr: string, endOfDay: boolean): string => {
     if (!dateStr) return ''
-    const d = new Date(dateStr)
-    if (endOfDay) d.setHours(23, 59, 59, 999)
-    return d.toISOString()
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+        const d = new Date(dateStr)
+        if (endOfDay) d.setHours(23, 59, 59, 999)
+        return d.toISOString()
+    }
+    const suffix = endOfDay ? 'T23:59:59.999-05:00' : 'T00:00:00.000-05:00'
+    return new Date(`${dateStr}${suffix}`).toISOString()
 }
 
 const fetchReservations = async () => {
@@ -1017,8 +1023,8 @@ const fetchReservations = async () => {
         }
 
         if (statusPayload) body.status = statusPayload
-        if (resFrom.value) body.reservedFromDate = toIsoUtc(resFrom.value)
-        if (resTo.value) body.reservedToDate = toIsoUtc(resTo.value, true)
+        if (resFrom.value) body.reservedFromDate = reservedColombiaDateToIsoUtc(resFrom.value, false)
+        if (resTo.value) body.reservedToDate = reservedColombiaDateToIsoUtc(resTo.value, true)
 
         const response = await orderApi.searchOrders(body)
 
@@ -1028,7 +1034,7 @@ const fetchReservations = async () => {
         }
 
         reservations.value = items
-        resTotalCount.value = resStatus.value === null ? items.length : response.totalCount
+        resTotalCount.value = response.totalCount
     } catch (err: any) {
         error('Error al cargar reservas', err.message)
     } finally {
@@ -1046,7 +1052,7 @@ const handleResSort = (field: string) => {
         resSortOrder.value = resSortOrder.value === 'asc' ? 'desc' : 'asc'
     } else {
         resSortBy.value = field
-        resSortOrder.value = 'asc'
+        resSortOrder.value = field === 'reservedFor' ? 'desc' : 'asc'
     }
     fetchReservations()
 }
