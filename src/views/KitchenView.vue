@@ -153,7 +153,7 @@ const cardGridRef = ref<InstanceType<typeof OrderCardGrid> | null>(null)
 
 const allOrders = computed(() => ordersStore.list?.items || [])
 
-/** Reservas del día (UTC, mismo criterio que API) en tomado: agenda hasta pasar a preparación. */
+/** Reservas del día (calendario Colombia, alineado con API forKitchen) en tomado: agenda hasta pasar a preparación. */
 const scheduledReservationOrders = computed(() => {
     const list = allOrders.value.filter((o) => KitchenService.isReservationTakenSameUtcServiceDay(o))
     return list.sort((a, b) => {
