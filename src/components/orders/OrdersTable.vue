@@ -4,7 +4,7 @@
             <thead class="sticky top-0 z-10 bg-gray-50 shadow-sm">
                 <tr>
                     <th scope="col"
-                        class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                        class="px-6 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
                         @click="$emit('sort', 'id')">
                         <div class="flex items-center space-x-1">
                             <span>ID</span>
@@ -14,23 +14,23 @@
                         </div>
                     </th>
                     <th scope="col"
-                        class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        class="px-6 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Tipo
                     </th>
                     <th scope="col"
-                        class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        class="px-6 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Cliente
                     </th>
                     <th scope="col"
-                        class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        class="px-6 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Dirección
                     </th>
                     <th scope="col"
-                        class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        class="px-6 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Estado
                     </th>
                     <th scope="col"
-                        class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                        class="px-6 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
                         @click="$emit('sort', 'total')">
                         <div class="flex items-center space-x-1">
                             <span>Total</span>
@@ -40,15 +40,15 @@
                         </div>
                     </th>
                     <th scope="col"
-                        class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        class="px-6 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Pagos
                     </th>
                     <th scope="col"
-                        class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        class="px-6 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Domiciliario
                     </th>
                     <th scope="col"
-                        class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                        class="px-6 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
                         @click="$emit('sort', 'createdAt')">
                         <div class="flex items-center space-x-1">
                             <span>Fecha</span>
@@ -73,16 +73,26 @@
                     </td>
                 </tr>
                 <tr v-else v-for="order in orders" :key="order.id" class="hover:bg-gray-50 transition-colors">
-                    <!-- ID (clickeable para ir a detalle) -->
-                    <td class="px-6 py-4 whitespace-nowrap">
-                        <router-link :to="{ name: 'OrderDetail', params: { id: order.id } }"
-                            class="text-sm font-medium text-emerald-600 hover:text-emerald-700 hover:underline">
-                            #{{ order.id }}
-                        </router-link>
+                    <!-- ID + productos (máx. 2 líneas + ....) -->
+                    <td class="px-6 py-2 align-top">
+                        <div class="flex items-start gap-2 min-w-0 max-w-[12rem] sm:max-w-xs lg:max-w-md">
+                            <router-link :to="{ name: 'OrderDetail', params: { id: order.id } }"
+                                class="shrink-0 text-sm font-medium text-emerald-600 hover:text-emerald-700 hover:underline whitespace-nowrap">
+                                #{{ order.id }}
+                            </router-link>
+                            <div v-if="productPreviewLines(order).length"
+                                class="min-w-0 flex-1 text-xs text-gray-600 leading-snug space-y-0.5">
+                                <div v-for="(line, idx) in productPreviewLines(order)" :key="idx"
+                                    :class="line === '....' ? 'text-gray-400' : 'line-clamp-1'"
+                                    :title="line === '....' ? undefined : line">
+                                    {{ line }}
+                                </div>
+                            </div>
+                        </div>
                     </td>
 
                     <!-- Tipo - CLICKEABLE -->
-                    <td class="px-6 py-4 whitespace-nowrap">
+                    <td class="px-6 py-2 whitespace-nowrap">
                         <button type="button" @click.stop="$emit('edit-type', order)"
                             class="hover:opacity-80 transition-opacity cursor-pointer">
                             <OrderTypeBadge :type="order.type" :display-name="order.typeDisplayName" />
@@ -98,7 +108,7 @@
                     </td>
 
                     <!-- Cliente (clickeable para editar) -->
-                    <td class="px-6 py-4 whitespace-nowrap">
+                    <td class="px-6 py-2 whitespace-nowrap">
                         <div class="flex items-start gap-1.5">
                             <button type="button" class="text-left hover:text-emerald-600 transition-colors min-w-0 flex-1"
                                 @click.stop="$emit('edit-customer', order)">
@@ -122,7 +132,7 @@
                     </td>
 
                     <!-- Dirección (clickeable para cambiar) -->
-                    <td class="px-6 py-4">
+                    <td class="px-6 py-2">
                         <button type="button" v-if="order.addressDescription || order.addressAdditionalInfo"
                             class="text-left text-sm text-gray-900 hover:text-emerald-600 hover:underline transition-colors max-w-xs"
                             @click.stop="$emit('edit-address', order)">
@@ -135,21 +145,21 @@
                     </td>
 
                     <!-- Estado (clickeable para cambiar) -->
-                    <td class="px-6 py-4 whitespace-nowrap">
+                    <td class="px-6 py-2 whitespace-nowrap">
                         <OrderStatusBadge :status="order.status" :display-name="order.statusDisplayName"
                             :status-time="getStatusTime(order)" :clickable="true"
                             @click="$emit('change-status', order)" />
                     </td>
 
                     <!-- Total -->
-                    <td class="px-6 py-4 whitespace-nowrap">
+                    <td class="px-6 py-2 whitespace-nowrap">
                         <div class="text-sm font-medium text-gray-900">
                             {{ formatCurrency(order.total) }}
                         </div>
                     </td>
 
                     <!-- Pagos -->
-                    <td class="px-6 py-4">
+                    <td class="px-6 py-2">
                         <div class="space-y-2">
                             <!-- Bank Payments -->
                             <div v-if="order.bankPayments && order.bankPayments.length > 0" class="space-y-1">
@@ -201,7 +211,7 @@
                     </td>
 
                     <!-- Domiciliario (clickeable para asignar/cambiar) -->
-                    <td class="px-6 py-4 whitespace-nowrap">
+                    <td class="px-6 py-2 whitespace-nowrap">
                         <button type="button" :disabled="!canAssignDeliveryman(order)" :class="[
                             'text-left transition-colors',
                             canAssignDeliveryman(order)
@@ -220,7 +230,7 @@
                     </td>
 
                     <!-- Fecha -->
-                    <td class="px-6 py-4 whitespace-nowrap">
+                    <td class="px-6 py-2 whitespace-nowrap">
                         <div class="text-xs text-gray-900">{{ formatDate(order.createdAt) }}</div>
                         <div class="text-xs text-gray-500">{{ formatTime(order.createdAt) }}</div>
                     </td>
@@ -324,5 +334,14 @@ const getStatusTime = (order: OrderListItem): string | undefined => {
 const formatQuickLabel = (bankName: string): string => {
     const base = `Transf ${bankName}`
     return base.length > 13 ? base.slice(0, 13) : base
+}
+
+/** Hasta 2 líneas de producto × cantidad; si hay más ítems, tercera línea "....". */
+function productPreviewLines(order: OrderListItem): string[] {
+    const lines = order.summaryLines ?? []
+    if (lines.length === 0) return []
+    const formatted = lines.map((l) => `${l.productName} × ${l.quantity}`)
+    if (formatted.length <= 2) return formatted
+    return [...formatted.slice(0, 2), '....']
 }
 </script>

@@ -1,12 +1,6 @@
 <template>
     <MainLayout>
-        <div class="flex flex-col lg:flex-row gap-6 items-start">
-            <!-- Sidebar: tabs fijos -->
-           
-
-            <div class="flex-1 min-w-0 w-full space-y-6">
-                
-
+        <div class="w-full space-y-6">
                 <!-- ===== TAB: PEDIDOS DEL DÍA ===== -->
                 <template v-if="activeTab === 'orders'">
                     <div class="bg-white rounded-lg shadow mb-6">
@@ -59,13 +53,28 @@
                         </div>
 
                         <div class="px-4 py-3 bg-gray-50 flex flex-wrap items-center justify-between gap-3">
-                            <div class="text-sm text-gray-600 min-w-0">
-                                <span v-if="!loading && filteredOrders.length > 0">
-                                    Mostrando <span class="font-medium">{{ filteredOrders.length }}</span>
-                                    de <span class="font-medium">{{ totalCount }}</span> pedidos
-                                </span>
-                                <span v-else-if="!loading" class="text-gray-400">No hay pedidos</span>
-                                <span v-else class="text-gray-400">Cargando...</span>
+                            <div class="flex flex-wrap items-center gap-3 min-w-0">
+                                <div
+                                    class="flex rounded-lg border border-gray-200 bg-white p-0.5 gap-0.5 shrink-0">
+                                    <button v-for="tab in tabs" :key="tab.value" type="button"
+                                        @click="switchTab(tab.value)" :class="[
+                                            'inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors',
+                                            activeTab === tab.value
+                                                ? 'bg-emerald-600 text-white shadow-sm'
+                                                : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900',
+                                        ]">
+                                        <component :is="tab.icon" class="w-3.5 h-3.5 shrink-0" />
+                                        <span class="whitespace-nowrap">{{ tab.label }}</span>
+                                    </button>
+                                </div>
+                                <div class="text-sm text-gray-600 min-w-0">
+                                    <span v-if="!loading && filteredOrders.length > 0">
+                                        Mostrando <span class="font-medium">{{ filteredOrders.length }}</span>
+                                        de <span class="font-medium">{{ totalCount }}</span> pedidos
+                                    </span>
+                                    <span v-else-if="!loading" class="text-gray-400">No hay pedidos</span>
+                                    <span v-else class="text-gray-400">Cargando...</span>
+                                </div>
                             </div>
                             <div class="flex items-center gap-2 shrink-0">
                                 <BaseButton
@@ -212,14 +221,29 @@
                             </div>
                         </div>
 
-                        <div class="px-4 py-3 bg-gray-50 flex items-center justify-between gap-3">
-                            <div class="text-sm text-gray-600">
-                                <span v-if="!resLoading && resFilteredItems.length > 0">
-                                    Mostrando <span class="font-medium">{{ resFilteredItems.length }}</span>
-                                    de <span class="font-medium">{{ resTotalCount }}</span> reservas
-                                </span>
-                                <span v-else-if="!resLoading" class="text-gray-400">No hay reservas</span>
-                                <span v-else class="text-gray-400">Cargando...</span>
+                        <div class="px-4 py-3 bg-gray-50 flex flex-wrap items-center justify-between gap-3">
+                            <div class="flex flex-wrap items-center gap-3 min-w-0">
+                                <div
+                                    class="flex rounded-lg border border-gray-200 bg-white p-0.5 gap-0.5 shrink-0">
+                                    <button v-for="tab in tabs" :key="'res-' + tab.value" type="button"
+                                        @click="switchTab(tab.value)" :class="[
+                                            'inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors',
+                                            activeTab === tab.value
+                                                ? 'bg-emerald-600 text-white shadow-sm'
+                                                : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900',
+                                        ]">
+                                        <component :is="tab.icon" class="w-3.5 h-3.5 shrink-0" />
+                                        <span class="whitespace-nowrap">{{ tab.label }}</span>
+                                    </button>
+                                </div>
+                                <div class="text-sm text-gray-600">
+                                    <span v-if="!resLoading && resFilteredItems.length > 0">
+                                        Mostrando <span class="font-medium">{{ resFilteredItems.length }}</span>
+                                        de <span class="font-medium">{{ resTotalCount }}</span> reservas
+                                    </span>
+                                    <span v-else-if="!resLoading" class="text-gray-400">No hay reservas</span>
+                                    <span v-else class="text-gray-400">Cargando...</span>
+                                </div>
                             </div>
                             <BaseButton variant="secondary" size="sm" class="shrink-0" :loading="resLoading"
                                 @click="fetchReservations">
@@ -266,29 +290,6 @@
                     </div>
                 </template><!-- /tab reservations -->
 
-            </div>
-            <aside class="w-full lg:w-52 shrink-0 lg:sticky lg:top-2 z-20">
-                <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
-                   
-                    <BaseButton v-if="activeTab === 'orders'" @click="navigateToNewOrder" variant="primary" size="sm"
-                        class="inline-flex items-center gap-1.5 shrink-0">
-                        <PlusIcon class="w-3.5 h-3.5 shrink-0" />
-                        <span>Nuevo pedido</span>
-                    </BaseButton>
-                </div>
-                <nav
-                    class="flex flex-row lg:flex-col gap-2 p-2 rounded-lg border border-gray-200 bg-gray-50 lg:bg-white shadow-sm">
-                    <button v-for="tab in tabs" :key="tab.value" type="button" @click="switchTab(tab.value)" :class="[
-                        'flex items-center gap-2 rounded-md px-3 py-2.5 text-sm font-medium transition-colors text-left lg:w-full',
-                        activeTab === tab.value
-                            ? 'bg-emerald-600 text-white shadow-sm'
-                            : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
-                    ]">
-                        <component :is="tab.icon" class="w-4 h-4 shrink-0" />
-                        <span class="whitespace-nowrap">{{ tab.label }}</span>
-                    </button>
-                </nav>
-            </aside>
         </div>
 
         <!-- Modales -->
@@ -315,7 +316,6 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
 import type { OrderListItem, Order, OrderStatus, OrderBankPaymentDetail } from '@/types/order'
 import { orderApi } from '@/services/MainAPI/orderApi'
 import { useOrderFilters, type OrderFilterState } from '@/composables/useOrderFilters'
@@ -346,7 +346,6 @@ import {
     CalendarDaysIcon,
 } from '@heroicons/vue/24/outline'
 
-const router = useRouter()
 const banksStore = useBanksStore()
 const { applyAllFilters, sortOrders } = useOrderFilters()
 const { getNextAllowedStatus, canChangeStatus } = useOrderPermissions()
@@ -837,10 +836,6 @@ const handleOrderUpdated = async (updatedOrder?: Order) => {
     if (!updatedOrder) {
         fetchOrders()
     }
-}
-
-const navigateToNewOrder = () => {
-    router.push('/orders/new')
 }
 
 const clearPendingStatusChange = () => {

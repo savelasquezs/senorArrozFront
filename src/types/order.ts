@@ -258,6 +258,13 @@ export interface OrderListItem {
     bankPayments: OrderBankPaymentDetail[]
     appPayments: OrderAppPaymentDetail[]
     totalDeposited: number
+    /** Resumen de líneas desde el API (search/list con detalles cargados). */
+    summaryLines?: OrderLineSummary[]
+}
+
+export interface OrderLineSummary {
+    productName: string
+    quantity: number
 }
 
 // ===== TIPOS PARA VISTA DE DETALLE =====
