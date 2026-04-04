@@ -49,6 +49,12 @@
             </div>
         </div>
 
+        <div v-if="orderNotesDisplay"
+            class="mb-1.5 sm:mb-2 md:mb-3 rounded-md bg-amber-50 border border-amber-100 px-2 py-1.5 sm:px-2.5 sm:py-2">
+            <p class="text-[10px] sm:text-xs font-semibold text-amber-900">Notas del pedido</p>
+            <p class="text-[10px] sm:text-xs text-gray-800 mt-0.5 whitespace-pre-wrap break-words">{{ orderNotesDisplay }}</p>
+        </div>
+
         <!-- Contenido según variant -->
         <div v-if="variant === 'kitchen' && orderItems" class="space-y-1 sm:space-y-1.5 md:space-y-2">
             <div v-for="item in orderItems" :key="item.id" class="flex items-start gap-1.5 sm:gap-2 text-xs sm:text-sm">
@@ -179,6 +185,8 @@ const kitchenPickupName = computed(() => {
     const n = (props.order.customerName?.trim() || props.order.guestName?.trim()) ?? ''
     return n
 })
+
+const orderNotesDisplay = computed(() => (props.order.notes ?? '').trim())
 
 const deliveryRecipientName = computed(() => {
     const n = (props.order.customerName?.trim() || props.order.guestName?.trim()) ?? ''

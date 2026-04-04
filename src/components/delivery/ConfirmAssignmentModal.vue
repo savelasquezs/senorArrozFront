@@ -18,6 +18,10 @@
                     <div v-if="order.neighborhoodName" class="text-xs text-gray-500 mt-1">
                         Barrio: {{ order.neighborhoodName }}
                     </div>
+                    <p v-if="orderNotes(order)"
+                        class="mt-2 text-sm text-amber-900 bg-amber-50 border border-amber-100 rounded-md px-2 py-1.5 whitespace-pre-wrap break-words">
+                        <span class="font-semibold">Notas del pedido: </span>{{ orderNotes(order) }}
+                    </p>
                 </div>
             </div>
 
@@ -65,6 +69,8 @@ interface Props {
 
 const props = defineProps<Props>()
 const emit = defineEmits<{ close: [], assigned: [] }>()
+
+const orderNotes = (order: OrderListItem): string => (order.notes ?? '').trim()
 
 const deliveryStore = useDeliveryStore()
 const { success, error } = useToast()

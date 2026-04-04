@@ -62,6 +62,10 @@
                                 <div>{{ order.addressDescription || '-' }}</div>
                                 <div v-if="order.addressAdditionalInfo" class="text-xs text-gray-500 mt-0.5">{{
                                     order.addressAdditionalInfo }}</div>
+                                <div v-if="orderNotes(order)"
+                                    class="text-xs text-amber-900 bg-amber-50 border border-amber-100 rounded px-2 py-1 mt-1.5 whitespace-pre-wrap">
+                                    <span class="font-semibold">Notas: </span>{{ orderNotes(order) }}
+                                </div>
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
                                 {{ order.neighborhoodName || '-' }}
@@ -144,6 +148,10 @@
                     <div><span class="font-medium">Cliente:</span> {{ order.customerName || order.guestName || '-' }}
                     </div>
                     <div><span class="font-medium">Teléfono:</span> {{ order.customerPhone || '-' }}</div>
+                    <div v-if="orderNotes(order)"
+                        class="text-xs text-amber-900 bg-amber-50 border border-amber-100 rounded px-2 py-1.5 mt-1 whitespace-pre-wrap">
+                        <span class="font-semibold">Notas del pedido:</span> {{ orderNotes(order) }}
+                    </div>
                 </div>
 
                 <div class="flex items-center justify-between pt-2 border-t border-gray-200">
@@ -201,6 +209,10 @@
                     <div><span class="font-medium">Cliente:</span> {{ orderToDeliver.customerName ||
                         orderToDeliver.guestName || '-' }}</div>
                     <div><span class="font-medium">Teléfono:</span> {{ orderToDeliver.customerPhone || '-' }}</div>
+                    <div v-if="orderNotes(orderToDeliver)"
+                        class="text-sm text-amber-900 bg-amber-50 border border-amber-100 rounded-md px-2 py-1.5 mt-2 whitespace-pre-wrap">
+                        <span class="font-semibold">Notas del pedido: </span>{{ orderNotes(orderToDeliver) }}
+                    </div>
                 </div>
             </div>
         </div>
@@ -261,6 +273,8 @@ const emit = defineEmits<{
 const { formatCurrency } = useFormatting()
 /** Filtro local por barrio (la API del historial aún no filtra por barrio) */
 const neighborhoodId = ref<number | null>(null)
+
+const orderNotes = (order: OrderListItem): string => (order.notes ?? '').trim()
 
 const displayedOrders = computed(() => {
     let list = props.orders

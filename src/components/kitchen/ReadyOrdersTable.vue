@@ -9,7 +9,7 @@
                 <thead class="bg-gray-50">
                     <tr>
                         <th class="px-3 sm:px-4 md:px-6 py-2 sm:py-3 text-left text-[10px] sm:text-xs font-medium text-gray-500 uppercase">Pedido</th>
-                        <th class="px-3 sm:px-4 md:px-6 py-2 sm:py-3 text-left text-[10px] sm:text-xs font-medium text-gray-500 uppercase">Productos</th>
+                        <th class="px-3 sm:px-4 md:px-6 py-2 sm:py-3 text-left text-[10px] sm:text-xs font-medium text-gray-500 uppercase">Productos / notas</th>
                         <th class="px-3 sm:px-4 md:px-6 py-2 sm:py-3 text-left text-[10px] sm:text-xs font-medium text-gray-500 uppercase whitespace-nowrap">Tiempo</th>
                         <th class="px-3 sm:px-4 md:px-6 py-2 sm:py-3 text-left text-[10px] sm:text-xs font-medium text-gray-500 uppercase">Acciones</th>
                     </tr>
@@ -27,6 +27,11 @@
                                 <div v-for="item in getOrderItems(order.id)" :key="item.id"
                                     class="text-xs sm:text-sm text-gray-600">
                                     <span class="font-medium">{{ item.quantity }}x</span> {{ item.productName }}
+                                </div>
+                                <div v-if="orderNotes(order)"
+                                    class="mt-1.5 sm:mt-2 pt-1.5 sm:pt-2 border-t border-amber-100 rounded-md bg-amber-50/80 px-2 py-1.5 text-[11px] sm:text-xs text-gray-800">
+                                    <span class="font-semibold text-amber-900">Notas del pedido: </span>
+                                    <span class="whitespace-pre-wrap break-words">{{ orderNotes(order) }}</span>
                                 </div>
                             </div>
                         </td>
@@ -76,5 +81,9 @@ const getOrderItems = (orderId: number): OrderDetailItem[] => {
 const formatElapsedTime = (order: OrderListItem): string => {
     const elapsed = KitchenService.getElapsedTime(order)
     return KitchenService.formatElapsedTime(elapsed)
+}
+
+const orderNotes = (order: OrderListItem): string => {
+    return (order.notes ?? '').trim()
 }
 </script>

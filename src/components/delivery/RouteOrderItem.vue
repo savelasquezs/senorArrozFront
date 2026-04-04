@@ -11,6 +11,10 @@
                     {{ order.addressAdditionalInfo }}
                 </div>
                 <div class="text-xs text-gray-500 truncate">{{ order.neighborhoodName || order.branchName }}</div>
+                <div v-if="orderNotes"
+                    class="text-xs text-amber-900 bg-amber-50 border border-amber-100 rounded px-2 py-1.5 mt-1.5 whitespace-pre-wrap break-words">
+                    <span class="font-semibold">Notas del pedido: </span>{{ orderNotes }}
+                </div>
             </div>
 
             <div class="flex gap-1 flex-wrap justify-end">
@@ -78,7 +82,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseDialog from '@/components/ui/BaseDialog.vue'
 import CustomerAddressForm from '@/components/customers/address/CustomerAddressForm.vue'
@@ -95,6 +99,9 @@ import { PrinterIcon } from '@heroicons/vue/24/outline'
 const { success, error: showError } = useToast()
 interface Props { order: OrderListItem }
 const props = defineProps<Props>()
+
+const orderNotes = computed(() => (props.order.notes ?? '').trim())
+
 const emit = defineEmits<{
     delivered: [orderId: number]
     addressUpdated: [payload: { orderId: number, addressDescription?: string, lat?: number, lng?: number }]

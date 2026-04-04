@@ -14,6 +14,10 @@
                             <span class="font-medium">{{ item.quantity }}x</span> {{ item.productName }}
                         </div>
                     </div>
+                    <p v-if="orderNotes(order)"
+                        class="mt-2 text-sm text-amber-900 bg-amber-50 border border-amber-100 rounded-md px-2 py-1.5 whitespace-pre-wrap break-words">
+                        <span class="font-semibold">Notas del pedido: </span>{{ orderNotes(order) }}
+                    </p>
                 </div>
             </div>
 
@@ -57,6 +61,10 @@ const isLoading = ref(false)
 
 const getOrderItems = (orderId: number): OrderDetailItem[] => {
     return props.orderItemsMap.get(orderId) || []
+}
+
+const orderNotes = (order: OrderListItem): string => {
+    return (order.notes ?? '').trim()
 }
 
 const confirmAndUpdate = async () => {
