@@ -770,6 +770,7 @@ const handleCustomerModalClose = () => {
         pendingOrderType.value = null
         originalOrderType.value = null
     }
+    showEditCustomerModal.value = false
 }
 
 const handleOrderUpdated = async (updatedOrder?: Order) => {

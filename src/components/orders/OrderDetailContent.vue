@@ -909,6 +909,7 @@ const handleCustomerModalClose = () => {
         pendingOrderType.value = null
         originalOrderType.value = null
     }
+    showEditCustomerModal.value = false
 }
 const updateOrderStatus = (updatedOrder: any) => {
     const orderAny = updatedOrder as any
