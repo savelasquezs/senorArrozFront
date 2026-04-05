@@ -5,41 +5,63 @@ const KITCHEN_MAX_TAKEN_TIME = 5 * 60 * 1000 // 5 minutos
 const KITCHEN_MAX_PREPARATION_TIME = 15 * 60 * 1000 // 15 minutos
 
 export class KitchenService {
-    /** Día calendario Colombia de reservedFor o prepareAt coincide con hoy en America/Bogotá. */
-    static isReservationTakenSameUtcServiceDay(order: OrderListItem): boolean {
+    /**
+     * Instante en que la cocina debe tomar la reserva: prepareAt, o reservedFor − 1h (misma regla que OrderRepository forKitchen).
+     */
+    static getReservationKitchenEntryTime(order: OrderListItem): Date | null {
+        if (order.prepareAt != null && String(order.prepareAt).trim() !== '') {
+            const d = new Date(order.prepareAt as string)
+            return Number.isNaN(d.getTime()) ? null : d
+        }
+        if (order.reservedFor != null && String(order.reservedFor).trim() !== '') {
+            const d = new Date(order.reservedFor as string)
+            if (Number.isNaN(d.getTime())) return null
+            return new Date(d.getTime() - 60 * 60 * 1000)
+        }
+        return null
+    }
+
+    /**
+     * Reserva en «Tomado»: se muestra en «Reservas hoy» solo si es el día calendario Colombia del ancla
+     * y aún NO llegó la hora de entrada a cocina (prepareAt o reservedFor−1h).
+     */
+    static isReservationTakenPendingKitchenTime(order: OrderListItem, now: Date = new Date()): boolean {
         if (order.type !== 'reservation' || order.status !== 'taken') return false
         const anchor = order.reservedFor ?? order.prepareAt
         if (anchor == null) return false
-        const d = new Date(anchor as string)
-        if (Number.isNaN(d.getTime())) return false
+        const anchorDate = new Date(anchor as string)
+        if (Number.isNaN(anchorDate.getTime())) return false
         const bogotaDay = (x: Date) => x.toLocaleDateString('en-CA', { timeZone: 'America/Bogota' })
-        return bogotaDay(d) === bogotaDay(new Date())
+        if (bogotaDay(anchorDate) !== bogotaDay(now)) return false
+
+        const entry = this.getReservationKitchenEntryTime(order)
+        if (!entry) return false
+        return entry.getTime() > now.getTime()
     }
 
     static getElapsedTime(order: OrderListItem): number {
-        // Para reservas: contar desde prepareAt (cuando debe empezar la cocina)
-        if (order.type === 'reservation' && order.prepareAt) {
-            const prepareAtDate = new Date(order.prepareAt)
-            const now = new Date()
-            const elapsed = now.getTime() - prepareAtDate.getTime()
-            return Math.max(0, elapsed)
+        const now = new Date()
+        if (order.type === 'reservation' && order.status === 'taken') {
+            const entry = this.getReservationKitchenEntryTime(order)
+            if (entry) {
+                return Math.max(0, now.getTime() - entry.getTime())
+            }
         }
 
         const takenTime = order.statusTimes?.taken
         if (!takenTime) return 0
 
         const takenDate = new Date(takenTime)
-        const now = new Date()
         return now.getTime() - takenDate.getTime()
     }
 
     static getElapsedTimeInCurrentStatus(order: OrderListItem): number {
-        // Para reservas en "taken": el estado empezó en prepareAt
-        if (order.type === 'reservation' && order.prepareAt && order.status === 'taken') {
-            const prepareAtDate = new Date(order.prepareAt)
-            const now = new Date()
-            const elapsed = now.getTime() - prepareAtDate.getTime()
-            return Math.max(0, elapsed)
+        const now = new Date()
+        if (order.type === 'reservation' && order.status === 'taken') {
+            const entry = this.getReservationKitchenEntryTime(order)
+            if (entry) {
+                return Math.max(0, now.getTime() - entry.getTime())
+            }
         }
 
         const statusKey = order.status === 'in_preparation' ? 'inpreparation' : order.status === 'on_the_way' ? 'ontheway' : order.status
@@ -47,7 +69,6 @@ export class KitchenService {
         if (!currentStatusTime) return 0
 
         const statusDate = new Date(currentStatusTime)
-        const now = new Date()
         return now.getTime() - statusDate.getTime()
     }
 

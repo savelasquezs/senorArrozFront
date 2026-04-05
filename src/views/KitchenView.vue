@@ -93,7 +93,7 @@
 
             <div v-if="activeTab === 'scheduled'">
                 <p v-if="scheduledReservationOrders.length === 0" class="text-sm text-gray-500 mb-3">
-                    No hay reservas del día en «Tomado». Al pasar una reserva a preparación aparecerá en Pedidos Activos.
+                    No hay reservas del día en «Tomado» pendientes de hora. Al llegar la hora de cocina o al pasar a preparación aparecen en Pedidos activos.
                 </p>
                 <OrderCardGrid v-else ref="cardGridRef" :orders="scheduledReservationOrders"
                     :order-items-map="orderItemsMap" :show-status-actions="false"
@@ -154,9 +154,9 @@ const cardGridRef = ref<InstanceType<typeof OrderCardGrid> | null>(null)
 
 const allOrders = computed(() => ordersStore.list?.items || [])
 
-/** Reservas del día (calendario Colombia, alineado con API forKitchen) en tomado: agenda hasta pasar a preparación. */
+/** Reservas del día en «Tomado» cuya hora de cocina aún no llegó (prepareAt o reservedFor−1h); luego pasan a Pedidos activos. */
 const scheduledReservationOrders = computed(() => {
-    const list = allOrders.value.filter((o) => KitchenService.isReservationTakenSameUtcServiceDay(o))
+    const list = allOrders.value.filter((o) => KitchenService.isReservationTakenPendingKitchenTime(o))
     return list.sort((a, b) => {
         const ta = new Date(a.prepareAt ?? a.reservedFor ?? 0).getTime()
         const tb = new Date(b.prepareAt ?? b.reservedFor ?? 0).getTime()
