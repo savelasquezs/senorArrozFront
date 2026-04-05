@@ -28,6 +28,23 @@
             </div>
         </div>
 
+        <!-- Opcional: coordenadas desde enlace de Maps (la búsqueda por dirección arriba sigue siendo la vía principal) -->
+        <div class="flex flex-col gap-2 sm:flex-row sm:items-end">
+            <BaseInput
+                v-model="mapsLinkPaste"
+                label="Pegar enlace de Google Maps"
+                placeholder="https://www.google.com/maps/..."
+                class="flex-1 min-w-0"
+                @keydown.enter.prevent="applyMapsLink"
+                @update:model-value="mapsLinkError = ''"
+            />
+            <BaseButton type="button" variant="outline" class="shrink-0 w-full sm:w-auto" :disabled="!mapsLinkPaste.trim()"
+                @click="applyMapsLink">
+                Usar coordenadas del enlace
+            </BaseButton>
+        </div>
+        <p v-if="mapsLinkError" class="text-xs text-red-600 -mt-2">{{ mapsLinkError }}</p>
+
         <!-- Map Container -->
         <div class="relative">
             <div ref="mapContainer" class="w-full h-64 border border-gray-300 rounded-lg overflow-hidden bg-gray-100">
@@ -131,7 +148,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, watch, onMounted, onUnmounted } from 'vue'
+import { parseGoogleMapsUrl } from '@/utils/parseGoogleMapsUrl'
 import BaseInput from './BaseInput.vue'
 import BaseButton from './BaseButton.vue'
 import BaseDialog from './BaseDialog.vue'
@@ -188,6 +206,9 @@ const manualLocation = ref<Location | null>(null)
 const showAddressModal = ref(false)
 const suggestedAddress = ref('')
 const editableAddress = ref('')
+
+const mapsLinkPaste = ref('')
+const mapsLinkError = ref('')
 
 // Google Maps instances
 let map: any = null
@@ -384,6 +405,8 @@ const initializeMap = async () => {
 
         isMapLoaded.value = true
 
+        syncFromModelValue()
+
     } catch (err) {
         if (!isDestroyed.value) {
             error.value = 'Error al cargar el mapa'
@@ -409,6 +432,30 @@ const updateLocation = (location: Location) => {
 
     if (!isDestroyed.value) {
         emit('update:modelValue', location)
+    }
+}
+
+function syncFromModelValue() {
+    const loc = props.modelValue
+    if (!loc || typeof loc.lat !== 'number' || typeof loc.lng !== 'number') return
+    if (!Number.isFinite(loc.lat) || !Number.isFinite(loc.lng)) return
+    updateLocation(loc)
+}
+
+const applyMapsLink = () => {
+    mapsLinkError.value = ''
+    const result = parseGoogleMapsUrl(mapsLinkPaste.value)
+    if (!result.ok) {
+        mapsLinkError.value = result.message
+        return
+    }
+    updateLocation(result.coords)
+    if (map && isMapLoaded.value && !isDestroyed.value) {
+        try {
+            map.setZoom(17)
+        } catch {
+            /* ignore */
+        }
     }
 }
 
@@ -606,6 +653,24 @@ const cancelAddressModal = () => {
     showAddressModal.value = false
     // Keep manual mode active
 }
+
+watch(
+    () => props.modelValue,
+    (loc) => {
+        if (!isMapLoaded.value || isDestroyed.value || !map) return
+        if (!loc || typeof loc.lat !== 'number' || typeof loc.lng !== 'number') return
+        if (!Number.isFinite(loc.lat) || !Number.isFinite(loc.lng)) return
+        const sel = selectedLocation.value
+        if (
+            sel &&
+            Math.abs(sel.lat - loc.lat) < 1e-8 &&
+            Math.abs(sel.lng - loc.lng) < 1e-8
+        ) {
+            return
+        }
+        updateLocation(loc)
+    }
+)
 
 // Lifecycle
 onMounted(async () => {
