@@ -5,8 +5,10 @@ import type {
   BranchInformalLoan,
   CashClosure,
   CashRegisterExpected,
+  CashVaultMovement,
   CloseCashRegisterDto,
   CreateBranchInformalLoanDto,
+  CreateCashVaultMovementDto,
   DeactivateBranchInformalLoanDto,
 } from '@/types/cashRegister'
 
@@ -48,6 +50,15 @@ class CashRegisterApi extends BaseApi {
     const params: Record<string, any> = {}
     if (branchId !== undefined) params.BranchId = branchId
     return this.post<BranchInformalLoan>(`/cash-register/informal-loans/${id}/deactivate`, dto, { params })
+  }
+
+  async createCashVaultMovement(
+    dto: CreateCashVaultMovementDto,
+    branchId?: number
+  ): Promise<CashVaultMovement> {
+    const params: Record<string, any> = {}
+    if (branchId !== undefined) params.BranchId = branchId
+    return this.post<CashVaultMovement>('/cash-register/cash-vault-movements', dto, { params })
   }
 
   async closeCashRegister(dto: CloseCashRegisterDto, branchId?: number): Promise<CashClosure> {

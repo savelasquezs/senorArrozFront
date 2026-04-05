@@ -97,6 +97,7 @@
                   Abonos reservas: +{{ formatCurrency(expected.cashDeposits) }} |
                   Gastos: -{{ formatCurrency(expected.cashExpenses) }} |
                   Abonos domic. (transferencia): -{{ formatCurrency(expected.advancesBankTransfer) }} |
+                  Caja mayor: abonos -{{ formatCurrency(expected.cashVaultAbonosTotal ?? 0) }} | descargas +{{ formatCurrency(expected.cashVaultDescargasTotal ?? 0) }} |
                   Prést. informales (activos): {{ formatCurrency(-(expected.informalLoansActiveTotal ?? 0)) }}
                 </p>
               </div>
@@ -218,6 +219,32 @@
           </div>
         </div>
 
+        <!-- ===== CAJA MAYOR EFECTIVO (CashVault): solo admin ===== -->
+        <div
+          v-if="canViewClosureHistory && cashVaultBank"
+          class="bg-white rounded-xl border border-gray-200 overflow-hidden"
+        >
+          <div class="bg-slate-50 border-b border-slate-100 px-6 py-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div class="flex items-center gap-3">
+              <BuildingLibraryIcon class="w-5 h-5 text-slate-600" />
+              <div>
+                <h2 class="text-lg font-semibold text-gray-800">{{ cashVaultBank.bankName }}</h2>
+                <p class="text-xs text-gray-500">
+                  Saldo esperado en período:
+                  <span class="font-semibold text-gray-700 tabular-nums">{{ formatCurrency(cashVaultBank.expectedBalance) }}</span>
+                  · Representa efectivo apartado en caja mayor (no es transferencia entre bancos).
+                </p>
+              </div>
+            </div>
+            <div class="flex flex-wrap gap-2">
+              <BaseButton variant="outline" size="sm" @click="openVaultAbono">Abonar</BaseButton>
+              <BaseButton variant="outline" size="sm" class="text-amber-800 border-amber-200" @click="openVaultDescarga">
+                Descargar
+              </BaseButton>
+            </div>
+          </div>
+        </div>
+
         <!-- ===== SECCIÓN 3: CONCILIACIÓN BANCOS ===== -->
         <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
           <div class="bg-blue-50 border-b border-blue-100 px-6 py-4 flex items-center gap-3">
@@ -329,6 +356,81 @@
       :branch-id="authStore.branchId"
     />
 
+    <BaseDialog v-model="vaultAbonoOpen" title="Abonar a caja mayor (efectivo)" size="md" @update:model-value="onVaultAbonoToggle">
+      <p class="text-sm text-gray-600 mb-3">
+        El valor sale del efectivo físico en cajón y suma al saldo esperado de «{{ cashVaultBank?.bankName }}».
+      </p>
+      <div class="space-y-3">
+        <div>
+          <label class="text-xs text-gray-500 block mb-1">Monto (COP)</label>
+          <input
+            v-model.number="vaultAbonoAmount"
+            type="number"
+            min="1"
+            step="1000"
+            class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-300"
+          />
+        </div>
+        <div>
+          <label class="text-xs text-gray-500 block mb-1">Nota (opcional)</label>
+          <input
+            v-model="vaultAbonoNote"
+            type="text"
+            maxlength="500"
+            class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-300"
+          />
+        </div>
+      </div>
+      <template #footer>
+        <BaseButton variant="outline" @click="vaultAbonoOpen = false">Cancelar</BaseButton>
+        <BaseButton variant="primary" :loading="savingVaultMovement" @click="submitVaultAbono">Registrar abono</BaseButton>
+      </template>
+    </BaseDialog>
+
+    <BaseDialog v-model="vaultDescargaOpen" title="Descargar desde caja mayor" size="md" @update:model-value="onVaultDescargaToggle">
+      <p class="text-sm text-gray-600 mb-3">
+        El valor vuelve al efectivo en cajón y resta del saldo esperado de «{{ cashVaultBank?.bankName }}».
+        Saldo esperado actual:
+        <span class="font-semibold tabular-nums">{{ formatCurrency(cashVaultBank?.expectedBalance ?? 0) }}</span>
+      </p>
+      <div class="space-y-3">
+        <label class="flex items-center gap-2 text-sm text-gray-800 cursor-pointer">
+          <input v-model="vaultDescargaAll" type="checkbox" class="rounded border-gray-300" />
+          Descargar todo el saldo (dejar en $0 el esperado de caja mayor)
+        </label>
+        <div v-if="!vaultDescargaAll">
+          <label class="text-xs text-gray-500 block mb-1">Monto (COP)</label>
+          <input
+            v-model.number="vaultDescargaAmount"
+            type="number"
+            min="1"
+            step="1000"
+            class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-200"
+          />
+        </div>
+        <div>
+          <label class="text-xs text-gray-500 block mb-1">Nota (opcional)</label>
+          <input
+            v-model="vaultDescargaNote"
+            type="text"
+            maxlength="500"
+            class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-200"
+          />
+        </div>
+      </div>
+      <template #footer>
+        <BaseButton variant="outline" @click="vaultDescargaOpen = false">Cancelar</BaseButton>
+        <BaseButton
+          variant="primary"
+          class="bg-amber-600 hover:bg-amber-700 border-amber-600"
+          :loading="savingVaultMovement"
+          @click="submitVaultDescarga"
+        >
+          Registrar descarga
+        </BaseButton>
+      </template>
+    </BaseDialog>
+
     <BaseDialog
       v-model="deactivateDialogOpen"
       title="Dar de baja préstamo informal"
@@ -406,6 +508,15 @@ const deactivateDialogOpen = ref(false)
 const deactivateNotes = ref('')
 const loanToDeactivate = ref<BranchInformalLoan | null>(null)
 const deactivatingLoan = ref(false)
+
+const vaultAbonoOpen = ref(false)
+const vaultDescargaOpen = ref(false)
+const vaultAbonoAmount = ref<number>(0)
+const vaultAbonoNote = ref('')
+const vaultDescargaAmount = ref<number>(0)
+const vaultDescargaAll = ref(false)
+const vaultDescargaNote = ref('')
+const savingVaultMovement = ref(false)
 
 const bankReconciliations = ref<
   Array<CloseBankReconciliationDto & { bankName: string }>
@@ -555,6 +666,11 @@ const canSave = computed(
     bankReconciliations.value.length > 0
 )
 
+const cashVaultBank = computed(() => {
+  const b = expected.value?.banks.find((x) => x.bankType === 'cash_vault')
+  return b ?? null
+})
+
 const saveBlockReason = computed(() => {
   const n = undeliveredCount.value
   if (n > 0) {
@@ -666,6 +782,88 @@ function onDeactivateDialogToggle(open: boolean) {
   if (!open) {
     loanToDeactivate.value = null
     deactivateNotes.value = ''
+  }
+}
+
+function openVaultAbono() {
+  vaultAbonoAmount.value = 0
+  vaultAbonoNote.value = ''
+  vaultAbonoOpen.value = true
+}
+
+function onVaultAbonoToggle(open: boolean) {
+  if (!open) {
+    vaultAbonoAmount.value = 0
+    vaultAbonoNote.value = ''
+  }
+}
+
+async function submitVaultAbono() {
+  const n = Number(vaultAbonoAmount.value)
+  if (!Number.isFinite(n) || n <= 0) {
+    toastError('Monto inválido', 'Indica un monto mayor a 0.')
+    return
+  }
+  savingVaultMovement.value = true
+  try {
+    await cashRegisterApi.createCashVaultMovement(
+      {
+        kind: 'abono_to_vault',
+        amount: n,
+        note: vaultAbonoNote.value.trim() || undefined,
+      },
+      authStore.branchId ?? undefined
+    )
+    vaultAbonoOpen.value = false
+    toastSuccess('Abono registrado', 4000)
+    await refreshExpectedPreservingBankActuals()
+  } catch (e: any) {
+    toastError('No se pudo registrar', e.message || 'Error')
+  } finally {
+    savingVaultMovement.value = false
+  }
+}
+
+function openVaultDescarga() {
+  vaultDescargaAmount.value = 0
+  vaultDescargaAll.value = false
+  vaultDescargaNote.value = ''
+  vaultDescargaOpen.value = true
+}
+
+function onVaultDescargaToggle(open: boolean) {
+  if (!open) {
+    vaultDescargaAmount.value = 0
+    vaultDescargaAll.value = false
+    vaultDescargaNote.value = ''
+  }
+}
+
+async function submitVaultDescarga() {
+  const all = vaultDescargaAll.value
+  const n = Number(vaultDescargaAmount.value)
+  if (!all && (!Number.isFinite(n) || n <= 0)) {
+    toastError('Monto inválido', 'Indica un monto o marca «descargar todo».')
+    return
+  }
+  savingVaultMovement.value = true
+  try {
+    await cashRegisterApi.createCashVaultMovement(
+      {
+        kind: 'withdraw_from_vault',
+        amount: all ? undefined : n,
+        withdrawAll: all,
+        note: vaultDescargaNote.value.trim() || undefined,
+      },
+      authStore.branchId ?? undefined
+    )
+    vaultDescargaOpen.value = false
+    toastSuccess('Descarga registrada', 4000)
+    await refreshExpectedPreservingBankActuals()
+  } catch (e: any) {
+    toastError('No se pudo registrar', e.message || 'Error')
+  } finally {
+    savingVaultMovement.value = false
   }
 }
 

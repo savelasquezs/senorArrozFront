@@ -74,6 +74,8 @@ export interface CashClosure {
 export interface BankExpectedBalance {
   bankId: number
   bankName: string
+  /** snake_case desde API: normal | cash_vault | real_vault */
+  bankType?: string
   openingBalance: number
   expectedBalance: number
 }
@@ -88,6 +90,10 @@ export interface CashRegisterExpected {
   advancesBankTransfer: number
   /** Suma de préstamos informales activos; ya restada en expectedCash. */
   informalLoansActiveTotal: number
+  /** Abonos a Caja Mayor Efectivo en el período; ya restados del expectedCash (neto con descargas). */
+  cashVaultAbonosTotal: number
+  /** Descargas desde Caja Mayor Efectivo en el período. */
+  cashVaultDescargasTotal: number
   /** Pedidos sin entregar ni cancelar en la sucursal; si hay alguno no se permite guardar el cuadre. */
   undeliveredOrdersCount: number
   asOf: string
@@ -117,6 +123,28 @@ export interface CreateBranchInformalLoanDto {
 
 export interface DeactivateBranchInformalLoanDto {
   notes?: string | null
+}
+
+/** Movimiento Caja Mayor Efectivo (API enum snake_case). */
+export type CashVaultMovementKind = 'abono_to_vault' | 'withdraw_from_vault'
+
+export interface CreateCashVaultMovementDto {
+  kind: CashVaultMovementKind
+  amount?: number | null
+  withdrawAll?: boolean
+  note?: string | null
+}
+
+export interface CashVaultMovement {
+  id: number
+  branchId: number
+  bankId: number
+  bankName: string
+  kind: CashVaultMovementKind
+  amount: number
+  note?: string | null
+  createdAt: string
+  createdById: number
 }
 
 // ===== DTO PARA ENVIAR CUADRE =====
