@@ -76,7 +76,15 @@
 
 		<p v-if="errorMsg" class="text-sm text-red-600">{{ errorMsg }}</p>
 
-		<template v-if="insights && !loading">
+		<p
+			v-if="refreshing"
+			class="text-xs text-gray-500 flex items-center gap-2 py-1"
+			aria-live="polite">
+			<BaseLoading size="sm" />
+			Actualizando datos del periodo…
+		</p>
+
+		<template v-if="insights">
 			<div v-if="!insights.linkedExpense" class="text-xs text-amber-900 bg-amber-50 border border-amber-100 rounded px-2 py-1.5">
 				Sin gasto de nómina asignado: no hay totales ni líneas hasta vincular un ítem del catálogo.
 			</div>
@@ -153,7 +161,7 @@
 			</template>
 		</template>
 
-		<div v-else-if="loading" class="flex justify-center py-6">
+		<div v-else-if="initialLoading" class="flex justify-center py-6">
 			<BaseLoading size="md" />
 		</div>
 	</div>
@@ -212,7 +220,10 @@ const seriesGranularityLabel = computed(() => {
 	return 'quincena'
 })
 
-const loading = ref(false)
+/** Primera carga sin datos aún: spinner centrado. */
+const initialLoading = ref(false)
+/** Refetch con datos previos visibles: aviso discreto arriba. */
+const refreshing = ref(false)
 const errorMsg = ref('')
 const insights = ref<UserPayrollInsights | null>(null)
 
@@ -300,7 +311,9 @@ function applyPresetMonth() {
 
 async function load() {
 	errorMsg.value = ''
-	loading.value = true
+	const hadData = insights.value != null
+	if (hadData) refreshing.value = true
+	else initialLoading.value = true
 	try {
 		insights.value = await userApi.getPayrollInsights(props.userId, {
 			from: fromStr.value,
@@ -314,9 +327,10 @@ async function load() {
 		const msg = e instanceof Error ? e.message : 'No se pudo cargar el resumen'
 		errorMsg.value = msg
 		error(msg)
-		insights.value = null
+		if (!hadData) insights.value = null
 	} finally {
-		loading.value = false
+		initialLoading.value = false
+		refreshing.value = false
 	}
 }
 
@@ -375,6 +389,7 @@ watch(
 	() => props.userId,
 	() => {
 		editingPayrollLink.value = false
+		insights.value = null
 		applyPresetBiweek()
 	}
 )
