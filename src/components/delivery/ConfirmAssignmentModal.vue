@@ -2,12 +2,7 @@
     <BaseDialog :model-value="isOpen" @update:model-value="$emit('close')" :title="dialogTitle">
         <div v-if="step === 'vueltos'" class="space-y-4">
             <p class="text-gray-700">
-                El día figura como liquidado y estos pedidos incluyen <strong>cobro en efectivo</strong>. Asegúrate de
-                haber pedido <strong>base o devuelta</strong> al cajero o a administración antes de salir, si aún no lo
-                hiciste.
-            </p>
-            <p class="text-sm text-gray-500">
-                Puedes continuar cuando estés listo; la asignación se hará en el siguiente paso.
+                Pide base o devuelta para {{ orders.length === 1 ? 'el pedido' : 'los pedidos' }}.
             </p>
         </div>
 
