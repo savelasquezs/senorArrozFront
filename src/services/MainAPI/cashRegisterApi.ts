@@ -2,9 +2,12 @@
 import { BaseApi } from './baseApi'
 import type { PagedResult } from '@/types/common'
 import type {
+  BranchInformalLoan,
   CashClosure,
   CashRegisterExpected,
   CloseCashRegisterDto,
+  CreateBranchInformalLoanDto,
+  DeactivateBranchInformalLoanDto,
 } from '@/types/cashRegister'
 
 class CashRegisterApi extends BaseApi {
@@ -23,6 +26,28 @@ class CashRegisterApi extends BaseApi {
     const params: Record<string, any> = {}
     if (branchId !== undefined) params.BranchId = branchId
     return this.get<CashRegisterExpected>('/cash-register/expected', { params })
+  }
+
+  async getInformalLoans(branchId?: number, scope: 'active' | 'inactive' | 'all' = 'active'): Promise<BranchInformalLoan[]> {
+    const params: Record<string, any> = { Scope: scope }
+    if (branchId !== undefined) params.BranchId = branchId
+    return this.get<BranchInformalLoan[]>('/cash-register/informal-loans', { params })
+  }
+
+  async createInformalLoan(dto: CreateBranchInformalLoanDto, branchId?: number): Promise<BranchInformalLoan> {
+    const params: Record<string, any> = {}
+    if (branchId !== undefined) params.BranchId = branchId
+    return this.post<BranchInformalLoan>('/cash-register/informal-loans', dto, { params })
+  }
+
+  async deactivateInformalLoan(
+    id: number,
+    dto: DeactivateBranchInformalLoanDto,
+    branchId?: number
+  ): Promise<BranchInformalLoan> {
+    const params: Record<string, any> = {}
+    if (branchId !== undefined) params.BranchId = branchId
+    return this.post<BranchInformalLoan>(`/cash-register/informal-loans/${id}/deactivate`, dto, { params })
   }
 
   async closeCashRegister(dto: CloseCashRegisterDto, branchId?: number): Promise<CashClosure> {

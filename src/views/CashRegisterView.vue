@@ -96,7 +96,8 @@
                   Ventas: {{ formatCurrency(expected.cashFromOrders) }} |
                   Abonos reservas: +{{ formatCurrency(expected.cashDeposits) }} |
                   Gastos: -{{ formatCurrency(expected.cashExpenses) }} |
-                  Abonos domic. (transferencia): -{{ formatCurrency(expected.advancesBankTransfer) }}
+                  Abonos domic. (transferencia): -{{ formatCurrency(expected.advancesBankTransfer) }} |
+                  Prést. informales (activos): {{ formatCurrency(-(expected.informalLoansActiveTotal ?? 0)) }}
                 </p>
               </div>
               <div :class="['rounded-lg p-3 text-center', cashDifference === 0 ? 'bg-green-50' : 'bg-red-50']">
@@ -112,57 +113,108 @@
           </div>
         </div>
 
-        <!-- ===== SECCIÓN 2: PRÉSTAMOS INFORMALES ===== -->
+        <!-- ===== SECCIÓN 2: PRÉSTAMOS INFORMALES (persistidos; afectan el efectivo esperado) ===== -->
         <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
-          <div class="bg-orange-50 border-b border-orange-100 px-6 py-4 flex items-center justify-between">
+          <div class="bg-orange-50 border-b border-orange-100 px-6 py-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div class="flex items-center gap-3">
               <ClockIcon class="w-5 h-5 text-orange-600" />
-              <h2 class="text-lg font-semibold text-gray-800">Préstamos Informales</h2>
+              <h2 class="text-lg font-semibold text-gray-800">Préstamos informales</h2>
             </div>
-            <BaseButton variant="outline" size="sm" @click="addLoan">
-              <PlusIcon class="w-4 h-4 mr-1" /> Agregar
-            </BaseButton>
+            <div class="flex rounded-lg border border-orange-200/80 bg-white/80 p-0.5 text-sm">
+              <button
+                type="button"
+                :class="[
+                  'px-3 py-1.5 rounded-md font-medium transition-colors',
+                  loansTab === 'active' ? 'bg-orange-500 text-white shadow-sm' : 'text-gray-600 hover:bg-orange-50',
+                ]"
+                @click="loansTab = 'active'"
+              >
+                Activos
+              </button>
+              <button
+                type="button"
+                :class="[
+                  'px-3 py-1.5 rounded-md font-medium transition-colors',
+                  loansTab === 'inactive' ? 'bg-orange-500 text-white shadow-sm' : 'text-gray-600 hover:bg-orange-50',
+                ]"
+                @click="loansTab = 'inactive'"
+              >
+                Inactivos
+              </button>
+            </div>
           </div>
 
           <div class="p-6">
             <p class="text-sm text-gray-500 mb-4">
-              Dinero que salió de caja pero se espera que regrese (ej: domiciliario en ruta al cierre).
+              Se guardan al instante (no hace falta cerrar caja). La suma de los activos se resta del efectivo esperado arriba.
             </p>
 
-            <div v-if="informalLoans.length === 0" class="text-center py-6 text-gray-400 text-sm">
-              Sin préstamos informales registrados
-            </div>
+            <div v-if="informalLoansLoading" class="text-center py-8 text-gray-500 text-sm">Cargando…</div>
 
-            <div v-else class="space-y-2">
-              <div
-                v-for="(loan, idx) in informalLoans"
-                :key="idx"
-                class="flex items-center gap-3 p-3 bg-gray-50 rounded-lg"
-              >
-                <input
-                  v-model="loan.concept"
-                  type="text"
-                  placeholder="Concepto"
-                  class="flex-1 border border-gray-300 rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-orange-300"
-                />
-                <input
-                  v-model.number="loan.amount"
-                  type="number"
-                  min="0"
-                  placeholder="Monto"
-                  class="w-32 border border-gray-300 rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-orange-300"
-                />
-                <button @click="removeLoan(idx)" class="text-red-400 hover:text-red-600">
-                  <TrashIcon class="w-4 h-4" />
-                </button>
+            <template v-else>
+              <div v-if="branchInformalLoans.length === 0" class="text-center py-6 text-gray-400 text-sm">
+                {{ loansTab === 'active' ? 'Sin préstamos activos' : 'Sin préstamos dados de baja' }}
               </div>
-            </div>
 
-            <div v-if="informalLoans.length > 0" class="mt-3 flex justify-end">
-              <span class="text-sm font-medium text-gray-700">
-                Total: {{ formatCurrency(totalLoans) }}
-              </span>
-            </div>
+              <div v-else class="space-y-2">
+                <div
+                  v-for="loan in branchInformalLoans"
+                  :key="loan.id"
+                  class="flex flex-col gap-2 p-3 bg-gray-50 rounded-lg sm:flex-row sm:items-center sm:gap-3"
+                >
+                  <div class="flex-1 min-w-0">
+                    <p class="text-sm font-medium text-gray-900">{{ loan.concept }}</p>
+                    <p class="text-xs text-gray-500 tabular-nums">{{ formatCurrency(loan.amount) }}</p>
+                    <p v-if="loansTab === 'inactive' && loan.deactivatedAt" class="text-xs text-gray-400 mt-1">
+                      Baja: {{ formatDate(loan.deactivatedAt) }}
+                      <span v-if="loan.deactivatedByName"> · {{ loan.deactivatedByName }}</span>
+                    </p>
+                    <p v-if="loansTab === 'inactive' && loan.deactivationNotes" class="text-xs text-gray-500 mt-0.5 italic">
+                      {{ loan.deactivationNotes }}
+                    </p>
+                  </div>
+                  <div v-if="loansTab === 'active'" class="shrink-0">
+                    <BaseButton variant="outline" size="sm" class="text-red-700 border-red-200" @click="openDeactivateLoan(loan)">
+                      Dar de baja
+                    </BaseButton>
+                  </div>
+                </div>
+              </div>
+
+              <div v-if="loansTab === 'active' && branchInformalLoans.length > 0" class="mt-3 flex justify-end">
+                <span class="text-sm font-medium text-gray-700">
+                  Total activos: {{ formatCurrency(totalActiveLoans) }}
+                </span>
+              </div>
+
+              <div v-if="loansTab === 'active'" class="mt-6 pt-4 border-t border-gray-100">
+                <p class="text-xs font-semibold text-gray-600 uppercase tracking-wide mb-2">Registrar préstamo</p>
+                <div class="flex flex-col gap-3 sm:flex-row sm:items-end">
+                  <div class="flex-1">
+                    <label class="text-xs text-gray-500 block mb-1">Concepto</label>
+                    <input
+                      v-model="newLoanConcept"
+                      type="text"
+                      placeholder="Ej. Domiciliario ruta noche"
+                      class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-300"
+                    />
+                  </div>
+                  <div class="w-full sm:w-40">
+                    <label class="text-xs text-gray-500 block mb-1">Monto (COP)</label>
+                    <input
+                      v-model.number="newLoanAmount"
+                      type="number"
+                      step="1000"
+                      placeholder="0"
+                      class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-300"
+                    />
+                  </div>
+                  <BaseButton variant="primary" class="shrink-0" :loading="savingLoan" @click="submitNewLoan">
+                    <PlusIcon class="w-4 h-4 mr-1" /> Registrar
+                  </BaseButton>
+                </div>
+              </div>
+            </template>
           </div>
         </div>
 
@@ -276,13 +328,38 @@
       v-model="showHistoryModal"
       :branch-id="authStore.branchId"
     />
+
+    <BaseDialog
+      v-model="deactivateDialogOpen"
+      title="Dar de baja préstamo informal"
+      size="md"
+      @update:model-value="onDeactivateDialogToggle"
+    >
+      <p class="text-sm text-gray-600 mb-3">
+        Opcional: nota interna (quién devolvió, acuerdo, etc.).
+      </p>
+      <textarea
+        v-model="deactivateNotes"
+        rows="3"
+        maxlength="500"
+        placeholder="Nota (opcional)"
+        class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-300"
+      />
+      <template #footer>
+        <BaseButton variant="outline" @click="deactivateDialogOpen = false">Cancelar</BaseButton>
+        <BaseButton variant="primary" :loading="deactivatingLoan" @click="confirmDeactivateLoan">
+          Confirmar baja
+        </BaseButton>
+      </template>
+    </BaseDialog>
   </MainLayout>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
+import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import MainLayout from '@/components/layout/MainLayout.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
+import BaseDialog from '@/components/ui/BaseDialog.vue'
 import CashClosureHistoryModal from '@/components/cashRegister/CashClosureHistoryModal.vue'
 import BankMovementsPanel from '@/components/payments/banks/BankMovementsPanel.vue'
 import { useAuthStore } from '@/store/auth'
@@ -293,17 +370,12 @@ import {
   BuildingLibraryIcon,
   ClockIcon,
   PlusIcon,
-  TrashIcon,
   CheckCircleIcon,
   ExclamationCircleIcon,
 } from '@heroicons/vue/24/outline'
 import { cashRegisterApi } from '@/services/MainAPI/cashRegisterApi'
 import { useToast } from '@/composables/useToast'
-import type {
-  CashRegisterExpected,
-  CloseBankReconciliationDto,
-  CloseInformalLoanDto,
-} from '@/types/cashRegister'
+import type { BranchInformalLoan, CashRegisterExpected, CloseBankReconciliationDto } from '@/types/cashRegister'
 import { DENOMINATIONS } from '@/types/cashRegister'
 
 const authStore = useAuthStore()
@@ -324,7 +396,16 @@ const expected = ref<CashRegisterExpected | null>(null)
 const denominationCounts = ref<Record<number, number>>(emptyDenominationCounts())
 const closingCash = ref(0)
 
-const informalLoans = ref<CloseInformalLoanDto[]>([])
+const loansTab = ref<'active' | 'inactive'>('active')
+const branchInformalLoans = ref<BranchInformalLoan[]>([])
+const informalLoansLoading = ref(false)
+const newLoanConcept = ref('')
+const newLoanAmount = ref<number>(0)
+const savingLoan = ref(false)
+const deactivateDialogOpen = ref(false)
+const deactivateNotes = ref('')
+const loanToDeactivate = ref<BranchInformalLoan | null>(null)
+const deactivatingLoan = ref(false)
 
 const bankReconciliations = ref<
   Array<CloseBankReconciliationDto & { bankName: string }>
@@ -456,7 +537,9 @@ function onDenominationBlur(denom: number) {
 // ===== COMPUTED =====
 const cashDifference = computed(() => closingCash.value - (expected.value?.expectedCash ?? 0))
 
-const totalLoans = computed(() => informalLoans.value.reduce((sum, l) => sum + (l.amount || 0), 0))
+const totalActiveLoans = computed(() =>
+  branchInformalLoans.value.reduce((sum, l) => sum + (l.amount || 0), 0)
+)
 
 const allBanksCuadred = computed(() =>
   bankReconciliations.value.every((r) => r.actualBalance - r.expectedBalance === 0)
@@ -522,12 +605,90 @@ function recalcClosingCash() {
   )
 }
 
-function addLoan() {
-  informalLoans.value.push({ concept: '', amount: 0 })
+async function refreshExpectedPreservingBankActuals() {
+  const branchId = authStore.branchId ?? undefined
+  const exp = await cashRegisterApi.getExpected(branchId)
+  expected.value = exp
+  for (const b of exp.banks) {
+    const row = bankReconciliations.value.find((r) => r.bankId === b.bankId)
+    if (row) row.expectedBalance = b.expectedBalance
+  }
 }
 
-function removeLoan(idx: number) {
-  informalLoans.value.splice(idx, 1)
+async function loadBranchInformalLoans() {
+  informalLoansLoading.value = true
+  try {
+    const scope = loansTab.value === 'inactive' ? 'inactive' : 'active'
+    branchInformalLoans.value = await cashRegisterApi.getInformalLoans(authStore.branchId ?? undefined, scope)
+  } catch (e) {
+    console.error('Error cargando préstamos informales:', e)
+    branchInformalLoans.value = []
+  } finally {
+    informalLoansLoading.value = false
+  }
+}
+
+watch(loansTab, () => {
+  void loadBranchInformalLoans()
+})
+
+async function submitNewLoan() {
+  const c = newLoanConcept.value.trim()
+  if (!c) {
+    toastError('Concepto obligatorio', 'Escribe un concepto para el préstamo.')
+    return
+  }
+  savingLoan.value = true
+  try {
+    await cashRegisterApi.createInformalLoan(
+      { concept: c, amount: Number(newLoanAmount.value) || 0 },
+      authStore.branchId ?? undefined
+    )
+    newLoanConcept.value = ''
+    newLoanAmount.value = 0
+    toastSuccess('Préstamo registrado', 4000)
+    await refreshExpectedPreservingBankActuals()
+    await loadBranchInformalLoans()
+  } catch (e: any) {
+    toastError('No se pudo registrar', e.message || 'Error')
+  } finally {
+    savingLoan.value = false
+  }
+}
+
+function openDeactivateLoan(loan: BranchInformalLoan) {
+  loanToDeactivate.value = loan
+  deactivateNotes.value = ''
+  deactivateDialogOpen.value = true
+}
+
+function onDeactivateDialogToggle(open: boolean) {
+  if (!open) {
+    loanToDeactivate.value = null
+    deactivateNotes.value = ''
+  }
+}
+
+async function confirmDeactivateLoan() {
+  const loan = loanToDeactivate.value
+  if (!loan) return
+  deactivatingLoan.value = true
+  try {
+    await cashRegisterApi.deactivateInformalLoan(
+      loan.id,
+      { notes: deactivateNotes.value.trim() || undefined },
+      authStore.branchId ?? undefined
+    )
+    deactivateDialogOpen.value = false
+    loanToDeactivate.value = null
+    toastSuccess('Préstamo dado de baja', 4000)
+    await refreshExpectedPreservingBankActuals()
+    await loadBranchInformalLoans()
+  } catch (e: any) {
+    toastError('No se pudo dar de baja', e.message || 'Error')
+  } finally {
+    deactivatingLoan.value = false
+  }
 }
 
 async function loadData() {
@@ -547,6 +708,7 @@ async function loadData() {
     }))
 
     hydrateDenominationDraft(expected.value)
+    await loadBranchInformalLoans()
   } catch (e: any) {
     console.error('Error cargando datos del cuadre:', e)
   } finally {
@@ -576,7 +738,6 @@ async function saveClosure() {
         actualBalance,
         adjustments,
       })),
-      informalLoans: informalLoans.value.filter((l) => l.concept && l.amount > 0),
     }
 
     await cashRegisterApi.closeCashRegister(dto, authStore.branchId ?? undefined)
@@ -584,7 +745,6 @@ async function saveClosure() {
     clearDenominationDraft()
     denominationCounts.value = emptyDenominationCounts()
     closingCash.value = 0
-    informalLoans.value = []
     await loadData()
   } catch (e: any) {
     toastError('No se pudo guardar el cuadre', e.message || 'Error desconocido')

@@ -159,6 +159,9 @@
 
             <div>
               <h4 class="text-sm font-semibold text-gray-800 mb-2">Préstamos informales</h4>
+              <p class="text-xs text-gray-500 mb-2">
+                Solo cuadres antiguos pueden mostrar un respaldo por cierre; los nuevos se gestionan en la vista de caja.
+              </p>
               <div v-if="!selected.informalLoans?.length" class="text-sm text-gray-400">Ninguno</div>
               <div v-else class="overflow-x-auto rounded-lg border border-gray-100">
                 <table class="min-w-full text-sm">

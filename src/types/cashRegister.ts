@@ -86,11 +86,37 @@ export interface CashRegisterExpected {
   cashExpenses: number
   /** Abonos domiciliario por transferencia: restados del efectivo esperado (cuadran en banco). */
   advancesBankTransfer: number
+  /** Suma de préstamos informales activos; ya restada en expectedCash. */
+  informalLoansActiveTotal: number
   /** Pedidos sin entregar ni cancelar en la sucursal; si hay alguno no se permite guardar el cuadre. */
   undeliveredOrdersCount: number
   asOf: string
   lastClosureAt?: string
   banks: BankExpectedBalance[]
+}
+
+/** Préstamo informal por sucursal (tabla branch_informal_loan). */
+export interface BranchInformalLoan {
+  id: number
+  branchId: number
+  concept: string
+  amount: number
+  createdAt: string
+  createdById: number
+  createdByName: string
+  deactivatedAt?: string | null
+  deactivatedById?: number | null
+  deactivatedByName?: string | null
+  deactivationNotes?: string | null
+}
+
+export interface CreateBranchInformalLoanDto {
+  concept: string
+  amount: number
+}
+
+export interface DeactivateBranchInformalLoanDto {
+  notes?: string | null
 }
 
 // ===== DTO PARA ENVIAR CUADRE =====
@@ -101,15 +127,9 @@ export interface CloseBankReconciliationDto {
   adjustments: string
 }
 
-export interface CloseInformalLoanDto {
-  concept: string
-  amount: number
-}
-
 export interface CloseCashRegisterDto {
   closedAt: string
   denominationCounts: string
   closingCash: number
   bankReconciliations: CloseBankReconciliationDto[]
-  informalLoans: CloseInformalLoanDto[]
 }
