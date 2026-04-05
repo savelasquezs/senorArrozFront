@@ -106,11 +106,6 @@
                 <ShoppingBagIcon class="w-3 h-3 sm:w-3.5 sm:h-3.5 md:w-4 md:h-4 text-gray-500 flex-shrink-0" />
                 <span class="text-gray-700">{{ totalItems }} {{ totalItems === 1 ? 'item' : 'items' }}</span>
             </div>
-
-            <p v-if="order.total != null && vueltosHint"
-                class="text-[10px] sm:text-xs text-indigo-700 leading-snug mt-1 border-t border-indigo-100 pt-1">
-                {{ vueltosHint }}
-            </p>
         </div>
     </div>
 </template>
@@ -119,7 +114,6 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import type { OrderListItem, OrderDetailItem } from '@/types/order'
 import { KitchenService } from '@/services/domain/KitchenService'
-import { formatVueltosHint } from '@/composables/useSuggestedVueltos'
 import { ClockIcon, HomeIcon, TruckIcon, CalendarIcon, CheckIcon, MapPinIcon, ShoppingBagIcon, UserIcon } from '@heroicons/vue/24/outline'
 import BaseBadge from '@/components/ui/BaseBadge.vue'
 
@@ -192,12 +186,6 @@ const deliveryRecipientName = computed(() => {
     const n = (props.order.customerName?.trim() || props.order.guestName?.trim()) ?? ''
     return n
 })
-
-const vueltosHint = computed(() =>
-    props.variant === 'delivery' && props.order.total != null
-        ? formatVueltosHint(props.order.total)
-        : ''
-)
 
 const getStatusVariant = () => {
     if (props.order.status === 'taken') return 'warning'
