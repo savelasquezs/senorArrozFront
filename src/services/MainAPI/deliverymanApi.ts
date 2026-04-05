@@ -33,7 +33,21 @@ export interface DeliverymanWithOrdersTodayItem {
     currentBalance: number
 }
 
+/** GET /deliverymen/me/day-state (rol Deliveryman) */
+export interface MyDeliverymanDayStateDto {
+    dayBlocked: boolean
+}
+
 class DeliverymanApi extends BaseApi {
+    /**
+     * Estado mínimo del día para el domiciliario autenticado (p. ej. día bloqueado tras liquidación).
+     */
+    async getMyDayState(date?: string): Promise<MyDeliverymanDayStateDto> {
+        return this.get<MyDeliverymanDayStateDto>('/deliverymen/me/day-state', {
+            params: date ? { date } : undefined,
+        })
+    }
+
     /**
      * Resumen completo del día: domiciliarios con stats + abonos.
      */

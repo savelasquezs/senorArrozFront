@@ -2,6 +2,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { orderApi } from '@/services/MainAPI/orderApi'
+import { deliverymanApi } from '@/services/MainAPI/deliverymanApi'
 import type {
     DeliverymanHistoryBranchSummary,
     DeliverymanHistoryNeighborhood,
@@ -54,6 +55,9 @@ export const useDeliveryStore = defineStore('delivery', () => {
 
     const isLoading = ref(false)
     const error = ref<string | null>(null)
+
+    /** Día bloqueado (liquidación total) según API; solo aplica a domiciliario. */
+    const myDayBlocked = ref(false)
 
     // ===== Acciones =====
 
@@ -196,6 +200,15 @@ export const useDeliveryStore = defineStore('delivery', () => {
     }
 
     /** Sin rango de fechas: incluye pedidos en ruta aunque CreatedAt sea de otro día */
+    const loadMyDayState = async () => {
+        try {
+            const r = await deliverymanApi.getMyDayState()
+            myDayBlocked.value = r.dayBlocked
+        } catch {
+            myDayBlocked.value = false
+        }
+    }
+
     const loadRouteAssignedOrders = async (deliveryManId: number) => {
         isLoading.value = true
         error.value = null
@@ -268,6 +281,7 @@ export const useDeliveryStore = defineStore('delivery', () => {
         historyFromDate.value = localDateString()
         historyToDate.value = localDateString()
         error.value = null
+        myDayBlocked.value = false
     }
 
     // Pedidos en camino (lista sin filtro de fecha)
@@ -296,8 +310,10 @@ export const useDeliveryStore = defineStore('delivery', () => {
         routeAssignedOrders,
         isLoading,
         error,
+        myDayBlocked,
 
         // Acciones
+        loadMyDayState,
         loadAvailableOrders,
         loadPreparationOrders,
         loadHistory,

@@ -1,6 +1,17 @@
 <template>
-    <BaseDialog :model-value="isOpen" @update:model-value="$emit('close')" title="Confirmar asignación">
-        <div class="space-y-4">
+    <BaseDialog :model-value="isOpen" @update:model-value="$emit('close')" :title="dialogTitle">
+        <div v-if="step === 'vueltos'" class="space-y-4">
+            <p class="text-gray-700">
+                El día figura como liquidado y estos pedidos incluyen <strong>cobro en efectivo</strong>. Asegúrate de
+                haber pedido <strong>base o devuelta</strong> al cajero o a administración antes de salir, si aún no lo
+                hiciste.
+            </p>
+            <p class="text-sm text-gray-500">
+                Puedes continuar cuando estés listo; la asignación se hará en el siguiente paso.
+            </p>
+        </div>
+
+        <div v-else class="space-y-4">
             <p class="text-gray-700">Ingresa tu contraseña para confirmar la asignación de los siguientes pedidos:</p>
 
             <div class="bg-gray-50 rounded-lg p-4 max-h-96 overflow-y-auto">
@@ -41,22 +52,33 @@
 
         <template #footer>
             <div class="flex gap-3 justify-end">
-                <BaseButton @click="$emit('close')" variant="outline" :disabled="isLoading">
-                    Cancelar
-                </BaseButton>
-                <BaseButton @click="handleConfirm" variant="primary" :loading="isLoading">
-                    Confirmar asignación
-                </BaseButton>
+                <template v-if="step === 'vueltos'">
+                    <BaseButton @click="$emit('close')" variant="outline">
+                        Cancelar
+                    </BaseButton>
+                    <BaseButton @click="goToConfirmStep" variant="primary">
+                        Continuar
+                    </BaseButton>
+                </template>
+                <template v-else>
+                    <BaseButton @click="$emit('close')" variant="outline" :disabled="isLoading">
+                        Cancelar
+                    </BaseButton>
+                    <BaseButton @click="handleConfirm" variant="primary" :loading="isLoading">
+                        Confirmar asignación
+                    </BaseButton>
+                </template>
             </div>
         </template>
     </BaseDialog>
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, computed, watch } from 'vue'
 import type { OrderListItem } from '@/types/order'
 import { useDeliveryStore } from '@/store/delivery'
 import { useToast } from '@/composables/useToast'
+import { sumOrdersCashPortion } from '@/utils/orderCashPortion'
 import BaseDialog from '@/components/ui/BaseDialog.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import PasswordInput from '@/components/ui/PasswordInput.vue'
@@ -65,6 +87,10 @@ import BaseBadge from '@/components/ui/BaseBadge.vue'
 interface Props {
     isOpen: boolean
     orders: OrderListItem[]
+    /** Día bloqueado tras liquidación total (API me/day-state). */
+    dayBlocked: boolean
+    /** Si ya tiene pedidos en camino, no se muestra el aviso de vueltos. */
+    hasOnTheWay: boolean
 }
 
 const props = defineProps<Props>()
@@ -78,6 +104,35 @@ const isLoading = ref(false)
 const password = ref('')
 const passwordError = ref('')
 const assignmentError = ref('')
+const step = ref<'vueltos' | 'confirm'>('confirm')
+
+const needsVueltosStep = computed(
+    () =>
+        props.dayBlocked &&
+        !props.hasOnTheWay &&
+        props.orders.length > 0 &&
+        sumOrdersCashPortion(props.orders) > 0,
+)
+
+const dialogTitle = computed(() =>
+    step.value === 'vueltos' ? 'Efectivo para vueltos' : 'Confirmar asignación',
+)
+
+watch(
+    () => props.isOpen,
+    (open) => {
+        if (open) {
+            step.value = needsVueltosStep.value ? 'vueltos' : 'confirm'
+            password.value = ''
+            passwordError.value = ''
+            assignmentError.value = ''
+        }
+    },
+)
+
+const goToConfirmStep = () => {
+    step.value = 'confirm'
+}
 
 const handleConfirm = async () => {
     passwordError.value = ''
@@ -91,18 +146,16 @@ const handleConfirm = async () => {
     try {
         isLoading.value = true
 
-        const orderIds = props.orders.map(o => o.id)
+        const orderIds = props.orders.map((o) => o.id)
         const assigned = await deliveryStore.assignOrders(orderIds, password.value)
 
-        // Placeholder de impresión
-        console.log('TODO: Imprimir facturas para pedidos:', assigned.map(o => o.id))
+        console.log('TODO: Imprimir facturas para pedidos:', assigned.map((o) => o.id))
 
         success(`${assigned.length} pedido(s) asignado(s) correctamente`, 5000)
 
         emit('assigned')
         emit('close')
 
-        // Limpiar password
         password.value = ''
     } catch (err: any) {
         const msg = err.message || 'Error al asignar pedidos'

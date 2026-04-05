@@ -261,6 +261,8 @@
         <ConfirmAssignmentModal
             :is-open="showConfirmModal"
             :orders="ordersToAssign"
+            :day-blocked="authStore.isDeliveryman ? deliveryStore.myDayBlocked : false"
+            :has-on-the-way="authStore.isDeliveryman && deliveryStore.ordersOnTheWay.length > 0"
             @close="closeConfirmModal"
             @assigned="handleAssigned"
         />
@@ -461,8 +463,11 @@ const handleOrderModifiedSignalR = async (payload: any) => {
 
 // ─── Asignación ───────────────────────────────────────────────
 
-const handleAssign = (orderIds: number[]) => {
+const handleAssign = async (orderIds: number[]) => {
     ordersToAssign.value = deliveryStore.availableOrders.filter((o: OrderListItem) => orderIds.includes(o.id))
+    if (authStore.isDeliveryman && authStore.user?.id) {
+        await Promise.all([deliveryStore.loadMyDayState(), loadRouteAssigned()])
+    }
     showConfirmModal.value = true
 }
 
@@ -470,6 +475,9 @@ const handleAssigned = async () => {
     await loadAvailableOrders()
     cardGridRef.value?.clearSelection()
     if (authStore.user?.id) {
+        if (authStore.isDeliveryman) {
+            await deliveryStore.loadMyDayState()
+        }
         await loadRouteAssigned()
         if (showHistoryModal.value) {
             await loadHistoryModal()
