@@ -85,7 +85,7 @@ export const useOrdersDraftsStore = defineStore('ordersDrafts', () => {
             itemCount: order.orderItems.length,
             total: order.total,
             type: order.type,
-            customerName: order.customerName || undefined,
+            guestName: order.guestName || undefined,
             isActive: order.tabId === currentTabId.value
         }))
     })

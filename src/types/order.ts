@@ -142,7 +142,8 @@ export interface OrderTab {
     itemCount: number
     total: number
     type: OrderType
-    customerName?: string
+    /** Nombre de quien recibe (incl. sync con cliente registrado); etiqueta de pestaña prioritaria. */
+    guestName?: string
     isActive: boolean
 }
 

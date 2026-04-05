@@ -5,8 +5,8 @@
             <div v-for="tab in orderTabs" :key="tab.tabId" class="tab-item" :class="{
                 'active': tab.isActive,
                 'has-items': tab.itemCount > 0
-            }" @click="switchTab(tab.tabId)">
-                <span class="tab-number">{{ getTabNumber(tab.tabName) }}</span>
+            }" :title="tabTitle(tab)" @click="switchTab(tab.tabId)">
+                <span class="tab-label">{{ tabLabel(tab) }}</span>
                 <BaseButton @click.stop="closeTab(tab.tabId)" variant="ghost" size="sm" class="close-button"
                     title="Cerrar pedido">
                     <XMarkIcon class="w-3 h-3" />
@@ -36,6 +36,9 @@ import {
     XMarkIcon
 } from '@heroicons/vue/24/outline'
 
+import type { OrderTab } from '@/types/order'
+import { orderTabSidebarLabel } from '@/utils/orderTabLabel'
+
 // Composables
 const ordersStore = useOrdersDraftsStore()
 const orderTabsComposable = useOrderTabs()
@@ -44,11 +47,19 @@ const orderTabsComposable = useOrderTabs()
 const orderTabs = computed(() => ordersStore.orderTabs)
 const canAddNewTab = computed(() => ordersStore.canAddNewTab)
 
-// Methods
-const getTabNumber = (tabName: string) => {
-    // Extraer el número del nombre del tab (ej: "Pedido #001" -> "001")
-    const match = tabName.match(/#(\d+)/)
-    return match ? match[1] : tabName
+function tabLabel(tab: OrderTab): string {
+    return orderTabSidebarLabel(tab.guestName, tab.tabId).label
+}
+
+function tabTitle(tab: OrderTab): string {
+    return orderTabSidebarLabel(tab.guestName, tab.tabId).title
+}
+
+function closeConfirmPhrase(tabId: string): string {
+    const order = ordersStore.draftOrders.get(tabId)
+    if (!order) return 'este pedido'
+    const { title } = orderTabSidebarLabel(order.guestName, order.tabId)
+    return `"${title}"`
 }
 
 const createNewTab = () => {
@@ -63,7 +74,9 @@ const closeTab = (tabId: string) => {
     // Verificar si hay items en la orden
     const order = ordersStore.draftOrders.get(tabId)
     if (order && order.orderItems.length > 0) {
-        const confirmed = confirm(`¿Estás seguro de que quieres cerrar "${order.tabName}"? Se perderán todos los productos (${order.orderItems.length}) del pedido.`)
+        const confirmed = confirm(
+            `¿Estás seguro de que quieres cerrar ${closeConfirmPhrase(tabId)}? Se perderán todos los productos (${order.orderItems.length}) del pedido.`
+        )
         if (!confirmed) return
     }
 
@@ -122,12 +135,16 @@ const closeTab = (tabId: string) => {
     color: white;
 }
 
-.tab-number {
+.tab-label {
     font-size: 0.75rem;
     font-weight: 600;
-    font-family: monospace;
-    min-width: 2rem;
-    text-align: center;
+    min-width: 0;
+    max-width: 7.5rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    text-align: left;
+    font-variant-numeric: tabular-nums;
 }
 
 .close-button {
