@@ -278,6 +278,9 @@ export interface OrderDetailItem {
     id: number
     orderId: number
     productId: number
+    /** Categoría del producto (API: primera línea para agrupar en cocina). */
+    productCategoryId?: number | null
+    productCategoryName?: string | null
     productName: string
     productDescription: string | null
     quantity: number

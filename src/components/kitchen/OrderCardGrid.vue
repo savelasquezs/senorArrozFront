@@ -41,10 +41,16 @@
                 <span class="w-2.5 h-2.5 sm:w-3 sm:h-3 bg-yellow-400 rounded-full flex-shrink-0"></span>
                 <span>Tomado ({{ takenOrders.length }})</span>
             </h3>
-            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
-                <OrderCard v-for="order in takenOrders" :key="order.id" :order="order"
-                    :order-items="getOrderItems(order.id)" :is-selected="selectedOrders.has(order.id)"
-                    :selectable="showStatusActions" @toggle-select="toggleSelect" />
+            <div v-for="group in takenOrdersGrouped" :key="`taken-${group.label}`" class="mb-5 sm:mb-6 last:mb-0">
+                <h4 class="text-sm sm:text-base font-medium text-gray-700 mb-2 sm:mb-3 border-b border-gray-200 pb-1">
+                    {{ group.label }}
+                    <span class="text-gray-500 font-normal">({{ group.orders.length }})</span>
+                </h4>
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
+                    <OrderCard v-for="order in group.orders" :key="order.id" :order="order"
+                        :order-items="getOrderItems(order.id)" :is-selected="selectedOrders.has(order.id)"
+                        :selectable="showStatusActions" @toggle-select="toggleSelect" />
+                </div>
             </div>
         </div>
 
@@ -53,10 +59,16 @@
                 <span class="w-2.5 h-2.5 sm:w-3 sm:h-3 bg-blue-400 rounded-full flex-shrink-0"></span>
                 <span>En Preparación ({{ inPreparationOrders.length }})</span>
             </h3>
-            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
-                <OrderCard v-for="order in inPreparationOrders" :key="order.id" :order="order"
-                    :order-items="getOrderItems(order.id)" :is-selected="selectedOrders.has(order.id)"
-                    :selectable="showStatusActions" @toggle-select="toggleSelect" />
+            <div v-for="group in inPreparationOrdersGrouped" :key="`prep-${group.label}`" class="mb-5 sm:mb-6 last:mb-0">
+                <h4 class="text-sm sm:text-base font-medium text-gray-700 mb-2 sm:mb-3 border-b border-gray-200 pb-1">
+                    {{ group.label }}
+                    <span class="text-gray-500 font-normal">({{ group.orders.length }})</span>
+                </h4>
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
+                    <OrderCard v-for="order in group.orders" :key="order.id" :order="order"
+                        :order-items="getOrderItems(order.id)" :is-selected="selectedOrders.has(order.id)"
+                        :selectable="showStatusActions" @toggle-select="toggleSelect" />
+                </div>
             </div>
         </div>
 
@@ -90,9 +102,39 @@ const emit = defineEmits<{ 'change-status': [orderIds: number[], newStatus: Orde
 const { canChangeStatus } = useOrderPermissions()
 const selectedOrders = ref(new Set<number>())
 
+const SIN_CATEGORIA = 'Sin categoría'
+
 const takenOrders = computed(() => props.orders.filter(o => o.status === 'taken'))
 const inPreparationOrders = computed(() => props.orders.filter(o => o.status === 'in_preparation'))
 const allOrders = computed(() => props.orders)
+
+/** Categoría del primer ítem del pedido (por id de línea), para subagrupar en cocina. */
+const firstLineCategoryLabel = (orderId: number): string => {
+    const items = props.orderItemsMap.get(orderId) ?? []
+    if (items.length === 0) return SIN_CATEGORIA
+    const first = [...items].sort((a, b) => a.id - b.id)[0]
+    const name = first.productCategoryName?.trim()
+    return name || SIN_CATEGORIA
+}
+
+const groupOrdersByFirstLineCategory = (orders: OrderListItem[]): { label: string; orders: OrderListItem[] }[] => {
+    const map = new Map<string, OrderListItem[]>()
+    for (const o of orders) {
+        const label = firstLineCategoryLabel(o.id)
+        if (!map.has(label)) map.set(label, [])
+        map.get(label)!.push(o)
+    }
+    const rows = [...map.entries()].map(([label, list]) => ({ label, orders: list }))
+    rows.sort((a, b) => {
+        if (a.label === SIN_CATEGORIA && b.label !== SIN_CATEGORIA) return 1
+        if (b.label === SIN_CATEGORIA && a.label !== SIN_CATEGORIA) return -1
+        return a.label.localeCompare(b.label, 'es', { sensitivity: 'base' })
+    })
+    return rows
+}
+
+const takenOrdersGrouped = computed(() => groupOrdersByFirstLineCategory(takenOrders.value))
+const inPreparationOrdersGrouped = computed(() => groupOrdersByFirstLineCategory(inPreparationOrders.value))
 
 const toggleSelect = (orderId: number) => {
     if (selectedOrders.value.has(orderId)) {
