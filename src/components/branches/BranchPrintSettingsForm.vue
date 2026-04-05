@@ -239,6 +239,7 @@ const paperWidthOptions = [
 const logoPreviewSrc = computed(() => {
     const p = props.initial?.receiptLogoPath
     if (!p) return ''
+    if (/^https?:\/\//i.test(p)) return p
     const origin = apiStaticOrigin()
     return origin + (p.startsWith('/') ? p : '/' + p)
 })
