@@ -4,6 +4,50 @@
  * Funciones puras sin estado - solo lógica de formateo
  */
 
+import type { OrderStatus } from '@/types/order'
+
+/** Clave en `statusTimes` del backend (C# guarda `InPreparation` → `inpreparation`). */
+export const orderStatusToStatusTimesKey = (status: OrderStatus): string => {
+    if (status === 'in_preparation') return 'inpreparation'
+    if (status === 'on_the_way') return 'ontheway'
+    return status
+}
+
+/** ISO del momento en que el pedido entró al estado actual, si existe en el mapa. */
+export const getStatusTimeFromRecord = (
+    statusTimes: Record<string, string> | undefined,
+    status: OrderStatus
+): string | undefined => {
+    if (!statusTimes) return undefined
+    const key = orderStatusToStatusTimesKey(status)
+    return statusTimes[key] ?? statusTimes[status]
+}
+
+/**
+ * Cuánto tiempo lleva en el estado actual: "hace 20 min", "hace 2 horas 30 min".
+ */
+export const formatDurationInCurrentStatus = (isoDate: string, nowMs: number = Date.now()): string => {
+    const t = new Date(isoDate).getTime()
+    if (Number.isNaN(t)) return ''
+    let ms = nowMs - t
+    if (ms < 0) ms = 0
+    const totalMin = Math.floor(ms / 60000)
+    if (totalMin < 1) return 'hace menos de 1 min'
+    if (totalMin < 60) {
+        return `hace ${totalMin} min`
+    }
+    const hours = Math.floor(totalMin / 60)
+    const mins = totalMin % 60
+    if (hours < 24) {
+        if (mins === 0) {
+            return `hace ${hours} ${hours === 1 ? 'hora' : 'horas'}`
+        }
+        return `hace ${hours} ${hours === 1 ? 'hora' : 'horas'} ${mins} min`
+    }
+    const days = Math.floor(totalMin / (60 * 24))
+    return `hace ${days} ${days === 1 ? 'día' : 'días'}`
+}
+
 /**
  * Formatea un número como moneda colombiana
  */
@@ -161,6 +205,9 @@ export const useFormatting = () => {
         formatTime,
         formatTimeAgo,
         formatTimeAgoCalendar,
+        formatDurationInCurrentStatus,
+        orderStatusToStatusTimesKey,
+        getStatusTimeFromRecord,
         truncateText,
         capitalizeFirst,
         getOrderStatusDisplayName,

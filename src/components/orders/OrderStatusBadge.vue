@@ -13,7 +13,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import type { OrderStatus } from '@/types/order'
 import {
     CheckCircleIcon,
@@ -22,7 +22,7 @@ import {
     FireIcon,
     XCircleIcon,
 } from '@heroicons/vue/24/solid'
-import { useFormatting } from '@/composables/useFormatting'
+import { formatDateTime, formatDurationInCurrentStatus } from '@/composables/useFormatting'
 
 interface Props {
     status: OrderStatus
@@ -39,7 +39,19 @@ const emit = defineEmits<{
     click: []
 }>()
 
-const { formatDateTime } = useFormatting()
+/** Recalcular “hace X min” periódicamente mientras el tooltip exista en pantalla. */
+const nowTick = ref(Date.now())
+let nowInterval: ReturnType<typeof setInterval> | undefined
+
+onMounted(() => {
+    nowInterval = setInterval(() => {
+        nowTick.value = Date.now()
+    }, 60000)
+})
+
+onUnmounted(() => {
+    if (nowInterval !== undefined) clearInterval(nowInterval)
+})
 
 // Mapeo de colores por estado
 const colorClasses = computed(() => {
@@ -71,7 +83,11 @@ const statusIcon = computed(() => {
 const tooltipText = computed(() => {
     if (!props.statusTime) return props.displayName || props.status
 
-    return `${props.displayName || props.status} - ${formatDateTime(props.statusTime)}`
+    const relative = formatDurationInCurrentStatus(props.statusTime, nowTick.value)
+    const absolute = formatDateTime(props.statusTime)
+    const name = props.displayName || props.status
+    if (!relative) return `${name} — ${absolute}`
+    return `${name}\n${relative}\n${absolute}`
 })
 
 const handleClick = () => {

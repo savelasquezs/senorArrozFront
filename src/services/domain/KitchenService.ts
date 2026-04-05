@@ -1,4 +1,5 @@
 import type { OrderListItem } from '@/types/order'
+import { orderStatusToStatusTimesKey } from '@/composables/useFormatting'
 
 // Constantes de tiempo (sin feature flags)
 const KITCHEN_MAX_TAKEN_TIME = 5 * 60 * 1000 // 5 minutos
@@ -64,7 +65,7 @@ export class KitchenService {
             }
         }
 
-        const statusKey = order.status === 'in_preparation' ? 'inpreparation' : order.status === 'on_the_way' ? 'ontheway' : order.status
+        const statusKey = orderStatusToStatusTimesKey(order.status)
         const currentStatusTime = order.statusTimes?.[statusKey]
         if (!currentStatusTime) return 0
 

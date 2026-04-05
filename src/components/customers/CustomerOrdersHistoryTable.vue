@@ -74,7 +74,7 @@
                         <OrderStatusBadge
                             :status="order.status"
                             :display-name="order.statusDisplayName"
-                            :status-time="order.statusTimes[order.status]"
+                            :status-time="statusTimeEntered(order)"
                             :clickable="false" />
                     </td>
                     <td class="px-3 py-2 whitespace-nowrap text-xs font-medium text-gray-900 tabular-nums">
@@ -119,7 +119,7 @@ import type { OrderListItem, OrderDetailItem } from '@/types/order'
 import OrderStatusBadge from '@/components/orders/OrderStatusBadge.vue'
 import OrderTypeBadge from '@/components/orders/OrderTypeBadge.vue'
 import BaseLoading from '@/components/ui/BaseLoading.vue'
-import { useFormatting } from '@/composables/useFormatting'
+import { useFormatting, getStatusTimeFromRecord } from '@/composables/useFormatting'
 
 const props = defineProps<{
     orders: OrderListItem[]
@@ -147,5 +147,9 @@ function deliveryLabel(order: OrderListItem): string {
     if (order.type === 'delivery') return 'Domicilio'
     if (order.type === 'reservation') return 'Reserva'
     return 'En el local'
+}
+
+function statusTimeEntered(order: OrderListItem): string | undefined {
+    return getStatusTimeFromRecord(order.statusTimes, order.status)
 }
 </script>

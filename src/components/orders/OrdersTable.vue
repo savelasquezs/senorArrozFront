@@ -246,7 +246,7 @@ import type { Bank } from '@/types/bank'
 import OrderStatusBadge from './OrderStatusBadge.vue'
 import OrderTypeBadge from './OrderTypeBadge.vue'
 import BaseLoading from '@/components/ui/BaseLoading.vue'
-import { useFormatting } from '@/composables/useFormatting'
+import { useFormatting, getStatusTimeFromRecord } from '@/composables/useFormatting'
 import { useToast } from '@/composables/useToast'
 import {
     ArrowsUpDownIcon,
@@ -328,7 +328,7 @@ const canAssignDeliveryman = (order: OrderListItem): boolean => {
 
 // Obtiene la fecha del estado actual del pedido
 const getStatusTime = (order: OrderListItem): string | undefined => {
-    return order.statusTimes[order.status]
+    return getStatusTimeFromRecord(order.statusTimes, order.status)
 }
 
 const formatQuickLabel = (bankName: string): string => {
