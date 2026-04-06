@@ -92,8 +92,17 @@
               <div class="bg-green-50 rounded-lg p-3 text-center">
                 <p class="text-xs text-gray-500">Sistema espera</p>
                 <p class="text-lg font-bold text-green-700">{{ formatCurrency(expected.expectedCash) }}</p>
-                <p class="text-xs text-gray-400 mt-1">
-                  Ventas: {{ formatCurrency(expected.cashFromOrders) }} |
+                <p class="text-xs text-gray-400 mt-1 leading-relaxed">
+                  Ventas entregadas (total pedidos):
+                  {{ formatCurrency(expected.deliveredOrdersSalesTotal ?? 0) }}
+                  · Efectivo de esas ventas:
+                  {{ formatCurrency(expected.cashFromOrders) }}
+                  · Banco en pedidos:
+                  {{ formatCurrency(expected.bankPaymentsFromOrdersTotal ?? 0) }}
+                  · Apps (fuera de caja/banco):
+                  {{ formatCurrency(expected.appPaymentsFromOrdersTotal ?? 0) }}
+                </p>
+                <p class="text-xs text-gray-400 mt-1 leading-relaxed">
                   Abonos reservas: +{{ formatCurrency(expected.cashDeposits) }} |
                   Gastos: -{{ formatCurrency(expected.cashExpenses) }} |
                   Abonos domic. (transferencia): -{{ formatCurrency(expected.advancesBankTransfer) }} |

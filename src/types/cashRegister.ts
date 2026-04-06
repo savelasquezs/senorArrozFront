@@ -84,6 +84,12 @@ export interface CashRegisterExpected {
   openingCash: number
   expectedCash: number
   cashFromOrders: number
+  /** Suma de totales de pedidos entregados en el período. */
+  deliveredOrdersSalesTotal: number
+  /** Pagos por banco en esos pedidos (concilian con cuadre bancario). */
+  bankPaymentsFromOrdersTotal: number
+  /** Pagos por apps en esos pedidos (no entran a caja ni banco de inmediato). */
+  appPaymentsFromOrdersTotal: number
   cashDeposits: number
   cashExpenses: number
   /** Abonos domiciliario por transferencia: restados del efectivo esperado (cuadran en banco). */
