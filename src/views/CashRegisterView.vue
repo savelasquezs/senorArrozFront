@@ -1,12 +1,12 @@
 <template>
   <MainLayout>
-    <div class="p-6 space-y-6 max-w-5xl mx-auto">
+    <div class="p-4 space-y-4 max-w-7xl mx-auto">
 
       <!-- Header -->
-      <div class="flex items-center justify-between">
+      <div class="flex items-center justify-between gap-3 flex-wrap">
         <div>
-          <h1 class="text-2xl font-bold text-gray-900">Cuadre de Caja</h1>
-          <p class="text-sm text-gray-500 mt-1">
+          <h1 class="text-xl font-bold text-gray-900">Cuadre de Caja</h1>
+          <p class="text-sm text-gray-500 mt-0.5">
             Último cuadre:
             <span v-if="expected?.lastClosureAt" class="font-medium text-gray-700">
               {{ formatDate(expected.lastClosureAt) }}
@@ -31,7 +31,7 @@
 
       <div
         v-if="expected && expected.undeliveredOrdersCount > 0"
-        class="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800 flex items-start gap-2"
+        class="rounded-lg border border-red-200 bg-red-50 px-3 py-2.5 text-sm text-red-800 flex items-start gap-2"
         role="alert"
       >
         <ExclamationCircleIcon class="w-5 h-5 shrink-0 text-red-600" />
@@ -51,304 +51,412 @@
       </div>
 
       <template v-else-if="expected">
-
-        <!-- ===== SECCIÓN 1: EFECTIVO ===== -->
-        <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
-          <div class="bg-yellow-50 border-b border-yellow-100 px-6 py-4 flex items-center gap-3">
-            <BanknotesIcon class="w-5 h-5 text-yellow-600" />
-            <h2 class="text-lg font-semibold text-gray-800">Conteo de Efectivo</h2>
-          </div>
-
-          <div class="p-6 space-y-4">
-            <!-- Denominaciones -->
-            <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
-              <div
-                v-for="denom in DENOMINATIONS"
-                :key="denom"
-                class="flex flex-col items-center gap-1"
-              >
-                <span class="text-xs font-medium text-gray-500">{{ formatCurrency(denom) }}</span>
-                <input
-                  type="number"
-                  min="0"
-                  v-model.number="denominationCounts[denom]"
-                  @input="onDenominationInput"
-                  @blur="onDenominationBlur(denom)"
-                  class="w-full text-center border border-gray-300 rounded-lg py-2 px-1 text-sm focus:outline-none focus:ring-2 focus:ring-yellow-400"
-                  placeholder="0"
-                />
-                <span class="text-xs text-gray-400">
-                  = {{ formatCurrency(denom * (denominationCounts[denom] || 0)) }}
-                </span>
-              </div>
-            </div>
-
-            <!-- Totales -->
-            <div class="grid grid-cols-3 gap-4 pt-4 border-t border-gray-100">
-              <div class="bg-gray-50 rounded-lg p-3 text-center">
-                <p class="text-xs text-gray-500">Apertura</p>
-                <p class="text-lg font-bold text-gray-700">{{ formatCurrency(expected.openingCash) }}</p>
-              </div>
-              <div class="bg-green-50 rounded-lg p-3 text-center">
-                <p class="text-xs text-gray-500">Sistema espera</p>
-                <p class="text-lg font-bold text-green-700">{{ formatCurrency(expected.expectedCash) }}</p>
-                <p class="text-xs text-gray-400 mt-1 leading-relaxed">
-                  Ventas entregadas (total pedidos):
-                  {{ formatCurrency(expected.deliveredOrdersSalesTotal ?? 0) }}
-                  · Efectivo de esas ventas:
-                  {{ formatCurrency(expected.cashFromOrders) }}
-                  · Banco en pedidos:
-                  {{ formatCurrency(expected.bankPaymentsFromOrdersTotal ?? 0) }}
-                  · Apps (fuera de caja/banco):
-                  {{ formatCurrency(expected.appPaymentsFromOrdersTotal ?? 0) }}
-                </p>
-                <p class="text-xs text-gray-400 mt-1 leading-relaxed">
-                  Abonos reservas: +{{ formatCurrency(expected.cashDeposits) }} |
-                  Gastos: -{{ formatCurrency(expected.cashExpenses) }} |
-                  Abonos domic. (transferencia): -{{ formatCurrency(expected.advancesBankTransfer) }} |
-                  Caja mayor: abonos -{{ formatCurrency(expected.cashVaultAbonosTotal ?? 0) }} | descargas +{{ formatCurrency(expected.cashVaultDescargasTotal ?? 0) }} |
-                  Prést. informales (activos): {{ formatCurrency(-(expected.informalLoansActiveTotal ?? 0)) }}
-                </p>
-              </div>
-              <div :class="['rounded-lg p-3 text-center', cashDifference === 0 ? 'bg-green-50' : 'bg-red-50']">
-                <p class="text-xs text-gray-500">Contado en caja</p>
-                <p :class="['text-lg font-bold', cashDifference === 0 ? 'text-green-700' : 'text-red-700']">
-                  {{ formatCurrency(closingCash) }}
-                </p>
-                <p class="text-xs text-gray-400 mt-1">
-                  Diferencia: {{ formatCurrency(cashDifference) }}
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- ===== SECCIÓN 2: PRÉSTAMOS INFORMALES (persistidos; afectan el efectivo esperado) ===== -->
-        <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
-          <div class="bg-orange-50 border-b border-orange-100 px-6 py-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div class="flex items-center gap-3">
-              <ClockIcon class="w-5 h-5 text-orange-600" />
-              <h2 class="text-lg font-semibold text-gray-800">Préstamos informales</h2>
-            </div>
-            <div class="flex rounded-lg border border-orange-200/80 bg-white/80 p-0.5 text-sm">
-              <button
-                type="button"
-                :class="[
-                  'px-3 py-1.5 rounded-md font-medium transition-colors',
-                  loansTab === 'active' ? 'bg-orange-500 text-white shadow-sm' : 'text-gray-600 hover:bg-orange-50',
-                ]"
-                @click="loansTab = 'active'"
-              >
-                Activos
-              </button>
-              <button
-                type="button"
-                :class="[
-                  'px-3 py-1.5 rounded-md font-medium transition-colors',
-                  loansTab === 'inactive' ? 'bg-orange-500 text-white shadow-sm' : 'text-gray-600 hover:bg-orange-50',
-                ]"
-                @click="loansTab = 'inactive'"
-              >
-                Inactivos
-              </button>
-            </div>
-          </div>
-
-          <div class="p-6">
-            <p class="text-sm text-gray-500 mb-4">
-              Se guardan al instante (no hace falta cerrar caja). La suma de los activos se resta del efectivo esperado arriba.
-            </p>
-
-            <div v-if="informalLoansLoading" class="text-center py-8 text-gray-500 text-sm">Cargando…</div>
-
-            <template v-else>
-              <div v-if="branchInformalLoans.length === 0" class="text-center py-6 text-gray-400 text-sm">
-                {{ loansTab === 'active' ? 'Sin préstamos activos' : 'Sin préstamos dados de baja' }}
+        <div class="flex flex-col gap-4">
+          <div class="lg:grid lg:grid-cols-2 lg:gap-4 lg:items-start">
+            <!-- ===== SECCIÓN 1: EFECTIVO ===== -->
+            <div class="bg-white rounded-xl border border-gray-200 overflow-hidden min-w-0">
+              <div class="bg-yellow-50 border-b border-yellow-100 px-4 py-2.5 flex items-center gap-2">
+                <BanknotesIcon class="w-4 h-4 text-yellow-600 shrink-0" />
+                <h2 class="text-base font-semibold text-gray-800">Conteo de Efectivo</h2>
               </div>
 
-              <div v-else class="space-y-2">
+              <div class="p-4 space-y-3">
+                <!-- Denominaciones -->
                 <div
-                  v-for="loan in branchInformalLoans"
-                  :key="loan.id"
-                  class="flex flex-col gap-2 p-3 bg-gray-50 rounded-lg sm:flex-row sm:items-center sm:gap-3"
+                  class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 xl:grid-cols-10 gap-2"
                 >
-                  <div class="flex-1 min-w-0">
-                    <p class="text-sm font-medium text-gray-900">{{ loan.concept }}</p>
-                    <p class="text-xs text-gray-500 tabular-nums">{{ formatCurrency(loan.amount) }}</p>
-                    <p v-if="loansTab === 'inactive' && loan.deactivatedAt" class="text-xs text-gray-400 mt-1">
-                      Baja: {{ formatDate(loan.deactivatedAt) }}
-                      <span v-if="loan.deactivatedByName"> · {{ loan.deactivatedByName }}</span>
-                    </p>
-                    <p v-if="loansTab === 'inactive' && loan.deactivationNotes" class="text-xs text-gray-500 mt-0.5 italic">
-                      {{ loan.deactivationNotes }}
+                  <div
+                    v-for="denom in DENOMINATIONS"
+                    :key="denom"
+                    class="flex flex-col items-center gap-0.5"
+                  >
+                    <span class="text-[10px] sm:text-xs font-medium text-gray-500 leading-tight text-center">{{
+                      formatCurrency(denom)
+                    }}</span>
+                    <input
+                      type="number"
+                      min="0"
+                      v-model.number="denominationCounts[denom]"
+                      @input="onDenominationInput"
+                      @blur="onDenominationBlur(denom)"
+                      class="w-full text-center border border-gray-300 rounded-md py-1 px-0.5 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-yellow-400"
+                      placeholder="0"
+                    />
+                    <span class="text-[10px] text-gray-400 leading-tight tabular-nums">
+                      = {{ formatCurrency(denom * (denominationCounts[denom] || 0)) }}
+                    </span>
+                  </div>
+                </div>
+
+                <!-- Totales -->
+                <div class="grid grid-cols-3 gap-2 sm:gap-3 pt-3 border-t border-gray-100">
+                  <div class="bg-gray-50 rounded-lg p-2 sm:p-2.5 text-center">
+                    <p class="text-[10px] sm:text-xs text-gray-500">Apertura</p>
+                    <p class="text-base sm:text-lg font-bold text-gray-700 tabular-nums">
+                      {{ formatCurrency(expected.openingCash) }}
                     </p>
                   </div>
-                  <div v-if="loansTab === 'active'" class="shrink-0">
-                    <BaseButton variant="outline" size="sm" class="text-red-700 border-red-200" @click="openDeactivateLoan(loan)">
-                      Dar de baja
+                  <div
+                    ref="expectedBreakdownTriggerEl"
+                    class="bg-green-50 rounded-lg p-2 sm:p-2.5 text-center"
+                    @mouseenter="onExpectedBreakdownEnter"
+                    @mouseleave="onExpectedBreakdownLeave"
+                  >
+                    <p class="text-[10px] sm:text-xs text-gray-500 flex items-center justify-center gap-0.5">
+                      Sistema espera
+                      <button
+                        type="button"
+                        class="p-0.5 rounded text-green-800 hover:bg-green-100/80 focus:outline-none focus-visible:ring-2 focus-visible:ring-green-500"
+                        aria-label="Desglose del efectivo esperado (también disponible al pasar el cursor)"
+                        @click.stop="onExpectedBreakdownIconClick"
+                      >
+                        <InformationCircleIcon class="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                      </button>
+                    </p>
+                    <p class="text-base sm:text-lg font-bold text-green-700 tabular-nums cursor-help">
+                      {{ formatCurrency(expected.expectedCash) }}
+                    </p>
+                  </div>
+                  <div :class="['rounded-lg p-2 sm:p-2.5 text-center', cashDifference === 0 ? 'bg-green-50' : 'bg-red-50']">
+                    <p class="text-[10px] sm:text-xs text-gray-500">Contado en caja</p>
+                    <p
+                      :class="[
+                        'text-base sm:text-lg font-bold tabular-nums',
+                        cashDifference === 0 ? 'text-green-700' : 'text-red-700',
+                      ]"
+                    >
+                      {{ formatCurrency(closingCash) }}
+                    </p>
+                    <p class="text-[10px] sm:text-xs text-gray-400 mt-0.5 tabular-nums">
+                      Dif.: {{ formatCurrency(cashDifference) }}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="min-w-0 space-y-4">
+              <!-- ===== SECCIÓN 2: PRÉSTAMOS INFORMALES ===== -->
+              <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
+                <button
+                  type="button"
+                  class="w-full text-left bg-orange-50 border-b border-orange-100 px-4 py-2.5 flex items-center justify-between gap-2 hover:bg-orange-100/60 transition-colors"
+                  @click="loansSectionExpanded = !loansSectionExpanded"
+                >
+                  <div class="flex items-center gap-2 min-w-0">
+                    <ClockIcon class="w-4 h-4 text-orange-600 shrink-0" />
+                    <span class="text-base font-semibold text-gray-800 truncate">Préstamos informales</span>
+                    <span v-if="!loansSectionExpanded" class="text-xs text-gray-600 truncate hidden sm:inline">
+                      · {{ loansCollapsedSummary }}
+                    </span>
+                  </div>
+                  <ChevronDownIcon
+                    :class="[
+                      'w-5 h-5 text-orange-700 shrink-0 transition-transform',
+                      loansSectionExpanded ? 'rotate-180' : '',
+                    ]"
+                  />
+                </button>
+                <p v-if="!loansSectionExpanded" class="px-4 py-1.5 text-xs text-gray-500 sm:hidden border-b border-orange-100/50">
+                  {{ loansCollapsedSummary }}
+                </p>
+
+                <div v-show="loansSectionExpanded" class="border-t border-orange-100/60">
+                  <div class="px-4 py-2 flex flex-wrap justify-end">
+                    <div class="flex rounded-md border border-orange-200/80 bg-gray-50/80 p-0.5 text-xs sm:text-sm">
+                      <button
+                        type="button"
+                        :class="[
+                          'px-2 sm:px-3 py-1 rounded font-medium transition-colors',
+                          loansTab === 'active' ? 'bg-orange-500 text-white shadow-sm' : 'text-gray-600 hover:bg-orange-50',
+                        ]"
+                        @click="loansTab = 'active'"
+                      >
+                        Activos
+                      </button>
+                      <button
+                        type="button"
+                        :class="[
+                          'px-2 sm:px-3 py-1 rounded font-medium transition-colors',
+                          loansTab === 'inactive' ? 'bg-orange-500 text-white shadow-sm' : 'text-gray-600 hover:bg-orange-50',
+                        ]"
+                        @click="loansTab = 'inactive'"
+                      >
+                        Inactivos
+                      </button>
+                    </div>
+                  </div>
+
+                  <div class="p-4 pt-0">
+                    <p class="text-xs text-gray-500 mb-3">
+                      Se guardan al instante. Los activos restan del efectivo esperado.
+                    </p>
+
+                    <div v-if="informalLoansLoading" class="text-center py-6 text-gray-500 text-sm">Cargando…</div>
+
+                    <template v-else>
+                      <div v-if="branchInformalLoans.length === 0" class="text-center py-4 text-gray-400 text-sm">
+                        {{ loansTab === 'active' ? 'Sin préstamos activos' : 'Sin préstamos dados de baja' }}
+                      </div>
+
+                      <div v-else class="space-y-1.5">
+                        <div
+                          v-for="loan in branchInformalLoans"
+                          :key="loan.id"
+                          class="flex flex-col gap-1 p-2 bg-gray-50 rounded-lg sm:flex-row sm:items-center sm:gap-2"
+                        >
+                          <div class="flex-1 min-w-0">
+                            <p class="text-sm font-medium text-gray-900">{{ loan.concept }}</p>
+                            <p class="text-xs text-gray-500 tabular-nums">{{ formatCurrency(loan.amount) }}</p>
+                            <p v-if="loansTab === 'inactive' && loan.deactivatedAt" class="text-xs text-gray-400 mt-0.5">
+                              Baja: {{ formatDate(loan.deactivatedAt) }}
+                              <span v-if="loan.deactivatedByName"> · {{ loan.deactivatedByName }}</span>
+                            </p>
+                            <p
+                              v-if="loansTab === 'inactive' && loan.deactivationNotes"
+                              class="text-xs text-gray-500 mt-0.5 italic"
+                            >
+                              {{ loan.deactivationNotes }}
+                            </p>
+                          </div>
+                          <div v-if="loansTab === 'active'" class="shrink-0">
+                            <BaseButton
+                              variant="outline"
+                              size="sm"
+                              class="text-red-700 border-red-200 text-xs py-0.5"
+                              @click="openDeactivateLoan(loan)"
+                            >
+                              Dar de baja
+                            </BaseButton>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div
+                        v-if="loansTab === 'active' && branchInformalLoans.length > 0"
+                        class="mt-2 flex justify-end"
+                      >
+                        <span class="text-xs sm:text-sm font-medium text-gray-700">
+                          Total activos: {{ formatCurrency(totalActiveLoans) }}
+                        </span>
+                      </div>
+
+                      <div v-if="loansTab === 'active'" class="mt-4 pt-3 border-t border-gray-100">
+                        <p class="text-xs font-semibold text-gray-600 uppercase tracking-wide mb-2">Registrar préstamo</p>
+                        <div class="flex flex-col gap-2 sm:flex-row sm:items-end">
+                          <div class="flex-1 min-w-0">
+                            <label class="text-xs text-gray-500 block mb-0.5">Concepto</label>
+                            <input
+                              v-model="newLoanConcept"
+                              type="text"
+                              placeholder="Ej. Domiciliario ruta noche"
+                              class="w-full border border-gray-300 rounded-md px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-orange-300"
+                            />
+                          </div>
+                          <div class="w-full sm:w-36 shrink-0">
+                            <label class="text-xs text-gray-500 block mb-0.5">Monto (COP)</label>
+                            <input
+                              v-model.number="newLoanAmount"
+                              type="number"
+                              step="1000"
+                              placeholder="0"
+                              class="w-full border border-gray-300 rounded-md px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-orange-300"
+                            />
+                          </div>
+                          <BaseButton variant="primary" class="shrink-0" size="sm" :loading="savingLoan" @click="submitNewLoan">
+                            <PlusIcon class="w-4 h-4 mr-1" /> Registrar
+                          </BaseButton>
+                        </div>
+                      </div>
+                    </template>
+                  </div>
+                </div>
+              </div>
+
+              <!-- ===== CAJA MAYOR EFECTIVO ===== -->
+              <div
+                v-if="canViewClosureHistory && cashVaultBank"
+                class="bg-white rounded-xl border border-gray-200 overflow-hidden"
+              >
+                <div
+                  class="bg-slate-50 border-b border-slate-100 px-4 py-2.5 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between"
+                >
+                  <div class="flex items-start gap-2 min-w-0">
+                    <BuildingLibraryIcon class="w-4 h-4 text-slate-600 shrink-0 mt-0.5" />
+                    <div class="min-w-0">
+                      <h2 class="text-base font-semibold text-gray-800">{{ cashVaultBank.bankName }}</h2>
+                      <p class="text-[11px] sm:text-xs text-gray-500 leading-snug">
+                        Esperado período:
+                        <span class="font-semibold text-gray-700 tabular-nums">{{
+                          formatCurrency(cashVaultBank.expectedBalance)
+                        }}</span>
+                        <span class="hidden sm:inline"> · Efectivo en caja mayor (no es transferencia entre bancos).</span>
+                      </p>
+                    </div>
+                  </div>
+                  <div class="flex flex-wrap gap-1.5 shrink-0">
+                    <BaseButton variant="outline" size="sm" class="text-xs py-1" @click="openVaultAbono">Abonar</BaseButton>
+                    <BaseButton
+                      variant="outline"
+                      size="sm"
+                      class="text-xs py-1 text-amber-800 border-amber-200"
+                      @click="openVaultDescarga"
+                    >
+                      Descargar
                     </BaseButton>
                   </div>
                 </div>
               </div>
 
-              <div v-if="loansTab === 'active' && branchInformalLoans.length > 0" class="mt-3 flex justify-end">
-                <span class="text-sm font-medium text-gray-700">
-                  Total activos: {{ formatCurrency(totalActiveLoans) }}
-                </span>
-              </div>
-
-              <div v-if="loansTab === 'active'" class="mt-6 pt-4 border-t border-gray-100">
-                <p class="text-xs font-semibold text-gray-600 uppercase tracking-wide mb-2">Registrar préstamo</p>
-                <div class="flex flex-col gap-3 sm:flex-row sm:items-end">
-                  <div class="flex-1">
-                    <label class="text-xs text-gray-500 block mb-1">Concepto</label>
-                    <input
-                      v-model="newLoanConcept"
-                      type="text"
-                      placeholder="Ej. Domiciliario ruta noche"
-                      class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-300"
-                    />
-                  </div>
-                  <div class="w-full sm:w-40">
-                    <label class="text-xs text-gray-500 block mb-1">Monto (COP)</label>
-                    <input
-                      v-model.number="newLoanAmount"
-                      type="number"
-                      step="1000"
-                      placeholder="0"
-                      class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-300"
-                    />
-                  </div>
-                  <BaseButton variant="primary" class="shrink-0" :loading="savingLoan" @click="submitNewLoan">
-                    <PlusIcon class="w-4 h-4 mr-1" /> Registrar
-                  </BaseButton>
+              <!-- ===== SECCIÓN 3: BANCOS ===== -->
+              <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
+                <div class="bg-blue-50 border-b border-blue-100 px-4 py-2.5 flex items-center gap-2">
+                  <BuildingLibraryIcon class="w-4 h-4 text-blue-600 shrink-0" />
+                  <h2 class="text-base font-semibold text-gray-800">Bancos y Aplicaciones</h2>
                 </div>
-              </div>
-            </template>
-          </div>
-        </div>
 
-        <!-- ===== CAJA MAYOR EFECTIVO (CashVault): solo admin ===== -->
-        <div
-          v-if="canViewClosureHistory && cashVaultBank"
-          class="bg-white rounded-xl border border-gray-200 overflow-hidden"
-        >
-          <div class="bg-slate-50 border-b border-slate-100 px-6 py-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div class="flex items-center gap-3">
-              <BuildingLibraryIcon class="w-5 h-5 text-slate-600" />
-              <div>
-                <h2 class="text-lg font-semibold text-gray-800">{{ cashVaultBank.bankName }}</h2>
-                <p class="text-xs text-gray-500">
-                  Saldo esperado en período:
-                  <span class="font-semibold text-gray-700 tabular-nums">{{ formatCurrency(cashVaultBank.expectedBalance) }}</span>
-                  · Representa efectivo apartado en caja mayor (no es transferencia entre bancos).
-                </p>
-              </div>
-            </div>
-            <div class="flex flex-wrap gap-2">
-              <BaseButton variant="outline" size="sm" @click="openVaultAbono">Abonar</BaseButton>
-              <BaseButton variant="outline" size="sm" class="text-amber-800 border-amber-200" @click="openVaultDescarga">
-                Descargar
-              </BaseButton>
-            </div>
-          </div>
-        </div>
-
-        <!-- ===== SECCIÓN 3: CONCILIACIÓN BANCOS ===== -->
-        <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
-          <div class="bg-blue-50 border-b border-blue-100 px-6 py-4 flex items-center gap-3">
-            <BuildingLibraryIcon class="w-5 h-5 text-blue-600" />
-            <h2 class="text-lg font-semibold text-gray-800">Bancos y Aplicaciones</h2>
-          </div>
-
-          <div class="p-6 space-y-4">
-            <p class="text-sm text-gray-500">
-              Ingresa el saldo real de cada banco/app. La diferencia debe ser <strong>$0</strong> para guardar el cuadre.
-            </p>
-
-            <div v-if="bankReconciliations.length === 0" class="text-center py-6 text-gray-400 text-sm">
-              No hay bancos configurados para esta sucursal.
-            </div>
-
-            <div v-else class="space-y-3">
-              <div
-                v-for="recon in bankReconciliations"
-                :key="recon.bankId"
-                class="grid grid-cols-4 gap-3 items-center p-3 rounded-lg"
-                :class="recon.actualBalance - recon.expectedBalance === 0 ? 'bg-green-50' : 'bg-red-50'"
-              >
-                <div class="col-span-1">
-                  <p class="text-sm font-medium text-gray-800">{{ recon.bankName }}</p>
-                  <p class="text-xs text-gray-400">Sistema: {{ formatCurrency(recon.expectedBalance) }}</p>
-                </div>
-                <div class="col-span-1">
-                  <label class="text-xs text-gray-500 block mb-1">Saldo real</label>
-                  <input
-                    v-model.number="recon.actualBalance"
-                    type="number"
-                    min="0"
-                    step="100"
-                    class="w-full border border-gray-300 rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
-                  />
-                </div>
-                <div class="col-span-1 text-center">
-                  <p class="text-xs text-gray-500">Diferencia</p>
-                  <p
-                    :class="[
-                      'text-base font-bold',
-                      recon.actualBalance - recon.expectedBalance === 0 ? 'text-green-700' : 'text-red-600'
-                    ]"
-                  >
-                    {{ formatCurrency(recon.actualBalance - recon.expectedBalance) }}
+                <div class="p-4 space-y-3">
+                  <p class="text-xs text-gray-500 leading-snug">
+                    Saldo real por cuenta; la diferencia debe ser <strong>$0</strong> para guardar.
                   </p>
-                </div>
-                <div class="col-span-1 flex flex-col items-center gap-1">
-                  <CheckCircleIcon
-                    v-if="recon.actualBalance - recon.expectedBalance === 0"
-                    class="w-6 h-6 text-green-500 mx-auto"
-                  />
-                  <ExclamationCircleIcon
-                    v-else
-                    class="w-6 h-6 text-red-500 mx-auto"
-                  />
-                  <BaseButton variant="outline" size="sm" class="text-xs px-2 py-0.5" @click="toggleMovements(recon.bankId)">
-                    {{ movementsBankId === recon.bankId ? 'Ocultar' : 'Ver' }} movimientos
-                  </BaseButton>
+
+                  <div v-if="bankReconciliations.length === 0" class="text-center py-4 text-gray-400 text-sm">
+                    No hay bancos configurados para esta sucursal.
+                  </div>
+
+                  <div v-else class="space-y-2">
+                    <div
+                      v-for="recon in bankReconciliations"
+                      :key="recon.bankId"
+                      class="grid grid-cols-4 gap-2 items-center p-2 rounded-lg"
+                      :class="recon.actualBalance - recon.expectedBalance === 0 ? 'bg-green-50' : 'bg-red-50'"
+                    >
+                      <div class="col-span-1 min-w-0">
+                        <p class="text-xs sm:text-sm font-medium text-gray-800 truncate">{{ recon.bankName }}</p>
+                        <p class="text-[10px] sm:text-xs text-gray-400 tabular-nums">
+                          Sis.: {{ formatCurrency(recon.expectedBalance) }}
+                        </p>
+                      </div>
+                      <div class="col-span-1">
+                        <label class="text-[10px] text-gray-500 block mb-0.5">Saldo real</label>
+                        <input
+                          v-model.number="recon.actualBalance"
+                          type="number"
+                          min="0"
+                          step="100"
+                          class="w-full border border-gray-300 rounded-md px-2 py-1 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
+                        />
+                      </div>
+                      <div class="col-span-1 text-center">
+                        <p class="text-[10px] text-gray-500">Dif.</p>
+                        <p
+                          :class="[
+                            'text-sm sm:text-base font-bold tabular-nums',
+                            recon.actualBalance - recon.expectedBalance === 0 ? 'text-green-700' : 'text-red-600',
+                          ]"
+                        >
+                          {{ formatCurrency(recon.actualBalance - recon.expectedBalance) }}
+                        </p>
+                      </div>
+                      <div class="col-span-1 flex flex-col items-center gap-0.5">
+                        <CheckCircleIcon
+                          v-if="recon.actualBalance - recon.expectedBalance === 0"
+                          class="w-5 h-5 text-green-500"
+                        />
+                        <ExclamationCircleIcon v-else class="w-5 h-5 text-red-500" />
+                        <BaseButton
+                          variant="outline"
+                          size="sm"
+                          class="text-[10px] px-1.5 py-0.5 min-h-0 h-auto"
+                          @click="toggleMovements(recon.bankId)"
+                        >
+                          {{ movementsBankId === recon.bankId ? 'Ocultar' : 'Ver' }}
+                        </BaseButton>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div v-if="movementsBankId != null && expected" class="mt-2">
+                    <BankMovementsPanel
+                      :key="movementsBankId"
+                      :bank-id="movementsBankId"
+                      :branch-id="authStore.branchId ?? undefined"
+                      embedded
+                      lock-date-range
+                      :initial-from-date="closureFromYmd"
+                      :initial-to-date="closureToYmd"
+                    />
+                  </div>
                 </div>
               </div>
             </div>
+          </div>
 
-            <div v-if="movementsBankId != null && expected" class="mt-4">
-              <BankMovementsPanel
-                :key="movementsBankId"
-                :bank-id="movementsBankId"
-                :branch-id="authStore.branchId ?? undefined"
-                embedded
-                lock-date-range
-                :initial-from-date="closureFromYmd"
-                :initial-to-date="closureToYmd"
-              />
+          <!-- ===== BOTÓN GUARDAR ===== -->
+          <div class="flex flex-col-reverse sm:flex-row sm:justify-end sm:items-center gap-2 pt-1">
+            <div v-if="!canSave" class="text-xs sm:text-sm text-red-600 flex items-center gap-1">
+              <ExclamationCircleIcon class="w-4 h-4 shrink-0" />
+              {{ saveBlockReason }}
             </div>
+            <BaseButton variant="primary" :disabled="!canSave" :loading="saving" @click="saveClosure" class="px-6 sm:px-8">
+              Guardar Cuadre
+            </BaseButton>
           </div>
         </div>
 
-        <!-- ===== BOTÓN GUARDAR ===== -->
-        <div class="flex justify-end gap-3 pt-2">
-          <div v-if="!canSave" class="text-sm text-red-600 flex items-center gap-1">
-            <ExclamationCircleIcon class="w-4 h-4" />
-            {{ saveBlockReason }}
-          </div>
-          <BaseButton
-            variant="primary"
-            :disabled="!canSave"
-            :loading="saving"
-            @click="saveClosure"
-            class="px-8"
+        <Teleport to="body">
+          <div
+            v-if="expectedBreakdownOpen && expected"
+            ref="expectedBreakdownPanelEl"
+            class="fixed z-[300] w-[min(20rem,calc(100vw-1rem))] max-h-[min(22rem,70vh)] overflow-y-auto rounded-lg border border-gray-200 bg-white p-3 text-xs text-gray-700 shadow-xl"
+            :style="breakdownPanelStyle"
+            role="dialog"
+            aria-label="Desglose efectivo esperado"
+            @mouseenter="onExpectedBreakdownPanelEnter"
+            @mouseleave="onExpectedBreakdownLeave"
           >
-            Guardar Cuadre
-          </BaseButton>
-        </div>
-
+            <p class="font-semibold text-gray-900 mb-2">Cómo se calcula el efectivo esperado</p>
+            <ul class="space-y-1.5 list-disc pl-4 text-gray-600">
+              <li>
+                Ventas entregadas (total pedidos):
+                <span class="font-medium text-gray-800 tabular-nums">{{
+                  formatCurrency(expected.deliveredOrdersSalesTotal ?? 0)
+                }}</span>
+              </li>
+              <li>
+                − Banco en pedidos:
+                <span class="font-medium text-gray-800 tabular-nums">{{
+                  formatCurrency(expected.bankPaymentsFromOrdersTotal ?? 0)
+                }}</span>
+              </li>
+              <li>
+                − Apps (fuera de caja/banco):
+                <span class="font-medium text-gray-800 tabular-nums">{{
+                  formatCurrency(expected.appPaymentsFromOrdersTotal ?? 0)
+                }}</span>
+              </li>
+              <li>
+                ⇒ Efectivo de ventas:
+                <span class="font-medium text-gray-800 tabular-nums">{{ formatCurrency(expected.cashFromOrders) }}</span>
+              </li>
+            </ul>
+            <p class="text-[11px] text-gray-500 border-t border-gray-100 mt-2 pt-2 space-y-1">
+              <span class="block"
+                >+ Abonos reservas: {{ formatCurrency(expected.cashDeposits) }} · − Gastos efectivo:
+                {{ formatCurrency(expected.cashExpenses) }}</span
+              >
+              <span class="block"
+                >− Abonos domic. transferencia: {{ formatCurrency(expected.advancesBankTransfer) }} · Caja mayor neto:
+                abonos −{{ formatCurrency(expected.cashVaultAbonosTotal ?? 0) }} / +descargas
+                {{ formatCurrency(expected.cashVaultDescargasTotal ?? 0) }}</span
+              >
+              <span class="block"
+                >− Préstamos informales activos: {{ formatCurrency(expected.informalLoansActiveTotal ?? 0) }} · + Apertura:
+                {{ formatCurrency(expected.openingCash) }}</span
+              >
+            </p>
+          </div>
+        </Teleport>
       </template>
 
       <!-- Estado vacío -->
@@ -467,7 +575,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
+import { ref, computed, watch, onMounted, onBeforeUnmount, nextTick } from 'vue'
 import MainLayout from '@/components/layout/MainLayout.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseDialog from '@/components/ui/BaseDialog.vue'
@@ -479,7 +587,9 @@ import {
   ArrowPathIcon,
   BanknotesIcon,
   BuildingLibraryIcon,
+  ChevronDownIcon,
   ClockIcon,
+  InformationCircleIcon,
   PlusIcon,
   CheckCircleIcon,
   ExclamationCircleIcon,
@@ -508,6 +618,7 @@ const denominationCounts = ref<Record<number, number>>(emptyDenominationCounts()
 const closingCash = ref(0)
 
 const loansTab = ref<'active' | 'inactive'>('active')
+const loansSectionExpanded = ref(false)
 const branchInformalLoans = ref<BranchInformalLoan[]>([])
 const informalLoansLoading = ref(false)
 const newLoanConcept = ref('')
@@ -532,6 +643,88 @@ const bankReconciliations = ref<
 >([])
 
 const movementsBankId = ref<number | null>(null)
+
+const expectedBreakdownOpen = ref(false)
+const expectedBreakdownTriggerEl = ref<HTMLElement | null>(null)
+const expectedBreakdownPanelEl = ref<HTMLElement | null>(null)
+const breakdownPanelStyle = ref<Record<string, string>>({ top: '0px', left: '0px' })
+
+let expectedBreakdownHideTimer: ReturnType<typeof setTimeout> | null = null
+let expectedBreakdownClickToggle = false
+
+function clearExpectedBreakdownHideTimer() {
+  if (expectedBreakdownHideTimer !== null) {
+    clearTimeout(expectedBreakdownHideTimer)
+    expectedBreakdownHideTimer = null
+  }
+}
+
+function scheduleExpectedBreakdownHide() {
+  clearExpectedBreakdownHideTimer()
+  expectedBreakdownHideTimer = setTimeout(() => {
+    expectedBreakdownHideTimer = null
+    if (!expectedBreakdownClickToggle) expectedBreakdownOpen.value = false
+  }, 220)
+}
+
+function updateBreakdownPanelPosition() {
+  const el = expectedBreakdownTriggerEl.value
+  if (!el || typeof window === 'undefined') return
+  const r = el.getBoundingClientRect()
+  const pad = 8
+  const panelWidth = Math.min(320, window.innerWidth - pad * 2)
+  let left = r.left + r.width / 2 - panelWidth / 2
+  left = Math.max(pad, Math.min(left, window.innerWidth - panelWidth - pad))
+  let top = r.bottom + pad
+  const maxTop = window.innerHeight - 120
+  if (top > maxTop) top = Math.max(pad, r.top - pad - Math.min(352, window.innerHeight * 0.45))
+  breakdownPanelStyle.value = {
+    top: `${top}px`,
+    left: `${left}px`,
+    width: `${panelWidth}px`,
+  }
+}
+
+function onExpectedBreakdownEnter() {
+  clearExpectedBreakdownHideTimer()
+  expectedBreakdownClickToggle = false
+  expectedBreakdownOpen.value = true
+  nextTick(() => updateBreakdownPanelPosition())
+}
+
+function onExpectedBreakdownLeave() {
+  scheduleExpectedBreakdownHide()
+}
+
+function onExpectedBreakdownPanelEnter() {
+  clearExpectedBreakdownHideTimer()
+}
+
+function onExpectedBreakdownIconClick() {
+  clearExpectedBreakdownHideTimer()
+  if (expectedBreakdownOpen.value) {
+    expectedBreakdownOpen.value = false
+    expectedBreakdownClickToggle = false
+  } else {
+    expectedBreakdownClickToggle = true
+    expectedBreakdownOpen.value = true
+    nextTick(() => updateBreakdownPanelPosition())
+  }
+}
+
+function onDocumentPointerDownExpectedBreakdown(ev: PointerEvent) {
+  if (!expectedBreakdownOpen.value) return
+  const t = ev.target as Node
+  if (expectedBreakdownTriggerEl.value?.contains(t)) return
+  if (expectedBreakdownPanelEl.value?.contains(t)) return
+  clearExpectedBreakdownHideTimer()
+  expectedBreakdownOpen.value = false
+  expectedBreakdownClickToggle = false
+}
+
+function onWindowRepositionBreakdown() {
+  if (expectedBreakdownOpen.value) updateBreakdownPanelPosition()
+}
 
 function denomsStorageKey(): string {
   return `senor-arroz:cash-register-denoms:${authStore.branchId ?? 0}`
@@ -703,6 +896,16 @@ const closureFromYmd = computed(() => {
 const closureToYmd = computed(() => {
   if (!expected.value) return ''
   return formatYmdBogota(new Date(expected.value.asOf))
+})
+
+const loansCollapsedSummary = computed(() => {
+  if (informalLoansLoading.value) return 'Cargando…'
+  const loans = branchInformalLoans.value
+  const tab = loansTab.value
+  if (!loans.length) return tab === 'active' ? 'Sin activos' : 'Sin inactivos'
+  const sum = loans.reduce((s, l) => s + (l.amount || 0), 0)
+  const label = tab === 'active' ? 'activos' : 'inactivos'
+  return `${loans.length} ${label} · ${formatCurrency(sum)}`
 })
 
 // ===== METHODS =====
@@ -960,9 +1163,18 @@ async function saveClosure() {
   }
 }
 
-onMounted(loadData)
+onMounted(() => {
+  document.addEventListener('pointerdown', onDocumentPointerDownExpectedBreakdown, true)
+  window.addEventListener('resize', onWindowRepositionBreakdown)
+  window.addEventListener('scroll', onWindowRepositionBreakdown, true)
+  void loadData()
+})
 
 onBeforeUnmount(() => {
   flushPersistDenominationDraft()
+  clearExpectedBreakdownHideTimer()
+  document.removeEventListener('pointerdown', onDocumentPointerDownExpectedBreakdown, true)
+  window.removeEventListener('resize', onWindowRepositionBreakdown)
+  window.removeEventListener('scroll', onWindowRepositionBreakdown, true)
 })
 </script>
