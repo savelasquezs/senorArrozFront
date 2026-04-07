@@ -205,6 +205,10 @@ import type { OrderListItem } from '@/types/order'
 import BaseLoading from '@/components/ui/BaseLoading.vue'
 import { useFormatting } from '@/composables/useFormatting'
 import {
+    orderListRecipientDisplayName,
+    orderListRecipientDisplayTitle,
+} from '@/utils/orderRecipientDisplay'
+import {
     ArrowsUpDownIcon,
     ChevronUpIcon,
     ChevronDownIcon,
@@ -230,20 +234,6 @@ const emit = defineEmits<{
 }>()
 
 const { formatCurrency } = useFormatting()
-
-function orderListRecipientDisplayName(order: OrderListItem): string {
-    const g = order.guestName?.trim()
-    const c = order.customerName?.trim()
-    return g || c || ''
-}
-
-function orderListRecipientDisplayTitle(order: OrderListItem): string {
-    const line1 = orderListRecipientDisplayName(order)
-    const g = order.guestName?.trim()
-    const c = order.customerName?.trim()
-    if (g && c && g !== c) return `${line1} (cliente: ${c})`
-    return line1
-}
 
 const formatDate = (dateString: string | Date | null): string => {
     if (!dateString) return '—'

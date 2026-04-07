@@ -114,6 +114,7 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import type { OrderListItem, OrderDetailItem } from '@/types/order'
 import { KitchenService } from '@/services/domain/KitchenService'
+import { orderListRecipientDisplayName } from '@/utils/orderRecipientDisplay'
 import { ClockIcon, HomeIcon, TruckIcon, CalendarIcon, CheckIcon, MapPinIcon, ShoppingBagIcon, UserIcon } from '@heroicons/vue/24/outline'
 import BaseBadge from '@/components/ui/BaseBadge.vue'
 
@@ -176,16 +177,12 @@ const totalItems = computed(() => {
 /** Nombre para mostrar en cocina en pedidos "en el local" (prioriza quien recibe / recoge). */
 const kitchenPickupName = computed(() => {
     if (props.variant !== 'kitchen' || props.order.type !== 'onsite') return ''
-    const n = (props.order.guestName?.trim() || props.order.customerName?.trim()) ?? ''
-    return n
+    return orderListRecipientDisplayName(props.order)
 })
 
 const orderNotesDisplay = computed(() => (props.order.notes ?? '').trim())
 
-const deliveryRecipientName = computed(() => {
-    const n = (props.order.guestName?.trim() || props.order.customerName?.trim()) ?? ''
-    return n
-})
+const deliveryRecipientName = computed(() => orderListRecipientDisplayName(props.order))
 
 const getStatusVariant = () => {
     if (props.order.status === 'taken') return 'warning'

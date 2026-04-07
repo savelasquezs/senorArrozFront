@@ -251,6 +251,10 @@ import OrderStatusBadge from './OrderStatusBadge.vue'
 import OrderTypeBadge from './OrderTypeBadge.vue'
 import BaseLoading from '@/components/ui/BaseLoading.vue'
 import { useFormatting, getStatusTimeFromRecord } from '@/composables/useFormatting'
+import {
+    orderListRecipientDisplayName,
+    orderListRecipientDisplayTitle,
+} from '@/utils/orderRecipientDisplay'
 import { useToast } from '@/composables/useToast'
 import {
     ArrowsUpDownIcon,
@@ -338,22 +342,6 @@ const getStatusTime = (order: OrderListItem): string | undefined => {
 const formatQuickLabel = (bankName: string): string => {
     const base = `Transf ${bankName}`
     return base.length > 13 ? base.slice(0, 13) : base
-}
-
-/** Prioriza quien recibe (guestname); si vacío, titular del pedido (customerName). */
-function orderListRecipientDisplayName(order: OrderListItem): string {
-    const g = order.guestName?.trim()
-    const c = order.customerName?.trim()
-    return g || c || ''
-}
-
-/** Tooltip: si hay ambos nombres y difieren, muestra ambos para identificar al titular. */
-function orderListRecipientDisplayTitle(order: OrderListItem): string {
-    const line1 = orderListRecipientDisplayName(order)
-    const g = order.guestName?.trim()
-    const c = order.customerName?.trim()
-    if (g && c && g !== c) return `${line1} (cliente: ${c})`
-    return line1
 }
 
 /** Hasta 2 líneas de producto × cantidad; si hay más ítems, tercera línea "....". */
