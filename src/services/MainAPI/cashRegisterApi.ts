@@ -10,6 +10,8 @@ import type {
   CreateBranchInformalLoanDto,
   CreateCashVaultMovementDto,
   DeactivateBranchInformalLoanDto,
+  DeliveryAdvanceOrderRow,
+  LiquidatedDeliverymanOption,
 } from '@/types/cashRegister'
 
 class CashRegisterApi extends BaseApi {
@@ -40,6 +42,20 @@ class CashRegisterApi extends BaseApi {
     const params: Record<string, any> = {}
     if (branchId !== undefined) params.BranchId = branchId
     return this.post<BranchInformalLoan>('/cash-register/informal-loans', dto, { params })
+  }
+
+  async getDeliveryAdvanceOrders(branchId?: number): Promise<DeliveryAdvanceOrderRow[]> {
+    const params: Record<string, any> = {}
+    if (branchId !== undefined) params.BranchId = branchId
+    return this.get<DeliveryAdvanceOrderRow[]>('/cash-register/delivery-advance/orders', { params })
+  }
+
+  async getLiquidatedFullBlockedDeliverymen(branchId?: number): Promise<LiquidatedDeliverymanOption[]> {
+    const params: Record<string, any> = {}
+    if (branchId !== undefined) params.BranchId = branchId
+    return this.get<LiquidatedDeliverymanOption[]>('/cash-register/delivery-advance/liquidated-deliverymen', {
+      params,
+    })
   }
 
   async deactivateInformalLoan(

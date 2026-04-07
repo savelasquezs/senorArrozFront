@@ -242,7 +242,19 @@
                       </div>
 
                       <div v-if="loansTab === 'active'" class="mt-4 pt-3 border-t border-gray-100">
-                        <p class="text-xs font-semibold text-gray-600 uppercase tracking-wide mb-2">Registrar préstamo</p>
+                        <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between mb-2">
+                          <p class="text-xs font-semibold text-gray-600 uppercase tracking-wide">
+                            Registrar préstamo
+                          </p>
+                          <BaseButton
+                            variant="outline"
+                            size="sm"
+                            class="text-xs shrink-0 border-orange-200 text-orange-800"
+                            @click="openDeliveryAdvanceModal"
+                          >
+                            Pedidos domicilio…
+                          </BaseButton>
+                        </div>
                         <div class="flex flex-col gap-2 sm:flex-row sm:items-end">
                           <div class="flex-1 min-w-0">
                             <label class="text-xs text-gray-500 block mb-0.5">Concepto</label>
@@ -548,6 +560,12 @@
       </template>
     </BaseDialog>
 
+    <DeliveryAdvanceLoanModal
+      v-model="deliveryAdvanceModalOpen"
+      :branch-id="authStore.branchId"
+      @success="onDeliveryAdvanceSuccess"
+    />
+
     <BaseDialog
       v-model="deactivateDialogOpen"
       title="Dar de baja préstamo informal"
@@ -580,6 +598,7 @@ import MainLayout from '@/components/layout/MainLayout.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseDialog from '@/components/ui/BaseDialog.vue'
 import CashClosureHistoryModal from '@/components/cashRegister/CashClosureHistoryModal.vue'
+import DeliveryAdvanceLoanModal from '@/components/cashRegister/DeliveryAdvanceLoanModal.vue'
 import BankMovementsPanel from '@/components/payments/banks/BankMovementsPanel.vue'
 import { useAuthStore } from '@/store/auth'
 import { formatYmdBogota } from '@/utils/colombiaDate'
@@ -624,6 +643,7 @@ const informalLoansLoading = ref(false)
 const newLoanConcept = ref('')
 const newLoanAmount = ref<number>(0)
 const savingLoan = ref(false)
+const deliveryAdvanceModalOpen = ref(false)
 const deactivateDialogOpen = ref(false)
 const deactivateNotes = ref('')
 const loanToDeactivate = ref<BranchInformalLoan | null>(null)
@@ -959,6 +979,16 @@ async function loadBranchInformalLoans() {
 watch(loansTab, () => {
   void loadBranchInformalLoans()
 })
+
+function openDeliveryAdvanceModal() {
+  loansSectionExpanded.value = true
+  deliveryAdvanceModalOpen.value = true
+}
+
+async function onDeliveryAdvanceSuccess() {
+  await refreshExpectedPreservingBankActuals()
+  await loadBranchInformalLoans()
+}
 
 async function submitNewLoan() {
   const c = newLoanConcept.value.trim()

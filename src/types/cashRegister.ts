@@ -122,9 +122,32 @@ export interface BranchInformalLoan {
   deactivationNotes?: string | null
 }
 
+export interface DeliveryAdvanceLineDto {
+  orderId: number
+  vueltoAdd: number
+}
+
+export interface CreateDeliveryAdvanceInformalLoanDto {
+  deliverymanId: number
+  lines: DeliveryAdvanceLineDto[]
+}
+
 export interface CreateBranchInformalLoanDto {
-  concept: string
-  amount: number
+  concept?: string
+  amount?: number
+  deliveryAdvance?: CreateDeliveryAdvanceInformalLoanDto
+}
+
+export interface DeliveryAdvanceOrderRow {
+  id: number
+  total: number
+  status: string
+  addressSummary: string
+}
+
+export interface LiquidatedDeliverymanOption {
+  id: number
+  name: string
 }
 
 export interface DeactivateBranchInformalLoanDto {
