@@ -53,6 +53,7 @@
       <template v-else-if="expected">
         <div class="flex flex-col gap-4">
           <div class="lg:grid lg:grid-cols-2 lg:gap-4 lg:items-start">
+            <div class="min-w-0 space-y-4">
             <!-- ===== SECCIÓN 1: EFECTIVO ===== -->
             <div class="bg-white rounded-xl border border-gray-200 overflow-hidden min-w-0">
               <div class="bg-yellow-50 border-b border-yellow-100 px-4 py-2.5 flex items-center gap-2">
@@ -135,7 +136,6 @@
               </div>
             </div>
 
-            <div class="min-w-0 space-y-4">
               <!-- ===== SECCIÓN 2: PRÉSTAMOS INFORMALES ===== -->
               <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
                 <button
@@ -284,7 +284,9 @@
                   </div>
                 </div>
               </div>
+            </div>
 
+            <div class="min-w-0 space-y-4">
               <!-- ===== CAJA MAYOR EFECTIVO ===== -->
               <div
                 v-if="canViewClosureHistory && cashVaultBank"
