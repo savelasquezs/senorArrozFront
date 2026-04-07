@@ -18,8 +18,9 @@
                         Tipo
                     </th>
                     <th scope="col"
-                        class="w-[10%] min-w-0 px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Cliente
+                        class="w-[10%] min-w-0 px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                        title="Nombre de quien recibe; si no hay, el del cliente del pedido">
+                        Recibe
                     </th>
                     <th scope="col"
                         class="w-[10%] min-w-0 px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -107,17 +108,17 @@
                         </button>
                     </td>
 
-                    <!-- Cliente (clickeable para editar) -->
+                    <!-- Quien recibe (guestName); respaldo nombre del cliente del pedido -->
                     <td class="min-w-0 px-3 py-2">
                         <div class="flex items-start gap-1">
                             <button type="button" class="text-left hover:text-emerald-600 transition-colors min-w-0 flex-1"
                                 @click.stop="$emit('edit-customer', order)">
-                                <div v-if="order.customerName || order.guestName"
+                                <div v-if="orderListRecipientDisplayName(order)"
                                     class="text-sm font-medium text-gray-900 hover:underline truncate"
-                                    :title="order.customerName || order.guestName || ''">
-                                    {{ order.customerName || order.guestName }}
+                                    :title="orderListRecipientDisplayTitle(order)">
+                                    {{ orderListRecipientDisplayName(order) }}
                                 </div>
-                                <span v-else class="text-sm text-gray-400 italic hover:underline">Sin cliente</span>
+                                <span v-else class="text-sm text-gray-400 italic hover:underline">Sin nombre</span>
                                 <div v-if="order.customerPhone" class="text-sm text-gray-500 tabular-nums truncate">
                                     {{ order.customerPhone }}
                                 </div>
@@ -337,6 +338,22 @@ const getStatusTime = (order: OrderListItem): string | undefined => {
 const formatQuickLabel = (bankName: string): string => {
     const base = `Transf ${bankName}`
     return base.length > 13 ? base.slice(0, 13) : base
+}
+
+/** Prioriza quien recibe (guestname); si vacío, titular del pedido (customerName). */
+function orderListRecipientDisplayName(order: OrderListItem): string {
+    const g = order.guestName?.trim()
+    const c = order.customerName?.trim()
+    return g || c || ''
+}
+
+/** Tooltip: si hay ambos nombres y difieren, muestra ambos para identificar al titular. */
+function orderListRecipientDisplayTitle(order: OrderListItem): string {
+    const line1 = orderListRecipientDisplayName(order)
+    const g = order.guestName?.trim()
+    const c = order.customerName?.trim()
+    if (g && c && g !== c) return `${line1} (cliente: ${c})`
+    return line1
 }
 
 /** Hasta 2 líneas de producto × cantidad; si hay más ítems, tercera línea "....". */

@@ -14,10 +14,11 @@
                             <ChevronDownIcon v-else class="w-3 h-3" />
                         </div>
                     </th>
-                    <!-- Cliente -->
+                    <!-- Quien recibe -->
                     <th scope="col"
-                        class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Cliente
+                        class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                        title="Nombre de quien recibe; si no hay, el del cliente del pedido">
+                        Recibe
                     </th>
                     <!-- Dirección -->
                     <th scope="col"
@@ -86,15 +87,16 @@
                         </router-link>
                     </td>
 
-                    <!-- Cliente -->
+                    <!-- Quien recibe -->
                     <td class="px-4 py-4 whitespace-nowrap">
                         <button class="text-left hover:text-emerald-600 transition-colors"
                             @click.stop="$emit('edit-customer', order)">
-                            <div v-if="order.customerName || order.guestName"
-                                class="text-sm font-medium text-gray-900 hover:underline">
-                                {{ order.customerName || order.guestName }}
+                            <div v-if="orderListRecipientDisplayName(order)"
+                                class="text-sm font-medium text-gray-900 hover:underline"
+                                :title="orderListRecipientDisplayTitle(order)">
+                                {{ orderListRecipientDisplayName(order) }}
                             </div>
-                            <span v-else class="text-sm text-gray-400 italic hover:underline">Sin cliente</span>
+                            <span v-else class="text-sm text-gray-400 italic hover:underline">Sin nombre</span>
                             <div v-if="order.customerPhone" class="text-xs text-gray-500">
                                 {{ order.customerPhone }}
                             </div>
@@ -228,6 +230,20 @@ const emit = defineEmits<{
 }>()
 
 const { formatCurrency } = useFormatting()
+
+function orderListRecipientDisplayName(order: OrderListItem): string {
+    const g = order.guestName?.trim()
+    const c = order.customerName?.trim()
+    return g || c || ''
+}
+
+function orderListRecipientDisplayTitle(order: OrderListItem): string {
+    const line1 = orderListRecipientDisplayName(order)
+    const g = order.guestName?.trim()
+    const c = order.customerName?.trim()
+    if (g && c && g !== c) return `${line1} (cliente: ${c})`
+    return line1
+}
 
 const formatDate = (dateString: string | Date | null): string => {
     if (!dateString) return '—'

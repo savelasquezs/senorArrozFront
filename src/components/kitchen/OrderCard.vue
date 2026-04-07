@@ -173,17 +173,17 @@ const totalItems = computed(() => {
     return props.orderItems?.reduce((sum, item) => sum + item.quantity, 0) || 0
 })
 
-/** Nombre para mostrar en cocina en pedidos "en el local". */
+/** Nombre para mostrar en cocina en pedidos "en el local" (prioriza quien recibe / recoge). */
 const kitchenPickupName = computed(() => {
     if (props.variant !== 'kitchen' || props.order.type !== 'onsite') return ''
-    const n = (props.order.customerName?.trim() || props.order.guestName?.trim()) ?? ''
+    const n = (props.order.guestName?.trim() || props.order.customerName?.trim()) ?? ''
     return n
 })
 
 const orderNotesDisplay = computed(() => (props.order.notes ?? '').trim())
 
 const deliveryRecipientName = computed(() => {
-    const n = (props.order.customerName?.trim() || props.order.guestName?.trim()) ?? ''
+    const n = (props.order.guestName?.trim() || props.order.customerName?.trim()) ?? ''
     return n
 })
 
