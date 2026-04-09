@@ -157,6 +157,25 @@ class DeliverymanApi extends BaseApi {
     async deleteAdvance(deliverymanId: number, advanceId: number): Promise<void> {
         return this.delete<void>(`/deliverymen/${deliverymanId}/advances/${advanceId}`)
     }
+
+    /**
+     * Obtiene la última ubicación GPS registrada de un domiciliario.
+     */
+    async getLastLocation(deliverymanId: number): Promise<DeliverymanLastLocationDto | null> {
+        try {
+            return await this.get<DeliverymanLastLocationDto>(`/deliverymen/${deliverymanId}/last-location`)
+        } catch {
+            return null
+        }
+    }
+}
+
+export interface DeliverymanLastLocationDto {
+    deliverymanId: number
+    deliveryRouteId: number | null
+    latitude: number
+    longitude: number
+    recordedAt: string
 }
 
 export const deliverymanApi = new DeliverymanApi()

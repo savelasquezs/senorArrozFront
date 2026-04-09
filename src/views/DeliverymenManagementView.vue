@@ -62,6 +62,26 @@
                     />
                 </div>
             </div>
+        <!-- Mapa GPS en tiempo real -->
+            <div class="mt-6">
+                <div class="flex items-center justify-between mb-3">
+                    <h2 class="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                        <span class="w-2.5 h-2.5 rounded-full"
+                            :class="Object.keys(driverLocations).length > 0 ? 'bg-emerald-500 animate-pulse' : 'bg-gray-300'">
+                        </span>
+                        Ubicación en tiempo real
+                    </h2>
+                    <span v-if="Object.keys(driverLocations).length === 0" class="text-xs text-gray-400">
+                        Sin señal GPS activa
+                    </span>
+                </div>
+                <div class="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
+                    <DeliveryMap
+                        :orders="[]"
+                        :deliveryman-locations="driverLocations"
+                    />
+                </div>
+            </div>
         </div>
 
         <!-- Modales -->
@@ -111,10 +131,11 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, onUnmounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/store/auth'
 import { useToast } from '@/composables/useToast'
+import { useSignalR } from '@/composables/useSignalR'
 import { deliverymanApi } from '@/services/MainAPI/deliverymanApi'
 import type { DeliverymanStats, DeliverymanAdvance, DeliverymanDetail, SettleDeliverymanDayResultDto } from '@/types/deliveryman'
 import { useOrdersDraftsStore } from '@/store/ordersDrafts'
@@ -128,11 +149,13 @@ import DeliverymanDetailModal from '@/components/deliverymen/DeliverymanDetailMo
 import LiquidationWizardModal from '@/components/deliverymen/LiquidationWizardModal.vue'
 import LiquidationConfirmModal from '@/components/deliverymen/LiquidationConfirmModal.vue'
 import DeliverymanOrdersModal from '@/components/deliverymen/DeliverymanOrdersModal.vue'
+import DeliveryMap, { type DriverLocation } from '@/components/delivery/DeliveryMap.vue'
 import { ArrowPathIcon, TruckIcon } from '@heroicons/vue/24/outline'
 
 const router = useRouter()
 const authStore = useAuthStore()
 const { success, error } = useToast()
+const { on, isConnected } = useSignalR()
 
 // Estado
 // Fecha de hoy en zona Colombia (evitar desfase por UTC)
@@ -179,6 +202,42 @@ const deliverymenStats = computed((): DeliverymanStats[] => {
         return { ...stat, baseAmount, currentBalance }
     })
 })
+
+// ─── GPS Tracking en tiempo real ────────────────────────────────────────────
+
+/**
+ * Ubicaciones GPS indexadas por deliverymanId.
+ * Se actualiza vía SignalR o polling como fallback.
+ */
+const driverLocations = ref<Record<number, DriverLocation>>({})
+
+let _pollInterval: ReturnType<typeof setInterval> | null = null
+
+const startPolling = () => {
+    if (_pollInterval) return
+    _pollInterval = setInterval(async () => {
+        if (isConnected.value) return
+        for (const stat of deliverymenStats.value) {
+            try {
+                const loc = await deliverymanApi.getLastLocation(stat.deliverymanId)
+                if (loc) {
+                    driverLocations.value[loc.deliverymanId] = {
+                        lat: loc.latitude,
+                        lng: loc.longitude,
+                        updatedAt: new Date(loc.recordedAt),
+                        name: stat.deliverymanName,
+                    }
+                }
+            } catch { /* ignorar errores de polling individual */ }
+        }
+    }, 30_000)
+}
+
+const stopPolling = () => {
+    if (_pollInterval) { clearInterval(_pollInterval); _pollInterval = null }
+}
+
+// ─── Carga de datos ──────────────────────────────────────────────────────────
 
 // Cargar datos: una sola llamada a getDailyOverview
 const loadData = async () => {
@@ -324,7 +383,6 @@ const goToExpenses = () => {
 }
 
 onMounted(() => {
-    // Verificar permisos
     if (authStore.userRole !== 'Admin' && authStore.userRole !== 'Cashier' && authStore.userRole !== 'Superadmin') {
         router.push('/')
         return
@@ -332,6 +390,24 @@ onMounted(() => {
 
     ordersDraftsStore.loadBanks()
     loadData()
+
+    // Escuchar actualizaciones de GPS en tiempo real
+    on('DeliverymanLocationUpdate', (data: any) => {
+        if (!data?.deliverymanId) return
+        const stat = deliverymenStats.value.find(s => s.deliverymanId === data.deliverymanId)
+        driverLocations.value[data.deliverymanId] = {
+            lat: data.latitude,
+            lng: data.longitude,
+            updatedAt: new Date(data.recordedAt),
+            name: stat?.deliverymanName,
+        }
+    })
+
+    startPolling()
+})
+
+onUnmounted(() => {
+    stopPolling()
 })
 </script>
 
