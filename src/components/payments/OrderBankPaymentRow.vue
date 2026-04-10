@@ -45,7 +45,7 @@
                         {{ payment.isVerified ? 'Verificado' : 'Pendiente' }}
                     </span>
                 </div>
-                <div :class="comfortableAmountClass">{{ formatCurrency(payment.amount) }}</div>
+                <div :class="comfortableAmountClass">{{ formatCurrency(payment.amount) }}  {{ payment.bankName }}</div>
                 <div v-if="payment.isVerified && payment.verifiedAt" :class="comfortableMetaClass">
                     Verificado: {{ formatDateTime(payment.verifiedAt) }}
                 </div>
