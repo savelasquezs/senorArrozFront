@@ -4,7 +4,7 @@
             <thead class="sticky top-0 z-10 bg-gray-50 shadow-sm">
                 <tr>
                     <th scope="col"
-                        class="w-[24%] min-w-0 px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                        class="w-[20%] min-w-0 px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
                         @click="$emit('sort', 'id')">
                         <div class="flex items-center space-x-1">
                             <span>ID</span>
@@ -14,7 +14,7 @@
                         </div>
                     </th>
                     <th scope="col"
-                        class="w-[6%] min-w-0 px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        class="w-[10%] min-w-0 px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Tipo
                     </th>
                     <th scope="col"
