@@ -3,7 +3,7 @@
     <div v-if="density === 'compact'" :class="compactWrapperClass">
         <div class="flex items-center gap-1 min-w-0 flex-1">
             <component :is="leadIcon" :class="compactIconClass" />
-            <span class="font-medium truncate max-w-[5.5rem]" :title="payment.bankName">{{ payment.bankName }}</span>
+            <span class="font-medium truncate min-w-0 flex-1 text-left" :title="payment.bankName">{{ payment.bankName }}</span>
             <span v-if="showVerifyActions && payment.isVerified" class="shrink-0 text-green-600" title="Verificado">
                 <CheckCircleIcon class="w-3 h-3" />
             </span>
@@ -45,7 +45,7 @@
                         {{ payment.isVerified ? 'Verificado' : 'Pendiente' }}
                     </span>
                 </div>
-                <div :class="comfortableAmountClass">{{ formatCurrency(payment.amount) }}  {{ payment.bankName }}</div>
+                <div :class="comfortableAmountClass">{{ formatCurrency(payment.amount) }}</div>
                 <div v-if="payment.isVerified && payment.verifiedAt" :class="comfortableMetaClass">
                     Verificado: {{ formatDateTime(payment.verifiedAt) }}
                 </div>
