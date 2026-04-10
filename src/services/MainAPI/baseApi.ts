@@ -34,6 +34,14 @@ export class BaseApi {
 			(response) => response,
 			async (error) => {
 				const originalRequest = error.config;
+				const url = String(originalRequest?.url ?? '');
+				// No reintentar login/refresh ni entrar en bucle si el refresh devuelve 401
+				if (
+					url.includes('/auth/login') ||
+					url.includes('/auth/refresh')
+				) {
+					return Promise.reject(error);
+				}
 				if (error.response?.status === 401 && !originalRequest._retry) {
 					originalRequest._retry = true;
 					try {
@@ -42,8 +50,12 @@ export class BaseApi {
 							const response = await this.api.post('/auth/refresh', {
 								refreshToken,
 							});
-							localStorage.setItem('auth_token', response.data.token);
-							originalRequest.headers.Authorization = `Bearer ${response.data.token}`;
+							const { token, refreshToken: newRefresh } = response.data;
+							localStorage.setItem('auth_token', token);
+							if (newRefresh) {
+								localStorage.setItem('refresh_token', newRefresh);
+							}
+							originalRequest.headers.Authorization = `Bearer ${token}`;
 							return this.api(originalRequest);
 						}
 					} catch {
