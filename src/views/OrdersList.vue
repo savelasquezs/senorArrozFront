@@ -959,8 +959,8 @@ const resSortOrder = ref<'asc' | 'desc'>('desc')
 const resSearch = ref('')
 const resStatus = ref<string | null>(null)
 const colombiaDateInput = () => new Date().toLocaleDateString('en-CA', { timeZone: 'America/Bogota' })
-const resFrom = ref(colombiaDateInput())
-const resTo = ref(colombiaDateInput())
+const resFrom = ref('')
+const resTo = ref('')
 
 const resStatusOptions = [
     { value: null, label: 'Activas (sin canceladas/entregadas)' },
