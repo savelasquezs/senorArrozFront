@@ -34,6 +34,11 @@
                                             display-key="label" placeholder="Banco (pagos)"
                                             @update:model-value="onBankFilterChange" />
                                     </div>
+                                    <div class="w-40 sm:w-44">
+                                        <BaseSelect v-model="filters.appPayments" :options="appPaymentsFilterOptions"
+                                            value-key="value" display-key="label" placeholder="Apps (pagos)"
+                                            @update:model-value="applyFilters" />
+                                    </div>
                                     <div class="flex items-center gap-2 flex-wrap">
                                         <BaseInput v-model="dateFilters.fromDate" type="date" placeholder="Desde"
                                             class="w-32 sm:w-36" @change="fetchOrders" />
@@ -381,6 +386,7 @@ const filters = ref<OrderFilterState>({
     type: null,
     status: null,
     customer: '',
+    appPayments: null,
 })
 
 /** Filtro servidor: pedidos con pago en este banco */
@@ -408,6 +414,12 @@ const typeOptions: Array<{ value: string | null; label: string }> = [
     { value: 'onsite', label: 'En el local' },
     { value: 'delivery', label: 'Domicilio' },
     { value: 'reservation', label: 'Reserva' },
+]
+
+const appPaymentsFilterOptions: Array<{ value: OrderFilterState['appPayments']; label: string }> = [
+    { value: null, label: 'Todas (apps)' },
+    { value: 'with', label: 'Con pago por app' },
+    { value: 'without', label: 'Sin pago por app' },
 ]
 
 const statusOptions: Array<{ value: string | null; label: string }> = [
@@ -503,6 +515,7 @@ const hasActiveFilters = computed(() => {
         filters.value.type ||
         filters.value.status ||
         filters.value.customer ||
+        filters.value.appPayments ||
         bankFilterId.value != null ||
         fromDiffers ||
         dateFilters.value.toDate
@@ -549,6 +562,7 @@ const clearFilters = () => {
         type: null,
         status: null,
         customer: '',
+        appPayments: null,
     }
     bankFilterId.value = null
     dateFilters.value = {

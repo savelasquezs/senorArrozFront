@@ -5,6 +5,9 @@ import type { OrderListItem, OrderType, OrderStatus } from '@/types/order'
  * Estado de filtros para órdenes (filtros locales sobre la página cargada).
  * bankId se aplica en el servidor vía searchOrders, no aquí.
  */
+/** Filtro por pagos vía apps (Rappi, etc.): con al menos un appPayment, sin ninguno, o todos. */
+export type AppPaymentsFilter = null | 'with' | 'without'
+
 export interface OrderFilterState {
     /** Dígitos del total: al tipear se acota por prefijo (ej. 3 → 30 → 300 para 30000). */
     totalQuery: string
@@ -12,6 +15,8 @@ export interface OrderFilterState {
     type: OrderType | null
     status: OrderStatus | null
     customer: string
+    /** null = todos; with = pedidos con al menos un pago por app; without = solo banco / sin appPayments */
+    appPayments: AppPaymentsFilter
 }
 
 /**
@@ -73,6 +78,17 @@ export function useOrderFilters() {
         })
     }
 
+    const filterByAppPayments = (
+        orders: OrderListItem[],
+        mode: AppPaymentsFilter
+    ): OrderListItem[] => {
+        if (!mode) return orders
+        return orders.filter((order) => {
+            const has = Array.isArray(order.appPayments) && order.appPayments.length > 0
+            return mode === 'with' ? has : !has
+        })
+    }
+
     const applyAllFilters = (
         orders: OrderListItem[],
         filters: OrderFilterState
@@ -95,6 +111,10 @@ export function useOrderFilters() {
 
         if (filters.customer) {
             filtered = filterByCustomer(filtered, filters.customer)
+        }
+
+        if (filters.appPayments) {
+            filtered = filterByAppPayments(filtered, filters.appPayments)
         }
 
         return filtered
@@ -132,6 +152,7 @@ export function useOrderFilters() {
         filterByType,
         filterByStatus,
         filterByCustomer,
+        filterByAppPayments,
         applyAllFilters,
         sortOrders,
     }
