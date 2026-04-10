@@ -155,7 +155,8 @@ import { ArrowPathIcon, TruckIcon } from '@heroicons/vue/24/outline'
 const router = useRouter()
 const authStore = useAuthStore()
 const { success, error } = useToast()
-const { on, isConnected } = useSignalR()
+const SIGNALR_HUB_URL = import.meta.env.VITE_SIGNALR_HUB_URL || 'http://localhost:5000/hubs/orders'
+const { on, isConnected } = useSignalR(SIGNALR_HUB_URL)
 
 // Estado
 // Fecha de hoy en zona Colombia (evitar desfase por UTC)
@@ -216,7 +217,7 @@ let _pollInterval: ReturnType<typeof setInterval> | null = null
 const startPolling = () => {
     if (_pollInterval) return
     _pollInterval = setInterval(async () => {
-        if (isConnected.value) return
+        if (isConnected.value || deliverymenStats.value.length === 0) return
         for (const stat of deliverymenStats.value) {
             try {
                 const loc = await deliverymanApi.getLastLocation(stat.deliverymanId)
