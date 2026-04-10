@@ -3,7 +3,7 @@
     <div v-if="density === 'compact'" :class="compactWrapperClass">
         <div class="flex items-center gap-1 min-w-0 flex-1">
             <component :is="leadIcon" :class="compactIconClass" />
-            <span class="font-medium truncate min-w-0 flex-1 text-left" :title="payment.bankName">{{ payment.bankName }}</span>
+            <span class="font-medium truncate min-w-0 flex-1 text-left" :title="bankDisplayName">{{ bankDisplayName }}</span>
             <span v-if="showVerifyActions && payment.isVerified" class="shrink-0 text-green-600" title="Verificado">
                 <CheckCircleIcon class="w-3 h-3" />
             </span>
@@ -39,7 +39,7 @@
             <component :is="leadIcon" :class="comfortableLeadIconClass" />
             <div class="flex-1 min-w-0">
                 <div class="flex items-center gap-2 flex-wrap">
-                    <div :class="comfortableTitleClass">{{ payment.bankName }}</div>
+                    <div :class="comfortableTitleClass">{{ bankDisplayName }}</div>
                     <span v-if="showVerificationBadge && showVerifyActions" :class="badgeClass">
                         <component :is="payment.isVerified ? CheckCircleIcon : ClockIcon" class="w-3 h-3 mr-1" />
                         {{ payment.isVerified ? 'Verificado' : 'Pendiente' }}
@@ -114,6 +114,12 @@ const emit = defineEmits<{
 }>()
 
 const { formatCurrency, formatDateTime } = useFormatting()
+
+/** Nombre para UI; el listado /search antes no cargaba Bank y el API devolvía bankName vacío. */
+const bankDisplayName = computed(() => {
+    const n = props.payment.bankName?.trim() ?? ''
+    return n || `Banco #${props.payment.bankId}`
+})
 
 const leadIcon = computed(() => (props.variant === 'table' ? BanknotesIcon : BuildingLibraryIcon))
 
