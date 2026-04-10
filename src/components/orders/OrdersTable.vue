@@ -166,25 +166,14 @@
                         <div class="space-y-1">
                             <!-- Bank Payments -->
                             <div v-if="order.bankPayments && order.bankPayments.length > 0" class="space-y-1">
-                                <div v-for="payment in order.bankPayments" :key="payment.id"
-                                    class="flex items-center justify-between gap-1 text-xs bg-blue-50 rounded px-1.5 py-0.5 min-w-0">
-                                    <div class="flex items-center gap-1 min-w-0">
-                                        <BanknotesIcon class="w-4 h-4 text-blue-600" />
-                                        <span class="font-medium text-blue-900 truncate max-w-[5.5rem]" :title="payment.bankName">{{ payment.bankName }}</span>
-                                        <span class="text-blue-700 shrink-0 tabular-nums">{{ formatCurrency(payment.amount) }}</span>
-                                    </div>
-                                    <!-- Botón de verificación -->
-                                    <button type="button" v-if="canVerifyPayment(order)"
-                                        @click.stop="emit('verify-bank-payment', order, payment)" :class="[
-                                            'p-1 rounded transition-colors',
-                                            payment.isVerified
-                                                ? 'text-green-600 hover:bg-green-100'
-                                                : 'text-gray-400 hover:bg-gray-100'
-                                        ]" :title="payment.isVerified ? 'Verificado' : 'Verificar pago'">
-                                        <CheckCircleIcon v-if="payment.isVerified" class="w-4 h-4" />
-                                        <XCircleIcon v-else class="w-4 h-4" />
-                                    </button>
-                                </div>
+                                <OrderBankPaymentRow v-for="payment in order.bankPayments" :key="payment.id"
+                                    :payment="payment" density="compact" variant="table"
+                                    :show-verify-actions="showVerifyBankActions(order)"
+                                    :show-edit-remove="permissions.canEditPayments(order)"
+                                    :show-verification-badge="false" @verify="emit('verify-bank-payment', order, payment)"
+                                    @unverify="emit('verify-bank-payment', order, payment)"
+                                    @edit="emit('edit-bank-payment', order, $event)"
+                                    @remove="emit('remove-bank-payment', order, $event)" />
                             </div>
 
                             <!-- App Payments (solo visualización) -->
@@ -250,7 +239,9 @@ import type { Bank } from '@/types/bank'
 import OrderStatusBadge from './OrderStatusBadge.vue'
 import OrderTypeBadge from './OrderTypeBadge.vue'
 import BaseLoading from '@/components/ui/BaseLoading.vue'
+import OrderBankPaymentRow from '@/components/payments/OrderBankPaymentRow.vue'
 import { useFormatting, getStatusTimeFromRecord } from '@/composables/useFormatting'
+import { useOrderPermissions } from '@/composables/useOrderPermissions'
 import {
     orderListRecipientDisplayName,
     orderListRecipientDisplayTitle,
@@ -262,8 +253,6 @@ import {
     ChevronDownIcon,
     BanknotesIcon,
     DevicePhoneMobileIcon,
-    CheckCircleIcon,
-    XCircleIcon,
     ClipboardDocumentIcon,
 } from '@heroicons/vue/24/outline'
 
@@ -277,6 +266,8 @@ interface Props {
 
 const props = defineProps<Props>()
 
+const permissions = useOrderPermissions()
+
 const emit = defineEmits<{
     'edit-customer': [order: OrderListItem]
     'edit-address': [order: OrderListItem]
@@ -284,6 +275,8 @@ const emit = defineEmits<{
     'assign-delivery': [order: OrderListItem]
     'edit-type': [order: OrderListItem]
     'verify-bank-payment': [order: OrderListItem, payment: OrderBankPaymentDetail]
+    'edit-bank-payment': [order: OrderListItem, payment: OrderBankPaymentDetail]
+    'remove-bank-payment': [order: OrderListItem, payment: OrderBankPaymentDetail]
     'quick-bank-transfer': [order: OrderListItem, bankId: number]
     'add-deposit': [order: OrderListItem]
     sort: [column: 'id' | 'total' | 'createdAt']
@@ -323,10 +316,8 @@ const formatTime = (dateString: string): string => {
     })
 }
 
-const canVerifyPayment = (order: OrderListItem): boolean => {
-    // Solo si el pedido no está cancelado
-    return order.status !== 'cancelled'
-}
+const showVerifyBankActions = (order: OrderListItem): boolean =>
+    permissions.canVerifyPayments() && order.status !== 'cancelled'
 
 // Valida si se puede asignar domiciliario al pedido
 const canAssignDeliveryman = (order: OrderListItem): boolean => {

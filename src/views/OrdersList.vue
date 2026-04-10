@@ -109,6 +109,8 @@
                                     @edit-customer="handleEditCustomer" @edit-address="handleEditAddress"
                                     @change-status="handleChangeStatus" @assign-delivery="handleAssignDelivery"
                                     @edit-type="handleEditType" @verify-bank-payment="handleVerifyBankPayment"
+                                    @edit-bank-payment="handleEditBankPaymentFromList"
+                                    @remove-bank-payment="handleRemoveBankPaymentFromList"
                                     @quick-bank-transfer="handleQuickBankTransfer" @add-deposit="handleOpenDeposit"
                                     @sort="handleSort" />
                             </template>
@@ -125,6 +127,8 @@
                                         @edit-customer="handleEditCustomer" @edit-address="handleEditAddress"
                                         @change-status="handleChangeStatus" @assign-delivery="handleAssignDelivery"
                                         @edit-type="handleEditType" @verify-bank-payment="handleVerifyBankPayment"
+                                        @edit-bank-payment="handleEditBankPaymentFromList"
+                                        @remove-bank-payment="handleRemoveBankPaymentFromList"
                                         @quick-bank-transfer="handleQuickBankTransfer"
                                         @add-deposit="handleOpenDeposit" @sort="handleSort" />
                                 </div>
@@ -316,6 +320,51 @@
             :order="depositOrder"
             @deposited="handleDeposited"
         />
+
+        <BaseDialog v-model="showRemoveBankPaymentDialog" title="Eliminar pago bancario" size="sm">
+            <p class="text-sm text-gray-600">
+                ¿Eliminar la transferencia
+                <span v-if="removeBankPaymentTarget" class="font-medium text-gray-900">{{
+                    removeBankPaymentTarget.payment.bankName
+                }}</span>
+                por
+                <span v-if="removeBankPaymentTarget" class="font-medium tabular-nums">{{
+                    formatCurrency(removeBankPaymentTarget.payment.amount)
+                }}</span>
+                ?
+            </p>
+            <template #footer>
+                <BaseButton variant="secondary" size="sm" :disabled="removeBankPaymentLoading"
+                    @click="closeRemoveBankPaymentDialog">
+                    Cancelar
+                </BaseButton>
+                <BaseButton variant="primary" size="sm" class="bg-red-600 hover:bg-red-700"
+                    :loading="removeBankPaymentLoading" @click="confirmRemoveBankPayment">
+                    Eliminar
+                </BaseButton>
+            </template>
+        </BaseDialog>
+
+        <BaseDialog v-model="showEditBankPaymentDialog" title="Editar monto — pago bancario" size="sm">
+            <div v-if="editBankPaymentTarget" class="space-y-3">
+                <p class="text-sm text-gray-600">
+                    {{ editBankPaymentTarget.payment.bankName }} — máximo
+                    {{ formatCurrency(maxEditBankPaymentAmount) }}
+                </p>
+                <BaseInput v-model.number="editBankPaymentAmount" type="number" :max="maxEditBankPaymentAmount"
+                    placeholder="Monto" class="w-full" />
+            </div>
+            <template #footer>
+                <BaseButton variant="secondary" size="sm" :disabled="editBankPaymentLoading"
+                    @click="closeEditBankPaymentDialog">
+                    Cancelar
+                </BaseButton>
+                <BaseButton variant="primary" size="sm" :loading="editBankPaymentLoading"
+                    @click="confirmEditBankPayment">
+                    Guardar
+                </BaseButton>
+            </template>
+        </BaseDialog>
     </MainLayout>
 </template>
 
@@ -326,7 +375,8 @@ import { orderApi } from '@/services/MainAPI/orderApi'
 import { useOrderFilters, type OrderFilterState } from '@/composables/useOrderFilters'
 import { useOrderPermissions } from '@/composables/useOrderPermissions'
 import { useToast } from '@/composables/useToast'
-import { getOrderStatusDisplayName, getOrderTypeDisplayName } from '@/composables/useFormatting'
+import { getOrderStatusDisplayName, getOrderTypeDisplayName, useFormatting } from '@/composables/useFormatting'
+import { sumPaymentsAmounts } from '@/utils/orderCashToCollect'
 import { bankPaymentApi } from '@/services/MainAPI/bankPaymentApi'
 import type { BankPayment } from '@/types/bank'
 import { useBanksStore } from '@/store/banks'
@@ -340,6 +390,7 @@ import ReservationsTable from '@/components/reservations/ReservationsTable.vue'
 import BaseInput from '@/components/ui/BaseInput.vue'
 import BaseSelect from '@/components/ui/BaseSelect.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
+import BaseDialog from '@/components/ui/BaseDialog.vue'
 import {
     MagnifyingGlassIcon,
     ArrowPathIcon,
@@ -369,6 +420,7 @@ const switchTab = (tab: TabValue) => {
     }
 }
 const { success, error } = useToast()
+const { formatCurrency } = useFormatting()
 
 // Estado
 const loading = ref(false)
@@ -407,6 +459,23 @@ const selectedOrder = ref<OrderListItem | null>(null)
 const pendingStatusChange = ref<OrderStatus | null>(null)
 const pendingOrderType = ref<'onsite' | 'delivery' | 'reservation' | null>(null)
 const originalOrderType = ref<'onsite' | 'delivery' | 'reservation' | null>(null)
+
+const showRemoveBankPaymentDialog = ref(false)
+const removeBankPaymentTarget = ref<{ order: OrderListItem; payment: OrderBankPaymentDetail } | null>(null)
+const removeBankPaymentLoading = ref(false)
+
+const showEditBankPaymentDialog = ref(false)
+const editBankPaymentTarget = ref<{ order: OrderListItem; payment: OrderBankPaymentDetail } | null>(null)
+const editBankPaymentAmount = ref(0)
+const editBankPaymentLoading = ref(false)
+
+const maxEditBankPaymentAmount = computed(() => {
+    const t = editBankPaymentTarget.value
+    if (!t) return 0
+    const totalPay =
+        sumPaymentsAmounts(t.order.bankPayments) + sumPaymentsAmounts(t.order.appPayments)
+    return t.order.total - totalPay + t.payment.amount
+})
 
 // Opciones de filtros
 const typeOptions: Array<{ value: string | null; label: string }> = [
@@ -704,6 +773,95 @@ const handleVerifyBankPayment = async (order: OrderListItem, payment: OrderBankP
         }
     } catch (err: any) {
         error('Error al verificar pago', err.message)
+    }
+}
+
+const closeRemoveBankPaymentDialog = () => {
+    showRemoveBankPaymentDialog.value = false
+    removeBankPaymentTarget.value = null
+}
+
+const handleRemoveBankPaymentFromList = (order: OrderListItem, payment: OrderBankPaymentDetail) => {
+    removeBankPaymentTarget.value = { order, payment }
+    showRemoveBankPaymentDialog.value = true
+}
+
+const confirmRemoveBankPayment = async () => {
+    const t = removeBankPaymentTarget.value
+    if (!t) return
+    removeBankPaymentLoading.value = true
+    try {
+        await bankPaymentApi.deletePayment(t.payment.id)
+        success('Pago eliminado', 5000, 'La transferencia fue eliminada')
+        const index = orders.value.findIndex((o) => o.id === t.order.id)
+        if (index !== -1) {
+            const o = orders.value[index]
+            const newList = [...orders.value]
+            newList[index] = {
+                ...o,
+                bankPayments: o.bankPayments.filter((p) => p.id !== t.payment.id),
+            }
+            orders.value = newList
+        }
+        closeRemoveBankPaymentDialog()
+    } catch (err: any) {
+        error('Error al eliminar pago', err.message)
+    } finally {
+        removeBankPaymentLoading.value = false
+    }
+}
+
+const closeEditBankPaymentDialog = () => {
+    showEditBankPaymentDialog.value = false
+    editBankPaymentTarget.value = null
+    editBankPaymentAmount.value = 0
+}
+
+const handleEditBankPaymentFromList = (order: OrderListItem, payment: OrderBankPaymentDetail) => {
+    editBankPaymentTarget.value = { order, payment }
+    editBankPaymentAmount.value = payment.amount
+    showEditBankPaymentDialog.value = true
+}
+
+const confirmEditBankPayment = async () => {
+    const t = editBankPaymentTarget.value
+    if (!t) return
+    const amount = Number(editBankPaymentAmount.value)
+    const max = maxEditBankPaymentAmount.value
+    if (!Number.isFinite(amount) || amount <= 0) {
+        error('Monto inválido', 'Ingresa un monto mayor a cero.')
+        return
+    }
+    if (amount > max) {
+        error('Monto inválido', `El máximo permitido es ${formatCurrency(max)}.`)
+        return
+    }
+    editBankPaymentLoading.value = true
+    try {
+        const u = await bankPaymentApi.updateBankPayment(t.payment.id, amount)
+        const next: OrderBankPaymentDetail = {
+            ...t.payment,
+            ...u,
+            verifiedAt: u.verifiedAt ?? t.payment.verifiedAt ?? null,
+        }
+        const index = orders.value.findIndex((o) => o.id === t.order.id)
+        if (index !== -1) {
+            const o = orders.value[index]
+            const pi = o.bankPayments.findIndex((p) => p.id === t.payment.id)
+            if (pi !== -1) {
+                const newPayments = [...o.bankPayments]
+                newPayments[pi] = next
+                const newList = [...orders.value]
+                newList[index] = { ...o, bankPayments: newPayments }
+                orders.value = newList
+            }
+        }
+        success('Pago actualizado', 5000, 'El monto fue guardado')
+        closeEditBankPaymentDialog()
+    } catch (err: any) {
+        error('Error al actualizar pago', err.message)
+    } finally {
+        editBankPaymentLoading.value = false
     }
 }
 

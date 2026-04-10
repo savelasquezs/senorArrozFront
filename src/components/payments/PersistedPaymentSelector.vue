@@ -82,53 +82,10 @@
             </div>
 
             <!-- Existing Bank Payments -->
-            <div v-for="payment in bankPayments" :key="payment.id"
-                class="flex items-center justify-between p-3 bg-green-50 rounded-lg border border-green-200">
-                <div class="flex items-center gap-3 flex-1">
-                    <BuildingLibraryIcon class="w-5 h-5 text-green-600" />
-                    <div class="flex-1">
-                        <div class="flex items-center gap-2">
-                            <div class="text-sm font-medium text-green-900">{{ payment.bankName }}</div>
-                            <!-- Badge de estado de verificación -->
-                            <span v-if="canVerify" :class="[
-                                'inline-flex items-center px-2 py-1 rounded-full text-xs font-medium',
-                                payment.isVerified
-                                    ? 'bg-green-100 text-green-800'
-                                    : 'bg-yellow-100 text-yellow-800'
-                            ]">
-                                <component :is="payment.isVerified ? CheckCircleIcon : ClockIcon"
-                                    class="w-3 h-3 mr-1" />
-                                {{ payment.isVerified ? 'Verificado' : 'Pendiente' }}
-                            </span>
-                        </div>
-                        <div class="text-sm text-green-600">{{ formatCurrency(payment.amount) }}</div>
-                        <div v-if="payment.isVerified && payment.verifiedAt" class="text-xs text-green-500 mt-1">
-                            Verificado: {{ formatDateTime(payment.verifiedAt) }}
-                        </div>
-                    </div>
-                </div>
-                <div class="flex gap-1">
-                    <!-- Botones de verificación (Admin/Superadmin) -->
-                    <BaseButton v-if="canVerify && !payment.isVerified" @click="handleVerifyPayment(payment.id)"
-                        variant="ghost" size="sm" title="Verificar pago">
-                        <CheckIcon class="w-4 h-4 text-emerald-600" />
-                    </BaseButton>
-                    <BaseButton v-if="canVerify && payment.isVerified" @click="handleUnverifyPayment(payment.id)"
-                        variant="ghost" size="sm" title="Desverificar pago">
-                        <XMarkIcon class="w-4 h-4 text-gray-600" />
-                    </BaseButton>
-
-                    <!-- Botones de edición (si tiene permisos) -->
-                    <BaseButton v-if="canEdit" @click="handleEditBankPayment(payment)" variant="ghost" size="sm"
-                        title="Editar monto">
-                        <PencilIcon class="w-4 h-4" />
-                    </BaseButton>
-                    <BaseButton v-if="canEdit" @click="handleRemoveBankPayment(payment.id)" variant="ghost" size="sm"
-                        class="text-red-600" title="Eliminar pago">
-                        <TrashIcon class="w-4 h-4" />
-                    </BaseButton>
-                </div>
-            </div>
+            <OrderBankPaymentRow v-for="payment in bankPayments" :key="payment.id" :payment="payment"
+                density="comfortable" variant="panel" :show-verify-actions="canVerify" :show-edit-remove="canEdit"
+                :show-verification-badge="true" @verify="handleVerifyPayment" @unverify="handleUnverifyPayment"
+                @edit="handleEditBankPayment" @remove="onRemoveBankPaymentRow" />
         </div>
 
         <!-- Payment Summary -->
@@ -229,9 +186,9 @@ import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseSelect from '@/components/ui/BaseSelect.vue'
 import BaseInput from '@/components/ui/BaseInput.vue'
 import BaseDialog from '@/components/ui/BaseDialog.vue'
+import OrderBankPaymentRow from '@/components/payments/OrderBankPaymentRow.vue'
 import {
     DevicePhoneMobileIcon,
-    BuildingLibraryIcon,
     TrashIcon,
     PencilIcon,
     PlusIcon,
@@ -358,6 +315,10 @@ const handleEditBankPayment = (payment: OrderBankPaymentDetail) => {
 
 const handleRemoveBankPayment = (paymentId: number) => {
     removeBankPaymentInternal(paymentId)
+}
+
+const onRemoveBankPaymentRow = (payment: OrderBankPaymentDetail) => {
+    handleRemoveBankPayment(payment.id)
 }
 
 const saveBankPayment = () => {
