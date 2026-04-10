@@ -149,6 +149,7 @@
 
 <script setup lang="ts">
 import { ref, watch, onMounted, onUnmounted } from 'vue'
+import { setOptions, importLibrary } from '@googlemaps/js-api-loader'
 import { parseGoogleMapsUrl } from '@/utils/parseGoogleMapsUrl'
 import BaseInput from './BaseInput.vue'
 import BaseButton from './BaseButton.vue'
@@ -216,201 +217,90 @@ let marker: any = null
 let geocoder: any = null
 let searchTimeout: any = null
 let sessionToken: any = null
+let placesLib: { AutocompleteSessionToken: any; AutocompleteSuggestion: any } | null = null
 
-// Load Google Maps script
-const loadGoogleMaps = () => {
-    return new Promise((resolve, reject) => {
-        if (isDestroyed.value) {
-            reject(new Error('Component destroyed'))
-            return
-        }
-
-        if ((window as any).google && (window as any).google.maps) {
-            resolve(true)
-            return
-        }
-
-        const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY
-        const mapId = import.meta.env.VITE_GOOGLE_MAPS_MAP_ID
-
-        if (!apiKey) {
-            reject(new Error('Google Maps API key not configured'))
-            return
-        }
-
-        // Build script URL with Map ID if available
-        let scriptUrl = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places&loading=async`
-        if (mapId && typeof mapId === 'string' && mapId.trim() !== '') {
-            scriptUrl += `&map_ids=${encodeURIComponent(mapId.trim())}`
-        }
-
-        const script = document.createElement('script')
-        script.src = scriptUrl
-        script.async = true
-        script.defer = true
-
-        script.onload = () => {
-            if (!isDestroyed.value) {
-                resolve(true)
-            } else {
-                reject(new Error('Component destroyed during script load'))
-            }
-        }
-        script.onerror = () => {
-            if (!isDestroyed.value) {
-                reject(new Error('Failed to load Google Maps'))
-            }
-        }
-
-        if (!isDestroyed.value) {
-            document.head.appendChild(script)
-        } else {
-            reject(new Error('Component destroyed before script append'))
-        }
-    })
-}
-
-// Initialize map
+// Initialize map using @googlemaps/js-api-loader (mismo loader que DeliveryMap.vue)
 const initializeMap = async () => {
     if (!mapContainer.value || isDestroyed.value) return
 
     try {
-        // Check if DOM element still exists
-        if (!mapContainer.value || !mapContainer.value.parentNode) {
-            return
-        }
-
-        // Wait a bit to ensure Google Maps is fully loaded
-        await new Promise(resolve => setTimeout(resolve, 100))
-
-        // Default location (Medellín, Colombia)
-        const defaultLocation = { lat: 6.2442, lng: -75.5812 }
-
-        const googleMaps = (window as any).google?.maps
-        if (!googleMaps || !googleMaps.Map) {
-            throw new Error('Google Maps not available or not fully loaded')
-        }
-
+        const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY
         const mapIdRaw = import.meta.env.VITE_GOOGLE_MAPS_MAP_ID
         const mapId = mapIdRaw && typeof mapIdRaw === 'string' && mapIdRaw.trim() !== '' ? mapIdRaw.trim() : undefined
 
-        const mapConfig: any = {
+        setOptions({
+            key: apiKey,
+            ...(mapId && { mapIds: [mapId] }),
+        })
+
+        // Cargar todas las librerías necesarias en paralelo (incluyendo places)
+        const [{ Map }, { Geocoder }, { AdvancedMarkerElement }, { AutocompleteSessionToken, AutocompleteSuggestion }] =
+            await Promise.all([
+                importLibrary('maps') as Promise<google.maps.MapsLibrary>,
+                importLibrary('geocoding') as Promise<google.maps.GeocodingLibrary>,
+                importLibrary('marker') as Promise<google.maps.MarkerLibrary>,
+                importLibrary('places') as Promise<google.maps.PlacesLibrary>,
+            ])
+
+        if (isDestroyed.value || !mapContainer.value?.parentNode) return
+
+        // Guardar referencias de places para uso en searchAddress
+        placesLib = { AutocompleteSessionToken, AutocompleteSuggestion }
+
+        const defaultLocation = { lat: 6.2442, lng: -75.5812 }
+
+        map = new Map(mapContainer.value, {
             center: defaultLocation,
             zoom: 15,
             mapTypeControl: false,
             streetViewControl: false,
             fullscreenControl: false,
             zoomControl: true,
-            ...(mapId && { mapId })
-        }
+            ...(mapId && { mapId }),
+        })
 
-        map = new googleMaps.Map(mapContainer.value, mapConfig)
+        geocoder = new Geocoder()
+        sessionToken = new AutocompleteSessionToken()
 
-        // Add error listener to prevent map from being destroyed
-        if ((window as any).google?.maps?.event) {
-            (window as any).google.maps.event.addListenerOnce(map, 'error', () => {
-                // Map will continue working without Map ID if necessary
-            })
-        }
-
-        // Check if component was destroyed during initialization
-        if (isDestroyed.value || !mapContainer.value || !mapContainer.value.parentNode) {
-            if (map) {
-                const googleMaps = (window as any).google?.maps
-                if (googleMaps) {
-                    googleMaps.event.clearInstanceListeners(map)
-                }
-                map = null
-            }
-            return
-        }
-
-        // Initialize geocoder
-        geocoder = new googleMaps.Geocoder()
-
-        // Initialize session token for autocomplete
-        if (googleMaps.places && googleMaps.places.AutocompleteSessionToken) {
-            sessionToken = new googleMaps.places.AutocompleteSessionToken()
-        }
-
-        // Add click listener to map
         map.addListener('click', (event: any) => {
-            if (event.latLng && !isDestroyed.value && mapContainer.value && mapContainer.value.parentNode) {
-                const location = {
-                    lat: event.latLng.lat(),
-                    lng: event.latLng.lng()
-                }
-                updateLocation(location)
+            if (event.latLng && !isDestroyed.value && mapContainer.value?.parentNode) {
+                updateLocation({ lat: event.latLng.lat(), lng: event.latLng.lng() })
             }
         })
 
-        // Add center_changed listener for manual mode
         map.addListener('center_changed', () => {
-            if (isManualMode.value && !isDestroyed.value && mapContainer.value && mapContainer.value.parentNode) {
+            if (isManualMode.value && !isDestroyed.value && mapContainer.value?.parentNode) {
                 const center = map.getCenter()
-                manualLocation.value = {
-                    lat: center.lat(),
-                    lng: center.lng()
-                }
+                manualLocation.value = { lat: center.lat(), lng: center.lng() }
             }
         })
 
-        // Try to use Advanced Markers, fallback to traditional markers if it fails
+        // Intentar AdvancedMarkerElement, fallback a Marker clásico
         try {
-            // Import Advanced Marker library
-            const { AdvancedMarkerElement } = await (window as any).google.maps.importLibrary("marker")
-
-            // Initialize Advanced Marker
-            marker = new AdvancedMarkerElement({
-                position: defaultLocation,
-                map: map,
-                title: 'Ubicación seleccionada'
-            })
-
-            // Add marker drag listener (AdvancedMarkerElement uses different event)
+            marker = new AdvancedMarkerElement({ position: defaultLocation, map, title: 'Ubicación seleccionada' })
             marker.addListener('dragend', () => {
-                if (marker && !isDestroyed.value && mapContainer.value && mapContainer.value.parentNode) {
-                    const position = marker.position
-                    const location = {
-                        lat: typeof position === 'object' ? position.lat : position.lat(),
-                        lng: typeof position === 'object' ? position.lng : position.lng()
-                    }
-                    updateLocation(location)
+                if (marker && !isDestroyed.value && mapContainer.value?.parentNode) {
+                    const pos = marker.position
+                    updateLocation({
+                        lat: typeof pos === 'object' ? (pos as any).lat : pos.lat(),
+                        lng: typeof pos === 'object' ? (pos as any).lng : pos.lng(),
+                    })
                 }
             })
-        } catch (markerError) {
-            // Fallback a marcador tradicional
-            try {
-                marker = new googleMaps.Marker({
-                    position: defaultLocation,
-                    map: map,
-                    title: 'Ubicación seleccionada',
-                    draggable: true
-                })
-
-                // Add marker drag listener (traditional marker)
-                marker.addListener('dragend', () => {
-                    if (marker && !isDestroyed.value && mapContainer.value && mapContainer.value.parentNode) {
-                        const location = {
-                            lat: marker.getPosition().lat(),
-                            lng: marker.getPosition().lng()
-                        }
-                        updateLocation(location)
-                    }
-                })
-            } catch (fallbackError) {
-                // Continue without marker, map will still work
-            }
+        } catch {
+            marker = new google.maps.Marker({ position: defaultLocation, map, title: 'Ubicación seleccionada', draggable: true })
+            marker.addListener('dragend', () => {
+                if (marker && !isDestroyed.value && mapContainer.value?.parentNode) {
+                    updateLocation({ lat: marker.getPosition().lat(), lng: marker.getPosition().lng() })
+                }
+            })
         }
 
         isMapLoaded.value = true
-
         syncFromModelValue()
 
     } catch (err) {
-        if (!isDestroyed.value) {
-            error.value = 'Error al cargar el mapa'
-        }
+        if (!isDestroyed.value) error.value = 'Error al cargar el mapa'
     }
 }
 
@@ -478,88 +368,51 @@ const searchAddress = async () => {
     if (!searchQuery.value.trim() || isDestroyed.value) return
 
     try {
-        const googleMaps = (window as any).google?.maps
-        if (!googleMaps || !googleMaps.places) {
-            throw new Error('Google Maps Places API not available')
-        }
+        // placesLib se carga en initializeMap; si aún no está listo, ignorar
+        if (!placesLib) return
 
-        // Importar la librería de lugares si no está disponible
-        if (!googleMaps.places.AutocompleteSuggestion) {
-            const { AutocompleteSuggestion } = await googleMaps.importLibrary("places")
-            googleMaps.places.AutocompleteSuggestion = AutocompleteSuggestion
-        }
+        const { AutocompleteSuggestion, AutocompleteSessionToken } = placesLib
 
-        // Crear un nuevo session token si no existe
-        if (!sessionToken && googleMaps.places.AutocompleteSessionToken) {
-            sessionToken = new googleMaps.places.AutocompleteSessionToken()
-        }
+        if (!sessionToken) sessionToken = new AutocompleteSessionToken()
 
         const request: any = {
             input: searchQuery.value,
-            includedRegionCodes: ['co']
+            includedRegionCodes: ['co'],
+            sessionToken,
         }
 
-        // Agregar session token si está disponible
-        if (sessionToken) {
-            request.sessionToken = sessionToken
-        }
+        const { suggestions } = await AutocompleteSuggestion.fetchAutocompleteSuggestions(request)
 
-        const { suggestions } = await googleMaps.places.AutocompleteSuggestion.fetchAutocompleteSuggestions(request)
-
-        if (!isDestroyed.value && suggestions && suggestions.length > 0) {
-            // Obtener detalles para cada sugerencia
+        if (!isDestroyed.value && suggestions?.length > 0) {
             const promises = suggestions.slice(0, 5).map(async (suggestion: any) => {
                 try {
-                    // Verificar que sea una predicción de lugar (no de consulta)
-                    if (!suggestion.placePrediction) {
-                        return null
-                    }
-
-                    const placePrediction = suggestion.placePrediction
-
-                    // Convertir a Place object
-                    const place = placePrediction.toPlace()
-
-                    // Obtener campos necesarios
-                    await place.fetchFields({
-                        fields: ['displayName', 'formattedAddress', 'location']
-                    })
-
-                    // Verificar que tengamos los datos necesarios
-                    if (!place.formattedAddress || !place.location) {
-                        return null
-                    }
-
+                    if (!suggestion.placePrediction) return null
+                    const place = suggestion.placePrediction.toPlace()
+                    await place.fetchFields({ fields: ['displayName', 'formattedAddress', 'location'] })
+                    if (!place.formattedAddress || !place.location) return null
                     return {
                         formatted_address: place.formattedAddress,
                         geometry: {
                             location: {
                                 lat: () => place.location.lat(),
-                                lng: () => place.location.lng()
-                            }
-                        }
+                                lng: () => place.location.lng(),
+                            },
+                        },
                     }
-                } catch (error) {
-                    console.warn('Error fetching place details:', error)
+                } catch {
                     return null
                 }
             })
 
             const results = await Promise.all(promises)
-            searchResults.value = results.filter(result => result !== null)
-
-            // Renovar session token después de obtener resultados
-            if (googleMaps.places.AutocompleteSessionToken) {
-                sessionToken = new googleMaps.places.AutocompleteSessionToken()
-            }
+            searchResults.value = results.filter(Boolean) as SearchResult[]
+            sessionToken = new AutocompleteSessionToken()
         } else {
             searchResults.value = []
         }
     } catch (err) {
         console.error('Error in searchAddress:', err)
-        if (!isDestroyed.value) {
-            searchResults.value = []
-        }
+        if (!isDestroyed.value) searchResults.value = []
     }
 }
 
@@ -675,22 +528,11 @@ watch(
 // Lifecycle
 onMounted(async () => {
     try {
-        await loadGoogleMaps()
-
-        // Wait a bit more to ensure everything is ready
-        await new Promise(resolve => setTimeout(resolve, 500))
-
         await initializeMap()
         searchQuery.value = props.initialAddress || ''
-        searchAddress()
+        if (searchQuery.value) searchAddress()
     } catch (err: any) {
-        if (!isDestroyed.value) {
-            if (err.message === 'Google Maps API key not configured') {
-                error.value = 'API key de Google Maps no configurada'
-            } else {
-                error.value = 'Error al cargar Google Maps'
-            }
-        }
+        if (!isDestroyed.value) error.value = 'Error al cargar Google Maps'
     }
 })
 
@@ -730,6 +572,7 @@ onUnmounted(() => {
     }
 
     geocoder = null
+    placesLib = null
 
     // Reset reactive state
     isMapLoaded.value = false
