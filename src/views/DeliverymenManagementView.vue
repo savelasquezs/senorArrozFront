@@ -136,7 +136,7 @@ import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/store/auth'
 import { useToast } from '@/composables/useToast'
 import { useSignalR } from '@/composables/useSignalR'
-import { deliverymanApi } from '@/services/MainAPI/deliverymanApi'
+import { deliverymanApi, type DeliverymanLastLocationDto } from '@/services/MainAPI/deliverymanApi'
 import type { DeliverymanStats, DeliverymanAdvance, DeliverymanDetail, SettleDeliverymanDayResultDto } from '@/types/deliveryman'
 import { useOrdersDraftsStore } from '@/store/ordersDrafts'
 import MainLayout from '@/components/layout/MainLayout.vue'
@@ -156,7 +156,7 @@ const router = useRouter()
 const authStore = useAuthStore()
 const { success, error } = useToast()
 const SIGNALR_HUB_URL = import.meta.env.VITE_SIGNALR_HUB_URL || 'http://localhost:5000/hubs/orders'
-const { on, isConnected } = useSignalR(SIGNALR_HUB_URL)
+const { on } = useSignalR(SIGNALR_HUB_URL)
 
 // Estado
 // Fecha de hoy en zona Colombia (evitar desfase por UTC)
@@ -214,23 +214,56 @@ const driverLocations = ref<Record<number, DriverLocation>>({})
 
 let _pollInterval: ReturnType<typeof setInterval> | null = null
 
+/** Incorpora última ubicación del API sin pisar una marca temporal más reciente (p. ej. SignalR). */
+function mergeLastLocationFromApi(
+    prev: Record<number, DriverLocation>,
+    stat: DeliverymanStats,
+    loc: DeliverymanLastLocationDto
+): Record<number, DriverLocation> {
+    const next = { ...prev }
+    const t = new Date(loc.recordedAt).getTime()
+    const cur = next[stat.deliverymanId]
+    if (cur && cur.updatedAt.getTime() > t) return prev
+    next[stat.deliverymanId] = {
+        lat: loc.latitude,
+        lng: loc.longitude,
+        updatedAt: new Date(loc.recordedAt),
+        name: stat.deliverymanName,
+    }
+    return next
+}
+
+async function refreshDriverLocationsFromApi(stats: DeliverymanStats[]) {
+    if (stats.length === 0) {
+        driverLocations.value = {}
+        return
+    }
+    const idSet = new Set(stats.map((s) => s.deliverymanId))
+    const settled = await Promise.allSettled(
+        stats.map(async (stat) => {
+            const loc = await deliverymanApi.getLastLocation(stat.deliverymanId)
+            return { stat, loc }
+        })
+    )
+    let acc: Record<number, DriverLocation> = {}
+    for (const [key, loc] of Object.entries(driverLocations.value)) {
+        const id = Number(key)
+        if (idSet.has(id)) acc[id] = loc
+    }
+    for (const r of settled) {
+        if (r.status !== 'fulfilled') continue
+        const { stat, loc } = r.value
+        if (!loc) continue
+        acc = mergeLastLocationFromApi(acc, stat, loc)
+    }
+    driverLocations.value = acc
+}
+
 const startPolling = () => {
     if (_pollInterval) return
     _pollInterval = setInterval(async () => {
-        if (isConnected.value || deliverymenStats.value.length === 0) return
-        for (const stat of deliverymenStats.value) {
-            try {
-                const loc = await deliverymanApi.getLastLocation(stat.deliverymanId)
-                if (loc) {
-                    driverLocations.value[loc.deliverymanId] = {
-                        lat: loc.latitude,
-                        lng: loc.longitude,
-                        updatedAt: new Date(loc.recordedAt),
-                        name: stat.deliverymanName,
-                    }
-                }
-            } catch { /* ignorar errores de polling individual */ }
-        }
+        if (deliverymenStats.value.length === 0) return
+        await refreshDriverLocationsFromApi(deliverymenStats.value)
     }, 30_000)
 }
 
@@ -250,6 +283,7 @@ const loadData = async () => {
         })
         deliverymenStatsRaw.value = overview.deliverymen
         advances.value = overview.advances
+        await refreshDriverLocationsFromApi(overview.deliverymen)
     } catch (err: any) {
         error('Error al cargar datos', err.message)
     } finally {
@@ -396,11 +430,17 @@ onMounted(() => {
     on('DeliverymanLocationUpdate', (data: any) => {
         if (!data?.deliverymanId) return
         const stat = deliverymenStats.value.find(s => s.deliverymanId === data.deliverymanId)
-        driverLocations.value[data.deliverymanId] = {
-            lat: data.latitude,
-            lng: data.longitude,
-            updatedAt: new Date(data.recordedAt),
-            name: stat?.deliverymanName,
+        const t = new Date(data.recordedAt).getTime()
+        const cur = driverLocations.value[data.deliverymanId]
+        if (cur && cur.updatedAt.getTime() > t) return
+        driverLocations.value = {
+            ...driverLocations.value,
+            [data.deliverymanId]: {
+                lat: data.latitude,
+                lng: data.longitude,
+                updatedAt: new Date(data.recordedAt),
+                name: stat?.deliverymanName,
+            },
         }
     })
 

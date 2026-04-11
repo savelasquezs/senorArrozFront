@@ -83,17 +83,66 @@ function lastUpdatedLabelFor(loc: DriverLocation): string {
     const diffSec = Math.floor((Date.now() - loc.updatedAt.getTime()) / 1000)
     if (diffSec < 5) return 'Ahora mismo'
     if (diffSec < 60) return `Hace ${diffSec}s`
-    return `Hace ${Math.floor(diffSec / 60)}min`
+    const diffMin = Math.floor(diffSec / 60)
+    if (diffMin < 60) return `Hace ${diffMin} min`
+    const diffH = Math.floor(diffMin / 60)
+    if (diffH < 24) return `Hace ${diffH} h`
+    const diffD = Math.floor(diffH / 24)
+    return `Hace ${diffD} día(s)`
+}
+
+function driverMarkerTooltip(driverId: number, loc: DriverLocation): string {
+    const name = loc.name ?? `Domiciliario #${driverId}`
+    return `${name} — Ubicación: ${lastUpdatedLabelFor(loc)}`
 }
 
 // =========================
 // 🔹 Marcadores de conductores (múltiples)
 // =========================
+let prevDriverLocationCount = 0
+
+function fitMapToDriverLocations(locs: Record<number, DriverLocation>) {
+    if (!map) return
+    const entries = Object.entries(locs)
+    if (entries.length === 0) return
+    const bounds = new google.maps.LatLngBounds()
+    for (const [, loc] of entries) {
+        bounds.extend({ lat: loc.lat, lng: loc.lng })
+    }
+    if (entries.length === 1) {
+        const loc = entries[0][1]
+        map.setCenter({ lat: loc.lat, lng: loc.lng })
+        map.setZoom(14)
+        return
+    }
+    map.fitBounds(bounds, { top: 56, right: 56, bottom: 56, left: 56 })
+}
+
+function refreshDriverMarkerTooltips() {
+    void nowSeconds.value
+    const locs = props.deliverymanLocations
+    if (!locs) return
+    for (const [id, marker] of driverMarkers) {
+        const loc = locs[id]
+        if (!loc) continue
+        const tip = driverMarkerTooltip(id, loc)
+        const m = marker as any
+        if (m.title !== undefined) m.title = tip
+        const el = m.content ?? m.element
+        if (el instanceof HTMLElement) el.title = tip
+    }
+}
+
 watch(
     () => props.deliverymanLocations,
     (locs) => {
         if (!map) return
+        const n = locs ? Object.keys(locs).length : 0
         updateDriverMarkers(locs)
+        if (props.orders.length === 0 && n > 0 && prevDriverLocationCount === 0) {
+            fitMapToDriverLocations(locs!)
+        }
+        prevDriverLocationCount = n
     },
     { deep: true }
 )
@@ -117,7 +166,7 @@ function updateDriverMarkers(locs: Record<number, DriverLocation> | undefined) {
     for (const [idStr, loc] of Object.entries(locs)) {
         const id = Number(idStr)
         const position = { lat: loc.lat, lng: loc.lng }
-        const label = loc.name ?? `Domiciliario #${id}`
+        const tip = driverMarkerTooltip(id, loc)
         const isConnected = Date.now() - loc.updatedAt.getTime() < 30_000
         const fill = isConnected ? '#7c3aed' : '#9ca3af'
 
@@ -125,18 +174,26 @@ function updateDriverMarkers(locs: Record<number, DriverLocation> | undefined) {
         if (existing) {
             if (typeof (existing as any).position !== 'undefined') (existing as any).position = position
             else if (typeof (existing as any).setPosition === 'function') (existing as any).setPosition(position)
+            const m = existing as any
+            if (m.title !== undefined) m.title = tip
+            const el = m.content ?? m.element
+            if (el instanceof HTMLElement) {
+                el.title = tip
+                el.style.background = fill
+            }
             continue
         }
 
         let marker: google.maps.marker.AdvancedMarkerElement | google.maps.Marker
         if (AdvancedMarkerElement) {
             const icon = document.createElement('div')
-            icon.style.cssText = `width:36px;height:36px;background:${fill};border-radius:50%;display:flex;align-items:center;justify-content:center;border:3px solid white;box-shadow:0 2px 6px rgba(0,0,0,.35);font-size:18px;`
-            icon.textContent = '🛵'
-            marker = new AdvancedMarkerElement({ position, map, title: label, content: icon })
+            icon.style.cssText = `width:36px;height:36px;background:${fill};border-radius:50%;display:flex;align-items:center;justify-content:center;border:3px solid white;box-shadow:0 2px 6px rgba(0,0,0,.35);font-size:18px;line-height:1;`
+            icon.textContent = '🏍️'
+            icon.title = tip
+            marker = new AdvancedMarkerElement({ position, map, title: tip, content: icon })
         } else {
             marker = new google.maps.Marker({
-                position, map, title: label,
+                position, map, title: tip,
                 icon: { url: 'https://maps.google.com/mapfiles/ms/icons/purple-dot.png', scaledSize: new google.maps.Size(40, 40) },
             })
         }
@@ -151,6 +208,7 @@ onMounted(async () => {
     // Iniciar reloj para "última actualización"
     _clockInterval = setInterval(() => {
         nowSeconds.value = Math.floor(Date.now() / 1000)
+        refreshDriverMarkerTooltips()
     }, 1000)
     const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY
     const mapId = import.meta.env.VITE_GOOGLE_MAPS_MAP_ID
@@ -192,9 +250,14 @@ onMounted(async () => {
     RouteOptimizationService.initialize(map)
     loadMarkers()
 
-    // Si ya hay ubicaciones al montar, colocar marcadores
+    // Si ya hay ubicaciones al montar, colocar marcadores y encuadrar (vista solo domiciliarios)
     if (props.deliverymanLocations && Object.keys(props.deliverymanLocations).length > 0) {
+        prevDriverLocationCount = 0
         updateDriverMarkers(props.deliverymanLocations)
+        if (props.orders.length === 0) {
+            fitMapToDriverLocations(props.deliverymanLocations)
+            prevDriverLocationCount = Object.keys(props.deliverymanLocations).length
+        }
     }
 })
 
