@@ -27,9 +27,9 @@ export function useOrderStatusChange() {
             return false
         }
 
-        // ✅ REGLA: delivery necesita domiciliario antes de on_the_way
+        // ✅ REGLA: delivery u onsite con envío por domiciliario necesita domiciliario antes de on_the_way
         if (
-            order.type === 'delivery' &&
+            (order.type === 'delivery' || order.type === 'onsite') &&
             newStatus === 'on_the_way' &&
             !order.deliveryManId
         ) {

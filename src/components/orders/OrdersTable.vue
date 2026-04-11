@@ -321,8 +321,8 @@ const showVerifyBankActions = (order: OrderListItem): boolean =>
 
 // Valida si se puede asignar domiciliario al pedido
 const canAssignDeliveryman = (order: OrderListItem): boolean => {
-    return order.type === 'delivery' &&
-        ['ready', 'on_the_way', 'delivered'].includes(order.status)
+    const typeOk = order.type === 'delivery' || order.type === 'onsite'
+    return typeOk && ['ready', 'on_the_way', 'delivered'].includes(order.status)
 }
 
 // Obtiene la fecha del estado actual del pedido

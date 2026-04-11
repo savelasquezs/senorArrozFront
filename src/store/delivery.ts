@@ -115,6 +115,8 @@ export const useDeliveryStore = defineStore('delivery', () => {
         const rows = await orderApi.fetchAssignedOrdersBranchSummary(deliveryManId, {
             fromDate: historyFromDate.value,
             toDate: historyToDate.value,
+            status: HISTORY_STATUS_DELIVERED,
+            includeOnsiteActiveInHistory: true,
         })
         historyBranchSummaries.value = rows
     }
@@ -161,6 +163,7 @@ export const useDeliveryStore = defineStore('delivery', () => {
                 toDate: historyToDate.value,
                 branchId,
                 status: HISTORY_STATUS_DELIVERED,
+                includeOnsiteActiveInHistory: true,
                 neighborhoodId: historyNeighborhoodId.value ?? undefined,
             })
             historySelectedBranchId.value = branchId
@@ -216,6 +219,8 @@ export const useDeliveryStore = defineStore('delivery', () => {
             const response = await orderApi.fetchAssignedOrders(deliveryManId, {
                 page: 1,
                 pageSize: 200,
+                status: 'OnTheWay',
+                type: 'Delivery',
             })
             routeAssignedOrders.value = [...response.items].sort((a, b) => b.id - a.id)
         } catch (err: any) {

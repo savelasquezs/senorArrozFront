@@ -178,16 +178,22 @@ class OrderApi extends BaseApi {
             branchId?: number
             /** Estado del pedido en la API (p. ej. Delivered para historial de entregas) */
             status?: string
+            /** p. ej. Delivery para excluir onsite de la lista en ruta */
+            type?: string
+            /** Con status Delivered + fechas: incluye onsite OnTheWay en el historial */
+            includeOnsiteActiveInHistory?: boolean
             neighborhoodId?: number
         }
     ): Promise<PagedResult<OrderListItem>> {
-        const params: Record<string, string | number> = {};
+        const params: Record<string, string | number | boolean> = {};
         if (filters?.page) params.Page = filters.page;
         if (filters?.pageSize) params.PageSize = filters.pageSize;
         if (filters?.fromDate) params.FromDate = filters.fromDate;
         if (filters?.toDate) params.ToDate = filters.toDate;
         if (filters?.branchId != null && filters.branchId > 0) params.BranchId = filters.branchId;
         if (filters?.status) params.Status = filters.status;
+        if (filters?.type) params.Type = filters.type;
+        if (filters?.includeOnsiteActiveInHistory === true) params.IncludeOnsiteActiveInHistory = true;
         if (filters?.neighborhoodId != null && filters.neighborhoodId > 0)
             params.NeighborhoodId = filters.neighborhoodId;
 
@@ -213,12 +219,18 @@ class OrderApi extends BaseApi {
     /** Conteos por sucursal para pestañas del historial (mismo rango de fechas que el listado) */
     async fetchAssignedOrdersBranchSummary(
         deliveryManId: number,
-        filters?: { fromDate?: string; toDate?: string; status?: string }
+        filters?: {
+            fromDate?: string
+            toDate?: string
+            status?: string
+            includeOnsiteActiveInHistory?: boolean
+        }
     ): Promise<DeliverymanHistoryBranchSummary[]> {
-        const params: Record<string, string> = {};
+        const params: Record<string, string | boolean> = {};
         if (filters?.fromDate) params.FromDate = filters.fromDate;
         if (filters?.toDate) params.ToDate = filters.toDate;
         if (filters?.status) params.Status = filters.status;
+        if (filters?.includeOnsiteActiveInHistory === true) params.IncludeOnsiteActiveInHistory = true;
         return this.get<DeliverymanHistoryBranchSummary[]>(
             `/orders/delivery/assigned/${deliveryManId}/branch-summary`,
             { params }

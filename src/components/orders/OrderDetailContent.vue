@@ -133,8 +133,8 @@
                             </div>
                         </div>
 
-                        <!-- Domiciliario - SOLO SI DELIVERY -->
-                        <div v-if="order.type === 'delivery'" class="space-y-2">
+                        <!-- Domiciliario: delivery y onsite (onsite puede llevarlo un domiciliario asignado desde caja) -->
+                        <div v-if="order.type === 'delivery' || order.type === 'onsite'" class="space-y-2">
                             <label class="text-xs sm:text-sm font-medium text-gray-700">Domiciliario</label>
                             <div class="flex items-center justify-between bg-gray-50 rounded-lg p-2 sm:p-3">
                                 <p class="text-xs sm:text-sm text-gray-900">
