@@ -33,9 +33,10 @@
 
             <p v-if="activeTab === 'cycle'" class="text-xs text-gray-500">
                 Datos para cuadrar y liquidar (desde la última liquidación del día, si hubo).
+                Incluye pedidos <strong>en el local</strong> con domiciliario asignado, además de delivery.
             </p>
             <p v-else-if="activeTab === 'fullday'" class="text-xs text-gray-500">
-                Totales del día calendario completos (todos los pedidos entregados y abonos del día).
+                Totales del día calendario completos (pedidos entregados con este domiciliario: delivery y en el local).
                 Referencia; el monto a liquidar ahora está en <strong>Ciclo actual</strong>.
             </p>
             <p v-else-if="activeTab === 'payroll'" class="text-xs text-gray-500">
