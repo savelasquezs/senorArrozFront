@@ -31,7 +31,7 @@ export class DeliveryService {
         return orderCashToCollect(order.total, {
             bankPayments: order.bankPayments,
             appPayments: order.appPayments,
-        })
+        }, { paidInStoreCash: order.paidInStoreCash === true })
     }
 
     // Calcular totales para historial

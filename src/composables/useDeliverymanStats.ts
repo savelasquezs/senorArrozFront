@@ -19,7 +19,7 @@ export function useDeliverymanStats() {
                 orderCashToCollect(order.total, {
                     bankPayments: order.bankPayments,
                     appPayments: order.appPayments,
-                }),
+                }, { paidInStoreCash: order.paidInStoreCash === true }),
             0
         )
 

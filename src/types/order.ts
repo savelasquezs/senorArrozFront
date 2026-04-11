@@ -259,6 +259,10 @@ export interface OrderListItem {
     bankPayments: OrderBankPaymentDetail[]
     appPayments: OrderAppPaymentDetail[]
     totalDeposited: number
+    /** Efectivo ya cobrado en sucursal; el domiciliario no cobra en entrega. */
+    paidInStoreCash?: boolean
+    paidInStoreCashAt?: string | null
+    paidInStoreCashAmount?: number | null
     /** Resumen de líneas desde el API (search/list con detalles cargados). */
     summaryLines?: OrderLineSummary[]
 }

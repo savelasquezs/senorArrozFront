@@ -283,6 +283,29 @@
                             <span v-else>Administra los pagos del pedido. Los pagos bancarios pueden ser verificados y
                                 los pagos por app pueden ser liquidados.</span>
                         </p>
+                        <div v-if="order"
+                            class="mb-4 rounded-lg border border-amber-200 bg-amber-50/90 p-3 sm:p-4 space-y-2">
+                            <div v-if="permissions.canEditPayments(order)" class="flex items-start gap-3">
+                                <input :id="'paid-in-store-' + order.id" type="checkbox"
+                                    :checked="order.paidInStoreCash === true" :disabled="savingPaidInStore"
+                                    class="mt-1 h-4 w-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500"
+                                    @change="onPaidInStoreChange(($event.target as HTMLInputElement).checked)" />
+                                <label :for="'paid-in-store-' + order.id"
+                                    class="text-sm text-gray-800 cursor-pointer flex-1">
+                                    <span class="font-medium">Pagó en efectivo en tienda</span>
+                                    <span class="block text-xs text-gray-600 mt-0.5">El domiciliario no cobra efectivo
+                                        en la entrega. Queda registrado para el cuadre de caja.</span>
+                                </label>
+                            </div>
+                            <p v-else-if="order.paidInStoreCash"
+                                class="text-sm text-amber-900 flex items-center gap-1.5">
+                                <InformationCircleIcon class="w-4 h-4 shrink-0" />
+                                Efectivo cobrado en tienda; nada que cobrar en entrega
+                                <template v-if="order.paidInStoreCashAmount != null">
+                                    ({{ formatCurrency(order.paidInStoreCashAmount) }})
+                                </template>.
+                            </p>
+                        </div>
                         <PersistedPaymentSelector v-if="order" :order="order" :bank-options="bankOptions"
                             :app-options="appOptions" @updated="handlePaymentUpdated" />
                     </div>
@@ -409,6 +432,7 @@ import { useOrdersDraftsStore } from '@/store/ordersDrafts'
 import { useOrdersDataStore } from '@/store/ordersData'
 import { useAuthStore } from '@/store/auth'
 import { customerApi } from '@/services/MainAPI/customerApi'
+import { orderApi } from '@/services/MainAPI/orderApi'
 import { bankPaymentApi } from '@/services/MainAPI/bankPaymentApi'
 import {
     toPaymentSnapshot,
@@ -448,6 +472,7 @@ const editableReservedForDate = ref<Date | null>(null)
 const editablePrepareAtDate = ref<Date | null>(null)
 const savingSchedule = ref(false)
 const savingPrepareNow = ref(false)
+const savingPaidInStore = ref(false)
 const showKitchenScheduleConfirm = ref(false)
 const showPrepareNowConfirm = ref(false)
 
@@ -608,7 +633,7 @@ const cashAmount = computed(() => {
             bankPayments: order.value.bankPayments,
             appPayments: order.value.appPayments,
         },
-        { floorAtZero: true }
+        { floorAtZero: true, paidInStoreCash: order.value.paidInStoreCash === true }
     )
 })
 
@@ -827,6 +852,37 @@ const handleRequestCancelOrderFromProducts = () => {
 
 const handlePaymentUpdated = (updates: Partial<OrderDetailView>) => {
     ordersDataStore.updateCurrent(updates)
+}
+
+const onPaidInStoreChange = async (checked: boolean) => {
+    if (!order.value || order.value.paidInStoreCash === checked) return
+    savingPaidInStore.value = true
+    try {
+        const updated = await orderApi.setPaidInStoreCash(order.value.id, checked)
+        const u = updated as unknown as {
+            paidInStoreCash?: boolean
+            paidInStoreCashAt?: string | null
+            paidInStoreCashAmount?: number | null
+            updatedAt?: string
+        }
+        handleModalUpdated({
+            paidInStoreCash: Boolean(u.paidInStoreCash),
+            paidInStoreCashAt: u.paidInStoreCashAt ?? null,
+            paidInStoreCashAmount:
+                typeof u.paidInStoreCashAmount === 'number' ? u.paidInStoreCashAmount : null,
+            updatedAt: u.updatedAt ?? order.value.updatedAt,
+        })
+        success(
+            'Actualizado',
+            4000,
+            checked ? 'Marcado como pagado en efectivo en tienda' : 'Marcador de pago en tienda quitado',
+        )
+    } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : 'No se pudo actualizar'
+        error('Error', msg)
+    } finally {
+        savingPaidInStore.value = false
+    }
 }
 
 const handleAssignDeliveryModalClose = () => {

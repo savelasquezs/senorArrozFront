@@ -145,6 +145,11 @@ class OrderApi extends BaseApi {
         return this.put<Order>(`/orders/${id}/unassign-delivery`, {});
     }
 
+    /** Efectivo ya cobrado en sucursal (0 a cobrar en entrega). */
+    async setPaidInStoreCash(id: number, paidInStoreCash: boolean): Promise<Order> {
+        return this.put<Order>(`/orders/${id}/paid-in-store-cash`, { paidInStoreCash });
+    }
+
     // ===== MÉTODOS PARA MÓDULO DE DOMICILIARIOS =====
 
     // 18. Obtener pedidos delivery ready (listos para asignar)

@@ -30,8 +30,9 @@ export function sumOrderNonCashPayments(inputs: OrderCashInputs): number {
 export function orderCashToCollect(
     orderTotal: number,
     inputs: OrderCashInputs,
-    options?: { floorAtZero?: boolean }
+    options?: { floorAtZero?: boolean; paidInStoreCash?: boolean }
 ): number {
+    if (options?.paidInStoreCash) return 0
     const raw = orderTotal - sumOrderNonCashPayments(inputs)
     if (options?.floorAtZero) return Math.max(0, raw)
     return raw
