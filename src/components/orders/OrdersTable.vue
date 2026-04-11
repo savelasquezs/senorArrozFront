@@ -190,9 +190,7 @@
                             <div v-if="(!order.bankPayments || order.bankPayments.length === 0) &&
                                 (!order.appPayments || order.appPayments.length === 0)"
                                 class="flex flex-wrap items-center gap-1">
-                                <span class="text-xs text-gray-400 italic">
-                                    Efectivo
-                                </span>
+                              
                                 <span v-if="order.paidInStoreCash"
                                     class="text-[11px] font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 rounded px-1.5 py-0.5">
                                     Pagó
