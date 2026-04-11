@@ -255,6 +255,17 @@ function formatDate(iso: string) {
   return new Date(iso).toLocaleString('es-CO', { dateStyle: 'short', timeStyle: 'short' })
 }
 
+/** API serializa BankType con JsonStringEnumConverter + snake_case → p. ej. "normal". */
+function isOperativeBankForDeposits(b: Bank): boolean {
+  const t = b.type as string | number | undefined
+  if (t === 0 || t === '0') return true
+  if (typeof t === 'string') {
+    const s = t.toLowerCase()
+    return s === 'normal'
+  }
+  return false
+}
+
 async function loadData() {
   if (!props.order) return
   deposits.value = []
@@ -265,7 +276,7 @@ async function loadData() {
   if (!availableBanks.value.length) {
     try {
       const result = await bankApi.getBanks({ branchId: props.order.branchId, page: 1, pageSize: 50 })
-      availableBanks.value = result.items.filter((b: any) => b.type === 0)
+      availableBanks.value = result.items.filter(isOperativeBankForDeposits)
     } catch {}
   }
 
