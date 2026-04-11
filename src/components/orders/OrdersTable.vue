@@ -193,6 +193,16 @@
                                 <span class="text-xs text-gray-400 italic">
                                     Efectivo
                                 </span>
+                                <span v-if="order.paidInStoreCash"
+                                    class="text-[11px] font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 rounded px-1.5 py-0.5">
+                                    Pagó
+                                </span>
+                                <button v-else-if="showPaidInStoreQuickButton(order)" type="button"
+                                    class="text-[11px] font-medium text-amber-800 bg-amber-100 hover:bg-amber-200 border border-amber-300 rounded px-1.5 py-0.5 disabled:opacity-50"
+                                    :disabled="savingPaidInStoreId === order.id"
+                                    @click.stop="quickMarkPaidInStore(order)">
+                                    {{ savingPaidInStoreId === order.id ? '…' : 'Pagó' }}
+                                </button>
                                 <button type="button" v-for="bank in (props.quickBanks || []).slice(0, 2)" :key="bank.id"
                                     class="text-[11px] text-blue-600 hover:text-blue-800 underline decoration-dotted"
                                     @click.stop="emit('quick-bank-transfer', order, bank.id)">
@@ -234,6 +244,7 @@
 </template>
 
 <script setup lang="ts">
+import { ref } from 'vue'
 import type { OrderListItem, OrderBankPaymentDetail } from '@/types/order'
 import type { Bank } from '@/types/bank'
 import OrderStatusBadge from './OrderStatusBadge.vue'
@@ -247,6 +258,7 @@ import {
     orderListRecipientDisplayTitle,
 } from '@/utils/orderRecipientDisplay'
 import { useToast } from '@/composables/useToast'
+import { orderApi } from '@/services/MainAPI/orderApi'
 import {
     ArrowsUpDownIcon,
     ChevronUpIcon,
@@ -262,9 +274,13 @@ interface Props {
     sortBy?: 'id' | 'total' | 'createdAt'
     sortOrder?: 'asc' | 'desc'
     quickBanks?: Bank[]
+    /** Si true, muestra acción rápida “Pagó” (listado de pedidos). */
+    enablePaidInStoreQuickAction?: boolean
 }
 
-const props = defineProps<Props>()
+const props = withDefaults(defineProps<Props>(), {
+    enablePaidInStoreQuickAction: false,
+})
 
 const permissions = useOrderPermissions()
 
@@ -279,11 +295,49 @@ const emit = defineEmits<{
     'remove-bank-payment': [order: OrderListItem, payment: OrderBankPaymentDetail]
     'quick-bank-transfer': [order: OrderListItem, bankId: number]
     'add-deposit': [order: OrderListItem]
+    'paid-in-store-updated': [order: OrderListItem]
     sort: [column: 'id' | 'total' | 'createdAt']
 }>()
 
 const { formatCurrency } = useFormatting()
 const { success, error } = useToast()
+
+const savingPaidInStoreId = ref<number | null>(null)
+
+const showPaidInStoreQuickButton = (order: OrderListItem): boolean =>
+    props.enablePaidInStoreQuickAction &&
+    order.status !== 'cancelled' &&
+    permissions.canEditPayments(order) &&
+    order.paidInStoreCash !== true
+
+async function quickMarkPaidInStore(order: OrderListItem) {
+    if (!showPaidInStoreQuickButton(order)) return
+    savingPaidInStoreId.value = order.id
+    try {
+        const updated = await orderApi.setPaidInStoreCash(order.id, true)
+        const u = updated as unknown as {
+            paidInStoreCash?: boolean
+            paidInStoreCashAt?: string | null
+            paidInStoreCashAmount?: number | null
+            updatedAt?: string
+        }
+        const patched: OrderListItem = {
+            ...order,
+            paidInStoreCash: Boolean(u.paidInStoreCash),
+            paidInStoreCashAt: u.paidInStoreCashAt ?? null,
+            paidInStoreCashAmount:
+                typeof u.paidInStoreCashAmount === 'number' ? u.paidInStoreCashAmount : null,
+            updatedAt: u.updatedAt ?? order.updatedAt,
+        }
+        emit('paid-in-store-updated', patched)
+        success('Pagó en tienda', 3500, 'Pedido marcado como pagado en efectivo en sucursal')
+    } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : 'No se pudo actualizar'
+        error('Error', msg)
+    } finally {
+        savingPaidInStoreId.value = null
+    }
+}
 
 async function copyCustomerPhone(order: OrderListItem) {
     const phone = order.customerPhone?.trim()

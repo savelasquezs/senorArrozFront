@@ -106,12 +106,14 @@
                             <template v-if="!groupByRoute">
                                 <OrdersTable :orders="filteredOrders" :loading="loading" :sort-by="sortBy"
                                     :sort-order="sortOrder" :quick-banks="quickBanks"
+                                    enable-paid-in-store-quick-action
                                     @edit-customer="handleEditCustomer" @edit-address="handleEditAddress"
                                     @change-status="handleChangeStatus" @assign-delivery="handleAssignDelivery"
                                     @edit-type="handleEditType" @verify-bank-payment="handleVerifyBankPayment"
                                     @edit-bank-payment="handleEditBankPaymentFromList"
                                     @remove-bank-payment="handleRemoveBankPaymentFromList"
                                     @quick-bank-transfer="handleQuickBankTransfer" @add-deposit="handleOpenDeposit"
+                                    @paid-in-store-updated="handlePaidInStoreUpdated"
                                     @sort="handleSort" />
                             </template>
                             <template v-else>
@@ -124,13 +126,16 @@
                                     </div>
                                     <OrdersTable :orders="block.orders" :loading="loading" :sort-by="sortBy"
                                         :sort-order="sortOrder" :quick-banks="quickBanks"
+                                        enable-paid-in-store-quick-action
                                         @edit-customer="handleEditCustomer" @edit-address="handleEditAddress"
                                         @change-status="handleChangeStatus" @assign-delivery="handleAssignDelivery"
                                         @edit-type="handleEditType" @verify-bank-payment="handleVerifyBankPayment"
                                         @edit-bank-payment="handleEditBankPaymentFromList"
                                         @remove-bank-payment="handleRemoveBankPaymentFromList"
                                         @quick-bank-transfer="handleQuickBankTransfer"
-                                        @add-deposit="handleOpenDeposit" @sort="handleSort" />
+                                        @add-deposit="handleOpenDeposit"
+                                        @paid-in-store-updated="handlePaidInStoreUpdated"
+                                        @sort="handleSort" />
                                 </div>
                             </template>
                         </div>
@@ -1068,6 +1073,18 @@ const patchListOrderBankPayment = (orderId: number, created: BankPayment) => {
     orders.value[idx] = {
         ...order,
         bankPayments: [...(order.bankPayments || []), bankPaymentToListDetail(created)],
+    }
+}
+
+const handlePaidInStoreUpdated = (patched: OrderListItem) => {
+    const idx = orders.value.findIndex((o) => o.id === patched.id)
+    if (idx === -1) return
+    orders.value[idx] = {
+        ...orders.value[idx],
+        paidInStoreCash: patched.paidInStoreCash,
+        paidInStoreCashAt: patched.paidInStoreCashAt,
+        paidInStoreCashAmount: patched.paidInStoreCashAmount,
+        updatedAt: patched.updatedAt,
     }
 }
 

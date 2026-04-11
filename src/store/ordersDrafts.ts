@@ -325,6 +325,19 @@ export const useOrdersDraftsStore = defineStore('ordersDrafts', () => {
         saveToLocalStorage()
     }
 
+    const updatePaidInStoreCash = (value: boolean) => {
+        if (!currentTabId.value) return
+        const order = draftOrders.value.get(currentTabId.value)
+        if (!order) return
+        const updatedOrder = {
+            ...order,
+            paidInStoreCash: value,
+            updatedAt: new Date(),
+        }
+        draftOrders.value.set(currentTabId.value, updatedOrder)
+        saveToLocalStorage()
+    }
+
     // Helper Methods - COPIAR líneas 468-521
     const recalculateTotals = (order: DraftOrder) => {
         const subtotal = order.orderItems.reduce((sum, item) => sum + item.subtotal, 0)
@@ -417,7 +430,8 @@ export const useOrdersDraftsStore = defineStore('ordersDrafts', () => {
             const migratedDrafts = data.draftOrders.map((order: any) => ({
                 ...order,
                 prepareAt: order.prepareAt ?? null,
-                isLater: order.isLater ?? false
+                isLater: order.isLater ?? false,
+                paidInStoreCash: order.paidInStoreCash ?? false,
             }))
             draftOrders.value = new Map(migratedDrafts.map((order: DraftOrder) => [order.tabId, order]))
             currentTabId.value = data.currentTabId
@@ -558,6 +572,7 @@ export const useOrdersDraftsStore = defineStore('ordersDrafts', () => {
         updateIsLater,
         updateReservedFor,
         updatePrepareAt,
+        updatePaidInStoreCash,
         updateDeliveryFee,
         recalculateTotals,
         autoAdjustSinglePayment,

@@ -34,7 +34,8 @@ export function useOrderTabs() {
             total: 0,
             discountTotal: 0,
             createdAt: new Date(),
-            updatedAt: new Date()
+            updatedAt: new Date(),
+            paidInStoreCash: false,
         }
 
         store.draftOrders.set(tabId, newOrder)

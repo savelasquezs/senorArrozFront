@@ -56,7 +56,8 @@ export function useOrderSubmission() {
             guestName: draft.guestName || undefined,
             orderDetails,
             bankPayments,
-            appPayments
+            appPayments,
+            paidInStoreCash: draft.paidInStoreCash === true,
         }
 
         // Add optional fields based on order type

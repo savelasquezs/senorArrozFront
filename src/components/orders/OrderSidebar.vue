@@ -88,6 +88,21 @@
                     </div>
 
                     <OrderItemList :tab-id="currentTabId || ''" @add-products="handleAddProducts" />
+                    <div v-if="showPaidInStoreInDraft"
+                        class="mx-4 mb-3 rounded-lg border border-amber-200 bg-amber-50/90 p-3 space-y-1">
+                        <div class="flex items-start gap-2">
+                            <input :id="'draft-paid-store-' + currentOrder.tabId" type="checkbox"
+                                :checked="currentOrder.paidInStoreCash === true"
+                                class="mt-1 h-4 w-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500"
+                                @change="onPaidInStoreDraftChange(($event.target as HTMLInputElement).checked)" />
+                            <label :for="'draft-paid-store-' + currentOrder.tabId"
+                                class="text-sm text-gray-800 cursor-pointer flex-1">
+                                <span class="font-medium">Pagó en efectivo en tienda</span>
+                                <span class="block text-xs text-gray-600 mt-0.5">Quedará registrado al enviar el pedido.
+                                    El domiciliario no cobra en la entrega.</span>
+                            </label>
+                        </div>
+                    </div>
                     <PaymentSelector :order="currentOrder" @payment-updated="handlePaymentUpdated" />
                 </div>
 
@@ -183,6 +198,17 @@ const showCopyAddressesButton = computed(() => {
     const n = c?.addresses?.filter((a) => a.address?.trim())?.length ?? 0
     return n > 0
 })
+
+/** Mismo criterio que “solo efectivo” en tabla: sin pagos electrónicos en el borrador. */
+const showPaidInStoreInDraft = computed(() => {
+    const o = currentOrder.value
+    if (!o) return false
+    return o.bankPayments.length === 0 && o.appPayment == null
+})
+
+function onPaidInStoreDraftChange(checked: boolean) {
+    ordersStore.updatePaidInStoreCash(checked)
+}
 
 function formatAddressLineForCopy(a: CustomerAddress): string {
     const street = (a.address || '').trim()

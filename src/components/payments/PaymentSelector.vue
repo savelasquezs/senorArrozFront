@@ -8,7 +8,7 @@
 
             <div v-if="!order.appPayment">
                 <BaseSelect v-model="selectedAppId" :options="appOptions" placeholder="Seleccionar app..." size="sm"
-                    class="text-xs" value-key="value" display-key="label" :disabled="!canAddPayments"
+                    class="text-xs" value-key="value" display-key="label" :disabled="!canAddElectronicPayments"
                     @update:model-value="handleAppSelected" />
             </div>
 
@@ -38,7 +38,7 @@
 
             <div>
                 <BaseSelect v-model="selectedBankId" :options="bankOptions" placeholder="Seleccionar banco..." size="sm"
-                    class="text-xs" value-key="value" display-key="label" :disabled="!canAddPayments"
+                    class="text-xs" value-key="value" display-key="label" :disabled="!canAddElectronicPayments"
                     @update:model-value="handleBankSelected" />
             </div>
 
@@ -208,13 +208,18 @@ const cashAmount = computed(() =>
             bankPayments: props.order.bankPayments,
             appPayment: props.order.appPayment,
         },
-        { floorAtZero: true }
+        { floorAtZero: true, paidInStoreCash: props.order.paidInStoreCash === true }
     )
 )
 
 const canAddPayments = computed(() => {
     return cashAmount.value > 0
 })
+
+/** Pagos banco/app: bloqueados si ya marcó “pagó en tienda”. */
+const canAddElectronicPayments = computed(
+    () => canAddPayments.value && !props.order.paidInStoreCash
+)
 
 const maxPaymentAmount = computed(() => {
     if (!editingPayment.value) return props.order.total

@@ -100,6 +100,8 @@ export interface DraftOrder {
     discountTotal: number
     createdAt: Date
     updatedAt: Date
+    /** Efectivo cobrado en tienda antes de enviar el pedido. */
+    paidInStoreCash?: boolean
 }
 
 // ===== TIPOS DE PEDIDOS COMPLETADOS =====
@@ -339,6 +341,7 @@ export interface CreateOrderDto {
     orderDetails: CreateOrderDetailDto[]
     bankPayments?: CreateBankPaymentDto[]
     appPayments?: CreateAppPaymentDto[]
+    paidInStoreCash?: boolean
 }
 
 export interface CreateOrderDetailDto {
