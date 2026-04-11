@@ -270,12 +270,12 @@ const handleCloseCustomerDetail = () => {
 }
 
 const handleSave = async () => {
-    if (!selectedCustomerId.value) return
-
     saving.value = true
     try {
-        const updateData: any = {
-            customerId: selectedCustomerId.value,
+        const updateData: Record<string, unknown> = {}
+
+        if (selectedCustomerId.value !== props.order.customerId) {
+            updateData.customerId = selectedCustomerId.value
         }
 
         // Incluir guestName si cambió
