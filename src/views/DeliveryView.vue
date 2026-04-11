@@ -17,6 +17,30 @@
                     >
                         App Android
                     </a>
+                    <div
+                        v-if="authStore.isAdmin || authStore.isSuperadmin"
+                        class="flex flex-wrap items-center gap-2 shrink-0"
+                    >
+                        <select
+                            v-if="authStore.isSuperadmin"
+                            v-model.number="fcmTestBranchId"
+                            class="max-w-[11rem] rounded-md border border-gray-200 bg-white px-2 py-1 text-xs text-gray-800 shadow-sm"
+                            aria-label="Sucursal para prueba FCM"
+                        >
+                            <option :value="0" disabled>Sucursal (prueba FCM)</option>
+                            <option v-for="b in fcmTestBranches" :key="b.id" :value="b.id">
+                                {{ b.name }}
+                            </option>
+                        </select>
+                        <button
+                            type="button"
+                            class="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium text-violet-700 bg-violet-50 hover:bg-violet-100 border border-violet-200 disabled:opacity-50"
+                            :disabled="fcmTestLoading"
+                            @click="runFcmTest"
+                        >
+                            {{ fcmTestLoading ? 'Enviando…' : 'Probar push (libres)' }}
+                        </button>
+                    </div>
                     <div :class="[
                         'flex items-center gap-1.5 px-2 py-1 rounded text-xs',
                         isConnected ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
@@ -304,6 +328,9 @@ import {
 } from '@/components/dashboard'
 import { useDeliverySelfAnalytics } from '@/composables/dashboard/useDeliverySelfAnalytics'
 import { DELIVERY_ANDROID_APK_PATH } from '@/constants/downloads'
+import { branchApi } from '@/services/MainAPI/branchApi'
+import { fcmApi } from '@/services/MainAPI/fcmApi'
+import type { Branch } from '@/types/common'
 
 const deliveryApkPath = DELIVERY_ANDROID_APK_PATH
 
@@ -332,7 +359,56 @@ const routePlanningWarningsText = computed(
 
 const cardGridRef = ref<InstanceType<typeof DeliveryCardGrid> | null>(null)
 
+/** Prueba FCM a domiciliarios libres (solo Admin / Superadmin). */
+const fcmTestBranches = ref<{ id: number; name: string }[]>([])
+const fcmTestBranchId = ref(0)
+const fcmTestLoading = ref(false)
+
 const userBranchId = () => authStore.user?.branchId ?? 0
+
+async function loadFcmTestBranches() {
+    if (!authStore.isSuperadmin) return
+    try {
+        const res = await branchApi.getBranches({
+            Page: 1,
+            PageSize: 200,
+            SortBy: 'name',
+            SortOrder: 'asc',
+        })
+        const items = (res.isSuccess && res.data?.items ? res.data.items : []) as Branch[]
+        fcmTestBranches.value = items.map((b) => ({ id: b.id, name: b.name }))
+        if (fcmTestBranchId.value <= 0 && fcmTestBranches.value.length > 0) {
+            fcmTestBranchId.value = fcmTestBranches.value[0].id
+        }
+    } catch {
+        /* selector vacío si falla */
+    }
+}
+
+async function runFcmTest() {
+    fcmTestLoading.value = true
+    try {
+        const payload: { branchId?: number } = {}
+        if (authStore.isSuperadmin) {
+            if (fcmTestBranchId.value <= 0) {
+                error('Prueba FCM', 'Seleccione una sucursal.')
+                return
+            }
+            payload.branchId = fcmTestBranchId.value
+        }
+        const r = await fcmApi.testFreeDeliverymen(payload)
+        success(
+            'Prueba FCM enviada',
+            12000,
+            `Ref ${r.correlationId} · sucursal ${r.branchId} · ${r.tokensTargeted} dispositivo(s) · ${r.busyDeliverymanCount} ocupado(s). Si no llega nada, busque en logs: FCM_TEST [${r.correlationId}] y FCM[${r.correlationId}].`
+        )
+    } catch (e: unknown) {
+        const msg = e instanceof Error ? e.message : 'Error desconocido'
+        error('Prueba FCM', msg)
+    } finally {
+        fcmTestLoading.value = false
+    }
+}
 
 /**
  * Pestañas por nombre de sucursal. Incluye la sucursal actual del domiciliario aunque no tenga entregas en el rango
@@ -644,6 +720,7 @@ onMounted(async () => {
         return
     }
 
+    await loadFcmTestBranches()
     await loadAvailableOrders()
     await loadRouteAssigned()
     // Precarga conteo/lista del día para el badge "Mi historial" (mismo rango que el modal)
