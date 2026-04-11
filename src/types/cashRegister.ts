@@ -8,9 +8,9 @@ export type DenominationCounts = Record<Denomination, number>
 // ===== BANK TRANSFERS =====
 export interface BankTransfer {
   id: number
-  fromBankId: number
+  fromBankId: number | null
   fromBankName: string
-  toBankId: number
+  toBankId: number | null
   toBankName: string
   amount: number
   note?: string
@@ -32,8 +32,8 @@ export interface BankTransferFilters {
 }
 
 export interface CreateBankTransferDto {
-  fromBankId: number
-  toBankId: number
+  fromBankId?: number | null
+  toBankId?: number | null
   amount: number
   note?: string
 }

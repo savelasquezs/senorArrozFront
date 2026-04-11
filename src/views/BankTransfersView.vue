@@ -85,28 +85,35 @@
 
           <div class="space-y-4">
             <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">Banco origen</label>
+              <label class="block text-sm font-medium text-gray-700 mb-1">Origen</label>
               <select
                 v-model.number="form.fromBankId"
                 class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
               >
-                <option value="" disabled>Seleccionar banco</option>
-                <option v-for="b in banks" :key="b.id" :value="b.id">{{ b.name }}</option>
-              </select>
-            </div>
-
-            <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">Banco destino</label>
-              <select
-                v-model.number="form.toBankId"
-                class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
-              >
-                <option value="" disabled>Seleccionar banco</option>
+                <option :value="UNSELECTED" disabled>Seleccionar…</option>
+                <option :value="CASH">Efectivo (caja)</option>
                 <option
                   v-for="b in banks"
                   :key="b.id"
                   :value="b.id"
-                  :disabled="b.id === form.fromBankId"
+                  :disabled="form.toBankId > 0 && b.id === form.toBankId"
+                >{{ b.name }}</option>
+              </select>
+            </div>
+
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">Destino</label>
+              <select
+                v-model.number="form.toBankId"
+                class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
+              >
+                <option :value="UNSELECTED" disabled>Seleccionar…</option>
+                <option :value="CASH">Efectivo (caja)</option>
+                <option
+                  v-for="b in banks"
+                  :key="b.id"
+                  :value="b.id"
+                  :disabled="form.fromBankId > 0 && b.id === form.fromBankId"
                 >{{ b.name }}</option>
               </select>
             </div>
@@ -173,6 +180,10 @@ import { bankApi } from '@/services/MainAPI/bankApi'
 import type { BankTransfer } from '@/types/cashRegister'
 import type { Bank } from '@/types/bank'
 
+/** Sin elegir; 0 = efectivo de caja; &gt;0 = id de banco */
+const UNSELECTED = -1
+const CASH = 0
+
 // ===== STATE =====
 const loading = ref(false)
 const transfers = ref<BankTransfer[]>([])
@@ -185,20 +196,23 @@ const creating = ref(false)
 const createError = ref('')
 
 const form = ref({
-  fromBankId: 0,
-  toBankId: 0,
+  fromBankId: UNSELECTED,
+  toBankId: UNSELECTED,
   amount: 0,
   note: '',
 })
 
 // ===== COMPUTED =====
-const formValid = computed(
-  () =>
-    form.value.fromBankId > 0 &&
-    form.value.toBankId > 0 &&
-    form.value.fromBankId !== form.value.toBankId &&
-    form.value.amount > 0
-)
+const formValid = computed(() => {
+  const f = form.value.fromBankId
+  const t = form.value.toBankId
+  if (f === UNSELECTED || t === UNSELECTED) return false
+  if (f === CASH && t === CASH) return false
+  if (f > 0 && t > 0 && f === t) return false
+  if (f === CASH && t <= 0) return false
+  if (t === CASH && f <= 0) return false
+  return form.value.amount > 0
+})
 
 // ===== METHODS =====
 function formatCurrency(value: number): string {
@@ -250,13 +264,13 @@ async function createTransfer() {
   createError.value = ''
   try {
     await bankTransferApi.createBankTransfer({
-      fromBankId: form.value.fromBankId,
-      toBankId: form.value.toBankId,
+      fromBankId: form.value.fromBankId === CASH ? null : form.value.fromBankId,
+      toBankId: form.value.toBankId === CASH ? null : form.value.toBankId,
       amount: form.value.amount,
       note: form.value.note || undefined,
     })
     showCreateModal.value = false
-    form.value = { fromBankId: 0, toBankId: 0, amount: 0, note: '' }
+    form.value = { fromBankId: UNSELECTED, toBankId: UNSELECTED, amount: 0, note: '' }
     await loadTransfers()
   } catch (e: any) {
     createError.value = e.message || 'Error al crear la transferencia'
