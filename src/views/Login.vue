@@ -22,6 +22,16 @@
       <!-- Login Form -->
       <LoginForm />
 
+      <div class="text-center">
+        <a
+          :href="deliveryApkPath"
+          class="inline-flex items-center justify-center gap-2 text-sm font-medium text-emerald-700 hover:text-emerald-800 underline underline-offset-2"
+          download
+        >
+          Descargar app Android (domiciliarios)
+        </a>
+      </div>
+
       <!-- Footer -->
       <div class="text-center">
         <p class="text-sm text-gray-500">
@@ -38,9 +48,12 @@ import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/store/auth'
 import LoginForm from '@/components/auth/LoginForm.vue'
 import BaseLoading from '@/components/ui/BaseLoading.vue'
+import { DELIVERY_ANDROID_APK_PATH } from '@/constants/downloads'
 
 const router = useRouter()
 const authStore = useAuthStore()
+
+const deliveryApkPath = DELIVERY_ANDROID_APK_PATH
 
 const currentYear = computed(() => new Date().getFullYear())
 const displayLogoUrl = computed(

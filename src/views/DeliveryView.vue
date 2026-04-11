@@ -9,7 +9,14 @@
                     <p class="text-sm md:text-base text-gray-600 mt-1">Gestión de entregas</p>
                 </div>
 
-                <div class="flex items-center gap-2">
+                <div class="flex items-center gap-2 flex-wrap justify-end">
+                    <a
+                        :href="deliveryApkPath"
+                        class="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 shrink-0"
+                        download
+                    >
+                        App Android
+                    </a>
                     <div :class="[
                         'flex items-center gap-1.5 px-2 py-1 rounded text-xs',
                         isConnected ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
@@ -296,6 +303,9 @@ import {
     type DeliveryBranchOption,
 } from '@/components/dashboard'
 import { useDeliverySelfAnalytics } from '@/composables/dashboard/useDeliverySelfAnalytics'
+import { DELIVERY_ANDROID_APK_PATH } from '@/constants/downloads'
+
+const deliveryApkPath = DELIVERY_ANDROID_APK_PATH
 
 const router = useRouter()
 const route = useRoute()
