@@ -201,7 +201,7 @@
                                     class="text-[11px] font-medium text-amber-800 bg-amber-100 hover:bg-amber-200 border border-amber-300 rounded px-1.5 py-0.5 disabled:opacity-50"
                                     :disabled="savingPaidInStoreId === order.id"
                                     @click.stop="quickMarkPaidInStore(order)">
-                                    {{ savingPaidInStoreId === order.id ? '…' : 'Pagó' }}
+                                    {{ savingPaidInStoreId === order.id ? '…' : 'Pagó?' }}
                                 </button>
                                 <button type="button" v-for="bank in (props.quickBanks || []).slice(0, 2)" :key="bank.id"
                                     class="text-[11px] text-blue-600 hover:text-blue-800 underline decoration-dotted"
