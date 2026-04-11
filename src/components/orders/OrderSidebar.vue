@@ -88,21 +88,15 @@
                     </div>
 
                     <OrderItemList :tab-id="currentTabId || ''" @add-products="handleAddProducts" />
-                    <div v-if="showPaidInStoreInDraft"
-                        class="mx-4 mb-3 rounded-lg border border-amber-200 bg-amber-50/90 p-3 space-y-1">
-                        <div class="flex items-start gap-2">
-                            <input :id="'draft-paid-store-' + currentOrder.tabId" type="checkbox"
-                                :checked="currentOrder.paidInStoreCash === true"
-                                class="mt-1 h-4 w-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500"
-                                @change="onPaidInStoreDraftChange(($event.target as HTMLInputElement).checked)" />
-                            <label :for="'draft-paid-store-' + currentOrder.tabId"
-                                class="text-sm text-gray-800 cursor-pointer flex-1">
-                                <span class="font-medium">Pagó en efectivo en tienda</span>
-                                <span class="block text-xs text-gray-600 mt-0.5">Quedará registrado al enviar el pedido.
-                                    El domiciliario no cobra en la entrega.</span>
-                            </label>
-                        </div>
-                    </div>
+                    <PaidInStoreCashPanel
+                        v-if="showPaidInStoreInDraft && currentOrder"
+                        :input-id="'draft-paid-store-' + currentOrder.tabId"
+                        :paid-in-store-cash="currentOrder.paidInStoreCash === true"
+                        editable
+                        density="compact"
+                        extra-class="mx-4 mb-3"
+                        helper-text="Quedará registrado al enviar el pedido. El domiciliario no cobra en la entrega."
+                        @update:paid-in-store-cash="onPaidInStoreDraftChange" />
                     <PaymentSelector :order="currentOrder" @payment-updated="handlePaymentUpdated" />
                 </div>
 
@@ -156,6 +150,7 @@ import OrderItemList from '@/components/orders/OrderItemList.vue'
 import CustomerSection from '@/components/customers/CustomerSection.vue'
 import CustomerDetailModal from '@/components/customers/CustomerDetailModal.vue'
 import PaymentSelector from '@/components/payments/PaymentSelector.vue'
+import PaidInStoreCashPanel from '@/components/orders/PaidInStoreCashPanel.vue'
 
 // Icons
 import {

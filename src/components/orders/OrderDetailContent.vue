@@ -283,29 +283,17 @@
                             <span v-else>Administra los pagos del pedido. Los pagos bancarios pueden ser verificados y
                                 los pagos por app pueden ser liquidados.</span>
                         </p>
-                        <div v-if="order"
-                            class="mb-4 rounded-lg border border-amber-200 bg-amber-50/90 p-3 sm:p-4 space-y-2">
-                            <div v-if="permissions.canEditPayments(order)" class="flex items-start gap-3">
-                                <input :id="'paid-in-store-' + order.id" type="checkbox"
-                                    :checked="order.paidInStoreCash === true" :disabled="savingPaidInStore"
-                                    class="mt-1 h-4 w-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500"
-                                    @change="onPaidInStoreChange(($event.target as HTMLInputElement).checked)" />
-                                <label :for="'paid-in-store-' + order.id"
-                                    class="text-sm text-gray-800 cursor-pointer flex-1">
-                                    <span class="font-medium">Pagó en efectivo en tienda</span>
-                                    <span class="block text-xs text-gray-600 mt-0.5">El domiciliario no cobra efectivo
-                                        en la entrega. Queda registrado para el cuadre de caja.</span>
-                                </label>
-                            </div>
-                            <p v-else-if="order.paidInStoreCash"
-                                class="text-sm text-amber-900 flex items-center gap-1.5">
-                                <InformationCircleIcon class="w-4 h-4 shrink-0" />
-                                Efectivo cobrado en tienda; nada que cobrar en entrega
-                                <template v-if="order.paidInStoreCashAmount != null">
-                                    ({{ formatCurrency(order.paidInStoreCashAmount) }})
-                                </template>.
-                            </p>
-                        </div>
+                        <PaidInStoreCashPanel
+                            v-if="order && (permissions.canEditPayments(order) || order.paidInStoreCash)"
+                            :input-id="'paid-in-store-' + order.id"
+                            :paid-in-store-cash="order.paidInStoreCash === true"
+                            :paid-in-store-cash-amount="order.paidInStoreCashAmount ?? null"
+                            :editable="permissions.canEditPayments(order)"
+                            :disabled="savingPaidInStore"
+                            density="comfortable"
+                            extra-class="mb-4"
+                            :helper-text="'El domiciliario no cobra efectivo en la entrega. Queda registrado para el cuadre de caja.'"
+                            @update:paid-in-store-cash="onPaidInStoreChange" />
                         <PersistedPaymentSelector v-if="order" :order="order" :bank-options="bankOptions"
                             :app-options="appOptions" @updated="handlePaymentUpdated" />
                     </div>
@@ -409,6 +397,7 @@
 import OrderTypeBadge from '@/components/orders/OrderTypeBadge.vue'
 import OrderProgressBar from '@/components/orders/OrderProgressBar.vue'
 import OrderDetailProductsList from '@/components/orders/OrderDetailProductsList.vue'
+import PaidInStoreCashPanel from '@/components/orders/PaidInStoreCashPanel.vue'
 import EditCustomerModal from '@/components/orders/EditCustomerModal.vue'
 import AssignDeliveryModal from '@/components/orders/AssignDeliveryModal.vue'
 import CancelOrderModal from '@/components/orders/CancelOrderModal.vue'
