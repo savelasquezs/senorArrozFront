@@ -121,6 +121,68 @@ export function selectedTabIsPaisaOrRopaVieja(
     return group === 'paisa' || group === 'ropa_vieja'
 }
 
+export type FirstWordGroupTabKind = 'gaseosas' | 'adiciones'
+
+/** Gaseosas vs Adiciones (no ambos en el mismo nombre). */
+export function categoryFirstWordGroupKind(name: string): FirstWordGroupTabKind | null {
+    const n = normalizeCategoryLabel(name)
+    if (!n) return null
+    const isGaseosa = n.includes('gaseosa')
+    const isAdicion = n.includes('adicion')
+    if (isGaseosa && isAdicion) return null
+    if (isGaseosa) return 'gaseosas'
+    if (isAdicion) return 'adiciones'
+    return null
+}
+
+/**
+ * Pestaña con una o varias categorías, todas del mismo tipo (solo gaseosas o solo adiciones).
+ * Si se mezclan tipos o hay categorías fuera de esos buckets, false (grid plano).
+ */
+export function selectedTabIsFirstWordGroupCategory(
+    catalog: { id: number; name: string }[],
+    selectedCategoryIds: number[] | null,
+): boolean {
+    if (!selectedCategoryIds?.length) return false
+    const catById = new Map(catalog.map(c => [c.id, c]))
+    let kind: FirstWordGroupTabKind | null = null
+    for (const id of selectedCategoryIds) {
+        const c = catById.get(id)
+        if (!c) return false
+        const k = categoryFirstWordGroupKind(c.name)
+        if (k === null) return false
+        if (kind === null) kind = k
+        else if (k !== kind) return false
+    }
+    return kind !== null
+}
+
+const FIRST_WORD_GROUP_STOPWORDS = new Set([
+    'gaseosa',
+    'gaseosas',
+    'bebida',
+    'bebidas',
+    'adicion',
+    'adiciones',
+])
+
+/**
+ * Clave estable para agrupar productos por “marca” o primera palabra útil del nombre (POS).
+ * Normaliza acentos; trata guiones como espacio; salta palabras genéricas.
+ */
+export function firstWordGroupKeyFromProductName(name: string): string {
+    const withSpaces = name.replace(/-/g, ' ')
+    const n = normalizeCategoryLabel(withSpaces)
+    if (!n) return 'otros'
+    const tokens = n.split(/\s+/).filter(Boolean)
+    let i = 0
+    while (i < tokens.length && FIRST_WORD_GROUP_STOPWORDS.has(tokens[i])) {
+        i++
+    }
+    if (i < tokens.length) return tokens[i]
+    return tokens[0] ?? 'otros'
+}
+
 /** Súper → Familiar → Trío → Dúo → Personal (índice menor = antes). Texto ya sin acentos. */
 const PORTION_ENDINGS: { rank: number; pattern: RegExp }[] = [
     { rank: 0, pattern: /\bsuper\s*$/i },

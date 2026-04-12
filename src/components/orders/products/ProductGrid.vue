@@ -21,7 +21,43 @@
 
         <!-- Products Grid -->
         <div v-else>
-            <template v-if="isSpecialCategory">
+            <template v-if="isFirstWordGroupTab && firstWordGroupEntries.length > 0">
+                <template v-if="selectedGroupKey === null">
+                    <div class="products-grid" :class="gridClasses">
+                        <button
+                            v-for="row in firstWordGroupEntries"
+                            :key="row.key"
+                            type="button"
+                            class="first-word-group-btn"
+                            @click="selectedGroupKey = row.key"
+                        >
+                            <span class="first-word-group-label">{{ row.label }}</span>
+                            <span class="first-word-group-count">{{ row.count }}</span>
+                        </button>
+                    </div>
+                </template>
+                <template v-else>
+                    <div class="first-word-group-back">
+                        <button type="button" class="first-word-back-btn" @click="selectedGroupKey = null">
+                            <ArrowLeftIcon class="w-4 h-4" />
+                            Volver
+                        </button>
+                    </div>
+                    <div class="products-grid" :class="gridClasses">
+                        <ProductCard
+                            v-for="product in productsInSelectedGroup"
+                            :key="product.id"
+                            :product="product"
+                            :variant="cardVariant"
+                            :is-selected="isProductSelected(product)"
+                            @product-click="handleProductClick"
+                            @product-add="handleProductAdd"
+                        />
+                    </div>
+                </template>
+            </template>
+
+            <template v-else-if="isSpecialCategory">
                 <div v-if="productsWithoutChich.length > 0" class="products-grid" :class="gridClasses">
                     <ProductCard v-for="product in productsWithoutChich" :key="product.id" :product="product"
                         :variant="cardVariant" :is-selected="isProductSelected(product)"
@@ -51,10 +87,15 @@
 </template>
 
 <script setup lang="ts">
-import { computed, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useOrdersDraftsStore } from '@/store/ordersDrafts'
 import { useProductCategoriesStore } from '@/store/productCategories'
-import { selectedTabIsPaisaOrRopaVieja } from '@/config/orderPosCategories'
+import {
+    selectedTabIsPaisaOrRopaVieja,
+    selectedTabIsFirstWordGroupCategory,
+    firstWordGroupKeyFromProductName,
+    sortProductsByPortionOrder,
+} from '@/config/orderPosCategories'
 import type { Product } from '@/types/order'
 
 // Components
@@ -62,7 +103,7 @@ import ProductCard from '@/components/orders/products/ProductCard.vue'
 import ProductCardSkeleton from '@/components/orders/products/ProductCardSkeleton.vue'
 
 // Icons
-import { ShoppingBagIcon } from '@heroicons/vue/24/outline'
+import { ShoppingBagIcon, ArrowLeftIcon } from '@heroicons/vue/24/outline'
 
 // Props
 interface Props {
@@ -112,6 +153,40 @@ const products = computed(() => {
 const posCatalog = computed(() =>
     productCategoriesStore.list?.items?.map(c => ({ id: c.id, name: c.name ?? '' })) ?? [],
 )
+
+const selectedGroupKey = ref<string | null>(null)
+
+const isFirstWordGroupTab = computed(() =>
+    selectedTabIsFirstWordGroupCategory(posCatalog.value, ordersStore.selectedCategoryIds),
+)
+
+function formatFirstWordGroupLabel(key: string): string {
+    if (!key) return key
+    return key.charAt(0).toUpperCase() + key.slice(1)
+}
+
+const firstWordGroupEntries = computed(() => {
+    if (!isFirstWordGroupTab.value) return []
+    const map = new Map<string, number>()
+    for (const p of products.value) {
+        const k = firstWordGroupKeyFromProductName(p.name)
+        map.set(k, (map.get(k) ?? 0) + 1)
+    }
+    const rows = [...map.entries()].map(([key, count]) => ({
+        key,
+        label: formatFirstWordGroupLabel(key),
+        count,
+    }))
+    rows.sort((a, b) => a.label.localeCompare(b.label, 'es', { sensitivity: 'base' }))
+    return rows
+})
+
+const productsInSelectedGroup = computed(() => {
+    if (!isFirstWordGroupTab.value || selectedGroupKey.value === null) return []
+    const key = selectedGroupKey.value
+    const list = products.value.filter(p => firstWordGroupKeyFromProductName(p.name) === key)
+    return sortProductsByPortionOrder(list)
+})
 
 const chichRegex = /chich/i
 
@@ -185,6 +260,14 @@ watch(products, (newProducts) => {
         emit('products-loaded', newProducts)
     }
 }, { immediate: true })
+
+watch(
+    () => ({ ids: ordersStore.selectedCategoryIds, productIds: products.value.map(p => p.id) }),
+    () => {
+        selectedGroupKey.value = null
+    },
+    { deep: true },
+)
 </script>
 
 <style scoped>
@@ -229,6 +312,56 @@ watch(products, (newProducts) => {
     font-size: 0.875rem;
     color: #065f46;
     font-weight: 500;
+}
+
+.first-word-group-back {
+    margin-bottom: 0.75rem;
+}
+
+.first-word-back-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: #047857;
+}
+
+.first-word-back-btn:hover {
+    color: #065f46;
+}
+
+.first-word-group-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: center;
+    gap: 0.25rem;
+    min-height: 4.5rem;
+    padding: 0.75rem 1rem;
+    text-align: left;
+    border-radius: 0.75rem;
+    border: 1px solid #e5e7eb;
+    background: #fff;
+    box-shadow: 0 1px 2px rgb(0 0 0 / 0.05);
+    transition: border-color 0.15s, box-shadow 0.15s, background-color 0.15s;
+}
+
+.first-word-group-btn:hover {
+    border-color: #10b981;
+    box-shadow: 0 2px 6px rgb(16 185 129 / 0.15);
+    background: #f0fdf4;
+}
+
+.first-word-group-label {
+    font-weight: 600;
+    color: #111827;
+    font-size: 0.9375rem;
+}
+
+.first-word-group-count {
+    font-size: 0.8125rem;
+    color: #6b7280;
 }
 
 /* Responsive adjustments */
