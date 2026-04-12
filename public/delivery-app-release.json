@@ -1,0 +1,8 @@
+{
+  "versionName": "1.0.0",
+  "buildNumber": 1,
+  "apkFileName": "senor-arroz-domiciliarios.apk",
+  "apkUrl": "/senor-arroz-domiciliarios.apk",
+  "minimumBuild": 1,
+  "message": "Hay una nueva versión de la app de domiciliarios. Descárgala e instálala encima de la actual (no hace falta desinstalar la app anterior)."
+}

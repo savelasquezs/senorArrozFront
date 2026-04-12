@@ -42,12 +42,21 @@
 			</BaseButton>
 		</form>
 	</BaseCard>
+
+	<DeliveryAppUpdateDialog
+		v-if="releaseManifest"
+		v-model="showReleaseDialog"
+		:manifest="releaseManifest"
+		:allow-close="allowReleaseClose"
+		@done="onReleaseDone"
+	/>
 </template>
 
 <script setup lang="ts">
 import { reactive, ref, computed, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { useAuthStore } from '@/store/auth';
+import { UserRole } from '@/types/auth';
 import { useToast } from '@/composables/useToast';
 
 import BaseCard from '@/components/ui/BaseCard.vue';
@@ -57,10 +66,19 @@ import BaseAlert from '@/components/ui/BaseAlert.vue';
 import PasswordInput from '@/components/ui/PasswordInput.vue';
 
 import { UserIcon, AtSymbolIcon } from '@heroicons/vue/24/outline';
+import DeliveryAppUpdateDialog from '@/components/delivery/DeliveryAppUpdateDialog.vue';
+import { useDeliveryAppReleaseGate } from '@/composables/useDeliveryAppReleaseGate';
 
 const router = useRouter();
 const authStore = useAuthStore();
 const { success, error: showError } = useToast();
+const {
+	showReleaseDialog,
+	releaseManifest,
+	allowReleaseClose,
+	onReleaseDone,
+	runGateIfNeeded,
+} = useDeliveryAppReleaseGate();
 
 const form = reactive({
 	email: '',
@@ -112,6 +130,9 @@ const handleSubmit = async () => {
 
 		success('Inicio de sesión exitoso', 3000, `Bienvenido ${authStore.user?.name || ''}`);
 		const redirectPath = getRedirectPath(authStore.userRole);
+		if (authStore.isDeliveryman) {
+			await runGateIfNeeded();
+		}
 		await router.push(redirectPath);
 	} catch (error: any) {
 		console.error('Login failed:', error);
@@ -121,15 +142,15 @@ const handleSubmit = async () => {
 
 const getRedirectPath = (role: string | null): string => {
 	switch (role) {
-		case 'superadmin':
+		case UserRole.SUPERADMIN:
 			return '/dashboard';
-		case 'admin':
+		case UserRole.ADMIN:
 			return '/orders/new';
-		case 'cashier':
+		case UserRole.CASHIER:
 			return '/orders';
-		case 'kitchen':
+		case UserRole.KITCHEN:
 			return '/kitchen';
-		case 'deliveryman':
+		case UserRole.DELIVERYMAN:
 			return '/delivery';
 		default:
 			return '/dashboard';

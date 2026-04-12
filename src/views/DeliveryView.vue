@@ -297,6 +297,14 @@
             @close="closeConfirmModal"
             @assigned="handleAssigned"
         />
+
+        <DeliveryAppUpdateDialog
+            v-if="releaseManifest"
+            v-model="showReleaseDialog"
+            :manifest="releaseManifest"
+            :allow-close="allowReleaseClose"
+            @done="onReleaseDone"
+        />
     </MainLayout>
 </template>
 
@@ -312,6 +320,7 @@ import MainLayout from '@/components/layout/MainLayout.vue'
 import DeliveryCardGrid from '@/components/delivery/DeliveryCardGrid.vue'
 import DeliveryHistoryTable from '@/components/delivery/DeliveryHistoryTable.vue'
 import ConfirmAssignmentModal from '@/components/delivery/ConfirmAssignmentModal.vue'
+import DeliveryAppUpdateDialog from '@/components/delivery/DeliveryAppUpdateDialog.vue'
 import RouteOrderManager from '@/components/delivery/RouteOrderManager.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseDialog from '@/components/ui/BaseDialog.vue'
@@ -327,12 +336,24 @@ import {
     type DeliveryBranchOption,
 } from '@/components/dashboard'
 import { useDeliverySelfAnalytics } from '@/composables/dashboard/useDeliverySelfAnalytics'
+import {
+    useDeliveryAppReleaseGate,
+    DELIVERY_APP_RELEASE_SESSION_KEY,
+} from '@/composables/useDeliveryAppReleaseGate'
 import { DELIVERY_ANDROID_APK_PATH } from '@/constants/downloads'
 import { branchApi } from '@/services/MainAPI/branchApi'
 import { fcmApi } from '@/services/MainAPI/fcmApi'
 import type { Branch } from '@/types/common'
 
 const deliveryApkPath = DELIVERY_ANDROID_APK_PATH
+
+const {
+    showReleaseDialog,
+    releaseManifest,
+    allowReleaseClose,
+    onReleaseDone,
+    runGateIfNeeded,
+} = useDeliveryAppReleaseGate()
 
 const router = useRouter()
 const route = useRoute()
@@ -726,6 +747,14 @@ onMounted(async () => {
     ) {
         router.push('/')
         return
+    }
+
+    if (authStore.isDeliveryman && sessionStorage.getItem(DELIVERY_APP_RELEASE_SESSION_KEY) !== '1') {
+        try {
+            await runGateIfNeeded()
+        } finally {
+            sessionStorage.setItem(DELIVERY_APP_RELEASE_SESSION_KEY, '1')
+        }
     }
 
     await loadFcmTestBranches()
