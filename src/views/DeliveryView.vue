@@ -338,7 +338,7 @@ const router = useRouter()
 const route = useRoute()
 const authStore = useAuthStore()
 const deliveryStore = useDeliveryStore()
-const { success, error } = useToast()
+const { success, error, warning } = useToast()
 
 const SIGNALR_HUB_URL = import.meta.env.VITE_SIGNALR_HUB_URL || 'http://localhost:5000/hubs/orders'
 const { isConnected, on } = useSignalR(SIGNALR_HUB_URL)
@@ -397,11 +397,19 @@ async function runFcmTest() {
             payload.branchId = fcmTestBranchId.value
         }
         const r = await fcmApi.testFreeDeliverymen(payload)
-        success(
-            'Prueba FCM enviada',
-            12000,
-            `Ref ${r.correlationId} · sucursal ${r.branchId} · ${r.tokensTargeted} dispositivo(s) · ${r.busyDeliverymanCount} ocupado(s). Si no llega nada, busque en logs: FCM_TEST [${r.correlationId}] y FCM[${r.correlationId}].`
-        )
+        if (r.tokensTargeted === 0) {
+            warning(
+                'Prueba FCM: nadie a quien enviar',
+                `Ref ${r.correlationId} · sucursal ${r.branchId}. No hay domiciliarios libres con token FCM registrado (ocupados en ruta: ${r.busyDeliverymanCount}). Abre la app del domiciliario en esa sucursal, inicia sesión y acepta notificaciones; o revisa user_device_token en BD.`,
+                14000
+            )
+        } else {
+            success(
+                'Prueba FCM enviada',
+                12000,
+                `Ref ${r.correlationId} · sucursal ${r.branchId} · ${r.tokensTargeted} dispositivo(s) · ${r.busyDeliverymanCount} ocupado(s). Revisa el dispositivo y los logs del API (FCM[${r.correlationId}]).`
+            )
+        }
     } catch (e: unknown) {
         const msg = e instanceof Error ? e.message : 'Error desconocido'
         error('Prueba FCM', msg)
