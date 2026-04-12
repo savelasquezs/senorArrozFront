@@ -214,8 +214,32 @@ const deliverymenStats = computed((): DeliverymanStats[] => {
  */
 const driverLocations = ref<Record<number, DriverLocation>>({})
 
-/** Pedidos asignados (en ruta + entregados del día) para el mapa y el panel lateral. */
-const mapOrders = ref<OrderListItem[]>([])
+/**
+ * Pedidos del día cargados por domiciliario (OnTheWay + Delivered), antes de filtrar por ruta activa.
+ * El mapa solo debe mostrar pedidos de la ruta actual de cada uno (ver `mapOrders`).
+ */
+const mapOrdersFetched = ref<OrderListItem[]>([])
+
+/** Incluye en el mapa solo pedidos de la ruta vigente del domiciliario (GPS/API/SignalR). */
+function orderMatchesDriverCurrentRoute(o: OrderListItem, loc: DriverLocation | undefined): boolean {
+    if (o.type !== 'delivery' || o.deliveryManId == null || !loc) return false
+    const routeId = loc.deliveryRouteId
+    if (routeId != null && routeId !== undefined) {
+        return o.deliveryRouteId === routeId
+    }
+    return o.status === 'on_the_way'
+}
+
+const mapOrders = computed((): OrderListItem[] => {
+    const locs = driverLocations.value
+    const rows = mapOrdersFetched.value
+    const out: OrderListItem[] = []
+    for (const o of rows) {
+        const loc = o.deliveryManId != null ? locs[o.deliveryManId] : undefined
+        if (orderMatchesDriverCurrentRoute(o, loc)) out.push(o)
+    }
+    return out.sort((a, b) => b.id - a.id)
+})
 
 let _pollInterval: ReturnType<typeof setInterval> | null = null
 
@@ -242,7 +266,7 @@ function mergeLastLocationFromApi(
 async function loadMapOrdersForDeliverymen(stats: DeliverymanStats[]) {
     const branchId = authStore.user?.branchId
     if (!branchId || stats.length === 0) {
-        mapOrders.value = []
+        mapOrdersFetched.value = []
         return
     }
     const fromDate = selectedDate.value
@@ -283,9 +307,9 @@ async function loadMapOrdersForDeliverymen(stats: DeliverymanStats[]) {
                 byId.set(o.id, o)
             }
         }
-        mapOrders.value = [...byId.values()].sort((a, b) => b.id - a.id)
+        mapOrdersFetched.value = [...byId.values()].sort((a, b) => b.id - a.id)
     } catch {
-        mapOrders.value = []
+        mapOrdersFetched.value = []
     }
 }
 
