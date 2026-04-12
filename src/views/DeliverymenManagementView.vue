@@ -77,7 +77,7 @@
                 </div>
                 <div class="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
                     <DeliveryMap
-                        :orders="[]"
+                        :orders="mapOrders"
                         :deliveryman-locations="driverLocations"
                     />
                 </div>
@@ -137,6 +137,8 @@ import { useAuthStore } from '@/store/auth'
 import { useToast } from '@/composables/useToast'
 import { useSignalR } from '@/composables/useSignalR'
 import { deliverymanApi, type DeliverymanLastLocationDto } from '@/services/MainAPI/deliverymanApi'
+import { orderApi } from '@/services/MainAPI/orderApi'
+import type { OrderListItem } from '@/types/order'
 import type { DeliverymanStats, DeliverymanAdvance, DeliverymanDetail, SettleDeliverymanDayResultDto } from '@/types/deliveryman'
 import { useOrdersDraftsStore } from '@/store/ordersDrafts'
 import MainLayout from '@/components/layout/MainLayout.vue'
@@ -212,6 +214,9 @@ const deliverymenStats = computed((): DeliverymanStats[] => {
  */
 const driverLocations = ref<Record<number, DriverLocation>>({})
 
+/** Pedidos asignados (en ruta + entregados del día) para el mapa y el panel lateral. */
+const mapOrders = ref<OrderListItem[]>([])
+
 let _pollInterval: ReturnType<typeof setInterval> | null = null
 
 /** Incorpora última ubicación del API sin pisar una marca temporal más reciente (p. ej. SignalR). */
@@ -229,8 +234,59 @@ function mergeLastLocationFromApi(
         lng: loc.longitude,
         updatedAt: new Date(loc.recordedAt),
         name: stat.deliverymanName,
+        deliveryRouteId: loc.deliveryRouteId ?? null,
     }
     return next
+}
+
+async function loadMapOrdersForDeliverymen(stats: DeliverymanStats[]) {
+    const branchId = authStore.user?.branchId
+    if (!branchId || stats.length === 0) {
+        mapOrders.value = []
+        return
+    }
+    const fromDate = selectedDate.value
+    const toDate = selectedDate.value
+    const byId = new Map<number, OrderListItem>()
+    try {
+        const settled = await Promise.allSettled(
+            stats.map(async (stat) => {
+                const [rOnWay, rDelivered] = await Promise.allSettled([
+                    orderApi.fetchAssignedOrders(stat.deliverymanId, {
+                        page: 1,
+                        pageSize: 200,
+                        fromDate,
+                        toDate,
+                        branchId,
+                        status: 'OnTheWay',
+                        type: 'Delivery',
+                    }),
+                    orderApi.fetchAssignedOrders(stat.deliverymanId, {
+                        page: 1,
+                        pageSize: 200,
+                        fromDate,
+                        toDate,
+                        branchId,
+                        status: 'Delivered',
+                        type: 'Delivery',
+                    }),
+                ])
+                const rows: OrderListItem[] = []
+                if (rOnWay.status === 'fulfilled') rows.push(...rOnWay.value.items)
+                if (rDelivered.status === 'fulfilled') rows.push(...rDelivered.value.items)
+                return rows
+            }),
+        )
+        for (const r of settled) {
+            if (r.status !== 'fulfilled') continue
+            for (const o of r.value) {
+                byId.set(o.id, o)
+            }
+        }
+        mapOrders.value = [...byId.values()].sort((a, b) => b.id - a.id)
+    } catch {
+        mapOrders.value = []
+    }
 }
 
 async function refreshDriverLocationsFromApi(stats: DeliverymanStats[]) {
@@ -284,6 +340,7 @@ const loadData = async () => {
         deliverymenStatsRaw.value = overview.deliverymen
         advances.value = overview.advances
         await refreshDriverLocationsFromApi(overview.deliverymen)
+        await loadMapOrdersForDeliverymen(overview.deliverymen)
     } catch (err: any) {
         error('Error al cargar datos', err.message)
     } finally {
@@ -440,6 +497,8 @@ onMounted(() => {
                 lng: data.longitude,
                 updatedAt: new Date(data.recordedAt),
                 name: stat?.deliverymanName,
+                deliveryRouteId:
+                    typeof data.deliveryRouteId === 'number' ? data.deliveryRouteId : null,
             },
         }
     })

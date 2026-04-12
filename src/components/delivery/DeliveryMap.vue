@@ -22,19 +22,60 @@
             </template>
         </div>
 
-        <!-- Mapa con posición relativa para superponer elementos -->
+        <!-- Mapa + panel lateral (pedidos / productos del domiciliario seleccionado) -->
         <div class="relative w-full">
             <div ref="mapContainer" class="w-full rounded-lg border border-gray-200"
                 :style="{ height: mapHeight }"></div>
+
+            <aside v-if="selectedDriverId != null"
+                class="delivery-map-panel absolute top-2 right-2 bottom-2 z-[1] flex w-[min(360px,calc(100%-1rem))] flex-col rounded-lg border border-gray-200 bg-white shadow-lg">
+                <div class="flex shrink-0 items-start justify-between gap-2 border-b border-gray-100 px-3 py-2.5">
+                    <div class="min-w-0">
+                        <p class="text-xs font-medium uppercase tracking-wide text-gray-400">Ruta / pedidos</p>
+                        <p class="truncate text-sm font-semibold text-gray-900">{{ panelDriverTitle }}</p>
+                    </div>
+                    <button type="button"
+                        class="shrink-0 rounded-md p-1 text-gray-500 hover:bg-gray-100 hover:text-gray-800"
+                        aria-label="Cerrar panel" @click="closeDriverPanel">
+                        <span class="text-lg leading-none">×</span>
+                    </button>
+                </div>
+                <div class="min-h-0 flex-1 overflow-y-auto px-2 py-2">
+                    <p v-if="panelOrders.length === 0" class="px-1 py-4 text-center text-sm text-gray-500">
+                        No hay pedidos para mostrar con los filtros actuales.
+                    </p>
+                    <ul v-else class="space-y-2">
+                        <li v-for="order in panelOrders" :key="order.id"
+                            class="rounded-md border border-gray-100 bg-gray-50/80 px-2 py-2">
+                            <button type="button"
+                                class="flex w-full items-center justify-between gap-2 text-left text-sm"
+                                @click="toggleOrderExpanded(order)">
+                                <span class="font-mono font-semibold text-emerald-800">#{{ order.id }}</span>
+                                <span class="shrink-0 text-xs text-gray-600">{{ order.statusDisplayName }}</span>
+                            </button>
+                            <div v-if="expandedOrderId === order.id" class="mt-2 border-t border-gray-200 pt-2">
+                                <p v-if="panelLoadingOrderId === order.id" class="text-xs text-gray-500">Cargando productos…</p>
+                                <ul v-else-if="linesForOrder(order).length" class="space-y-0.5 text-xs text-gray-700">
+                                    <li v-for="(line, idx) in linesForOrder(order)" :key="idx">
+                                        {{ line.quantity }}× {{ line.productName }}
+                                    </li>
+                                </ul>
+                                <p v-else class="text-xs text-gray-500">Sin líneas de detalle.</p>
+                            </div>
+                        </li>
+                    </ul>
+                </div>
+            </aside>
         </div>
     </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, watch, computed } from 'vue'
+import { ref, onMounted, onUnmounted, watch, computed, shallowRef } from 'vue'
 import { setOptions, importLibrary } from '@googlemaps/js-api-loader'
 import BaseButton from '@/components/ui/BaseButton.vue'
-import type { OrderListItem } from '@/types/order'
+import type { OrderDetailItem, OrderLineSummary, OrderListItem } from '@/types/order'
+import { orderApi } from '@/services/MainAPI/orderApi'
 import { RouteOptimizationService } from '@/services/domain/RouteOptimizationService'
 import type { GeoLocation } from '@/composables/useGeolocation'
 
@@ -46,6 +87,8 @@ export interface DriverLocation {
     lng: number
     updatedAt: Date
     name?: string
+    /** Ruta activa del domiciliario (API / SignalR); null si no aplica. */
+    deliveryRouteId?: number | null
 }
 
 interface Props {
@@ -63,6 +106,8 @@ const mapContainer = ref<HTMLDivElement | null>(null)
 let map: google.maps.Map | null = null
 let markers: (google.maps.marker.AdvancedMarkerElement | google.maps.Marker)[] = []
 const driverMarkers = new Map<number, google.maps.marker.AdvancedMarkerElement | google.maps.Marker>()
+/** Raíz DOM del pin (Advanced Marker) para actualizar texto sin recrear el marcador. */
+const driverMarkerRoots = new Map<number, HTMLElement>()
 let routePolyline: google.maps.Polyline | null = null
 const extraCoordsByOrderId = new Map<number, GeoLocation>()
 
@@ -91,9 +136,95 @@ function lastUpdatedLabelFor(loc: DriverLocation): string {
     return `Hace ${diffD} día(s)`
 }
 
-function driverMarkerTooltip(driverId: number, loc: DriverLocation): string {
+function ordersOnTheWayForDriver(driverId: number): OrderListItem[] {
+    return props.orders.filter(
+        (o) =>
+            o.type === 'delivery' &&
+            o.deliveryManId === driverId &&
+            o.status === 'on_the_way'
+    )
+}
+
+/** Tooltip nativo estable (sin “hace X s”; la frescura va en los chips superiores). */
+function driverMarkerStableTitle(driverId: number, loc: DriverLocation): string {
     const name = loc.name ?? `Domiciliario #${driverId}`
-    return `${name} — Ubicación: ${lastUpdatedLabelFor(loc)}`
+    const onWay = ordersOnTheWayForDriver(driverId)
+    const n = onWay.length
+    if (n === 0) return `${name} — 0 en ruta`
+    const base = `${name} — ${n} en ruta`
+    const ids = onWay.map((o) => o.id)
+    const idList = ids.map((id) => `#${id}`).join(', ')
+    const withIds = `${base} (${idList})`
+    if (withIds.length > 80 || ids.length > 5) return `${base} · clic para ver lista`
+    return withIds
+}
+
+function onTheWayCountForDriver(driverId: number): number {
+    return ordersOnTheWayForDriver(driverId).length
+}
+
+// ─── Panel lateral (clic en pin) ───────────────────────────────────────────
+
+const selectedDriverId = ref<number | null>(null)
+const expandedOrderId = ref<number | null>(null)
+const orderDetailLinesCache = shallowRef(new Map<number, OrderDetailItem[]>())
+const panelLoadingOrderId = ref<number | null>(null)
+
+const panelDriverTitle = computed(() => {
+    const id = selectedDriverId.value
+    if (id == null) return ''
+    const loc = props.deliverymanLocations?.[id]
+    return loc?.name ?? `Domiciliario #${id}`
+})
+
+const panelOrders = computed((): OrderListItem[] => {
+    const id = selectedDriverId.value
+    if (id == null || !props.deliverymanLocations) return []
+    const loc = props.deliverymanLocations[id]
+    const forDriver = props.orders.filter(
+        (o) => o.type === 'delivery' && o.deliveryManId === id
+    )
+    if (loc?.deliveryRouteId != null && loc.deliveryRouteId !== undefined) {
+        const rid = loc.deliveryRouteId
+        return forDriver.filter((o) => o.deliveryRouteId === rid).sort((a, b) => b.id - a.id)
+    }
+    return forDriver.filter((o) => o.status === 'on_the_way').sort((a, b) => b.id - a.id)
+})
+
+function closeDriverPanel() {
+    selectedDriverId.value = null
+    expandedOrderId.value = null
+}
+
+function linesForOrder(order: OrderListItem): OrderLineSummary[] {
+    const sl = order.summaryLines
+    if (sl?.length) return sl
+    const details = orderDetailLinesCache.value.get(order.id)
+    if (!details?.length) return []
+    return details.map((d) => ({ productName: d.productName, quantity: d.quantity }))
+}
+
+async function toggleOrderExpanded(order: OrderListItem) {
+    if (expandedOrderId.value === order.id) {
+        expandedOrderId.value = null
+        return
+    }
+    expandedOrderId.value = order.id
+    if (order.summaryLines?.length) return
+    if (orderDetailLinesCache.value.has(order.id)) return
+    panelLoadingOrderId.value = order.id
+    try {
+        const d = await orderApi.fetchDetail(order.id)
+        const next = new Map(orderDetailLinesCache.value)
+        next.set(order.id, d.orderDetails)
+        orderDetailLinesCache.value = next
+    } catch {
+        const next = new Map(orderDetailLinesCache.value)
+        next.set(order.id, [])
+        orderDetailLinesCache.value = next
+    } finally {
+        panelLoadingOrderId.value = null
+    }
 }
 
 // =========================
@@ -118,25 +249,12 @@ function fitMapToDriverLocations(locs: Record<number, DriverLocation>) {
     map.fitBounds(bounds, { top: 56, right: 56, bottom: 56, left: 56 })
 }
 
-function refreshDriverMarkerTooltips() {
-    void nowSeconds.value
-    const locs = props.deliverymanLocations
-    if (!locs) return
-    for (const [id, marker] of driverMarkers) {
-        const loc = locs[id]
-        if (!loc) continue
-        const tip = driverMarkerTooltip(id, loc)
-        const m = marker as any
-        if (m.title !== undefined) m.title = tip
-        const el = m.content ?? m.element
-        if (el instanceof HTMLElement) el.title = tip
-    }
-}
-
 watch(
     () => props.deliverymanLocations,
     (locs) => {
         if (!map) return
+        const sid = selectedDriverId.value
+        if (sid != null && (!locs || !locs[sid])) closeDriverPanel()
         const n = locs ? Object.keys(locs).length : 0
         updateDriverMarkers(locs)
         if (props.orders.length === 0 && n > 0 && prevDriverLocationCount === 0) {
@@ -147,17 +265,103 @@ watch(
     { deep: true }
 )
 
+watch(
+    () => props.orders,
+    () => {
+        if (!map) return
+        updateDriverMarkers(props.deliverymanLocations)
+    },
+    { deep: true }
+)
+
+function syncDriverPinDom(root: HTMLElement, driverId: number, loc: DriverLocation) {
+    const title = driverMarkerStableTitle(driverId, loc)
+    root.title = title
+    const isConnected = Date.now() - loc.updatedAt.getTime() < 30_000
+    const fill = isConnected ? '#7c3aed' : '#9ca3af'
+    const icon = root.querySelector('.dm-marker-icon') as HTMLElement | null
+    if (icon) icon.style.background = fill
+    const label = root.querySelector('.dm-marker-label') as HTMLElement | null
+    if (label) {
+        const displayName = (loc.name ?? `#${driverId}`).trim()
+        label.textContent = displayName.length > 18 ? displayName.slice(0, 17) + '…' : displayName
+        label.title = loc.name ?? `Domiciliario #${driverId}`
+    }
+    const badge = root.querySelector('.dm-marker-badge') as HTMLElement | null
+    const n = onTheWayCountForDriver(driverId)
+    if (badge) {
+        if (n > 0) {
+            badge.textContent = String(n)
+            badge.style.display = 'block'
+        } else {
+            badge.style.display = 'none'
+        }
+    }
+}
+
+function createDriverPinRoot(driverId: number, loc: DriverLocation): HTMLElement {
+    const title = driverMarkerStableTitle(driverId, loc)
+    const isConnected = Date.now() - loc.updatedAt.getTime() < 30_000
+    const fill = isConnected ? '#7c3aed' : '#9ca3af'
+
+    const root = document.createElement('div')
+    root.className = 'dm-marker-root'
+    root.title = title
+    root.style.cssText =
+        'display:flex;flex-direction:column;align-items:center;cursor:pointer;user-select:none;'
+
+    const wrap = document.createElement('div')
+    wrap.style.cssText = 'position:relative;'
+
+    const icon = document.createElement('div')
+    icon.className = 'dm-marker-icon'
+    icon.style.cssText = `width:36px;height:36px;background:${fill};border-radius:50%;display:flex;align-items:center;justify-content:center;border:3px solid white;box-shadow:0 2px 6px rgba(0,0,0,.35);font-size:18px;line-height:1;`
+    icon.textContent = '🏍️'
+
+    const badge = document.createElement('div')
+    badge.className = 'dm-marker-badge'
+    badge.style.cssText =
+        'position:absolute;top:-6px;right:-6px;min-width:18px;height:18px;padding:0 5px;font-size:10px;font-weight:700;line-height:18px;text-align:center;color:#fff;background:#059669;border-radius:9999px;border:2px solid #fff;display:none;box-shadow:0 1px 3px rgba(0,0,0,.25);'
+
+    const label = document.createElement('div')
+    label.className = 'dm-marker-label'
+    const displayName = (loc.name ?? `#${driverId}`).trim()
+    label.textContent = displayName.length > 18 ? displayName.slice(0, 17) + '…' : displayName
+    label.title = loc.name ?? `Domiciliario #${driverId}`
+    label.style.cssText =
+        'margin-top:2px;max-width:112px;padding:1px 6px;font-size:10px;font-weight:600;line-height:1.2;color:#111827;background:rgba(255,255,255,.95);border-radius:4px;box-shadow:0 1px 3px rgba(0,0,0,.2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;'
+
+    wrap.appendChild(icon)
+    wrap.appendChild(badge)
+    root.appendChild(wrap)
+    root.appendChild(label)
+
+    const n = onTheWayCountForDriver(driverId)
+    if (n > 0) {
+        badge.textContent = String(n)
+        badge.style.display = 'block'
+    }
+
+    root.addEventListener('click', (e) => {
+        e.stopPropagation()
+        selectedDriverId.value = driverId
+    })
+
+    return root
+}
+
 function updateDriverMarkers(locs: Record<number, DriverLocation> | undefined) {
     if (!map) return
     const AdvancedMarkerElement = (window as any)._AdvancedMarkerElement
     const currentIds = new Set(Object.keys(locs ?? {}).map(Number))
 
-    // Eliminar marcadores de conductores que ya no están en la lista
     for (const [id, marker] of driverMarkers) {
         if (!currentIds.has(id)) {
+            google.maps.event.clearInstanceListeners(marker as any)
             if (typeof (marker as any).setMap === 'function') (marker as any).setMap(null)
             else (marker as any).map = null
             driverMarkers.delete(id)
+            driverMarkerRoots.delete(id)
         }
     }
 
@@ -166,35 +370,53 @@ function updateDriverMarkers(locs: Record<number, DriverLocation> | undefined) {
     for (const [idStr, loc] of Object.entries(locs)) {
         const id = Number(idStr)
         const position = { lat: loc.lat, lng: loc.lng }
-        const tip = driverMarkerTooltip(id, loc)
-        const isConnected = Date.now() - loc.updatedAt.getTime() < 30_000
-        const fill = isConnected ? '#7c3aed' : '#9ca3af'
+        const stableTitle = driverMarkerStableTitle(id, loc)
 
         const existing = driverMarkers.get(id)
         if (existing) {
             if (typeof (existing as any).position !== 'undefined') (existing as any).position = position
             else if (typeof (existing as any).setPosition === 'function') (existing as any).setPosition(position)
             const m = existing as any
-            if (m.title !== undefined) m.title = tip
-            const el = m.content ?? m.element
-            if (el instanceof HTMLElement) {
-                el.title = tip
-                el.style.background = fill
+            if (m.title !== undefined) m.title = stableTitle
+            const root = driverMarkerRoots.get(id)
+            if (root) syncDriverPinDom(root, id, loc)
+            else {
+                const el = m.content ?? m.element
+                if (el instanceof HTMLElement) {
+                    if (el.querySelector('.dm-marker-icon')) syncDriverPinDom(el, id, loc)
+                    else {
+                        el.title = stableTitle
+                    }
+                }
             }
             continue
         }
 
         let marker: google.maps.marker.AdvancedMarkerElement | google.maps.Marker
         if (AdvancedMarkerElement) {
-            const icon = document.createElement('div')
-            icon.style.cssText = `width:36px;height:36px;background:${fill};border-radius:50%;display:flex;align-items:center;justify-content:center;border:3px solid white;box-shadow:0 2px 6px rgba(0,0,0,.35);font-size:18px;line-height:1;`
-            icon.textContent = '🏍️'
-            icon.title = tip
-            marker = new AdvancedMarkerElement({ position, map, title: tip, content: icon })
+            const root = createDriverPinRoot(id, loc)
+            driverMarkerRoots.set(id, root)
+            marker = new AdvancedMarkerElement({
+                position,
+                map,
+                title: stableTitle,
+                content: root,
+            })
+            google.maps.event.addListener(marker as any, 'click', () => {
+                selectedDriverId.value = id
+            })
         } else {
             marker = new google.maps.Marker({
-                position, map, title: tip,
-                icon: { url: 'https://maps.google.com/mapfiles/ms/icons/purple-dot.png', scaledSize: new google.maps.Size(40, 40) },
+                position,
+                map,
+                title: stableTitle,
+                icon: {
+                    url: 'https://maps.google.com/mapfiles/ms/icons/purple-dot.png',
+                    scaledSize: new google.maps.Size(40, 40),
+                },
+            })
+            google.maps.event.addListener(marker, 'click', () => {
+                selectedDriverId.value = id
             })
         }
         driverMarkers.set(id, marker)
@@ -205,10 +427,9 @@ function updateDriverMarkers(locs: Record<number, DriverLocation> | undefined) {
 // 🔹 Inicialización
 // =========================
 onMounted(async () => {
-    // Iniciar reloj para "última actualización"
+    // Reloj solo para chips "hace X s" (no actualiza title de pins cada segundo).
     _clockInterval = setInterval(() => {
         nowSeconds.value = Math.floor(Date.now() / 1000)
-        refreshDriverMarkerTooltips()
     }, 1000)
     const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY
     const mapId = import.meta.env.VITE_GOOGLE_MAPS_MAP_ID
@@ -264,10 +485,12 @@ onMounted(async () => {
 onUnmounted(() => {
     if (_clockInterval) clearInterval(_clockInterval)
     for (const marker of driverMarkers.values()) {
+        google.maps.event.clearInstanceListeners(marker as any)
         if (typeof (marker as any).setMap === 'function') (marker as any).setMap(null)
         else (marker as any).map = null
     }
     driverMarkers.clear()
+    driverMarkerRoots.clear()
 })
 
 // =========================
