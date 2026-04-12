@@ -117,6 +117,12 @@ export function useOrderPermissions() {
         return role === 'Superadmin' || role === 'Admin'
     }
 
+    /** Reimprimir comanda / ticket térmico desde detalle de pedido (cola por sucursal del pedido). */
+    const canReprintThermalTickets = (): boolean => {
+        const role = authStore.userRole
+        return role === 'Superadmin' || role === 'Admin' || role === 'Cashier'
+    }
+
     /**
      * Verifica si el usuario puede liquidar app payments
      */
@@ -317,6 +323,7 @@ export function useOrderPermissions() {
         canEditProducts,
         canEditPayments,
         canVerifyPayments,
+        canReprintThermalTickets,
         canSettleAppPayments,
         canChangeStatus,
         canCancel,

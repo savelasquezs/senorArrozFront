@@ -13,12 +13,36 @@
                 </p>
             </div>
 
-            <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
+            <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto flex-wrap">
                 <BaseButton v-if="!isDeliveryman" variant="secondary" size="sm" class="w-full sm:w-auto"
                     @click="$router.push({ name: 'OrdersList' })">
                     <ArrowLeftIcon class="w-4 h-4 mr-1" />
                     Volver
                 </BaseButton>
+                <template v-if="permissions.canReprintThermalTickets() && order">
+                    <BaseButton
+                        variant="outline"
+                        size="sm"
+                        class="w-full sm:w-auto"
+                        :loading="reprintKitchenLoading"
+                        title="Reimprimir comanda de cocina"
+                        @click="onReprintKitchen"
+                    >
+                        <PrinterIcon class="w-4 h-4 mr-1" />
+                        Comanda cocina
+                    </BaseButton>
+                    <BaseButton
+                        variant="outline"
+                        size="sm"
+                        class="w-full sm:w-auto"
+                        :loading="reprintDeliveryLoading"
+                        title="Reimprimir ticket de domicilio"
+                        @click="onReprintDelivery"
+                    >
+                        <PrinterIcon class="w-4 h-4 mr-1" />
+                        Ticket domicilio
+                    </BaseButton>
+                </template>
                 <BaseButton v-if="permissions.canCancel(order)" variant="danger" size="sm" class="w-full sm:w-auto"
                     @click="showCancelModal = true">
                     <XCircleIcon class="w-4 h-4 mr-1" />
@@ -423,6 +447,7 @@ import { useAuthStore } from '@/store/auth'
 import { customerApi } from '@/services/MainAPI/customerApi'
 import { orderApi } from '@/services/MainAPI/orderApi'
 import { bankPaymentApi } from '@/services/MainAPI/bankPaymentApi'
+import { printJobsApi } from '@/services/MainAPI/printJobsApi'
 import {
     toPaymentSnapshot,
     evaluateBankSyncAfterTotalChange,
@@ -445,6 +470,7 @@ import {
     ShoppingBagIcon,
     CreditCardIcon,
     CheckCircleIcon,
+    PrinterIcon,
 } from '@heroicons/vue/24/outline'
 import { ref, computed, watch, onMounted, nextTick } from 'vue'
 const permissions = useOrderPermissions()
@@ -464,6 +490,8 @@ const savingPrepareNow = ref(false)
 const savingPaidInStore = ref(false)
 const showKitchenScheduleConfirm = ref(false)
 const showPrepareNowConfirm = ref(false)
+const reprintKitchenLoading = ref(false)
+const reprintDeliveryLoading = ref(false)
 
 function parseOrderDate(iso: string | Date | undefined | null): Date | null {
     if (iso === undefined || iso === null || iso === '') return null
@@ -507,6 +535,54 @@ const activeTab = ref('info')
 const router = useRouter()
 
 const { success, error } = useToast()
+
+async function onReprintKitchen() {
+    const o = order.value
+    if (!o) return
+    const branchId = o.branchId
+    if (!branchId) {
+        error('Sin sucursal', 'El pedido no tiene sucursal asociada.')
+        return
+    }
+    reprintKitchenLoading.value = true
+    try {
+        const res = await printJobsApi.enqueueKitchenJob(branchId, [o.id])
+        if (!res.isSuccess) {
+            error('Reimpresión', res.message || 'No se pudo encolar la comanda.')
+            return
+        }
+        success('Comanda en cola', 3500, 'El agente de impresión la emitirá en breve.')
+    } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : 'No se pudo encolar la reimpresión.'
+        error('Reimpresión', msg)
+    } finally {
+        reprintKitchenLoading.value = false
+    }
+}
+
+async function onReprintDelivery() {
+    const o = order.value
+    if (!o) return
+    const branchId = o.branchId
+    if (!branchId) {
+        error('Sin sucursal', 'El pedido no tiene sucursal asociada.')
+        return
+    }
+    reprintDeliveryLoading.value = true
+    try {
+        const res = await printJobsApi.enqueueDeliveryJob(branchId, [o.id])
+        if (!res.isSuccess) {
+            error('Reimpresión', res.message || 'No se pudo encolar el ticket.')
+            return
+        }
+        success('Ticket en cola', 3500, 'El agente lo imprimirá en breve.')
+    } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : 'No se pudo encolar la reimpresión.'
+        error('Reimpresión', msg)
+    } finally {
+        reprintDeliveryLoading.value = false
+    }
+}
 
 // Modales
 const showEditCustomerModal = ref(false)
