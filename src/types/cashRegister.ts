@@ -82,24 +82,14 @@ export interface BankExpectedBalance {
 
 export interface CashRegisterExpected {
   openingCash: number
-  expectedCash: number
-  cashFromOrders: number
-  /** Suma de totales de pedidos entregados en el período. */
-  deliveredOrdersSalesTotal: number
-  /** Pagos por banco en esos pedidos (concilian con cuadre bancario). */
-  bankPaymentsFromOrdersTotal: number
-  /** Pagos por apps en esos pedidos (no entran a caja ni banco de inmediato). */
-  appPaymentsFromOrdersTotal: number
-  cashDeposits: number
-  cashExpenses: number
-  /** Abonos domiciliario por transferencia: restados del efectivo esperado (cuadran en banco). */
-  advancesBankTransfer: number
-  /** Suma de préstamos informales activos; ya restada en expectedCash. */
+  /** Efectivo + bancos + snapshot préstamos al último cierre. */
+  openingGlobalTotal: number
+  /** Ventas (pedidos entregados) en el período por instante PrepareAt/CreatedAt. */
+  salesInPeriodTotal: number
+  expensesInPeriodTotal: number
+  expectedGlobalTotal: number
+  /** Préstamos informales activos: suman al total global contado (efectivo del negocio fuera del cajón). */
   informalLoansActiveTotal: number
-  /** Abonos a Caja Mayor Efectivo en el período; ya restados del expectedCash (neto con descargas). */
-  cashVaultAbonosTotal: number
-  /** Descargas desde Caja Mayor Efectivo en el período. */
-  cashVaultDescargasTotal: number
   /** Pedidos sin entregar ni cancelar en la sucursal; si hay alguno no se permite guardar el cuadre. */
   undeliveredOrdersCount: number
   asOf: string

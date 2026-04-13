@@ -52,6 +52,38 @@
 
       <template v-else-if="expected">
         <div class="flex flex-col gap-4">
+          <!-- Balance global del período -->
+          <div
+            class="rounded-xl border px-4 py-3"
+            :class="globalCuadred ? 'border-emerald-200 bg-emerald-50/80' : 'border-amber-200 bg-amber-50/80'"
+          >
+            <h2 class="text-sm font-semibold text-gray-900 mb-2">Balance global del período</h2>
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">
+              <div>
+                <p class="text-xs text-gray-500">Esperado (sistema)</p>
+                <p class="font-bold tabular-nums text-gray-900">{{ formatCurrency(expected.expectedGlobalTotal) }}</p>
+                <p class="text-[11px] text-gray-500 mt-1 leading-snug">
+                  Apert. caja+bancos+L snapshot {{ formatCurrency(expected.openingGlobalTotal) }} + ventas
+                  {{ formatCurrency(expected.salesInPeriodTotal) }} − gastos
+                  {{ formatCurrency(expected.expensesInPeriodTotal) }}; el esperado incluye préstamos activos actuales.
+                </p>
+              </div>
+              <div>
+                <p class="text-xs text-gray-500">Contado (caja + bancos + prést. activos)</p>
+                <p class="font-bold tabular-nums text-gray-900">{{ formatCurrency(countedGlobalTotal) }}</p>
+              </div>
+              <div>
+                <p class="text-xs text-gray-500">Diferencia</p>
+                <p
+                  class="font-bold tabular-nums"
+                  :class="globalCuadred ? 'text-emerald-800' : 'text-amber-900'"
+                >
+                  {{ formatCurrency(globalDifference) }}
+                </p>
+              </div>
+            </div>
+          </div>
+
           <div class="lg:grid lg:grid-cols-2 lg:gap-4 lg:items-start">
             <div class="min-w-0 space-y-4">
             <!-- ===== SECCIÓN 1: EFECTIVO ===== -->
@@ -90,46 +122,17 @@
                 </div>
 
                 <!-- Totales -->
-                <div class="grid grid-cols-3 gap-2 sm:gap-3 pt-3 border-t border-gray-100">
+                <div class="grid grid-cols-2 gap-2 sm:gap-3 pt-3 border-t border-gray-100">
                   <div class="bg-gray-50 rounded-lg p-2 sm:p-2.5 text-center">
-                    <p class="text-[10px] sm:text-xs text-gray-500">Apertura</p>
+                    <p class="text-[10px] sm:text-xs text-gray-500">Apertura efectivo (último cierre)</p>
                     <p class="text-base sm:text-lg font-bold text-gray-700 tabular-nums">
                       {{ formatCurrency(expected.openingCash) }}
                     </p>
                   </div>
-                  <div
-                    ref="expectedBreakdownTriggerEl"
-                    class="bg-green-50 rounded-lg p-2 sm:p-2.5 text-center"
-                    @mouseenter="onExpectedBreakdownEnter"
-                    @mouseleave="onExpectedBreakdownLeave"
-                  >
-                    <p class="text-[10px] sm:text-xs text-gray-500 flex items-center justify-center gap-0.5">
-                      Sistema espera
-                      <button
-                        type="button"
-                        class="p-0.5 rounded text-green-800 hover:bg-green-100/80 focus:outline-none focus-visible:ring-2 focus-visible:ring-green-500"
-                        aria-label="Desglose del efectivo esperado (también disponible al pasar el cursor)"
-                        @click.stop="onExpectedBreakdownIconClick"
-                      >
-                        <InformationCircleIcon class="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                      </button>
-                    </p>
-                    <p class="text-base sm:text-lg font-bold text-green-700 tabular-nums cursor-help">
-                      {{ formatCurrency(expected.expectedCash) }}
-                    </p>
-                  </div>
-                  <div :class="['rounded-lg p-2 sm:p-2.5 text-center', cashDifference === 0 ? 'bg-green-50' : 'bg-red-50']">
+                  <div class="bg-yellow-50/80 rounded-lg p-2 sm:p-2.5 text-center">
                     <p class="text-[10px] sm:text-xs text-gray-500">Contado en caja</p>
-                    <p
-                      :class="[
-                        'text-base sm:text-lg font-bold tabular-nums',
-                        cashDifference === 0 ? 'text-green-700' : 'text-red-700',
-                      ]"
-                    >
+                    <p class="text-base sm:text-lg font-bold text-yellow-900 tabular-nums">
                       {{ formatCurrency(closingCash) }}
-                    </p>
-                    <p class="text-[10px] sm:text-xs text-gray-400 mt-0.5 tabular-nums">
-                      Dif.: {{ formatCurrency(cashDifference) }}
                     </p>
                   </div>
                 </div>
@@ -189,7 +192,7 @@
 
                   <div class="p-4 pt-0">
                     <p class="text-xs text-gray-500 mb-3">
-                      Se guardan al instante. Los activos restan del efectivo esperado.
+                      Se guardan al instante. Los activos suman al total global contado (efectivo del negocio que no está en el cajón en este momento).
                     </p>
 
                     <div v-if="informalLoansLoading" class="text-center py-6 text-gray-500 text-sm">Cargando…</div>
@@ -418,59 +421,6 @@
           </div>
         </div>
 
-        <Teleport to="body">
-          <div
-            v-if="expectedBreakdownOpen && expected"
-            ref="expectedBreakdownPanelEl"
-            class="fixed z-[300] w-[min(20rem,calc(100vw-1rem))] max-h-[min(22rem,70vh)] overflow-y-auto rounded-lg border border-gray-200 bg-white p-3 text-xs text-gray-700 shadow-xl"
-            :style="breakdownPanelStyle"
-            role="dialog"
-            aria-label="Desglose efectivo esperado"
-            @mouseenter="onExpectedBreakdownPanelEnter"
-            @mouseleave="onExpectedBreakdownLeave"
-          >
-            <p class="font-semibold text-gray-900 mb-2">Cómo se calcula el efectivo esperado</p>
-            <ul class="space-y-1.5 list-disc pl-4 text-gray-600">
-              <li>
-                Ventas entregadas (total pedidos):
-                <span class="font-medium text-gray-800 tabular-nums">{{
-                  formatCurrency(expected.deliveredOrdersSalesTotal ?? 0)
-                }}</span>
-              </li>
-              <li>
-                − Banco en pedidos:
-                <span class="font-medium text-gray-800 tabular-nums">{{
-                  formatCurrency(expected.bankPaymentsFromOrdersTotal ?? 0)
-                }}</span>
-              </li>
-              <li>
-                − Apps (fuera de caja/banco):
-                <span class="font-medium text-gray-800 tabular-nums">{{
-                  formatCurrency(expected.appPaymentsFromOrdersTotal ?? 0)
-                }}</span>
-              </li>
-              <li>
-                ⇒ Efectivo de ventas:
-                <span class="font-medium text-gray-800 tabular-nums">{{ formatCurrency(expected.cashFromOrders) }}</span>
-              </li>
-            </ul>
-            <p class="text-[11px] text-gray-500 border-t border-gray-100 mt-2 pt-2 space-y-1">
-              <span class="block"
-                >+ Abonos reservas: {{ formatCurrency(expected.cashDeposits) }} · − Gastos efectivo:
-                {{ formatCurrency(expected.cashExpenses) }}</span
-              >
-              <span class="block"
-                >− Abonos domic. transferencia: {{ formatCurrency(expected.advancesBankTransfer) }} · Caja mayor neto:
-                abonos −{{ formatCurrency(expected.cashVaultAbonosTotal ?? 0) }} / +descargas
-                {{ formatCurrency(expected.cashVaultDescargasTotal ?? 0) }}</span
-              >
-              <span class="block"
-                >− Préstamos informales activos: {{ formatCurrency(expected.informalLoansActiveTotal ?? 0) }} · + Apertura:
-                {{ formatCurrency(expected.openingCash) }}</span
-              >
-            </p>
-          </div>
-        </Teleport>
       </template>
 
       <!-- Estado vacío -->
@@ -595,7 +545,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onMounted, onBeforeUnmount, nextTick } from 'vue'
+import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import MainLayout from '@/components/layout/MainLayout.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseDialog from '@/components/ui/BaseDialog.vue'
@@ -610,7 +560,6 @@ import {
   BuildingLibraryIcon,
   ChevronDownIcon,
   ClockIcon,
-  InformationCircleIcon,
   PlusIcon,
   CheckCircleIcon,
   ExclamationCircleIcon,
@@ -665,88 +614,6 @@ const bankReconciliations = ref<
 >([])
 
 const movementsBankId = ref<number | null>(null)
-
-const expectedBreakdownOpen = ref(false)
-const expectedBreakdownTriggerEl = ref<HTMLElement | null>(null)
-const expectedBreakdownPanelEl = ref<HTMLElement | null>(null)
-const breakdownPanelStyle = ref<Record<string, string>>({ top: '0px', left: '0px' })
-
-let expectedBreakdownHideTimer: ReturnType<typeof setTimeout> | null = null
-let expectedBreakdownClickToggle = false
-
-function clearExpectedBreakdownHideTimer() {
-  if (expectedBreakdownHideTimer !== null) {
-    clearTimeout(expectedBreakdownHideTimer)
-    expectedBreakdownHideTimer = null
-  }
-}
-
-function scheduleExpectedBreakdownHide() {
-  clearExpectedBreakdownHideTimer()
-  expectedBreakdownHideTimer = setTimeout(() => {
-    expectedBreakdownHideTimer = null
-    if (!expectedBreakdownClickToggle) expectedBreakdownOpen.value = false
-  }, 220)
-}
-
-function updateBreakdownPanelPosition() {
-  const el = expectedBreakdownTriggerEl.value
-  if (!el || typeof window === 'undefined') return
-  const r = el.getBoundingClientRect()
-  const pad = 8
-  const panelWidth = Math.min(320, window.innerWidth - pad * 2)
-  let left = r.left + r.width / 2 - panelWidth / 2
-  left = Math.max(pad, Math.min(left, window.innerWidth - panelWidth - pad))
-  let top = r.bottom + pad
-  const maxTop = window.innerHeight - 120
-  if (top > maxTop) top = Math.max(pad, r.top - pad - Math.min(352, window.innerHeight * 0.45))
-  breakdownPanelStyle.value = {
-    top: `${top}px`,
-    left: `${left}px`,
-    width: `${panelWidth}px`,
-  }
-}
-
-function onExpectedBreakdownEnter() {
-  clearExpectedBreakdownHideTimer()
-  expectedBreakdownClickToggle = false
-  expectedBreakdownOpen.value = true
-  nextTick(() => updateBreakdownPanelPosition())
-}
-
-function onExpectedBreakdownLeave() {
-  scheduleExpectedBreakdownHide()
-}
-
-function onExpectedBreakdownPanelEnter() {
-  clearExpectedBreakdownHideTimer()
-}
-
-function onExpectedBreakdownIconClick() {
-  clearExpectedBreakdownHideTimer()
-  if (expectedBreakdownOpen.value) {
-    expectedBreakdownOpen.value = false
-    expectedBreakdownClickToggle = false
-  } else {
-    expectedBreakdownClickToggle = true
-    expectedBreakdownOpen.value = true
-    nextTick(() => updateBreakdownPanelPosition())
-  }
-}
-
-function onDocumentPointerDownExpectedBreakdown(ev: PointerEvent) {
-  if (!expectedBreakdownOpen.value) return
-  const t = ev.target as Node
-  if (expectedBreakdownTriggerEl.value?.contains(t)) return
-  if (expectedBreakdownPanelEl.value?.contains(t)) return
-  clearExpectedBreakdownHideTimer()
-  expectedBreakdownOpen.value = false
-  expectedBreakdownClickToggle = false
-}
-
-function onWindowRepositionBreakdown() {
-  if (expectedBreakdownOpen.value) updateBreakdownPanelPosition()
-}
 
 function denomsStorageKey(): string {
   return `senor-arroz:cash-register-denoms:${authStore.branchId ?? 0}`
@@ -870,7 +737,20 @@ function onDenominationBlur(denom: number) {
 }
 
 // ===== COMPUTED =====
-const cashDifference = computed(() => closingCash.value - (expected.value?.expectedCash ?? 0))
+const countedGlobalTotal = computed(() => {
+  const e = expected.value
+  if (!e) return 0
+  const banksSum = bankReconciliations.value.reduce((s, r) => s + (Number(r.actualBalance) || 0), 0)
+  return closingCash.value + banksSum + (e.informalLoansActiveTotal ?? 0)
+})
+
+const globalDifference = computed(
+  () => countedGlobalTotal.value - (expected.value?.expectedGlobalTotal ?? 0)
+)
+
+const globalCuadred = computed(
+  () => expected.value != null && globalDifference.value === 0
+)
 
 const totalActiveLoans = computed(() =>
   branchInformalLoans.value.reduce((sum, l) => sum + (l.amount || 0), 0)
@@ -887,6 +767,7 @@ const canSave = computed(
     !saving.value &&
     undeliveredCount.value === 0 &&
     allBanksCuadred.value &&
+    globalCuadred.value &&
     bankReconciliations.value.length > 0
 )
 
@@ -904,6 +785,8 @@ const saveBlockReason = computed(() => {
   }
   if (bankReconciliations.value.length === 0) return 'No hay bancos configurados para esta sucursal.'
   if (!allBanksCuadred.value) return 'Hay bancos con diferencia distinta de $0'
+  if (!globalCuadred.value)
+    return 'El balance global (caja + bancos + préstamos activos) no coincide con el esperado del período.'
   return ''
 })
 
@@ -1196,17 +1079,10 @@ async function saveClosure() {
 }
 
 onMounted(() => {
-  document.addEventListener('pointerdown', onDocumentPointerDownExpectedBreakdown, true)
-  window.addEventListener('resize', onWindowRepositionBreakdown)
-  window.addEventListener('scroll', onWindowRepositionBreakdown, true)
   void loadData()
 })
 
 onBeforeUnmount(() => {
   flushPersistDenominationDraft()
-  clearExpectedBreakdownHideTimer()
-  document.removeEventListener('pointerdown', onDocumentPointerDownExpectedBreakdown, true)
-  window.removeEventListener('resize', onWindowRepositionBreakdown)
-  window.removeEventListener('scroll', onWindowRepositionBreakdown, true)
 })
 </script>
