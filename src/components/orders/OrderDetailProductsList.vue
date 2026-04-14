@@ -145,7 +145,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import type { OrderDetailItem, UpdateOrderDetailDto } from '@/types/order'
 import { useFormatting } from '@/composables/useFormatting'
 import { useToast } from '@/composables/useToast'
@@ -214,7 +214,7 @@ const enterEditMode = () => {
 }
 
 const cancelEdit = () => {
-    localProducts.value = []
+    localProducts.value = JSON.parse(JSON.stringify(originalProducts.value))
     editing.value = false
 }
 
@@ -268,6 +268,17 @@ const saveChanges = async () => {
     emit('save', updateDto)
 }
 
-// Inicializar productos
-localProducts.value = [...props.products]
+/** Sincroniza con el padre cuando llegan datos del API (tras guardar, o carga inicial). Así los id reales y las líneas eliminadas no quedan desfasados en una segunda edición. */
+watch(
+    () => props.products,
+    (next) => {
+        const list = next ?? []
+        const copy = JSON.parse(JSON.stringify(list)) as OrderDetailItem[]
+        localProducts.value = copy
+        if (editing.value) {
+            originalProducts.value = JSON.parse(JSON.stringify(list)) as OrderDetailItem[]
+        }
+    },
+    { deep: true, immediate: true }
+)
 </script>

@@ -143,7 +143,7 @@ const { speak, cancel } = useTextToSpeech()
 const { permission, requestPermission, notify } = useNotifications()
 
 const SIGNALR_HUB_URL = import.meta.env.VITE_SIGNALR_HUB_URL || 'http://localhost:5000/hubs/orders'
-const { isConnected, on } = useSignalR(SIGNALR_HUB_URL)
+const { isConnected, on, off } = useSignalR(SIGNALR_HUB_URL)
 
 const activeTab = ref<'scheduled' | 'active' | 'ready'>('active')
 const soundEnabled = ref(true)
@@ -234,13 +234,11 @@ const notifyOrderShownInKitchen = async (orderData: any, isReservation: boolean)
 }
 
 const handleNewOrder = async (orderData: any) => {
-    console.log('Nuevo pedido recibido:', orderData)
     await loadOrders()
     await notifyOrderShownInKitchen(orderData, false)
 }
 
 const handleReservationReady = async (orderData: any) => {
-    console.log('Reserva próxima:', orderData)
     await loadOrders()
     await notifyOrderShownInKitchen(orderData, true)
 }
@@ -251,10 +249,14 @@ const notifyKitchenOrderModified = async (
     modificationKind: string,
     kitchenChanges: KitchenOrderModificationSummary | undefined
 ) => {
-    if (!orderData?.id) return
-    const prev = allOrders.value.find((o) => o.id === orderData.id)
-    if (!prev || (prev.status !== 'taken' && prev.status !== 'in_preparation')) return
-    if (!KitchenService.isVisibleToActiveKitchenForAlerts(prev)) return
+    const oid = orderData?.id
+    const prev = oid ? allOrders.value.find((o) => o.id === oid) : undefined
+    let skip = ''
+    if (!oid) skip = 'no_order_id'
+    else if (!prev) skip = 'no_prev_in_list'
+    else if (prev.status !== 'taken' && prev.status !== 'in_preparation') skip = `bad_status:${prev.status}`
+    else if (!KitchenService.isVisibleToActiveKitchenForAlerts(prev)) skip = 'not_visible_reservation_window'
+    if (skip || !prev) return
 
     try {
         await ordersStore.fetchById(orderData.id)
@@ -292,9 +294,10 @@ const handleOrderModified = async (payload: any) => {
     const data = payload?.order ?? payload
     const kind = typeof payload?.modificationKind === 'string' ? payload.modificationKind : 'content'
     const kitchenChanges = payload?.kitchenChanges as KitchenOrderModificationSummary | undefined
+    const prev = data?.id ? allOrders.value.find((o) => o.id === data.id) : undefined
+    const visible = prev ? KitchenService.isVisibleToActiveKitchenForAlerts(prev) : false
     if (!data?.id) return
-    const prev = allOrders.value.find((o) => o.id === data.id)
-    if (prev && KitchenService.isVisibleToActiveKitchenForAlerts(prev)) {
+    if (prev && visible) {
         await notifyKitchenOrderModified(data, kind, kitchenChanges)
     }
     await loadOrders()
@@ -406,6 +409,11 @@ onMounted(async () => {
 
     await loadOrders()
 
+    // Evita handlers duplicados (p. ej. HMR o remount) que disparen TTS varias veces por el mismo evento.
+    off('NewOrder')
+    off('ReservationReady')
+    off('OrderModified')
+    off('OrderCancelled')
     on('NewOrder', handleNewOrder)
     on('ReservationReady', handleReservationReady)
     on('OrderModified', handleOrderModified)

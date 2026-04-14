@@ -58,7 +58,6 @@ export const useOrdersDataStore = defineStore('ordersData', () => {
         error.value = null
         try {
             const response = await orderApi.updateOrder(id, payload)
-            console.log('response', response)
             // Update item in list
             if (list.value) {
                 const index = list.value.items.findIndex(item => item.id === id)
