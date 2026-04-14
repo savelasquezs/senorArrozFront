@@ -145,11 +145,21 @@ export class KitchenService {
         return `${n}`
     }
 
+    /** Texto de notas del pedido listo para TTS / notificación (espacios y longitud). */
+    private static formatOrderNotesForVoice(notes: string | null | undefined, maxLen = 400): string {
+        const t = (notes ?? '').replace(/\s+/g, ' ').trim()
+        if (!t) return ''
+        if (t.length <= maxLen) return t
+        return `${t.slice(0, maxLen)}…`
+    }
+
     /** Cuerpo de notificación del navegador (sin título). */
     static buildOrderModifiedNotificationBody(
         orderId: number,
         _kind: string,
-        changes: KitchenOrderModificationSummary | null | undefined
+        changes: KitchenOrderModificationSummary | null | undefined,
+        /** Notas actuales del pedido tras el cambio (para leer en voz si notesChanged). */
+        orderNotes?: string | null
     ): { body: string; usedFallback: boolean } {
         const intro = `Modificación del pedido número ${orderId}.`
         const parts: string[] = []
@@ -182,7 +192,14 @@ export class KitchenService {
                 )
             }
             if (changes.scheduleChanged) parts.push('Cambio de horario del pedido.')
-            if (changes.notesChanged) parts.push('Cambio en las notas del pedido.')
+            if (changes.notesChanged) {
+                const spoken = this.formatOrderNotesForVoice(orderNotes)
+                if (spoken) {
+                    parts.push(`Notas del pedido: ${spoken}.`)
+                } else {
+                    parts.push('Las notas del pedido quedaron vacías.')
+                }
+            }
         }
 
         const usedFallback = parts.length === 0
@@ -195,9 +212,10 @@ export class KitchenService {
     static buildOrderModifiedSpeechText(
         orderId: number,
         kind: string,
-        changes: KitchenOrderModificationSummary | null | undefined
+        changes: KitchenOrderModificationSummary | null | undefined,
+        orderNotes?: string | null
     ): string {
-        const { body } = this.buildOrderModifiedNotificationBody(orderId, kind, changes)
+        const { body } = this.buildOrderModifiedNotificationBody(orderId, kind, changes, orderNotes)
         return `Atención cocina. ${body}`
     }
 

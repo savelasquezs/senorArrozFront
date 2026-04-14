@@ -262,13 +262,20 @@ const notifyKitchenOrderModified = async (
 
         orderItemsMap.value.set(orderData.id, [...(ordersStore.current.orderDetails || [])])
 
+        const orderNotes = ordersStore.current.notes ?? null
         const title = KitchenService.buildOrderModifiedNotificationTitle(prev.id)
         const { body: bodyText } = KitchenService.buildOrderModifiedNotificationBody(
             prev.id,
             modificationKind,
-            kitchenChanges
+            kitchenChanges,
+            orderNotes
         )
-        const speechText = KitchenService.buildOrderModifiedSpeechText(prev.id, modificationKind, kitchenChanges)
+        const speechText = KitchenService.buildOrderModifiedSpeechText(
+            prev.id,
+            modificationKind,
+            kitchenChanges,
+            orderNotes
+        )
 
         if (soundEnabled.value) {
             if (permission.value === 'granted') {
