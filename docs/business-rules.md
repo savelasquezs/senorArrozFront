@@ -117,6 +117,11 @@ enum UserRole {
 - **Contabilidad**: Se suma en las ventas del día de entrega (no de creación)
 - **Validación**: No se puede crear sin fecha/hora de entrega
 
+### Totales al crear pedido (API)
+
+- En la creación del pedido, el servidor **recalcula** `subtotal`, `discount_total` y `total` a partir de las líneas (`order_details`) y el `delivery_fee`, para que coincidan con la suma de líneas. Las validaciones posteriores (por ejemplo **efectivo en tienda** frente al remanente `total − bancos − apps`) usan ese total coherente y no dependen de que el cliente envíe `total` en el cuerpo del JSON.
+- **Persistencia EF**: esos tres campos deben **persistirse y leerse** en el modelo EF como valores de aplicación (no como “solo generados por BD ignorados tras guardar”). Si la entidad `Order` quedara con `total = 0` en memoria justo después del insert, el tope de efectivo en tienda sería 0 y fallaría la validación aunque el cliente enviara un monto parcial correcto. En PostgreSQL pueden seguir existiendo triggers que recalculan totales al cambiar líneas; deben ser coherentes con la misma fórmula.
+
 ### Estados del Pedido
 
 ```typescript
@@ -170,7 +175,7 @@ CANCELLED  CANCELLED   CANCELLED  CANCELLED
 #### Efectivo cobrado en tienda (`paid_in_store_cash`)
 - **Quién puede marcar, ajustar monto o quitar**: Admin, Superadmin y Cajero (misma autorización que el endpoint `PUT /orders/{id}/paid-in-store-cash`).
 - **Remanente y UI**: El remanente “en efectivo” antes de marcar cobro en tienda es `max(0, total − Σ bancos − Σ apps)` (misma función `orderCashToCollect` que el selector de pagos en borrador). Solo si ese remanente es **> 0** se ofrece marcar cobro en tienda (listado rápido, borrador sidebar, pestaña Pagos en detalle). Si transferencias/apps **cubren** el total, no se muestra esa opción. Si ya hay cobro en tienda registrado, el panel sigue visible para ver monto, editar o quitar. Los pagos banco/app adicionales siguen la regla complementaria: solo mientras el remanente tras efectivo en tienda sea > 0 (`canAddPayments` / `cashAmount` en borrador).
-- **Invariante**: Σ pagos banco + Σ pagos app + monto efectivo en tienda ≤ total del pedido (el monto en tienda se valida entre 1 y el remanente permitido cuando se envía explícitamente; al activar sin monto se usa el remanente calculado, pudiendo ser 0 si ya no queda efectivo pendiente).
+- **Invariante**: Σ pagos banco + Σ pagos app + monto efectivo en tienda ≤ total del pedido (el monto en tienda se valida entre 1 y el remanente permitido cuando se envía explícitamente). Si el usuario **solo** activa el flag (p. ej. checkbox) sin enviar `paidInStoreCashAmount` en el payload del store, se **conserva** un monto numérico ya fijado en el borrador (re-clamp al remanente); si no había monto fijado, se usa el remanente implícito (puede ser 0 si no queda pendiente).
 - **Listado de pedidos**: En la columna Pagos se listan todos los medios registrados: transferencias, apps y, si aplica, una fila compacta de efectivo en tienda (monto, editar, quitar) **junto** con los electrónicos cuando el pedido combina ambos. Si no hay pagos electrónicos y tampoco está marcado cobro en tienda, se muestran atajos de transferencia rápida y el botón «Pagó?» cuando el remanente lo permite; si ya hay electrónicos y aún queda remanente, solo el atajo «Pagó?». Si solo hay efectivo en tienda (sin electrónicos), no se muestran atajos de transferencia rápida. Quitar el marcador de cobro en tienda vuelve a habilitar los atajos de transferencia en el caso sin electrónicos.
 - **Detalle del pedido y borrador (sidebar)**: Con permisos de edición de pagos, el mismo patrón (monto, editar, quitar) aplica en la pestaña Pagos del detalle y en el borrador del sidebar; al crear el pedido se puede enviar un monto explícito de efectivo en tienda si se ajustó en el borrador.
 - **Domiciliario / valor a cobrar**: El efectivo a cobrar en entrega es el remanente del total menos bancos, apps y el monto registrado como cobrado en tienda (si el flag está activo).

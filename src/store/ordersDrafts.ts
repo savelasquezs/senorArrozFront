@@ -336,7 +336,9 @@ export const useOrdersDraftsStore = defineStore('ordersDrafts', () => {
         const appSum = order.appPayment ? Number(order.appPayment.amount ?? 0) : 0
         const cap = Math.max(0, order.total - bankSum - appSum)
 
-        let nextAmount: number | null | undefined = order.paidInStoreCashAmount
+        const amountKeyPresent = Object.prototype.hasOwnProperty.call(payload, 'paidInStoreCashAmount')
+
+        let nextAmount: number | null | undefined
         if (!payload.paidInStoreCash) {
             nextAmount = null
         } else if (
@@ -345,6 +347,18 @@ export const useOrdersDraftsStore = defineStore('ordersDrafts', () => {
         ) {
             const v = Math.round(payload.paidInStoreCashAmount)
             nextAmount = cap <= 0 ? 0 : Math.min(cap, Math.max(1, v))
+        } else if (amountKeyPresent && (payload.paidInStoreCashAmount === null || payload.paidInStoreCashAmount === undefined)) {
+            // Explícito: volver a remanente implícito (sin monto fijado en JSON)
+            nextAmount = cap <= 0 ? 0 : null
+        } else if (!amountKeyPresent) {
+            // Solo paidInStoreCash (p. ej. checkbox): no borrar un monto parcial ya guardado
+            const prev = order.paidInStoreCashAmount
+            if (typeof prev === 'number' && Number.isFinite(prev)) {
+                const v = Math.round(prev)
+                nextAmount = cap <= 0 ? 0 : Math.min(cap, Math.max(1, v))
+            } else {
+                nextAmount = cap <= 0 ? 0 : null
+            }
         } else {
             nextAmount = cap <= 0 ? 0 : null
         }
@@ -357,6 +371,27 @@ export const useOrdersDraftsStore = defineStore('ordersDrafts', () => {
         }
         draftOrders.value.set(currentTabId.value, updatedOrder)
         saveToLocalStorage()
+    }
+
+    /** Tras total/pagos: si no queda remanente o el monto en tienda lo excede, alinear con el backend. */
+    const clampPaidInStoreToRemainder = (order: DraftOrder): DraftOrder => {
+        if (!order.paidInStoreCash) return order
+        const bankSum = order.bankPayments.reduce((s, p) => s + Number(p.amount ?? 0), 0)
+        const appSum = order.appPayment ? Number(order.appPayment.amount ?? 0) : 0
+        const cap = Math.max(0, order.total - bankSum - appSum)
+        if (cap < 1) {
+            return {
+                ...order,
+                paidInStoreCash: false,
+                paidInStoreCashAmount: null,
+                updatedAt: new Date(),
+            }
+        }
+        const amt = order.paidInStoreCashAmount
+        if (typeof amt === 'number' && Number.isFinite(amt) && amt > cap) {
+            return { ...order, paidInStoreCashAmount: cap, updatedAt: new Date() }
+        }
+        return order
     }
 
     // Helper Methods - COPIAR líneas 468-521
@@ -375,6 +410,7 @@ export const useOrdersDraftsStore = defineStore('ordersDrafts', () => {
 
         // Auto-ajustar pago único si aplica
         updatedOrder = autoAdjustSinglePayment(updatedOrder)
+        updatedOrder = clampPaidInStoreToRemainder(updatedOrder)
 
         // Reemplazar el objeto completo en el Map
         if (currentTabId.value && order.tabId === currentTabId.value) {

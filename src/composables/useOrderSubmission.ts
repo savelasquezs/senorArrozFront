@@ -89,6 +89,22 @@ export function useOrderSubmission() {
             dto.prepareAt = draft.prepareAt
         }
 
+        const bankSumGuard = (draft.bankPayments ?? []).reduce((s, p) => s + Number(p.amount ?? 0), 0)
+        const appSumGuard = draft.appPayment ? Number(draft.appPayment.amount ?? 0) : 0
+        const remGuard = Math.max(0, draft.total - bankSumGuard - appSumGuard)
+        if (remGuard < 1 && dto.paidInStoreCash) {
+            dto.paidInStoreCash = false
+            dto.paidInStoreCashAmount = undefined
+        } else if (
+            remGuard >= 1 &&
+            dto.paidInStoreCash === true &&
+            typeof dto.paidInStoreCashAmount === 'number' &&
+            Number.isFinite(dto.paidInStoreCashAmount) &&
+            dto.paidInStoreCashAmount > remGuard
+        ) {
+            dto.paidInStoreCashAmount = remGuard
+        }
+
         return dto
     }
 
