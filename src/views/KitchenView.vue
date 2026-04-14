@@ -125,6 +125,7 @@ import { useTextToSpeech } from '@/composables/useTextToSpeech'
 import { useNotifications } from '@/composables/useNotifications'
 import { useToast } from '@/composables/useToast'
 import { KitchenService } from '@/services/domain/KitchenService'
+import type { KitchenOrderModificationSummary } from '@/types/kitchenModification'
 import { printJobsApi } from '@/services/MainAPI/printJobsApi'
 import type { OrderListItem, OrderDetailItem, OrderStatus } from '@/types/order'
 import MainLayout from '@/components/layout/MainLayout.vue'
@@ -194,15 +195,13 @@ const loadOrders = async () => {
 
 const loadOrderDetails = async () => {
     for (const order of allOrders.value) {
-        if (!orderItemsMap.value.has(order.id)) {
-            try {
-                await ordersStore.fetchById(order.id)
-                if (ordersStore.current) {
-                    orderItemsMap.value.set(order.id, ordersStore.current.orderDetails || [])
-                }
-            } catch (err) {
-                console.error(`Error loading details for order ${order.id}:`, err)
+        try {
+            await ordersStore.fetchById(order.id)
+            if (ordersStore.current) {
+                orderItemsMap.value.set(order.id, [...(ordersStore.current.orderDetails || [])])
             }
+        } catch (err) {
+            console.error(`Error loading details for order ${order.id}:`, err)
         }
     }
 }
@@ -246,26 +245,30 @@ const handleReservationReady = async (orderData: any) => {
     await notifyOrderShownInKitchen(orderData, true)
 }
 
-/** Notificar antes de recargar la lista: si el pedido deja de venir en forKitchen, ya no estaría en allOrders tras loadOrders. */
-const notifyKitchenOrderModified = async (orderData: any, modificationKind: string) => {
+/** Notificación TTS + navegador; actualiza ítems en mapa desde API. */
+const notifyKitchenOrderModified = async (
+    orderData: any,
+    modificationKind: string,
+    kitchenChanges: KitchenOrderModificationSummary | undefined
+) => {
     if (!orderData?.id) return
     const prev = allOrders.value.find((o) => o.id === orderData.id)
     if (!prev || (prev.status !== 'taken' && prev.status !== 'in_preparation')) return
+    if (!KitchenService.isVisibleToActiveKitchenForAlerts(prev)) return
 
     try {
         await ordersStore.fetchById(orderData.id)
         if (!ordersStore.current) return
 
-        const products = ordersStore.current.orderDetails.map((item) => ({
-            name: item.productName,
-            quantity: item.quantity,
-        }))
-        const title =
-            modificationKind === 'schedule'
-                ? `Cambio de horario #${prev.id}`
-                : `Pedido #${prev.id} actualizado`
-        const bodyText = KitchenService.generateOrderModifiedNotificationText(prev, products, modificationKind)
-        const speechText = KitchenService.generateOrderModifiedSpeechText(prev, products, modificationKind)
+        orderItemsMap.value.set(orderData.id, [...(ordersStore.current.orderDetails || [])])
+
+        const title = KitchenService.buildOrderModifiedNotificationTitle(prev.id)
+        const { body: bodyText } = KitchenService.buildOrderModifiedNotificationBody(
+            prev.id,
+            modificationKind,
+            kitchenChanges
+        )
+        const speechText = KitchenService.buildOrderModifiedSpeechText(prev.id, modificationKind, kitchenChanges)
 
         if (soundEnabled.value) {
             if (permission.value === 'granted') {
@@ -281,8 +284,30 @@ const notifyKitchenOrderModified = async (orderData: any, modificationKind: stri
 const handleOrderModified = async (payload: any) => {
     const data = payload?.order ?? payload
     const kind = typeof payload?.modificationKind === 'string' ? payload.modificationKind : 'content'
+    const kitchenChanges = payload?.kitchenChanges as KitchenOrderModificationSummary | undefined
     if (!data?.id) return
-    await notifyKitchenOrderModified(data, kind)
+    const prev = allOrders.value.find((o) => o.id === data.id)
+    if (prev && KitchenService.isVisibleToActiveKitchenForAlerts(prev)) {
+        await notifyKitchenOrderModified(data, kind, kitchenChanges)
+    }
+    await loadOrders()
+}
+
+const handleOrderCancelled = async (payload: any) => {
+    const orderId = typeof payload?.orderId === 'number' ? payload.orderId : Number(payload?.orderId)
+    if (!Number.isFinite(orderId)) return
+    orderItemsMap.value.delete(orderId)
+    if (cardGridRef.value) cardGridRef.value.clearSelection()
+    error(
+        `Pedido #${orderId} cancelado`,
+        typeof payload?.reasonPreview === 'string' && payload.reasonPreview.trim()
+            ? payload.reasonPreview.trim()
+            : 'El pedido fue cancelado.',
+        8000
+    )
+    if (soundEnabled.value) {
+        speak(`Pedido número ${orderId} cancelado.`)
+    }
     await loadOrders()
 }
 
@@ -377,5 +402,6 @@ onMounted(async () => {
     on('NewOrder', handleNewOrder)
     on('ReservationReady', handleReservationReady)
     on('OrderModified', handleOrderModified)
+    on('OrderCancelled', handleOrderCancelled)
 })
 </script>

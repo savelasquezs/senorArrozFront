@@ -58,8 +58,11 @@
         <!-- Contenido según variant -->
         <div v-if="variant === 'kitchen' && orderItems" class="space-y-1 sm:space-y-1.5 md:space-y-2">
             <div v-for="item in orderItems" :key="item.id" class="flex items-start gap-1.5 sm:gap-2 text-xs sm:text-sm">
-                <span class="font-bold text-emerald-600 min-w-[1.5rem] sm:min-w-[2rem] flex-shrink-0">{{ item.quantity
-                }}x</span>
+                <span v-if="item.quantity > 1"
+                    class="inline-flex items-center justify-center min-w-[1.75rem] h-7 sm:min-w-8 sm:h-8 px-1.5 rounded-full bg-orange-500 text-white text-[11px] sm:text-xs font-bold flex-shrink-0 ring-1 ring-orange-200/80 shadow-sm">
+                    {{ item.quantity }}x
+                </span>
+                <span v-else class="font-bold text-emerald-600 min-w-[1.5rem] sm:min-w-[2rem] flex-shrink-0">{{ item.quantity }}x</span>
                 <div class="flex-1 min-w-0">
                     <p class="font-medium text-gray-900 break-words">{{ item.productName }}</p>
                     <p v-if="item.notes" class="text-[10px] sm:text-xs text-gray-600 italic mt-0.5 sm:mt-1 break-words">

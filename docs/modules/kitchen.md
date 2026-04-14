@@ -80,6 +80,21 @@ on('ReservationReady', handleReservationReady)
 - Se dispara cuando una reservación está próxima
 - Acciones: Recarga la lista de pedidos
 
+#### 3. `OrderModified` - Pedido actualizado (cocina activa)
+```typescript
+on('OrderModified', handleOrderModified)
+```
+- Payload: `{ order, modificationKind, kitchenChanges? }` donde `kitchenChanges` incluye `addedLines`, `removedLines`, `quantityChanges`, `productReplacements`, `scheduleChanged`, `notesChanged` (camelCase).
+- El backend solo notifica si el pedido está en `taken`/`in_preparation` y, si es reserva, ya pasó la hora de entrada a cocina.
+- La vista actualiza `orderItemsMap` y recarga la lista; TTS y notificación del navegador usan `KitchenService.buildOrderModified*` según el diff.
+
+#### 4. `OrderCancelled` - Pedido cancelado
+```typescript
+on('OrderCancelled', handleOrderCancelled)
+```
+- Payload: `{ orderId, reasonPreview? }`
+- Toast de error visible varios segundos, TTS opcional, limpieza de ítems en mapa y recarga de lista.
+
 ### Conexión
 ```typescript
 const { isConnected, on } = useSignalR(SIGNALR_HUB_URL)
@@ -87,6 +102,8 @@ const { isConnected, on } = useSignalR(SIGNALR_HUB_URL)
 onMounted(() => {
     on('NewOrder', handleNewOrder)
     on('ReservationReady', handleReservationReady)
+    on('OrderModified', handleOrderModified)
+    on('OrderCancelled', handleOrderCancelled)
 })
 ```
 

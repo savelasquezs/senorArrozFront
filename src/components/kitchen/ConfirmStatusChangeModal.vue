@@ -10,8 +10,14 @@
                         <BaseBadge variant="info">{{ order.statusDisplayName }}</BaseBadge>
                     </div>
                     <div class="space-y-1">
-                        <div v-for="item in getOrderItems(order.id)" :key="item.id" class="text-sm text-gray-600">
-                            <span class="font-medium">{{ item.quantity }}x</span> {{ item.productName }}
+                        <div v-for="item in getOrderItems(order.id)" :key="item.id"
+                            class="text-sm text-gray-600 flex items-start gap-1.5">
+                            <span v-if="item.quantity > 1"
+                                class="inline-flex items-center justify-center min-w-[1.75rem] h-7 px-1.5 rounded-full bg-orange-500 text-white text-xs font-bold flex-shrink-0 ring-1 ring-orange-200/80">
+                                {{ item.quantity }}x
+                            </span>
+                            <span v-else class="font-medium flex-shrink-0">{{ item.quantity }}x</span>
+                            <span>{{ item.productName }}</span>
                         </div>
                     </div>
                     <p v-if="orderNotes(order)"

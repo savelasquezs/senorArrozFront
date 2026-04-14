@@ -25,8 +25,13 @@
                         <td class="px-3 sm:px-4 md:px-6 py-3 sm:py-4">
                             <div class="space-y-0.5 sm:space-y-1">
                                 <div v-for="item in getOrderItems(order.id)" :key="item.id"
-                                    class="text-xs sm:text-sm text-gray-600">
-                                    <span class="font-medium">{{ item.quantity }}x</span> {{ item.productName }}
+                                    class="text-xs sm:text-sm text-gray-600 flex items-start gap-1.5">
+                                    <span v-if="item.quantity > 1"
+                                        class="inline-flex items-center justify-center min-w-[1.75rem] h-7 px-1.5 rounded-full bg-orange-500 text-white text-[10px] sm:text-xs font-bold flex-shrink-0 ring-1 ring-orange-200/80">
+                                        {{ item.quantity }}x
+                                    </span>
+                                    <span v-else class="font-medium flex-shrink-0">{{ item.quantity }}x</span>
+                                    <span>{{ item.productName }}</span>
                                 </div>
                                 <div v-if="orderNotes(order)"
                                     class="mt-1.5 sm:mt-2 pt-1.5 sm:pt-2 border-t border-amber-100 rounded-md bg-amber-50/80 px-2 py-1.5 text-[11px] sm:text-xs text-gray-800">

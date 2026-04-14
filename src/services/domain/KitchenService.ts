@@ -1,4 +1,5 @@
 import type { OrderListItem } from '@/types/order'
+import type { KitchenOrderModificationSummary } from '@/types/kitchenModification'
 import { orderStatusToStatusTimesKey } from '@/composables/useFormatting'
 
 // Constantes de tiempo (sin feature flags)
@@ -82,7 +83,22 @@ export class KitchenService {
     }
 
     static formatReadyByTime(date: Date): string {
-        return date.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })
+        return date.toLocaleTimeString('es-CO', {
+            hour: '2-digit',
+            minute: '2-digit',
+            timeZone: 'America/Bogota',
+        })
+    }
+
+    /**
+     * Misma regla que backend: taken/in_preparation y reserva solo si ya pasó la hora de entrada a cocina.
+     */
+    static isVisibleToActiveKitchenForAlerts(order: OrderListItem, now: Date = new Date()): boolean {
+        if (order.status !== 'taken' && order.status !== 'in_preparation') return false
+        if (order.type !== 'reservation') return true
+        const entry = this.getReservationKitchenEntryTime(order)
+        if (!entry) return false
+        return entry.getTime() <= now.getTime()
     }
 
     static getCardColorClass(order: OrderListItem): string {
@@ -122,38 +138,72 @@ export class KitchenService {
         return `Pedido #${order.id}: ${items}`
     }
 
-    /** Notificación en pantalla cuando un pedido ya en cocina se modifica (horario, notas, productos). */
-    static generateOrderModifiedNotificationText(
-        order: OrderListItem,
-        products: Array<{ name: string; quantity: number }>,
-        kind: string
-    ): string {
-        const items = products.length ? products.map(p => `${p.quantity}x ${p.name}`).join(', ') : 'revisa el pedido'
-        const prefix =
-            kind === 'schedule' ? 'Cambio de horario. ' : kind === 'content' ? 'Cambios en el pedido. ' : 'Actualización. '
-        return `${prefix}#${order.id}: ${items}`
+    private static qtyWord(n: number): string {
+        if (n === 1) return 'una'
+        if (n === 2) return 'dos'
+        if (n === 3) return 'tres'
+        return `${n}`
     }
 
-    /** Texto para TTS en pedido modificado (taken / in_preparation). */
-    static generateOrderModifiedSpeechText(
-        order: OrderListItem,
-        products: Array<{ name: string; quantity: number }>,
-        kind: string
+    /** Cuerpo de notificación del navegador (sin título). */
+    static buildOrderModifiedNotificationBody(
+        orderId: number,
+        _kind: string,
+        changes: KitchenOrderModificationSummary | null | undefined
+    ): { body: string; usedFallback: boolean } {
+        const intro = `Modificación del pedido número ${orderId}.`
+        const parts: string[] = []
+
+        if (changes) {
+            const rep = changes.productReplacements ?? []
+            for (const r of rep) {
+                parts.push(`Cambio de ${r.previousProductName} por ${r.newProductName}.`)
+            }
+            const added = changes.addedLines ?? []
+            if (added.length === 1) {
+                parts.push(`Se agregó ${this.qtyWord(added[0].quantity)} ${added[0].productName}.`)
+            } else if (added.length > 1) {
+                parts.push(
+                    `Se agregaron: ${added.map((a) => `${a.quantity}x ${a.productName}`).join(', ')}.`
+                )
+            }
+            const rem = changes.removedLines ?? []
+            if (rem.length === 1) {
+                parts.push(`Ya el pedido no lleva: ${rem[0].productName}.`)
+            } else if (rem.length > 1) {
+                parts.push(`Ya el pedido no lleva: ${rem.map((r) => r.productName).join(', ')}.`)
+            }
+            const qc = changes.quantityChanges ?? []
+            for (const q of qc) {
+                const dir =
+                    q.newQuantity > q.previousQuantity ? 'se aumentó' : 'se disminuyó'
+                parts.push(
+                    `Ya no es ${this.qtyWord(q.previousQuantity)} de ${q.productName}, ${dir} a ${this.qtyWord(q.newQuantity)}.`
+                )
+            }
+            if (changes.scheduleChanged) parts.push('Cambio de horario del pedido.')
+            if (changes.notesChanged) parts.push('Cambio en las notas del pedido.')
+        }
+
+        const usedFallback = parts.length === 0
+        const mid = usedFallback ? 'Cambio en el pedido. Verifica en pantalla.' : parts.join(' ')
+        const closing = usedFallback ? '' : ' Verifica en tu pantalla los cambios.'
+        return { body: `${intro} ${mid}${closing}`.replace(/\s+/g, ' ').trim(), usedFallback }
+    }
+
+    /** Texto completo para TTS. */
+    static buildOrderModifiedSpeechText(
+        orderId: number,
+        kind: string,
+        changes: KitchenOrderModificationSummary | null | undefined
     ): string {
-        const items = products.map((p, index) => {
-            const quantity = p.quantity === 1 ? 'una' : p.quantity === 2 ? 'dos' : p.quantity === 3 ? 'tres' : `${p.quantity}`
-            const isLast = index === products.length - 1
-            const connector = isLast && products.length > 1 ? ' y ' : ', '
-            return `${quantity} ${p.name}${!isLast ? connector : ''}`
-        })
-        const intro =
-            kind === 'schedule'
-                ? 'Atención cocina. Cambio de horario en el pedido número'
-                : kind === 'content'
-                  ? 'Atención cocina. Pedido número'
-                  : 'Atención cocina. Actualización del pedido número'
-        const tail = items.length ? `: ${items.join('')}` : ''
-        return `${intro} ${order.id}${tail}`
+        const { body } = this.buildOrderModifiedNotificationBody(orderId, kind, changes)
+        return `Atención cocina. ${body}`
+    }
+
+    /** Título corto para notificación del sistema. */
+    static buildOrderModifiedNotificationTitle(orderId: number): string {
+        return `Pedido #${orderId} modificado`
     }
 }
 
