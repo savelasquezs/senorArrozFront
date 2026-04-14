@@ -167,6 +167,14 @@ CANCELLED  CANCELLED   CANCELLED  CANCELLED
 - **Registro**: Se considera automáticamente como efectivo
 - **Validación**: Suma de pagos ≤ total del pedido
 
+#### Efectivo cobrado en tienda (`paid_in_store_cash`)
+- **Quién puede marcar, ajustar monto o quitar**: Admin, Superadmin y Cajero (misma autorización que el endpoint `PUT /orders/{id}/paid-in-store-cash`).
+- **Remanente y UI**: El remanente “en efectivo” antes de marcar cobro en tienda es `max(0, total − Σ bancos − Σ apps)` (misma función `orderCashToCollect` que el selector de pagos en borrador). Solo si ese remanente es **> 0** se ofrece marcar cobro en tienda (listado rápido, borrador sidebar, pestaña Pagos en detalle). Si transferencias/apps **cubren** el total, no se muestra esa opción. Si ya hay cobro en tienda registrado, el panel sigue visible para ver monto, editar o quitar. Los pagos banco/app adicionales siguen la regla complementaria: solo mientras el remanente tras efectivo en tienda sea > 0 (`canAddPayments` / `cashAmount` en borrador).
+- **Invariante**: Σ pagos banco + Σ pagos app + monto efectivo en tienda ≤ total del pedido (el monto en tienda se valida entre 1 y el remanente permitido cuando se envía explícitamente; al activar sin monto se usa el remanente calculado, pudiendo ser 0 si ya no queda efectivo pendiente).
+- **Listado de pedidos**: En la columna Pagos se listan todos los medios registrados: transferencias, apps y, si aplica, una fila compacta de efectivo en tienda (monto, editar, quitar) **junto** con los electrónicos cuando el pedido combina ambos. Si no hay pagos electrónicos y tampoco está marcado cobro en tienda, se muestran atajos de transferencia rápida y el botón «Pagó?» cuando el remanente lo permite; si ya hay electrónicos y aún queda remanente, solo el atajo «Pagó?». Si solo hay efectivo en tienda (sin electrónicos), no se muestran atajos de transferencia rápida. Quitar el marcador de cobro en tienda vuelve a habilitar los atajos de transferencia en el caso sin electrónicos.
+- **Detalle del pedido y borrador (sidebar)**: Con permisos de edición de pagos, el mismo patrón (monto, editar, quitar) aplica en la pestaña Pagos del detalle y en el borrador del sidebar; al crear el pedido se puede enviar un monto explícito de efectivo en tienda si se ajustó en el borrador.
+- **Domiciliario / valor a cobrar**: El efectivo a cobrar en entrega es el remanente del total menos bancos, apps y el monto registrado como cobrado en tienda (si el flag está activo).
+
 ### Reglas de Liquidación
 
 #### Liquidación de Apps

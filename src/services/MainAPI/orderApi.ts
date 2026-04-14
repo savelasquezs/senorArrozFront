@@ -145,9 +145,23 @@ class OrderApi extends BaseApi {
         return this.put<Order>(`/orders/${id}/unassign-delivery`, {});
     }
 
-    /** Efectivo ya cobrado en sucursal (0 a cobrar en entrega). */
-    async setPaidInStoreCash(id: number, paidInStoreCash: boolean): Promise<Order> {
-        return this.put<Order>(`/orders/${id}/paid-in-store-cash`, { paidInStoreCash });
+    /**
+     * Efectivo cobrado en sucursal. Opcional `paidInStoreCashAmount` cuando `paidInStoreCash` es true
+     * para fijar o ajustar el monto (validado en backend contra el remanente).
+     */
+    async setPaidInStoreCash(
+        id: number,
+        paidInStoreCash: boolean,
+        paidInStoreCashAmount?: number | null
+    ): Promise<Order> {
+        const body: {
+            paidInStoreCash: boolean
+            paidInStoreCashAmount?: number | null
+        } = { paidInStoreCash }
+        if (paidInStoreCashAmount !== undefined && paidInStoreCashAmount !== null) {
+            body.paidInStoreCashAmount = paidInStoreCashAmount
+        }
+        return this.put<Order>(`/orders/${id}/paid-in-store-cash`, body)
     }
 
     // ===== MÉTODOS PARA MÓDULO DE DOMICILIARIOS =====

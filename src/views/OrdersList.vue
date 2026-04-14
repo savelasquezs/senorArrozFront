@@ -114,6 +114,8 @@
                                     @remove-bank-payment="handleRemoveBankPaymentFromList"
                                     @quick-bank-transfer="handleQuickBankTransfer" @add-deposit="handleOpenDeposit"
                                     @paid-in-store-updated="handlePaidInStoreUpdated"
+                                    @edit-paid-in-store-cash="handleEditPaidInStoreFromList"
+                                    @remove-paid-in-store-cash="handleRemovePaidInStoreFromList"
                                     @sort="handleSort" />
                             </template>
                             <template v-else>
@@ -135,6 +137,8 @@
                                         @quick-bank-transfer="handleQuickBankTransfer"
                                         @add-deposit="handleOpenDeposit"
                                         @paid-in-store-updated="handlePaidInStoreUpdated"
+                                        @edit-paid-in-store-cash="handleEditPaidInStoreFromList"
+                                        @remove-paid-in-store-cash="handleRemovePaidInStoreFromList"
                                         @sort="handleSort" />
                                 </div>
                             </template>
@@ -370,6 +374,45 @@
                 </BaseButton>
             </template>
         </BaseDialog>
+
+        <BaseDialog v-model="showRemovePaidInStoreDialog" title="Quitar cobro en tienda" size="sm">
+            <p v-if="removePaidInStoreTarget" class="text-sm text-gray-600">
+                Se quitará el registro de efectivo cobrado en sucursal
+                (<span class="font-medium tabular-nums">{{ formatCurrency(removePaidInStoreTarget.displayAmount) }}</span>).
+                Podrás volver a marcar transferencia o “Pagó?”.
+            </p>
+            <template #footer>
+                <BaseButton variant="secondary" size="sm" :disabled="removePaidInStoreLoading"
+                    @click="closeRemovePaidInStoreDialog">
+                    Cancelar
+                </BaseButton>
+                <BaseButton variant="primary" size="sm" class="bg-red-600 hover:bg-red-700"
+                    :loading="removePaidInStoreLoading" @click="confirmRemovePaidInStore">
+                    Quitar
+                </BaseButton>
+            </template>
+        </BaseDialog>
+
+        <BaseDialog v-model="showEditPaidInStoreDialog" title="Editar monto — efectivo en tienda" size="sm">
+            <div v-if="editPaidInStoreTarget" class="space-y-3">
+                <p class="text-sm text-gray-600">
+                    Máximo permitido
+                    {{ formatCurrency(maxEditPaidInStoreAmount) }}
+                </p>
+                <BaseInput v-model.number="editPaidInStoreAmount" type="number" :max="maxEditPaidInStoreAmount"
+                    placeholder="Monto" class="w-full" />
+            </div>
+            <template #footer>
+                <BaseButton variant="secondary" size="sm" :disabled="editPaidInStoreLoading"
+                    @click="closeEditPaidInStoreDialog">
+                    Cancelar
+                </BaseButton>
+                <BaseButton variant="primary" size="sm" :loading="editPaidInStoreLoading"
+                    @click="confirmEditPaidInStore">
+                    Guardar
+                </BaseButton>
+            </template>
+        </BaseDialog>
     </MainLayout>
 </template>
 
@@ -473,6 +516,21 @@ const showEditBankPaymentDialog = ref(false)
 const editBankPaymentTarget = ref<{ order: OrderListItem; payment: OrderBankPaymentDetail } | null>(null)
 const editBankPaymentAmount = ref(0)
 const editBankPaymentLoading = ref(false)
+
+const showRemovePaidInStoreDialog = ref(false)
+const removePaidInStoreTarget = ref<{ order: OrderListItem; displayAmount: number } | null>(null)
+const removePaidInStoreLoading = ref(false)
+
+const showEditPaidInStoreDialog = ref(false)
+const editPaidInStoreTarget = ref<OrderListItem | null>(null)
+const editPaidInStoreAmount = ref(0)
+const editPaidInStoreLoading = ref(false)
+
+const maxEditPaidInStoreAmount = computed(() => {
+    const t = editPaidInStoreTarget.value
+    if (!t) return 0
+    return t.total - sumPaymentsAmounts(t.bankPayments) - sumPaymentsAmounts(t.appPayments)
+})
 
 const maxEditBankPaymentAmount = computed(() => {
     const t = editBankPaymentTarget.value
@@ -870,6 +928,114 @@ const confirmEditBankPayment = async () => {
     }
 }
 
+function paidInStoreDisplayAmountForOrder(order: OrderListItem): number {
+    const cap =
+        order.total - sumPaymentsAmounts(order.bankPayments) - sumPaymentsAmounts(order.appPayments)
+    if (typeof order.paidInStoreCashAmount === 'number' && Number.isFinite(order.paidInStoreCashAmount)) {
+        return order.paidInStoreCashAmount
+    }
+    return Math.max(0, cap)
+}
+
+const closeRemovePaidInStoreDialog = () => {
+    showRemovePaidInStoreDialog.value = false
+    removePaidInStoreTarget.value = null
+}
+
+const handleRemovePaidInStoreFromList = (order: OrderListItem) => {
+    removePaidInStoreTarget.value = {
+        order,
+        displayAmount: paidInStoreDisplayAmountForOrder(order),
+    }
+    showRemovePaidInStoreDialog.value = true
+}
+
+const confirmRemovePaidInStore = async () => {
+    const t = removePaidInStoreTarget.value
+    if (!t) return
+    removePaidInStoreLoading.value = true
+    try {
+        const updated = await orderApi.setPaidInStoreCash(t.order.id, false)
+        const u = updated as unknown as {
+            paidInStoreCash?: boolean
+            paidInStoreCashAt?: string | null
+            paidInStoreCashAmount?: number | null
+            updatedAt?: string
+        }
+        handlePaidInStoreUpdated({
+            ...t.order,
+            paidInStoreCash: Boolean(u.paidInStoreCash),
+            paidInStoreCashAt: u.paidInStoreCashAt ?? null,
+            paidInStoreCashAmount:
+                typeof u.paidInStoreCashAmount === 'number' ? u.paidInStoreCashAmount : null,
+            updatedAt: u.updatedAt ?? t.order.updatedAt,
+        })
+        success('Actualizado', 4000, 'Se quitó el cobro en tienda')
+        closeRemovePaidInStoreDialog()
+    } catch (err: any) {
+        error('Error', err.message ?? 'No se pudo actualizar')
+    } finally {
+        removePaidInStoreLoading.value = false
+    }
+}
+
+const closeEditPaidInStoreDialog = () => {
+    showEditPaidInStoreDialog.value = false
+    editPaidInStoreTarget.value = null
+    editPaidInStoreAmount.value = 0
+}
+
+const handleEditPaidInStoreFromList = (order: OrderListItem) => {
+    editPaidInStoreTarget.value = order
+    const cap =
+        order.total - sumPaymentsAmounts(order.bankPayments) - sumPaymentsAmounts(order.appPayments)
+    const seed =
+        typeof order.paidInStoreCashAmount === 'number' && Number.isFinite(order.paidInStoreCashAmount)
+            ? order.paidInStoreCashAmount
+            : Math.max(1, cap)
+    editPaidInStoreAmount.value = cap < 1 ? 0 : Math.min(seed, cap)
+    showEditPaidInStoreDialog.value = true
+}
+
+const confirmEditPaidInStore = async () => {
+    const t = editPaidInStoreTarget.value
+    if (!t) return
+    const amount = Number(editPaidInStoreAmount.value)
+    const max = maxEditPaidInStoreAmount.value
+    if (!Number.isFinite(amount) || amount < 1) {
+        error('Monto inválido', 'Ingresa un monto mayor a cero.')
+        return
+    }
+    if (amount > max) {
+        error('Monto inválido', `El máximo permitido es ${formatCurrency(max)}.`)
+        return
+    }
+    editPaidInStoreLoading.value = true
+    try {
+        const updated = await orderApi.setPaidInStoreCash(t.id, true, amount)
+        const u = updated as unknown as {
+            paidInStoreCash?: boolean
+            paidInStoreCashAt?: string | null
+            paidInStoreCashAmount?: number | null
+            updatedAt?: string
+        }
+        handlePaidInStoreUpdated({
+            ...t,
+            paidInStoreCash: Boolean(u.paidInStoreCash),
+            paidInStoreCashAt: u.paidInStoreCashAt ?? null,
+            paidInStoreCashAmount:
+                typeof u.paidInStoreCashAmount === 'number' ? u.paidInStoreCashAmount : amount,
+            updatedAt: u.updatedAt ?? t.updatedAt,
+        })
+        success('Monto actualizado', 4000, 'Efectivo en tienda guardado')
+        closeEditPaidInStoreDialog()
+    } catch (err: any) {
+        error('Error', err.message ?? 'No se pudo actualizar')
+    } finally {
+        editPaidInStoreLoading.value = false
+    }
+}
+
 // Handler unificado para actualización de pedidos en la lista
 const updateOrderInList = (updatedOrder: Order) => {
     const orderAny = updatedOrder as any
@@ -1079,11 +1245,17 @@ const patchListOrderBankPayment = (orderId: number, created: BankPayment) => {
 const handlePaidInStoreUpdated = (patched: OrderListItem) => {
     const idx = orders.value.findIndex((o) => o.id === patched.id)
     if (idx === -1) return
+    const prev = orders.value[idx]
     orders.value[idx] = {
-        ...orders.value[idx],
+        ...prev,
         paidInStoreCash: patched.paidInStoreCash,
-        paidInStoreCashAt: patched.paidInStoreCashAt,
-        paidInStoreCashAmount: patched.paidInStoreCashAmount,
+        paidInStoreCashAt: patched.paidInStoreCashAt ?? null,
+        paidInStoreCashAmount:
+            patched.paidInStoreCash === false
+                ? null
+                : typeof patched.paidInStoreCashAmount === 'number'
+                  ? patched.paidInStoreCashAmount
+                  : prev.paidInStoreCashAmount,
         updatedAt: patched.updatedAt,
     }
 }

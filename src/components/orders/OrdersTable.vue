@@ -186,25 +186,44 @@
                                 </div>
                             </div>
 
-                            <!-- Sin pagos = efectivo + acciones rápidas -->
-                            <div v-if="(!order.bankPayments || order.bankPayments.length === 0) &&
-                                (!order.appPayments || order.appPayments.length === 0)"
+                            <!-- Efectivo en tienda: siempre visible si aplica (junto con banco/app) -->
+                            <div v-if="order.paidInStoreCash" class="flex flex-wrap items-center gap-1">
+                                <PaidInStoreCashCompactRow
+                                    :amount="order.paidInStoreCashAmount ?? null"
+                                    :max-amount="paidInStoreCashCap(order)"
+                                    :show-edit-remove="permissions.canEditPayments(order)"
+                                    :disabled="savingPaidInStoreId === order.id"
+                                    @edit="emit('edit-paid-in-store-cash', order)"
+                                    @remove="emit('remove-paid-in-store-cash', order)" />
+                            </div>
+
+                            <!-- Sin electrónicos: atajos Pagó? + transferencia rápida -->
+                            <div v-if="!orderHasElectronicPayments(order) && !order.paidInStoreCash"
                                 class="flex flex-wrap items-center gap-1">
-                              
-                                <span v-if="order.paidInStoreCash"
-                                    class="text-[11px] font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 rounded px-1.5 py-0.5">
-                                    Pagó
-                                </span>
-                                <button v-else-if="showPaidInStoreQuickButton(order)" type="button"
+                                <button v-if="showPaidInStoreQuickButton(order)" type="button"
                                     class="text-[11px] font-medium text-amber-800 bg-amber-100 hover:bg-amber-200 border border-amber-300 rounded px-1.5 py-0.5 disabled:opacity-50"
                                     :disabled="savingPaidInStoreId === order.id"
                                     @click.stop="quickMarkPaidInStore(order)">
                                     {{ savingPaidInStoreId === order.id ? '…' : 'Pagó?' }}
                                 </button>
-                                <button type="button" v-for="bank in (props.quickBanks || []).slice(0, 2)" :key="bank.id"
+                                <button
+                                    v-for="bank in (props.quickBanks || []).slice(0, 2)"
+                                    :key="bank.id"
+                                    type="button"
                                     class="text-[11px] text-blue-600 hover:text-blue-800 underline decoration-dotted"
                                     @click.stop="emit('quick-bank-transfer', order, bank.id)">
                                     {{ formatQuickLabel(bank.name) }}
+                                </button>
+                            </div>
+
+                            <!-- Con electrónicos y remanente: solo atajo Pagó? (evita duplicar con bloque sin electrónicos) -->
+                            <div v-if="orderHasElectronicPayments(order) && showPaidInStoreQuickButton(order)"
+                                class="flex flex-wrap items-center gap-1">
+                                <button type="button"
+                                    class="text-[11px] font-medium text-amber-800 bg-amber-100 hover:bg-amber-200 border border-amber-300 rounded px-1.5 py-0.5 disabled:opacity-50"
+                                    :disabled="savingPaidInStoreId === order.id"
+                                    @click.stop="quickMarkPaidInStore(order)">
+                                    {{ savingPaidInStoreId === order.id ? '…' : 'Pagó?' }}
                                 </button>
                             </div>
                         </div>
@@ -249,6 +268,7 @@ import OrderStatusBadge from './OrderStatusBadge.vue'
 import OrderTypeBadge from './OrderTypeBadge.vue'
 import BaseLoading from '@/components/ui/BaseLoading.vue'
 import OrderBankPaymentRow from '@/components/payments/OrderBankPaymentRow.vue'
+import PaidInStoreCashCompactRow from '@/components/orders/PaidInStoreCashCompactRow.vue'
 import { useFormatting, getStatusTimeFromRecord } from '@/composables/useFormatting'
 import { useOrderPermissions } from '@/composables/useOrderPermissions'
 import {
@@ -257,6 +277,8 @@ import {
 } from '@/utils/orderRecipientDisplay'
 import { useToast } from '@/composables/useToast'
 import { orderApi } from '@/services/MainAPI/orderApi'
+import { orderCashToCollect, sumPaymentsAmounts } from '@/utils/orderCashToCollect'
+import { orderHasElectronicPayments } from '@/utils/orderListPayments'
 import {
     ArrowsUpDownIcon,
     ChevronUpIcon,
@@ -294,6 +316,8 @@ const emit = defineEmits<{
     'quick-bank-transfer': [order: OrderListItem, bankId: number]
     'add-deposit': [order: OrderListItem]
     'paid-in-store-updated': [order: OrderListItem]
+    'edit-paid-in-store-cash': [order: OrderListItem]
+    'remove-paid-in-store-cash': [order: OrderListItem]
     sort: [column: 'id' | 'total' | 'createdAt']
 }>()
 
@@ -306,7 +330,12 @@ const showPaidInStoreQuickButton = (order: OrderListItem): boolean =>
     props.enablePaidInStoreQuickAction &&
     order.status !== 'cancelled' &&
     permissions.canEditPayments(order) &&
-    order.paidInStoreCash !== true
+    order.paidInStoreCash !== true &&
+    orderCashToCollect(
+        order.total,
+        { bankPayments: order.bankPayments, appPayments: order.appPayments },
+        { floorAtZero: true },
+    ) > 0
 
 async function quickMarkPaidInStore(order: OrderListItem) {
     if (!showPaidInStoreQuickButton(order)) return
@@ -385,6 +414,12 @@ const getStatusTime = (order: OrderListItem): string | undefined => {
 const formatQuickLabel = (bankName: string): string => {
     const base = `Transf ${bankName}`
     return base.length > 13 ? base.slice(0, 13) : base
+}
+
+function paidInStoreCashCap(order: OrderListItem): number {
+    const bank = sumPaymentsAmounts(order.bankPayments)
+    const app = sumPaymentsAmounts(order.appPayments)
+    return Math.max(0, order.total - bank - app)
 }
 
 /** Hasta 2 líneas de producto × cantidad; si hay más ítems, tercera línea "....". */

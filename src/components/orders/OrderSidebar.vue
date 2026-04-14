@@ -92,11 +92,15 @@
                         v-if="showPaidInStoreInDraft && currentOrder"
                         :input-id="'draft-paid-store-' + currentOrder.tabId"
                         :paid-in-store-cash="currentOrder.paidInStoreCash === true"
+                        :paid-in-store-cash-amount="currentOrder.paidInStoreCashAmount ?? null"
+                        :max-paid-in-store-amount="draftPaidInStoreCap"
                         editable
                         density="compact"
                         extra-class="mx-4 mb-3"
                         helper-text="Quedará registrado al enviar el pedido. El domiciliario no cobra en la entrega."
-                        @update:paid-in-store-cash="onPaidInStoreDraftChange" />
+                        @update:paid-in-store-cash="onPaidInStoreDraftChange"
+                        @edit-paid-in-store-cash="openDraftEditPaidInStore"
+                        @remove-paid-in-store-cash="openDraftRemovePaidInStore" />
                     <PaymentSelector :order="currentOrder" @payment-updated="handlePaymentUpdated" />
                 </div>
 
@@ -124,6 +128,41 @@
             </div>
         </div>
 
+        <BaseDialog v-model="showDraftRemovePaidInStoreDialog" title="Quitar cobro en tienda (borrador)" size="sm">
+            <p v-if="currentOrder" class="text-sm text-gray-600">
+                Se quitará el marcador de efectivo en tienda
+                (<span class="font-medium tabular-nums">{{ formatCurrency(draftPaidInStoreDisplayAmount) }}</span>).
+            </p>
+            <template #footer>
+                <BaseButton variant="secondary" size="sm" @click="showDraftRemovePaidInStoreDialog = false">
+                    Cancelar
+                </BaseButton>
+                <BaseButton variant="primary" size="sm" class="bg-red-600 hover:bg-red-700"
+                    @click="confirmDraftRemovePaidInStore">
+                    Quitar
+                </BaseButton>
+            </template>
+        </BaseDialog>
+
+        <BaseDialog v-model="showDraftEditPaidInStoreDialog" title="Editar monto — efectivo en tienda (borrador)"
+            size="sm">
+            <div v-if="currentOrder" class="space-y-3">
+                <p class="text-sm text-gray-600">
+                    Máximo {{ formatCurrency(maxDraftEditPaidInStoreAmount) }}
+                </p>
+                <BaseInput v-model.number="draftEditPaidInStoreAmount" type="number"
+                    :max="maxDraftEditPaidInStoreAmount" placeholder="Monto" class="w-full" />
+            </div>
+            <template #footer>
+                <BaseButton variant="secondary" size="sm" @click="showDraftEditPaidInStoreDialog = false">
+                    Cancelar
+                </BaseButton>
+                <BaseButton variant="primary" size="sm" @click="confirmDraftEditPaidInStore">
+                    Guardar
+                </BaseButton>
+            </template>
+        </BaseDialog>
+
         <!-- Customer Detail Modal -->
         <CustomerDetailModal v-if="selectedCustomer" :show="showCustomerDetail" :customer="selectedCustomer"
             @close="closeCustomerDetail" @customer-updated="handleCustomerUpdated" />
@@ -140,6 +179,8 @@ import { VueDatePicker } from '@vuepic/vue-datepicker';
 import '@vuepic/vue-datepicker/dist/main.css'
 
 import { useToast } from '@/composables/useToast'
+import { useFormatting } from '@/composables/useFormatting'
+import { orderCashToCollect, sumPaymentsAmounts } from '@/utils/orderCashToCollect'
 import type { Customer, CustomerAddress } from '@/types/customer'
 
 // Components
@@ -170,6 +211,7 @@ const { ordersStore } = useOrderPersistence()
 const { createNewTab, closeTab } = useOrderTabs()
 const { submitOrder } = useOrderSubmission()
 const { success, error: showError } = useToast()
+const { formatCurrency } = useFormatting()
 
 // State
 const showCustomerDetail = ref(false)
@@ -180,6 +222,10 @@ const reservedForLocal = ref<LocalHour | null>(null)
 // reservation: datepicker completo (fecha + hora, otro día)
 const prepareAtDateLocal = ref<Date | null>(null)
 const reservedForDateLocal = ref<Date | null>(null)
+
+const showDraftRemovePaidInStoreDialog = ref(false)
+const showDraftEditPaidInStoreDialog = ref(false)
+const draftEditPaidInStoreAmount = ref(0)
 
 // Computed
 const currentOrder = computed(() => ordersStore.currentOrder)
@@ -194,15 +240,82 @@ const showCopyAddressesButton = computed(() => {
     return n > 0
 })
 
-/** Mismo criterio que “solo efectivo” en tabla: sin pagos electrónicos en el borrador. */
+/** Remanente a cubrir en efectivo (total − banco − app); mismo criterio que PaymentSelector. */
+const draftNonStoreCashRemainder = computed(() => {
+    const o = currentOrder.value
+    if (!o) return 0
+    return orderCashToCollect(
+        o.total,
+        { bankPayments: o.bankPayments, appPayment: o.appPayment },
+        { floorAtZero: true },
+    )
+})
+
+/** Panel visible si hay remanente > 0 o ya quedó marcado cobro en tienda (editar/quitar). */
 const showPaidInStoreInDraft = computed(() => {
     const o = currentOrder.value
     if (!o) return false
-    return o.bankPayments.length === 0 && o.appPayment == null
+    return draftNonStoreCashRemainder.value > 0 || o.paidInStoreCash === true
 })
 
+const draftPaidInStoreCap = computed(() => {
+    const o = currentOrder.value
+    if (!o) return 0
+    return Math.max(
+        0,
+        o.total - sumPaymentsAmounts(o.bankPayments) - (o.appPayment ? Number(o.appPayment.amount ?? 0) : 0),
+    )
+})
+
+const draftPaidInStoreDisplayAmount = computed(() => {
+    const o = currentOrder.value
+    if (!o) return 0
+    if (typeof o.paidInStoreCashAmount === 'number' && Number.isFinite(o.paidInStoreCashAmount)) {
+        return o.paidInStoreCashAmount
+    }
+    return draftPaidInStoreCap.value
+})
+
+const maxDraftEditPaidInStoreAmount = computed(() => draftPaidInStoreCap.value)
+
 function onPaidInStoreDraftChange(checked: boolean) {
-    ordersStore.updatePaidInStoreCash(checked)
+    ordersStore.updatePaidInStoreCash({ paidInStoreCash: checked })
+}
+
+function openDraftRemovePaidInStore() {
+    showDraftRemovePaidInStoreDialog.value = true
+}
+
+function confirmDraftRemovePaidInStore() {
+    ordersStore.updatePaidInStoreCash({ paidInStoreCash: false })
+    showDraftRemovePaidInStoreDialog.value = false
+}
+
+function openDraftEditPaidInStore() {
+    const o = currentOrder.value
+    if (!o) return
+    const cap = draftPaidInStoreCap.value
+    const seed =
+        typeof o.paidInStoreCashAmount === 'number' && Number.isFinite(o.paidInStoreCashAmount)
+            ? o.paidInStoreCashAmount
+            : Math.max(1, cap)
+    draftEditPaidInStoreAmount.value = cap < 1 ? 0 : Math.min(seed, cap)
+    showDraftEditPaidInStoreDialog.value = true
+}
+
+function confirmDraftEditPaidInStore() {
+    const amount = Number(draftEditPaidInStoreAmount.value)
+    const max = maxDraftEditPaidInStoreAmount.value
+    if (!Number.isFinite(amount) || amount < 1) {
+        showError('Monto inválido', 'Ingresa un monto mayor a cero.')
+        return
+    }
+    if (amount > max) {
+        showError('Monto inválido', `El máximo permitido es ${formatCurrency(max)}.`)
+        return
+    }
+    ordersStore.updatePaidInStoreCash({ paidInStoreCash: true, paidInStoreCashAmount: amount })
+    showDraftEditPaidInStoreDialog.value = false
 }
 
 function formatAddressLineForCopy(a: CustomerAddress): string {

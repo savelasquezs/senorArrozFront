@@ -31,7 +31,11 @@ export function usePersistedOrderPayments(
                 bankPayments: order.value.bankPayments,
                 appPayments: order.value.appPayments,
             },
-            { floorAtZero: true, paidInStoreCash: order.value.paidInStoreCash === true }
+            {
+                floorAtZero: true,
+                paidInStoreCash: order.value.paidInStoreCash === true,
+                paidInStoreCashAmount: order.value.paidInStoreCashAmount ?? null,
+            }
         )
     })
 

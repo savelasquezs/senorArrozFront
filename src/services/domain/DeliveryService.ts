@@ -28,10 +28,17 @@ export class DeliveryService {
 
     /** Efectivo del pedido (puede ser negativo si hubo sobrepago). */
     static getCashCollected(order: OrderListItem): number {
-        return orderCashToCollect(order.total, {
-            bankPayments: order.bankPayments,
-            appPayments: order.appPayments,
-        }, { paidInStoreCash: order.paidInStoreCash === true })
+        return orderCashToCollect(
+            order.total,
+            {
+                bankPayments: order.bankPayments,
+                appPayments: order.appPayments,
+            },
+            {
+                paidInStoreCash: order.paidInStoreCash === true,
+                paidInStoreCashAmount: order.paidInStoreCashAmount ?? null,
+            }
+        )
     }
 
     // Calcular totales para historial

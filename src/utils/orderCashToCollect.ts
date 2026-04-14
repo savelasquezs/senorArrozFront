@@ -24,16 +24,32 @@ export function sumOrderNonCashPayments(inputs: OrderCashInputs): number {
 }
 
 /**
- * Efectivo del pedido: total − pagos no efectivo.
+ * Efectivo del pedido: total − pagos no efectivo − (opcional) efectivo ya cobrado en tienda.
  * @param floorAtZero true en UI de cobro (no mostrar negativo por sobrepago).
+ * @param paidInStoreCashAmount si `paidInStoreCash` y hay número, monto COP cobrado en sucursal; si es null/omitido con flag activo, se asume cubierto todo el remanente (comportamiento previo).
  */
 export function orderCashToCollect(
     orderTotal: number,
     inputs: OrderCashInputs,
-    options?: { floorAtZero?: boolean; paidInStoreCash?: boolean }
+    options?: {
+        floorAtZero?: boolean
+        paidInStoreCash?: boolean
+        paidInStoreCashAmount?: number | null
+    }
 ): number {
-    if (options?.paidInStoreCash) return 0
-    const raw = orderTotal - sumOrderNonCashPayments(inputs)
-    if (options?.floorAtZero) return Math.max(0, raw)
-    return raw
+    const nonCash = sumOrderNonCashPayments(inputs)
+    const remainder = orderTotal - nonCash
+
+    if (options?.paidInStoreCash) {
+        const covered =
+            typeof options.paidInStoreCashAmount === 'number' && Number.isFinite(options.paidInStoreCashAmount)
+                ? Math.max(0, options.paidInStoreCashAmount)
+                : Math.max(0, remainder)
+        const raw = remainder - covered
+        if (options.floorAtZero) return Math.max(0, raw)
+        return raw
+    }
+
+    if (options?.floorAtZero) return Math.max(0, remainder)
+    return remainder
 }

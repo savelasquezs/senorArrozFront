@@ -59,6 +59,13 @@ export function useOrderSubmission() {
             appPayments,
             paidInStoreCash: draft.paidInStoreCash === true,
         }
+        if (
+            draft.paidInStoreCash === true &&
+            typeof draft.paidInStoreCashAmount === 'number' &&
+            Number.isFinite(draft.paidInStoreCashAmount)
+        ) {
+            dto.paidInStoreCashAmount = draft.paidInStoreCashAmount
+        }
 
         // Add optional fields based on order type
         if (draft.customerId) {

@@ -208,7 +208,11 @@ const cashAmount = computed(() =>
             bankPayments: props.order.bankPayments,
             appPayment: props.order.appPayment,
         },
-        { floorAtZero: true, paidInStoreCash: props.order.paidInStoreCash === true }
+        {
+            floorAtZero: true,
+            paidInStoreCash: props.order.paidInStoreCash === true,
+            paidInStoreCashAmount: props.order.paidInStoreCashAmount ?? null,
+        }
     )
 )
 
@@ -216,10 +220,8 @@ const canAddPayments = computed(() => {
     return cashAmount.value > 0
 })
 
-/** Pagos banco/app: bloqueados si ya marcó “pagó en tienda”. */
-const canAddElectronicPayments = computed(
-    () => canAddPayments.value && !props.order.paidInStoreCash
-)
+/** Pagos banco/app: mismo remanente que el efectivo a cobrar (si hay cobro parcial en tienda, aún se pueden agregar). */
+const canAddElectronicPayments = computed(() => canAddPayments.value)
 
 const maxPaymentAmount = computed(() => {
     if (!editingPayment.value) return props.order.total

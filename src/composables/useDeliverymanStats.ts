@@ -19,7 +19,10 @@ export function useDeliverymanStats() {
                 orderCashToCollect(order.total, {
                     bankPayments: order.bankPayments,
                     appPayments: order.appPayments,
-                }, { paidInStoreCash: order.paidInStoreCash === true }),
+                }, {
+                    paidInStoreCash: order.paidInStoreCash === true,
+                    paidInStoreCashAmount: order.paidInStoreCashAmount ?? null,
+                }),
             0
         )
 

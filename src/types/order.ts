@@ -102,6 +102,8 @@ export interface DraftOrder {
     updatedAt: Date
     /** Efectivo cobrado en tienda antes de enviar el pedido. */
     paidInStoreCash?: boolean
+    /** Monto COP en tienda (borrador avanzado; opcional). */
+    paidInStoreCashAmount?: number | null
 }
 
 // ===== TIPOS DE PEDIDOS COMPLETADOS =====
@@ -342,6 +344,7 @@ export interface CreateOrderDto {
     bankPayments?: CreateBankPaymentDto[]
     appPayments?: CreateAppPaymentDto[]
     paidInStoreCash?: boolean
+    paidInStoreCashAmount?: number | null
 }
 
 export interface CreateOrderDetailDto {

@@ -325,13 +325,34 @@ export const useOrdersDraftsStore = defineStore('ordersDrafts', () => {
         saveToLocalStorage()
     }
 
-    const updatePaidInStoreCash = (value: boolean) => {
+    const updatePaidInStoreCash = (payload: {
+        paidInStoreCash: boolean
+        paidInStoreCashAmount?: number | null
+    }) => {
         if (!currentTabId.value) return
         const order = draftOrders.value.get(currentTabId.value)
         if (!order) return
+        const bankSum = order.bankPayments.reduce((s, p) => s + Number(p.amount ?? 0), 0)
+        const appSum = order.appPayment ? Number(order.appPayment.amount ?? 0) : 0
+        const cap = Math.max(0, order.total - bankSum - appSum)
+
+        let nextAmount: number | null | undefined = order.paidInStoreCashAmount
+        if (!payload.paidInStoreCash) {
+            nextAmount = null
+        } else if (
+            typeof payload.paidInStoreCashAmount === 'number' &&
+            Number.isFinite(payload.paidInStoreCashAmount)
+        ) {
+            const v = Math.round(payload.paidInStoreCashAmount)
+            nextAmount = cap <= 0 ? 0 : Math.min(cap, Math.max(1, v))
+        } else {
+            nextAmount = cap <= 0 ? 0 : null
+        }
+
         const updatedOrder = {
             ...order,
-            paidInStoreCash: value,
+            paidInStoreCash: payload.paidInStoreCash,
+            paidInStoreCashAmount: nextAmount ?? null,
             updatedAt: new Date(),
         }
         draftOrders.value.set(currentTabId.value, updatedOrder)
@@ -432,6 +453,8 @@ export const useOrdersDraftsStore = defineStore('ordersDrafts', () => {
                 prepareAt: order.prepareAt ?? null,
                 isLater: order.isLater ?? false,
                 paidInStoreCash: order.paidInStoreCash ?? false,
+                paidInStoreCashAmount:
+                    typeof order.paidInStoreCashAmount === 'number' ? order.paidInStoreCashAmount : null,
             }))
             draftOrders.value = new Map(migratedDrafts.map((order: DraftOrder) => [order.tabId, order]))
             currentTabId.value = data.currentTabId
