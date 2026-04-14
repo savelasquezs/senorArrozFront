@@ -195,9 +195,7 @@ export class KitchenService {
             if (changes.notesChanged) {
                 const spoken = this.formatOrderNotesForVoice(orderNotes)
                 if (spoken) {
-                    parts.push(`Notas del pedido: ${spoken}.`)
-                } else {
-                    parts.push('Las notas del pedido quedaron vacías.')
+                    parts.push(spoken.endsWith('.') ? spoken : `${spoken}.`)
                 }
             }
         }
