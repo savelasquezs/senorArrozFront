@@ -77,12 +77,31 @@ const chartOptions = computed<ChartOptions<'bar'>>(() => ({
 			labels: { boxWidth: 12, boxHeight: 12, usePointStyle: true },
 		},
 		tooltip: {
+			displayColors: false,
+			filter: (item) => item.datasetIndex === 0,
 			callbacks: {
 				label: (ctx) => {
-					const v = ctx.parsed.y;
-					if (v == null) return '';
-					const raw = ctx.dataset.label ? `${ctx.dataset.label}: ` : '';
-					return `${raw}${formatTooltipCurrency(v)}`;
+					if (ctx.datasetIndex !== 0) return '';
+					const i = ctx.dataIndex;
+					const sales = Number(props.salesCop[i] ?? 0);
+					const lines: string[] = [`Ventas: ${formatTooltipCurrency(sales)}`];
+
+					let totalExpenses = 0;
+					const breakdown = props.expenseCategories.map((c) => {
+						const amount = Number(c.amountsCop[i] ?? 0);
+						totalExpenses += amount;
+						return { name: c.name, amount };
+					});
+
+					lines.push(`Total gastos: ${formatTooltipCurrency(totalExpenses)}`);
+					for (const { name, amount } of breakdown) {
+						if (amount === 0) continue;
+						const pct =
+							totalExpenses > 0 ? Math.round((amount / totalExpenses) * 100) : 0;
+						lines.push(`  ${name}: ${formatTooltipCurrency(amount)} (${pct}%)`);
+					}
+
+					return lines;
 				},
 			},
 		},
