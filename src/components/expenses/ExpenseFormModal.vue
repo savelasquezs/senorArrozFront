@@ -1,115 +1,94 @@
 <template>
     <BaseDialog :model-value="isOpen" @update:model-value="$emit('close')"
         :title="editingExpense ? `Editar Gasto #${editingExpense.id}` : 'Nuevo Gasto'" size="4xl">
-        <form @submit.prevent="handleSubmit" class="space-y-6">
-            <!-- Selección de Proveedor -->
-            <div>
-                <div class="flex items-start gap-2 mb-2">
-                    <label class="block text-sm font-medium text-gray-700">
-                        Proveedor <span class="text-red-500">*</span>
-                    </label>
-                    <BaseButton v-if="canManageSuppliers" type="button" size="sm" variant="secondary" class="ml-auto"
-                        @click="openSupplierModal">
-                        <PlusIcon class="w-4 h-4 mr-1" />
-                        Nuevo
+        <form @submit.prevent="handleSubmit" class="space-y-4">
+            <!-- Proveedor -->
+            <div class="rounded-xl border border-gray-200/80 bg-gray-50/40 px-3 py-2.5">
+                <div class="flex flex-wrap items-end gap-2">
+                    <div class="flex-1 min-w-[200px]">
+                        <label class="block text-xs font-semibold text-gray-600 uppercase tracking-wide mb-1">
+                            Proveedor <span class="text-red-500">*</span>
+                        </label>
+                        <BaseSelect v-model="formData.supplierId" :options="supplierOptions" searchable allow-create
+                            size="sm"
+                            :placeholder="suppliersLoading ? 'Cargando…' : 'Buscar o crear…'"
+                            value-key="value" display-key="label" required :disabled="suppliersLoading"
+                            @create="onSupplierCreateFromSearch" />
+                    </div>
+                    <BaseButton type="button" variant="outline" size="sm" class="shrink-0 text-xs"
+                        :disabled="suppliersLoading" @click="applyGeneralSupplier">
+                        Proveedor general
                     </BaseButton>
                 </div>
-                <BaseSelect v-model="formData.supplierId" :options="supplierOptions" searchable allow-create
-                    :placeholder="suppliersLoading ? 'Cargando proveedores...' : 'Buscar o crear proveedor...'"
-                    value-key="value" display-key="label" required :disabled="suppliersLoading"
-                    @create="onSupplierCreateFromSearch" />
-                <p class="text-xs text-gray-500 mt-1">
-                    Gestiona tus proveedores desde la vista de sucursal o crea uno al vuelo.
-                </p>
             </div>
 
-            <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Notas del comprobante (opcional)</label>
-                <textarea
-                    v-model="formData.notes"
-                    rows="2"
-                    maxlength="2000"
-                    class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
-                    placeholder="Ej. referencia de factura, acuerdos con el proveedor…"
-                />
-                <p class="text-xs text-gray-400 mt-1">{{ (formData.notes || '').length }}/2000</p>
-            </div>
-
-            <!-- Detalles del Gasto -->
-            <div>
-                <div class="flex items-center justify-between mb-3">
-                    <label class="block text-sm font-medium text-gray-700">
-                        Detalles del Gasto <span class="text-red-500">*</span>
+            <!-- Líneas -->
+            <div class="rounded-xl border border-gray-200/80 bg-white px-3 py-2.5 shadow-sm">
+                <div
+                    class="flex flex-nowrap items-center gap-2 mb-2 pb-2 border-b border-gray-100/90 overflow-x-auto min-h-8"
+                >
+                    <label class="text-xs font-semibold text-gray-600 uppercase tracking-wide shrink-0">
+                        Líneas <span class="text-red-500">*</span>
                     </label>
-                    <div class="flex items-center gap-2">
-                        <BaseButton type="button" variant="secondary" size="sm" @click="openCreateExpenseCategory">
-                            <PlusIcon class="w-4 h-4 mr-1" />
-                            Categoría
-                        </BaseButton>
-                        <BaseButton type="button" variant="secondary" size="sm" @click="openCreateExpenseForNewDetail">
-                            <PlusIcon class="w-4 h-4 mr-1" />
-                            Gasto
-                        </BaseButton>
-                        <BaseButton type="button" variant="secondary" size="sm" @click="addDetail">
-                            <PlusIcon class="w-4 h-4 mr-1" />
-                            Agregar
-                        </BaseButton>
-                    </div>
-                </div>
-
-                <div v-if="supplierHasFavoriteExpenses" class="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-emerald-100 bg-emerald-50/60 px-3 py-2 mb-3">
-                    <div class="flex items-center gap-2 text-sm text-emerald-700">
-                        <SparklesIcon class="w-4 h-4" />
-                        <span>
-                            {{
-                                showAllSupplierExpenses
-                                    ? 'Mostrando todos los gastos. Los frecuentes aparecen primero.'
-                                    : 'Mostrando gastos frecuentes para este proveedor.'
-                            }}
-                        </span>
-                    </div>
-                    <BaseButton type="button" variant="ghost" size="sm" class="text-emerald-700 hover:bg-emerald-100"
-                        @click="toggleExpenseOptionMode">
-                        {{ showAllSupplierExpenses ? 'Ver solo frecuentes' : 'Mostrar todos' }}
+                    <BaseButton type="button" variant="secondary" size="sm" class="text-xs h-8 shrink-0" @click="addDetail">
+                        <PlusIcon class="w-3.5 h-3.5 shrink-0" />
+                        Agregar
                     </BaseButton>
+                    <template v-if="supplierHasFavoriteExpenses">
+                        <span class="h-3.5 w-px bg-emerald-200/90 shrink-0" aria-hidden="true" />
+                        <div class="flex items-center gap-1.5 text-[11px] text-emerald-800 min-w-0 flex-1">
+                            <SparklesIcon class="w-3.5 h-3.5 shrink-0 text-emerald-600" />
+                            <span class="truncate">
+                                {{
+                                    showAllSupplierExpenses
+                                        ? 'Todos los gastos (frecuentes primero).'
+                                        : 'Gastos frecuentes del proveedor.'
+                                }}
+                            </span>
+                        </div>
+                        <BaseButton type="button" variant="ghost" size="sm"
+                            class="text-emerald-800 hover:bg-emerald-100/80 text-xs h-7 px-2 shrink-0"
+                            @click="toggleExpenseOptionMode">
+                            {{ showAllSupplierExpenses ? 'Solo frecuentes' : 'Ver todos' }}
+                        </BaseButton>
+                    </template>
+                    <p v-else-if="supplierExpensesLoading" class="text-[11px] text-gray-500 shrink-0 whitespace-nowrap">
+                        Cargando sugerencias…
+                    </p>
                 </div>
-                <p v-else-if="supplierExpensesLoading" class="text-xs text-gray-500 mb-3">
-                    Buscando gastos frecuentes para este proveedor...
-                </p>
 
                 <div v-if="formData.expenseDetails.length === 0"
-                    class="text-center py-8 text-gray-400 border-2 border-dashed rounded-lg">
-                    <p>No hay detalles agregados</p>
-                    <p class="text-xs mt-1">Haz clic en "Agregar" para comenzar</p>
+                    class="text-center py-6 text-gray-400 border border-dashed border-gray-200 rounded-lg bg-gray-50/30">
+                    <p class="text-sm">Sin líneas</p>
+                    <p class="text-[11px] mt-0.5">Usa <span class="font-medium">Agregar</span> para la primera.</p>
                 </div>
 
                 <div v-else>
-                    <!-- Header de columnas -->
-                    <div class="flex items-center gap-2 mb-2 pb-2 border-b border-gray-300">
+                    <div class="flex items-center gap-2 mb-1.5 pb-1.5 border-b border-gray-200/90">
                         <div class="flex-1 min-w-[220px]">
-                            <span class="text-xs font-semibold text-gray-700 uppercase">Gasto</span>
+                            <span class="text-[11px] font-semibold text-gray-500 uppercase tracking-wide">Gasto</span>
                         </div>
                         <div class="w-20">
-                            <span class="text-xs font-semibold text-gray-700 uppercase">Cant.</span>
+                            <span class="text-[11px] font-semibold text-gray-500 uppercase tracking-wide">Cant.</span>
                         </div>
                         <div class="w-28">
-                            <span class="text-xs font-semibold text-gray-700 uppercase">Total</span>
+                            <span class="text-[11px] font-semibold text-gray-500 uppercase tracking-wide">Total</span>
                         </div>
                         <div class="w-28">
-                            <span class="text-xs font-semibold text-gray-700 uppercase">Unit.</span>
+                            <span class="text-[11px] font-semibold text-gray-500 uppercase tracking-wide">Unit.</span>
                         </div>
-                        <div class="w-10"></div>
+                        <div class="w-[4.5rem] shrink-0" aria-hidden="true"></div>
                     </div>
 
-                    <!-- Filas de gastos -->
-                    <div class="space-y-3">
+                    <div class="space-y-2">
                         <div v-for="(detail, index) in formData.expenseDetails" :key="detail.tempId"
-                            class="border rounded-md p-2 bg-white space-y-2"
+                            class="border border-gray-100 rounded-lg p-1.5 bg-gray-50/30 space-y-1.5 shadow-sm"
                             :data-expense-line-id="detail.detailId != null && detail.detailId > 0 ? detail.detailId : undefined">
-                            <div class="flex items-center gap-2 hover:bg-gray-50 transition-colors -m-2 p-2 rounded">
+                            <div class="flex items-center gap-1.5 hover:bg-white/80 transition-colors -m-0.5 p-1 rounded-md">
                             <!-- Gasto (más ancho) -->
                             <div class="flex-1 min-w-[220px]">
                                 <BaseSelect v-model="detail.expenseId" :options="prioritizedExpenseOptions"
+                                    size="sm"
                                     :placeholder="expenseSelectPlaceholder" value-key="value" display-key="label" searchable
                                     allow-create required @update:model-value="onExpenseSelected(index, $event)"
                                     @create="onExpenseCreateFromSearch(index, $event)" />
@@ -117,7 +96,7 @@
 
                             <!-- Cantidad -->
                             <div class="w-20">
-                                <BaseInput v-model.number="detail.quantity" type="number" :min="0.01" step="0.01" required
+                                <BaseInput v-model.number="detail.quantity" type="number" size="sm" :min="0.01" step="0.01" required
                                     @input="updateDerivedUnitAmount(index)" />
                             </div>
 
@@ -125,91 +104,90 @@
                             <div class="w-28">
                                 <BaseInput :model-value="detail.total ?? 0"
                                     @update:model-value="(val) => { detail.total = parseLineTotal(val); updateDerivedUnitAmount(index) }"
-                                    type="number" :min="0" step="0.01" required />
+                                    type="number" size="sm" :min="0" step="0.01" required />
                             </div>
 
-                            <!-- Precio Unitario (referencia: total ÷ cantidad, no se usa para recalcular el total) -->
                             <div class="w-28">
                                 <div
-                                    class="px-2 py-1.5 bg-gray-100 rounded-md text-xs text-gray-700 border border-gray-300 text-right font-medium"
+                                    class="px-1.5 py-1 bg-white rounded-md text-[11px] text-gray-700 border border-gray-200 text-right font-medium tabular-nums"
                                     :title="'Referencia: total ÷ cantidad'">
                                     {{ formatUnitRef(calculateUnitPriceRef(detail)) }}
                                 </div>
                             </div>
 
-                            <!-- Botón eliminar -->
-                            <div class="w-10 flex justify-center">
-                                <BaseButton type="button" variant="ghost" size="sm" @click="removeDetail(index)"
-                                    class="text-red-600 hover:text-red-700 hover:bg-red-50 p-1.5">
-                                    <TrashIcon class="w-4 h-4" />
-                                </BaseButton>
-                            </div>
-                            </div>
-                            <div class="flex items-start gap-2 pt-1 border-t border-gray-100">
+                            <div class="flex items-center justify-end gap-0 shrink-0">
                                 <BaseButton
                                     type="button"
                                     variant="ghost"
                                     size="sm"
-                                    class="shrink-0 mt-0.5 p-1.5 text-gray-500 hover:text-indigo-600"
+                                    class="text-gray-500 hover:text-emerald-700 hover:bg-emerald-50/80 p-1"
+                                    :class="{ 'text-emerald-700 bg-emerald-50/60': lineNotesOpen[detail.tempId] }"
                                     :title="lineNotesOpen[detail.tempId] ? 'Ocultar nota de línea' : 'Nota en esta línea'"
                                     @click="toggleLineNotes(detail.tempId)"
                                 >
-                                    <ChatBubbleLeftRightIcon class="w-4 h-4" />
+                                    <ChatBubbleLeftRightIcon class="w-3.5 h-3.5" />
                                 </BaseButton>
-                                <div v-show="lineNotesOpen[detail.tempId]" class="flex-1 min-w-0">
-                                    <label class="text-xs font-medium text-gray-500">Notas de la línea (opcional)</label>
-                                    <textarea
-                                        v-model="detail.notes"
-                                        rows="2"
-                                        maxlength="1000"
-                                        class="w-full mt-0.5 border border-gray-200 rounded-md px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-indigo-300"
-                                        placeholder="Detalle u observación solo para esta línea"
-                                    />
-                                </div>
+                                <BaseButton type="button" variant="ghost" size="sm" @click="removeDetail(index)"
+                                    class="text-red-600 hover:text-red-700 hover:bg-red-50 p-1">
+                                    <TrashIcon class="w-3.5 h-3.5" />
+                                </BaseButton>
+                            </div>
+                            </div>
+                            <div
+                                v-show="lineNotesOpen[detail.tempId]"
+                                class="pt-1.5 mt-0.5 border-t border-gray-100/80"
+                            >
+                                <label class="text-[11px] font-medium text-gray-500">Nota de línea (opcional)</label>
+                                <textarea
+                                    v-model="detail.notes"
+                                    rows="2"
+                                    maxlength="1000"
+                                    class="w-full mt-0.5 border border-gray-200 rounded-md px-2 py-1 text-[11px] leading-snug focus:outline-none focus:ring-1 focus:ring-emerald-500/25"
+                                    placeholder="Nota de línea…"
+                                />
                             </div>
                         </div>
                     </div>
                 </div>
             </div>
 
-            <div class="rounded-lg border border-gray-200 bg-amber-50/50 px-3 py-3">
+            <div class="rounded-xl border border-amber-100/80 bg-amber-50/35 px-3 py-2">
                 <label class="inline-flex items-start gap-2 text-sm text-gray-800 cursor-pointer">
-                    <input v-model="applyVat" type="checkbox" class="rounded border-gray-300 mt-0.5" />
+                    <input v-model="applyVat" type="checkbox" class="rounded border-gray-300 mt-0.5 shrink-0" />
                     <span>
-                        <span class="font-medium">Aplicar IVA 19%</span>
-                        <span class="block text-xs text-gray-600 mt-0.5">
-                            Se calcula sobre el subtotal de las líneas (importes sin IVA). El total factura y los pagos usan subtotal + IVA.
+                        <span class="font-medium">IVA 19%</span>
+                        <span class="block text-[11px] text-gray-600 mt-0.5 leading-snug">
+                            Sobre subtotal de líneas; total factura y pagos incluyen IVA si aplica.
                         </span>
                     </span>
                 </label>
             </div>
 
-            <!-- Métodos de Pago -->
-            <div>
-                <div class="flex items-center justify-between mb-3">
-                    <label class="block text-sm font-medium text-gray-700">
-                        Métodos de Pago (Opcional)
+            <div class="rounded-xl border border-gray-200/80 bg-white px-3 py-2.5 shadow-sm">
+                <div class="flex items-center justify-between gap-2 mb-2">
+                    <label class="text-xs font-semibold text-gray-600 uppercase tracking-wide">
+                        Pagos (opcional)
                     </label>
-                    <BaseButton type="button" variant="secondary" size="sm" @click="addBankPayment">
-                        <PlusIcon class="w-4 h-4 mr-1" />
-                        Agregar Pago
+                    <BaseButton type="button" variant="secondary" size="sm" class="text-xs h-8" @click="addBankPayment">
+                        <PlusIcon class="w-3.5 h-3.5 shrink-0" />
+                        Agregar
                     </BaseButton>
                 </div>
 
-                <div v-if="formData.expenseBankPayments.length === 0" class="text-sm text-gray-500 italic mb-3">
-                    Sin pagos bancarios (se registrará como efectivo)
+                <div v-if="formData.expenseBankPayments.length === 0" class="text-xs text-gray-500 italic mb-2">
+                    Sin transferencias → se registra como efectivo.
                 </div>
 
-                <div v-else class="space-y-2">
+                <div v-else class="space-y-1.5">
                     <div v-for="(payment, index) in formData.expenseBankPayments" :key="payment.tempId"
-                        class="flex items-center gap-3 border rounded-lg p-3 bg-blue-50">
+                        class="flex items-center gap-2 border border-blue-100/80 rounded-lg p-2 bg-blue-50/40">
                         <div class="flex-1">
-                            <BaseSelect v-model="payment.bankId" :options="bankOptions"
-                                placeholder="Seleccionar banco..." value-key="value" display-key="label"
+                            <BaseSelect v-model="payment.bankId" :options="bankOptions" size="sm"
+                                placeholder="Banco…" value-key="value" display-key="label"
                                 @update:model-value="onBankPaymentBankSelected(index)" />
                         </div>
                         <div class="w-32">
-                            <BaseInput v-model.number="payment.amount" type="number" :min="0" step="1000"
+                            <BaseInput v-model.number="payment.amount" type="number" size="sm" :min="0" step="1000"
                                 placeholder="Monto" @input="clearBankPaymentSync(index)" />
                         </div>
                         <BaseButton type="button" variant="ghost" size="sm" @click="removeBankPayment(index)">
@@ -218,8 +196,7 @@
                     </div>
                 </div>
 
-                <!-- Resumen de Pagos (siempre visible) -->
-                <div class="mt-3 p-3 bg-gray-50 rounded-lg">
+                <div class="mt-2 p-2.5 bg-gray-50/80 rounded-lg border border-gray-100">
                     <div class="flex justify-between text-sm">
                         <span class="font-medium text-gray-700">Subtotal de líneas:</span>
                         <span class="font-semibold text-gray-900">{{ formatCurrency(totalExpenses) }}</span>
@@ -244,19 +221,33 @@
                             {{ formatCurrency(cashDifference) }}
                         </span>
                     </div>
-                    <p v-if="cashDifference < 0" class="text-xs text-red-600 mt-2">
-                        ⚠️ Los pagos bancarios exceden el total
+                    <p v-if="cashDifference < 0" class="text-[11px] text-red-600 mt-1.5">
+                        Los pagos bancarios exceden el total.
                     </p>
                 </div>
             </div>
 
+            <div class="rounded-xl border border-gray-200/80 bg-white px-3 py-2.5 shadow-sm">
+                <label class="block text-xs font-semibold text-gray-600 uppercase tracking-wide mb-1">
+                    Notas del comprobante (opcional)
+                </label>
+                <textarea
+                    v-model="formData.notes"
+                    rows="2"
+                    maxlength="2000"
+                    class="w-full border border-gray-200 rounded-md px-2 py-1.5 text-xs leading-snug focus:outline-none focus:ring-1 focus:ring-emerald-500/30 focus:border-emerald-400"
+                    placeholder="Referencia de factura, acuerdos…"
+                />
+                <p class="text-[11px] text-gray-400 mt-0.5 tabular-nums">{{ (formData.notes || '').length }}/2000</p>
+            </div>
+
             <!-- Abono a domiciliario -->
-            <div v-if="skipAutoAdvance && presetDeliverymanId" class="mt-4 border-t border-gray-200 pt-4">
+            <div v-if="skipAutoAdvance && presetDeliverymanId" class="border-t border-gray-200 pt-3">
                 <p class="text-xs text-blue-900 bg-blue-50 border border-blue-100 rounded-lg p-3">
                     Gasto imputado al domiciliario en liquidación. El abono contable se registra al confirmar la liquidación.
                 </p>
             </div>
-            <div v-else-if="editingExpense?.deliverymanId" class="mt-4 border-t border-gray-200 pt-4 space-y-2">
+            <div v-else-if="editingExpense?.deliverymanId" class="border-t border-gray-200 pt-3 space-y-2">
                 <p class="text-sm font-semibold text-gray-800">Abono de domiciliario</p>
                 <div class="rounded-lg border border-emerald-100 bg-emerald-50/80 px-3 py-2 text-sm text-gray-800">
                     <span class="font-medium">{{ editingExpense.deliverymanName || `Domiciliario #${editingExpense.deliverymanId}` }}</span>
@@ -276,7 +267,7 @@
                     ({{ formatCurrency(invoiceGrossTotal) }}).
                 </p>
             </div>
-            <div v-else class="mt-4 border-t border-gray-200 pt-4 space-y-2">
+            <div v-else class="border-t border-gray-200 pt-3 space-y-2">
                 <label class="inline-flex items-center gap-2 text-sm text-gray-700">
                     <input type="checkbox" v-model="isDeliverymanAdvance">
                     <span>Es abono de domiciliario</span>
@@ -284,7 +275,8 @@
                 <div v-if="isDeliverymanAdvance" class="space-y-1">
                     <BaseSelect v-model="selectedDeliverymanId"
                         :options="deliverymenOptions"
-                        :placeholder="loadingDeliverymen ? 'Cargando domiciliarios...' : 'Seleccionar domiciliario...'"
+                        size="sm"
+                        :placeholder="loadingDeliverymen ? 'Cargando…' : 'Domiciliario…'"
                         value-key="value"
                         display-key="label"
                         :disabled="loadingDeliverymen"
@@ -308,10 +300,10 @@
 
     <BaseDialog v-model="showSupplierModal" title="Nuevo proveedor" size="md">
         <form @submit.prevent="handleSupplierCreate" class="space-y-4">
-            <BaseInput v-model="newSupplier.name" label="Nombre" placeholder="Nombre del proveedor" required />
-            <BaseInput v-model="newSupplier.phone" label="Teléfono" placeholder="Teléfono" required />
-            <BaseInput v-model="newSupplier.address" label="Dirección (opcional)" />
-            <BaseInput v-model="newSupplier.email" label="Email (opcional)" type="email" />
+            <BaseInput v-model="newSupplier.name" size="sm" label="Nombre" placeholder="Nombre del proveedor" required />
+            <BaseInput v-model="newSupplier.phone" size="sm" label="Teléfono" placeholder="Teléfono" required />
+            <BaseInput v-model="newSupplier.address" size="sm" label="Dirección (opcional)" />
+            <BaseInput v-model="newSupplier.email" size="sm" label="Email (opcional)" type="email" />
 
             <div class="flex justify-end space-x-2 pt-2">
                 <BaseButton type="button" variant="secondary" @click="showSupplierModal = false"
@@ -332,7 +324,7 @@
         @submit="handleExpenseCategorySubmit" />
 
     <!-- Crear gasto (reutilizado) -->
-    <BaseDialog v-model="showExpenseForm" title="Nuevo Gasto" size="lg">
+    <BaseDialog v-model="showExpenseForm" title="Nuevo Gasto" size="lg" z-class="z-[55]">
         <ExpenseForm :expense="null" :categories="allExpenseCategories" :loading="expenseFormLoading"
             :prefill-name="expensePrefillName"
             @submit="handleExpenseSubmit" @cancel="onExpenseFormCancel"
@@ -399,6 +391,7 @@ import ExpenseForm from '@/components/expenses/ExpenseForm.vue'
 import { PlusIcon, TrashIcon, SparklesIcon, ChatBubbleLeftRightIcon } from '@heroicons/vue/24/outline'
 import { distributeExpenseBankPaymentsProportionally } from '@/utils/expenseBankDistribution'
 import { todayYmd, defaultBusinessCalendar } from '@/utils/datetime'
+import { DEFAULT_GENERAL_SUPPLIER_ID } from '@/utils/expenseFormDefaults'
 
 interface Props {
     isOpen: boolean
@@ -803,7 +796,7 @@ const initializeForm = async () => {
         applyVat.value = false
         editExpensePaymentSnapshot.value = null
         formData.value = {
-            supplierId: null,
+            supplierId: DEFAULT_GENERAL_SUPPLIER_ID,
             notes: '',
             expenseDetails: [],
             expenseBankPayments: [],
@@ -811,6 +804,7 @@ const initializeForm = async () => {
         if (supplierOptions.value.length === 0) {
             await loadSuppliers()
         }
+        await ensureSupplierOption(DEFAULT_GENERAL_SUPPLIER_ID)
         if (props.presetDeliverymanId) {
             selectedDeliverymanId.value = props.presetDeliverymanId
             isDeliverymanAdvance.value = true
@@ -893,10 +887,10 @@ watch(invoiceGrossTotal, (gross) => {
     }
 })
 
-const canManageSuppliers = computed(() => {
-    const role = authStore.user?.role
-    return role === 'Superadmin' || role === 'Admin'
-})
+async function applyGeneralSupplier() {
+    formData.value.supplierId = DEFAULT_GENERAL_SUPPLIER_ID
+    await ensureSupplierOption(DEFAULT_GENERAL_SUPPLIER_ID)
+}
 
 // Métodos
 async function loadSuppliers() {
@@ -939,19 +933,6 @@ async function loadExpenseCategories() {
     } catch (err) {
         console.error('Error loading expense categories:', err)
     }
-}
-
-const openCreateExpenseCategory = () => {
-    categorySearchInitialName.value = ''
-    showExpenseCategoryForm.value = true
-}
-
-const openCreateExpenseForNewDetail = () => {
-    // Si el usuario quiere crear un gasto, le creamos la fila y luego asignamos el gasto creado a esa fila.
-    addDetail()
-    targetDetailIndexForNewExpense.value = formData.value.expenseDetails.length - 1
-    expensePrefillName.value = ''
-    showExpenseForm.value = true
 }
 
 const handleExpenseCategorySubmit = async (data: CreateExpenseCategoryDto) => {
@@ -1146,7 +1127,7 @@ function updateDerivedUnitAmount(index: number) {
 }
 
 const addDetail = () => {
-    formData.value.expenseDetails.push({
+    formData.value.expenseDetails.unshift({
         expenseId: 0,
         quantity: 1,
         amount: 0,

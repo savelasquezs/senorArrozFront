@@ -1,7 +1,7 @@
 <template>
 	<div class="space-y-1">
 		<!-- Label -->
-		<label v-if="label" :for="inputId" class="block text-sm font-medium text-gray-700">
+		<label v-if="label" :for="inputId" :class="labelClass">
 			{{ label }}
 			<span v-if="required" class="text-red-500 ml-1">*</span>
 		</label>
@@ -32,12 +32,14 @@
 </template>
 
 <script setup lang="ts">
-import { computed, useSlots, useId } from 'vue';
+import { computed, useSlots, useId } from 'vue'
 
 interface Props {
 	// Aceptamos string | number | null para modelValue
 	modelValue: string | number | null;
 	type?: string;
+	/** `sm`: compacto · `lg`: más alto (modales de monto). */
+	size?: 'md' | 'sm' | 'lg';
 	label?: string;
 	placeholder?: string;
 	required?: boolean;
@@ -52,11 +54,18 @@ interface Props {
 
 const props = withDefaults(defineProps<Props>(), {
 	type: 'text',
+	size: 'md',
 	required: false,
 	disabled: false,
 	minlength: 0,
 	maxlength: 100,
 });
+
+const labelClass = computed(() =>
+	props.size === 'sm'
+		? 'block text-xs font-medium text-gray-600'
+		: 'block text-sm font-medium text-gray-700',
+)
 
 const emit = defineEmits<{
 	(e: 'update:modelValue', value: string | number | null): void;
@@ -101,9 +110,22 @@ const inputValue = computed({
 });
 
 const inputClasses = computed(() => {
-	const base =
-		'block w-full px-3 py-2 border rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-1 sm:text-sm transition-colors';
-	const hasIcon = !!slots.icon ? 'pl-10' : '';
+	let sizing: string
+	if (props.size === 'sm') {
+		sizing = 'px-2 py-1.5 text-xs rounded-md focus:ring-1 focus:ring-offset-0'
+	} else if (props.size === 'lg') {
+		sizing = 'px-4 py-3 text-base rounded-xl focus:ring-2 focus:ring-offset-1'
+	} else {
+		sizing = 'px-3 py-2 sm:text-sm rounded-xl focus:ring-2 focus:ring-offset-1'
+	}
+	const base = `block w-full border shadow-sm focus:outline-none transition-colors ${sizing}`;
+	const hasIcon = !!slots.icon
+		? props.size === 'sm'
+			? 'pl-8'
+			: props.size === 'lg'
+				? 'pl-11'
+				: 'pl-10'
+		: '';
 
 	if (props.error) {
 		return `${base} ${hasIcon} border-red-300 text-red-900 placeholder-red-300 focus:ring-red-500 focus:border-red-500`;

@@ -1,8 +1,8 @@
 <template>
 	<button :type="type" :disabled="disabled || loading" :class="buttonClasses" @click="$emit('click', $event)">
 		<!-- Loading state -->
-		<span v-if="loading" class="flex items-center">
-			<svg class="animate-spin -ml-1 mr-2 h-4 w-4" :class="loadingIconColor" xmlns="http://www.w3.org/2000/svg"
+		<span v-if="loading" class="inline-flex items-center gap-1.5">
+			<svg class="animate-spin h-4 w-4 shrink-0 -ml-0.5" :class="loadingIconColor" xmlns="http://www.w3.org/2000/svg"
 				fill="none" viewBox="0 0 24 24">
 				<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
 				<path class="opacity-75" fill="currentColor"
@@ -10,23 +10,20 @@
 				</path>
 			</svg>
 			<span v-if="loadingText">{{ loadingText }}</span>
-			<span v-else>
+			<span v-else class="inline-flex items-center gap-1 min-w-0 leading-none">
 				<slot />
 			</span>
 		</span>
 
-		<!-- Normal state -->
-		<span v-else class="flex items-center">
-			<!-- Icon (left side) -->
-			<component v-if="icon" :is="icon" class="h-4 w-4" :class="iconClasses" />
+		<!-- Normal state: un solo eje horizontal (icono + slot + icono derecho) -->
+		<span v-else :class="innerRowClass">
+			<component v-if="icon" :is="icon" class="h-4 w-4 shrink-0" :class="iconClasses" />
 
-			<!-- Text content -->
-			<span v-if="$slots.default" :class="textClasses">
+			<span v-if="$slots.default" class="inline-flex items-center gap-1 min-w-0 leading-none">
 				<slot />
 			</span>
 
-			<!-- Right icon -->
-			<component v-if="rightIcon" :is="rightIcon" class="h-4 w-4 ml-2" :class="iconClasses" />
+			<component v-if="rightIcon" :is="rightIcon" class="h-4 w-4 shrink-0" :class="iconClasses" />
 		</span>
 	</button>
 </template>
@@ -72,9 +69,9 @@ const buttonClasses = computed(() => {
 	};
 
 	const sizes = {
-		sm: 'px-3 py-1.5 text-sm gap-1',
-		md: 'px-4 py-2 text-sm gap-2',
-		lg: 'px-6 py-3 text-base gap-2',
+		sm: 'px-3 py-1.5 text-sm',
+		md: 'px-4 py-2 text-sm',
+		lg: 'px-6 py-3 text-base',
 	};
 
 	const width = props.fullWidth ? 'w-full' : '';
@@ -92,14 +89,10 @@ const iconClasses = computed(() => {
 	return 'text-white';
 });
 
-const textClasses = computed(() => {
-	if (props.icon && props.rightIcon) {
-		return 'mx-2';
-	}
-	if (props.icon || props.rightIcon) {
-		return 'ml-2';
-	}
-	return '';
+/** Fila interna: espacio uniforme entre icono prop, slot y rightIcon */
+const innerRowClass = computed(() => {
+	const gap = props.size === 'sm' ? 'gap-1' : props.size === 'lg' ? 'gap-2' : 'gap-1.5'
+	return `inline-flex items-center justify-center ${gap} min-w-0`
 });
 
 const loadingIconColor = computed(() => {

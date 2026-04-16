@@ -1,7 +1,11 @@
 <template>
 	<Teleport to="body">
 		<Transition name="dialog">
-			<div v-if="modelValue" class="fixed inset-0 z-50 flex items-center justify-center p-4">
+			<div
+				v-if="modelValue"
+				class="fixed inset-0 flex items-center justify-center p-4"
+				:class="zClass"
+			>
 				<!-- Backdrop -->
 				<div class="fixed inset-0 bg-black/50 transition-opacity" @click="closeDialog" />
 
@@ -51,12 +55,15 @@ interface Props {
 	iconVariant?: 'primary' | 'danger' | 'warning' | 'success';
 	showCloseButton?: boolean;
 	closeOnBackdrop?: boolean;
+	/** Capa del overlay (p. ej. z-50 por defecto; z-[60] para diálogos anidados). */
+	zClass?: string;
 }
 
 const props = withDefaults(defineProps<Props>(), {
 	size: 'md',
 	showCloseButton: true,
 	closeOnBackdrop: true,
+	zClass: 'z-50',
 });
 
 const emit = defineEmits<{

@@ -1,7 +1,7 @@
 <!-- src/components/expenses/ExpenseCategoryFormModal.vue -->
 <template>
     <BaseDialog :model-value="isOpen" @update:model-value="$emit('close')"
-        :title="editingCategory ? `Editar Categoría` : 'Nueva Categoría'" size="md">
+        :title="editingCategory ? `Editar Categoría` : 'Nueva Categoría'" size="md" z-class="z-[60]">
         <form @submit.prevent="handleSubmit" class="space-y-4">
             <BaseInput v-model="formData.name" label="Nombre" placeholder="Nombre de la categoría" required
                 :disabled="loading" />
