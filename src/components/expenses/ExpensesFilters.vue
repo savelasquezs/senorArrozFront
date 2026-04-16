@@ -1,10 +1,10 @@
 <template>
-    <div class="rounded-lg border border-gray-200 bg-white shadow-sm mb-2 overflow-hidden">
+    <div class="relative z-50 rounded-lg border border-gray-200 bg-white shadow-sm mb-2 overflow-visible">
         <!-- Una sola barra densa: controles principales -->
         <div class="flex flex-wrap items-center gap-2 p-2">
             <div class="w-[7.25rem] shrink-0 expenses-compact-select">
                 <BaseSelect :model-value="presetId" :options="presetOptions" value-key="value" display-key="label"
-                    placeholder="Periodo" @update:model-value="onPresetChange" />
+                    teleport-dropdown placeholder="Periodo" @update:model-value="onPresetChange" />
             </div>
 
             <div v-if="presetId === 'custom'" class="min-w-[200px] max-w-[260px] flex-1 expenses-compact-dp">
@@ -24,17 +24,17 @@
 
             <div class="w-[7rem] sm:w-[7.5rem] shrink-0 expenses-compact-select">
                 <BaseSelect :model-value="localFilters.categoryNames" :options="categoryOptions" value-key="value"
-                    display-key="label" placeholder="Categorías" multiple
+                    display-key="label" teleport-dropdown placeholder="Categorías" multiple
                     @update:model-value="updateLocal('categoryNames', $event)" />
             </div>
             <div class="w-[7rem] sm:w-[7.5rem] shrink-0 expenses-compact-select">
                 <BaseSelect :model-value="localFilters.bankNames" :options="bankOptions" value-key="value"
-                    display-key="label" placeholder="Pago" multiple
+                    display-key="label" teleport-dropdown placeholder="Pago" multiple
                     @update:model-value="updateLocal('bankNames', $event)" />
             </div>
             <div class="w-[7rem] sm:w-[7.5rem] shrink-0 expenses-compact-select">
                 <BaseSelect :model-value="localFilters.supplierIds" :options="supplierOptions" value-key="value"
-                    display-key="label" placeholder="Prov." multiple
+                    display-key="label" teleport-dropdown placeholder="Prov." multiple
                     @update:model-value="updateLocal('supplierIds', $event)" />
             </div>
 
@@ -42,7 +42,7 @@
                 <span class="text-[10px] uppercase tracking-wide text-gray-400 hidden lg:inline">Orden</span>
                 <div class="w-[6.5rem] expenses-compact-select">
                     <BaseSelect :model-value="sortBy" :options="sortFieldOptions" value-key="value" display-key="label"
-                        @update:model-value="$emit('update:sortBy', $event)" />
+                        teleport-dropdown @update:model-value="$emit('update:sortBy', $event)" />
                 </div>
                 <BaseButton variant="secondary" size="sm" class="!px-2 !py-1 text-xs min-w-0"
                     :title="sortOrder === 'asc' ? 'Ascendente' : 'Descendente'" @click="$emit('toggle-sort-order')">

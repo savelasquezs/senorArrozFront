@@ -5,13 +5,14 @@
             :header-height="34" :row-height="36" :get-row-id="getRowId" :overlay-no-rows-template="noRowsHtml"
             dom-layout="normal"
             :pagination="false" :animate-rows="true" @grid-ready="onGridReady" @cell-clicked="onCellClicked"
+            @row-data-updated="onRowDataUpdated"
             @filter-changed="onFilterChanged" @column-resized="onColumnChanged" @column-moved="onColumnChanged"
             @column-visible="onColumnChanged" @sort-changed="onColumnChanged" />
     </div>
 </template>
 
 <script setup lang="ts">
-import { watch, ref } from 'vue'
+import { ref } from 'vue'
 import { AgGridVue } from 'ag-grid-vue3'
 import {
     themeQuartz,
@@ -21,6 +22,7 @@ import {
     type GridApi,
     type GridReadyEvent,
     type ICellRendererParams,
+    type RowDataUpdatedEvent,
 } from 'ag-grid-community'
 import type { ExpenseDetailGridRow } from '@/types/expense'
 import { formatCurrency, formatDateShort, formatTime } from '@/composables/useFormatting'
@@ -216,6 +218,10 @@ function onCellClicked(ev: CellClickedEvent<ExpenseDetailGridRow>) {
     }
 }
 
+function onRowDataUpdated(e: RowDataUpdatedEvent<ExpenseDetailGridRow>) {
+    recalcSummary(e.api)
+}
+
 function onFilterChanged(e: { api: GridApi<ExpenseDetailGridRow> }) {
     recalcSummary(e.api)
 }
@@ -224,17 +230,6 @@ function onColumnChanged(e: { api: GridApi<ExpenseDetailGridRow> }) {
     emitColumnState(e.api)
     recalcSummary(e.api)
 }
-
-watch(
-    () => props.rowData,
-    () => {
-        const api = gridApi.value
-        if (api) {
-            recalcSummary(api)
-        }
-    },
-    { deep: true },
-)
 </script>
 
 <style scoped>

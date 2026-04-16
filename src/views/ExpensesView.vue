@@ -25,7 +25,7 @@
                 @toggle-sort-order="toggleSortOrder" @clear-filters="clearFilters" @refresh="fetchExpenses">
                 <template #result-hint>
                     <span v-if="!loading && totalCount > 0">
-                        Facturas en esta página:
+                        Facturas con líneas que coinciden (pág.):
                         <span class="font-medium">{{ filteredExpenses.length }}</span>
                         · Total servidor:
                         <span class="font-medium">{{ totalCount }}</span>
@@ -35,8 +35,8 @@
                 </template>
             </ExpensesFilters>
 
-            <div class="flex-1 min-h-0 flex flex-col gap-2">
-                <ExpenseDetailsAgGrid class="flex-1 min-h-0" :row-data="gridRowData" :loading="loading"
+            <div class="relative z-0 flex-1 min-h-0 flex flex-col gap-2 min-w-0">
+                <ExpenseDetailsAgGrid class="flex-1 min-h-0 min-w-0" :row-data="gridRowData" :loading="loading"
                     :initial-column-state="columnState" @summary-change="onSummaryChange"
                     @column-state-change="onColumnStateChange"
                     @view-detail="handleViewDetailByHeaderId" @edit="handleEditByHeaderId"
@@ -356,6 +356,7 @@ function toggleSortOrder() {
 
 const fetchExpenses = async () => {
     loading.value = true
+    summary.value = { totalAmount: 0, rowCount: 0 }
     try {
         const response = await expenseHeaderApi.getExpenseHeaders({
             fromDate: dateFilters.value.fromDate || undefined,
