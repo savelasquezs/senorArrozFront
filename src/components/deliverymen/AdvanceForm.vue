@@ -15,7 +15,7 @@
                     </option>
                 </select>
                 <p v-if="!deliverymen || deliverymen.length === 0" class="text-xs text-amber-600 mt-1">
-                    No hay domiciliarios con pedidos entregados hoy
+                    No hay domiciliarios con pedidos adjudicados para esta fecha
                 </p>
             </div>
 

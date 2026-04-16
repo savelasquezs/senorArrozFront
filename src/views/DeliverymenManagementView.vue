@@ -27,7 +27,7 @@
                 <!-- Izquierda: Cards de domiciliarios -->
                 <div>
                     <h2 class="text-lg font-semibold text-gray-900 mb-4">
-                        Domiciliarios activos ({{ deliverymenStats.length }})
+                        Con pedidos adjudicados ({{ deliverymenStats.length }})
                     </h2>
                     
                     <div v-if="loading" class="grid grid-cols-1 gap-4">
@@ -48,7 +48,7 @@
 
                     <div v-else class="bg-gray-50 rounded-lg p-12 text-center">
                         <TruckIcon class="w-16 h-16 text-gray-300 mx-auto mb-4" />
-                        <p class="text-gray-500">No hay domiciliarios con pedidos entregados hoy</p>
+                        <p class="text-gray-500">No hay domiciliarios con al menos un pedido adjudicado para esta fecha</p>
                     </div>
                 </div>
 
