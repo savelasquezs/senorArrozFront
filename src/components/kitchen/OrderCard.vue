@@ -117,6 +117,7 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import type { OrderListItem, OrderDetailItem } from '@/types/order'
 import { KitchenService } from '@/services/domain/KitchenService'
+import { DEFAULT_BUSINESS_TIMEZONE } from '@/utils/datetime/constants'
 import { orderListRecipientDisplayName } from '@/utils/orderRecipientDisplay'
 import { ClockIcon, HomeIcon, TruckIcon, CalendarIcon, CheckIcon, MapPinIcon, ShoppingBagIcon, UserIcon } from '@heroicons/vue/24/outline'
 import BaseBadge from '@/components/ui/BaseBadge.vue'
@@ -160,7 +161,7 @@ const formattedPrepareAtStart = computed(() => {
         weekday: 'short',
         hour: '2-digit',
         minute: '2-digit',
-        timeZone: 'America/Bogota',
+        timeZone: DEFAULT_BUSINESS_TIMEZONE,
     })
 })
 

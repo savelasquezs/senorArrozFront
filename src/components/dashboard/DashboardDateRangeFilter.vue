@@ -22,6 +22,7 @@
 import { VueDatePicker } from '@vuepic/vue-datepicker';
 import { es } from 'date-fns/locale';
 import '@vuepic/vue-datepicker/dist/main.css';
+import { zonedDayFromPickerLocalDate } from '@/utils/datetime';
 
 const esLocale = es;
 
@@ -45,10 +46,8 @@ const emit = defineEmits<{
 
 function onUpdate(v: Date[] | Date | null) {
 	if (!v || !Array.isArray(v) || v.length !== 2 || !v[0] || !v[1]) return;
-	const a = new Date(v[0]);
-	const b = new Date(v[1]);
-	a.setHours(0, 0, 0, 0);
-	b.setHours(0, 0, 0, 0);
+	const a = zonedDayFromPickerLocalDate(new Date(v[0]));
+	const b = zonedDayFromPickerLocalDate(new Date(v[1]));
 	if (a <= b) emit('update:modelValue', [a, b]);
 	else emit('update:modelValue', [b, a]);
 }

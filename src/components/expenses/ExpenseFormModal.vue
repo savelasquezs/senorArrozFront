@@ -397,6 +397,7 @@ import ExpenseCategoryFormModal from '@/components/expenses/ExpenseCategoryFormM
 import ExpenseForm from '@/components/expenses/ExpenseForm.vue'
 import { PlusIcon, TrashIcon, SparklesIcon, ChatBubbleLeftRightIcon } from '@heroicons/vue/24/outline'
 import { distributeExpenseBankPaymentsProportionally } from '@/utils/expenseBankDistribution'
+import { todayYmd } from '@/utils/datetime'
 
 interface Props {
     isOpen: boolean
@@ -672,8 +673,7 @@ watch(isDeliverymanAdvance, async (newVal) => {
 
     loadingDeliverymen.value = true
     try {
-        // Fecha de hoy en zona Colombia (evitar desfase por UTC)
-        const today = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Bogota' })
+        const today = todayYmd()
         const raw = await deliverymanApi.getWithOrdersToday({ date: today })
         const list = Array.isArray(raw) ? raw : [raw]
         deliverymenOptions.value = list.map(dm => ({

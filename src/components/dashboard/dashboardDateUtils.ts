@@ -1,148 +1,153 @@
-/** Inicio del día local (00:00). */
+import { TZDate } from '@date-fns/tz'
+import { startOfDay as dfStartOfDay } from 'date-fns'
+import {
+	addZonedCalendarMonths,
+	addZonedDays,
+	DEFAULT_BUSINESS_TIMEZONE,
+	endOfZonedMonthContaining,
+	startOfZonedDayAsDate,
+	startOfZonedMonthContaining,
+	zonedCalendarParts,
+} from '@/utils/datetime'
+
+const TZ = DEFAULT_BUSINESS_TIMEZONE
+
+/** Inicio del día calendario en zona de negocio (America/Bogotá). */
 export function startOfDay(d: Date): Date {
-	const x = new Date(d);
-	x.setHours(0, 0, 0, 0);
-	return x;
+	return startOfZonedDayAsDate(d, TZ)
 }
 
 /** Rango por defecto: últimos `n` días inclusive (hoy = fin). */
-export function defaultDateRangeLastDays(n: number): [Date, Date] {
-	const end = startOfDay(new Date());
-	const start = new Date(end);
-	start.setDate(start.getDate() - (n - 1));
-	return [start, end];
+export function defaultDateRangeLastDays(n: number, ref: Date | number = Date.now()): [Date, Date] {
+	const end = startOfZonedDayAsDate(ref, TZ)
+	const start = addZonedDays(end, -(n - 1), TZ)
+	return [start, end]
 }
 
-/** Rango por defecto: solo el día en curso (inicio y fin del mismo día local). */
-export function defaultDateRangeToday(): [Date, Date] {
-	const day = startOfDay(new Date());
-	return [new Date(day), new Date(day)];
+/** Rango por defecto: solo el día en curso en zona de negocio. */
+export function defaultDateRangeToday(ref: Date | number = Date.now()): [Date, Date] {
+	const day = startOfZonedDayAsDate(ref, TZ)
+	return [day, day]
 }
 
-/** Un solo día: ayer (calendario local). */
-export function defaultDateRangeYesterday(): [Date, Date] {
-	const y = startOfDay(new Date());
-	y.setDate(y.getDate() - 1);
-	return [new Date(y), new Date(y)];
+/** Un solo día: ayer (calendario zona de negocio). */
+export function defaultDateRangeYesterday(ref: Date | number = Date.now()): [Date, Date] {
+	const todayStart = startOfZonedDayAsDate(ref, TZ)
+	const y = addZonedDays(todayStart, -1, TZ)
+	return [y, y]
 }
 
-/** Mes calendario en curso: día 1 → último día del mes (hora local). */
-export function defaultDateRangeThisMonth(): [Date, Date] {
-	const now = new Date();
-	const first = new Date(now.getFullYear(), now.getMonth(), 1);
-	const last = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-	return [startOfDay(first), startOfDay(last)];
+/** Mes calendario en curso en zona de negocio: día 1 → último día del mes. */
+export function defaultDateRangeThisMonth(ref: Date | number = Date.now()): [Date, Date] {
+	const first = startOfZonedMonthContaining(ref, TZ)
+	const last = endOfZonedMonthContaining(ref, TZ)
+	return [startOfZonedDayAsDate(first, TZ), startOfZonedDayAsDate(last, TZ)]
 }
 
 /** Mes calendario anterior completo. */
-export function defaultDateRangeLastMonth(): [Date, Date] {
-	const now = new Date();
-	const first = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-	const last = new Date(now.getFullYear(), now.getMonth(), 0);
-	return [startOfDay(first), startOfDay(last)];
+export function defaultDateRangeLastMonth(ref: Date | number = Date.now()): [Date, Date] {
+	const startThis = startOfZonedMonthContaining(ref, TZ)
+	const startPrev = addZonedCalendarMonths(startThis, -1, TZ)
+	const endPrev = endOfZonedMonthContaining(startPrev, TZ)
+	return [startPrev, startOfZonedDayAsDate(endPrev, TZ)]
 }
 
 /**
- * Quincena en curso: días 1–15 o 16–último del mes (calendario local).
+ * Quincena en curso: días 1–15 o 16–último del mes (zona de negocio).
  */
-export function defaultDateRangeThisFortnight(): [Date, Date] {
-	const now = new Date();
-	const y = now.getFullYear();
-	const m = now.getMonth();
-	const d = now.getDate();
+export function defaultDateRangeThisFortnight(ref: Date | number = Date.now()): [Date, Date] {
+	const { year, monthIndex, day } = zonedCalendarParts(ref, TZ)
 
-	if (d <= 15) {
-		const first = new Date(y, m, 1);
-		const last = new Date(y, m, 15);
-		return [startOfDay(first), startOfDay(last)];
+	if (day <= 15) {
+		const first = TZDate.tz(TZ, year, monthIndex, 1, 0, 0, 0, 0)
+		const last = TZDate.tz(TZ, year, monthIndex, 15, 0, 0, 0, 0)
+		return [new Date(dfStartOfDay(first).getTime()), new Date(dfStartOfDay(last).getTime())]
 	}
-	const first = new Date(y, m, 16);
-	const last = new Date(y, m + 1, 0);
-	return [startOfDay(first), startOfDay(last)];
+	const first = TZDate.tz(TZ, year, monthIndex, 16, 0, 0, 0, 0)
+	const last = TZDate.tz(TZ, year, monthIndex + 1, 0, 0, 0, 0, 0)
+	return [new Date(dfStartOfDay(first).getTime()), new Date(dfStartOfDay(last).getTime())]
 }
 
 /**
  * Quincena anterior: si estamos en 1ª quincena, la 2ª del mes pasado; si en 2ª, la 1ª del mismo mes.
  */
-export function defaultDateRangeLastFortnight(): [Date, Date] {
-	const now = new Date();
-	const y = now.getFullYear();
-	const m = now.getMonth();
-	const d = now.getDate();
+export function defaultDateRangeLastFortnight(ref: Date | number = Date.now()): [Date, Date] {
+	const { year, monthIndex, day } = zonedCalendarParts(ref, TZ)
 
-	if (d <= 15) {
-		const first = new Date(y, m - 1, 16);
-		const last = new Date(y, m, 0);
-		return [startOfDay(first), startOfDay(last)];
+	if (day <= 15) {
+		const first = TZDate.tz(TZ, year, monthIndex - 1, 16, 0, 0, 0, 0)
+		const last = TZDate.tz(TZ, year, monthIndex, 0, 0, 0, 0, 0)
+		return [new Date(dfStartOfDay(first).getTime()), new Date(dfStartOfDay(last).getTime())]
 	}
-	const first = new Date(y, m, 1);
-	const last = new Date(y, m, 15);
-	return [startOfDay(first), startOfDay(last)];
+	const first = TZDate.tz(TZ, year, monthIndex, 1, 0, 0, 0, 0)
+	const last = TZDate.tz(TZ, year, monthIndex, 15, 0, 0, 0, 0)
+	return [new Date(dfStartOfDay(first).getTime()), new Date(dfStartOfDay(last).getTime())]
 }
 
-/** Año calendario en curso (1 ene – 31 dic). */
-export function defaultDateRangeThisYear(): [Date, Date] {
-	const y = new Date().getFullYear();
-	const first = new Date(y, 0, 1);
-	const last = new Date(y, 11, 31);
-	return [startOfDay(first), startOfDay(last)];
+/** Año calendario en curso (1 ene – 31 dic) en zona de negocio. */
+export function defaultDateRangeThisYear(ref: Date | number = Date.now()): [Date, Date] {
+	const { year } = zonedCalendarParts(ref, TZ)
+	const first = TZDate.tz(TZ, year, 0, 1, 0, 0, 0, 0)
+	const last = TZDate.tz(TZ, year, 11, 31, 0, 0, 0, 0)
+	return [new Date(dfStartOfDay(first).getTime()), new Date(dfStartOfDay(last).getTime())]
 }
 
 /** Año calendario anterior completo. */
-export function defaultDateRangeLastYear(): [Date, Date] {
-	const y = new Date().getFullYear() - 1;
-	const first = new Date(y, 0, 1);
-	const last = new Date(y, 11, 31);
-	return [startOfDay(first), startOfDay(last)];
+export function defaultDateRangeLastYear(ref: Date | number = Date.now()): [Date, Date] {
+	const { year } = zonedCalendarParts(ref, TZ)
+	const y = year - 1
+	const first = TZDate.tz(TZ, y, 0, 1, 0, 0, 0, 0)
+	const last = TZDate.tz(TZ, y, 11, 31, 0, 0, 0, 0)
+	return [new Date(dfStartOfDay(first).getTime()), new Date(dfStartOfDay(last).getTime())]
 }
 
-/** Días calendario desde `from` hasta `to` inclusive (ambos normalizados a inicio de día). Máximo `maxDays` por seguridad. */
+/** Días calendario desde `from` hasta `to` inclusive (inicio de día en zona de negocio). Máximo `maxDays` por seguridad. */
 export function daysInclusive(from: Date, to: Date, maxDays = 62): Date[] {
-	const s = startOfDay(from);
-	const e = startOfDay(to);
-	if (e < s) return [];
+	const s = startOfZonedDayAsDate(from, TZ)
+	const e = startOfZonedDayAsDate(to, TZ)
+	if (e < s) return []
 
-	const out: Date[] = [];
-	const cur = new Date(s);
-	let guard = 0;
+	const out: Date[] = []
+	let cur = new Date(s.getTime())
+	let guard = 0
 	while (cur <= e && guard < maxDays) {
-		out.push(new Date(cur));
-		cur.setDate(cur.getDate() + 1);
-		guard++;
+		out.push(new Date(cur.getTime()))
+		cur = addZonedDays(cur, 1, TZ)
+		guard++
 	}
-	return out;
+	return out
 }
 
 /**
- * Primer día de cada mes desde el mes de `from` hasta el de `to` (inclusive).
+ * Primer día de cada mes desde el mes de `from` hasta el de `to` (inclusive), en zona de negocio.
  */
 export function monthsInclusive(from: Date, to: Date, maxMonths = 36): Date[] {
-	const s = new Date(from.getFullYear(), from.getMonth(), 1);
-	const e = new Date(to.getFullYear(), to.getMonth(), 1);
-	if (e < s) return [];
+	const s = startOfZonedMonthContaining(from, TZ)
+	const e = startOfZonedMonthContaining(to, TZ)
+	if (e < s) return []
 
-	const out: Date[] = [];
-	const cur = new Date(s);
-	let guard = 0;
+	const out: Date[] = []
+	let cur = new Date(s.getTime())
+	let guard = 0
 	while (cur <= e && guard < maxMonths) {
-		out.push(new Date(cur));
-		cur.setMonth(cur.getMonth() + 1);
-		guard++;
+		out.push(new Date(cur.getTime()))
+		cur = addZonedCalendarMonths(cur, 1, TZ)
+		guard++
 	}
-	return out;
+	return out
 }
 
 /**
- * Años enteros desde el año de `from` hasta el de `to` (inclusive).
+ * Años enteros desde el año de `from` hasta el de `to` (inclusive), según calendario en zona de negocio.
  */
 export function yearsInclusive(from: Date, to: Date, maxYears = 20): number[] {
-	const y0 = from.getFullYear();
-	const y1 = to.getFullYear();
-	if (y1 < y0) return [];
+	const y0 = zonedCalendarParts(from, TZ).year
+	const y1 = zonedCalendarParts(to, TZ).year
+	if (y1 < y0) return []
 
-	const out: number[] = [];
+	const out: number[] = []
 	for (let y = y0; y <= y1 && out.length < maxYears; y++) {
-		out.push(y);
+		out.push(y)
 	}
-	return out;
+	return out
 }

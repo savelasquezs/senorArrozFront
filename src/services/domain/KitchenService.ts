@@ -1,6 +1,8 @@
 import type { OrderListItem } from '@/types/order'
 import type { KitchenOrderModificationSummary } from '@/types/kitchenModification'
 import { orderStatusToStatusTimesKey } from '@/composables/useFormatting'
+import { formatYmd } from '@/utils/datetime'
+import { DEFAULT_BUSINESS_TIMEZONE } from '@/utils/datetime/constants'
 
 // Constantes de tiempo (sin feature flags)
 const KITCHEN_MAX_TAKEN_TIME = 5 * 60 * 1000 // 5 minutos
@@ -33,8 +35,8 @@ export class KitchenService {
         if (anchor == null) return false
         const anchorDate = new Date(anchor as string)
         if (Number.isNaN(anchorDate.getTime())) return false
-        const bogotaDay = (x: Date) => x.toLocaleDateString('en-CA', { timeZone: 'America/Bogota' })
-        if (bogotaDay(anchorDate) !== bogotaDay(now)) return false
+        const businessDay = (x: Date) => formatYmd(x, DEFAULT_BUSINESS_TIMEZONE)
+        if (businessDay(anchorDate) !== businessDay(now)) return false
 
         const entry = this.getReservationKitchenEntryTime(order)
         if (!entry) return false
@@ -86,7 +88,7 @@ export class KitchenService {
         return date.toLocaleTimeString('es-CO', {
             hour: '2-digit',
             minute: '2-digit',
-            timeZone: 'America/Bogota',
+            timeZone: DEFAULT_BUSINESS_TIMEZONE,
         })
     }
 

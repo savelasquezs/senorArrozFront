@@ -153,6 +153,7 @@ import LiquidationConfirmModal from '@/components/deliverymen/LiquidationConfirm
 import DeliverymanOrdersModal from '@/components/deliverymen/DeliverymanOrdersModal.vue'
 import DeliveryMap, { type DriverLocation } from '@/components/delivery/DeliveryMap.vue'
 import { ArrowPathIcon, TruckIcon } from '@heroicons/vue/24/outline'
+import { todayYmd } from '@/utils/datetime'
 
 const router = useRouter()
 const authStore = useAuthStore()
@@ -161,8 +162,7 @@ const SIGNALR_HUB_URL = import.meta.env.VITE_SIGNALR_HUB_URL || 'http://localhos
 const { on } = useSignalR(SIGNALR_HUB_URL)
 
 // Estado
-// Fecha de hoy en zona Colombia (evitar desfase por UTC)
-const selectedDate = ref(new Date().toLocaleDateString('en-CA', { timeZone: 'America/Bogota' }))
+const selectedDate = ref(todayYmd())
 const loading = ref(false)
 const submitting = ref(false)
 const loadingDetail = ref(false)
@@ -186,7 +186,7 @@ const ordersDraftsStore = useOrdersDraftsStore()
 
 /** Solo el día calendario actual en Colombia puede liquidarse desde esta vista. */
 const isSelectedDateToday = computed(() => {
-    const today = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Bogota' })
+    const today = todayYmd()
     return selectedDate.value === today
 })
 

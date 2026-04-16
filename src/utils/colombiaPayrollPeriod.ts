@@ -1,7 +1,9 @@
+import { DEFAULT_BUSINESS_TIMEZONE } from '@/utils/datetime/constants'
+
 /** Fecha calendario Colombia (America/Bogota). */
 export function getColombiaYmdParts(): { y: number; m: number; d: number } {
 	const fmt = new Intl.DateTimeFormat('en-CA', {
-		timeZone: 'America/Bogota',
+		timeZone: DEFAULT_BUSINESS_TIMEZONE,
 		year: 'numeric',
 		month: '2-digit',
 		day: '2-digit',

@@ -425,6 +425,7 @@ import { useOrderPermissions } from '@/composables/useOrderPermissions'
 import { useToast } from '@/composables/useToast'
 import { getOrderStatusDisplayName, getOrderTypeDisplayName, useFormatting } from '@/composables/useFormatting'
 import { sumPaymentsAmounts } from '@/utils/orderCashToCollect'
+import { todayYmd } from '@/utils/datetime'
 import { bankPaymentApi } from '@/services/MainAPI/bankPaymentApi'
 import type { BankPayment } from '@/types/bank'
 import { useBanksStore } from '@/store/banks'
@@ -495,7 +496,7 @@ const bankFilterId = ref<number | null>(null)
 const groupByRoute = ref(false)
 
 const dateFilters = ref({
-    fromDate: new Date().toLocaleDateString('en-CA', { timeZone: 'America/Bogota' }), // Fecha Colombia en formato YYYY-MM-DD
+    fromDate: todayYmd(),
     toDate: '',
 })
 
@@ -639,7 +640,7 @@ const visiblePages = computed(() => {
 })
 
 const hasActiveFilters = computed(() => {
-    const defaultFrom = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Bogota' })
+    const defaultFrom = todayYmd()
     const fromDiffers = dateFilters.value.fromDate && dateFilters.value.fromDate !== defaultFrom
     return !!(
         filters.value.totalQuery?.trim() ||
@@ -698,7 +699,7 @@ const clearFilters = () => {
     }
     bankFilterId.value = null
     dateFilters.value = {
-        fromDate: new Date().toLocaleDateString('en-CA', { timeZone: 'America/Bogota' }),
+        fromDate: todayYmd(),
         toDate: '',
     }
     currentPage.value = 1
@@ -1305,7 +1306,7 @@ const resSortBy = ref('reservedFor')
 const resSortOrder = ref<'asc' | 'desc'>('desc')
 const resSearch = ref('')
 const resStatus = ref<string | null>(null)
-const colombiaDateInput = () => new Date().toLocaleDateString('en-CA', { timeZone: 'America/Bogota' })
+const colombiaDateInput = () => todayYmd()
 const resFrom = ref('')
 const resTo = ref('')
 

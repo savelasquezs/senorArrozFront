@@ -302,6 +302,9 @@ import {
     ScaleIcon,
 } from '@heroicons/vue/24/outline'
 import type { ProductFormData, ProductSalesUnitsEvolutionPoint } from '@/types/product'
+import { format } from 'date-fns'
+import { TZDate } from '@date-fns/tz'
+import { DEFAULT_BUSINESS_TIMEZONE } from '@/utils/datetime/constants'
 
 const props = defineProps<{
     open: boolean
@@ -333,16 +336,9 @@ const productDetail = computed(() => store.currentDetail)
 
 const salesUnitsEvolutionSeries = computed(() => productDetail.value?.salesUnitsEvolution ?? [])
 
-/** Clave YYYY-MM en zona horaria América/Bogotá (alineado con operación en Colombia). */
+/** Clave YYYY-MM en zona de negocio (America/Bogotá). */
 function monthKeyColombia(iso: string): string {
-    const parts = new Intl.DateTimeFormat('en-CA', {
-        timeZone: 'America/Bogota',
-        year: 'numeric',
-        month: '2-digit',
-    }).formatToParts(new Date(iso))
-    const y = parts.find(p => p.type === 'year')?.value ?? '0'
-    const m = parts.find(p => p.type === 'month')?.value ?? '01'
-    return `${y}-${m}`
+    return format(TZDate.tz(DEFAULT_BUSINESS_TIMEZONE, iso), 'yyyy-MM')
 }
 
 function aggregateSalesByMonth(points: ProductSalesUnitsEvolutionPoint[]): ProductSalesUnitsEvolutionPoint[] {

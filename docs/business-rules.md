@@ -86,6 +86,13 @@ enum UserRole {
 - **Geolocalización**: Vista con Google Maps de pedidos "OnTheWay" asignados
 - **Entrega automática**: Opción de marcar como entregado al estar a 20m o menos del destino 
 
+## Fechas y zona horaria (frontend)
+
+- **Zona de negocio por defecto**: El calendario operativo de la aplicación web (filtros por día, presets del dashboard, historial de domiciliario, gastos, etc.) se interpreta en la zona IANA **`America/Bogota`**. Colombia no aplica horario de verano; el offset efectivo es **UTC−05:00**.
+- **Cadenas `YYYY-MM-DD`**: Cuando el front envía o muestra solo fecha sin hora, ese valor corresponde al **día calendario en `America/Bogota`**, no al día local del navegador del usuario.
+- **Instantes ISO / hora**: Los timestamps completos (`createdAt`, `reservedFor`, etc.) siguen siendo instantes en el tiempo; el backend y el front los serializan típicamente en ISO 8601 (UTC). La zona de Bogotá se usa para decidir **qué día calendario** agrupa un evento en reportes y filtros por fecha.
+- **Extensión futura**: Si una sucursal definiera otra zona horaria en configuración, las mismas reglas aplicarían usando ese identificador IANA en el núcleo de fechas del front; hoy el valor fijo es `America/Bogota`.
+
 ## 🍽️ Sistema de Pedidos
 
 ### Tipos de Pedido
