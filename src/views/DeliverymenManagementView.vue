@@ -30,11 +30,14 @@
                         Con pedidos adjudicados ({{ deliverymenStats.length }})
                     </h2>
                     
-                    <div v-if="loading" class="grid grid-cols-1 gap-4">
-                        <div v-for="i in 3" :key="i" class="bg-gray-100 animate-pulse rounded-lg h-64"></div>
+                    <div v-if="loading" class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-2">
+                        <div v-for="i in 6" :key="i" class="bg-gray-100 animate-pulse rounded-lg h-28"></div>
                     </div>
 
-                    <div v-else-if="deliverymenStats.length > 0" class="grid grid-cols-1 gap-4">
+                    <div
+                        v-else-if="deliverymenStats.length > 0"
+                        class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-2"
+                    >
                         <DeliverymanCard
                             v-for="stat in deliverymenStats"
                             :key="stat.deliverymanId"
