@@ -29,8 +29,8 @@ import { formatCurrency, formatDateShort, formatTime } from '@/composables/useFo
 
 export interface ExpensesGridContext {
     onViewDetail: (headerId: number) => void
-    onEdit: (headerId: number) => void
-    onDeleteHeader: (headerId: number) => void
+    onEditDetail: (headerId: number, detailId: number) => void
+    onDeleteDetail: (headerId: number, detailId: number) => void
 }
 
 const props = withDefaults(
@@ -49,8 +49,8 @@ const emit = defineEmits<{
     'summary-change': [payload: { totalAmount: number; rowCount: number }]
     'column-state-change': [state: ColumnState[]]
     'view-detail': [headerId: number]
-    edit: [headerId: number]
-    'delete-header': [headerId: number]
+    'edit-detail': [payload: { headerId: number; detailId: number }]
+    'delete-detail': [payload: { headerId: number; detailId: number }]
     'invoice-click': [headerId: number]
 }>()
 
@@ -58,8 +58,8 @@ const gridApi = ref<GridApi<ExpenseDetailGridRow> | null>(null)
 
 const gridContext: ExpensesGridContext = {
     onViewDetail: (id: number) => emit('view-detail', id),
-    onEdit: (id: number) => emit('edit', id),
-    onDeleteHeader: (id: number) => emit('delete-header', id),
+    onEditDetail: (headerId: number, detailId: number) => emit('edit-detail', { headerId, detailId }),
+    onDeleteDetail: (headerId: number, detailId: number) => emit('delete-detail', { headerId, detailId }),
 }
 
 const noRowsHtml =
@@ -100,14 +100,14 @@ function actionsCellRenderer() {
             mkBtn(
                 'Editar',
                 'px-2 py-1 text-xs font-medium rounded-lg border border-emerald-200 bg-emerald-50 text-emerald-800 hover:bg-emerald-100',
-                () => ctx.onEdit(data.headerId),
+                () => ctx.onEditDetail(data.headerId, data.detailId),
             ),
         )
         wrap.appendChild(
             mkBtn(
                 'Eliminar',
                 'px-2 py-1 text-xs font-medium rounded-lg border border-red-100 bg-red-50 text-red-700 hover:bg-red-100',
-                () => ctx.onDeleteHeader(data.headerId),
+                () => ctx.onDeleteDetail(data.headerId, data.detailId),
             ),
         )
         return wrap

@@ -104,7 +104,8 @@
                     <!-- Filas de gastos -->
                     <div class="space-y-3">
                         <div v-for="(detail, index) in formData.expenseDetails" :key="detail.tempId"
-                            class="border rounded-md p-2 bg-white space-y-2">
+                            class="border rounded-md p-2 bg-white space-y-2"
+                            :data-expense-line-id="detail.detailId != null && detail.detailId > 0 ? detail.detailId : undefined">
                             <div class="flex items-center gap-2 hover:bg-gray-50 transition-colors -m-2 p-2 rounded">
                             <!-- Gasto (más ancho) -->
                             <div class="flex-1 min-w-[220px]">
@@ -377,7 +378,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onMounted } from 'vue'
+import { ref, computed, watch, onMounted, nextTick } from 'vue'
 import type { ExpenseHeader, CreateExpenseHeaderDto, UpdateExpenseHeaderDto, CreateExpenseDetailDto, CreateExpenseBankPaymentDto, SupplierExpenseSuggestion, ExpenseCategory, CreateExpenseCategoryDto, CreateExpenseDto, Expense } from '@/types/expense'
 import type { Supplier, CreateSupplierDto } from '@/types/supplier'
 import { expenseHeaderApi } from '@/services/MainAPI/expenseHeaderApi'
@@ -403,6 +404,8 @@ interface Props {
     isOpen: boolean
     editingExpense?: ExpenseHeader | null
     loading?: boolean
+    /** Id de línea (`expense_detail`) para scroll al abrir desde la grilla. */
+    focusDetailId?: number | null
     /** Pre-asigna domiciliario (p. ej. liquidación). */
     presetDeliverymanId?: number | null
     /** No crear abono automático al guardar (el abono va en la liquidación). */
@@ -412,6 +415,7 @@ interface Props {
 const props = withDefaults(defineProps<Props>(), {
     editingExpense: null,
     loading: false,
+    focusDetailId: null,
     presetDeliverymanId: null,
     skipAutoAdvance: false,
 })
@@ -794,6 +798,7 @@ const initializeForm = async () => {
             selectedDeliverymanId.value = null
         }
         syncLineNotesVisibilityFromDetails()
+        await scrollToFocusedExpenseLine()
     } else {
         applyVat.value = false
         editExpensePaymentSnapshot.value = null
@@ -815,6 +820,16 @@ const initializeForm = async () => {
         }
         syncLineNotesVisibilityFromDetails()
     }
+}
+
+async function scrollToFocusedExpenseLine() {
+    const id = props.focusDetailId
+    if (id == null || id <= 0) return
+    await nextTick()
+    requestAnimationFrame(() => {
+        const el = document.querySelector(`[data-expense-line-id="${id}"]`)
+        el?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    })
 }
 
 watch([() => props.isOpen, () => props.editingExpense], async () => {

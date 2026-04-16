@@ -39,8 +39,8 @@
                 <ExpenseDetailsAgGrid class="flex-1 min-h-0 min-w-0" :row-data="gridRowData" :loading="loading"
                     :initial-column-state="columnState" @summary-change="onSummaryChange"
                     @column-state-change="onColumnStateChange"
-                    @view-detail="handleViewDetailByHeaderId" @edit="handleEditByHeaderId"
-                    @delete-header="handleDeleteByHeaderId" @invoice-click="handleViewDetailByHeaderId" />
+                    @view-detail="handleViewDetailByHeaderId" @edit-detail="handleEditDetailLine"
+                    @delete-detail="handleDeleteDetailLine" @invoice-click="handleViewDetailByHeaderId" />
 
                 <div v-if="!loading && totalPages > 1"
                     class="flex-shrink-0 flex flex-wrap items-center justify-between gap-2 bg-gray-50 px-3 py-2 rounded-lg border border-gray-200">
@@ -86,14 +86,37 @@
             @edit="handleEditFromDetail" />
 
         <ExpenseFormModal v-if="showFormModal" :is-open="showFormModal" :editing-expense="editingExpense"
-            :loading="submitting" @close="closeFormModal" @submit="handleSubmitExpense" />
+            :focus-detail-id="formFocusDetailId" :loading="submitting" @close="closeFormModal"
+            @submit="handleSubmitExpense" />
+
+        <BaseDialog :model-value="showDeleteLineConfirm" title="Confirmar eliminación" size="md"
+            @update:model-value="onDeleteLineDialogUpdate">
+            <p v-if="deleteLinePending" class="text-sm text-gray-700">
+                <template v-if="deleteLinePending.mode === 'full'">
+                    Esta es la única línea de la factura
+                    <span class="font-semibold">#{{ deleteLinePending.headerId }}</span>.
+                    ¿Eliminar la factura completa?
+                </template>
+                <template v-else>
+                    ¿Eliminar esta línea del gasto?
+                </template>
+            </p>
+            <template #footer>
+                <BaseButton variant="secondary" :disabled="deleteLineExecuting" @click="closeDeleteLineConfirm">
+                    Cancelar
+                </BaseButton>
+                <BaseButton variant="danger" :loading="deleteLineExecuting" @click="confirmDeleteDetailLine">
+                    Eliminar
+                </BaseButton>
+            </template>
+        </BaseDialog>
     </MainLayout>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
 import type { ColumnState } from 'ag-grid-community'
-import type { ExpenseHeader } from '@/types/expense'
+import type { ExpenseHeader, UpdateExpenseHeaderDto } from '@/types/expense'
 import { expenseHeaderApi } from '@/services/MainAPI/expenseHeaderApi'
 import { useExpenseFilters, type ExpenseFilterState } from '@/composables/useExpenseFilters'
 import { useToast } from '@/composables/useToast'
@@ -114,6 +137,7 @@ import ExpenseDetailModal from '@/components/expenses/ExpenseDetailModal.vue'
 import ExpenseFormModal from '@/components/expenses/ExpenseFormModal.vue'
 import BaseSelect from '@/components/ui/BaseSelect.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
+import BaseDialog from '@/components/ui/BaseDialog.vue'
 import { PlusIcon, ChevronLeftIcon, ChevronRightIcon } from '@heroicons/vue/24/outline'
 
 const { applyAllFilters } = useExpenseFilters()
@@ -154,6 +178,8 @@ const showDetailModal = ref(false)
 const showFormModal = ref(false)
 const selectedExpense = ref<ExpenseHeader | null>(null)
 const editingExpense = ref<ExpenseHeader | null>(null)
+/** Línea de detalle a enfocar al abrir el formulario desde la grilla. */
+const formFocusDetailId = ref<number | null>(null)
 
 const summary = ref({ totalAmount: 0, rowCount: 0 })
 const columnState = ref<ColumnState[] | null>(stored.columnState)
@@ -424,43 +450,134 @@ const handleViewDetailByHeaderId = async (headerId: number) => {
     }
 }
 
-const handleEditByHeaderId = async (headerId: number) => {
+const handleEditByHeaderId = async (headerId: number, opts?: { focusDetailId?: number | null }) => {
+    formFocusDetailId.value = opts?.focusDetailId ?? null
     try {
         const fresh = await expenseHeaderApi.getExpenseHeaderById(headerId)
         editingExpense.value = normalizeExpense(fresh)
         showFormModal.value = true
+    } catch (err: unknown) {
+        formFocusDetailId.value = null
+        const msg = err instanceof Error ? err.message : 'Error desconocido'
+        error('Error al cargar el gasto', msg)
+    }
+}
+
+const handleEditDetailLine = (payload: { headerId: number; detailId: number }) => {
+    void handleEditByHeaderId(payload.headerId, { focusDetailId: payload.detailId })
+}
+
+const handleEditFromDetail = () => {
+    const id = selectedExpense.value?.id
+    if (id == null) return
+    closeDetailModal()
+    void handleEditByHeaderId(id)
+}
+
+type DeleteLinePending = {
+    mode: 'full' | 'line'
+    headerId: number
+    detailId: number
+    header: ExpenseHeader
+}
+
+const showDeleteLineConfirm = ref(false)
+const deleteLinePending = ref<DeleteLinePending | null>(null)
+const deleteLineExecuting = ref(false)
+
+function closeDeleteLineConfirm() {
+    if (deleteLineExecuting.value) return
+    showDeleteLineConfirm.value = false
+    deleteLinePending.value = null
+}
+
+function onDeleteLineDialogUpdate(open: boolean) {
+    if (!open) closeDeleteLineConfirm()
+}
+
+const handleDeleteDetailLine = async (payload: { headerId: number; detailId: number }) => {
+    const { headerId, detailId } = payload
+    try {
+        const header = normalizeExpense(await expenseHeaderApi.getExpenseHeaderById(headerId))
+        const line = header.expenseDetails.find(d => d.id === detailId)
+        if (!line) {
+            error('Línea no encontrada', 'Recarga la lista e inténtalo de nuevo.')
+            return
+        }
+
+        deleteLinePending.value = {
+            mode: header.expenseDetails.length === 1 ? 'full' : 'line',
+            headerId,
+            detailId,
+            header,
+        }
+        showDeleteLineConfirm.value = true
     } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : 'Error desconocido'
         error('Error al cargar el gasto', msg)
     }
 }
 
-const handleEditFromDetail = () => {
-    if (selectedExpense.value) {
-        closeDetailModal()
-        handleEditByHeaderId(selectedExpense.value.id)
-    }
-}
+const confirmDeleteDetailLine = async () => {
+    const pending = deleteLinePending.value
+    if (!pending) return
 
-const handleDeleteByHeaderId = async (headerId: number) => {
-    if (!confirm(`¿Estás seguro de eliminar el gasto #${headerId}?`)) {
-        return
-    }
-
+    const { headerId, detailId, header, mode } = pending
+    deleteLineExecuting.value = true
     try {
-        await expenseHeaderApi.deleteExpenseHeader(headerId)
-        success('Gasto eliminado', 5000, 'El gasto se eliminó exitosamente')
+        if (mode === 'full') {
+            await expenseHeaderApi.deleteExpenseHeader(headerId)
+            success('Factura eliminada', 5000, 'Se eliminó el gasto completo.')
+            expenses.value = expenses.value.filter(e => e.id !== headerId)
+            totalCount.value = Math.max(0, totalCount.value - 1)
+            if (selectedExpense.value?.id === headerId) {
+                closeDetailModal()
+            }
+        } else {
+            const remaining = header.expenseDetails.filter(d => d.id !== detailId)
+            const includeVat = Number(header.vatAmount ?? 0) > 0.01
+            const updatePayload: UpdateExpenseHeaderDto = {
+                includeVat,
+                notes: header.notes ?? null,
+                expenseDetails: remaining.map(d => {
+                    const lineNotes = (d.notes || '').trim()
+                    return {
+                        id: d.id,
+                        expenseId: d.expenseId,
+                        quantity: d.quantity,
+                        amount: Math.round(Number(d.amount)),
+                        total: d.total != null ? Number(d.total) : undefined,
+                        ...(lineNotes ? { notes: lineNotes.slice(0, 1000) } : { notes: null }),
+                    }
+                }),
+            }
 
-        expenses.value = expenses.value.filter(e => e.id !== headerId)
-        totalCount.value = Math.max(0, totalCount.value - 1)
+            const updated = normalizeExpense(await expenseHeaderApi.updateExpenseHeader(headerId, updatePayload))
+            success('Línea eliminada', 5000, 'Se actualizó la factura.')
+
+            const idx = expenses.value.findIndex(e => e.id === headerId)
+            if (idx !== -1) {
+                const next = [...expenses.value]
+                next[idx] = updated
+                expenses.value = next
+            }
+            if (selectedExpense.value?.id === headerId) {
+                selectedExpense.value = updated
+            }
+        }
+        showDeleteLineConfirm.value = false
+        deleteLinePending.value = null
     } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : 'Error desconocido'
         error('Error al eliminar', msg)
+    } finally {
+        deleteLineExecuting.value = false
     }
 }
 
 const openCreateModal = () => {
     editingExpense.value = null
+    formFocusDetailId.value = null
     showFormModal.value = true
 }
 
@@ -472,6 +589,7 @@ const closeDetailModal = () => {
 const closeFormModal = () => {
     showFormModal.value = false
     editingExpense.value = null
+    formFocusDetailId.value = null
 }
 
 const handleSubmitExpense = (expense: ExpenseHeader) => {
