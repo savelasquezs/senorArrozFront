@@ -641,6 +641,7 @@ import { useBanksStore } from '@/store/banks'
 import { useAppsStore } from '@/store/apps'
 import { useAuthStore } from '@/store/auth'
 import { useToast } from '@/composables/useToast'
+import { defaultBusinessCalendar } from '@/utils/datetime'
 import MainLayout from '@/components/layout/MainLayout.vue'
 import BaseCard from '@/components/ui/BaseCard.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
@@ -901,11 +902,7 @@ const totalCustomers = computed(() => {
 })
 
 const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('es-CO', {
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric'
-    })
+    return defaultBusinessCalendar.formatDateLong(dateString)
 }
 
 const formatCurrency = (value: number) => {

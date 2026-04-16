@@ -397,7 +397,7 @@ import ExpenseCategoryFormModal from '@/components/expenses/ExpenseCategoryFormM
 import ExpenseForm from '@/components/expenses/ExpenseForm.vue'
 import { PlusIcon, TrashIcon, SparklesIcon, ChatBubbleLeftRightIcon } from '@heroicons/vue/24/outline'
 import { distributeExpenseBankPaymentsProportionally } from '@/utils/expenseBankDistribution'
-import { todayYmd } from '@/utils/datetime'
+import { todayYmd, defaultBusinessCalendar } from '@/utils/datetime'
 
 interface Props {
     isOpen: boolean
@@ -556,11 +556,7 @@ function onExpenseFormCancel() {
 const formatLastUsedAt = (value?: string | null) => {
     if (!value) return ''
     try {
-        return new Date(value).toLocaleDateString('es-CO', {
-            day: '2-digit',
-            month: 'short',
-            year: 'numeric'
-        })
+        return defaultBusinessCalendar.formatDayShortMonthYear(value)
     } catch {
         return ''
     }

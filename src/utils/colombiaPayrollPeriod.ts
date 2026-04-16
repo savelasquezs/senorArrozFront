@@ -1,16 +1,9 @@
-import { DEFAULT_BUSINESS_TIMEZONE } from '@/utils/datetime/constants'
+import { defaultBusinessCalendar } from '@/utils/datetime'
 
-/** Fecha calendario Colombia (America/Bogota). */
+/** Fecha calendario en zona de negocio (America/Bogotá). */
 export function getColombiaYmdParts(): { y: number; m: number; d: number } {
-	const fmt = new Intl.DateTimeFormat('en-CA', {
-		timeZone: DEFAULT_BUSINESS_TIMEZONE,
-		year: 'numeric',
-		month: '2-digit',
-		day: '2-digit',
-	})
-	const parts = fmt.formatToParts(new Date())
-	const n = (t: string) => Number(parts.find((p) => p.type === t)?.value ?? 0)
-	return { y: n('year'), m: n('month'), d: n('day') }
+	const { year, monthIndex, day } = defaultBusinessCalendar.zonedCalendarParts(Date.now())
+	return { y: year, m: monthIndex + 1, d: day }
 }
 
 export function toYmd(y: number, m: number, d: number): string {

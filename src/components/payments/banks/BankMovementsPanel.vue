@@ -244,6 +244,7 @@ import { bankTransferApi } from '@/services/MainAPI/bankTransferApi'
 import type { BankBalanceBreakdown, BankPayment, DeliverymanBankAdvanceLine, ExpenseBankPaymentLine } from '@/types/bank'
 import type { BankTransfer } from '@/types/cashRegister'
 import { formatYmdBogota } from '@/utils/colombiaDate'
+import { defaultBusinessCalendar } from '@/utils/datetime'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseLoading from '@/components/ui/BaseLoading.vue'
 
@@ -342,10 +343,7 @@ function formatCurrency(value: number) {
 }
 
 function formatDateTime(iso: string) {
-    return new Date(iso).toLocaleString('es-CO', {
-        dateStyle: 'short',
-        timeStyle: 'short',
-    })
+    return defaultBusinessCalendar.formatDateTimeCompact(iso)
 }
 
 async function loadSummary() {

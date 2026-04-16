@@ -2,6 +2,8 @@ export { DEFAULT_BUSINESS_TIMEZONE } from './constants'
 export {
 	addZonedCalendarMonths,
 	addZonedDays,
+	createBusinessCalendar,
+	defaultBusinessCalendar,
 	endOfZonedDayAsDate,
 	endOfZonedMonthContaining,
 	formatYmd,
@@ -11,5 +13,6 @@ export {
 	todayYmd,
 	zonedCalendarParts,
 	zonedDayFromPickerLocalDate,
+	type BusinessCalendar,
 	type BusinessTimeZone,
 } from './businessCalendar'

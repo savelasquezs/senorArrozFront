@@ -17,6 +17,7 @@ import type { DashboardSectionId } from '@/views/dashboard/dashboardSectionIds';
 import type { DeliveryDashboardPayload } from '@/services/MainAPI/dashboardSectionApi';
 import { buildDeliveryEvolutionBundle, scaleSeriesToTargetSum } from '@/utils/deliveryEvolutionSeries';
 import { ClipboardDocumentListIcon, CurrencyDollarIcon, UsersIcon } from '@heroicons/vue/24/outline';
+import { defaultBusinessCalendar } from '@/utils/datetime';
 
 export interface UseDashboardShellMockStateOptions {
 	/** Sucursal activa para domicilios, medias y (opcional) series de ventas. */
@@ -240,13 +241,7 @@ export function useDashboardShellMockState(options: UseDashboardShellMockStateOp
 	const salesByDayBase = computed<SalesTimeSeriesBlock>(() => {
 		const [from, to] = evolutionDateRange.value;
 		const dayList = daysInclusive(from, to, 62);
-		const labels = dayList.map((d: Date) =>
-			d.toLocaleDateString('es-CO', {
-				weekday: 'short',
-				day: 'numeric',
-				month: 'short',
-			}),
-		);
+		const labels = dayList.map((d: Date) => defaultBusinessCalendar.formatWeekdayDayShortMonth(d));
 		const seedBase = Math.abs(Math.floor(from.getTime() / 86400000) % 97);
 		const names = ventasComparisonRows.value.map((b) => b.name);
 		return {
@@ -284,9 +279,7 @@ export function useDashboardShellMockState(options: UseDashboardShellMockStateOp
 	const salesByMonthBase = computed<SalesTimeSeriesBlock>(() => {
 		const [from, to] = evolutionDateRange.value;
 		const months = monthsInclusive(from, to, 36);
-		const labels = months.map((d: Date) =>
-			d.toLocaleDateString('es-CO', { month: 'short', year: 'numeric' }),
-		);
+		const labels = months.map((d: Date) => defaultBusinessCalendar.formatShortMonthYear(d));
 		const seedBase = Math.abs(Math.floor(from.getTime() / 86400000) % 97);
 		const names = ventasComparisonRows.value.map((b) => b.name);
 		return {
@@ -350,13 +343,7 @@ export function useDashboardShellMockState(options: UseDashboardShellMockStateOp
 	const ordersByDay = computed<OrdersPerHourBlock>(() => {
 		const [from, to] = evolutionDateRange.value;
 		const dayList = daysInclusive(from, to, 62);
-		const labels = dayList.map((d: Date) =>
-			d.toLocaleDateString('es-CO', {
-				weekday: 'short',
-				day: 'numeric',
-				month: 'short',
-			}),
-		);
+		const labels = dayList.map((d: Date) => defaultBusinessCalendar.formatWeekdayDayShortMonth(d));
 		const seedBase = Math.abs(Math.floor(from.getTime() / 86400000) % 97);
 		return {
 			labels,
@@ -383,9 +370,7 @@ export function useDashboardShellMockState(options: UseDashboardShellMockStateOp
 	const ordersByMonth = computed<OrdersPerHourBlock>(() => {
 		const [from, to] = evolutionDateRange.value;
 		const months = monthsInclusive(from, to, 36);
-		const labels = months.map((d: Date) =>
-			d.toLocaleDateString('es-CO', { month: 'short', year: 'numeric' }),
-		);
+		const labels = months.map((d: Date) => defaultBusinessCalendar.formatShortMonthYear(d));
 		const seedBase = Math.abs(Math.floor(from.getTime() / 86400000) % 97);
 		return {
 			labels,
@@ -428,7 +413,7 @@ export function useDashboardShellMockState(options: UseDashboardShellMockStateOp
 		const hours = Math.floor(minutes / 60);
 		if (hours < 24) return `Hace ${hours} hora${hours > 1 ? 's' : ''}`;
 
-		return date.toLocaleDateString();
+		return defaultBusinessCalendar.formatDateShort(date);
 	}
 
 	return {

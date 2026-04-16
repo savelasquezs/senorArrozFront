@@ -91,6 +91,7 @@ enum UserRole {
 - **Zona de negocio por defecto**: El calendario operativo de la aplicación web (filtros por día, presets del dashboard, historial de domiciliario, gastos, etc.) se interpreta en la zona IANA **`America/Bogota`**. Colombia no aplica horario de verano; el offset efectivo es **UTC−05:00**.
 - **Cadenas `YYYY-MM-DD`**: Cuando el front envía o muestra solo fecha sin hora, ese valor corresponde al **día calendario en `America/Bogota`**, no al día local del navegador del usuario.
 - **Instantes ISO / hora**: Los timestamps completos (`createdAt`, `reservedFor`, etc.) siguen siendo instantes en el tiempo; el backend y el front los serializan típicamente en ISO 8601 (UTC). La zona de Bogotá se usa para decidir **qué día calendario** agrupa un evento en reportes y filtros por fecha.
+- **Texto visible de fecha y hora**: Los listados, tablas, dashboard y modales que muestran fechas u horas al usuario deben usar los formateadores centralizados del front (`defaultBusinessCalendar` / `useFormatting`), alineados a la **misma** zona IANA que el calendario operativo (`America/Bogota`), salvo excepciones puntuales documentadas en código.
 - **Extensión futura**: Si una sucursal definiera otra zona horaria en configuración, las mismas reglas aplicarían usando ese identificador IANA en el núcleo de fechas del front; hoy el valor fijo es `America/Bogota`.
 
 ## 🍽️ Sistema de Pedidos

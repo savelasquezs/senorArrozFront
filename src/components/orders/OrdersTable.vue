@@ -275,6 +275,7 @@ import {
     orderListRecipientDisplayName,
     orderListRecipientDisplayTitle,
 } from '@/utils/orderRecipientDisplay'
+import { defaultBusinessCalendar } from '@/utils/datetime'
 import { useToast } from '@/composables/useToast'
 import { orderApi } from '@/services/MainAPI/orderApi'
 import { orderCashToCollect, sumPaymentsAmounts } from '@/utils/orderCashToCollect'
@@ -377,25 +378,9 @@ async function copyCustomerPhone(order: OrderListItem) {
     }
 }
 
-// Formatear solo fecha
-const formatDate = (dateString: string): string => {
-    const date = new Date(dateString)
-    return date.toLocaleDateString('es-CO', {
-        day: '2-digit',
-        month: '2-digit',
-        year: 'numeric'
-    })
-}
+const formatDate = (dateString: string): string => defaultBusinessCalendar.formatDateShort(dateString)
 
-// Formatear solo hora
-const formatTime = (dateString: string): string => {
-    const date = new Date(dateString)
-    return date.toLocaleTimeString('es-CO', {
-        hour: '2-digit',
-        minute: '2-digit',
-        hour12: true
-    })
-}
+const formatTime = (dateString: string): string => defaultBusinessCalendar.formatTime12h(dateString)
 
 const showVerifyBankActions = (order: OrderListItem): boolean =>
     permissions.canVerifyPayments() && order.status !== 'cancelled'

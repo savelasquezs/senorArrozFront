@@ -193,6 +193,7 @@
 
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
+import { defaultBusinessCalendar } from '@/utils/datetime'
 import BaseDialog from '@/components/ui/BaseDialog.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import { cashRegisterApi } from '@/services/MainAPI/cashRegisterApi'
@@ -229,10 +230,7 @@ function formatCurrency(value: number): string {
 }
 
 function formatDate(iso: string): string {
-  return new Date(iso).toLocaleString('es-CO', {
-    dateStyle: 'medium',
-    timeStyle: 'short',
-  })
+  return defaultBusinessCalendar.formatDateMediumTime(iso)
 }
 
 function parseDenominationCounts(raw: string): Record<number, number> {

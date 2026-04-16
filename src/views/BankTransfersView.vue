@@ -165,6 +165,7 @@
 </template>
 
 <script setup lang="ts">
+import { defaultBusinessCalendar } from '@/utils/datetime'
 import { ref, computed, onMounted } from 'vue'
 import MainLayout from '@/components/layout/MainLayout.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
@@ -224,7 +225,7 @@ function formatCurrency(value: number): string {
 }
 
 function formatDate(iso: string): string {
-  return new Date(iso).toLocaleString('es-CO', { dateStyle: 'short', timeStyle: 'short' })
+  return defaultBusinessCalendar.formatDateTimeCompact(iso)
 }
 
 async function loadTransfers() {

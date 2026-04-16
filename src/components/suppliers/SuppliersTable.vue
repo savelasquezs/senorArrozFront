@@ -106,6 +106,7 @@ import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseLoading from '@/components/ui/BaseLoading.vue'
 import PhoneNumberItem from '@/components/customers/PhoneNumberItem.vue'
 import { PlusIcon, PencilIcon, TrashIcon } from '@heroicons/vue/24/outline'
+import { defaultBusinessCalendar } from '@/utils/datetime'
 
 interface Props {
     list: PagedResult<Supplier> | null
@@ -127,10 +128,6 @@ defineEmits<{
 }>()
 
 const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('es-CO', {
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric'
-    })
+    return defaultBusinessCalendar.formatDayShortMonthYear(dateString)
 }
 </script>

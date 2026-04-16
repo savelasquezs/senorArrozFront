@@ -178,6 +178,7 @@ import BaseInput from '@/components/ui/BaseInput.vue'
 import BaseLoading from '@/components/ui/BaseLoading.vue'
 import StatsCard from '@/components/ui/StatsCard.vue'
 import ExpenseCategoryFormModal from '@/components/expenses/ExpenseCategoryFormModal.vue'
+import { defaultBusinessCalendar } from '@/utils/datetime'
 
 const { success, error: showError } = useToast()
 
@@ -208,11 +209,7 @@ const categoriesWithoutExpenses = computed(() => {
 
 // Methods
 const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('es-CO', {
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric'
-    })
+    return defaultBusinessCalendar.formatDayShortMonthYear(dateString)
 }
 
 const load = async () => {

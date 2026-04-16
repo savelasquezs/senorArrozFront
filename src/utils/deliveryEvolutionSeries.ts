@@ -9,6 +9,7 @@ import {
 	startOfDay,
 } from '@/components/dashboard/dashboardDateUtils';
 import { dayCountInclusive } from '@/utils/dashboardPeriodPresets';
+import { defaultBusinessCalendar } from '@/utils/datetime';
 
 export interface DeliveryEvolutionSeries {
 	labels: string[];
@@ -61,13 +62,7 @@ export function buildDeliveryEvolutionBundle(range: [Date, Date]): DeliveryEvolu
 		);
 	} else if (nDays <= 45) {
 		const dayList = daysInclusive(from, to, 62);
-		labels = dayList.map((d) =>
-			d.toLocaleDateString('es-CO', {
-				weekday: 'short',
-				day: 'numeric',
-				month: 'short',
-			}),
-		);
+		labels = dayList.map((d) => defaultBusinessCalendar.formatWeekdayDayShortMonth(d));
 		deliveries = dayList.map((_, i) =>
 			Math.max(4, Math.round(18 + pseudoRandom(seed, i) * 22 + Math.sin(i * 0.45) * 12)),
 		);
@@ -78,9 +73,7 @@ export function buildDeliveryEvolutionBundle(range: [Date, Date]): DeliveryEvolu
 		for (let i = 0; i < dayList.length; i += 7) {
 			const chunk = dayList.slice(i, i + 7);
 			const first = chunk[0]!;
-			labels.push(
-				`Sem. ${first.toLocaleDateString('es-CO', { day: 'numeric', month: 'short' })}`,
-			);
+			labels.push(`Sem. ${defaultBusinessCalendar.formatDayShortMonth(first)}`);
 			const chunkSum = chunk.reduce(
 				(acc, _, j) => acc + Math.max(8, Math.round(80 + pseudoRandom(seed, i + j) * 60)),
 				0,
@@ -89,9 +82,7 @@ export function buildDeliveryEvolutionBundle(range: [Date, Date]): DeliveryEvolu
 		}
 	} else {
 		const monthList = monthsInclusive(from, to, 36);
-		labels = monthList.map((d) =>
-			d.toLocaleDateString('es-CO', { month: 'short', year: 'numeric' }),
-		);
+		labels = monthList.map((d) => defaultBusinessCalendar.formatShortMonthYear(d));
 		deliveries = monthList.map((_, i) =>
 			Math.max(120, Math.round(400 + pseudoRandom(seed, i + 100) * 280 + i * 40)),
 		);

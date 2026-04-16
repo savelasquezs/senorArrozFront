@@ -10,6 +10,7 @@ import {
 	defaultDateRangeLastFortnight,
 } from '@/components/dashboard/dashboardDateUtils';
 import type { DashboardTimeGranularity } from '@/views/dashboard/dashboardGlobalFilters';
+import { defaultBusinessCalendar } from '@/utils/datetime';
 
 export const GRANULARITY_TAB_LABELS: Record<DashboardTimeGranularity, string> = {
 	day: 'Día',
@@ -95,7 +96,7 @@ export function fortnightLabelForDate(d: Date): string {
 	const y = d.getFullYear();
 	const m = d.getMonth();
 	const day = d.getDate();
-	const monthShort = d.toLocaleDateString('es-CO', { month: 'short' });
+	const monthShort = defaultBusinessCalendar.formatMonthShort(d);
 	if (day <= 15) return `1–15 ${monthShort} ${y}`;
 	const last = new Date(y, m + 1, 0).getDate();
 	return `16–${last} ${monthShort} ${y}`;

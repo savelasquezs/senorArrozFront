@@ -154,6 +154,7 @@ import {
 } from '@heroicons/vue/24/outline'
 
 import type { ProductCategory, ProductCategoryFormData } from '@/types/product'
+import { defaultBusinessCalendar } from '@/utils/datetime'
 
 const CATEGORIES_PAGE_SIZE = 50
 
@@ -208,11 +209,7 @@ const categoriesWithoutProducts = computed(() =>
 )
 
 const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('es-CO', {
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric'
-    })
+    return defaultBusinessCalendar.formatDayShortMonthYear(dateString)
 }
 
 const loadAll = async () => {

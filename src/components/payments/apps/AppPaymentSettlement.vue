@@ -136,6 +136,7 @@
 import { ref, computed } from 'vue'
 import { useToast } from '@/composables/useToast'
 import type { AppPayment } from '@/types/bank'
+import { defaultBusinessCalendar } from '@/utils/datetime'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseBadge from '@/components/ui/BaseBadge.vue'
 import {
@@ -259,14 +260,5 @@ const formatCurrency = (value: number) => {
     }).format(value)
 }
 
-const formatDate = (dateString: string) => {
-    const date = new Date(dateString)
-    return date.toLocaleDateString('es-CO', {
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit'
-    })
-}
+const formatDate = (dateString: string) => defaultBusinessCalendar.formatDateMediumTime(dateString)
 </script>

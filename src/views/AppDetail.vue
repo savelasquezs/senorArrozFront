@@ -224,6 +224,7 @@ import { useAppPaymentsStore } from '@/store/appPayments'
 import { useAuthStore } from '@/store/auth'
 import { useToast } from '@/composables/useToast'
 import type { AppPayment } from '@/types/bank'
+import { defaultBusinessCalendar } from '@/utils/datetime'
 import type { UpdateAppDto } from '@/types/bank'
 
 // Components
@@ -297,13 +298,7 @@ const formatCurrency = (amount: number) => {
 }
 
 const formatDate = (date: string) => {
-    return new Date(date).toLocaleDateString('es-CO', {
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-    })
+    return defaultBusinessCalendar.formatDateMediumTime(date)
 }
 
 const fetchAppData = async () => {
