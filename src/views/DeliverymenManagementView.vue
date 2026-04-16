@@ -62,21 +62,41 @@
                     />
                 </div>
             </div>
-        <!-- Mapa GPS en tiempo real -->
+            <!-- Mapa GPS: chunk y APIs solo tras "Ver ubicaciones" -->
             <div class="mt-6">
-                <div class="flex items-center justify-between mb-3">
+                <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-3">
                     <h2 class="text-lg font-semibold text-gray-900 flex items-center gap-2">
                         <span class="w-2.5 h-2.5 rounded-full"
-                            :class="Object.keys(driverLocations).length > 0 ? 'bg-emerald-500 animate-pulse' : 'bg-gray-300'">
+                            :class="liveMapActivated && Object.keys(driverLocations).length > 0 ? 'bg-emerald-500 animate-pulse' : 'bg-gray-300'">
                         </span>
                         Ubicación en tiempo real
                     </h2>
-                    <span v-if="Object.keys(driverLocations).length === 0" class="text-xs text-gray-400">
+                    <template v-if="!liveMapActivated">
+                        <BaseButton size="sm" variant="outline" @click="activateLiveMap" :loading="liveMapBootstrapping"
+                            :disabled="loading || deliverymenStats.length === 0">
+                            Ver ubicaciones
+                        </BaseButton>
+                    </template>
+                    <span v-else-if="Object.keys(driverLocations).length === 0" class="text-xs text-gray-400">
                         Sin señal GPS activa
                     </span>
                 </div>
-                <div class="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
-                    <DeliveryMap
+
+                <div v-if="!liveMapActivated"
+                    class="rounded-xl border border-dashed border-gray-200 bg-gray-50/80 px-4 py-8 text-center text-sm text-gray-500">
+                    <p class="max-w-md mx-auto">
+                        El mapa y las consultas de ubicación no se cargan hasta que pulses <strong>Ver ubicaciones</strong>.
+                        Así la página abre más rápido.
+                    </p>
+                </div>
+
+                <div v-else class="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
+                    <div v-if="liveMapBootstrapping" class="flex items-center justify-center gap-2 py-16 text-sm text-gray-500">
+                        <ArrowPathIcon class="w-5 h-5 animate-spin" />
+                        Cargando mapa y ubicaciones…
+                    </div>
+                    <DeliveryMapAsync
+                        v-else
                         :orders="mapOrders"
                         :deliveryman-locations="driverLocations"
                     />
@@ -131,7 +151,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, computed } from 'vue'
+import { ref, onMounted, onUnmounted, computed, defineAsyncComponent } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/store/auth'
 import { useToast } from '@/composables/useToast'
@@ -151,9 +171,11 @@ import DeliverymanDetailModal from '@/components/deliverymen/DeliverymanDetailMo
 import LiquidationWizardModal from '@/components/deliverymen/LiquidationWizardModal.vue'
 import LiquidationConfirmModal from '@/components/deliverymen/LiquidationConfirmModal.vue'
 import DeliverymanOrdersModal from '@/components/deliverymen/DeliverymanOrdersModal.vue'
-import DeliveryMap, { type DriverLocation } from '@/components/delivery/DeliveryMap.vue'
+import type { DriverLocation } from '@/components/delivery/DeliveryMap.vue'
 import { ArrowPathIcon, TruckIcon } from '@heroicons/vue/24/outline'
 import { todayYmd } from '@/utils/datetime'
+
+const DeliveryMapAsync = defineAsyncComponent(() => import('@/components/delivery/DeliveryMap.vue'))
 
 const router = useRouter()
 const authStore = useAuthStore()
@@ -181,6 +203,10 @@ const ordersModalDeliveryman = ref<{ id: number; name: string } | null>(null)
 const editingAdvance = ref<DeliverymanAdvance | null>(null)
 const selectedDeliverymanDetail = ref<DeliverymanDetail | null>(null)
 const liquidatedDeliveryman = ref<{ name: string; amount: number; baseAmount: number } | null>(null)
+
+/** Mapa: montaje del componente (chunk) y APIs GPS/pedidos solo tras el clic del usuario. */
+const liveMapActivated = ref(false)
+const liveMapBootstrapping = ref(false)
 
 const ordersDraftsStore = useOrdersDraftsStore()
 
@@ -347,13 +373,29 @@ const startPolling = () => {
     }, 30_000)
 }
 
+async function activateLiveMap() {
+    if (liveMapActivated.value || deliverymenStats.value.length === 0) return
+    liveMapActivated.value = true
+    liveMapBootstrapping.value = true
+    try {
+        const list = deliverymenStats.value
+        await refreshDriverLocationsFromApi(list)
+        await loadMapOrdersForDeliverymen(list)
+        startPolling()
+    } catch (err: any) {
+        error('Error al cargar ubicaciones', err.message)
+    } finally {
+        liveMapBootstrapping.value = false
+    }
+}
+
 const stopPolling = () => {
     if (_pollInterval) { clearInterval(_pollInterval); _pollInterval = null }
 }
 
 // ─── Carga de datos ──────────────────────────────────────────────────────────
 
-// Cargar datos: una sola llamada a getDailyOverview
+// Cargar datos: getDailyOverview; mapa (ubicaciones + pedidos) solo si ya se activó
 const loadData = async () => {
     loading.value = true
     try {
@@ -363,8 +405,21 @@ const loadData = async () => {
         })
         deliverymenStatsRaw.value = overview.deliverymen
         advances.value = overview.advances
-        await refreshDriverLocationsFromApi(overview.deliverymen)
-        await loadMapOrdersForDeliverymen(overview.deliverymen)
+        if (liveMapActivated.value) {
+            const forMap = deliverymenStats.value
+            if (forMap.length === 0) {
+                driverLocations.value = {}
+                mapOrdersFetched.value = []
+                stopPolling()
+            } else {
+                await refreshDriverLocationsFromApi(forMap)
+                await loadMapOrdersForDeliverymen(forMap)
+            }
+        } else {
+            driverLocations.value = {}
+            mapOrdersFetched.value = []
+            stopPolling()
+        }
     } catch (err: any) {
         error('Error al cargar datos', err.message)
     } finally {
@@ -507,9 +562,10 @@ onMounted(() => {
     ordersDraftsStore.loadBanks()
     loadData()
 
-    // Escuchar actualizaciones de GPS en tiempo real
+    // GPS en tiempo real solo con mapa activo y domiciliario presente en el resumen del día
     on('DeliverymanLocationUpdate', (data: any) => {
-        if (!data?.deliverymanId) return
+        if (!liveMapActivated.value || !data?.deliverymanId) return
+        if (!deliverymenStats.value.some((s) => s.deliverymanId === data.deliverymanId)) return
         const stat = deliverymenStats.value.find(s => s.deliverymanId === data.deliverymanId)
         const t = new Date(data.recordedAt).getTime()
         const cur = driverLocations.value[data.deliverymanId]
@@ -526,8 +582,6 @@ onMounted(() => {
             },
         }
     })
-
-    startPolling()
 })
 
 onUnmounted(() => {
