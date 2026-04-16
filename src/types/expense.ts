@@ -44,6 +44,21 @@ export interface ExpenseDetail {
     updatedAt: string
 }
 
+/** Fila aplanada (detalle + datos del encabezado) para la grilla de gastos. */
+export interface ExpenseDetailGridRow {
+    detailId: number
+    headerId: number
+    createdAt: string
+    categoryName: string
+    expenseName: string
+    supplierName: string
+    quantity: number
+    amount: number
+    total: number
+    notes: string
+    createdByName: string
+}
+
 export interface ExpenseBankPayment {
     id: number
     expenseHeaderId: number
