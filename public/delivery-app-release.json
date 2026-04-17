@@ -1,8 +1,8 @@
 {
-  "versionName": "1.1.0",
-  "buildNumber": 3,
+  "versionName": "1.2.0",
+  "buildNumber": 4,
   "apkFileName": "senor-arroz-domiciliarios.apk",
   "apkUrl": "/senor-arroz-domiciliarios.apk",
   "minimumBuild": 1,
-  "message": "Versión 1.1.0: conexión en tiempo real más estable al reabrir la app o volver del segundo plano; en el mapa de dirección aparece «Usar ubicación actual» con claridad. Descarga el APK e instálalo encima de la actual (no hace falta desinstalar)."
+  "message": "Versión 1.2.0: aviso de nueva versión en inicio cuando hay un APK más reciente publicado (configurable por URL del manifiesto); descarga del APK en el navegador. Descarga el APK e instálalo encima de la actual (no hace falta desinstalar)."
 }
