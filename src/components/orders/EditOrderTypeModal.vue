@@ -237,10 +237,13 @@ async function persistTypeChange() {
         if (prepareAtDate.value) {
             updateData.prepareAt = prepareAtDate.value
         }
-    }
-
-    if (props.order.type === 'reservation' && selectedType.value !== 'reservation') {
-        updateData.reservedFor = null
+    } else if (props.order.type === 'reservation' && selectedType.value !== 'reservation') {
+        if (props.order.reservedFor) {
+            updateData.reservedFor = new Date(props.order.reservedFor)
+        }
+        if (props.order.prepareAt) {
+            updateData.prepareAt = new Date(props.order.prepareAt)
+        }
     }
 
     if (props.order.type === 'delivery' && selectedType.value !== 'delivery') {

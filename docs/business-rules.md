@@ -86,6 +86,16 @@ enum UserRole {
 - **Geolocalización**: Vista con Google Maps de pedidos "OnTheWay" asignados
 - **Entrega automática**: Opción de marcar como entregado al estar a 20m o menos del destino 
 
+## Zona horaria y fechas de negocio
+
+- **Persistencia**: Los instantes (`CreatedAt`, `ReservedFor`, etc.) se guardan y comparan como **UTC** en base de datos y en la API (timestamptz).
+- **Día operativo y “hoy”**: Cualquier regla de negocio que dependa del **día calendario** (mismo día que la creación, “solo hoy”, filtros por fecha de operación, liquidaciones, rangos por defecto cuando el usuario no envía fechas) usa el calendario de **America/Bogotá** (Colombia, UTC−5 fijo salvo cambio normativo).
+- **Backend**: Centralizar en `ColombiaTimeHelper` (`SenorArroz.Application`): conversión a fecha calendario Colombia, rangos UTC por día(s) en Colombia (`GetColombiaCalendarDateRangeUtc`), `IsColombiaTodayFromUtc`, `IsSameColombiaCalendarDay`, etc. **No** usar `_clock.UtcNow.Date` ni `timestampUtc.Date` para definir “hoy” o “mismo día” de negocio.
+- **Frontend**: Para mostrar o enviar fechas de negocio usar `America/Bogotá` (p. ej. `Intl` con `timeZone: 'America/Bogota'`, utilidades en `src/utils/colombiaDate.ts` / `DateTimeService`).
+- **Evitar**: Tomar solo `toISOString().slice(0, 10)` sin zona Bogotá para “hoy”; mezclar el calendario del reloj del PC del usuario con reglas que deben ser siempre Colombia.
+- **Gestión de domiciliarios y liquidación (filtro por fecha)**: En el resumen diario, el detalle por domiciliario, la liquidación del día, el listado paginado del modal de pedidos y la nómina/insights que suman domicilio por período, los pedidos **entregados** se filtran por el **instante en que se marcó entregado** (`status_times.delivered` en base de datos, en UTC), dentro del rango del día o período elegido. **No** se usa para ese filtro la fecha de creación del pedido ni `reserved_for`. Si aplica liquidación parcial en el día, el recorte “después de la última liquidación” se aplica **después** sobre ese conjunto (misma lógica de ciclo que ya existía).
+- **Quién aparece en gestión de domiciliarios (`daily-overview`)**: domiciliarios con al menos un pedido **Delivered** cuya entrega cae en el período seleccionado **o** al menos un pedido **OnTheWay** (delivery u onsite) con domiciliario asignado. Las cifras de cuadre en la tarjeta pueden seguir usando el ciclo de liquidación parcial.
+
 ## 🍽️ Sistema de Pedidos
 
 ### Tipos de Pedido
@@ -109,13 +119,16 @@ enum UserRole {
 
 #### Reservation (Reservación)
 - **Cliente**: Opcional
-- **Dirección**: Obligatoria solo si es delivery
+- **Dirección**: Opcional en creación (reserva en local). Si el usuario **selecciona** una dirección del cliente, el front debe enviar `addressId` y `delivery_fee` coherentes con esa dirección al crear el pedido, para persistir el dato y permitir pasar el pedido a domicilio sin perder la ubicación.
+- **Nota**: Una reserva con fecha programada que nace desde el flujo **Delivery + “para más tarde”** sigue exigiendo dirección como en Delivery.
 - **guestName**: Obligatorio (auto-completado con nombre del cliente si existe, editable)
 - **Fecha/Hora**: Campo `reservedFor` obligatorio
 - **Validación**: No se puede crear sin fecha/hora y guestName
 - **Status inicial**: `'taken'`
 - **Contabilidad**: Se suma en las ventas del día de entrega (no de creación)
 - **Validación**: No se puede crear sin fecha/hora de entrega
+- **Reserva → en preparación (cocina)**: al pasar de `taken` a `in_preparation`, el backend puede fijar el tipo final (`delivery` si hay `address_id`, `onsite` si no). Las **líneas del pedido** deben conservarse; ese paso no debe borrar ni reemplazar productos.
+- **Cambio manual de tipo (reserva → domicilio o en el local)**: si el pedido ya tenía `reserved_for` y `prepare_at`, deben **conservarse** (mismo horario de entrega y de aparición en cocina), salvo que en ese mismo flujo el usuario edite esas fechas.
 
 ### Totales al crear pedido (API)
 
@@ -191,6 +204,9 @@ CANCELLED  CANCELLED   CANCELLED  CANCELLED
 #### Gastos
 - **Efectivo puro**: Si no hay `expense_bank_payment` → 100% efectivo
 - **Movimientos internos**: Entre bancos y caja-bancos usando `bank_payment` (income) y `expense_bank_payment` (outcome)
+
+### Cuadre de caja (total esperado global)
+- **Fórmula**: `(C0 + B0 + L0) + ventas del período − gastos del período`, donde `C0+B0+L0` es el total de apertura del último cierre (efectivo + saldos bancarios del cuadre + snapshot de préstamos informales en ese cierre). El esperado **no** suma aparte el total actual de préstamos activos (`L1`): el snapshot `L0` ya está en la apertura. El API sigue devolviendo `informalLoansActiveTotal` como referencia para el conteo físico al cerrar.
 
 ## 👤 Gestión de Clientes
 

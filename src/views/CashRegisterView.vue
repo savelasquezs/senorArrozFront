@@ -786,7 +786,7 @@ const saveBlockReason = computed(() => {
   if (bankReconciliations.value.length === 0) return 'No hay bancos configurados para esta sucursal.'
   if (!allBanksCuadred.value) return 'Hay bancos con diferencia distinta de $0'
   if (!globalCuadred.value)
-    return 'El balance global (caja + bancos + préstamos activos) no coincide con el esperado del período.'
+    return 'El total global contado (caja + bancos + préstamos activos) no coincide con el esperado (apertura + ventas − gastos).'
   return ''
 })
 

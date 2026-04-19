@@ -72,11 +72,17 @@ export function useOrderSubmission() {
             dto.customerId = draft.customerId
         }
 
-        if (draft.addressId && draft.type === 'delivery') {
+        if (
+            draft.addressId &&
+            (draft.type === 'delivery' || draft.type === 'reservation')
+        ) {
             dto.addressId = draft.addressId
         }
 
-        if (draft.type === 'delivery') {
+        if (
+            draft.type === 'delivery' ||
+            (draft.type === 'reservation' && draft.addressId)
+        ) {
             dto.deliveryFee = draft.deliveryFee ?? 0
         }
 
