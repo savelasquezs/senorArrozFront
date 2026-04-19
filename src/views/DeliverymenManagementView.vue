@@ -131,6 +131,7 @@
             :detail="selectedDeliverymanDetail"
             :selected-date="selectedDate"
             :bank-options="bankOptions"
+            @detail-refresh-requested="refreshSelectedDeliverymanDetail"
             @success="handleSettleSuccess"
         />
 
@@ -446,6 +447,22 @@ const handleViewDetail = async (deliverymanId: number) => {
         showDetailModal.value = false
     } finally {
         loadingDetail.value = false
+    }
+}
+
+/** Actualiza stats/pedidos tras abonos o gastos (p. ej. liquidación: crear gasto con abono automático). */
+const refreshSelectedDeliverymanDetail = async () => {
+    const d = selectedDeliverymanDetail.value
+    if (!d) return
+    try {
+        const overrideBase = baseAmounts.value.get(d.deliverymanId)
+        const detail = await deliverymanApi.getDaySummary(d.deliverymanId, {
+            date: selectedDate.value,
+            ...(overrideBase != null ? { baseAmount: overrideBase } : {}),
+        })
+        selectedDeliverymanDetail.value = detail
+    } catch (err: any) {
+        error('No se pudo actualizar el resumen del domiciliario', err.message)
     }
 }
 

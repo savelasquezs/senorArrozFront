@@ -135,6 +135,8 @@ const props = defineProps<{
 
 const emit = defineEmits<{
     success: [result: SettleDeliverymanDayResultDto]
+    /** Tras crear un gasto puede crearse abono automático; el padre debe volver a cargar getDaySummary. */
+    'detail-refresh-requested': []
 }>()
 
 function close() {
@@ -226,6 +228,7 @@ function onExpenseCreated(expense: ExpenseHeader) {
         amount: total,
         label: expense.supplierName || 'Gasto',
     })
+    emit('detail-refresh-requested')
 }
 
 async function submit(mode: 1 | 2) {
