@@ -110,6 +110,7 @@ import type { PagedResult } from '@/types/common'
 import { TagIcon, CurrencyDollarIcon, PlusIcon, PencilIcon, TrashIcon } from '@heroicons/vue/24/outline'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseLoading from '@/components/ui/BaseLoading.vue'
+import { defaultBusinessCalendar } from '@/utils/datetime'
 
 interface Props {
     list: PagedResult<ExpenseCategory> | null
@@ -129,11 +130,7 @@ defineEmits<{
 }>()
 
 const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('es-CO', {
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric'
-    })
+    return defaultBusinessCalendar.formatDayShortMonthYear(dateString)
 }
 </script>
 

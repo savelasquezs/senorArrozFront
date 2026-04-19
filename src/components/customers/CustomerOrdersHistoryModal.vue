@@ -51,6 +51,7 @@ import BaseDialog from '@/components/ui/BaseDialog.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseLoading from '@/components/ui/BaseLoading.vue'
 import CustomerOrdersHistoryTable from '@/components/customers/CustomerOrdersHistoryTable.vue'
+import { formatYmd, todayYmd } from '@/utils/datetime'
 
 const props = defineProps<{
     open: boolean
@@ -73,10 +74,10 @@ const unrestrictedDateRange = ref(false)
 
 const registrationDateStr = computed(() => {
     if (!props.customer?.createdAt) return ''
-    return new Date(props.customer.createdAt).toLocaleDateString('en-CA', { timeZone: 'America/Bogota' })
+    return formatYmd(props.customer.createdAt)
 })
 
-const todayStr = () => new Date().toLocaleDateString('en-CA', { timeZone: 'America/Bogota' })
+const todayStr = () => todayYmd()
 
 function onOpenChange(val: boolean) {
     if (!val) emit('close')
@@ -129,9 +130,7 @@ async function fetchOrders() {
             excludeFutureReservations: false,
         }
         if (!unrestrictedDateRange.value && props.customer.createdAt) {
-            body.fromDate = new Date(props.customer.createdAt).toLocaleDateString('en-CA', {
-                timeZone: 'America/Bogota',
-            })
+            body.fromDate = formatYmd(props.customer.createdAt)
             body.toDate = todayStr()
         }
 

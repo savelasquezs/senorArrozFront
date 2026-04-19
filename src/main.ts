@@ -1,8 +1,11 @@
 import { createApp } from 'vue'
 import router from './router'
 import { createPinia } from 'pinia'
+import { ModuleRegistry, AllCommunityModule } from 'ag-grid-community'
 import './style.css'
 import App from './App.vue'
+
+ModuleRegistry.registerModules([AllCommunityModule])
 
 // Global error handler for unhandled promise rejections and errors
 window.addEventListener('unhandledrejection', (event) => {

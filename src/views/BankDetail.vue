@@ -351,6 +351,7 @@ import { useBankPaymentsStore } from '@/store/bankPayments'
 import { useAuthStore } from '@/store/auth'
 import { useToast } from '@/composables/useToast'
 import type { App, BankDetail, BankPayment } from '@/types/bank'
+import { defaultBusinessCalendar } from '@/utils/datetime'
 import type { CreateAppDto, UpdateAppDto } from '@/types/bank'
 
 // Components
@@ -412,13 +413,7 @@ const formatCurrency = (amount: number) => {
 }
 
 const formatDate = (date: string) => {
-    return new Date(date).toLocaleDateString('es-CO', {
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-    })
+    return defaultBusinessCalendar.formatDateMediumTime(date)
 }
 
 const fetchBankData = async () => {

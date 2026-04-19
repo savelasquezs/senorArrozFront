@@ -54,6 +54,7 @@ import {
 	type DashboardPeriodPresetId,
 	type DashboardPeriodValue,
 } from '@/utils/dashboardPeriodPresets';
+import { defaultBusinessCalendar } from '@/utils/datetime';
 
 const props = defineProps<{
 	modelValue: DashboardPeriodValue;
@@ -71,7 +72,7 @@ const lastCustomRange = ref<[Date, Date] | null>(null);
 const formattedRange = computed(() => {
 	const [a, b] = props.modelValue.range;
 	const same = a.getTime() === b.getTime();
-	const f = (d: Date) => d.toLocaleDateString('es-CO', { day: 'numeric', month: 'short', year: 'numeric' });
+	const f = (d: Date) => defaultBusinessCalendar.formatDayShortMonthYear(d);
 	return same ? f(a) : `${f(a)} — ${f(b)}`;
 });
 

@@ -554,6 +554,7 @@ import DeliveryAdvanceLoanModal from '@/components/cashRegister/DeliveryAdvanceL
 import BankMovementsPanel from '@/components/payments/banks/BankMovementsPanel.vue'
 import { useAuthStore } from '@/store/auth'
 import { formatYmdBogota } from '@/utils/colombiaDate'
+import { defaultBusinessCalendar } from '@/utils/datetime'
 import {
   ArrowPathIcon,
   BanknotesIcon,
@@ -825,10 +826,7 @@ function formatCurrency(value: number): string {
 }
 
 function formatDate(iso: string): string {
-  return new Date(iso).toLocaleString('es-CO', {
-    dateStyle: 'medium',
-    timeStyle: 'short',
-  })
+  return defaultBusinessCalendar.formatDateMediumTime(iso)
 }
 
 function recalcClosingCash() {

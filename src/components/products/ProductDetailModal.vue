@@ -302,6 +302,7 @@ import {
     ScaleIcon,
 } from '@heroicons/vue/24/outline'
 import type { ProductFormData, ProductSalesUnitsEvolutionPoint } from '@/types/product'
+import { defaultBusinessCalendar } from '@/utils/datetime'
 
 const props = defineProps<{
     open: boolean
@@ -333,16 +334,9 @@ const productDetail = computed(() => store.currentDetail)
 
 const salesUnitsEvolutionSeries = computed(() => productDetail.value?.salesUnitsEvolution ?? [])
 
-/** Clave YYYY-MM en zona horaria América/Bogotá (alineado con operación en Colombia). */
+/** Clave YYYY-MM en zona de negocio (America/Bogotá). */
 function monthKeyColombia(iso: string): string {
-    const parts = new Intl.DateTimeFormat('en-CA', {
-        timeZone: 'America/Bogota',
-        year: 'numeric',
-        month: '2-digit',
-    }).formatToParts(new Date(iso))
-    const y = parts.find(p => p.type === 'year')?.value ?? '0'
-    const m = parts.find(p => p.type === 'month')?.value ?? '01'
-    return `${y}-${m}`
+    return defaultBusinessCalendar.formatYearMonth(iso)
 }
 
 function aggregateSalesByMonth(points: ProductSalesUnitsEvolutionPoint[]): ProductSalesUnitsEvolutionPoint[] {
@@ -372,13 +366,12 @@ const salesUnitsChartSeries = computed(() => {
 const salesUnitsChartLabels = computed(() => {
     if (salesHistoryGroupBy.value === 'day') {
         return salesUnitsChartSeries.value.map(p =>
-            new Date(p.bucketStart).toLocaleDateString('es-CO', { day: 'numeric', month: 'short' }),
+            defaultBusinessCalendar.formatDayShortMonth(p.bucketStart),
         )
     }
-    return salesUnitsChartSeries.value.map(p => {
-        const d = new Date(p.bucketStart)
-        return d.toLocaleDateString('es-CO', { month: 'short', year: 'numeric' })
-    })
+    return salesUnitsChartSeries.value.map(p =>
+        defaultBusinessCalendar.formatShortMonthYear(p.bucketStart),
+    )
 })
 
 const salesUnitsChartDatasets = computed<LineChartDataset[]>(() => [
@@ -395,8 +388,7 @@ const canAccessProduct = computed(() => {
     return false
 })
 
-const formatDate = (dateString: string) =>
-    new Date(dateString).toLocaleDateString('es-CO', { year: 'numeric', month: 'long', day: 'numeric' })
+const formatDate = (dateString: string) => defaultBusinessCalendar.formatDateLong(dateString)
 
 const formatWeightGrams = (grams: number | null | undefined) => {
     if (grams == null || grams <= 0) return 'Sin definir'

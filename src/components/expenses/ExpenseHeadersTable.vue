@@ -135,22 +135,11 @@ defineEmits<{
     sort: ['id' | 'total' | 'createdAt']
 }>()
 
-const { formatCurrency } = useFormatting()
+const { formatCurrency, formatDateShort, formatTime: formatTimeHm } = useFormatting()
 
-const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('es-CO', {
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric'
-    })
-}
+const formatDate = (dateString: string) => formatDateShort(dateString)
 
-const formatTime = (dateString: string) => {
-    return new Date(dateString).toLocaleTimeString('es-CO', {
-        hour: '2-digit',
-        minute: '2-digit'
-    })
-}
+const formatTime = (dateString: string) => formatTimeHm(dateString)
 
 const calculateTotal = (expense: ExpenseHeader) => {
     return expense.expenseDetails.reduce((sum, detail) => {

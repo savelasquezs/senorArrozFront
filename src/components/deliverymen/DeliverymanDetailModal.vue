@@ -281,6 +281,7 @@
 
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
+import { defaultBusinessCalendar } from '@/utils/datetime'
 import type {
     DeliverymanDetail,
     DeliverymanRouteDayStats,
@@ -341,12 +342,10 @@ function formatRouteKm(meters: number): string {
     return `${(meters / 1000).toFixed(1)} km`
 }
 
-const colTimeFmt: Intl.DateTimeFormatOptions = { timeStyle: 'short' }
-
 /** Solo hora (el modal ya está filtrado por fecha). */
 function formatColTime(iso: string | null | undefined): string {
     if (!iso) return '—'
-    return new Date(iso).toLocaleString('es-CO', colTimeFmt)
+    return defaultBusinessCalendar.formatTime(iso)
 }
 
 /** Diferencia real vs meta (segundos). */

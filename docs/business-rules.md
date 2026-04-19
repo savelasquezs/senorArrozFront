@@ -95,6 +95,11 @@ enum UserRole {
 - **Evitar**: Tomar solo `toISOString().slice(0, 10)` sin zona Bogotá para “hoy”; mezclar el calendario del reloj del PC del usuario con reglas que deben ser siempre Colombia.
 - **Gestión de domiciliarios y liquidación (filtro por fecha)**: En el resumen diario, el detalle por domiciliario, la liquidación del día, el listado paginado del modal de pedidos y la nómina/insights que suman domicilio por período, los pedidos **entregados** se filtran por el **instante en que se marcó entregado** (`status_times.delivered` en base de datos, en UTC), dentro del rango del día o período elegido. **No** se usa para ese filtro la fecha de creación del pedido ni `reserved_for`. Si aplica liquidación parcial en el día, el recorte “después de la última liquidación” se aplica **después** sobre ese conjunto (misma lógica de ciclo que ya existía).
 - **Quién aparece en gestión de domiciliarios (`daily-overview`)**: domiciliarios con al menos un pedido **Delivered** cuya entrega cae en el período seleccionado **o** al menos un pedido **OnTheWay** (delivery u onsite) con domiciliario asignado. Las cifras de cuadre en la tarjeta pueden seguir usando el ciclo de liquidación parcial.
+- **Cadenas solo fecha (`YYYY-MM-DD`)**: Cuando el front envía o muestra solo fecha sin hora, ese valor corresponde al **día calendario en `America/Bogota`**, no al día local del navegador del usuario.
+- **Instantes ISO**: Los timestamps completos (`createdAt`, `reservedFor`, etc.) son instantes en el tiempo; el backend y el front los serializan típicamente en **ISO 8601 (UTC)**. La zona de Bogotá se usa para decidir **qué día calendario** agrupa un evento en reportes y filtros por fecha.
+- **Texto visible en UI**: Listados, tablas, dashboard y modales que muestran fechas u horas deben usar los formateadores centralizados del front (`defaultBusinessCalendar` / `useFormatting`), alineados a la **misma** zona IANA que el calendario operativo (`America/Bogota`), salvo excepciones puntuales documentadas en código.
+- **Horario de verano**: Colombia **no** aplica horario de verano; el offset efectivo respecto a UTC es **UTC−05:00** (coherente con el "UTC−5 fijo" indicado arriba, salvo cambio normativo).
+- **Extensión futura**: Si una sucursal definiera otra zona horaria en configuración, las mismas reglas aplicarían usando ese identificador IANA en el núcleo de fechas del front; hoy el valor fijo es `America/Bogota`.
 
 ## 🍽️ Sistema de Pedidos
 
@@ -351,7 +356,7 @@ Validaciones implementadas antes de enviar un pedido al backend:
 - **Precisión**: Usar GPS para mayor precisión en la ubicación
 - **Batería**: Optimizar uso de batería con actualizaciones inteligentes
 - **Offline**: Funcionalidad básica sin conexión (caché de mapas)
-- **Privacidad**: Ubicación disponible para admin, superadmin y domicilirio.
+- **Privacidad**: Ubicación disponible para admin, superadmin y domiciliario.
 
 ### Estados de Ubicación
 - **Tracking activo**: Seguimiento en tiempo real de la ubicación

@@ -245,6 +245,7 @@ import {
 } from '@heroicons/vue/24/outline'
 
 import type { Customer, CustomerFilters, CustomerFormData } from '@/types/customer'
+import { defaultBusinessCalendar } from '@/utils/datetime'
 
 const store = useCustomersStore()
 const branchesStore = useBranchesStore()
@@ -313,7 +314,7 @@ function formatDateShort(dateString: string) {
     if (days === 1) return 'Ayer'
     if (days < 7) return `Hace ${days} días`
     if (days < 30) return `Hace ${Math.floor(days / 7)} sem.`
-    return date.toLocaleDateString('es-CO', { year: 'numeric', month: 'short', day: 'numeric' })
+    return defaultBusinessCalendar.formatDayShortMonthYear(date)
 }
 
 function canAccessCustomerRow(customer: Customer | null): boolean {

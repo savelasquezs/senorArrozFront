@@ -1,62 +1,108 @@
 <template>
-    <div class="bg-white rounded-lg shadow p-3 transition-shadow relative"
-        :class="stats.dayBlocked ? 'ring-2 ring-amber-300 opacity-95' : 'hover:shadow-md'">
-        <div v-if="stats.dayBlocked"
-            class="absolute top-2 right-2 px-2 py-0.5 rounded text-[10px] font-semibold bg-amber-100 text-amber-900">
-            Liquidado
-        </div>
-        <div class="flex items-start justify-between mb-2">
-            <div>
-                <h3 class="text-base font-semibold text-gray-900">{{ stats.deliverymanName }}</h3>
-                <button
-                type="button"
-                class="text-xs text-gray-500 hover:text-emerald-600 hover:underline cursor-pointer"
-                @click="$emit('orders-click', stats.deliverymanId)"
+    <div
+        class="group rounded-lg border bg-white p-2 sm:p-2.5 transition-shadow touch-manipulation"
+        :class="stats.dayBlocked
+            ? 'border-amber-200 ring-1 ring-amber-200/80 shadow-sm'
+            : 'border-gray-200 shadow-sm hover:shadow-md hover:border-gray-300'"
+    >
+        <!-- Fila 1: identidad + saldo -->
+        <div class="flex items-start gap-2 min-w-0">
+            <div class="min-w-0 flex-1">
+                <div class="flex items-center gap-1.5 flex-wrap min-w-0">
+                    <h3 class="text-sm font-semibold text-gray-900 truncate" :title="stats.deliverymanName">
+                        {{ stats.deliverymanName }}
+                    </h3>
+                    <span
+                        v-if="stats.dayBlocked"
+                        class="shrink-0 rounded px-1 py-px text-[9px] font-bold uppercase tracking-wide bg-amber-100 text-amber-900"
+                    >
+                        Liquidado
+                    </span>
+                </div>
+            </div>
+            <div
+                class="shrink-0 text-right"
+                :title="`Saldo a entregar: ${formatCurrency(stats.currentBalance)}`"
             >
-                {{ stats.ordersCount }} pedido(s)
-            </button>
-            </div>
-            <span :class="[
-                'px-2 py-1 rounded-full text-xs font-medium',
-                stats.currentBalance >= 0 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
-            ]">
-                {{ formatCurrency(stats.currentBalance) }}
-            </span>
-        </div>
-
-        <div class="space-y-1 mb-3">
-            <div class="flex justify-between text-xs">
-                <span class="text-gray-600">Efectivo:</span>
-                <span class="font-medium text-gray-900">{{ formatCurrency(stats.totalCash) }}</span>
-            </div>
-            <div class="flex justify-between text-xs">
-                <span class="text-gray-600">Abonos:</span>
-                <span class="font-medium text-orange-600">{{ formatCurrency(stats.totalAdvances) }}</span>
-            </div>
-            <div class="flex justify-between text-xs">
-                <span class="text-gray-600">Tiempo promedio:</span>
-                <span class="font-medium text-gray-900">{{ stats.averageDeliveryTime }} min</span>
+                <div class="text-[9px] font-medium uppercase tracking-wide text-gray-400">Saldo</div>
+                <div
+                    :class="[
+                        'text-sm font-bold tabular-nums leading-none',
+                        stats.currentBalance >= 0 ? 'text-emerald-700' : 'text-red-600',
+                    ]"
+                >
+                    {{ formatCurrency(stats.currentBalance) }}
+                </div>
             </div>
         </div>
 
-        <div class="mb-2">
-            <label class="block text-xs font-medium text-gray-700 mb-1">
-                Base inicial
+        <!-- Métricas en rejilla densa (misma info que antes) -->
+        <div
+            class="mt-2 grid grid-cols-2 sm:grid-cols-4 gap-x-2 gap-y-1.5 text-[11px] leading-tight border-t border-gray-100 pt-2"
+        >
+            <div class="min-w-0">
+                <div class="text-gray-500 truncate" title="Pedidos (entregas en el ciclo del día)">Pedidos</div>
+                <button
+                    type="button"
+                    class="mt-0.5 font-semibold text-emerald-700 hover:text-emerald-800 hover:underline text-left tabular-nums"
+                    @click="$emit('orders-click', stats.deliverymanId)"
+                >
+                    {{ stats.ordersCount }}
+                </button>
+            </div>
+            <div class="min-w-0" title="Efectivo recaudado">
+                <div class="text-gray-500 truncate">Efectivo</div>
+                <div class="mt-0.5 font-semibold text-gray-900 tabular-nums truncate">
+                    {{ formatCurrency(stats.totalCash) }}
+                </div>
+            </div>
+            <div class="min-w-0" title="Total abonos del período">
+                <div class="text-gray-500 truncate">Abonos</div>
+                <div class="mt-0.5 font-semibold text-orange-600 tabular-nums truncate">
+                    {{ formatCurrency(stats.totalAdvances) }}
+                </div>
+            </div>
+            <div class="min-w-0" title="Tiempo promedio de entrega">
+                <div class="text-gray-500 truncate">T. medio</div>
+                <div class="mt-0.5 font-semibold text-gray-900 tabular-nums">
+                    {{ stats.averageDeliveryTime }}&nbsp;min
+                </div>
+            </div>
+        </div>
+
+        <!-- Base + acciones en una fila -->
+        <div class="mt-2 flex flex-wrap items-end gap-2 border-t border-gray-100 pt-2">
+            <label class="flex flex-col gap-0.5 min-w-0 shrink-0">
+                <span class="text-[9px] font-medium uppercase tracking-wide text-gray-500">Base inicial</span>
+                <input
+                    :value="localBaseAmount"
+                    type="number"
+                    min="0"
+                    step="1000"
+                    class="w-[5.5rem] sm:w-24 rounded border border-gray-300 px-1.5 py-1 text-xs tabular-nums focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                    @input="handleBaseAmountChange"
+                />
             </label>
-            <input :value="localBaseAmount" @input="handleBaseAmountChange" type="number"
-                class="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                min="0" step="1000" />
-        </div>
-
-        <div class="flex flex-col gap-2">
-            <BaseButton @click="$emit('view-detail', stats.deliverymanId)" variant="outline" size="sm"
-                class="w-full text-xs">
-                Ver detalle
-            </BaseButton>
-            <BaseButton v-if="stats.dayBlocked" type="button" variant="secondary" size="sm" class="w-full text-xs"
-                @click="$emit('unlock-day', stats.deliverymanId)">
-                Desbloquear día
-            </BaseButton>
+            <div class="flex flex-wrap gap-1.5 ml-auto justify-end">
+                <BaseButton
+                    variant="outline"
+                    size="sm"
+                    class="!px-2 !py-1 text-[11px]"
+                    @click="$emit('view-detail', stats.deliverymanId)"
+                >
+                    Detalle
+                </BaseButton>
+                <BaseButton
+                    v-if="stats.dayBlocked"
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    class="!px-2 !py-1 text-[11px]"
+                    @click="$emit('unlock-day', stats.deliverymanId)"
+                >
+                    Desbloquear
+                </BaseButton>
+            </div>
         </div>
     </div>
 </template>
@@ -82,9 +128,12 @@ const emit = defineEmits<{
 const { formatCurrency } = useFormatting()
 const localBaseAmount = ref(props.stats.baseAmount)
 
-watch(() => props.stats.baseAmount, (newValue) => {
-    localBaseAmount.value = newValue
-})
+watch(
+    () => props.stats.baseAmount,
+    (newValue) => {
+        localBaseAmount.value = newValue
+    }
+)
 
 const handleBaseAmountChange = (event: Event) => {
     const value = parseInt((event.target as HTMLInputElement).value) || 0

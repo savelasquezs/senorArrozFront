@@ -179,6 +179,7 @@
 
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
+import { defaultBusinessCalendar } from '@/utils/datetime'
 import { XMarkIcon, ExclamationCircleIcon, CheckCircleIcon } from '@heroicons/vue/24/outline'
 import { reservationDepositApi } from '@/services/MainAPI/reservationDepositApi'
 import { bankApi } from '@/services/MainAPI/bankApi'
@@ -252,7 +253,7 @@ function formatCurrency(value: number) {
 }
 
 function formatDate(iso: string) {
-  return new Date(iso).toLocaleString('es-CO', { dateStyle: 'short', timeStyle: 'short' })
+  return defaultBusinessCalendar.formatDateTimeCompact(iso)
 }
 
 /** API serializa BankType con JsonStringEnumConverter + snake_case → p. ej. "normal". */

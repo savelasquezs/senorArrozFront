@@ -545,6 +545,7 @@ import type {
 	DashboardRouteHistoryItem,
 	DeliveryRouteDashboardMetrics,
 } from '@/services/MainAPI/dashboardSectionApi';
+import { defaultBusinessCalendar } from '@/utils/datetime';
 
 const branchId = defineModel<number | null>('branchId', { required: true });
 const deliveryEvolutionDriverId = defineModel<number | 'all'>('deliveryEvolutionDriverId', {
@@ -594,12 +595,7 @@ const props = withDefaults(
 
 const formattedDateRange = computed(() => {
 	const [a, b] = props.dateRange;
-	const opts: Intl.DateTimeFormatOptions = {
-		day: '2-digit',
-		month: 'short',
-		year: 'numeric',
-	};
-	return `${a.toLocaleDateString('es-CO', opts)} — ${b.toLocaleDateString('es-CO', opts)}`;
+	return `${defaultBusinessCalendar.formatDayPaddedShortMonthYear(a)} — ${defaultBusinessCalendar.formatDayPaddedShortMonthYear(b)}`;
 });
 
 function onBranchChange(e: Event) {
@@ -811,7 +807,7 @@ function formatMinutes1(n: number): string {
 function formatRouteClosedAt(iso: string | null): string {
 	if (!iso) return '—';
 	try {
-		return new Date(iso).toLocaleString('es-CO', { dateStyle: 'short', timeStyle: 'short' });
+		return defaultBusinessCalendar.formatDateTimeCompact(iso);
 	} catch {
 		return iso;
 	}

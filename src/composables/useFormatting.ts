@@ -5,6 +5,7 @@
  */
 
 import type { OrderStatus } from '@/types/order'
+import { defaultBusinessCalendar } from '@/utils/datetime'
 
 /** Clave en `statusTimes` del backend (C# guarda `InPreparation` → `inpreparation`). */
 export const orderStatusToStatusTimesKey = (status: OrderStatus): string => {
@@ -67,40 +68,49 @@ export const formatNumber = (number: number): string => {
 }
 
 /**
- * Formatea una fecha a formato legible
+ * Formatea una fecha a formato legible (zona de negocio + locale es).
  */
 export const formatDateTime = (date: string | Date): string => {
-    const dateObj = typeof date === 'string' ? new Date(date) : date
-    return new Intl.DateTimeFormat('es-CO', {
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit'
-    }).format(dateObj)
+    return defaultBusinessCalendar.formatDateTime(date)
 }
 
 /**
- * Formatea una fecha a formato corto
+ * Formatea una fecha a formato corto dd/MM/yyyy (zona de negocio).
  */
 export const formatDateShort = (date: string | Date): string => {
-    const dateObj = typeof date === 'string' ? new Date(date) : date
-    return new Intl.DateTimeFormat('es-CO', {
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit'
-    }).format(dateObj)
+    return defaultBusinessCalendar.formatDateShort(date)
 }
 
 /**
- * Formatea solo la hora de una fecha
+ * Formatea solo la hora HH:mm (zona de negocio).
  */
 export const formatTime = (date: string | Date): string => {
-    const dateObj = typeof date === 'string' ? new Date(date) : date
-    return new Intl.DateTimeFormat('es-CO', {
-        hour: '2-digit',
-        minute: '2-digit'
-    }).format(dateObj)
+    return defaultBusinessCalendar.formatTime(date)
+}
+
+/** Hora 12 h con sufijo a. m. / p. m. (zona de negocio). */
+export const formatTime12h = (date: string | Date): string => {
+    return defaultBusinessCalendar.formatTime12h(date)
+}
+
+/** Fecha larga sin hora (zona de negocio). */
+export const formatDateLong = (date: string | Date): string => {
+    return defaultBusinessCalendar.formatDateLong(date)
+}
+
+/** dd/MM/yyyy, HH:mm (zona de negocio). */
+export const formatDateTimeCompact = (date: string | Date): string => {
+    return defaultBusinessCalendar.formatDateTimeCompact(date)
+}
+
+/** Día y mes corto, p. ej. gráficos. */
+export const formatDayShortMonth = (date: string | Date): string => {
+    return defaultBusinessCalendar.formatDayShortMonth(date)
+}
+
+/** Mes y año cortos. */
+export const formatShortMonthYear = (date: string | Date): string => {
+    return defaultBusinessCalendar.formatShortMonthYear(date)
 }
 
 /**
@@ -201,8 +211,13 @@ export const useFormatting = () => {
         formatCurrency,
         formatNumber,
         formatDateTime,
+        formatDateLong,
         formatDateShort,
+        formatDateTimeCompact,
+        formatDayShortMonth,
+        formatShortMonthYear,
         formatTime,
+        formatTime12h,
         formatTimeAgo,
         formatTimeAgoCalendar,
         formatDurationInCurrentStatus,

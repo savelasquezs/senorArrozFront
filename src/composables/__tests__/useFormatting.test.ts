@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import {
     formatCurrency,
     formatNumber,
-    formatDate,
+    formatDateTime,
     formatDateShort,
     truncateText,
     capitalizeFirst
@@ -43,10 +43,10 @@ describe('useFormatting', () => {
         })
     })
 
-    describe('formatDate', () => {
+    describe('formatDateTime', () => {
         it('formats date string correctly', () => {
             const dateStr = '2024-01-15T14:30:00Z'
-            const formatted = formatDate(dateStr)
+            const formatted = formatDateTime(dateStr)
             expect(formatted).toContain('enero')
             expect(formatted).toContain('2024')
             expect(formatted).toContain('15')
@@ -54,7 +54,7 @@ describe('useFormatting', () => {
 
         it('formats Date object correctly', () => {
             const date = new Date('2024-01-15T14:30:00Z')
-            const formatted = formatDate(date)
+            const formatted = formatDateTime(date)
             expect(formatted).toContain('enero')
             expect(formatted).toContain('2024')
         })

@@ -204,6 +204,7 @@
 import type { OrderListItem } from '@/types/order'
 import BaseLoading from '@/components/ui/BaseLoading.vue'
 import { useFormatting } from '@/composables/useFormatting'
+import { defaultBusinessCalendar } from '@/utils/datetime'
 import {
     orderListRecipientDisplayName,
     orderListRecipientDisplayTitle,
@@ -237,22 +238,12 @@ const { formatCurrency } = useFormatting()
 
 const formatDate = (dateString: string | Date | null): string => {
     if (!dateString) return '—'
-    const date = new Date(dateString as string)
-    return date.toLocaleDateString('es-CO', {
-        day: '2-digit',
-        month: '2-digit',
-        year: 'numeric',
-    })
+    return defaultBusinessCalendar.formatDateShort(dateString as string)
 }
 
 const formatTime = (dateString: string | Date | null): string => {
     if (!dateString) return ''
-    const date = new Date(dateString as string)
-    return date.toLocaleTimeString('es-CO', {
-        hour: '2-digit',
-        minute: '2-digit',
-        hour12: true,
-    })
+    return defaultBusinessCalendar.formatTime12h(dateString as string)
 }
 
 const isUpcoming = (dateString: string | null): boolean => {

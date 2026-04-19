@@ -3,6 +3,7 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { orderApi } from '@/services/MainAPI/orderApi'
 import { deliverymanApi } from '@/services/MainAPI/deliverymanApi'
+import { todayYmd } from '@/utils/datetime'
 import type {
     DeliverymanHistoryBranchSummary,
     DeliverymanHistoryNeighborhood,
@@ -12,12 +13,9 @@ import type {
 /** Historial del modal: solo pedidos entregados (enum API .NET) */
 const HISTORY_STATUS_DELIVERED = 'Delivered'
 
-/** Fecha local YYYY-MM-DD (no UTC) para alinear con el calendario del domiciliario */
-function localDateString(d = new Date()): string {
-    const y = d.getFullYear()
-    const m = String(d.getMonth() + 1).padStart(2, '0')
-    const day = String(d.getDate()).padStart(2, '0')
-    return `${y}-${m}-${day}`
+/** Fecha calendario YYYY-MM-DD en zona de negocio (America/Bogotá). */
+function businessDateString(d = new Date()): string {
+    return todayYmd(d.getTime())
 }
 
 export const useDeliveryStore = defineStore('delivery', () => {
@@ -36,9 +34,9 @@ export const useDeliveryStore = defineStore('delivery', () => {
     const historyTotalCount = ref(0)
     const historyPage = ref(1)
     const historyPageSize = ref(100)
-    /** Rango del modal "Mi historial" (por defecto: hoy local) */
-    const historyFromDate = ref(localDateString())
-    const historyToDate = ref(localDateString())
+    /** Rango del modal "Mi historial" (por defecto: hoy en zona de negocio) */
+    const historyFromDate = ref(businessDateString())
+    const historyToDate = ref(businessDateString())
 
     /** Pestañas por sucursal (historial con fechas) */
     const historyBranchSummaries = ref<DeliverymanHistoryBranchSummary[]>([])
@@ -283,8 +281,8 @@ export const useDeliveryStore = defineStore('delivery', () => {
         historyNeighborhoodOptions.value = []
         historyModalRequestId.value = 0
         routeAssignedOrders.value = []
-        historyFromDate.value = localDateString()
-        historyToDate.value = localDateString()
+        historyFromDate.value = businessDateString()
+        historyToDate.value = businessDateString()
         error.value = null
         myDayBlocked.value = false
     }

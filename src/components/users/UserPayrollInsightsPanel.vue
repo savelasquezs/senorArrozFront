@@ -176,6 +176,7 @@ import { useFormatting } from '@/composables/useFormatting'
 import { useToast } from '@/composables/useToast'
 import { useAuthStore } from '@/store/auth'
 import { currentBiweekRangeYmd, currentMonthRangeYmd } from '@/utils/colombiaPayrollPeriod'
+import { defaultBusinessCalendar } from '@/utils/datetime'
 import BaseSelect from '@/components/ui/BaseSelect.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseLoading from '@/components/ui/BaseLoading.vue'
@@ -279,7 +280,7 @@ function onPickerRange(v: [Date, Date]) {
 }
 
 function formatDt(iso: string) {
-	return new Date(iso).toLocaleString('es-CO', { dateStyle: 'short', timeStyle: 'short' })
+	return defaultBusinessCalendar.formatDateTimeCompact(iso)
 }
 
 function scheduleLoad() {

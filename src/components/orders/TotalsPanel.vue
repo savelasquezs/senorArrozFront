@@ -91,6 +91,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import type { ActiveOrder } from '@/types/order'
+import { defaultBusinessCalendar } from '@/utils/datetime'
 
 // Icons
 import {
@@ -182,7 +183,7 @@ const orderSummaryInfo = computed(() => {
             }
         case 'reservation':
             return {
-                text: `Reservado para ${props.order.reservedFor ? new Date(props.order.reservedFor).toLocaleString('es-CO') : 'fecha por definir'}`,
+                text: `Reservado para ${props.order.reservedFor ? defaultBusinessCalendar.formatDateTime(props.order.reservedFor) : 'fecha por definir'}`,
                 icon: 'CalendarIcon'
             }
         default:

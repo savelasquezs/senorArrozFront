@@ -117,6 +117,7 @@ import {
 	aggregateCategoryEvolutionPointsByFortnight,
 	fortnightLabelForDate,
 } from '@/views/dashboard/dashboardGranularityBuckets';
+import { defaultBusinessCalendar } from '@/utils/datetime';
 
 const props = defineProps<{
 	branchId: number | null;
@@ -172,8 +173,8 @@ const hasPie = computed(() => pieValues.value.some((v) => v > 0));
 function formatBucketLabel(iso: string, g: 'day' | 'month' | 'year'): string {
 	const d = new Date(iso);
 	if (Number.isNaN(d.getTime())) return iso;
-	if (g === 'day') return d.toLocaleDateString('es-CO', { day: 'numeric', month: 'short' });
-	if (g === 'month') return d.toLocaleDateString('es-CO', { month: 'short', year: 'numeric' });
+	if (g === 'day') return defaultBusinessCalendar.formatDayShortMonth(d);
+	if (g === 'month') return defaultBusinessCalendar.formatShortMonthYear(d);
 	return String(d.getFullYear());
 }
 

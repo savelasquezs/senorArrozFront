@@ -24,6 +24,7 @@ import {
 	type DashboardSalesProductsApiResponse,
 } from './dashboardApi';
 import type { SalesTimeSeriesBlock, OrdersPerHourBlock } from '@/components/dashboard';
+import { endOfZonedDayAsDate, startOfZonedDayAsDate } from '@/utils/datetime';
 
 const MOCK_LATENCY_MS = 60;
 
@@ -95,12 +96,10 @@ export async function fetchPrincipalDashboard(
 	return mapPrincipalFromApi(raw);
 }
 
-/** Rango de periodo del dashboard → query `from`/`to` en UTC (inicio/fin de día local inclusive). */
+/** Rango de periodo del dashboard → query `from`/`to` en UTC (inicio/fin de día en zona de negocio inclusive). */
 export function encodeDashboardRangeToApi(range: [Date, Date]): { from: string; to: string } {
-	const from = new Date(range[0]);
-	from.setHours(0, 0, 0, 0);
-	const to = new Date(range[1]);
-	to.setHours(23, 59, 59, 999);
+	const from = startOfZonedDayAsDate(range[0]);
+	const to = endOfZonedDayAsDate(range[1]);
 	return { from: from.toISOString(), to: to.toISOString() };
 }
 

@@ -148,6 +148,7 @@ import { expenseCategoryApi } from '@/services/MainAPI/expenseCategoryApi';
 import { expenseApi } from '@/services/MainAPI/expenseApi';
 import type { Expense } from '@/types/expense';
 import type { GastosDashboardPayload } from '@/composables/dashboard/useDashboardGastosSection';
+import { defaultBusinessCalendar } from '@/utils/datetime';
 
 const props = defineProps<{
 	loading: boolean;
@@ -247,13 +248,10 @@ const lineLabels = computed(() => {
 	const raw = props.payload?.timeSeries?.labels ?? [];
 	return raw.map((l) => {
 		if (/^\d{4}-\d{2}-\d{2}$/.test(l)) {
-			const d = new Date(`${l}T12:00:00`);
-			return d.toLocaleDateString('es-CO', { day: '2-digit', month: 'short' });
+			return defaultBusinessCalendar.formatDayPaddedShortMonth(l);
 		}
 		if (/^\d{4}-\d{2}$/.test(l)) {
-			const [y, m] = l.split('-').map(Number);
-			const d = new Date(y, m - 1, 1);
-			return d.toLocaleDateString('es-CO', { month: 'short', year: 'numeric' });
+			return defaultBusinessCalendar.formatShortMonthYear(l);
 		}
 		return l;
 	});

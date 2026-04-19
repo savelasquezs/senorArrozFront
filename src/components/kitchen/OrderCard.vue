@@ -117,6 +117,7 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import type { OrderListItem, OrderDetailItem } from '@/types/order'
 import { KitchenService } from '@/services/domain/KitchenService'
+import { defaultBusinessCalendar } from '@/utils/datetime'
 import { orderListRecipientDisplayName } from '@/utils/orderRecipientDisplay'
 import { ClockIcon, HomeIcon, TruckIcon, CalendarIcon, CheckIcon, MapPinIcon, ShoppingBagIcon, UserIcon } from '@heroicons/vue/24/outline'
 import BaseBadge from '@/components/ui/BaseBadge.vue'
@@ -156,12 +157,7 @@ const formattedPrepareAtStart = computed(() => {
     if (props.variant !== 'kitchen' || props.order.type !== 'reservation' || !props.order.prepareAt) return ''
     const d = new Date(props.order.prepareAt as string)
     if (Number.isNaN(d.getTime())) return ''
-    return d.toLocaleString('es-CO', {
-        weekday: 'short',
-        hour: '2-digit',
-        minute: '2-digit',
-        timeZone: 'America/Bogota',
-    })
+    return defaultBusinessCalendar.formatWeekdayShortTime(d)
 })
 
 const orderTypeIcon = computed(() => {

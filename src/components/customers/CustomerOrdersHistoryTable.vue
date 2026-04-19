@@ -120,6 +120,7 @@ import OrderStatusBadge from '@/components/orders/OrderStatusBadge.vue'
 import OrderTypeBadge from '@/components/orders/OrderTypeBadge.vue'
 import BaseLoading from '@/components/ui/BaseLoading.vue'
 import { useFormatting, getStatusTimeFromRecord } from '@/composables/useFormatting'
+import { defaultBusinessCalendar } from '@/utils/datetime'
 
 const props = defineProps<{
     orders: OrderListItem[]
@@ -131,11 +132,9 @@ const props = defineProps<{
 
 const { formatCurrency } = useFormatting()
 
-const formatDate = (dateString: string): string =>
-    new Date(dateString).toLocaleDateString('es-CO', { day: '2-digit', month: '2-digit', year: 'numeric' })
+const formatDate = (dateString: string): string => defaultBusinessCalendar.formatDateShort(dateString)
 
-const formatTime = (dateString: string): string =>
-    new Date(dateString).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit', hour12: true })
+const formatTime = (dateString: string): string => defaultBusinessCalendar.formatTime12h(dateString)
 
 function productLines(orderId: number): { q: number; name: string }[] {
     const lines = props.orderLinesById[orderId]

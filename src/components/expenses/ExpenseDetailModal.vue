@@ -157,28 +157,14 @@ defineEmits<{
     'edit': []
 }>()
 
-const { formatCurrency } = useFormatting()
+const { formatCurrency, formatDateShort, formatTime12h } = useFormatting()
 
 const totalBankPayments = computed(() => {
     if (!props.expense) return 0
     return props.expense.expenseBankPayments.reduce((sum, payment) => sum + Number(payment.amount), 0)
 })
 
-const formatDate = (dateString: string): string => {
-    const date = new Date(dateString)
-    return date.toLocaleDateString('es-CO', {
-        day: '2-digit',
-        month: '2-digit',
-        year: 'numeric'
-    })
-}
+const formatDate = (dateString: string): string => formatDateShort(dateString)
 
-const formatTime = (dateString: string): string => {
-    const date = new Date(dateString)
-    return date.toLocaleTimeString('es-CO', {
-        hour: '2-digit',
-        minute: '2-digit',
-        hour12: true
-    })
-}
+const formatTime = (dateString: string): string => formatTime12h(dateString)
 </script>

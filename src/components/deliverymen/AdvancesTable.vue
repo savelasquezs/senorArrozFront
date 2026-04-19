@@ -101,6 +101,7 @@
 import { computed } from 'vue'
 import type { DeliverymanAdvance } from '@/types/deliveryman.ts'
 import { useFormatting } from '@/composables/useFormatting'
+import { defaultBusinessCalendar } from '@/utils/datetime'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import { PlusIcon, PencilIcon, TrashIcon, BanknotesIcon } from '@heroicons/vue/24/outline'
 
@@ -115,28 +116,16 @@ const emit = defineEmits<{
     'delete-advance': [advance: DeliverymanAdvance]
 }>()
 
-const { formatCurrency } = useFormatting()
+const { formatCurrency, formatTime: formatTimeHm } = useFormatting()
 
 const totalAdvances = computed(() => {
     return props.advances.reduce((sum, advance) => sum + advance.amount, 0)
 })
 
-const formatDate = (dateString: string): string => {
-    const date = new Date(dateString)
-    return date.toLocaleDateString('es-CO', { 
-        day: '2-digit', 
-        month: 'short', 
-        year: 'numeric' 
-    })
-}
+const formatDate = (dateString: string): string =>
+    defaultBusinessCalendar.formatDayPaddedShortMonthYear(dateString)
 
-const formatTime = (dateString: string): string => {
-    const date = new Date(dateString)
-    return date.toLocaleTimeString('es-CO', { 
-        hour: '2-digit', 
-        minute: '2-digit' 
-    })
-}
+const formatTime = (dateString: string): string => formatTimeHm(dateString)
 
 const handleDelete = (advance: DeliverymanAdvance) => {
     if (confirm(`¿Estás seguro de eliminar este abono de ${formatCurrency(advance.amount)} para ${advance.deliverymanName}?`)) {

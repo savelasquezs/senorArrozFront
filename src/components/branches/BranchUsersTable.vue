@@ -145,6 +145,7 @@ import {
     ChartBarIcon
 } from '@heroicons/vue/24/outline'
 import type { BranchUserSummary } from '@/types/common'
+import { defaultBusinessCalendar } from '@/utils/datetime'
 
 interface Props {
     users: BranchUserSummary[]
@@ -242,11 +243,7 @@ const formatLastLogin = (lastLogin?: string) => {
     } else if (diffInHours < 48) {
         return 'Ayer'
     } else {
-        return date.toLocaleDateString('es-CO', {
-            day: 'numeric',
-            month: 'short',
-            year: 'numeric'
-        })
+        return defaultBusinessCalendar.formatDayShortMonthYear(date)
     }
 }
 
