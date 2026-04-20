@@ -1,73 +1,79 @@
 <template>
-    <div class="space-y-4 sm:space-y-6">
-        <div v-if="allOrders.length > 0 && showStatusActions" class="bg-gray-50 p-3 sm:p-4 rounded-lg space-y-2 sm:space-y-3">
+    <div class="space-y-3 sm:space-y-4">
+        <div v-if="allOrders.length > 0 && showStatusActions" class="bg-gray-50 p-2 sm:p-3 rounded-lg space-y-1.5 sm:space-y-2">
             <!-- Controles de selección y contador -->
-            <div class="flex items-center justify-between flex-wrap gap-2">
-                <div class="flex items-center gap-2 sm:gap-3 md:gap-4">
-                    <button @click="selectAll" class="text-xs sm:text-sm text-emerald-600 hover:text-emerald-700 font-medium whitespace-nowrap">
+            <div class="flex items-center justify-between flex-wrap gap-1.5">
+                <div class="flex items-center gap-1.5 sm:gap-2">
+                    <button @click="selectAll" class="text-xs text-emerald-600 hover:text-emerald-700 font-medium whitespace-nowrap">
                         Seleccionar todos
                     </button>
-                    <button @click="clearSelection" class="text-xs sm:text-sm text-gray-600 hover:text-gray-700 font-medium whitespace-nowrap">
+                    <button @click="clearSelection" class="text-xs text-gray-600 hover:text-gray-700 font-medium whitespace-nowrap">
                         Limpiar
                     </button>
-                    <span v-if="selectedOrders.size > 0" class="text-xs sm:text-sm text-gray-600 whitespace-nowrap">
+                    <span v-if="selectedOrders.size > 0" class="text-xs text-gray-600 whitespace-nowrap">
                         {{ selectedOrders.size }} seleccionado(s)
                     </span>
                 </div>
             </div>
 
             <!-- Botones de acción -->
-            <div v-if="canMoveToPreparation || canMoveToReady" class="flex items-center gap-2 flex-wrap">
+            <div v-if="canMoveToPreparation || canMoveToReady" class="flex items-center gap-1.5 flex-wrap">
                 <BaseButton v-if="canMoveToPreparation" @click="handleChangeStatus('in_preparation')" variant="primary"
                     size="sm" class="flex-1 sm:flex-none">
-                    <span class="flex items-center gap-1 sm:gap-2 justify-center">
-                        <ArrowRightIcon class="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                        <span class="text-xs sm:text-sm">Pasar a Preparación</span>
+                    <span class="flex items-center gap-1 justify-center">
+                        <ArrowRightIcon class="w-3.5 h-3.5" />
+                        <span class="text-xs">Pasar a Preparación</span>
                     </span>
                 </BaseButton>
 
                 <BaseButton v-if="canMoveToReady" @click="handleChangeStatus('ready')" variant="success" size="sm"
                     class="flex-1 sm:flex-none">
-                    <span class="flex items-center gap-1 sm:gap-2 justify-center">
-                        <CheckIcon class="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                        <span class="text-xs sm:text-sm">Marcar como Listo</span>
+                    <span class="flex items-center gap-1 justify-center">
+                        <CheckIcon class="w-3.5 h-3.5" />
+                        <span class="text-xs">Marcar como Listo</span>
                     </span>
                 </BaseButton>
             </div>
         </div>
 
         <div v-if="takenOrders.length > 0">
-            <h3 class="text-base sm:text-lg font-semibold text-gray-900 mb-2 sm:mb-3 flex items-center gap-1.5 sm:gap-2">
-                <span class="w-2.5 h-2.5 sm:w-3 sm:h-3 bg-yellow-400 rounded-full flex-shrink-0"></span>
+            <h3 class="text-sm sm:text-base font-semibold text-gray-900 mb-2 flex items-center gap-1.5">
+                <span class="w-2 h-2 sm:w-2.5 sm:h-2.5 bg-yellow-400 rounded-full flex-shrink-0"></span>
                 <span>Tomado ({{ takenOrders.length }})</span>
             </h3>
-            <div v-for="group in takenOrdersGrouped" :key="`taken-${group.label}`" class="mb-5 sm:mb-6 last:mb-0">
-                <h4 class="text-sm sm:text-base font-medium text-gray-700 mb-2 sm:mb-3 border-b border-gray-200 pb-1">
-                    {{ group.label }}
-                    <span class="text-gray-500 font-normal">({{ group.orders.length }})</span>
-                </h4>
-                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
-                    <OrderCard v-for="order in group.orders" :key="order.id" :order="order"
-                        :order-items="getOrderItems(order.id)" :is-selected="selectedOrders.has(order.id)"
-                        :selectable="showStatusActions" @toggle-select="toggleSelect" />
+            <div
+                class="grid gap-2 sm:gap-3 [grid-template-columns:repeat(auto-fit,minmax(clamp(220px,28vw,320px),1fr))]">
+                <div v-for="group in takenOrdersGrouped" :key="`taken-${group.label}`" class="min-w-0 flex flex-col gap-2">
+                    <h4 class="text-xs sm:text-sm font-medium text-gray-700 border-b border-gray-200 pb-0.5">
+                        {{ group.label }}
+                        <span class="text-gray-500 font-normal">({{ group.orders.length }})</span>
+                    </h4>
+                    <div class="flex flex-col gap-2">
+                        <OrderCard v-for="order in group.orders" :key="order.id" :order="order"
+                            :order-items="getOrderItems(order.id)" :is-selected="selectedOrders.has(order.id)"
+                            :selectable="showStatusActions" @toggle-select="toggleSelect" />
+                    </div>
                 </div>
             </div>
         </div>
 
         <div v-if="inPreparationOrders.length > 0">
-            <h3 class="text-base sm:text-lg font-semibold text-gray-900 mb-2 sm:mb-3 flex items-center gap-1.5 sm:gap-2">
-                <span class="w-2.5 h-2.5 sm:w-3 sm:h-3 bg-blue-400 rounded-full flex-shrink-0"></span>
+            <h3 class="text-sm sm:text-base font-semibold text-gray-900 mb-2 flex items-center gap-1.5">
+                <span class="w-2 h-2 sm:w-2.5 sm:h-2.5 bg-blue-400 rounded-full flex-shrink-0"></span>
                 <span>En Preparación ({{ inPreparationOrders.length }})</span>
             </h3>
-            <div v-for="group in inPreparationOrdersGrouped" :key="`prep-${group.label}`" class="mb-5 sm:mb-6 last:mb-0">
-                <h4 class="text-sm sm:text-base font-medium text-gray-700 mb-2 sm:mb-3 border-b border-gray-200 pb-1">
-                    {{ group.label }}
-                    <span class="text-gray-500 font-normal">({{ group.orders.length }})</span>
-                </h4>
-                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
-                    <OrderCard v-for="order in group.orders" :key="order.id" :order="order"
-                        :order-items="getOrderItems(order.id)" :is-selected="selectedOrders.has(order.id)"
-                        :selectable="showStatusActions" @toggle-select="toggleSelect" />
+            <div
+                class="grid gap-2 sm:gap-3 [grid-template-columns:repeat(auto-fit,minmax(clamp(220px,28vw,320px),1fr))]">
+                <div v-for="group in inPreparationOrdersGrouped" :key="`prep-${group.label}`" class="min-w-0 flex flex-col gap-2">
+                    <h4 class="text-xs sm:text-sm font-medium text-gray-700 border-b border-gray-200 pb-0.5">
+                        {{ group.label }}
+                        <span class="text-gray-500 font-normal">({{ group.orders.length }})</span>
+                    </h4>
+                    <div class="flex flex-col gap-2">
+                        <OrderCard v-for="order in group.orders" :key="order.id" :order="order"
+                            :order-items="getOrderItems(order.id)" :is-selected="selectedOrders.has(order.id)"
+                            :selectable="showStatusActions" @toggle-select="toggleSelect" />
+                    </div>
                 </div>
             </div>
         </div>

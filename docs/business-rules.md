@@ -77,6 +77,8 @@ enum UserRole {
 - **Vista simplificada**: Solo ve pedidos en preparación
 - **Estado limitado**: Solo puede cambiar pedidos a "Ready"
 - **Filtrado**: Pedidos desaparecen de su vista al pasarlos a "Ready"
+- **Cabecera en `/kitchen`**: La franja con estado de conexión (SignalR), permiso de notificaciones del navegador, activación de sonido TTS y botón «Actualizar» se muestra **solo** al usuario con rol **Kitchen**. Quien entre con **Admin** o **Superadmin** sigue pudiendo usar el módulo según la matriz, pero sin esa barra en cabecera.
+- **Nombre corto de producto en pantalla**: En las tarjetas de cocina se usa la misma lógica de abreviación que en la comanda impresa: backend `KitchenProductNameFormatter`; frontend `formatKitchenProductDisplayName` (`useKitchenProductDisplayName.ts`).
 
 #### Deliveryman
 - **Pedidos listos**: Solo ve pedidos en estado "Ready" y los suyos propios
