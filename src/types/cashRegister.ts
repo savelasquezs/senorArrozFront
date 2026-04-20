@@ -65,6 +65,8 @@ export interface CashClosure {
   openingCash: number
   closingCash: number
   denominationCounts: string
+  /** JSON: snapshot de apps pendientes al cerrar (base siguiente período). */
+  pendingAppPaymentsSnapshot?: string
   bankReconciliations: CashClosureBankReconciliation[]
   informalLoans: CashClosureInformalLoan[]
   createdAt: string
@@ -80,10 +82,18 @@ export interface BankExpectedBalance {
   expectedBalance: number
 }
 
+export interface UnsettledAppLine {
+  appId: number
+  appName: string
+  amount: number
+}
+
 export interface CashRegisterExpected {
   openingCash: number
-  /** Efectivo + bancos + snapshot préstamos al último cierre. */
+  /** Efectivo + bancos + snapshot préstamos + snapshot apps pendientes al último cierre. */
   openingGlobalTotal: number
+  /** Parte de apertura global que viene del snapshot de apps del último cierre. */
+  openingUnsettledAppsTotal?: number
   /** Ventas (pedidos entregados) en el período por instante PrepareAt/CreatedAt. */
   salesInPeriodTotal: number
   expensesInPeriodTotal: number
@@ -95,6 +105,9 @@ export interface CashRegisterExpected {
   asOf: string
   lastClosureAt?: string
   banks: BankExpectedBalance[]
+  /** Pagos vía app aún no liquidados (pedidos entregados). */
+  unsettledAppLines?: UnsettledAppLine[]
+  unsettledAppsTotal?: number
 }
 
 /** Préstamo informal por sucursal (tabla branch_informal_loan). */

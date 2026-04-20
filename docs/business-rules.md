@@ -211,7 +211,9 @@ CANCELLED  CANCELLED   CANCELLED  CANCELLED
 - **Movimientos internos**: Entre bancos y caja-bancos usando `bank_payment` (income) y `expense_bank_payment` (outcome)
 
 ### Cuadre de caja (total esperado global)
-- **Fórmula**: `(C0 + B0 + L0) + ventas del período − gastos del período`, donde `C0+B0+L0` es el total de apertura del último cierre (efectivo + saldos bancarios del cuadre + snapshot de préstamos informales en ese cierre). El esperado **no** suma aparte el total actual de préstamos activos (`L1`): el snapshot `L0` ya está en la apertura. El API sigue devolviendo `informalLoansActiveTotal` como referencia para el conteo físico al cerrar.
+- **Fórmula esperada**: `(C0 + B0 + L0 + A0) + ventas del período − gastos del período`, donde `C0+B0+L0+A0` es la apertura del último cierre: efectivo contado + saldos reales por banco (incluye cuentas operativas, apps y caja mayor según bancos configurados) + snapshot de préstamos informales + **snapshot de apps pendientes por liquidar** (`A0`, JSON por app guardado en el cierre anterior). Si el cierre anterior no tenía snapshot de apps, `A0 = 0`.
+- **Total contado al cerrar** (debe coincidir con el esperado): efectivo físico (`closingCash`) + suma de saldos reales por banco del cuadre + **suma actual de pagos vía app no liquidados** (pedidos entregados) + préstamos informales activos (`L1`). Los bancos incluyen la fila de caja mayor efectivo cuando aplique. El **pendiente en apps** no es un campo aparte que el usuario edita: se toma del sistema en el momento del cierre y se persiste como snapshot para `A0` del siguiente período.
+- El esperado **no** “dobla” préstamos: el snapshot `L0` en apertura ya fija la parte de préstamos reconocida al cierre anterior; al cerrar se comparan préstamos activos actuales con el esperado global según la misma fórmula anterior. El API sigue devolviendo `informalLoansActiveTotal` y el desglose de apps pendientes para la UI.
 
 ## 👤 Gestión de Clientes
 

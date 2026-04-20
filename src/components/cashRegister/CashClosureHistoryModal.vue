@@ -157,6 +157,32 @@
               </div>
             </div>
 
+            <div v-if="pendingAppLines.length > 0">
+              <h4 class="text-sm font-semibold text-gray-800 mb-2">Apps pendientes por liquidar (snapshot al cierre)</h4>
+              <div class="overflow-x-auto rounded-lg border border-gray-100">
+                <table class="min-w-full text-sm">
+                  <thead class="bg-violet-50 text-xs text-gray-600">
+                    <tr>
+                      <th class="px-3 py-2 text-left">App</th>
+                      <th class="px-3 py-2 text-right">Monto</th>
+                    </tr>
+                  </thead>
+                  <tbody class="divide-y divide-gray-50">
+                    <tr v-for="line in pendingAppLines" :key="line.appId">
+                      <td class="px-3 py-1.5">{{ line.appName }}</td>
+                      <td class="px-3 py-1.5 text-right tabular-nums">{{ formatCurrency(line.amount) }}</td>
+                    </tr>
+                  </tbody>
+                  <tfoot class="bg-violet-50/80 font-medium">
+                    <tr>
+                      <td class="px-3 py-2 text-right">Total</td>
+                      <td class="px-3 py-2 text-right tabular-nums">{{ formatCurrency(pendingAppSum) }}</td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            </div>
+
             <div>
               <h4 class="text-sm font-semibold text-gray-800 mb-2">Préstamos informales</h4>
               <p class="text-xs text-gray-500 mb-2">
@@ -259,6 +285,29 @@ const denominationLines = computed(() => {
 
 const denominationSum = computed(() =>
   denominationLines.value.reduce((s, l) => s + l.subtotal, 0)
+)
+
+interface PendingAppSnapLine {
+  appId: number
+  appName: string
+  amount: number
+}
+
+const pendingAppLines = computed((): PendingAppSnapLine[] => {
+  const c = selected.value
+  if (!c?.pendingAppPaymentsSnapshot) return []
+  const t = c.pendingAppPaymentsSnapshot.trim()
+  if (!t || t === '[]') return []
+  try {
+    const a = JSON.parse(t) as PendingAppSnapLine[]
+    return Array.isArray(a) ? a : []
+  } catch {
+    return []
+  }
+})
+
+const pendingAppSum = computed(() =>
+  pendingAppLines.value.reduce((s, x) => s + (Number(x.amount) || 0), 0)
 )
 
 function formatAdjustments(json: string): string {

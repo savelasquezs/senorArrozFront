@@ -63,13 +63,18 @@
                 <p class="text-xs text-gray-500">Esperado (sistema)</p>
                 <p class="font-bold tabular-nums text-gray-900">{{ formatCurrency(expected.expectedGlobalTotal) }}</p>
                 <p class="text-[11px] text-gray-500 mt-1 leading-snug">
-                  Apert. caja+bancos+L snapshot {{ formatCurrency(expected.openingGlobalTotal) }} + ventas
+                  Apert. (caja+bancos+L+apps snapshot
+                  <span v-if="(expected.openingUnsettledAppsTotal ?? 0) !== 0" class="font-medium">
+                    ; apps en apert.: {{ formatCurrency(expected.openingUnsettledAppsTotal ?? 0) }}
+                  </span>
+                  ) {{ formatCurrency(expected.openingGlobalTotal) }} + ventas
                   {{ formatCurrency(expected.salesInPeriodTotal) }} − gastos
-                  {{ formatCurrency(expected.expensesInPeriodTotal) }}; el esperado incluye préstamos activos actuales.
+                  {{ formatCurrency(expected.expensesInPeriodTotal) }}. El global contado suma préstamos activos y
+                  pendiente en apps no liquidado.
                 </p>
               </div>
               <div>
-                <p class="text-xs text-gray-500">Contado (caja + bancos + prést. activos)</p>
+                <p class="text-xs text-gray-500">Contado (caja + bancos + apps pend. + prést. activos)</p>
                 <p class="font-bold tabular-nums text-gray-900">{{ formatCurrency(countedGlobalTotal) }}</p>
               </div>
               <div>
@@ -82,6 +87,46 @@
                 </p>
               </div>
             </div>
+          </div>
+
+          <!-- Apps: pendiente por liquidar (suma al total global contado; se guarda snapshot al cerrar) -->
+          <div
+            v-if="(expected.unsettledAppLines?.length ?? 0) > 0 || (expected.unsettledAppsTotal ?? 0) > 0"
+            class="rounded-xl border border-violet-200 bg-violet-50/70 px-4 py-3"
+          >
+            <h2 class="text-sm font-semibold text-gray-900 mb-2">Pendiente por liquidar en apps</h2>
+            <p class="text-[11px] text-violet-900/80 mb-2 leading-snug">
+              Dinero en pedidos entregados aún sin liquidar a cuenta bancaria. Se incluye en el total global contado y se
+              guarda por app al cerrar para la base del día siguiente.
+            </p>
+            <div class="overflow-x-auto rounded-lg border border-violet-100 bg-white/80">
+              <table class="min-w-full text-sm">
+                <thead class="bg-violet-100/80 text-left text-xs text-gray-600">
+                  <tr>
+                    <th class="px-3 py-2">App</th>
+                    <th class="px-3 py-2 text-right">Monto</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-violet-100">
+                  <tr v-for="line in expected.unsettledAppLines ?? []" :key="line.appId">
+                    <td class="px-3 py-1.5 font-medium text-gray-800">{{ line.appName }}</td>
+                    <td class="px-3 py-1.5 text-right tabular-nums">{{ formatCurrency(line.amount) }}</td>
+                  </tr>
+                </tbody>
+                <tfoot class="bg-violet-50/90 font-semibold text-gray-900">
+                  <tr>
+                    <td class="px-3 py-2">Total apps pendientes</td>
+                    <td class="px-3 py-2 text-right tabular-nums">{{ formatCurrency(expected.unsettledAppsTotal ?? 0) }}</td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          </div>
+          <div
+            v-else
+            class="rounded-xl border border-gray-200 bg-gray-50/80 px-4 py-2.5 text-xs text-gray-600"
+          >
+            Sin pendiente por liquidar en apps (o todo ya liquidado a banco en el período).
           </div>
 
           <div class="lg:grid lg:grid-cols-2 lg:gap-4 lg:items-start">
@@ -742,7 +787,8 @@ const countedGlobalTotal = computed(() => {
   const e = expected.value
   if (!e) return 0
   const banksSum = bankReconciliations.value.reduce((s, r) => s + (Number(r.actualBalance) || 0), 0)
-  return closingCash.value + banksSum + (e.informalLoansActiveTotal ?? 0)
+  const appsPend = Number(e.unsettledAppsTotal ?? 0) || 0
+  return closingCash.value + banksSum + appsPend + (e.informalLoansActiveTotal ?? 0)
 })
 
 const globalDifference = computed(
@@ -787,7 +833,7 @@ const saveBlockReason = computed(() => {
   if (bankReconciliations.value.length === 0) return 'No hay bancos configurados para esta sucursal.'
   if (!allBanksCuadred.value) return 'Hay bancos con diferencia distinta de $0'
   if (!globalCuadred.value)
-    return 'El total global contado (caja + bancos + préstamos activos) no coincide con el esperado (apertura + ventas − gastos).'
+    return 'El total global contado (caja + bancos + apps pendientes + préstamos activos) no coincide con el esperado (apertura + ventas − gastos).'
   return ''
 })
 
