@@ -81,17 +81,18 @@ export function buildDeliveryCopyMessage(p: BuildDeliveryCopyMessageParams): str
     const eta = p.etaPhrase
 
     if (!p.freeDeliveryRequested) {
-        return `El domicilio tiene un costo de ${fc(fee)}, serían en total ${fc(total)}, y llega en ${eta}.`
+        return `El domicilio tiene un costo de ${fc(fee)}, serían ${fc(total)} y llega en ${eta}.`
     }
 
     if (fee <= 0) {
-        return `Total del pedido ${fc(total)}. Llega en ${eta}.`
+        return `Hoy tienes el domi gratis, serían ${fc(total)} y llega en ${eta}.`
     }
 
-    const budget = deliveryDiscountBudget(fee, cap)
+    // Promo activa: si el envío no supera el tope, el descuento cubre todo el domicilio.
     if (fee <= cap) {
-        return `Hoy tenemos domicilio gratis (envío ${fc(fee)}). Total del pedido ${fc(total)}. Llega en ${eta}.`
+        return `Hoy tienes el domi gratis, serían ${fc(total)} y llega en ${eta}.`
     }
 
-    return `Hoy te cubrimos hasta ${fc(budget)} del valor del domicilio (${fc(fee)}). Total del pedido ${fc(total)}. Llega en ${eta}.`
+    const remainder = fee - cap
+    return `Hoy el domicilio te queda en solo ${fc(remainder)} pesitos, serían ${fc(total)}, y te llega en ${eta}.`
 }

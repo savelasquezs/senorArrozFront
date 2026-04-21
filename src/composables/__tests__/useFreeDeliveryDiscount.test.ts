@@ -55,7 +55,7 @@ describe('buildDeliveryCopyMessage', () => {
         expect(s).not.toContain('gratis')
     })
 
-    it('con promo y envío ≤ tope: domicilio gratis', () => {
+    it('con promo y envío ≤ tope: domi gratis natural', () => {
         const s = buildDeliveryCopyMessage({
             deliveryFee: 2500,
             orderTotal: 20000,
@@ -64,10 +64,11 @@ describe('buildDeliveryCopyMessage', () => {
             formatCurrency: fc,
             etaPhrase: '30-40 min',
         })
-        expect(s.toLowerCase()).toContain('gratis')
+        expect(s.toLowerCase()).toContain('tienes el domi gratis')
+        expect(s).toContain('20.000')
     })
 
-    it('con promo y envío > tope: cubrimos hasta el tope', () => {
+    it('con promo y envío > tope: te queda en solo X pesitos', () => {
         const s = buildDeliveryCopyMessage({
             deliveryFee: 6000,
             orderTotal: 22000,
@@ -76,7 +77,8 @@ describe('buildDeliveryCopyMessage', () => {
             formatCurrency: fc,
             etaPhrase: '30-40 min',
         })
-        expect(s).toContain('cubrimos hasta')
-        expect(s).toContain('domicilio')
+        expect(s).toContain('pesitos')
+        expect(s).toContain('te queda en solo')
+        expect(s).toContain('3.000')
     })
 })
