@@ -94,7 +94,7 @@ import { useBranchPosSettingsStore } from '@/store/branchPosSettings'
 import { useOrderItems } from '@/composables/useOrderItems'
 import { useFormatting } from '@/composables/useFormatting'
 import { useToast } from '@/composables/useToast'
-import { deliveryDiscountBudget } from '@/composables/useFreeDeliveryDiscount'
+import { buildDeliveryCopyMessage, deliveryDiscountBudget } from '@/composables/useFreeDeliveryDiscount'
 
 // Components
 import BaseButton from '@/components/ui/BaseButton.vue'
@@ -228,9 +228,15 @@ const handleDeliveryFeeChange = () => {
 
 async function copyDeliverySummaryText() {
     if (!isDeliveryOrder.value) return
-    const fee = deliveryFee.value
-    const t = total.value
-    const msg = `El domicilio tiene un costo de ${formatCurrency(fee)}, serían en total ${formatCurrency(t)}, y llega en ${DELIVERY_ETA_PHRASE}`
+    const o = currentOrder.value
+    const msg = buildDeliveryCopyMessage({
+        deliveryFee: deliveryFee.value,
+        orderTotal: total.value,
+        freeDeliveryRequested: o?.freeDeliveryRequested === true,
+        maxBranchCap: branchPosSettings.maxFreeDeliveryDiscount,
+        formatCurrency,
+        etaPhrase: DELIVERY_ETA_PHRASE,
+    })
     try {
         await navigator.clipboard.writeText(msg)
         success('Copiado', 2500, 'Mensaje de domicilio listo para pegar.')

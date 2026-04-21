@@ -59,3 +59,39 @@ export function lineCapacityCop(line: LineCapacityInput): number {
     const manual = Math.max(0, Math.round(line.manualDiscount || 0))
     return Math.max(0, Math.round(gross) - manual)
 }
+
+export interface BuildDeliveryCopyMessageParams {
+    deliveryFee: number
+    orderTotal: number
+    freeDeliveryRequested: boolean
+    /** Tope COP de la sucursal para el descuento tipo domicilio gratis. */
+    maxBranchCap: number
+    formatCurrency: (amount: number) => string
+    etaPhrase: string
+}
+
+/**
+ * Texto para copiar a WhatsApp (domicilio): menciona promoción si aplica.
+ */
+export function buildDeliveryCopyMessage(p: BuildDeliveryCopyMessageParams): string {
+    const fee = Math.max(0, Math.round(Number(p.deliveryFee) || 0))
+    const total = Math.max(0, Math.round(Number(p.orderTotal) || 0))
+    const cap = Math.max(0, Math.round(Number(p.maxBranchCap) || 0))
+    const fc = p.formatCurrency
+    const eta = p.etaPhrase
+
+    if (!p.freeDeliveryRequested) {
+        return `El domicilio tiene un costo de ${fc(fee)}, serían en total ${fc(total)}, y llega en ${eta}.`
+    }
+
+    if (fee <= 0) {
+        return `Total del pedido ${fc(total)}. Llega en ${eta}.`
+    }
+
+    const budget = deliveryDiscountBudget(fee, cap)
+    if (fee <= cap) {
+        return `Hoy tenemos domicilio gratis (envío ${fc(fee)}). Total del pedido ${fc(total)}. Llega en ${eta}.`
+    }
+
+    return `Hoy te cubrimos hasta ${fc(budget)} del valor del domicilio (${fc(fee)}). Total del pedido ${fc(total)}. Llega en ${eta}.`
+}
