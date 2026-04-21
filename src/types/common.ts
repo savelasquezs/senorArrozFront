@@ -155,18 +155,20 @@ export interface UpdateBranchPrintSettingsPayload {
 }
 
 export interface Branch {
-  id: number;
-  name: string;
-  /** Nombre comercial en ticket (opcional). */
-  businessName?: string | null;
-  /** NIT (opcional). */
-  nit?: string | null;
-  address: string;
-  phone1: string;
-  phone2?: string | null;
-  latitude?: number | null;
-  longitude?: number | null;
-  createdAt: string;
+    id: number;
+    name: string;
+    /** Nombre comercial en ticket (opcional). */
+    businessName?: string | null;
+    /** NIT (opcional). */
+    nit?: string | null;
+    address: string;
+    phone1: string;
+    phone2?: string | null;
+    latitude?: number | null;
+    longitude?: number | null;
+    /** Tope COP del descuento “domicilio gratis” en POS (por línea sumada). */
+    maxFreeDeliveryDiscount?: number;
+    createdAt: string;
   updatedAt: string;
   totalUsers: number;
   totalCustomers: number;

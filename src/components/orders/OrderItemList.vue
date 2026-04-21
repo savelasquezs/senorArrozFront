@@ -55,6 +55,21 @@
                             class="w-16 px-1 py-0.5 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500" />
                     </div>
                 </div>
+                <div v-if="showFreeDeliveryCheckbox" class="summary-line items-start">
+                    <label class="flex items-center gap-2 cursor-pointer text-xs text-gray-700">
+                        <input type="checkbox" class="rounded border-gray-300 text-emerald-600 focus:ring-emerald-500"
+                            :checked="currentOrder?.freeDeliveryRequested === true"
+                            @change="onFreeDeliveryCheckboxChange" />
+                        Domicilio gratis
+                    </label>
+                    <span class="text-[10px] text-gray-400 text-right max-w-[9rem] leading-tight">
+                        Hasta {{ formatCurrency(freeDeliveryBudgetCap) }} sobre el envío
+                    </span>
+                </div>
+                <div v-if="freeDeliveryAppliedTotal > 0" class="summary-line text-xs text-emerald-700">
+                    <span>Domicilio gratis aplicado</span>
+                    <span>−{{ formatCurrency(freeDeliveryAppliedTotal) }}</span>
+                </div>
                 <div class="summary-line total-line">
                     <span class="text-sm font-bold">Total:</span>
                     <span class="text-sm font-bold text-emerald-600">{{ formatCurrency(total) }}</span>
@@ -72,11 +87,14 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
+import { useAuthStore } from '@/store/auth'
 import { useOrdersDraftsStore } from '@/store/ordersDrafts'
+import { useBranchPosSettingsStore } from '@/store/branchPosSettings'
 import { useOrderItems } from '@/composables/useOrderItems'
 import { useFormatting } from '@/composables/useFormatting'
 import { useToast } from '@/composables/useToast'
+import { deliveryDiscountBudget } from '@/composables/useFreeDeliveryDiscount'
 
 // Components
 import BaseButton from '@/components/ui/BaseButton.vue'
@@ -108,6 +126,8 @@ const emit = defineEmits<{
 const { formatCurrency } = useFormatting()
 const { success, error: showError } = useToast()
 const ordersStore = useOrdersDraftsStore()
+const authStore = useAuthStore()
+const branchPosSettings = useBranchPosSettingsStore()
 const orderItems = useOrderItems()
 
 // Computed
@@ -119,6 +139,39 @@ const discountTotal = computed(() => currentOrder.value?.discountTotal || 0)
 const deliveryFee = computed(() => currentOrder.value?.deliveryFee || 0)
 const total = computed(() => currentOrder.value?.total || 0)
 const isDeliveryOrder = computed(() => currentOrder.value?.type === 'delivery')
+
+const showFreeDeliveryCheckbox = computed(() => {
+    const o = currentOrder.value
+    if (!o) return false
+    return o.type === 'delivery' || (o.type === 'reservation' && o.addressId != null)
+})
+
+const freeDeliveryBudgetCap = computed(() =>
+    deliveryDiscountBudget(deliveryFee.value, branchPosSettings.maxFreeDeliveryDiscount),
+)
+
+const freeDeliveryAppliedTotal = computed(() =>
+    (currentOrder.value?.orderItems ?? []).reduce((s, i) => s + (i.freeDeliveryDiscount ?? 0), 0),
+)
+
+const onFreeDeliveryCheckboxChange = (e: Event) => {
+    const el = e.target as HTMLInputElement
+    ordersStore.updateFreeDeliveryRequested(el.checked)
+}
+
+onMounted(async () => {
+    await branchPosSettings.ensureForBranch(authStore.branchId ?? undefined)
+    const o = ordersStore.currentOrder
+    if (o) ordersStore.recalculateTotals(o)
+})
+
+watch(
+    () => branchPosSettings.maxFreeDeliveryDiscount,
+    () => {
+        const o = ordersStore.currentOrder
+        if (o) ordersStore.recalculateTotals(o)
+    },
+)
 
 /** Texto fijo de tiempo de entrega para el mensaje copiable (WhatsApp, etc.). */
 const DELIVERY_ETA_PHRASE = '30-40 min'

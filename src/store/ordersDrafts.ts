@@ -26,6 +26,12 @@ import {
     getRiceCategoryIdSet,
     sortProductsByPortionOrder,
 } from '@/config/orderPosCategories'
+import { useBranchPosSettingsStore } from '@/store/branchPosSettings'
+import {
+    deliveryDiscountBudget,
+    distributeEqualWithCaps,
+    lineCapacityCop,
+} from '@/composables/useFreeDeliveryDiscount'
 
 /** Si falla la API al rehidratar, reconstruye un cliente mínimo desde el borrador persistido. */
 function buildFallbackCustomerForDraft(customerId: number, drafts: DraftOrder[]): Customer | null {
@@ -394,28 +400,76 @@ export const useOrdersDraftsStore = defineStore('ordersDrafts', () => {
         return order
     }
 
+    const applyFreeDeliveryToOrder = (order: DraftOrder): DraftOrder => {
+        const pos = useBranchPosSettingsStore()
+        const maxCap = pos.maxFreeDeliveryDiscount
+        const items = order.orderItems.map((i) => ({ ...i }))
+        const eligible =
+            order.freeDeliveryRequested &&
+            (order.type === 'delivery' ||
+                (order.type === 'reservation' && order.addressId != null)) &&
+            items.length > 0
+
+        if (!eligible) {
+            const cleared = items.map((i) => {
+                const fd = 0
+                const sub = Math.max(0, i.quantity * i.unitPrice - i.discount - fd)
+                return { ...i, freeDeliveryDiscount: fd, subtotal: sub }
+            })
+            return { ...order, orderItems: cleared }
+        }
+
+        const budget = deliveryDiscountBudget(order.deliveryFee, maxCap)
+        const caps = items.map((i) =>
+            lineCapacityCop({
+                quantity: i.quantity,
+                unitPrice: i.unitPrice,
+                manualDiscount: i.discount,
+            }),
+        )
+        const shares = distributeEqualWithCaps(budget, caps)
+        const next = items.map((i, idx) => {
+            const fd = shares[idx] ?? 0
+            const sub = Math.max(0, i.quantity * i.unitPrice - i.discount - fd)
+            return { ...i, freeDeliveryDiscount: fd, subtotal: sub }
+        })
+        return { ...order, orderItems: next }
+    }
+
     // Helper Methods - COPIAR líneas 468-521
     const recalculateTotals = (order: DraftOrder) => {
-        const subtotal = order.orderItems.reduce((sum, item) => sum + item.subtotal, 0)
-        const discountTotal = order.orderItems.reduce((sum, item) => sum + item.discount, 0)
-        const total = subtotal + order.deliveryFee
+        const withFd = applyFreeDeliveryToOrder(order)
+        const subtotal = withFd.orderItems.reduce((sum, item) => sum + item.subtotal, 0)
+        const discountTotal = withFd.orderItems.reduce(
+            (sum, item) => sum + item.discount + (item.freeDeliveryDiscount ?? 0),
+            0,
+        )
+        const total = subtotal + withFd.deliveryFee
 
         // Crear nuevo objeto con totales actualizados
         let updatedOrder = {
-            ...order,
+            ...withFd,
             subtotal,
             discountTotal,
-            total
+            total,
         }
 
         // Auto-ajustar pago único si aplica
         updatedOrder = autoAdjustSinglePayment(updatedOrder)
         updatedOrder = clampPaidInStoreToRemainder(updatedOrder)
 
-        // Reemplazar el objeto completo en el Map
-        if (currentTabId.value && order.tabId === currentTabId.value) {
-            draftOrders.value.set(currentTabId.value, updatedOrder)
+        if (draftOrders.value.has(order.tabId)) {
+            draftOrders.value.set(order.tabId, updatedOrder)
         }
+    }
+
+    const updateFreeDeliveryRequested = (value: boolean) => {
+        if (!currentTabId.value) return
+        const order = draftOrders.value.get(currentTabId.value)
+        if (!order) return
+        const updated = { ...order, freeDeliveryRequested: value, updatedAt: new Date() }
+        recalculateTotals(updated)
+        saveToLocalStorage()
     }
 
     // Auto-ajustar pago único al total del pedido
@@ -491,8 +545,23 @@ export const useOrdersDraftsStore = defineStore('ordersDrafts', () => {
                 paidInStoreCash: order.paidInStoreCash ?? false,
                 paidInStoreCashAmount:
                     typeof order.paidInStoreCashAmount === 'number' ? order.paidInStoreCashAmount : null,
+                freeDeliveryRequested: order.freeDeliveryRequested ?? false,
+                orderItems: (order.orderItems ?? []).map((it: any) => {
+                    const fd = typeof it.freeDeliveryDiscount === 'number' ? it.freeDeliveryDiscount : 0
+                    const disc = typeof it.discount === 'number' ? it.discount : 0
+                    const q = typeof it.quantity === 'number' ? it.quantity : 0
+                    const up = typeof it.unitPrice === 'number' ? it.unitPrice : 0
+                    return {
+                        ...it,
+                        freeDeliveryDiscount: fd,
+                        subtotal: Math.max(0, q * up - disc - fd),
+                    }
+                }),
             }))
             draftOrders.value = new Map(migratedDrafts.map((order: DraftOrder) => [order.tabId, order]))
+            for (const o of draftOrders.value.values()) {
+                recalculateTotals(o)
+            }
             currentTabId.value = data.currentTabId
             nextTabNumber.value = data.nextTabNumber
         } catch (error) {
@@ -633,6 +702,7 @@ export const useOrdersDraftsStore = defineStore('ordersDrafts', () => {
         updatePrepareAt,
         updatePaidInStoreCash,
         updateDeliveryFee,
+        updateFreeDeliveryRequested,
         recalculateTotals,
         autoAdjustSinglePayment,
         saveToLocalStorage,

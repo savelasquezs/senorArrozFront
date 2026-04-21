@@ -18,6 +18,7 @@ function minimalDraft(overrides: Partial<DraftOrder>): DraftOrder {
         addressId: null,
         addressDescription: null,
         deliveryFee: 0,
+        freeDeliveryRequested: false,
         reservedFor: null,
         prepareAt: null,
         isLater: false,
@@ -31,6 +32,7 @@ function minimalDraft(overrides: Partial<DraftOrder>): DraftOrder {
                 quantity: 1,
                 unitPrice: 1000,
                 discount: 0,
+                freeDeliveryDiscount: 0,
                 subtotal: 1000,
                 notes: '',
             },
@@ -98,5 +100,28 @@ describe('useOrderSubmission', () => {
         expect(dto.type).toBe('reservation')
         expect(dto.addressId).toBeUndefined()
         expect(dto.deliveryFee).toBeUndefined()
+    })
+
+    it('envía discount en línea como manual + domicilio gratis', () => {
+        const { transformDraftToCreateDto } = useOrderSubmission()
+        const dto = transformDraftToCreateDto(
+            minimalDraft({
+                orderItems: [
+                    {
+                        tempId: 'x',
+                        productId: 1,
+                        productName: 'P',
+                        productPrice: 10000,
+                        quantity: 1,
+                        unitPrice: 10000,
+                        discount: 500,
+                        freeDeliveryDiscount: 1500,
+                        subtotal: 8000,
+                        notes: '',
+                    },
+                ],
+            })
+        )
+        expect(dto.orderDetails[0]?.discount).toBe(2000)
     })
 })

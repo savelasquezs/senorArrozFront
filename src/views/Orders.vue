@@ -41,6 +41,7 @@ import { useProductsStore } from '@/store/products'
 import { useProductCategoriesStore } from '@/store/productCategories'
 import { useAuthStore } from '@/store/auth'
 import { bootstrapOrderCatalog } from '@/utils/orderCatalogBootstrap'
+import { useBranchPosSettingsStore } from '@/store/branchPosSettings'
 import { buildOrderPosTabs } from '@/config/orderPosCategories'
 // Components
 import MainLayout from '@/components/layout/MainLayout.vue'
@@ -56,6 +57,7 @@ const ordersStore = useOrdersDraftsStore()
 const productsStore = useProductsStore()
 const productCategoriesStore = useProductCategoriesStore()
 const authStore = useAuthStore()
+const branchPosSettings = useBranchPosSettingsStore()
 
 // Categorías transversales desde el store; respaldo por productos cargados en catálogo.
 const categories = computed(() => {
@@ -102,6 +104,7 @@ const refreshTotals = () => {
 
 const initializeData = async () => {
     await ensureOrderPageData()
+    await branchPosSettings.ensureForBranch(authStore.branchId ?? undefined)
 }
 
 // Lifecycle

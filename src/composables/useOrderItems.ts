@@ -26,7 +26,8 @@ export function useOrderItems() {
             updatedItems = order.orderItems.map((item, index) => {
                 if (index === existingIndex) {
                     const newQuantity = item.quantity + quantity
-                    const newSubtotal = (newQuantity * item.unitPrice) - item.discount
+                    const fd = item.freeDeliveryDiscount ?? 0
+                    const newSubtotal = (newQuantity * item.unitPrice) - item.discount - fd
                     return { ...item, quantity: newQuantity, subtotal: newSubtotal }
                 }
                 return item
@@ -40,6 +41,7 @@ export function useOrderItems() {
                 quantity,
                 unitPrice: product.price,
                 discount: 0,
+                freeDeliveryDiscount: 0,
                 subtotal: product.price * quantity,
                 notes: ''
             }
@@ -71,7 +73,8 @@ export function useOrderItems() {
 
         const updatedItems = order.orderItems.map(item => {
             if (item.tempId === itemTempId) {
-                const newSubtotal = (quantity * item.unitPrice) - item.discount
+                const fd = item.freeDeliveryDiscount ?? 0
+                const newSubtotal = (quantity * item.unitPrice) - item.discount - fd
                 return { ...item, quantity, subtotal: newSubtotal }
             }
             return item
@@ -89,7 +92,8 @@ export function useOrderItems() {
 
         const updatedItems = order.orderItems.map(item => {
             if (item.tempId === itemTempId) {
-                const newSubtotal = (item.quantity * price) - item.discount
+                const fd = item.freeDeliveryDiscount ?? 0
+                const newSubtotal = (item.quantity * price) - item.discount - fd
                 return { ...item, unitPrice: price, subtotal: newSubtotal }
             }
             return item
@@ -107,7 +111,8 @@ export function useOrderItems() {
 
         const updatedItems = order.orderItems.map(item => {
             if (item.tempId === itemTempId) {
-                const newSubtotal = (item.quantity * item.unitPrice) - discount
+                const fd = item.freeDeliveryDiscount ?? 0
+                const newSubtotal = (item.quantity * item.unitPrice) - discount - fd
                 return { ...item, discount, subtotal: newSubtotal }
             }
             return item

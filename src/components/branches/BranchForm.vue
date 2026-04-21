@@ -58,6 +58,14 @@
             </BaseInput>
         </div>
 
+        <div>
+            <BaseInput :model-value="form.maxFreeDeliveryDiscount"
+                @update:model-value="(v) => { form.maxFreeDeliveryDiscount = Math.max(0, Math.round(Number(v) || 0)) }"
+                type="number" :min="0" :step="100"
+                label="Tope descuento domicilio gratis (COP)" placeholder="3000" />
+            <p class="mt-1 text-xs text-gray-500">Máximo a descontar en productos al activar «Domicilio gratis» en el POS (por pedido).</p>
+        </div>
+
         <!-- Validation Info -->
         <BaseAlert v-if="showValidationInfo" variant="info">
             <InformationCircleIcon class="w-5 h-5" />
@@ -120,6 +128,7 @@ interface BranchFormData {
     phone2?: string
     latitude: number
     longitude: number
+    maxFreeDeliveryDiscount: number
 }
 
 const emit = defineEmits<{
@@ -136,6 +145,7 @@ const form = reactive({
     phone2: '',
     latitude: 0,
     longitude: 0,
+    maxFreeDeliveryDiscount: 3000,
 })
 
 const errors = reactive({
@@ -262,6 +272,7 @@ const handleSubmit = () => {
         phone2: form.phone2.trim() || undefined,
         latitude: form.latitude,
         longitude: form.longitude,
+        maxFreeDeliveryDiscount: Math.max(0, Math.round(Number(form.maxFreeDeliveryDiscount) || 0)),
     }
 
     emit('submit', formData)
@@ -308,6 +319,10 @@ watch(
 
             const lat = newBranch.latitude
             const lng = newBranch.longitude
+            form.maxFreeDeliveryDiscount =
+                typeof newBranch.maxFreeDeliveryDiscount === 'number' && newBranch.maxFreeDeliveryDiscount >= 0
+                    ? Math.round(newBranch.maxFreeDeliveryDiscount)
+                    : 3000
             if (lat != null && lng != null && lat !== 0 && lng !== 0) {
                 form.latitude = Number(lat)
                 form.longitude = Number(lng)
@@ -327,6 +342,7 @@ watch(
             form.address = ''
             form.phone1 = ''
             form.phone2 = ''
+            form.maxFreeDeliveryDiscount = 3000
             showValidationInfo.value = true
             resetMapState()
             setTimeout(() => {

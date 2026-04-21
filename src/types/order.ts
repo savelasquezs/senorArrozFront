@@ -17,7 +17,10 @@ export interface OrderItem {
     productPrice: number
     quantity: number
     unitPrice: number
+    /** Descuento manual (UI porcentaje). */
     discount: number
+    /** Descuento automático por “domicilio gratis” (reparto en líneas). */
+    freeDeliveryDiscount: number
     subtotal: number
     notes: string
 }
@@ -88,6 +91,8 @@ export interface DraftOrder {
     addressDescription: string | null
     addressAdditionalInfo?: string | null
     deliveryFee: number
+    /** Si está activo, reparte descuento equivalente al domicilio (hasta tope de sucursal) en las líneas. */
+    freeDeliveryRequested: boolean
     reservedFor: Date | null
     prepareAt: Date | null
     isLater: boolean

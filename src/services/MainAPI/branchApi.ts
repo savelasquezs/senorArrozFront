@@ -41,7 +41,15 @@ class BranchApi extends BaseApi {
 	async createBranch(
 		payload: Pick<
 			Branch,
-			'name' | 'address' | 'phone1' | 'phone2' | 'latitude' | 'longitude' | 'businessName' | 'nit'
+			| 'name'
+			| 'address'
+			| 'phone1'
+			| 'phone2'
+			| 'latitude'
+			| 'longitude'
+			| 'businessName'
+			| 'nit'
+			| 'maxFreeDeliveryDiscount'
 		>
 	): Promise<ApiResponse<Branch>> {
 		return this.post<ApiResponse<Branch>>('/Branches', payload);
@@ -51,7 +59,15 @@ class BranchApi extends BaseApi {
 		id: number,
 		payload: Pick<
 			Branch,
-			'name' | 'address' | 'phone1' | 'phone2' | 'latitude' | 'longitude' | 'businessName' | 'nit'
+			| 'name'
+			| 'address'
+			| 'phone1'
+			| 'phone2'
+			| 'latitude'
+			| 'longitude'
+			| 'businessName'
+			| 'nit'
+			| 'maxFreeDeliveryDiscount'
 		>
 	): Promise<ApiResponse<Branch>> {
 		return this.put<ApiResponse<Branch>>(`/Branches/${id}`, payload);

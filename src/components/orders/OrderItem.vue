@@ -62,8 +62,13 @@
         </div>
 
         <!-- Mostrar ahorro si hay descuento (opcional, tercera línea pequeña) -->
-        <div v-if="discountAmount > 0" class="mt-1 text-xs text-green-600 text-right">
-            Ahorro: {{ formatCurrency(discountAmount) }}
+        <div v-if="discountAmount > 0 || freeDeliveryCop > 0" class="mt-1 text-xs text-right space-y-0.5">
+            <div v-if="discountAmount > 0" class="text-green-600">
+                Ahorro: {{ formatCurrency(discountAmount) }}
+            </div>
+            <div v-if="freeDeliveryCop > 0" class="text-emerald-700">
+                Domicilio gratis: −{{ formatCurrency(freeDeliveryCop) }}
+            </div>
         </div>
     </div>
 </template>
@@ -131,9 +136,11 @@ const discountAmount = computed(() => {
     return (subtotalSinDescuento.value * discountPercentage.value) / 100
 })
 
+const freeDeliveryCop = computed(() => Math.max(0, props.item.freeDeliveryDiscount ?? 0))
+
 // Subtotal final calculado
 const calculatedSubtotal = computed(() => {
-    return subtotalSinDescuento.value - discountAmount.value
+    return subtotalSinDescuento.value - discountAmount.value - freeDeliveryCop.value
 })
 
 // Métodos

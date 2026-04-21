@@ -59,7 +59,15 @@ export const useBranchesStore = defineStore('branches', () => {
 	const create = async (
 		payload: Pick<
 			Branch,
-			'name' | 'address' | 'phone1' | 'phone2' | 'latitude' | 'longitude' | 'businessName' | 'nit'
+			| 'name'
+			| 'address'
+			| 'phone1'
+			| 'phone2'
+			| 'latitude'
+			| 'longitude'
+			| 'businessName'
+			| 'nit'
+			| 'maxFreeDeliveryDiscount'
 		>
 	) => {
 		try {
@@ -80,7 +88,15 @@ export const useBranchesStore = defineStore('branches', () => {
 		id: number,
 		payload: Pick<
 			Branch,
-			'name' | 'address' | 'phone1' | 'phone2' | 'latitude' | 'longitude' | 'businessName' | 'nit'
+			| 'name'
+			| 'address'
+			| 'phone1'
+			| 'phone2'
+			| 'latitude'
+			| 'longitude'
+			| 'businessName'
+			| 'nit'
+			| 'maxFreeDeliveryDiscount'
 		>
 	) => {
 		try {

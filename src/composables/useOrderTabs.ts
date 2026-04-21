@@ -23,6 +23,7 @@ export function useOrderTabs() {
             addressDescription: null,
             addressAdditionalInfo: null,
             deliveryFee: 0,
+            freeDeliveryRequested: false,
             reservedFor: null,
             prepareAt: null,
             isLater: false,
@@ -78,8 +79,14 @@ export function useOrderTabs() {
         const order = store.draftOrders.get(store.currentTabId)
         if (!order) return
 
-        const updated = { ...order, type, updatedAt: new Date() }
+        const updated = {
+            ...order,
+            type,
+            updatedAt: new Date(),
+            ...(type === 'onsite' ? { freeDeliveryRequested: false } : {}),
+        }
         store.draftOrders.set(store.currentTabId, updated)
+        store.recalculateTotals(updated)
         store.saveToLocalStorage()
     }
 

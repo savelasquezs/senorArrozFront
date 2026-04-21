@@ -140,6 +140,14 @@ enum UserRole {
 ### Totales al crear pedido (API)
 
 - En la creación del pedido, el servidor **recalcula** `subtotal`, `discount_total` y `total` a partir de las líneas (`order_details`) y el `delivery_fee`, para que coincidan con la suma de líneas. Las validaciones posteriores (por ejemplo **efectivo en tienda** frente al remanente `total − bancos − apps`) usan ese total coherente y no dependen de que el cliente envíe `total` en el cuerpo del JSON.
+
+### Domicilio gratis (borrador POS)
+
+- **Tope por sucursal**: `branch.max_free_delivery_discount` (COP, por defecto 3000). Configurable en ficha de sucursal.
+- **Presupuesto de descuento**: `min(delivery_fee, max_free_delivery_discount)` cuando el usuario activa «Domicilio gratis» en el borrador.
+- **Alcance de tipo**: aplica en pedidos **delivery** y en **reserva con dirección** (`address_id`); al pasar a **onsite** se desactiva el flag y se limpia el reparto.
+- **Reparto**: el presupuesto se reparte en **partes enteras COP** entre las líneas de producto de forma equitativa, respetando que el descuento por línea no supere `cantidad × precio_unitario − descuento_manual` en esa línea (sin subtotales negativos). La suma del descuento repartido coincide exactamente con el presupuesto (salvo si la suma de capacidades de líneas es menor que el presupuesto, en cuyo caso se descuenta solo hasta esa suma).
+- **Persistencia API**: el precio unitario no se altera; en cada línea se envía `discount` = descuento manual + descuento de domicilio gratis (un solo campo en `order_details`).
 - **Persistencia EF**: esos tres campos deben **persistirse y leerse** en el modelo EF como valores de aplicación (no como “solo generados por BD ignorados tras guardar”). Si la entidad `Order` quedara con `total = 0` en memoria justo después del insert, el tope de efectivo en tienda sería 0 y fallaría la validación aunque el cliente enviara un monto parcial correcto. En PostgreSQL pueden seguir existiendo triggers que recalculan totales al cambiar líneas; deben ser coherentes con la misma fórmula.
 
 ### Estados del Pedido
