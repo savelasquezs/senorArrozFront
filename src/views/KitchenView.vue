@@ -152,11 +152,18 @@ const ordersToConfirm = ref<OrderListItem[]>([])
 const orderItemsMap = ref(new Map<number, OrderDetailItem[]>())
 const cardGridRef = ref<InstanceType<typeof OrderCardGrid> | null>(null)
 
+/** Ids cuyo due de cocina ya anunció el servidor (ReservationReady) pero el reloj local podría aún considerar “pendiente de hora”. Alinea lista activa con el backend. */
+const reservationServerDue = ref<Set<number>>(new Set())
+
 const allOrders = computed(() => ordersStore.list?.items || [])
 
 /** Reservas del día en «Tomado» cuya hora de cocina aún no llegó (prepareAt o reservedFor−1h); luego pasan a Pedidos activos. */
 const scheduledReservationOrders = computed(() => {
-    const list = allOrders.value.filter((o) => KitchenService.isReservationTakenPendingKitchenTime(o))
+    const list = allOrders.value.filter(
+        (o) =>
+            KitchenService.isReservationTakenPendingKitchenTime(o) &&
+            !reservationServerDue.value.has(o.id)
+    )
     return list.sort((a, b) => {
         const ta = new Date(a.prepareAt ?? a.reservedFor ?? 0).getTime()
         const tb = new Date(b.prepareAt ?? b.reservedFor ?? 0).getTime()
@@ -185,6 +192,14 @@ const loadOrders = async () => {
             forKitchen: true
         })
         await loadOrderDetails()
+        // Quitar override cuando el cliente ya considera vencida la hora de cocina (reloj alineado o usuario pasó a preparación).
+        reservationServerDue.value = new Set(
+            [...reservationServerDue.value].filter((id) => {
+                const o = allOrders.value.find((x) => x.id === id)
+                if (!o) return false
+                return KitchenService.isReservationTakenPendingKitchenTime(o)
+            })
+        )
     } catch (err: any) {
         error('Error al cargar pedidos', err.message)
     } finally {
@@ -239,6 +254,10 @@ const handleNewOrder = async (orderData: any) => {
 
 const handleReservationReady = async (orderData: any) => {
     await loadOrders()
+    const oid = typeof orderData?.id === 'number' ? orderData.id : Number(orderData?.id)
+    if (Number.isFinite(oid)) {
+        reservationServerDue.value = new Set([...reservationServerDue.value, oid as number])
+    }
     await notifyOrderShownInKitchen(orderData, true)
 }
 
