@@ -71,29 +71,6 @@ export class BaseApi {
 	protected handleError(error: any): Error {
 		if (error.response) {
 			const data = error.response.data;
-			const status = error.response.status as number;
-			// #region agent log
-			if (status === 500) {
-				fetch('http://127.0.0.1:7318/ingest/1919580f-ef77-45e7-8913-3193e1e0f3d7', {
-					method: 'POST',
-					headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': 'b12624' },
-					body: JSON.stringify({
-						sessionId: 'b12624',
-						hypothesisId: 'H500',
-						runId: 'api-error',
-						location: 'baseApi.ts:handleError',
-						message: 'http_500',
-						data: {
-							url: String(error.config?.url ?? ''),
-							status,
-							detail: data?.detail ?? null,
-							apiMessage: data?.message ?? null,
-						},
-						timestamp: Date.now(),
-					}),
-				}).catch(() => {});
-			}
-			// #endregion
 			if (data?.errors) {
 				const validationMessages = Object.values(data.errors)
 					.flat()
