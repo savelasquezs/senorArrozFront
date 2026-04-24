@@ -330,6 +330,8 @@ export interface OrderAppPaymentDetail {
     amount: number
     isSettled: boolean
     settledAt: string | null
+    /** Alias del API (`IsSetted` → camelCase). Opcional si ya se normalizó a `isSettled`. */
+    isSetted?: boolean
 }
 
 // ===== TIPOS PARA CREACIÓN/ACTUALIZACIÓN =====

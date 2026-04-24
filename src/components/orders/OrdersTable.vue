@@ -176,14 +176,12 @@
                                     @remove="emit('remove-bank-payment', order, $event)" />
                             </div>
 
-                            <!-- App Payments (solo visualización) -->
+                            <!-- App Payments -->
                             <div v-if="order.appPayments && order.appPayments.length > 0" class="space-y-1">
-                                <div v-for="payment in order.appPayments" :key="payment.id"
-                                    class="flex items-center gap-1 text-xs bg-purple-50 rounded px-1.5 py-0.5 min-w-0">
-                                    <DevicePhoneMobileIcon class="w-4 h-4 text-purple-600 shrink-0" />
-                                    <span class="font-medium text-purple-900 truncate max-w-[4.5rem]" :title="payment.appName">{{ payment.appName }}</span>
-                                    <span class="text-purple-700 shrink-0 tabular-nums">{{ formatCurrency(payment.amount) }}</span>
-                                </div>
+                                <OrderAppPaymentRow v-for="payment in order.appPayments" :key="payment.id"
+                                    :payment="payment" :show-settle-actions="showSettleAppActions(order)"
+                                    @settle="emit('settle-app-payment', order, payment)"
+                                    @unsettle="emit('settle-app-payment', order, payment)" />
                             </div>
 
                             <!-- Efectivo en tienda: siempre visible si aplica (junto con banco/app) -->
@@ -262,12 +260,13 @@
 
 <script setup lang="ts">
 import { ref } from 'vue'
-import type { OrderListItem, OrderBankPaymentDetail } from '@/types/order'
+import type { OrderListItem, OrderBankPaymentDetail, OrderAppPaymentDetail } from '@/types/order'
 import type { Bank } from '@/types/bank'
 import OrderStatusBadge from './OrderStatusBadge.vue'
 import OrderTypeBadge from './OrderTypeBadge.vue'
 import BaseLoading from '@/components/ui/BaseLoading.vue'
 import OrderBankPaymentRow from '@/components/payments/OrderBankPaymentRow.vue'
+import OrderAppPaymentRow from '@/components/payments/OrderAppPaymentRow.vue'
 import PaidInStoreCashCompactRow from '@/components/orders/PaidInStoreCashCompactRow.vue'
 import { useFormatting, getStatusTimeFromRecord } from '@/composables/useFormatting'
 import { useOrderPermissions } from '@/composables/useOrderPermissions'
@@ -284,8 +283,6 @@ import {
     ArrowsUpDownIcon,
     ChevronUpIcon,
     ChevronDownIcon,
-    BanknotesIcon,
-    DevicePhoneMobileIcon,
     ClipboardDocumentIcon,
 } from '@heroicons/vue/24/outline'
 
@@ -297,10 +294,13 @@ interface Props {
     quickBanks?: Bank[]
     /** Si true, muestra acción rápida “Pagó” (listado de pedidos). */
     enablePaidInStoreQuickAction?: boolean
+    /** Si true, liquidar/desliquidar app desde la columna Pagos (solo listado; requiere handler en el padre). */
+    enableAppSettleQuickAction?: boolean
 }
 
 const props = withDefaults(defineProps<Props>(), {
     enablePaidInStoreQuickAction: false,
+    enableAppSettleQuickAction: false,
 })
 
 const permissions = useOrderPermissions()
@@ -312,6 +312,7 @@ const emit = defineEmits<{
     'assign-delivery': [order: OrderListItem]
     'edit-type': [order: OrderListItem]
     'verify-bank-payment': [order: OrderListItem, payment: OrderBankPaymentDetail]
+    'settle-app-payment': [order: OrderListItem, payment: OrderAppPaymentDetail]
     'edit-bank-payment': [order: OrderListItem, payment: OrderBankPaymentDetail]
     'remove-bank-payment': [order: OrderListItem, payment: OrderBankPaymentDetail]
     'quick-bank-transfer': [order: OrderListItem, bankId: number]
@@ -384,6 +385,11 @@ const formatTime = (dateString: string): string => defaultBusinessCalendar.forma
 
 const showVerifyBankActions = (order: OrderListItem): boolean =>
     permissions.canVerifyPayments() && order.status !== 'cancelled'
+
+const showSettleAppActions = (order: OrderListItem): boolean =>
+    props.enableAppSettleQuickAction &&
+    permissions.canSettleAppPayments() &&
+    order.status !== 'cancelled'
 
 // Valida si se puede asignar domiciliario al pedido
 const canAssignDeliveryman = (order: OrderListItem): boolean => {

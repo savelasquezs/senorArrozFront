@@ -106,10 +106,11 @@
                             <template v-if="!groupByRoute">
                                 <OrdersTable :orders="filteredOrders" :loading="loading" :sort-by="sortBy"
                                     :sort-order="sortOrder" :quick-banks="quickBanks"
-                                    enable-paid-in-store-quick-action
+                                    enable-paid-in-store-quick-action enable-app-settle-quick-action
                                     @edit-customer="handleEditCustomer" @edit-address="handleEditAddress"
                                     @change-status="handleChangeStatus" @assign-delivery="handleAssignDelivery"
                                     @edit-type="handleEditType" @verify-bank-payment="handleVerifyBankPayment"
+                                    @settle-app-payment="handleSettleAppPayment"
                                     @edit-bank-payment="handleEditBankPaymentFromList"
                                     @remove-bank-payment="handleRemoveBankPaymentFromList"
                                     @quick-bank-transfer="handleQuickBankTransfer" @add-deposit="handleOpenDeposit"
@@ -128,10 +129,11 @@
                                     </div>
                                     <OrdersTable :orders="block.orders" :loading="loading" :sort-by="sortBy"
                                         :sort-order="sortOrder" :quick-banks="quickBanks"
-                                        enable-paid-in-store-quick-action
+                                        enable-paid-in-store-quick-action enable-app-settle-quick-action
                                         @edit-customer="handleEditCustomer" @edit-address="handleEditAddress"
                                         @change-status="handleChangeStatus" @assign-delivery="handleAssignDelivery"
                                         @edit-type="handleEditType" @verify-bank-payment="handleVerifyBankPayment"
+                                        @settle-app-payment="handleSettleAppPayment"
                                         @edit-bank-payment="handleEditBankPaymentFromList"
                                         @remove-bank-payment="handleRemoveBankPaymentFromList"
                                         @quick-bank-transfer="handleQuickBankTransfer"
@@ -418,7 +420,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
-import type { OrderListItem, Order, OrderStatus, OrderBankPaymentDetail } from '@/types/order'
+import type { OrderListItem, Order, OrderStatus, OrderBankPaymentDetail, OrderAppPaymentDetail } from '@/types/order'
 import { orderApi } from '@/services/MainAPI/orderApi'
 import { useOrderFilters, type OrderFilterState } from '@/composables/useOrderFilters'
 import { useOrderPermissions } from '@/composables/useOrderPermissions'
@@ -427,6 +429,8 @@ import { getOrderStatusDisplayName, getOrderTypeDisplayName, useFormatting } fro
 import { sumPaymentsAmounts } from '@/utils/orderCashToCollect'
 import { todayYmd } from '@/utils/datetime'
 import { bankPaymentApi } from '@/services/MainAPI/bankPaymentApi'
+import { appPaymentApi } from '@/services/MainAPI/appPaymentApi'
+import { appPaymentIsSettled } from '@/utils/orderListPayments'
 import type { BankPayment } from '@/types/bank'
 import { useBanksStore } from '@/store/banks'
 import MainLayout from '@/components/layout/MainLayout.vue'
@@ -837,6 +841,42 @@ const handleVerifyBankPayment = async (order: OrderListItem, payment: OrderBankP
         }
     } catch (err: any) {
         error('Error al verificar pago', err.message)
+    }
+}
+
+const patchOrderListAppPaymentSettled = (
+    list: OrderListItem[],
+    orderId: number,
+    paymentId: number,
+    nextSettled: boolean,
+) => {
+    const index = list.findIndex((o) => o.id === orderId)
+    if (index === -1) return
+    const paymentIndex = list[index].appPayments.findIndex((p) => p.id === paymentId)
+    if (paymentIndex === -1) return
+    list[index].appPayments[paymentIndex] = {
+        ...list[index].appPayments[paymentIndex],
+        isSettled: nextSettled,
+        isSetted: nextSettled,
+        settledAt: nextSettled ? new Date().toISOString() : null,
+    }
+}
+
+const handleSettleAppPayment = async (order: OrderListItem, payment: OrderAppPaymentDetail) => {
+    const settled = appPaymentIsSettled(payment)
+    try {
+        if (settled) {
+            await appPaymentApi.unsettleAppPayment(payment.id)
+            success('Liquidación removida', 5000, 'El pago por app quedó pendiente de liquidar')
+        } else {
+            await appPaymentApi.settleAppPayment(payment.id)
+            success('Pago liquidado', 5000, 'El pago por app fue liquidado')
+        }
+
+        const next = !settled
+        patchOrderListAppPaymentSettled(orders.value, order.id, payment.id, next)
+    } catch (err: any) {
+        error(settled ? 'Error al desliquidar' : 'Error al liquidar', err.message)
     }
 }
 

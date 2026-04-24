@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { orderHasElectronicPayments } from '../orderListPayments'
+import { appPaymentIsSettled, orderHasElectronicPayments } from '../orderListPayments'
 
 describe('orderHasElectronicPayments', () => {
     it('false sin bancos ni apps', () => {
@@ -36,5 +36,19 @@ describe('orderHasElectronicPayments', () => {
                 ],
             }),
         ).toBe(true)
+    })
+})
+
+describe('appPaymentIsSettled', () => {
+    it('true con isSettled', () => {
+        expect(appPaymentIsSettled({ isSettled: true })).toBe(true)
+    })
+
+    it('true con isSetted (API)', () => {
+        expect(appPaymentIsSettled({ isSettled: false, isSetted: true })).toBe(true)
+    })
+
+    it('false sin ninguno', () => {
+        expect(appPaymentIsSettled({ isSettled: false })).toBe(false)
     })
 })
