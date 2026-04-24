@@ -44,7 +44,7 @@ Leyenda: **Completado** · **Parcial** · **Pendiente**
 | Archivo | Qué mejoró | Qué falta |
 |---------|------------|-----------|
 | `queryParams.ts` | `QueryParamMapper`, `buildQueryParams`, tests | Extender adopción a más clientes HTTP |
-| `orderApi.ts` | `BaseApi`, métodos claros | **Reemplazar construcción manual de `params` en `getOrders` por `buildQueryParams`** |
+| `orderApi.ts` | `getOrders` usa `buildQueryParams` + `orderGetOrdersQueryMapper`; tests `orderGetOrdersQuery.test.ts` | Otros métodos con `params` manual (`fetchList`, `fetchDeliveryReady`, etc.) si se unifica |
 
 ### Completado (mapper)
 
@@ -91,6 +91,6 @@ Leyenda: **Completado** · **Parcial** · **Pendiente**
 
 ## Próximo archivo a refactorizar (un solo archivo)
 
-**`src/services/MainAPI/orderApi.ts`** — método **`getOrders`**: sustituir construcción manual de `params` por **`buildQueryParams`** + mapper tipado (misma semántica que hoy).
+Sugerencia: **`orderApi.fetchList`** o **`fetchDeliveryReady`** (mismo patrón `buildQueryParams`) **o** el siguiente store pendiente (`ordersDrafts`, `delivery`, etc.) — ver tabla **Pendiente** arriba.
 
-**Por qué:** `ordersData` ya usa `resourceStore`; el siguiente cuello de Fase 1 en pedidos es la duplicación de query params frente al resto de APIs.
+**Por qué:** `getOrders` ya está unificado; conviene un archivo a la vez para no mezclar riesgos.

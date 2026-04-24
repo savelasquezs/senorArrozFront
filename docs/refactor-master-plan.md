@@ -36,7 +36,7 @@ Consta en la terminal / transcript revisado:
 | Helpers de mutación de listas paginadas | **Hecho (stores migrados)** | `prependPagedItem`, `replacePagedItem`, `removePagedItem` en `resourceStore.ts`; usados en stores CRUD migrados, incl. **`ordersData`** en update/remove/selfAssign. |
 | Paginación centralizada (`BasePagination`) | **Muy parcial** | Uso confirmado en `DeliveryHistoryTable.vue`. El componente vive como `BasePaginatiopn.vue` (typo en nombre de archivo). Muchas vistas con lógica de página propia (p. ej. pedidos). |
 | Fechas vía capa de dominio (`DateTimeService` / calendario) | **Parcial** | `DateTimeService` + `defaultBusinessCalendar` / `useDateTime` existen. Uso correcto en p. ej. `OrderSidebar.vue`. Persisten utilidades y TZ dispersas; conviene auditar vistas que aún formatean o interpretan fechas inline. |
-| `QueryParamMapper` / `buildQueryParams` | **Parcial** | Implementado en `src/services/MainAPI/queryParams.ts` y usado en `appApi`, `bankApi`, `customerApi`, `productApi`, `productCategoryApi`. **`orderApi.getOrders` sigue mapeando filtros a mano** (duplicación y riesgo de desalineación). |
+| `QueryParamMapper` / `buildQueryParams` | **Parcial** | Implementado en `queryParams.ts` y usado en varias APIs; **`orderApi.getOrders`** usa `orderGetOrdersQueryMapper` + tests `orderGetOrdersQuery.test.ts`. Otros métodos de `orderApi` pueden seguir con params manuales. |
 
 ### Fase 2
 
@@ -68,7 +68,7 @@ Consta en la terminal / transcript revisado:
 ## Pendiente (priorizado, incremental)
 
 1. **Fase 1 — cerrar brechas sin tocar aún los god components**
-   - Refactorizar **`orderApi.getOrders`** para usar `buildQueryParams` + mapper tipado (misma semántica que el objeto `params` actual).
+   - Opcional: más métodos de **`orderApi`** (`fetchList`, `fetchDeliveryReady`, …) con `buildQueryParams`.
    - Extender uso de **`BasePagination`** (y corregir nombre del archivo del componente cuando haya ventana segura de renombre + imports).
 2. **Fase 1 — resto de stores** con patrón manual `isLoading`/`try`/`catch`: priorizar los que alimentan listas paginadas o pantallas críticas (`productSearch`, `delivery`, `ordersDrafts`, etc.).
 3. **Fase 2 —** introducir **`OrderPolicy`** (funciones puras / clase pequeña) y mover reglas desde `OrdersList.vue` / `OrderDetailContent.vue` de forma incremental.
@@ -81,7 +81,7 @@ Consta en la terminal / transcript revisado:
 
 - **God components:** `OrdersList.vue` (~1490 líneas), `OrderDetailContent.vue` (~1323 líneas).
 - **`ordersData`:** resuelto en cuanto a `resourceStore`; permanece deuda en torno a **`orderApi`** (query params) y god components que consumen el store.
-- **`orderApi`:** filtros no usan `buildQueryParams`.
+- **`orderApi`:** solo **`getOrders`** unificado con `buildQueryParams`; resto de métodos con `params` inline según se priorice.
 - **Paginación:** poco reutilizo del componente UI; nombre de archivo `BasePaginatiopn.vue` inconsistente.
 - **Comentarios legacy** en `ordersData.ts` (“COPIAR EXACTO”) indican deuda de documentación y posible desalineación con la fuente de verdad.
 
@@ -89,4 +89,4 @@ Consta en la terminal / transcript revisado:
 
 ## Próximo paso único recomendado
 
-Ver **`docs/refactor-tracking.md`** (siguiente: **`orderApi.getOrders`** → `buildQueryParams`).
+Ver **`docs/refactor-tracking.md`** para el siguiente archivo incremental.
