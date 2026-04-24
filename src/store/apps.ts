@@ -1,5 +1,5 @@
-// src/store/apps.ts
 import { defineStore } from 'pinia'
+import { ref } from 'vue'
 import { appApi } from '@/services/MainAPI/appApi'
 import type {
     App,
@@ -8,175 +8,125 @@ import type {
     UpdateAppDto
 } from '@/types/bank'
 import type { PagedResult } from '@/types/common'
+import {
+    createResourceState,
+    prependPagedItem,
+    removePagedItem,
+    replacePagedItem,
+    type ResourceActionOptions,
+} from './helpers/resourceStore'
 
 let appsListEnsureInFlight: Promise<void> | null = null
 
-interface AppsState {
-    list: PagedResult<App> | null
-    current: App | null
-    byBank: App[] | null
-    isLoading: boolean
-    error: string | null
-}
+type FetchOpts = ResourceActionOptions
 
-export const useAppsStore = defineStore('apps', {
-    state: (): AppsState => ({
-        list: null,
-        current: null,
-        byBank: null,
-        isLoading: false,
-        error: null
-    }),
+export const useAppsStore = defineStore('apps', () => {
+    const list = ref<PagedResult<App> | null>(null)
+    const current = ref<App | null>(null)
+    const byBank = ref<App[] | null>(null)
+    const { isLoading, error, run, clearError } = createResourceState()
 
-    actions: {
-        async fetch(filters?: AppFilters) {
-            this.isLoading = true
-            this.error = null
-            try {
-                const response = await appApi.getApps(filters)
-                // Backend returns data directly, not wrapped in ApiResponse
-                if (response && response.items) {
-                    this.list = response as PagedResult<App>
-                } else {
-                    this.error = 'Error al obtener apps'
-                }
-            } catch (error: any) {
-                this.error = error.message || 'Error de conexión'
-            } finally {
-                this.isLoading = false
-            }
-        },
+    const fetch = async (filters?: AppFilters, opts?: FetchOpts) => {
+        await run(async () => {
+            const response = await appApi.getApps(filters)
+            list.value = response
+        }, { ...opts, errorMessage: 'Error al obtener apps' })
+    }
 
-        async ensureListLoaded() {
-            if (this.list?.items?.length) {
-                return
-            }
-            if (appsListEnsureInFlight) {
-                return appsListEnsureInFlight
-            }
-            appsListEnsureInFlight = this.fetch({ page: 1, pageSize: 100 }).finally(() => {
-                appsListEnsureInFlight = null
-            })
-            return appsListEnsureInFlight
-        },
-
-        async fetchById(id: number) {
-            this.isLoading = true
-            this.error = null
-            try {
-                const response = await appApi.getAppById(id)
-                this.current = response
-            } catch (error: any) {
-                this.error = error.message || 'Error de conexión'
-            } finally {
-                this.isLoading = false
-            }
-        },
-
-        async fetchByBank(bankId: number) {
-            this.isLoading = true
-            this.error = null
-            try {
-                const response = await appApi.getAppsByBank(bankId)
-                this.byBank = response
-            } catch (error: any) {
-                this.error = error.message || 'Error de conexión'
-            } finally {
-                this.isLoading = false
-            }
-        },
-
-        async create(payload: CreateAppDto) {
-            this.isLoading = true
-            this.error = null
-            try {
-                const response = await appApi.createApp(payload)
-                // Add to list if it exists
-                if (this.list) {
-                    this.list.items.unshift(response)
-                    this.list.totalCount++
-                }
-                // Add to byBank if it exists and matches
-                if (this.byBank && response.bankId === payload.bankId) {
-                    this.byBank.unshift(response)
-                }
-                this.current = response
-                return response
-            } catch (error: any) {
-                this.error = error.message || 'Error de conexión'
-                throw error
-            } finally {
-                this.isLoading = false
-            }
-        },
-
-        async update(id: number, payload: UpdateAppDto) {
-            this.isLoading = true
-            this.error = null
-            try {
-                const response = await appApi.updateApp(id, payload)
-                // Update item in list
-                if (this.list) {
-                    const index = this.list.items.findIndex(item => item.id === id)
-                    if (index !== -1) {
-                        this.list.items[index] = response
-                    }
-                }
-                // Update item in byBank
-                if (this.byBank) {
-                    const index = this.byBank.findIndex(item => item.id === id)
-                    if (index !== -1) {
-                        this.byBank[index] = response
-                    }
-                }
-                // Update current if it's the same app
-                if (this.current?.id === id) {
-                    this.current = response
-                }
-                return response
-            } catch (error: any) {
-                this.error = error.message || 'Error de conexión'
-                throw error
-            } finally {
-                this.isLoading = false
-            }
-        },
-
-        async remove(id: number) {
-            this.isLoading = true
-            this.error = null
-            try {
-                await appApi.deleteApp(id)
-                // Remove from list
-                if (this.list) {
-                    this.list.items = this.list.items.filter(item => item.id !== id)
-                    this.list.totalCount--
-                }
-                // Remove from byBank
-                if (this.byBank) {
-                    this.byBank = this.byBank.filter(item => item.id !== id)
-                }
-                // Clear current if it was the deleted app
-                if (this.current?.id === id) {
-                    this.current = null
-                }
-            } catch (error: any) {
-                this.error = error.message || 'Error de conexión'
-                throw error
-            } finally {
-                this.isLoading = false
-            }
-        },
-
-        clear() {
-            this.current = null
-            this.error = null
-        },
-
-        clearList() {
-            this.list = null
-            this.byBank = null
-            this.error = null
+    const ensureListLoaded = async () => {
+        if (list.value?.items?.length) {
+            return
         }
+        if (appsListEnsureInFlight) {
+            return appsListEnsureInFlight
+        }
+        appsListEnsureInFlight = fetch({ page: 1, pageSize: 100 }).finally(() => {
+            appsListEnsureInFlight = null
+        })
+        return appsListEnsureInFlight
+    }
+
+    const fetchById = async (id: number, opts?: FetchOpts) => {
+        await run(async () => {
+            const response = await appApi.getAppById(id)
+            current.value = response
+        }, { ...opts, errorMessage: 'Error al obtener app' })
+    }
+
+    const fetchByBank = async (bankId: number, opts?: FetchOpts) => {
+        await run(async () => {
+            const response = await appApi.getAppsByBank(bankId)
+            byBank.value = response
+        }, { ...opts, errorMessage: 'Error al obtener apps del banco' })
+    }
+
+    const create = async (payload: CreateAppDto, opts?: FetchOpts) => {
+        return run(async () => {
+            const response = await appApi.createApp(payload)
+            prependPagedItem(list, response)
+            if (byBank.value && response.bankId === payload.bankId) {
+                byBank.value.unshift(response)
+            }
+            current.value = response
+            return response
+        }, { ...opts, errorMessage: 'Error de conexion' })
+    }
+
+    const update = async (id: number, payload: UpdateAppDto, opts?: FetchOpts) => {
+        return run(async () => {
+            const response = await appApi.updateApp(id, payload)
+            replacePagedItem(list, response)
+            if (byBank.value) {
+                const index = byBank.value.findIndex(item => item.id === id)
+                if (index !== -1) {
+                    byBank.value[index] = response
+                }
+            }
+            if (current.value?.id === id) {
+                current.value = response
+            }
+            return response
+        }, { ...opts, errorMessage: 'Error de conexion' })
+    }
+
+    const remove = async (id: number, opts?: FetchOpts) => {
+        await run(async () => {
+            await appApi.deleteApp(id)
+            removePagedItem(list, id)
+            if (byBank.value) {
+                byBank.value = byBank.value.filter(item => item.id !== id)
+            }
+            if (current.value?.id === id) {
+                current.value = null
+            }
+        }, { ...opts, errorMessage: 'Error de conexion' })
+    }
+
+    const clear = () => {
+        current.value = null
+        clearError()
+    }
+
+    const clearList = () => {
+        list.value = null
+        byBank.value = null
+        clearError()
+    }
+
+    return {
+        list,
+        current,
+        byBank,
+        isLoading,
+        error,
+        fetch,
+        ensureListLoaded,
+        fetchById,
+        fetchByBank,
+        create,
+        update,
+        remove,
+        clear,
+        clearList,
     }
 })
