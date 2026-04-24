@@ -10,41 +10,36 @@ import type {
     CreateProductCategoryDto,
     UpdateProductCategoryDto,
 } from '@/types/product';
+import { buildQueryParams } from './queryParams';
 
 class ProductCategoryApi extends BaseApi {
-    // 1. Obtener categorías con filtros y paginación
     async getProductCategories(
         filters?: ProductCategoryFilters
     ): Promise<ApiResponse<PagedResult<ProductCategory>>> {
-        // Mapear parámetros de frontend (camelCase) a backend (PascalCase)
-        const params: any = {};
-        if (filters) {
-            if (filters.name) params.Name = filters.name;
-            if (filters.branchId !== undefined) params.BranchId = filters.branchId;
-            params.Page = filters.page || 1;
-            params.PageSize = filters.pageSize || 10;
-            if (filters.sortBy) params.SortBy = filters.sortBy;
-            if (filters.sortOrder) params.SortOrder = filters.sortOrder;
-        }
+        const params = buildQueryParams(filters, {
+            Name: 'name',
+            BranchId: 'branchId',
+            Page: (value) => value.page ?? 1,
+            PageSize: (value) => value.pageSize ?? 10,
+            SortBy: 'sortBy',
+            SortOrder: 'sortOrder',
+        });
 
         return this.get<ApiResponse<PagedResult<ProductCategory>>>('/productcategories', {
             params,
         });
     }
 
-    // 2. Obtener categoría por ID
     async getProductCategoryById(id: number): Promise<ApiResponse<ProductCategory>> {
         return this.get<ApiResponse<ProductCategory>>(`/productcategories/${id}`);
     }
 
-    // 3. Crear categoría
     async createProductCategory(
         payload: CreateProductCategoryDto
     ): Promise<ApiResponse<ProductCategory>> {
         return this.post<ApiResponse<ProductCategory>>('/productcategories', payload);
     }
 
-    // 4. Actualizar categoría
     async updateProductCategory(
         id: number,
         payload: UpdateProductCategoryDto
@@ -52,11 +47,9 @@ class ProductCategoryApi extends BaseApi {
         return this.put<ApiResponse<ProductCategory>>(`/productcategories/${id}`, payload);
     }
 
-    // 5. Eliminar categoría
     async deleteProductCategory(id: number): Promise<ApiResponse<string>> {
         return this.delete<ApiResponse<string>>(`/productcategories/${id}`);
     }
 }
 
 export const productCategoryApi = new ProductCategoryApi();
-
