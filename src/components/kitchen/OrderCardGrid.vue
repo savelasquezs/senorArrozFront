@@ -42,7 +42,7 @@
                 <span>Tomado ({{ takenOrders.length }})</span>
             </h3>
             <div
-                class="grid gap-2 sm:gap-3 [grid-template-columns:repeat(auto-fit,minmax(clamp(220px,28vw,320px),1fr))]">
+                class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3">
                 <div v-for="group in takenOrdersGrouped" :key="`taken-${group.label}`" class="min-w-0 flex flex-col gap-2">
                     <h4 class="text-xs sm:text-sm font-medium text-gray-700 border-b border-gray-200 pb-0.5">
                         {{ group.label }}
@@ -63,7 +63,7 @@
                 <span>En Preparación ({{ inPreparationOrders.length }})</span>
             </h3>
             <div
-                class="grid gap-2 sm:gap-3 [grid-template-columns:repeat(auto-fit,minmax(clamp(220px,28vw,320px),1fr))]">
+                class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3">
                 <div v-for="group in inPreparationOrdersGrouped" :key="`prep-${group.label}`" class="min-w-0 flex flex-col gap-2">
                     <h4 class="text-xs sm:text-sm font-medium text-gray-700 border-b border-gray-200 pb-0.5">
                         {{ group.label }}

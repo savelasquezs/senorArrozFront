@@ -1,54 +1,11 @@
 <template>
     <MainLayout>
         <div class="p-3 sm:p-4 md:p-5 space-y-3 sm:space-y-4">
-            <!-- Header: título + barra de cocina (solo rol Kitchen) -->
-            <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
-                <div class="min-w-0">
-                    <h1 class="text-xl sm:text-2xl font-bold text-gray-900 leading-tight">Cocina</h1>
-                    <p class="text-xs sm:text-sm text-gray-600 mt-0.5">Gestión de pedidos en preparación</p>
-                </div>
-
-                <div v-if="authStore.isKitchen"
-                    class="flex flex-wrap items-center gap-1.5 sm:gap-2">
-                    <div :class="[
-                        'flex items-center gap-1 px-1.5 sm:px-2 py-0.5 rounded-md text-[11px] sm:text-xs',
-                        isConnected ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
-                    ]">
-                        <span :class="['w-1.5 h-1.5 rounded-full flex-shrink-0', isConnected ? 'bg-green-500' : 'bg-red-500']"></span>
-                        <span class="whitespace-nowrap">{{ isConnected ? 'Conectado' : 'Desconectado' }}</span>
-                    </div>
-
-                    <button v-if="permission === 'default'" type="button" @click="requestPermission"
-                        class="flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[11px] sm:text-xs bg-amber-100 text-amber-700 hover:bg-amber-200 transition-colors"
-                        title="Activar notificaciones">
-                        <BellIcon class="w-3.5 h-3.5 flex-shrink-0" />
-                        <span class="hidden sm:inline">Activar notificaciones</span>
-                    </button>
-                    <div v-else :class="[
-                        'flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[11px] sm:text-xs',
-                        permission === 'granted' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'
-                    ]" :title="permission === 'granted' ? 'Notificaciones activas' : 'Notificaciones desactivadas'">
-                        <BellIcon class="w-3.5 h-3.5 flex-shrink-0" />
-                        <span class="hidden sm:inline">{{ permission === 'granted' ? 'Notif. OK' : 'No' }}</span>
-                    </div>
-                    <button type="button" @click="toggleSound" :class="[
-                        'p-1 rounded-md transition-colors',
-                        soundEnabled ? 'bg-emerald-100 text-emerald-600' : 'bg-gray-100 text-gray-400'
-                    ]" :title="soundEnabled ? 'Desactivar sonido' : 'Activar sonido'">
-                        <component :is="soundEnabled ? SpeakerWaveIcon : SpeakerXMarkIcon" class="w-4 h-4 sm:w-5 sm:h-5" />
-                    </button>
-
-                    <BaseButton @click="refreshOrders" variant="outline" size="sm" :loading="isLoading">
-                        <span class="flex items-center gap-1">
-                            <ArrowPathIcon class="w-3.5 h-3.5" />
-                            <span class="text-xs">Actualizar</span>
-                        </span>
-                    </BaseButton>
-                </div>
-            </div>
-
-            <div class="border-b border-gray-200 -mx-3 px-3 sm:mx-0 sm:px-0">
-                <nav class="-mb-px flex space-x-4 sm:space-x-6 overflow-x-auto">
+            <!-- Pestañas + barra de cocina (solo rol Kitchen) en la misma franja -->
+            <div
+                class="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between sm:gap-3 border-b border-gray-200 -mx-3 px-3 sm:mx-0 sm:px-0"
+            >
+                <nav class="-mb-px flex min-w-0 flex-1 space-x-4 sm:space-x-6 overflow-x-auto">
                     <button type="button" @click="activeTab = 'scheduled'" :class="[
                         'py-2 sm:py-2.5 px-1 border-b-2 font-medium text-xs sm:text-sm transition-colors whitespace-nowrap flex-shrink-0',
                         activeTab === 'scheduled'
@@ -88,6 +45,44 @@
                         </span>
                     </button>
                 </nav>
+
+                <div v-if="authStore.isKitchen"
+                    class="flex flex-wrap items-center justify-end gap-1.5 sm:gap-2 sm:pb-0.5 sm:flex-shrink-0">
+                    <div :class="[
+                        'flex items-center gap-1 px-1.5 sm:px-2 py-0.5 rounded-md text-[11px] sm:text-xs',
+                        isConnected ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+                    ]">
+                        <span :class="['w-1.5 h-1.5 rounded-full flex-shrink-0', isConnected ? 'bg-green-500' : 'bg-red-500']"></span>
+                        <span class="whitespace-nowrap">{{ isConnected ? 'Conectado' : 'Desconectado' }}</span>
+                    </div>
+
+                    <button v-if="permission === 'default'" type="button" @click="requestPermission"
+                        class="flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[11px] sm:text-xs bg-amber-100 text-amber-700 hover:bg-amber-200 transition-colors"
+                        title="Activar notificaciones">
+                        <BellIcon class="w-3.5 h-3.5 flex-shrink-0" />
+                        <span class="hidden sm:inline">Activar notificaciones</span>
+                    </button>
+                    <div v-else :class="[
+                        'flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[11px] sm:text-xs',
+                        permission === 'granted' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'
+                    ]" :title="permission === 'granted' ? 'Notificaciones activas' : 'Notificaciones desactivadas'">
+                        <BellIcon class="w-3.5 h-3.5 flex-shrink-0" />
+                        <span class="hidden sm:inline">{{ permission === 'granted' ? 'Notif. OK' : 'No' }}</span>
+                    </div>
+                    <button type="button" @click="toggleSound" :class="[
+                        'p-1 rounded-md transition-colors',
+                        soundEnabled ? 'bg-emerald-100 text-emerald-600' : 'bg-gray-100 text-gray-400'
+                    ]" :title="soundEnabled ? 'Desactivar sonido' : 'Activar sonido'">
+                        <component :is="soundEnabled ? SpeakerWaveIcon : SpeakerXMarkIcon" class="w-4 h-4 sm:w-5 sm:h-5" />
+                    </button>
+
+                    <BaseButton @click="refreshOrders" variant="outline" size="sm" :loading="isLoading">
+                        <span class="flex items-center gap-1">
+                            <ArrowPathIcon class="w-3.5 h-3.5" />
+                            <span class="text-xs">Actualizar</span>
+                        </span>
+                    </BaseButton>
+                </div>
             </div>
 
             <div v-if="activeTab === 'scheduled'">

@@ -78,7 +78,15 @@ enum UserRole {
 - **Estado limitado**: Solo puede cambiar pedidos a "Ready"
 - **Filtrado**: Pedidos desaparecen de su vista al pasarlos a "Ready"
 - **Cabecera en `/kitchen`**: La franja con estado de conexión (SignalR), permiso de notificaciones del navegador, activación de sonido TTS y botón «Actualizar» se muestra **solo** al usuario con rol **Kitchen**. Quien entre con **Admin** o **Superadmin** sigue pudiendo usar el módulo según la matriz, pero sin esa barra en cabecera.
-- **Nombre corto de producto en pantalla**: En las tarjetas de cocina se usa la misma lógica de abreviación que en la comanda impresa: backend `KitchenProductNameFormatter`; frontend `formatKitchenProductDisplayName` (`useKitchenProductDisplayName.ts`).
+- **Nombre corto de producto en cocina (pantalla y comanda)**: Misma lógica en `KitchenProductNameFormatter` (API / tickets) y `formatKitchenProductDisplayName` en `useKitchenProductDisplayName.ts` (vue cocina). Reglas, en orden de aplicación razonable:
+  - Se omiten como conectores o relleno: `arroz`, `con`, `de`, `unidades` (comparación **sin tildes** en minúsculas).
+  - Frase fija `a la francesa` (tolerar `francésa` / typo `fransesa`): se quita.
+  - `chicharron` / `chicharrón` (y variantes) en cualquier parte de un token: se sustituye por `chich` (p. ej. compuesto *Combochicharrón* → *Combochich*).
+  - Secuencia `ropa` + `vieja` (dos palabras) → una palabra: `ropa`.
+  - Si en el **mismo** nombre de producto aparecen `Súper` y `Familiar` (cada una como token), se elimina `Familiar` y `Súper` pasa a `super` (p. ej. *… Súper Familiar* → … **super** …).
+  - Si el nombre contiene el tamaño `Súper` (token `super` tras normalizar), `super` se muestra **al inicio** del nombre corto (lectura en cocina: tamaño primero; p. ej. *Arroz ropa vieja con chicharrón Súper* → *super ropa chich*).
+  - Postproceso en la cadena mostrada: “número + gr” (con o sin espacio) pasa a “número + g” (p. ej. *500 gr* → *500g*); un token *x* seguido de dígitos (*x5*, *X10*) pasa a *x 5*, *x 10* (separar cantidad de la *x*).
+- Si tras todas las reglas no quedara ningún token, se conserva el nombre original (trim) para no dejar el ítem en blanco (p. ej. solo *arroz con*).
 
 #### Deliveryman
 - **Pedidos listos**: Solo ve pedidos en estado "Ready" y los suyos propios
