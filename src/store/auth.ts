@@ -9,15 +9,21 @@ import type {
 	resetPasswordCredentials,
 } from '@/types/auth';
 import { authApi } from '@/services/MainAPI/authApi';
+import {
+	clearSession,
+	getAccessToken,
+	getRefreshToken,
+	getStoredUser,
+	persistSession,
+	updateStoredUser,
+} from '@/services/auth/authSession';
 import { bootstrapOrderCatalog } from '@/utils/orderCatalogBootstrap';
 
 export const useAuthStore = defineStore('auth', () => {
 	// State
 	const user = ref<User | null>(null);
-	const token = ref<string | null>(localStorage.getItem('auth_token'));
-	const refreshToken = ref<string | null>(
-		localStorage.getItem('refresh_token')
-	);
+	const token = ref<string | null>(getAccessToken());
+	const refreshToken = ref<string | null>(getRefreshToken());
 	const isLoading = ref(false);
 	const error = ref<string | null>(null);
 
@@ -92,9 +98,7 @@ export const useAuthStore = defineStore('auth', () => {
 		token.value = data.token;
 		refreshToken.value = data.refreshToken;
 
-		localStorage.setItem('auth_token', data.token);
-		localStorage.setItem('refresh_token', data.refreshToken);
-		localStorage.setItem('user_data', JSON.stringify(data.user));
+		persistSession(data);
 
 		void bootstrapOrderCatalog(data.user.role);
 	};
@@ -105,9 +109,7 @@ export const useAuthStore = defineStore('auth', () => {
 		refreshToken.value = null;
 		error.value = null;
 
-		localStorage.removeItem('auth_token');
-		localStorage.removeItem('refresh_token');
-		localStorage.removeItem('user_data');
+		clearSession();
 	};
 
 	const changePassword = async (
@@ -158,20 +160,22 @@ export const useAuthStore = defineStore('auth', () => {
 	};
 
 	const initializeAuth = (): void => {
-		const storedToken = localStorage.getItem('auth_token');
-		const storedUser = localStorage.getItem('user_data');
+		const storedToken = getAccessToken();
+		const storedRefreshToken = getRefreshToken();
+		const storedUser = getStoredUser();
 
 		if (storedToken && storedUser) {
-			try {
-				token.value = storedToken;
-				user.value = JSON.parse(storedUser);
-				if (user.value) {
-					void bootstrapOrderCatalog(user.value.role);
-				}
-			} catch (err) {
-				console.error('Error parsing stored user data:', err);
-				clearAuthData();
+			token.value = storedToken;
+			refreshToken.value = storedRefreshToken;
+			user.value = storedUser;
+			if (user.value) {
+				void bootstrapOrderCatalog(user.value.role);
 			}
+			return;
+		}
+
+		if (storedToken || storedRefreshToken) {
+			clearAuthData();
 		}
 	};
 
@@ -182,7 +186,7 @@ export const useAuthStore = defineStore('auth', () => {
 	const updateUserData = (partial: Partial<User>): void => {
 		if (!user.value) return;
 		user.value = { ...user.value, ...partial };
-		localStorage.setItem('user_data', JSON.stringify(user.value));
+		updateStoredUser(user.value);
 	};
 
 	return {

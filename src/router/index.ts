@@ -1,6 +1,7 @@
 // src/router/index.ts
 import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router'
 import { useAuthStore } from '@/store/auth'
+import { hasAccessToken } from '@/services/auth/authSession'
 import { UserRole } from '@/types/auth'
 
 // Import views
@@ -317,12 +318,12 @@ const router = createRouter({
 
 // Navigation guards
 router.beforeEach(async (to, _from, next) => {
-    const authStore = useAuthStore()
+	const authStore = useAuthStore()
 
-    // Initialize auth state if not already done
-    if (!authStore.isAuthenticated && localStorage.getItem('auth_token')) {
-        authStore.initializeAuth()
-    }
+	// Initialize auth state if not already done
+	if (!authStore.isAuthenticated && hasAccessToken()) {
+		authStore.initializeAuth()
+	}
 
     // Set page title
     document.title = to.meta.title ? `${to.meta.title} - Señor Arroz` : 'Señor Arroz'

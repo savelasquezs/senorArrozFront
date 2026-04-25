@@ -1,5 +1,6 @@
 // src/services/baseApi.ts
 import axios, { type AxiosInstance, type AxiosRequestConfig } from 'axios';
+import { getAccessToken, refreshAccessToken } from '@/services/auth/authSession';
 
 export class BaseApi {
 	protected api: AxiosInstance;
@@ -17,12 +18,13 @@ export class BaseApi {
 	private setupInterceptors(): void {
 		this.api.interceptors.request.use(
 			(config) => {
-				const token = localStorage.getItem('auth_token');
+				const token = getAccessToken();
 				if (token) {
+					config.headers = config.headers ?? {};
 					config.headers.Authorization = `Bearer ${token}`;
 				}
-				// FormData: no forzar Content-Type para que el navegador envíe multipart con boundary
-				if (config.data instanceof FormData) {
+				// FormData: no forzar Content-Type para que el navegador envie multipart con boundary
+				if (config.data instanceof FormData && config.headers) {
 					delete config.headers['Content-Type'];
 				}
 				return config;
@@ -35,34 +37,25 @@ export class BaseApi {
 			async (error) => {
 				const originalRequest = error.config;
 				const url = String(originalRequest?.url ?? '');
-				// No reintentar login/refresh ni entrar en bucle si el refresh devuelve 401
+
 				if (
 					url.includes('/auth/login') ||
 					url.includes('/auth/refresh')
 				) {
 					return Promise.reject(error);
 				}
-				if (error.response?.status === 401 && !originalRequest._retry) {
+
+				if (error.response?.status === 401 && originalRequest && !originalRequest._retry) {
 					originalRequest._retry = true;
-					try {
-						const refreshToken = localStorage.getItem('refresh_token');
-						if (refreshToken) {
-							const response = await this.api.post('/auth/refresh', {
-								refreshToken,
-							});
-							const { token, refreshToken: newRefresh } = response.data;
-							localStorage.setItem('auth_token', token);
-							if (newRefresh) {
-								localStorage.setItem('refresh_token', newRefresh);
-							}
-							originalRequest.headers.Authorization = `Bearer ${token}`;
-							return this.api(originalRequest);
-						}
-					} catch {
-						localStorage.clear();
-						window.location.href = '/login';
+					const token = await refreshAccessToken();
+
+					if (token) {
+						originalRequest.headers = originalRequest.headers ?? {};
+						originalRequest.headers.Authorization = `Bearer ${token}`;
+						return this.api(originalRequest);
 					}
 				}
+
 				return Promise.reject(error);
 			}
 		);
@@ -80,7 +73,7 @@ export class BaseApi {
 			if (data?.message || data?.error) {
 				const base = (data.message || data.error) as string;
 				if (data?.detail) {
-					return new Error(`${base} — ${String(data.detail)}`);
+					return new Error(`${base} - ${String(data.detail)}`);
 				}
 				return new Error(base);
 			}
@@ -89,14 +82,13 @@ export class BaseApi {
 			);
 		} else if (error.request) {
 			return new Error(
-				'No se pudo conectar con el servidor. Verifica tu conexión.'
+				'No se pudo conectar con el servidor. Verifica tu conexion.'
 			);
 		} else {
 			return new Error(error.message || 'Error inesperado');
 		}
 	}
 
-	// Métodos genéricos
 	async get<T>(url: string, config?: AxiosRequestConfig): Promise<T> {
 		try {
 			const response = await this.api.get(url, config);

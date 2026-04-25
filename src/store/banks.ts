@@ -1,5 +1,5 @@
-// src/store/banks.ts
 import { defineStore } from 'pinia'
+import { ref } from 'vue'
 import { bankApi } from '@/services/MainAPI/bankApi'
 import type {
     Bank,
@@ -9,166 +9,119 @@ import type {
     UpdateBankDto
 } from '@/types/bank'
 import type { PagedResult } from '@/types/common'
+import {
+    createResourceState,
+    prependPagedItem,
+    removePagedItem,
+    replacePagedItem,
+    type ResourceActionOptions,
+} from './helpers/resourceStore'
 
 let banksListEnsureInFlight: Promise<void> | null = null
 
-interface BanksState {
-    list: PagedResult<Bank> | null
-    current: Bank | null
-    currentDetail: BankDetail | null
-    isLoading: boolean
-    error: string | null
-}
+type FetchOpts = ResourceActionOptions
 
-export const useBanksStore = defineStore('banks', {
-    state: (): BanksState => ({
-        list: null,
-        current: null,
-        currentDetail: null,
-        isLoading: false,
-        error: null
-    }),
+export const useBanksStore = defineStore('banks', () => {
+    const list = ref<PagedResult<Bank> | null>(null)
+    const current = ref<Bank | null>(null)
+    const currentDetail = ref<BankDetail | null>(null)
+    const { isLoading, error, run, clearError } = createResourceState()
 
-    actions: {
-        async fetch(filters?: BankFilters) {
-            this.isLoading = true
-            this.error = null
-            try {
-                const response = await bankApi.getBanks(filters)
-                // Backend returns data directly, not wrapped in ApiResponse
-                if (response && response.items) {
-                    this.list = response as PagedResult<Bank>
-                } else {
-                    this.error = 'Error al obtener bancos'
-                }
-            } catch (error: any) {
-                this.error = error.message || 'Error de conexión'
-            } finally {
-                this.isLoading = false
-            }
-        },
+    const fetch = async (filters?: BankFilters, opts?: FetchOpts) => {
+        await run(async () => {
+            const response = await bankApi.getBanks(filters)
+            list.value = response
+        }, { ...opts, errorMessage: 'Error al obtener bancos' })
+    }
 
-        async ensureListLoaded() {
-            if (this.list?.items?.length) {
-                return
-            }
-            if (banksListEnsureInFlight) {
-                return banksListEnsureInFlight
-            }
-            banksListEnsureInFlight = this.fetch({ page: 1, pageSize: 100 }).finally(() => {
-                banksListEnsureInFlight = null
-            })
-            return banksListEnsureInFlight
-        },
-
-        async fetchById(id: number) {
-            this.isLoading = true
-            this.error = null
-            try {
-                const response = await bankApi.getBankById(id)
-                this.current = response
-            } catch (error: any) {
-                this.error = error.message || 'Error de conexión'
-            } finally {
-                this.isLoading = false
-            }
-        },
-
-        async fetchDetail(id: number) {
-            this.isLoading = true
-            this.error = null
-            try {
-                const response = await bankApi.getBankDetail(id)
-                this.currentDetail = response
-            } catch (error: any) {
-                this.error = error.message || 'Error de conexión'
-            } finally {
-                this.isLoading = false
-            }
-        },
-
-        async create(payload: CreateBankDto) {
-            this.isLoading = true
-            this.error = null
-            try {
-                const response = await bankApi.createBank(payload)
-                // Add to list if it exists
-                if (this.list) {
-                    this.list.items.unshift(response)
-                    this.list.totalCount++
-                }
-                this.current = response
-                return response
-            } catch (error: any) {
-                this.error = error.message || 'Error de conexión'
-                throw error
-            } finally {
-                this.isLoading = false
-            }
-        },
-
-        async update(id: number, payload: UpdateBankDto) {
-            this.isLoading = true
-            this.error = null
-            try {
-                const response = await bankApi.updateBank(id, payload)
-                // Update item in list
-                if (this.list) {
-                    const index = this.list.items.findIndex(item => item.id === id)
-                    if (index !== -1) {
-                        this.list.items[index] = response
-                    }
-                }
-                // Update current if it's the same bank
-                if (this.current?.id === id) {
-                    this.current = response
-                }
-                if (this.currentDetail?.id === id) {
-                    this.currentDetail = { ...this.currentDetail, ...response }
-                }
-                return response
-            } catch (error: any) {
-                this.error = error.message || 'Error de conexión'
-                throw error
-            } finally {
-                this.isLoading = false
-            }
-        },
-
-        async remove(id: number) {
-            this.isLoading = true
-            this.error = null
-            try {
-                await bankApi.deleteBank(id)
-                // Remove from list
-                if (this.list) {
-                    this.list.items = this.list.items.filter(item => item.id !== id)
-                    this.list.totalCount--
-                }
-                // Clear current if it was the deleted bank
-                if (this.current?.id === id) {
-                    this.current = null
-                }
-                if (this.currentDetail?.id === id) {
-                    this.currentDetail = null
-                }
-            } catch (error: any) {
-                this.error = error.message || 'Error de conexión'
-                throw error
-            } finally {
-                this.isLoading = false
-            }
-        },
-
-        clear() {
-            this.current = null
-            this.currentDetail = null
-            this.error = null
-        },
-
-        clearList() {
-            this.list = null
-            this.error = null
+    const ensureListLoaded = async () => {
+        if (list.value?.items?.length) {
+            return
         }
+        if (banksListEnsureInFlight) {
+            return banksListEnsureInFlight
+        }
+        banksListEnsureInFlight = fetch({ page: 1, pageSize: 100 }).finally(() => {
+            banksListEnsureInFlight = null
+        })
+        return banksListEnsureInFlight
+    }
+
+    const fetchById = async (id: number, opts?: FetchOpts) => {
+        await run(async () => {
+            const response = await bankApi.getBankById(id)
+            current.value = response
+        }, { ...opts, errorMessage: 'Error al obtener banco' })
+    }
+
+    const fetchDetail = async (id: number, opts?: FetchOpts) => {
+        await run(async () => {
+            const response = await bankApi.getBankDetail(id)
+            currentDetail.value = response
+        }, { ...opts, errorMessage: 'Error al obtener detalle del banco' })
+    }
+
+    const create = async (payload: CreateBankDto, opts?: FetchOpts) => {
+        return run(async () => {
+            const response = await bankApi.createBank(payload)
+            prependPagedItem(list, response)
+            current.value = response
+            return response
+        }, { ...opts, errorMessage: 'Error de conexion' })
+    }
+
+    const update = async (id: number, payload: UpdateBankDto, opts?: FetchOpts) => {
+        return run(async () => {
+            const response = await bankApi.updateBank(id, payload)
+            replacePagedItem(list, response)
+            if (current.value?.id === id) {
+                current.value = response
+            }
+            if (currentDetail.value?.id === id) {
+                currentDetail.value = { ...currentDetail.value, ...response }
+            }
+            return response
+        }, { ...opts, errorMessage: 'Error de conexion' })
+    }
+
+    const remove = async (id: number, opts?: FetchOpts) => {
+        await run(async () => {
+            await bankApi.deleteBank(id)
+            removePagedItem(list, id)
+            if (current.value?.id === id) {
+                current.value = null
+            }
+            if (currentDetail.value?.id === id) {
+                currentDetail.value = null
+            }
+        }, { ...opts, errorMessage: 'Error de conexion' })
+    }
+
+    const clear = () => {
+        current.value = null
+        currentDetail.value = null
+        clearError()
+    }
+
+    const clearList = () => {
+        list.value = null
+        clearError()
+    }
+
+    return {
+        list,
+        current,
+        currentDetail,
+        isLoading,
+        error,
+        fetch,
+        ensureListLoaded,
+        fetchById,
+        fetchDetail,
+        create,
+        update,
+        remove,
+        clear,
+        clearList,
     }
 })

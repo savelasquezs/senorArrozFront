@@ -1,5 +1,6 @@
 import { ref, onMounted, onUnmounted } from 'vue'
 import * as signalR from '@microsoft/signalr'
+import { getAccessToken } from '@/services/auth/authSession'
 
 export function useSignalR(hubUrl: string) {
     const connection = ref<signalR.HubConnection | null>(null)
@@ -11,8 +12,7 @@ export function useSignalR(hubUrl: string) {
             connection.value = new signalR.HubConnectionBuilder()
                 .withUrl(hubUrl, {
                     accessTokenFactory: () => {
-                        const token = localStorage.getItem('auth_token') || ''
-                        return token
+                        return getAccessToken() || ''
                     }
                 })
                 .withAutomaticReconnect({

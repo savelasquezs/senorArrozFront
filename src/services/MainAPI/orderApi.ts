@@ -14,25 +14,29 @@ import type {
     DeliverymanHistoryBranchSummary,
     DeliverymanHistoryNeighborhood,
 } from '@/types/order';
+import { buildQueryParams, type QueryParamMapper } from './queryParams';
+
+/** Mapeo GET /orders (camelCase filtros → query PascalCase). No incluye sortBy/sortOrder: el endpoint no los usaba antes. */
+export const orderGetOrdersQueryMapper: QueryParamMapper<OrderFilters> = {
+    BranchId: 'branchId',
+    CustomerId: 'customerId',
+    Type: 'type',
+    Status: 'status',
+    FromDate: 'fromDate',
+    ToDate: 'toDate',
+    ForKitchen: 'forKitchen',
+    Page: (f) => f.page ?? 1,
+    PageSize: (f) => f.pageSize ?? 10,
+};
 
 class OrderApi extends BaseApi {
     // 1. Obtener pedidos con filtros y paginación
     async getOrders(
         filters?: OrderFilters
     ): Promise<PagedResult<Order>> {
-        // Mapear parámetros de frontend (camelCase) a backend (PascalCase)
-        const params: any = {};
-        if (filters) {
-            if (filters.branchId !== undefined) params.BranchId = filters.branchId;
-            if (filters.customerId !== undefined) params.CustomerId = filters.customerId;
-            if (filters.type) params.Type = filters.type;
-            if (filters.status) params.Status = filters.status;
-            if (filters.fromDate) params.FromDate = filters.fromDate;
-            if (filters.toDate) params.ToDate = filters.toDate;
-            if (filters.forKitchen !== undefined) params.ForKitchen = filters.forKitchen;
-            params.Page = filters.page || 1;
-            params.PageSize = filters.pageSize || 10;
-        }
+        const params = filters
+            ? buildQueryParams(filters, orderGetOrdersQueryMapper)
+            : {};
 
         return this.get<PagedResult<Order>>('/orders', {
             params,

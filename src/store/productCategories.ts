@@ -8,20 +8,22 @@ import type {
   UpdateProductCategoryDto,
   ProductCategoryFilters
 } from '@/types/product'
+import {
+  createResourceState,
+  prependPagedItem,
+  removePagedItem,
+  replacePagedItem,
+} from './helpers/resourceStore'
 
-/** Categorías de menú compartidas entre sucursales (no enviar branchId en catálogo de pedidos). */
 export const ORDER_CATALOG_CATEGORY_PAGE_SIZE = 100
 
 let categoriesCatalogLoadInFlight: Promise<void> | null = null
 
 export const useProductCategoriesStore = defineStore('productCategories', () => {
-  // State - CRUD
   const list = ref<PagedResult<ProductCategory> | null>(null)
   const current = ref<ProductCategory | null>(null)
-  const isLoading = ref(false)
-  const error = ref<string | null>(null)
+  const { isLoading, error, run, clearError } = createResourceState()
 
-  // State - UI
   const searchQuery = ref('')
   const favorites = ref<Set<number>>(new Set())
   const sortBy = ref<'name' | 'popularity' | 'custom'>('name')
@@ -29,15 +31,12 @@ export const useProductCategoriesStore = defineStore('productCategories', () => 
   const multiSelect = ref(false)
   const selectedCategories = ref<Set<number>>(new Set())
 
-  // Storage keys
   const FAVORITES_KEY = 'senor-arroz-category-favorites'
   const SORT_PREFERENCES_KEY = 'senor-arroz-category-sort'
 
-  // Getters
   const filteredCategories = computed(() => (categories: ProductCategory[]) => {
     let filtered = [...categories]
 
-    // Filter by search query
     if (searchQuery.value) {
       const query = searchQuery.value.toLowerCase()
       filtered = filtered.filter(category =>
@@ -45,10 +44,7 @@ export const useProductCategoriesStore = defineStore('productCategories', () => 
       )
     }
 
-    // Sort categories
-    filtered = sortCategories(filtered)
-
-    return filtered
+    return sortCategories(filtered)
   })
 
   const sortedCategories = computed(() => (categories: ProductCategory[]) => {
@@ -78,19 +74,11 @@ export const useProductCategoriesStore = defineStore('productCategories', () => 
   const currentCategories = computed(() => list.value?.items || [])
   const totalCategories = computed(() => list.value?.totalCount || 0)
 
-  // Actions - CRUD
-  const fetch = async (filters?: ProductCategoryFilters) => {
-    try {
-      isLoading.value = true
-      error.value = null
+  const fetch = async (filters?: ProductCategoryFilters, opts?: { silent?: boolean }) => {
+    await run(async () => {
       const res = await productCategoryApi.getProductCategories(filters)
       list.value = res.data
-    } catch (err: any) {
-      error.value = err.message || 'Error al cargar categorías'
-      throw err
-    } finally {
-      isLoading.value = false
-    }
+    }, { ...opts, errorMessage: 'Error al cargar categorias' })
   }
 
   const ensureCatalogLoaded = async () => {
@@ -115,98 +103,51 @@ export const useProductCategoriesStore = defineStore('productCategories', () => 
     return categoriesCatalogLoadInFlight
   }
 
-  const fetchById = async (id: number) => {
-    try {
-      isLoading.value = true
-      error.value = null
+  const fetchById = async (id: number, opts?: { silent?: boolean }) => {
+    await run(async () => {
       const res = await productCategoryApi.getProductCategoryById(id)
       current.value = res.data
-    } catch (err: any) {
-      error.value = err.message || 'Error al cargar la categoría'
-      throw err
-    } finally {
-      isLoading.value = false
-    }
+    }, { ...opts, errorMessage: 'Error al cargar la categoria' })
   }
 
-  const create = async (payload: CreateProductCategoryDto) => {
-    try {
-      isLoading.value = true
-      error.value = null
+  const create = async (payload: CreateProductCategoryDto, opts?: { silent?: boolean }) => {
+    return run(async () => {
       const res = await productCategoryApi.createProductCategory(payload)
-      // Add to local list if it exists
-      if (list.value) {
-        list.value.items.unshift(res.data)
-        list.value.totalCount += 1
-      }
+      prependPagedItem(list, res.data)
       return res.data
-    } catch (err: any) {
-      error.value = err.message || 'Error al crear la categoría'
-      throw err
-    } finally {
-      isLoading.value = false
-    }
+    }, { ...opts, errorMessage: 'Error al crear la categoria' })
   }
 
-  const update = async (id: number, payload: UpdateProductCategoryDto) => {
-    try {
-      isLoading.value = true
-      error.value = null
+  const update = async (id: number, payload: UpdateProductCategoryDto, opts?: { silent?: boolean }) => {
+    return run(async () => {
       const res = await productCategoryApi.updateProductCategory(id, payload)
       current.value = res.data
-
-      // Update in local list if it exists
-      if (list.value) {
-        const index = list.value.items.findIndex(category => category.id === id)
-        if (index !== -1) {
-          list.value.items[index] = res.data
-        }
-      }
-
+      replacePagedItem(list, res.data)
       return res.data
-    } catch (err: any) {
-      error.value = err.message || 'Error al actualizar la categoría'
-      throw err
-    } finally {
-      isLoading.value = false
-    }
+    }, { ...opts, errorMessage: 'Error al actualizar la categoria' })
   }
 
-  const remove = async (id: number) => {
-    try {
-      isLoading.value = true
-      error.value = null
+  const remove = async (id: number, opts?: { silent?: boolean }) => {
+    await run(async () => {
       await productCategoryApi.deleteProductCategory(id)
+      removePagedItem(list, id)
 
-      // Remove from local list if it exists
-      if (list.value) {
-        list.value.items = list.value.items.filter(category => category.id !== id)
-        list.value.totalCount -= 1
-      }
-
-      // Clear current if it's the deleted category
-      if (current.value && current.value.id === id) {
+      if (current.value?.id === id) {
         current.value = null
       }
-    } catch (err: any) {
-      error.value = err.message || 'Error al eliminar la categoría'
-      throw err
-    } finally {
-      isLoading.value = false
-    }
+    }, { ...opts, errorMessage: 'Error al eliminar la categoria' })
   }
 
   const clear = () => {
     current.value = null
-    error.value = null
+    clearError()
   }
 
   const clearList = () => {
     list.value = null
-    error.value = null
+    clearError()
   }
 
-  // Actions - UI
   const setSearchQuery = (query: string) => {
     searchQuery.value = query
   }
@@ -309,7 +250,6 @@ export const useProductCategoriesStore = defineStore('productCategories', () => 
     }
   }
 
-  // Helper functions
   const sortCategories = (categories: ProductCategory[]): ProductCategory[] => {
     const sorted = [...categories]
 
@@ -329,7 +269,6 @@ export const useProductCategoriesStore = defineStore('productCategories', () => 
         break
 
       case 'custom':
-        // First favorites, then by name
         sorted.sort((a, b) => {
           const aIsFavorite = favorites.value.has(a.id)
           const bIsFavorite = favorites.value.has(b.id)
@@ -346,7 +285,6 @@ export const useProductCategoriesStore = defineStore('productCategories', () => 
     return sorted
   }
 
-  // Storage functions
   const saveFavoritesToStorage = () => {
     try {
       const favoritesArray = Array.from(favorites.value)
@@ -396,13 +334,11 @@ export const useProductCategoriesStore = defineStore('productCategories', () => 
     }
   }
 
-  // Initialize store
   const initializeStore = () => {
     loadFavoritesFromStorage()
     loadSortPreferencesFromStorage()
   }
 
-  // Reset store
   const resetStore = () => {
     searchQuery.value = ''
     favorites.value.clear()
@@ -413,21 +349,16 @@ export const useProductCategoriesStore = defineStore('productCategories', () => 
   }
 
   return {
-    // State - CRUD
     list,
     current,
     isLoading,
     error,
-
-    // State - UI
     searchQuery,
     favorites,
     sortBy,
     sortOrder,
     multiSelect,
     selectedCategories,
-
-    // Getters
     filteredCategories,
     sortedCategories,
     favoriteCategories,
@@ -437,8 +368,6 @@ export const useProductCategoriesStore = defineStore('productCategories', () => 
     selectedCategoriesList,
     currentCategories,
     totalCategories,
-
-    // Actions - CRUD
     fetch,
     ensureCatalogLoaded,
     fetchById,
@@ -447,8 +376,6 @@ export const useProductCategoriesStore = defineStore('productCategories', () => 
     remove,
     clear,
     clearList,
-
-    // Actions - UI
     setSearchQuery,
     clearSearch,
     toggleFavorite,

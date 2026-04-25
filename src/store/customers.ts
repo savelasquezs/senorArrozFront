@@ -12,257 +12,136 @@ import type {
     UpdateCustomerAddressDto
 } from '@/types/customer';
 import type { PagedResult } from '@/types/common';
+import {
+    createResourceState,
+    prependPagedItem,
+    removePagedItem,
+    replacePagedItem,
+    type ResourceActionOptions,
+} from './helpers/resourceStore';
 
 let neighborhoodsLoadInFlight: Promise<void> | null = null;
+
+type FetchOpts = ResourceActionOptions;
 
 export const useCustomersStore = defineStore('customers', () => {
     const list = ref<PagedResult<Customer> | null>(null);
     const current = ref<Customer | null>(null);
     const addresses = ref<CustomerAddress[]>([]);
     const neighborhoods = ref<Neighborhood[]>([]);
-    const isLoading = ref(false);
-    const error = ref<string | null>(null);
+    const { isLoading, error, run, clearError } = createResourceState();
 
-    // Computed
     const currentAddresses = computed(() => addresses.value);
     const availableNeighborhoods = computed(() => neighborhoods.value);
 
-    // Fetch customers with filters
-    const fetch = async (filters?: CustomerFilters) => {
-        try {
-            isLoading.value = true;
-            error.value = null;
+    const fetch = async (filters?: CustomerFilters, opts?: FetchOpts) => {
+        await run(async () => {
             const res = await customerApi.getCustomers(filters);
             list.value = res.data;
-        } catch (err: any) {
-            error.value = err.message || 'Error al cargar clientes';
-            throw err;
-        } finally {
-            isLoading.value = false;
-        }
+        }, { ...opts, errorMessage: 'Error al cargar clientes' });
     };
 
-    // Fetch customer by ID
-    const fetchById = async (id: number, opts?: { silent?: boolean }) => {
-        try {
-            if (!opts?.silent) isLoading.value = true;
-            error.value = null;
+    const fetchById = async (id: number, opts?: FetchOpts) => {
+        await run(async () => {
             const res = await customerApi.getCustomerById(id);
             current.value = res.data;
-        } catch (err: any) {
-            error.value = err.message || 'Error al cargar el cliente';
-            throw err;
-        } finally {
-            if (!opts?.silent) isLoading.value = false;
-        }
+        }, { ...opts, errorMessage: 'Error al cargar el cliente' });
     };
 
-    // Search customer by phone
-    const searchByPhone = async (phone: string) => {
-        try {
-            isLoading.value = true;
-            error.value = null;
+    const searchByPhone = async (phone: string, opts?: FetchOpts) => {
+        return run(async () => {
             const res = await customerApi.getCustomerByPhone(phone);
             return res.data;
-        } catch (err: any) {
-            error.value = err.message || 'Error al buscar cliente por teléfono';
-            throw err;
-        } finally {
-            isLoading.value = false;
-        }
+        }, { ...opts, errorMessage: 'Error al buscar cliente por telefono' });
     };
 
-    // Create customer
-    const create = async (payload: CreateCustomerDto) => {
-        try {
-            isLoading.value = true;
-            error.value = null;
+    const create = async (payload: CreateCustomerDto, opts?: FetchOpts) => {
+        return run(async () => {
             const res = await customerApi.createCustomer(payload);
-            // Add to local list if it exists
-            if (list.value) {
-                list.value.items.unshift(res.data);
-                list.value.totalCount += 1;
-            }
+            prependPagedItem(list, res.data);
             return res.data;
-        } catch (err: any) {
-            error.value = err.message || 'Error al crear el cliente';
-            throw err;
-        } finally {
-            isLoading.value = false;
-        }
+        }, { ...opts, errorMessage: 'Error al crear el cliente' });
     };
 
-    // Update customer
-    const update = async (id: number, payload: UpdateCustomerDto) => {
-        try {
-            isLoading.value = true;
-            error.value = null;
+    const update = async (id: number, payload: UpdateCustomerDto, opts?: FetchOpts) => {
+        return run(async () => {
             const res = await customerApi.updateCustomer(id, payload);
             current.value = res.data;
-
-            // Update in local list if it exists
-            if (list.value) {
-                const index = list.value.items.findIndex(customer => customer.id === id);
-                if (index !== -1) {
-                    list.value.items[index] = res.data;
-                }
-            }
-
+            replacePagedItem(list, res.data);
             return res.data;
-        } catch (err: any) {
-            error.value = err.message || 'Error al actualizar el cliente';
-            throw err;
-        } finally {
-            isLoading.value = false;
-        }
+        }, { ...opts, errorMessage: 'Error al actualizar el cliente' });
     };
 
-    // Delete customer
-    const remove = async (id: number) => {
-        try {
-            isLoading.value = true;
-            error.value = null;
+    const remove = async (id: number, opts?: FetchOpts) => {
+        await run(async () => {
             await customerApi.deleteCustomer(id);
+            removePagedItem(list, id);
 
-            // Remove from local list if it exists
-            if (list.value) {
-                list.value.items = list.value.items.filter(customer => customer.id !== id);
-                list.value.totalCount -= 1;
-            }
-
-            // Clear current if it's the deleted customer
-            if (current.value && current.value.id === id) {
+            if (current.value?.id === id) {
                 current.value = null;
             }
-        } catch (err: any) {
-            error.value = err.message || 'Error al eliminar el cliente';
-            throw err;
-        } finally {
-            isLoading.value = false;
-        }
+        }, { ...opts, errorMessage: 'Error al eliminar el cliente' });
     };
 
-    // Fetch customer addresses
-    const fetchAddresses = async (customerId: number, opts?: { silent?: boolean }) => {
-        try {
-            if (!opts?.silent) isLoading.value = true;
-            error.value = null;
+    const fetchAddresses = async (customerId: number, opts?: FetchOpts) => {
+        await run(async () => {
             const res = await customerApi.getCustomerAddresses(customerId);
             addresses.value = res.data;
-        } catch (err: any) {
-            error.value = err.message || 'Error al cargar direcciones';
-            throw err;
-        } finally {
-            if (!opts?.silent) isLoading.value = false;
-        }
+        }, { ...opts, errorMessage: 'Error al cargar direcciones' });
     };
 
-    // Fetch single address by ID
-    const fetchAddressById = async (addressId: number) => {
-        try {
-            isLoading.value = true;
-            error.value = null;
+    const fetchAddressById = async (addressId: number, opts?: FetchOpts) => {
+        return run(async () => {
             const res = await customerApi.getCustomerAddressById(addressId);
             return res.data;
-        } catch (err: any) {
-            error.value = err.message || 'Error al cargar la dirección';
-            throw err;
-        } finally {
-            isLoading.value = false;
-        }
+        }, { ...opts, errorMessage: 'Error al cargar la direccion' });
     };
 
-    // Create customer address
-    const createAddress = async (customerId: number, payload: CreateCustomerAddressDto) => {
-        try {
-            isLoading.value = true;
-            error.value = null;
+    const createAddress = async (customerId: number, payload: CreateCustomerAddressDto, opts?: FetchOpts) => {
+        return run(async () => {
             const res = await customerApi.createCustomerAddress(customerId, payload);
-            // Add to local addresses list
             addresses.value.push(res.data);
             return res.data;
-        } catch (err: any) {
-            error.value = err.message || 'Error al crear la dirección';
-            throw err;
-        } finally {
-            isLoading.value = false;
-        }
+        }, { ...opts, errorMessage: 'Error al crear la direccion' });
     };
 
-    // Update customer address
-    const updateAddress = async (customerId: number, addressId: number, payload: UpdateCustomerAddressDto) => {
-        try {
-            isLoading.value = true;
-            error.value = null;
+    const updateAddress = async (customerId: number, addressId: number, payload: UpdateCustomerAddressDto, opts?: FetchOpts) => {
+        return run(async () => {
             const res = await customerApi.updateCustomerAddress(customerId, addressId, payload);
-            // Update in local addresses list
             const index = addresses.value.findIndex(addr => addr.id === addressId);
             if (index !== -1) {
                 addresses.value[index] = res.data;
             }
             return res.data;
-        } catch (err: any) {
-            error.value = err.message || 'Error al actualizar la dirección';
-            throw err;
-        } finally {
-            isLoading.value = false;
-        }
+        }, { ...opts, errorMessage: 'Error al actualizar la direccion' });
     };
 
-    // Delete customer address
-    const removeAddress = async (customerId: number, addressId: number) => {
-        try {
-            isLoading.value = true;
-            error.value = null;
+    const removeAddress = async (customerId: number, addressId: number, opts?: FetchOpts) => {
+        await run(async () => {
             await customerApi.deleteCustomerAddress(customerId, addressId);
-            // Remove from local addresses list
             addresses.value = addresses.value.filter(addr => addr.id !== addressId);
-        } catch (err: any) {
-            error.value = err.message || 'Error al eliminar la dirección';
-            throw err;
-        } finally {
-            isLoading.value = false;
-        }
+        }, { ...opts, errorMessage: 'Error al eliminar la direccion' });
     };
 
-    // Set primary address
-    const setPrimaryAddress = async (customerId: number, addressId: number) => {
-        try {
-            isLoading.value = true;
-            error.value = null;
+    const setPrimaryAddress = async (customerId: number, addressId: number, opts?: FetchOpts) => {
+        return run(async () => {
             const res = await customerApi.setPrimaryAddress(customerId, addressId);
-
-            // Update the address in local state
             const addressIndex = addresses.value.findIndex(addr => addr.id === addressId);
             if (addressIndex !== -1) {
-                // Set all addresses as non-primary first
-                addresses.value.forEach(addr => addr.isPrimary = false);
-                // Set the selected address as primary
+                addresses.value.forEach(addr => {
+                    addr.isPrimary = false;
+                });
                 addresses.value[addressIndex] = res.data;
             }
-
             return res.data;
-        } catch (err: any) {
-            error.value = err.message || 'Error al establecer dirección como principal';
-            throw err;
-        } finally {
-            isLoading.value = false;
-        }
+        }, { ...opts, errorMessage: 'Error al establecer direccion como principal' });
     };
 
-    // Fetch neighborhoods
-    const fetchNeighborhoods = async () => {
-        try {
-            isLoading.value = true;
-            error.value = null;
+    const fetchNeighborhoods = async (opts?: FetchOpts) => {
+        await run(async () => {
             const res = await customerApi.getNeighborhoods();
             neighborhoods.value = res.data;
-        } catch (err: any) {
-            error.value = err.message || 'Error al cargar barrios';
-            throw err;
-        } finally {
-            isLoading.value = false;
-        }
+        }, { ...opts, errorMessage: 'Error al cargar barrios' });
     };
 
     const ensureNeighborhoodsLoaded = async () => {
@@ -282,7 +161,6 @@ export const useCustomersStore = defineStore('customers', () => {
         return neighborhoodsLoadInFlight;
     };
 
-    /** Búsqueda por nombre para el selector de pedidos (no reemplaza `list` ni precarga 1000 clientes). */
     const searchCustomersByName = async (name: string): Promise<Customer[]> => {
         const trimmed = name.trim();
         if (trimmed.length < 2) {
@@ -297,49 +175,34 @@ export const useCustomersStore = defineStore('customers', () => {
         return res.data?.items ?? [];
     };
 
-    // Create neighborhood
-    const createNeighborhood = async (payload: { name: string; deliveryFee: number; branchId: number }) => {
-        try {
-            isLoading.value = true;
-            error.value = null;
+    const createNeighborhood = async (payload: { name: string; deliveryFee: number; branchId: number }, opts?: FetchOpts) => {
+        return run(async () => {
             const res = await customerApi.createNeighborhood(payload);
-            // Add to local state
             neighborhoods.value.push(res.data);
             return res.data;
-        } catch (err: any) {
-            error.value = err.message || 'Error al crear barrio';
-            throw err;
-        } finally {
-            isLoading.value = false;
-        }
+        }, { ...opts, errorMessage: 'Error al crear barrio' });
     };
 
-    // Clear state
     const clear = () => {
         current.value = null;
         addresses.value = [];
-        error.value = null;
+        clearError();
     };
 
     const clearList = () => {
         list.value = null;
-        error.value = null;
+        clearError();
     };
 
     return {
-        // State
         list,
         current,
         addresses,
         neighborhoods,
         isLoading,
         error,
-
-        // Computed
         currentAddresses,
         availableNeighborhoods,
-
-        // Actions
         fetch,
         fetchById,
         searchByPhone,
