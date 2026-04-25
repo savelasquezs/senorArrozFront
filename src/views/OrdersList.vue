@@ -8,11 +8,11 @@
                             <div class="flex flex-wrap items-end gap-3">
                                 <div class="w-28 sm:w-32 shrink-0">
                                     <BaseInput v-model="filters.totalQuery" type="text" inputmode="numeric"
-                                        placeholder="Total (dígitos)" class="w-full" @input="applyFilters" />
+                                        placeholder="Total (dígitos)" class="w-full" @input="onOrdersTextFilterInput" />
                                 </div>
                                 <div class="flex-1 min-w-[180px]">
                                     <BaseInput v-model="filters.search" placeholder="Cliente, teléfono, invitado…"
-                                        @input="applyFilters">
+                                        @input="onOrdersTextFilterInput">
                                         <template #icon>
                                             <MagnifyingGlassIcon class="w-4 h-4" />
                                         </template>
@@ -22,29 +22,37 @@
                                 <div class="flex flex-wrap items-end gap-2">
                                     <div class="w-36 sm:w-40">
                                         <BaseSelect v-model="filters.type" :options="typeOptions" value-key="value"
-                                            display-key="label" placeholder="Tipo" @update:model-value="applyFilters" />
+                                            display-key="label" placeholder="Tipo"
+                                            @update:model-value="onOrdersSelectFilterChange" />
                                     </div>
                                     <div class="w-36 sm:w-44">
                                         <BaseSelect v-model="filters.status" :options="statusOptions" value-key="value"
                                             display-key="label" placeholder="Estado"
-                                            @update:model-value="applyFilters" />
+                                            @update:model-value="onOrdersSelectFilterChange" />
                                     </div>
                                     <div class="w-44 sm:w-52">
                                         <BaseSelect v-model="bankFilterId" :options="bankFilterOptions" value-key="value"
                                             display-key="label" placeholder="Banco (pagos)"
                                             @update:model-value="onBankFilterChange" />
                                     </div>
-                                    <div class="w-40 sm:w-44">
-                                        <BaseSelect v-model="filters.appPayments" :options="appPaymentsFilterOptions"
-                                            value-key="value" display-key="label" placeholder="Apps (pagos)"
-                                            @update:model-value="applyFilters" />
+                                    <div class="w-44 sm:w-52">
+                                        <BaseSelect v-model="appFilterId" :options="appFilterOptions" value-key="value"
+                                            display-key="label" placeholder="App (pagos)"
+                                            @update:model-value="onAppFilterChange" />
                                     </div>
+                                    <label
+                                        class="flex items-center gap-2 text-xs text-gray-700 cursor-pointer shrink-0">
+                                        <input v-model="appUnsettledOnly" type="checkbox"
+                                            class="rounded border-gray-300 text-emerald-600 focus:ring-emerald-500"
+                                            @change="onAppUnsettledChange" />
+                                        Solo app no liquidados
+                                    </label>
                                     <div class="flex items-center gap-2 flex-wrap">
                                         <BaseInput v-model="dateFilters.fromDate" type="date" placeholder="Desde"
-                                            class="w-32 sm:w-36" @change="fetchOrders" />
+                                            class="w-32 sm:w-36" @change="onDateFiltersChange" />
                                         <span class="text-gray-400">-</span>
                                         <BaseInput v-model="dateFilters.toDate" type="date" placeholder="Hasta"
-                                            class="w-32 sm:w-36" @change="fetchOrders" />
+                                            class="w-32 sm:w-36" @change="onDateFiltersChange" />
                                     </div>
                                     <BaseButton v-if="hasActiveFilters" variant="ghost" size="sm" class="shrink-0"
                                         @click="clearFilters">
@@ -73,8 +81,8 @@
                                     </button>
                                 </div>
                                 <div class="text-sm text-gray-600 min-w-0">
-                                    <span v-if="!loading && filteredOrders.length > 0">
-                                        Mostrando <span class="font-medium">{{ filteredOrders.length }}</span>
+                                    <span v-if="!loading && orders.length > 0">
+                                        Mostrando <span class="font-medium">{{ orders.length }}</span>
                                         de <span class="font-medium">{{ totalCount }}</span> pedidos
                                     </span>
                                     <span v-else-if="!loading" class="text-gray-400">No hay pedidos</span>
@@ -104,7 +112,7 @@
                     <div class="bg-white rounded-lg shadow overflow-hidden min-w-0 flex flex-col max-h-[min(75vh,42rem)]">
                         <div class="overflow-y-auto overflow-x-auto min-h-0 min-w-0 flex-1">
                             <template v-if="!groupByRoute">
-                                <OrdersTable :orders="filteredOrders" :loading="loading" :sort-by="sortBy"
+                                <OrdersTable :orders="orders" :loading="loading" :sort-by="sortBy"
                                     :sort-order="sortOrder" :quick-banks="quickBanks"
                                     enable-paid-in-store-quick-action enable-app-settle-quick-action
                                     @edit-customer="handleEditCustomer" @edit-address="handleEditAddress"
@@ -422,7 +430,9 @@
 import { ref, computed, onMounted } from 'vue'
 import type { OrderListItem, Order, OrderStatus, OrderBankPaymentDetail, OrderAppPaymentDetail } from '@/types/order'
 import { orderApi } from '@/services/MainAPI/orderApi'
-import { useOrderFilters, type OrderFilterState } from '@/composables/useOrderFilters'
+import { type OrderFilterState } from '@/composables/useOrderFilters'
+import { buildOrderSearchBody } from '@/composables/useOrderSearchPayload'
+import { useDebouncedCallback } from '@/composables/useDebouncedCallback'
 import { useOrderPermissions } from '@/composables/useOrderPermissions'
 import { useToast } from '@/composables/useToast'
 import { getOrderStatusDisplayName, getOrderTypeDisplayName, useFormatting } from '@/composables/useFormatting'
@@ -433,6 +443,7 @@ import { appPaymentApi } from '@/services/MainAPI/appPaymentApi'
 import { appPaymentIsSettled } from '@/utils/orderListPayments'
 import type { BankPayment } from '@/types/bank'
 import { useBanksStore } from '@/store/banks'
+import { useAppsStore } from '@/store/apps'
 import MainLayout from '@/components/layout/MainLayout.vue'
 import OrdersTable from '@/components/orders/OrdersTable.vue'
 import EditCustomerModal from '@/components/orders/EditCustomerModal.vue'
@@ -456,7 +467,10 @@ import {
 } from '@heroicons/vue/24/outline'
 
 const banksStore = useBanksStore()
-const { applyAllFilters, sortOrders } = useOrderFilters()
+const appsStore = useAppsStore()
+const debouncedRefetchOrders = useDebouncedCallback(() => {
+    void fetchOrders()
+}, 300)
 const { getNextAllowedStatus, canChangeStatus } = useOrderPermissions()
 
 // ===== TABS =====
@@ -491,11 +505,16 @@ const filters = ref<OrderFilterState>({
     type: null,
     status: null,
     customer: '',
-    appPayments: null,
 })
 
 /** Filtro servidor: pedidos con pago en este banco */
 const bankFilterId = ref<number | null>(null)
+
+/** Filtro servidor: pedidos con pago registrado en esta app */
+const appFilterId = ref<number | null>(null)
+
+/** Filtro servidor: al menos un pago por app no liquidado (opcionalmente para la app elegida) */
+const appUnsettledOnly = ref(false)
 
 const groupByRoute = ref(false)
 
@@ -553,12 +572,6 @@ const typeOptions: Array<{ value: string | null; label: string }> = [
     { value: 'reservation', label: 'Reserva' },
 ]
 
-const appPaymentsFilterOptions: Array<{ value: OrderFilterState['appPayments']; label: string }> = [
-    { value: null, label: 'Todas (apps)' },
-    { value: 'with', label: 'Con pago por app' },
-    { value: 'without', label: 'Sin pago por app' },
-]
-
 const statusOptions: Array<{ value: string | null; label: string }> = [
     { value: null, label: 'Todos los estados' },
     { value: 'taken', label: 'Tomado' },
@@ -578,15 +591,18 @@ const bankFilterOptions = computed(() => {
     ]
 })
 
-// Computed
-const filteredOrders = computed(() => {
-    let filtered = applyAllFilters(orders.value, filters.value)
-    return sortOrders(filtered, sortBy.value, sortOrder.value)
+const appFilterOptions = computed(() => {
+    const items = appsStore.list?.items || []
+    const active = items.filter((a) => a.active).sort((a, b) => a.name.localeCompare(b.name))
+    return [
+        { value: null as number | null, label: 'Todas las apps' },
+        ...active.map((a) => ({ value: a.id, label: a.name })),
+    ]
 })
 
 /** Bloques por deliveryRouteId para vista agrupada (mismo criterio que en detalle domiciliario). */
 const orderRouteBlocks = computed(() => {
-    const list = filteredOrders.value
+    const list = orders.value
     const buckets = new Map<string, OrderListItem[]>()
     const keyFor = (o: OrderListItem) =>
         o.deliveryRouteId != null ? `r:${o.deliveryRouteId}` : 'none'
@@ -652,8 +668,9 @@ const hasActiveFilters = computed(() => {
         filters.value.type ||
         filters.value.status ||
         filters.value.customer ||
-        filters.value.appPayments ||
         bankFilterId.value != null ||
+        appFilterId.value != null ||
+        appUnsettledOnly.value ||
         fromDiffers ||
         dateFilters.value.toDate
     )
@@ -663,20 +680,27 @@ const hasActiveFilters = computed(() => {
 const fetchOrders = async () => {
     loading.value = true
     try {
-        const body: Record<string, any> = {
+        const searchParts = [filters.value.search, filters.value.customer]
+            .map((s) => s.trim())
+            .filter(Boolean)
+        const combinedSearch = searchParts.join(' ').trim()
+
+        const body = buildOrderSearchBody({
             page: currentPage.value,
             pageSize: pageSize.value,
             sortBy: sortBy.value,
             sortOrder: sortOrder.value,
             excludeFutureReservations: true,
-        }
-        // Solo YYYY-MM-DD: el API interpreta el día en hora Colombia (evita UTC midnight de toISOString)
-        if (dateFilters.value.fromDate) body.fromDate = dateFilters.value.fromDate
-        if (dateFilters.value.toDate) body.toDate = dateFilters.value.toDate
-
-        if (bankFilterId.value != null) {
-            body.bankId = bankFilterId.value
-        }
+            fromDate: dateFilters.value.fromDate || undefined,
+            toDate: dateFilters.value.toDate || undefined,
+            bankId: bankFilterId.value,
+            appId: appFilterId.value,
+            appPaymentsUnsettledOnly: appUnsettledOnly.value,
+            search: combinedSearch,
+            totalQuery: filters.value.totalQuery,
+            type: filters.value.type,
+            status: filters.value.status,
+        })
 
         const response = await orderApi.searchOrders(body)
         orders.value = response.items
@@ -688,8 +712,33 @@ const fetchOrders = async () => {
     }
 }
 
-const applyFilters = () => {
+const onOrdersTextFilterInput = () => {
     currentPage.value = 1
+    debouncedRefetchOrders.schedule()
+}
+
+const onOrdersSelectFilterChange = () => {
+    currentPage.value = 1
+    debouncedRefetchOrders.cancel()
+    void fetchOrders()
+}
+
+const onAppFilterChange = () => {
+    currentPage.value = 1
+    debouncedRefetchOrders.cancel()
+    void fetchOrders()
+}
+
+const onAppUnsettledChange = () => {
+    currentPage.value = 1
+    debouncedRefetchOrders.cancel()
+    void fetchOrders()
+}
+
+const onDateFiltersChange = () => {
+    currentPage.value = 1
+    debouncedRefetchOrders.cancel()
+    void fetchOrders()
 }
 
 const clearFilters = () => {
@@ -699,20 +748,23 @@ const clearFilters = () => {
         type: null,
         status: null,
         customer: '',
-        appPayments: null,
     }
     bankFilterId.value = null
+    appFilterId.value = null
+    appUnsettledOnly.value = false
     dateFilters.value = {
         fromDate: todayYmd(),
         toDate: '',
     }
     currentPage.value = 1
-    fetchOrders()
+    debouncedRefetchOrders.cancel()
+    void fetchOrders()
 }
 
 const onBankFilterChange = () => {
     currentPage.value = 1
-    fetchOrders()
+    debouncedRefetchOrders.cancel()
+    void fetchOrders()
 }
 
 const changePage = (page: number) => {
@@ -1485,6 +1537,6 @@ const handleCancelReservation = async (order: OrderListItem) => {
 
 // Lifecycle
 onMounted(async () => {
-    await Promise.all([fetchOrders(), banksStore.ensureListLoaded()])
+    await Promise.all([fetchOrders(), banksStore.ensureListLoaded(), appsStore.ensureListLoaded()])
 })
 </script>

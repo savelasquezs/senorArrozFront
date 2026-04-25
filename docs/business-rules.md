@@ -376,6 +376,12 @@ Validaciones implementadas antes de enviar un pedido al backend:
 - **Sin permisos**: Estado cuando no se han otorgado permisos de ubicación
 - **Error de ubicación**: Manejo de errores de GPS/red
 
+### Listado de pedidos (/orders)
+
+- **Filtros en servidor**: Estado, tipo, rango de fechas (día operativo Colombia vía API), banco con pago, app con pago, total por prefijo de dígitos y texto de búsqueda (cliente, teléfonos, invitado, notas, id) se aplican en `POST /orders/search`; la paginación y el total reflejan ese conjunto filtrado.
+- **App (pagos)**: Igual que el filtro por banco: se elige una app; opcionalmente “solo app no liquidados” restringe a pedidos con al menos un `AppPayment` no liquidado (`is_setted = false`), y si hay app elegida solo cuentan líneas de esa app.
+- **Debounce**: Los campos de texto que disparan la búsqueda (búsqueda y total por dígitos) usan un retardo corto (~300 ms) para no saturar el API; selects y fechas disparan la petición al cambiar.
+
 ## 📱 Reglas de UI/UX
 
 ### Navegación
