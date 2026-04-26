@@ -647,6 +647,19 @@ export const useOrdersDraftsStore = defineStore('ordersDrafts', () => {
         selectedCategoryIds.value = categoryId == null ? null : [categoryId]
     }
 
+    /**
+     * Tarifa de envío de la dirección elegida (cliente + addressId en memoria). 0 sin dirección o sin match.
+     * Misma lógica que al elegir dirección en `updateAddress`.
+     */
+    const resolveDeliveryFeeFromSelectedAddress = (
+        o: Pick<DraftOrder, 'customerId' | 'addressId'>,
+    ): number => {
+        if (o.customerId == null || o.addressId == null) return 0
+        const c = customers.value.find((x) => x.id === o.customerId)
+        const a = c?.addresses?.find((x) => x.id === o.addressId)
+        return a ? (a.deliveryFee ?? 0) : 0
+    }
+
     // Clear - COPIAR líneas 357-360
     const clear = () => {
         error.value = null
@@ -703,6 +716,7 @@ export const useOrdersDraftsStore = defineStore('ordersDrafts', () => {
         updatePaidInStoreCash,
         updateDeliveryFee,
         updateFreeDeliveryRequested,
+        resolveDeliveryFeeFromSelectedAddress,
         recalculateTotals,
         autoAdjustSinglePayment,
         saveToLocalStorage,

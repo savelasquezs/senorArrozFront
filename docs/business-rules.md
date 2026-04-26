@@ -118,7 +118,7 @@ enum UserRole {
 #### Onsite (En el local)
 - **Cliente**: Opcional
 - **Dirección**: No aplica
-- **Delivery Fee**: No aplica
+- **Delivery Fee**: No aplica. En el **borrador del POS**, al pasar a onsite el monto de envío se pone en **0**; al volver a **delivery** se reajusta a la tarifa de la **dirección** si ya está seleccionada. Las **reservas** no cambian el envío solo por el selector de tipo.
 - **guestName**: Campo opcional
 - **Fidelización**: Se aplica si se asigna cliente
 - **Status inicial**: `'taken'`
