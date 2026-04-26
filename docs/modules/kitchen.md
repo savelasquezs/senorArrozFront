@@ -163,7 +163,7 @@ onMounted(() => {
 - `change-status`: [orderIds: number[], newStatus: OrderStatus]
 
 **Funcionalidad:**
-- Grid responsive (1/2/3/4 columnas según pantalla)
+- Grid responsive (1 / 2 / 5 columnas: `sm` / `lg`; gap compacto)
 - Muestra pedidos separados por estado (Taken / En Preparación)
 - Selección múltiple con botones "Seleccionar todos" / "Limpiar"
 - Botones de acción condicionales según estado y permisos
