@@ -5,48 +5,52 @@
             <div
                 class="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between sm:gap-3 border-b border-gray-200 -mx-3 px-3 sm:mx-0 sm:px-0"
             >
-                <nav class="-mb-px flex min-w-0 flex-1 items-end space-x-4 sm:space-x-6 overflow-x-auto">
-                    <button type="button" @click="activeTab = 'scheduled'" :class="[
-                        'py-2 sm:py-2.5 px-1 border-b-2 font-medium text-xs sm:text-sm transition-colors whitespace-nowrap flex-shrink-0',
-                        activeTab === 'scheduled'
-                            ? 'border-indigo-500 text-indigo-600'
-                            : 'border-transparent text-gray-500 hover:text-gray-700'
-                    ]">
-                        <span>Reservas hoy</span>
-                        <span v-if="scheduledReservationOrders.length > 0"
-                            class="ml-1.5 sm:ml-2 py-0.5 px-1.5 sm:px-2 rounded-full text-[10px] sm:text-xs bg-indigo-100 text-indigo-700">
-                            {{ scheduledReservationOrders.length }}
-                        </span>
-                    </button>
+                <!-- Pestañas: scroll solo en esta franja (sin envolver al checkbox) para no mostrar barra rara entre check y "Conectado" -->
+                <div class="-mb-px flex min-w-0 flex-1 items-end gap-2 sm:gap-3">
+                    <nav
+                        class="kitchen-tabs-nav min-w-0 flex-1 flex items-end space-x-4 sm:space-x-6 overflow-x-auto overflow-y-hidden"
+                        aria-label="Vistas de cocina">
+                        <button type="button" @click="activeTab = 'scheduled'" :class="[
+                            'py-2 sm:py-2.5 px-1 border-b-2 font-medium text-xs sm:text-sm transition-colors whitespace-nowrap flex-shrink-0',
+                            activeTab === 'scheduled'
+                                ? 'border-indigo-500 text-indigo-600'
+                                : 'border-transparent text-gray-500 hover:text-gray-700'
+                        ]">
+                            <span>Reservas hoy</span>
+                            <span v-if="scheduledReservationOrders.length > 0"
+                                class="ml-1.5 sm:ml-2 py-0.5 px-1.5 sm:px-2 rounded-full text-[10px] sm:text-xs bg-indigo-100 text-indigo-700">
+                                {{ scheduledReservationOrders.length }}
+                            </span>
+                        </button>
 
-                    <button type="button" @click="activeTab = 'active'" :class="[
-                        'py-2 sm:py-2.5 px-1 border-b-2 font-medium text-xs sm:text-sm transition-colors whitespace-nowrap flex-shrink-0',
-                        activeTab === 'active'
-                            ? 'border-emerald-500 text-emerald-600'
-                            : 'border-transparent text-gray-500 hover:text-gray-700'
-                    ]">
-                        <span>Pedidos Activos</span>
-                        <span v-if="activeOrders.length > 0"
-                            class="ml-1.5 sm:ml-2 py-0.5 px-1.5 sm:px-2 rounded-full text-[10px] sm:text-xs bg-emerald-100 text-emerald-600">
-                            {{ activeOrders.length }}
-                        </span>
-                    </button>
+                        <button type="button" @click="activeTab = 'active'" :class="[
+                            'py-2 sm:py-2.5 px-1 border-b-2 font-medium text-xs sm:text-sm transition-colors whitespace-nowrap flex-shrink-0',
+                            activeTab === 'active'
+                                ? 'border-emerald-500 text-emerald-600'
+                                : 'border-transparent text-gray-500 hover:text-gray-700'
+                        ]">
+                            <span>Pedidos Activos</span>
+                            <span v-if="activeOrders.length > 0"
+                                class="ml-1.5 sm:ml-2 py-0.5 px-1.5 sm:px-2 rounded-full text-[10px] sm:text-xs bg-emerald-100 text-emerald-600">
+                                {{ activeOrders.length }}
+                            </span>
+                        </button>
 
-                    <button type="button" @click="activeTab = 'ready'" :class="[
-                        'py-2 sm:py-2.5 px-1 border-b-2 font-medium text-xs sm:text-sm transition-colors whitespace-nowrap flex-shrink-0',
-                        activeTab === 'ready'
-                            ? 'border-emerald-500 text-emerald-600'
-                            : 'border-transparent text-gray-500 hover:text-gray-700'
-                    ]">
-                        <span>Pedidos Listos</span>
-                        <span v-if="readyOrders.length > 0"
-                            class="ml-1.5 sm:ml-2 py-0.5 px-1.5 sm:px-2 rounded-full text-[10px] sm:text-xs bg-green-100 text-green-600">
-                            {{ readyOrders.length }}
-                        </span>
-                    </button>
+                        <button type="button" @click="activeTab = 'ready'" :class="[
+                            'py-2 sm:py-2.5 px-1 border-b-2 font-medium text-xs sm:text-sm transition-colors whitespace-nowrap flex-shrink-0',
+                            activeTab === 'ready'
+                                ? 'border-emerald-500 text-emerald-600'
+                                : 'border-transparent text-gray-500 hover:text-gray-700'
+                        ]">
+                            <span>Pedidos Listos</span>
+                            <span v-if="readyOrders.length > 0"
+                                class="ml-1.5 sm:ml-2 py-0.5 px-1.5 sm:px-2 rounded-full text-[10px] sm:text-xs bg-green-100 text-green-600">
+                                {{ readyOrders.length }}
+                            </span>
+                        </button>
+                    </nav>
 
-                    <div v-if="activeTab === 'active'"
-                        class="ml-auto flex flex-shrink-0 items-end pl-2 sm:pl-4 pb-2 sm:pb-2.5 -mb-px self-end">
+                    <div v-if="activeTab === 'active'" class="flex flex-shrink-0 items-end pb-2 sm:pb-2.5 -mb-px">
                         <label
                             class="inline-flex items-center gap-1.5 text-[11px] sm:text-xs text-gray-800 cursor-pointer select-none whitespace-nowrap"
                             title="Agrupa Tomado y En preparación en un solo bloque">
@@ -55,7 +59,7 @@
                             <span class="font-medium">Modo combinado</span>
                         </label>
                     </div>
-                </nav>
+                </div>
 
                 <div v-if="authStore.isKitchen"
                     class="flex flex-wrap items-center justify-end gap-1.5 sm:gap-2 sm:pb-0.5 sm:flex-shrink-0">
@@ -456,3 +460,14 @@ onMounted(async () => {
     on('OrderCancelled', handleOrderCancelled)
 })
 </script>
+
+<style scoped>
+/* Scroll horizontal solo en las pestañas, sin barra/rueditas nativas visibles (no aporta y confunde). */
+.kitchen-tabs-nav {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+}
+.kitchen-tabs-nav::-webkit-scrollbar {
+    display: none;
+}
+</style>
