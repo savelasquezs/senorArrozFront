@@ -1,8 +1,12 @@
 <template>
-    <div class="space-y-3 sm:space-y-4">
-        <div v-if="allOrders.length > 0 && showStatusActions" class="bg-gray-50 p-2 sm:p-3 rounded-lg space-y-1.5 sm:space-y-2">
-            <!-- Controles de selección y contador -->
-            <div class="flex items-center justify-between flex-wrap gap-1.5">
+    <div :class="combinedMode ? 'space-y-2 sm:space-y-3' : 'space-y-3 sm:space-y-4'">
+        <div v-if="allOrders.length > 0 && showStatusActions && (!combinedMode || canMarkCombinedReady)"
+            :class="[
+                'rounded-lg',
+                combinedMode ? 'bg-gray-50 p-1.5 sm:p-2' : 'bg-gray-50 p-2 sm:p-3 space-y-1.5 sm:space-y-2',
+            ]">
+            <!-- Controles de selección (vista clásica) -->
+            <div v-if="!combinedMode" class="flex items-center justify-between flex-wrap gap-1.5">
                 <div class="flex items-center gap-1.5 sm:gap-2">
                     <button @click="selectAll" class="text-xs text-emerald-600 hover:text-emerald-700 font-medium whitespace-nowrap">
                         Seleccionar todos
@@ -34,9 +38,9 @@
                     </span>
                 </BaseButton>
             </div>
-            <div v-else-if="combinedMode && canMarkCombinedReady" class="flex items-center gap-1.5 flex-wrap">
+            <div v-else-if="combinedMode && canMarkCombinedReady" class="flex items-center justify-end gap-1.5 flex-wrap">
                 <BaseButton @click="handleChangeStatus('ready')" variant="success" size="sm"
-                    class="flex-1 sm:flex-none">
+                    class="flex-1 sm:flex-none sm:min-w-[10rem]">
                     <span class="flex items-center gap-1 justify-center">
                         <CheckIcon class="w-3.5 h-3.5" />
                         <span class="text-xs">Marcar como Listo</span>
@@ -88,8 +92,8 @@
         </div>
 
         <div v-if="combinedMode && allOrders.length > 0">
-            <h3 class="text-sm sm:text-base font-semibold text-gray-900 mb-2 flex items-center gap-1.5">
-                <span class="w-2 h-2 sm:w-2.5 sm:h-2.5 bg-emerald-500 rounded-full flex-shrink-0"></span>
+            <h3 class="text-xs sm:text-sm font-semibold text-gray-900 mb-1.5 flex items-center gap-1.5">
+                <span class="w-1.5 h-1.5 sm:w-2 sm:h-2 bg-emerald-500 rounded-full flex-shrink-0"></span>
                 <span>Tomado + En preparación ({{ allOrders.length }})</span>
             </h3>
             <div

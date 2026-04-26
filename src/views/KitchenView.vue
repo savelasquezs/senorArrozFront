@@ -5,7 +5,7 @@
             <div
                 class="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between sm:gap-3 border-b border-gray-200 -mx-3 px-3 sm:mx-0 sm:px-0"
             >
-                <nav class="-mb-px flex min-w-0 flex-1 space-x-4 sm:space-x-6 overflow-x-auto">
+                <nav class="-mb-px flex min-w-0 flex-1 items-end space-x-4 sm:space-x-6 overflow-x-auto">
                     <button type="button" @click="activeTab = 'scheduled'" :class="[
                         'py-2 sm:py-2.5 px-1 border-b-2 font-medium text-xs sm:text-sm transition-colors whitespace-nowrap flex-shrink-0',
                         activeTab === 'scheduled'
@@ -44,6 +44,17 @@
                             {{ readyOrders.length }}
                         </span>
                     </button>
+
+                    <div v-if="activeTab === 'active'"
+                        class="ml-auto flex flex-shrink-0 items-end pl-2 sm:pl-4 pb-2 sm:pb-2.5 -mb-px self-end">
+                        <label
+                            class="inline-flex items-center gap-1.5 text-[11px] sm:text-xs text-gray-800 cursor-pointer select-none whitespace-nowrap"
+                            title="Agrupa Tomado y En preparación en un solo bloque">
+                            <input v-model="combinedKitchenMode" type="checkbox"
+                                class="rounded border-gray-300 text-emerald-600 focus:ring-emerald-500" />
+                            <span class="font-medium">Modo combinado</span>
+                        </label>
+                    </div>
                 </nav>
 
                 <div v-if="authStore.isKitchen"
@@ -83,20 +94,6 @@
                         </span>
                     </BaseButton>
                 </div>
-            </div>
-
-            <div v-if="activeTab === 'active'"
-                class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 -mt-0.5 border-b border-gray-100 pb-3 -mx-3 px-3 sm:mx-0 sm:px-0 sm:border-0 sm:pb-0">
-                <label
-                    class="inline-flex items-center gap-2 text-xs sm:text-sm text-gray-800 cursor-pointer select-none">
-                    <input v-model="combinedKitchenMode" type="checkbox"
-                        class="rounded border-gray-300 text-emerald-600 focus:ring-emerald-500" />
-                    <span class="font-medium">Modo combinado</span>
-                </label>
-                <p class="text-xs text-gray-500 sm:max-w-xl sm:text-right">
-                    Une Tomado y En preparación en un solo bloque por categoría. «Marcar como listo» aplica
-                    preparación o listo según corresponda.
-                </p>
             </div>
 
             <div v-if="activeTab === 'scheduled'">

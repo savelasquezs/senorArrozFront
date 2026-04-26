@@ -159,7 +159,7 @@ onMounted(() => {
 - `orders`: OrderListItem[]
 - `orderItemsMap`: Map<number, OrderDetailItem[]>
 - `showStatusActions?`: boolean (p. ej. desactivo en *Reservas hoy*)
-- `combinedMode?`: si es true, un solo bloque «Tomado + En preparación» por categoría y solo el botón «Marcar como Listo» (la confirmación encadena en el modal vía `chainTakenToReady`)
+- `combinedMode?`: si es true, un solo bloque «Tomado + En preparación» por categoría, sin *Seleccionar todos* / *Limpiar* (solo botón «Marcar como Listo» cuando aplica, selección en tarjeta). La confirmación encadena en el modal vía `chainTakenToReady`
 
 **Emits:**
 - `change-status`: [orderIds: number[], newStatus: OrderStatus]
