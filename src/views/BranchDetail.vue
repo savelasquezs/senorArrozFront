@@ -637,6 +637,7 @@
 import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useBranchesStore } from '@/store/branches'
+import { useBranchPosSettingsStore } from '@/store/branchPosSettings'
 import { useBanksStore } from '@/store/banks'
 import { useAppsStore } from '@/store/apps'
 import { useAuthStore } from '@/store/auth'
@@ -696,6 +697,7 @@ import { useExpenseCategoriesCatalogStore } from '@/store/expenseCategoriesCatal
 const route = useRoute()
 const router = useRouter()
 const branchesStore = useBranchesStore()
+const branchPosSettings = useBranchPosSettingsStore()
 const banksStore = useBanksStore()
 const appsStore = useAppsStore()
 const expenseCategoriesCatalogStore = useExpenseCategoriesCatalogStore()
@@ -928,6 +930,7 @@ const handleEditSubmit = async (formData: any) => {
         await branchesStore.update(branchId.value, formData)
         showEditDialog.value = false
         success('Sucursal actualizada', 5000, 'La sucursal se ha actualizado correctamente')
+        await branchPosSettings.ensureForBranch(branchId.value, { force: true })
 
         // Admin: sincronizar datos de sucursal en sesión (domiciliarios / UI sin re-login)
         if (authStore.isAdmin && !authStore.isSuperadmin) {

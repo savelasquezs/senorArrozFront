@@ -68,6 +68,8 @@ export const useBranchesStore = defineStore('branches', () => {
 			| 'businessName'
 			| 'nit'
 			| 'maxFreeDeliveryDiscount'
+			| 'posCopyEtaMinMinutes'
+			| 'posCopyEtaRangeMinutes'
 		>
 	) => {
 		try {
@@ -97,6 +99,8 @@ export const useBranchesStore = defineStore('branches', () => {
 			| 'businessName'
 			| 'nit'
 			| 'maxFreeDeliveryDiscount'
+			| 'posCopyEtaMinMinutes'
+			| 'posCopyEtaRangeMinutes'
 		>
 	) => {
 		try {

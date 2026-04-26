@@ -292,6 +292,8 @@ const submitCreate = async (data: {
     latitude: number
     longitude: number
     maxFreeDeliveryDiscount: number
+    posCopyEtaMinMinutes: number
+    posCopyEtaRangeMinutes: number
 }) => {
     try {
         creating.value = true
@@ -305,6 +307,8 @@ const submitCreate = async (data: {
             latitude: data.latitude,
             longitude: data.longitude,
             maxFreeDeliveryDiscount: data.maxFreeDeliveryDiscount,
+            posCopyEtaMinMinutes: data.posCopyEtaMinMinutes,
+            posCopyEtaRangeMinutes: data.posCopyEtaRangeMinutes,
         })
         showCreate.value = false
         success('Sucursal creada', 3000, `La sucursal "${data.name}" se ha creado correctamente`)

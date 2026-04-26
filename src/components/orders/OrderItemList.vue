@@ -172,9 +172,6 @@ watch(
     },
 )
 
-/** Ventana aproximada (recogida inmediata / entrega a domicilio inmediata). */
-const COPY_ETA_PHRASE = '30-40 min'
-
 // Local state
 const localDeliveryFee = ref(deliveryFee.value)
 
@@ -241,7 +238,7 @@ async function copyOrderSummaryToClipboard() {
         formatTime,
         formatDateShort,
         guestName: o.guestName,
-        etaPhrase: COPY_ETA_PHRASE,
+        etaPhrase: branchPosSettings.posCopyMessageEtaPhrase,
     })
     try {
         await navigator.clipboard.writeText(msg)

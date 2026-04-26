@@ -168,6 +168,10 @@ export interface Branch {
     longitude?: number | null;
     /** Tope COP del descuento “domicilio gratis” en POS (por línea sumada). */
     maxFreeDeliveryDiscount?: number;
+    /** Minutos mínimos en la ventana de «Copiar mensaje» (POS). */
+    posCopyEtaMinMinutes?: number;
+    /** Minutos adicionales al mínimo para el tope (mín + rango → p. ej. 30-45 min). */
+    posCopyEtaRangeMinutes?: number;
     createdAt: string;
   updatedAt: string;
   totalUsers: number;

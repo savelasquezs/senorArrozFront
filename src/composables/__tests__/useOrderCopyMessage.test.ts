@@ -14,7 +14,7 @@ const base = {
     formatTime: ft,
     formatDateShort: fds,
     guestName: 'María',
-    etaPhrase: '30-40 min',
+    etaPhrase: '30-45 min',
 }
 
 describe('buildPosOrderCopyMessage', () => {
@@ -27,7 +27,7 @@ describe('buildPosOrderCopyMessage', () => {
             reservedFor: null,
         })
         expect(s).toContain('64.000')
-        expect(s).toContain('30-40 min')
+        expect(s).toContain('30-45 min')
         expect(s.toLowerCase()).toContain('recoger')
         expect(s).toContain('María')
     })
@@ -54,7 +54,7 @@ describe('buildPosOrderCopyMessage', () => {
         })
         expect(s).toContain('domicilio')
         expect(s).toContain('3.000')
-        expect(s).toContain('30-40 min')
+        expect(s).toContain('30-45 min')
     })
 
     it('delivery programado: allá a la hora, sin 30-40', () => {
@@ -66,7 +66,7 @@ describe('buildPosOrderCopyMessage', () => {
             reservedFor: new Date('2026-04-15T20:00:00'),
         })
         expect(s).toContain('allá estaremos entonces a las 15:30')
-        expect(s).not.toMatch(/30-40 min/)
+        expect(s).not.toMatch(/30-45 min/)
     })
 
     it('reserva con domicilio: fecha y hora en el cierre', () => {

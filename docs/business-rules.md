@@ -160,10 +160,12 @@ enum UserRole {
 
 ### Mensaje copiable al cliente (borrador POS)
 
-El botón **Copiar mensaje** en el resumen de ítems del borrador genera un texto listo para pegar (p. ej. WhatsApp) según el tipo y la programación:
+El botón **Copiar mensaje** en el resumen de ítems del borrador genera un texto listo para pegar (p. ej. WhatsApp) según el tipo y la programación.
 
-- **En el local (`onsite`)**: total, ventana aproximada de recogida **«30-40 min»** si el pedido no es «para más tarde»; si es «para más tarde» y hay hora de entrega (`reservedFor`), se usa **«a las {hora}»** en su lugar. Cierre: **reclamar a nombre de** `guestName` si está informado; si no, se indica identificarse al recoger.
-- **Domicilio (`delivery`)** — mismo criterio de costos y promoción **domicilio gratis** que antes (ver arriba): con **entrega inmediata** (sin «para más tarde») el cierre usa la ventana **«llega en 30-40 min»**; con **para más tarde** y `reservedFor`, el cierre pasa a **«allá estaremos entonces a las {hora}»** (misma estructura en todas las variantes con promo: sin promo, domi gratis, o remanente de envío con «pesitos»).
+- **Ventana de tiempo (configurable por sucursal)**: en `branch` se guardan `pos_copy_eta_minutes` (mínimo, por defecto 30) y `pos_copy_eta_range_minutes` (margen al tope, por defecto 15). El texto mostrado es `"{mínimo}-{mínimo+margen} min"` (p. ej. 30+15 → `30-45 min`); si el margen es 0, solo `"{mínimo} min"`. Editable en ficha de sucursal (Admin o Superadmin). Aplica a recogida inmediata, entrega inmediata a domicilio y variantes con promo **domicilio gratis**; no altera frases con hora o fecha concretas.
+
+- **En el local (`onsite`)**: total, ventana aproximada de recogida usando el texto de sucursal si el pedido no es «para más tarde»; si es «para más tarde» y hay hora de entrega (`reservedFor`), se usa **«a las {hora}»** en su lugar. Cierre: **reclamar a nombre de** `guestName` si está informado; si no, se indica identificarse al recoger.
+- **Domicilio (`delivery`)** — mismo criterio de costos y promoción **domicilio gratis** que antes (ver arriba): con **entrega inmediata** (sin «para más tarde») el cierre usa la ventana configurada (**«llega en {texto}»**); con **para más tarde** y `reservedFor`, el cierre pasa a **«allá estaremos entonces a las {hora}»** (misma estructura en todas las variantes con promo: sin promo, domi gratis, o remanente de envío con «pesitos»).
 - **Reserva con entrega a domicilio** (`reservation` y dirección): mismo bloque de domicilio y promociones, pero el cierre de entrega usa **fecha y hora** de `reservedFor`: **«allá estaremos entonces el {fecha} a las {hora}»**.
 - **Reserva sin entrega a domicilio** (sin dirección): total, fecha/hora del evento (`reservedFor`); si aún no hay fecha en el borrador, solo el total y la línea de **reclamar a nombre** / identificación, alineada con `guestName`.
 

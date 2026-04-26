@@ -66,6 +66,16 @@
             <p class="mt-1 text-xs text-gray-500">Máximo a descontar en productos al activar «Domicilio gratis» en el POS (por pedido).</p>
         </div>
 
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <BaseInput :model-value="form.posCopyEtaMinMinutes"
+                @update:model-value="(v) => { form.posCopyEtaMinMinutes = Math.max(0, Math.round(Number(v) || 0)) }"
+                type="number" :min="0" :step="1" label="Entrega / recogida mín. (min)" placeholder="30" />
+            <BaseInput :model-value="form.posCopyEtaRangeMinutes"
+                @update:model-value="(v) => { form.posCopyEtaRangeMinutes = Math.max(0, Math.round(Number(v) || 0)) }"
+                type="number" :min="0" :step="1" label="Margen superior (min)" placeholder="15" />
+        </div>
+        <p class="text-xs text-gray-500 -mt-2">En «Copiar mensaje» del POS se mostrará por ejemplo «30-45 min» si el mínimo es 30 y el margen 15. Si el margen es 0, solo se indica el mínimo (p. ej. «30 min»).</p>
+
         <!-- Validation Info -->
         <BaseAlert v-if="showValidationInfo" variant="info">
             <InformationCircleIcon class="w-5 h-5" />
@@ -129,6 +139,8 @@ interface BranchFormData {
     latitude: number
     longitude: number
     maxFreeDeliveryDiscount: number
+    posCopyEtaMinMinutes: number
+    posCopyEtaRangeMinutes: number
 }
 
 const emit = defineEmits<{
@@ -146,6 +158,8 @@ const form = reactive({
     latitude: 0,
     longitude: 0,
     maxFreeDeliveryDiscount: 3000,
+    posCopyEtaMinMinutes: 30,
+    posCopyEtaRangeMinutes: 15,
 })
 
 const errors = reactive({
@@ -273,6 +287,8 @@ const handleSubmit = () => {
         latitude: form.latitude,
         longitude: form.longitude,
         maxFreeDeliveryDiscount: Math.max(0, Math.round(Number(form.maxFreeDeliveryDiscount) || 0)),
+        posCopyEtaMinMinutes: Math.max(0, Math.min(10080, Math.round(Number(form.posCopyEtaMinMinutes) || 0))),
+        posCopyEtaRangeMinutes: Math.max(0, Math.min(10080, Math.round(Number(form.posCopyEtaRangeMinutes) || 0))),
     }
 
     emit('submit', formData)
@@ -323,6 +339,14 @@ watch(
                 typeof newBranch.maxFreeDeliveryDiscount === 'number' && newBranch.maxFreeDeliveryDiscount >= 0
                     ? Math.round(newBranch.maxFreeDeliveryDiscount)
                     : 3000
+            form.posCopyEtaMinMinutes =
+                typeof newBranch.posCopyEtaMinMinutes === 'number' && newBranch.posCopyEtaMinMinutes >= 0
+                    ? Math.min(10080, Math.round(newBranch.posCopyEtaMinMinutes))
+                    : 30
+            form.posCopyEtaRangeMinutes =
+                typeof newBranch.posCopyEtaRangeMinutes === 'number' && newBranch.posCopyEtaRangeMinutes >= 0
+                    ? Math.min(10080, Math.round(newBranch.posCopyEtaRangeMinutes))
+                    : 15
             if (lat != null && lng != null && lat !== 0 && lng !== 0) {
                 form.latitude = Number(lat)
                 form.longitude = Number(lng)
@@ -343,6 +367,8 @@ watch(
             form.phone1 = ''
             form.phone2 = ''
             form.maxFreeDeliveryDiscount = 3000
+            form.posCopyEtaMinMinutes = 30
+            form.posCopyEtaRangeMinutes = 15
             showValidationInfo.value = true
             resetMapState()
             setTimeout(() => {
