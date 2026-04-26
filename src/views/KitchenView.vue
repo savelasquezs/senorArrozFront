@@ -85,6 +85,20 @@
                 </div>
             </div>
 
+            <div v-if="activeTab === 'active'"
+                class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 -mt-0.5 border-b border-gray-100 pb-3 -mx-3 px-3 sm:mx-0 sm:px-0 sm:border-0 sm:pb-0">
+                <label
+                    class="inline-flex items-center gap-2 text-xs sm:text-sm text-gray-800 cursor-pointer select-none">
+                    <input v-model="combinedKitchenMode" type="checkbox"
+                        class="rounded border-gray-300 text-emerald-600 focus:ring-emerald-500" />
+                    <span class="font-medium">Modo combinado</span>
+                </label>
+                <p class="text-xs text-gray-500 sm:max-w-xl sm:text-right">
+                    Une Tomado y En preparación en un solo bloque por categoría. «Marcar como listo» aplica
+                    preparación o listo según corresponda.
+                </p>
+            </div>
+
             <div v-if="activeTab === 'scheduled'">
                 <p v-if="scheduledReservationOrders.length === 0" class="text-sm text-gray-500 mb-3">
                     No hay reservas del día en «Tomado» pendientes de hora. Al llegar la hora de cocina o al pasar a preparación aparecen en Pedidos activos.
@@ -96,7 +110,7 @@
 
             <div v-else-if="activeTab === 'active'">
                 <OrderCardGrid ref="cardGridRef" :orders="activeOrders" :order-items-map="orderItemsMap"
-                    @change-status="handleChangeStatus" />
+                    :combined-mode="combinedKitchenMode" @change-status="handleChangeStatus" />
             </div>
 
             <div v-else-if="activeTab === 'ready'">
@@ -105,12 +119,12 @@
         </div>
 
         <ConfirmStatusChangeModal :is-open="showConfirmModal" :orders="ordersToConfirm" :order-items-map="orderItemsMap"
-            @close="closeConfirmModal" @updated="handleModalUpdated" />
+            :chain-taken-to-ready="confirmChainTakenToReady" @close="closeConfirmModal" @updated="handleModalUpdated" />
     </MainLayout>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/store/auth'
 import { useOrdersDataStore } from '@/store/ordersData'
@@ -139,11 +153,21 @@ const { permission, requestPermission, notify } = useNotifications()
 const SIGNALR_HUB_URL = import.meta.env.VITE_SIGNALR_HUB_URL || 'http://localhost:5000/hubs/orders'
 const { isConnected, on, off } = useSignalR(SIGNALR_HUB_URL)
 
+const KITCHEN_COMBINED_MODE_KEY = 'senorarroz.kitchen.combinedMode'
+const combinedKitchenMode = ref(
+    typeof localStorage !== 'undefined' && localStorage.getItem(KITCHEN_COMBINED_MODE_KEY) === '1'
+)
+watch(combinedKitchenMode, (v) => {
+    localStorage.setItem(KITCHEN_COMBINED_MODE_KEY, v ? '1' : '0')
+})
+
 const activeTab = ref<'scheduled' | 'active' | 'ready'>('active')
 const soundEnabled = ref(true)
 const isLoading = ref(false)
 const showConfirmModal = ref(false)
 const ordersToConfirm = ref<OrderListItem[]>([])
+/** Copia de `combinedKitchenMode` al abrir el modal (confirmación encadenada a Listo). */
+const confirmChainTakenToReady = ref(false)
 const orderItemsMap = ref(new Map<number, OrderDetailItem[]>())
 const cardGridRef = ref<InstanceType<typeof OrderCardGrid> | null>(null)
 
@@ -338,6 +362,7 @@ const handleChangeStatus = (orderIds: number[], newStatus: OrderStatus) => {
     const selectedOrders = allOrders.value.filter(o => orderIds.includes(o.id))
 
     if (newStatus === 'ready') {
+        confirmChainTakenToReady.value = combinedKitchenMode.value
         ordersToConfirm.value = selectedOrders
         showConfirmModal.value = true
     } else {
@@ -376,6 +401,7 @@ const handleModalUpdated = async () => {
 const closeConfirmModal = () => {
     showConfirmModal.value = false
     ordersToConfirm.value = []
+    confirmChainTakenToReady.value = false
 }
 
 const refreshOrders = async () => {
