@@ -68,6 +68,12 @@ export interface BuildDeliveryCopyMessageParams {
     maxBranchCap: number
     formatCurrency: (amount: number) => string
     etaPhrase: string
+    /**
+     * Sustituye el cierre con tiempo/entrega. `plain` reemplaza ` y llega en ${eta}.` (tres variantes iniciales);
+     * `pesitos` reemplaza `, y te llega en ${eta}.` (cuando el envío supera el tope y queda un remanente).
+     * Incluir espacio/puntuación según el caso (p. ej. " y allá estaremos entonces a las 15:00.").
+     */
+    arrivalClosings?: { plain: string; pesitos: string }
 }
 
 /**
@@ -79,20 +85,22 @@ export function buildDeliveryCopyMessage(p: BuildDeliveryCopyMessageParams): str
     const cap = Math.max(0, Math.round(Number(p.maxBranchCap) || 0))
     const fc = p.formatCurrency
     const eta = p.etaPhrase
+    const plainClose = p.arrivalClosings?.plain ?? ` y llega en ${eta}.`
+    const pesitosClose = p.arrivalClosings?.pesitos ?? `, y te llega en ${eta}.`
 
     if (!p.freeDeliveryRequested) {
-        return `El domicilio tiene un costo de ${fc(fee)}, serían ${fc(total)} y llega en ${eta}.`
+        return `El domicilio tiene un costo de ${fc(fee)}, serían ${fc(total)}${plainClose}`
     }
 
     if (fee <= 0) {
-        return `Hoy tienes el domi gratis, serían ${fc(total)} y llega en ${eta}.`
+        return `Hoy tienes el domi gratis, serían ${fc(total)}${plainClose}`
     }
 
     // Promo activa: si el envío no supera el tope, el descuento cubre todo el domicilio.
     if (fee <= cap) {
-        return `Hoy tienes el domi gratis, serían ${fc(total)} y llega en ${eta}.`
+        return `Hoy tienes el domi gratis, serían ${fc(total)}${plainClose}`
     }
 
     const remainder = fee - cap
-    return `Hoy el domicilio te queda en solo ${fc(remainder)} pesitos, serían ${fc(total)}, y te llega en ${eta}.`
+    return `Hoy el domicilio te queda en solo ${fc(remainder)} pesitos, serían ${fc(total)}${pesitosClose}`
 }
