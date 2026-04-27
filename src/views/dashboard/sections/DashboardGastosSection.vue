@@ -116,14 +116,29 @@
 				<template v-else>
 					<div
 						v-if="topLines.length > 0"
-						class="relative min-h-[220px] w-full -mx-1 px-1"
+						class="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start w-full -mx-1 px-1"
 					>
-						<p class="text-xs font-medium text-gray-600 mb-2">Comparativo (mismos datos que la tabla)</p>
-						<DashboardBarChart
-							:labels="topCatalogBarLabels"
-							:datasets="topCatalogBarDatasets"
-							y-format="currency"
-						/>
+						<div class="relative min-h-[220px] min-w-0">
+							<p class="text-xs font-medium text-gray-600 mb-2">Comparativo (mismos datos que la tabla)</p>
+							<DashboardBarChart
+								:labels="topCatalogBarLabels"
+								:datasets="topCatalogBarDatasets"
+								y-format="currency"
+							/>
+						</div>
+						<div class="min-w-0">
+							<p class="text-xs font-medium text-gray-600 mb-2">
+								Participación en la categoría (top {{ PIE_CATALOG_NAMED_MAX }} + Otros)
+							</p>
+							<p class="text-[11px] text-gray-500 mb-1">
+								Porcentajes sobre el total de los ítems listados (mismo rango y filtros).
+							</p>
+							<DashboardRevenueShareDonut
+								:labels="topCatalogPieLabels"
+								:values="topCatalogPieValues"
+								:percents="topCatalogPiePercents"
+							/>
+						</div>
 					</div>
 					<div class="overflow-x-auto -mx-1">
 						<table class="min-w-full text-left text-xs text-gray-800">
@@ -372,4 +387,35 @@ const topCatalogBarDatasets = computed((): BarChartDataset[] => [
 		data: props.topLines.map((r) => r.totalCop),
 	},
 ]);
+
+/** Máx. rebanadas con nombre en la torta; el resto se agrupa en "Otros" (7 u 8 porciones en total). */
+const PIE_CATALOG_NAMED_MAX = 6;
+
+const topCatalogPieLabels = computed(() => topCatalogPieBundle.value.labels);
+const topCatalogPieValues = computed(() => topCatalogPieBundle.value.values);
+const topCatalogPiePercents = computed(() => topCatalogPieBundle.value.percents);
+
+const topCatalogPieBundle = computed(() => {
+	const rows = props.topLines;
+	if (rows.length === 0) {
+		return { labels: [] as string[], values: [] as number[], percents: [] as number[] };
+	}
+	const total = rows.reduce((s, r) => s + r.totalCop, 0);
+	if (total <= 0) {
+		return { labels: [] as string[], values: [] as number[], percents: [] as number[] };
+	}
+	const head = rows.slice(0, PIE_CATALOG_NAMED_MAX);
+	const tail = rows.slice(PIE_CATALOG_NAMED_MAX);
+	const othersCop = tail.reduce((s, r) => s + r.totalCop, 0);
+	const labels: string[] = head.map((r) => r.expenseName);
+	const values: number[] = head.map((r) => r.totalCop);
+	if (othersCop > 0) {
+		labels.push('Otros');
+		values.push(othersCop);
+	}
+	const percents = values.map((v) =>
+		Math.round((1000 * v) / total) / 10,
+	);
+	return { labels, values, percents };
+});
 </script>
