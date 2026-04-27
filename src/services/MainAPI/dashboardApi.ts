@@ -245,7 +245,7 @@ class DashboardApi extends BaseApi {
 		return this.get<DashboardExpenseTimeSeriesApiResponse>('/dashboard/expenses/timeseries', { params });
 	}
 
-	/** Mayores líneas de detalle por categoría (y opcionalmente por ítem de catálogo). `limit` 1–500, por defecto 15. */
+	/** Top ítems de catálogo por suma de importes de línea (agrupa varias compras del mismo ítem). `limit` 1–500, por defecto 15. */
 	async getExpenseTopLines(
 		branchId: number | null,
 		fromIso: string,
@@ -381,14 +381,11 @@ export type DashboardExpenseTimeSeriesApiResponse = {
 };
 
 export type DashboardExpenseTopLineItemApi = {
-	detailId: number;
-	headerId: number;
-	headerCreatedAtUtc: string;
-	lineCop: number;
+	expenseId: number;
 	expenseName: string;
 	categoryName: string;
-	supplierName: string;
-	branchName: string;
+	totalCop: number;
+	lineCount: number;
 };
 
 export type DashboardExpenseTopLinesApiResponse = {

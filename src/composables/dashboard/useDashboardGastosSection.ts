@@ -39,15 +39,13 @@ export type GastosDashboardPayload = {
 	timeSeries: GastosTimeSeriesPayload | null;
 };
 
-export type GastosTopLineItem = {
-	detailId: number;
-	headerId: number;
-	headerCreatedAtUtc: string;
-	lineCop: number;
+/** Top ítems de catálogo: suma de líneas en el rango, agrupado por ítem de catálogo (mismo criterio que el gráfico). */
+export type GastosTopCatalogItem = {
+	expenseId: number;
 	expenseName: string;
 	categoryName: string;
-	supplierName: string;
-	branchName: string;
+	totalCop: number;
+	lineCount: number;
 };
 
 const DEFAULT_TOP_LINES_LIMIT = 15;
@@ -103,7 +101,7 @@ export function useDashboardGastosSection(
 	const filterCategoryId = ref<number | null>(null);
 	const filterExpenseId = ref<number | null>(null);
 	const topLinesLimit = ref(DEFAULT_TOP_LINES_LIMIT);
-	const topLines = ref<GastosTopLineItem[]>([]);
+	const topLines = ref<GastosTopCatalogItem[]>([]);
 	const topLinesLoading = ref(false);
 
 	const isActive = computed(() => activeSection.value === 'gastos');
@@ -237,14 +235,11 @@ export function useDashboardGastosSection(
 			});
 			if (seq !== topSeq) return;
 			topLines.value = (raw.items ?? []).map((r) => ({
-				detailId: r.detailId,
-				headerId: r.headerId,
-				headerCreatedAtUtc: r.headerCreatedAtUtc,
-				lineCop: r.lineCop,
+				expenseId: r.expenseId,
 				expenseName: r.expenseName,
 				categoryName: r.categoryName,
-				supplierName: r.supplierName,
-				branchName: r.branchName,
+				totalCop: r.totalCop,
+				lineCount: r.lineCount,
 			}));
 		} catch {
 			if (seq !== topSeq) return;

@@ -43,7 +43,9 @@
 					</select>
 				</div>
 				<div v-if="filterCategoryId != null" class="min-w-[200px]">
-					<label class="block text-xs font-medium text-gray-600 mb-1">Cuántas líneas mostrar (mayor importe)</label>
+					<label class="block text-xs font-medium text-gray-600 mb-1">
+						Ítems de catálogo a listar (por suma total)
+					</label>
 					<select
 						v-model.number="topLinesLimit"
 						class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 bg-white"
@@ -93,53 +95,67 @@
 
 			<div
 				v-if="filterCategoryId != null"
-				class="rounded-xl border border-gray-200 bg-white p-3 shadow-sm"
+				class="rounded-xl border border-gray-200 bg-white p-3 shadow-sm space-y-4"
 			>
-				<div class="flex flex-wrap items-center justify-between gap-2 mb-2">
-					<p class="text-sm font-medium text-gray-800">Mayores importes (por línea)</p>
+				<div class="flex flex-wrap items-center justify-between gap-2">
+					<div>
+						<p class="text-sm font-medium text-gray-800">Gastos de catálogo (suma en el periodo)</p>
+						<p class="text-[11px] text-gray-500 mt-0.5">
+							Varias compras del mismo ítem (p. ej. arroz) se agrupan en una fila. Mismas fechas y
+							sucursal del panel. Orden: mayor suma total.
+						</p>
+					</div>
 					<p v-if="topLinesLoading" class="text-xs text-gray-500">Cargando…</p>
 				</div>
-				<p class="text-[11px] text-gray-500 mb-2">
-					Mismas fechas y sucursal del panel. Orden: importe de línea descendente.
-				</p>
 				<div
 					v-if="!topLinesLoading && topLines.length === 0"
 					class="text-sm text-gray-500 py-4 text-center"
 				>
-					Sin líneas en este rango y filtros.
+					Sin movimientos en este rango y filtros.
 				</div>
-				<div v-else class="overflow-x-auto -mx-1">
-					<table class="min-w-full text-left text-xs text-gray-800">
-						<thead>
-							<tr class="border-b border-gray-200 text-[10px] uppercase tracking-wide text-gray-500">
-								<th class="py-2 pr-2">Factura</th>
-								<th class="py-2 pr-2">Fecha</th>
-								<th class="py-2 pr-2">Gasto (línea)</th>
-								<th class="py-2 pr-2">Proveedor</th>
-								<th class="py-2 pr-2 hidden sm:table-cell">Sucursal</th>
-								<th class="py-2 text-right">Importe</th>
-							</tr>
-						</thead>
-						<tbody>
-							<tr
-								v-for="row in topLines"
-								:key="row.detailId"
-								class="border-b border-gray-100 last:border-0"
-							>
-								<td class="py-1.5 pr-2 font-mono text-[11px]">#{{ row.headerId }}</td>
-								<td class="py-1.5 pr-2 tabular-nums">
-									{{ formatDateTimeCompact(row.headerCreatedAtUtc) }}
-								</td>
-								<td class="py-1.5 pr-2">{{ row.expenseName }}</td>
-								<td class="py-1.5 pr-2">{{ row.supplierName || '—' }}</td>
-								<td class="py-1.5 pr-2 hidden sm:table-cell">{{ row.branchName || '—' }}</td>
-								<td class="py-1.5 text-right font-medium tabular-nums">
-									{{ formatCurrency(row.lineCop) }}
-								</td>
-							</tr>
-						</tbody>
-					</table>
-				</div>
+				<template v-else>
+					<div
+						v-if="topLines.length > 0"
+						class="relative min-h-[220px] w-full -mx-1 px-1"
+					>
+						<p class="text-xs font-medium text-gray-600 mb-2">Comparativo (mismos datos que la tabla)</p>
+						<DashboardBarChart
+							:labels="topCatalogBarLabels"
+							:datasets="topCatalogBarDatasets"
+							y-format="currency"
+						/>
+					</div>
+					<div class="overflow-x-auto -mx-1">
+						<table class="min-w-full text-left text-xs text-gray-800">
+							<thead>
+								<tr
+									class="border-b border-gray-200 text-[10px] uppercase tracking-wide text-gray-500"
+								>
+									<th class="py-2 pr-2">Gasto (catálogo)</th>
+									<th class="py-2 pr-2 hidden sm:table-cell">Categoría</th>
+									<th class="py-2 pr-2 text-right">Líneas en periodo</th>
+									<th class="py-2 text-right">Suma total</th>
+								</tr>
+							</thead>
+							<tbody>
+								<tr
+									v-for="row in topLines"
+									:key="row.expenseId"
+									class="border-b border-gray-100 last:border-0"
+								>
+									<td class="py-1.5 pr-2 font-medium">{{ row.expenseName }}</td>
+									<td class="py-1.5 pr-2 hidden sm:table-cell text-gray-600">
+										{{ row.categoryName || '—' }}
+									</td>
+									<td class="py-1.5 pr-2 text-right tabular-nums">{{ row.lineCount }}</td>
+									<td class="py-1.5 text-right font-medium tabular-nums">
+										{{ formatCurrency(row.totalCop) }}
+									</td>
+								</tr>
+							</tbody>
+						</table>
+					</div>
+				</template>
 			</div>
 
 			<div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
@@ -203,17 +219,21 @@
 <script setup lang="ts">
 import { computed, ref, watch, withDefaults } from 'vue';
 import BaseCard from '@/components/ui/BaseCard.vue';
-import { DashboardLineChart, DashboardRevenueShareDonut } from '@/components/dashboard';
+import {
+	DashboardBarChart,
+	DashboardLineChart,
+	DashboardRevenueShareDonut,
+} from '@/components/dashboard';
 import MenuCategoryCostingPanel from '@/components/dashboard/MenuCategoryCostingPanel.vue';
-import type { LineChartDataset } from '@/components/dashboard';
+import type { BarChartDataset, LineChartDataset } from '@/components/dashboard';
 import { expenseCategoryApi } from '@/services/MainAPI/expenseCategoryApi';
 import { expenseApi } from '@/services/MainAPI/expenseApi';
 import type { Expense } from '@/types/expense';
 import type {
 	GastosDashboardPayload,
-	GastosTopLineItem,
+	GastosTopCatalogItem,
 } from '@/composables/dashboard/useDashboardGastosSection';
-import { formatCurrency, formatDateTimeCompact } from '@/composables/useFormatting';
+import { formatCurrency } from '@/composables/useFormatting';
 import { defaultBusinessCalendar } from '@/utils/datetime';
 
 const props = withDefaults(
@@ -225,7 +245,7 @@ const props = withDefaults(
 		payload: GastosDashboardPayload | null | undefined;
 		branchId: number | null;
 		dateRange: [Date, Date];
-		topLines?: GastosTopLineItem[];
+		topLines?: GastosTopCatalogItem[];
 		topLinesLoading?: boolean;
 	}>(),
 	{
@@ -344,4 +364,12 @@ const lineDatasets = computed((): LineChartDataset[] => {
 		},
 	];
 });
+
+const topCatalogBarLabels = computed(() => props.topLines.map((r) => r.expenseName));
+const topCatalogBarDatasets = computed((): BarChartDataset[] => [
+	{
+		label: 'Suma en el periodo',
+		data: props.topLines.map((r) => r.totalCop),
+	},
+]);
 </script>
