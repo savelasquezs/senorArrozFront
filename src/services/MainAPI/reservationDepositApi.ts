@@ -4,11 +4,11 @@ import type { ReservationDeposit, CreateReservationDepositDto } from '@/types/re
 
 class ReservationDepositApi extends BaseApi {
   async getByOrder(orderId: number): Promise<ReservationDeposit[]> {
-    return this.get<ReservationDeposit[]>(`/reservation-deposits/by-order/${orderId}`)
+    return this.get<ReservationDeposit[]>(`/reservationdeposits/by-order/${orderId}`)
   }
 
   async create(dto: CreateReservationDepositDto): Promise<ReservationDeposit> {
-    return this.post<ReservationDeposit>('/reservation-deposits', dto)
+    return this.post<ReservationDeposit>('/reservationdeposits', dto)
   }
 
   async getPaged(filters?: {
@@ -26,7 +26,7 @@ class ReservationDepositApi extends BaseApi {
     if (filters?.orderId !== undefined) params.orderId = filters.orderId
     params.page = filters?.page ?? 1
     params.pageSize = filters?.pageSize ?? 20
-    return this.get<PagedResult<ReservationDeposit>>('/reservation-deposits', { params })
+    return this.get<PagedResult<ReservationDeposit>>('/reservationdeposits', { params })
   }
 }
 
