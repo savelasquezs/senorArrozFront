@@ -69,8 +69,11 @@
                   </span>
                   ) {{ formatCurrency(expected.openingGlobalTotal) }} + ventas
                   {{ formatCurrency(expected.salesInPeriodTotal) }} − gastos
-                  {{ formatCurrency(expected.expensesInPeriodTotal) }}. El global contado suma préstamos activos y
-                  pendiente en apps no liquidado.
+                  {{ formatCurrency(expected.expensesInPeriodTotal)
+                  }}<template v-if="(expected.reservationDepositsAddedToGlobalTotal ?? 0) !== 0">
+                    + abonos reserva (entrega pedido ≠ hoy CO)
+                    {{ formatCurrency(expected.reservationDepositsAddedToGlobalTotal ?? 0) }}
+                  </template>. El global contado suma préstamos activos y pendiente en apps no liquidado.
                 </p>
               </div>
               <div>
@@ -833,7 +836,7 @@ const saveBlockReason = computed(() => {
   if (bankReconciliations.value.length === 0) return 'No hay bancos configurados para esta sucursal.'
   if (!allBanksCuadred.value) return 'Hay bancos con diferencia distinta de $0'
   if (!globalCuadred.value)
-    return 'El total global contado (caja + bancos + apps pendientes + préstamos activos) no coincide con el esperado (apertura + ventas − gastos).'
+    return 'El total global contado (caja + bancos + apps pendientes + préstamos activos) no coincide con el esperado (apertura + ventas − gastos + abonos reserva si aplica).'
   return ''
 })
 

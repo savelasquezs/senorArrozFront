@@ -97,6 +97,8 @@ export interface CashRegisterExpected {
   /** Ventas (pedidos entregados) en el período por instante PrepareAt/CreatedAt. */
   salesInPeriodTotal: number
   expensesInPeriodTotal: number
+  /** Abonos de reserva del período con fecha entrega/programación del pedido (CO) distinta a hoy; sumados al esperado global. */
+  reservationDepositsAddedToGlobalTotal?: number
   expectedGlobalTotal: number
   /** Préstamos informales activos: suman al total global contado (efectivo del negocio fuera del cajón). */
   informalLoansActiveTotal: number
