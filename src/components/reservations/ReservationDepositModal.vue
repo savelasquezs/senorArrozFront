@@ -305,6 +305,7 @@ async function submit() {
     deposits.value.push(created)
     form.value = { amount: 0, paymentType: 'cash', bankId: undefined, appId: undefined, notes: '' }
     emit('deposited', created)
+    close()
   } catch (e: any) {
     error.value = e?.response?.data?.message || e?.message || 'Error al registrar el abono'
   } finally {

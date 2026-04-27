@@ -3,6 +3,7 @@
 // Importar tipos existentes para evitar duplicación
 import type { PagedResult } from './common'
 import type { BankPayment, AppPayment } from './bank'
+import type { ReservationDeposit } from './reservationDeposit'
 
 import type { Product, ProductCategory } from './product'
 
@@ -268,6 +269,8 @@ export interface OrderListItem {
     bankPayments: OrderBankPaymentDetail[]
     appPayments: OrderAppPaymentDetail[]
     totalDeposited: number
+    /** Abonos de anticipo (reservas); viene en búsqueda/listado enriquecido. */
+    reservationDeposits?: ReservationDeposit[]
     /** Efectivo ya cobrado en sucursal; el domiciliario no cobra en entrega. */
     paidInStoreCash?: boolean
     paidInStoreCashAt?: string | null

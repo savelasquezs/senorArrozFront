@@ -11,6 +11,18 @@ class ReservationDepositApi extends BaseApi {
     return this.post<ReservationDeposit>('/reservationdeposits', dto)
   }
 
+  async updateAmount(id: number, amount: number): Promise<ReservationDeposit> {
+    return this.put<ReservationDeposit>(`/reservationdeposits/${id}`, { amount })
+  }
+
+  async remove(id: number): Promise<void> {
+    try {
+      await this.api.delete(`/reservationdeposits/${id}`)
+    } catch (error: any) {
+      throw this.handleError(error)
+    }
+  }
+
   async getPaged(filters?: {
     branchId?: number
     fromDate?: string

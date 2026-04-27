@@ -122,6 +122,8 @@
                                     @edit-bank-payment="handleEditBankPaymentFromList"
                                     @remove-bank-payment="handleRemoveBankPaymentFromList"
                                     @quick-bank-transfer="handleQuickBankTransfer" @add-deposit="handleOpenDeposit"
+                                    @edit-reservation-deposit="handleEditReservationDepositFromList"
+                                    @remove-reservation-deposit="handleRemoveReservationDepositFromList"
                                     @paid-in-store-updated="handlePaidInStoreUpdated"
                                     @edit-paid-in-store-cash="handleEditPaidInStoreFromList"
                                     @remove-paid-in-store-cash="handleRemovePaidInStoreFromList"
@@ -144,9 +146,11 @@
                                         @settle-app-payment="handleSettleAppPayment"
                                         @edit-bank-payment="handleEditBankPaymentFromList"
                                         @remove-bank-payment="handleRemoveBankPaymentFromList"
-                                        @quick-bank-transfer="handleQuickBankTransfer"
-                                        @add-deposit="handleOpenDeposit"
-                                        @paid-in-store-updated="handlePaidInStoreUpdated"
+                                    @quick-bank-transfer="handleQuickBankTransfer"
+                                    @add-deposit="handleOpenDeposit"
+                                    @edit-reservation-deposit="handleEditReservationDepositFromList"
+                                    @remove-reservation-deposit="handleRemoveReservationDepositFromList"
+                                    @paid-in-store-updated="handlePaidInStoreUpdated"
                                         @edit-paid-in-store-cash="handleEditPaidInStoreFromList"
                                         @remove-paid-in-store-cash="handleRemovePaidInStoreFromList"
                                         @sort="handleSort" />
@@ -285,6 +289,8 @@
                             <ReservationsTable :reservations="resFilteredItems" :loading="resLoading"
                                 :sort-by="resSortBy" :sort-order="resSortOrder" @edit-customer="handleEditCustomer"
                                 @edit-address="handleEditAddress" @add-deposit="handleOpenDeposit"
+                                @edit-reservation-deposit="handleEditReservationDepositFromList"
+                                @remove-reservation-deposit="handleRemoveReservationDepositFromList"
                                 @cancel-reservation="handleCancelReservation" @sort="handleResSort" />
                         </div>
 
@@ -423,13 +429,55 @@
                 </BaseButton>
             </template>
         </BaseDialog>
+
+        <BaseDialog v-model="showRemoveReservationDepositDialog" title="Eliminar abono de reserva" size="sm">
+            <p v-if="removeReservationDepositTarget" class="text-sm text-gray-600">
+                ¿Eliminar el abono de
+                <span class="font-medium tabular-nums">{{
+                    formatCurrency(removeReservationDepositTarget.deposit.amount)
+                }}</span>
+                ?
+            </p>
+            <template #footer>
+                <BaseButton variant="secondary" size="sm" :disabled="removeReservationDepositLoading"
+                    @click="closeRemoveReservationDepositDialog">
+                    Cancelar
+                </BaseButton>
+                <BaseButton variant="primary" size="sm" class="bg-red-600 hover:bg-red-700"
+                    :loading="removeReservationDepositLoading" @click="confirmRemoveReservationDeposit">
+                    Eliminar
+                </BaseButton>
+            </template>
+        </BaseDialog>
+
+        <BaseDialog v-model="showEditReservationDepositDialog" title="Editar monto — abono de reserva" size="sm">
+            <div v-if="editReservationDepositTarget" class="space-y-3">
+                <p class="text-sm text-gray-600">
+                    Máximo permitido {{ formatCurrency(maxEditReservationDepositAmount) }}
+                </p>
+                <BaseInput v-model.number="editReservationDepositAmount" type="number"
+                    :max="maxEditReservationDepositAmount" placeholder="Monto" class="w-full" />
+            </div>
+            <template #footer>
+                <BaseButton variant="secondary" size="sm" :disabled="editReservationDepositLoading"
+                    @click="closeEditReservationDepositDialog">
+                    Cancelar
+                </BaseButton>
+                <BaseButton variant="primary" size="sm" :loading="editReservationDepositLoading"
+                    @click="confirmEditReservationDeposit">
+                    Guardar
+                </BaseButton>
+            </template>
+        </BaseDialog>
     </MainLayout>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import type { OrderListItem, Order, OrderStatus, OrderBankPaymentDetail, OrderAppPaymentDetail } from '@/types/order'
+import type { ReservationDeposit } from '@/types/reservationDeposit'
 import { orderApi } from '@/services/MainAPI/orderApi'
+import { reservationDepositApi } from '@/services/MainAPI/reservationDepositApi'
 import { type OrderFilterState } from '@/composables/useOrderFilters'
 import { buildOrderSearchBody } from '@/composables/useOrderSearchPayload'
 import { useDebouncedCallback } from '@/composables/useDebouncedCallback'
@@ -541,6 +589,15 @@ const editBankPaymentTarget = ref<{ order: OrderListItem; payment: OrderBankPaym
 const editBankPaymentAmount = ref(0)
 const editBankPaymentLoading = ref(false)
 
+const showRemoveReservationDepositDialog = ref(false)
+const removeReservationDepositTarget = ref<{ order: OrderListItem; deposit: ReservationDeposit } | null>(null)
+const removeReservationDepositLoading = ref(false)
+
+const showEditReservationDepositDialog = ref(false)
+const editReservationDepositTarget = ref<{ order: OrderListItem; deposit: ReservationDeposit } | null>(null)
+const editReservationDepositAmount = ref(0)
+const editReservationDepositLoading = ref(false)
+
 const showRemovePaidInStoreDialog = ref(false)
 const removePaidInStoreTarget = ref<{ order: OrderListItem; displayAmount: number } | null>(null)
 const removePaidInStoreLoading = ref(false)
@@ -562,6 +619,12 @@ const maxEditBankPaymentAmount = computed(() => {
     const totalPay =
         sumPaymentsAmounts(t.order.bankPayments) + sumPaymentsAmounts(t.order.appPayments)
     return t.order.total - totalPay + t.payment.amount
+})
+
+const maxEditReservationDepositAmount = computed(() => {
+    const t = editReservationDepositTarget.value
+    if (!t) return 0
+    return t.order.total - t.order.totalDeposited + t.deposit.amount
 })
 
 // Opciones de filtros
@@ -1021,6 +1084,97 @@ const confirmEditBankPayment = async () => {
     }
 }
 
+function patchReservationDepositsInList(
+    list: OrderListItem[],
+    orderId: number,
+    updater: (prev: ReservationDeposit[]) => ReservationDeposit[],
+): OrderListItem[] {
+    const idx = list.findIndex((o) => o.id === orderId)
+    if (idx === -1) return list
+    const o = list[idx]
+    const prevDeps = o.reservationDeposits ?? []
+    const nextDeps = updater(prevDeps)
+    const totalDeposited = nextDeps.reduce((s, d) => s + d.amount, 0)
+    const next = [...list]
+    next[idx] = { ...o, reservationDeposits: nextDeps, totalDeposited }
+    return next
+}
+
+const closeRemoveReservationDepositDialog = () => {
+    showRemoveReservationDepositDialog.value = false
+    removeReservationDepositTarget.value = null
+}
+
+const handleRemoveReservationDepositFromList = (order: OrderListItem, deposit: ReservationDeposit) => {
+    removeReservationDepositTarget.value = { order, deposit }
+    showRemoveReservationDepositDialog.value = true
+}
+
+const confirmRemoveReservationDeposit = async () => {
+    const t = removeReservationDepositTarget.value
+    if (!t) return
+    removeReservationDepositLoading.value = true
+    try {
+        await reservationDepositApi.remove(t.deposit.id)
+        success('Abono eliminado', 4000, 'El abono fue eliminado')
+        reservations.value = patchReservationDepositsInList(reservations.value, t.order.id, (deps) =>
+            deps.filter((d) => d.id !== t.deposit.id),
+        )
+        orders.value = patchReservationDepositsInList(orders.value, t.order.id, (deps) =>
+            deps.filter((d) => d.id !== t.deposit.id),
+        )
+        closeRemoveReservationDepositDialog()
+    } catch (err: any) {
+        error('Error al eliminar abono', err.message)
+    } finally {
+        removeReservationDepositLoading.value = false
+    }
+}
+
+const closeEditReservationDepositDialog = () => {
+    showEditReservationDepositDialog.value = false
+    editReservationDepositTarget.value = null
+    editReservationDepositAmount.value = 0
+}
+
+const handleEditReservationDepositFromList = (order: OrderListItem, deposit: ReservationDeposit) => {
+    editReservationDepositTarget.value = { order, deposit }
+    editReservationDepositAmount.value = deposit.amount
+    showEditReservationDepositDialog.value = true
+}
+
+const confirmEditReservationDeposit = async () => {
+    const t = editReservationDepositTarget.value
+    if (!t) return
+    const amount = Number(editReservationDepositAmount.value)
+    const max = maxEditReservationDepositAmount.value
+    if (!Number.isFinite(amount) || amount <= 0) {
+        error('Monto inválido', 'Ingresa un monto mayor a cero.')
+        return
+    }
+    if (amount > max) {
+        error('Monto inválido', `El máximo permitido es ${formatCurrency(max)}.`)
+        return
+    }
+    editReservationDepositLoading.value = true
+    try {
+        const u = await reservationDepositApi.updateAmount(t.deposit.id, amount)
+        const merged: ReservationDeposit = { ...t.deposit, ...u, amount: Number(u.amount) }
+        reservations.value = patchReservationDepositsInList(reservations.value, t.order.id, (deps) =>
+            deps.map((d) => (d.id === merged.id ? merged : d)),
+        )
+        orders.value = patchReservationDepositsInList(orders.value, t.order.id, (deps) =>
+            deps.map((d) => (d.id === merged.id ? merged : d)),
+        )
+        success('Abono actualizado', 4000, 'El monto fue guardado')
+        closeEditReservationDepositDialog()
+    } catch (err: any) {
+        error('Error al actualizar abono', err.message)
+    } finally {
+        editReservationDepositLoading.value = false
+    }
+}
+
 function paidInStoreDisplayAmountForOrder(order: OrderListItem): number {
     const cap =
         order.total - sumPaymentsAmounts(order.bankPayments) - sumPaymentsAmounts(order.appPayments)
@@ -1384,8 +1538,13 @@ const handleOpenDeposit = (order: OrderListItem) => {
     showDepositModal.value = true
 }
 
-const handleDeposited = () => {
+const handleDeposited = (deposit: ReservationDeposit) => {
     success('Abono registrado', 3000, 'El abono fue registrado correctamente')
+    reservations.value = patchReservationDepositsInList(reservations.value, deposit.orderId, (deps) => [
+        ...deps,
+        deposit,
+    ])
+    orders.value = patchReservationDepositsInList(orders.value, deposit.orderId, (deps) => [...deps, deposit])
 }
 
 // ===== RESERVACIONES TAB =====
