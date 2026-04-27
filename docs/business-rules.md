@@ -398,6 +398,10 @@ Validaciones implementadas antes de enviar un pedido al backend:
 - **Sin permisos**: Estado cuando no se han otorgado permisos de ubicación
 - **Error de ubicación**: Manejo de errores de GPS/red
 
+### App móvil domiciliarios (Flutter)
+
+- **Pestaña «En preparación»**: muestra pedidos **delivery** con estado **Tomado** o **En preparación** (unión de dos consultas a `POST /orders/search` con el mismo criterio de tipo/estado que el resto del sistema; sin duplicados; si un id figurara en ambas listas, prevalece **En preparación**). **No** se aplica la regla de «Reservas hoy» de cocina (esa exclusión es solo para `type === reservation` en la web). El orden de la lista y de los bloques por barrio sigue la **ancla de urgencia** del repartidor: `prepareAt`, si no existe hora de `taken` en `statusTimes`, y si no `createdAt` (coherente con el semáforo en pantalla), de más a menos urgente.
+
 ### Listado de pedidos (/orders)
 
 - **Filtros en servidor**: Estado, tipo, rango de fechas (día operativo Colombia vía API), banco con pago, app con pago, total por prefijo de dígitos y texto de búsqueda (cliente, teléfonos, invitado, notas, id) se aplican en `POST /orders/search`; la paginación y el total reflejan ese conjunto filtrado.
