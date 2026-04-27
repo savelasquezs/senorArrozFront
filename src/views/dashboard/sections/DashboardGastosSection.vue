@@ -42,6 +42,17 @@
 						</option>
 					</select>
 				</div>
+				<div v-if="filterCategoryId != null" class="min-w-[200px]">
+					<label class="block text-xs font-medium text-gray-600 mb-1">Cuántas líneas mostrar (mayor importe)</label>
+					<select
+						v-model.number="topLinesLimit"
+						class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 bg-white"
+					>
+						<option v-for="n in topLineLimitOptions" :key="n" :value="n">
+							{{ n === 500 ? 'Hasta 500 (máx.)' : `Top ${n}` }}
+						</option>
+					</select>
+				</div>
 			</div>
 
 			<div v-if="payload?.summary" class="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4 mt-4">
@@ -78,6 +89,57 @@
 						{{ formatCop(Math.round(payload.summary.avgTicketCop)) }}
 					</p>
 				</BaseCard>
+			</div>
+
+			<div
+				v-if="filterCategoryId != null"
+				class="rounded-xl border border-gray-200 bg-white p-3 shadow-sm"
+			>
+				<div class="flex flex-wrap items-center justify-between gap-2 mb-2">
+					<p class="text-sm font-medium text-gray-800">Mayores importes (por línea)</p>
+					<p v-if="topLinesLoading" class="text-xs text-gray-500">Cargando…</p>
+				</div>
+				<p class="text-[11px] text-gray-500 mb-2">
+					Mismas fechas y sucursal del panel. Orden: importe de línea descendente.
+				</p>
+				<div
+					v-if="!topLinesLoading && topLines.length === 0"
+					class="text-sm text-gray-500 py-4 text-center"
+				>
+					Sin líneas en este rango y filtros.
+				</div>
+				<div v-else class="overflow-x-auto -mx-1">
+					<table class="min-w-full text-left text-xs text-gray-800">
+						<thead>
+							<tr class="border-b border-gray-200 text-[10px] uppercase tracking-wide text-gray-500">
+								<th class="py-2 pr-2">Factura</th>
+								<th class="py-2 pr-2">Fecha</th>
+								<th class="py-2 pr-2">Gasto (línea)</th>
+								<th class="py-2 pr-2">Proveedor</th>
+								<th class="py-2 pr-2 hidden sm:table-cell">Sucursal</th>
+								<th class="py-2 text-right">Importe</th>
+							</tr>
+						</thead>
+						<tbody>
+							<tr
+								v-for="row in topLines"
+								:key="row.detailId"
+								class="border-b border-gray-100 last:border-0"
+							>
+								<td class="py-1.5 pr-2 font-mono text-[11px]">#{{ row.headerId }}</td>
+								<td class="py-1.5 pr-2 tabular-nums">
+									{{ formatDateTimeCompact(row.headerCreatedAtUtc) }}
+								</td>
+								<td class="py-1.5 pr-2">{{ row.expenseName }}</td>
+								<td class="py-1.5 pr-2">{{ row.supplierName || '—' }}</td>
+								<td class="py-1.5 pr-2 hidden sm:table-cell">{{ row.branchName || '—' }}</td>
+								<td class="py-1.5 text-right font-medium tabular-nums">
+									{{ formatCurrency(row.lineCop) }}
+								</td>
+							</tr>
+						</tbody>
+					</table>
+				</div>
 			</div>
 
 			<div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
@@ -139,7 +201,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue';
+import { computed, ref, watch, withDefaults } from 'vue';
 import BaseCard from '@/components/ui/BaseCard.vue';
 import { DashboardLineChart, DashboardRevenueShareDonut } from '@/components/dashboard';
 import MenuCategoryCostingPanel from '@/components/dashboard/MenuCategoryCostingPanel.vue';
@@ -147,18 +209,33 @@ import type { LineChartDataset } from '@/components/dashboard';
 import { expenseCategoryApi } from '@/services/MainAPI/expenseCategoryApi';
 import { expenseApi } from '@/services/MainAPI/expenseApi';
 import type { Expense } from '@/types/expense';
-import type { GastosDashboardPayload } from '@/composables/dashboard/useDashboardGastosSection';
+import type {
+	GastosDashboardPayload,
+	GastosTopLineItem,
+} from '@/composables/dashboard/useDashboardGastosSection';
+import { formatCurrency, formatDateTimeCompact } from '@/composables/useFormatting';
 import { defaultBusinessCalendar } from '@/utils/datetime';
 
-const props = defineProps<{
-	loading: boolean;
-	seriesBusy: boolean;
-	error: string | null | undefined;
-	/** `null` hasta la primera carga exitosa. */
-	payload: GastosDashboardPayload | null | undefined;
-	branchId: number | null;
-	dateRange: [Date, Date];
-}>();
+const props = withDefaults(
+	defineProps<{
+		loading: boolean;
+		seriesBusy: boolean;
+		error: string | null | undefined;
+		/** `null` hasta la primera carga exitosa. */
+		payload: GastosDashboardPayload | null | undefined;
+		branchId: number | null;
+		dateRange: [Date, Date];
+		topLines?: GastosTopLineItem[];
+		topLinesLoading?: boolean;
+	}>(),
+	{
+		topLines: () => [],
+		topLinesLoading: false,
+	},
+);
+
+const topLineLimitOptions = [5, 10, 15, 25, 50, 100, 500] as const;
+const topLinesLimit = defineModel<number>('topLinesLimit', { default: 15 });
 
 const branchId = computed(() => props.branchId);
 const dateRange = computed(() => props.dateRange);

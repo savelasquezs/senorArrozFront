@@ -59,10 +59,13 @@
                     key="gastos"
                     v-model:filter-category-id="gastosFilterCategoryId"
                     v-model:filter-expense-id="gastosFilterExpenseId"
+                    v-model:top-lines-limit="gastosTopLinesLimit"
                     :loading="gastosLoading"
                     :series-busy="gastosSeriesBusy"
                     :error="gastosError"
                     :payload="gastosData"
+                    :top-lines="gastosTopLines"
+                    :top-lines-loading="gastosTopLinesLoading"
                     :branch-id="adminBranchId"
                     :date-range="globalDashboardDateRange"
                 />
@@ -200,6 +203,9 @@ const {
 	data: gastosData,
 	filterCategoryId: gastosFilterCategoryId,
 	filterExpenseId: gastosFilterExpenseId,
+	topLines: gastosTopLines,
+	topLinesLoading: gastosTopLinesLoading,
+	topLinesLimit: gastosTopLinesLimit,
 } = gastosSection
 
 const principalData = principalSection.data
