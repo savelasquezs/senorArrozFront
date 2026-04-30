@@ -4,10 +4,11 @@ import { useOrdersDraftsStore } from '@/store/ordersDrafts'
 import type { DraftOrder, ValidationResult } from '@/types/order'
 import { sumOrderNonCashPayments } from '@/utils/orderCashToCollect'
 
-export function useOrderValidation(order?: DraftOrder) {
+export function useOrderValidation() {
     const ordersStore = useOrdersDraftsStore()
 
-    const currentOrder = computed(() => order || ordersStore.currentOrder)
+    /** Siempre el pedido activo del tab; no usar snapshot del setup (rompía la reactividad). */
+    const currentOrder = computed(() => ordersStore.currentOrder)
 
     const validateOrder = (order: DraftOrder): ValidationResult => {
         const errors: string[] = []
@@ -47,7 +48,7 @@ export function useOrderValidation(order?: DraftOrder) {
 
         return {
             isValid: errors.length === 0,
-            errors
+            errors,
         }
     }
 
@@ -78,6 +79,6 @@ export function useOrderValidation(order?: DraftOrder) {
         isOrderValid,
         orderErrors,
         canSubmitOrder,
-        calculateTotalPayments
+        calculateTotalPayments,
     }
 }

@@ -200,9 +200,13 @@ export const useOrdersDraftsStore = defineStore('ordersDrafts', () => {
         }
 
         // Crear nuevo objeto para disparar reactividad
+        const numericAddressId =
+            address != null && address.id != null && !Number.isNaN(Number(address.id)) && Number(address.id) > 0
+                ? Number(address.id)
+                : null
         const updatedOrder = {
             ...order,
-            addressId: address ? address.id : null,
+            addressId: numericAddressId,
             addressDescription: address ? address.address : null,
             addressAdditionalInfo: address ? (address.additionalInfo ?? null) : null,
             deliveryFee: address ? (address.deliveryFee || 0) : 0,
@@ -214,15 +218,27 @@ export const useOrdersDraftsStore = defineStore('ordersDrafts', () => {
     }
 
     /** Añade o actualiza una dirección en la lista de clientes del store para que getAddress la encuentre (p. ej. tras crear una nueva). */
-    const addAddressToCustomer = (customerId: number, address: CustomerAddress) => {
+    const addAddressToCustomer = (
+        customerId: number,
+        address: CustomerAddress,
+        hintCustomer?: Customer | null,
+    ) => {
+        const mergeInto = (base: Customer, prevAddresses: CustomerAddress[]) => {
+            const existingIdx = prevAddresses.findIndex((a) => a.id === address.id)
+            return existingIdx >= 0
+                ? prevAddresses.map((a, i) => (i === existingIdx ? address : a))
+                : [...prevAddresses, address]
+        }
+
         const idx = customers.value.findIndex((c) => c.id === customerId)
-        if (idx === -1) return
+        if (idx === -1) {
+            if (!hintCustomer || hintCustomer.id !== customerId) return
+            const nextAddresses = mergeInto(hintCustomer, hintCustomer.addresses ?? [])
+            customers.value = [{ ...hintCustomer, addresses: nextAddresses }, ...customers.value]
+            return
+        }
         const customer = customers.value[idx]
-        const prev = customer.addresses ?? []
-        const existingIdx = prev.findIndex((a) => a.id === address.id)
-        const nextAddresses = existingIdx >= 0
-            ? prev.map((a, i) => (i === existingIdx ? address : a))
-            : [...prev, address]
+        const nextAddresses = mergeInto(customer, customer.addresses ?? [])
         customers.value = customers.value.map((c, i) =>
             i === idx ? { ...c, addresses: nextAddresses } : c
         )
