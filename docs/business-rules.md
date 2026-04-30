@@ -96,6 +96,7 @@ enum UserRole {
 - **Pedidos en curso**: Vista de los pedidos en ruta de entrega
 - **Geolocalización**: Vista con Google Maps de pedidos "OnTheWay" asignados
 - **Entrega automática**: Opción de marcar como entregado al estar a 20m o menos del destino 
+- **Push FCM “pedido listo” (`order_ready`)**: Solo reciben el push los domiciliarios activos de la sucursal que ese día calendario (**America/Bogota**) tienen al menos un pedido con instante de **asignación** incluido en `orders.status_times` (clave preferente `delivery_man_assigned`, guardada en cada asignación/reasignación; si falta en datos antiguos se usa como respaldo `ontheway` / `on_the_way`), que **no** tengan liquidación total del día (`deliveryman_day_states.blocked` para esa fecha), y que **no** estén “ocupados” con algún pedido en estado **OnTheWay** en esa sucursal. SignalR (`OrderReady` en el grupo de delivery de la sucursal) no cambia con esta regla.
 
 ## Zona horaria y fechas de negocio
 
