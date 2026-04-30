@@ -1,10 +1,18 @@
 // src/composables/useOrderValidation.ts
-import { computed } from 'vue'
+import { computed, type ComputedRef } from 'vue'
 import { useOrdersDraftsStore } from '@/store/ordersDrafts'
 import type { DraftOrder, ValidationResult } from '@/types/order'
 import { sumOrderNonCashPayments } from '@/utils/orderCashToCollect'
 
-export function useOrderValidation() {
+export type UseOrderValidationReturn = {
+    validateOrder: (order: DraftOrder) => ValidationResult
+    isOrderValid: ComputedRef<boolean>
+    orderErrors: ComputedRef<string[]>
+    canSubmitOrder: ComputedRef<boolean>
+    calculateTotalPayments: (order: DraftOrder) => number
+}
+
+export function useOrderValidation(): UseOrderValidationReturn {
     const ordersStore = useOrdersDraftsStore()
 
     /** Siempre el pedido activo del tab; no usar snapshot del setup (rompía la reactividad). */

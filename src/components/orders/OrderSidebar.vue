@@ -494,7 +494,7 @@ const handleSubmitOrder = async () => {
 
             // Show individual errors if multiple
             if (orderErrors.value.length > 1) {
-                orderErrors.value.slice(0, 3).forEach((error, index) => {
+                orderErrors.value.slice(0, 3).forEach((error: string, index: number) => {
                     setTimeout(() => {
                         showError('Requisito', error)
                     }, (index + 1) * 600)
