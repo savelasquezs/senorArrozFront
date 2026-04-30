@@ -158,13 +158,15 @@ onMounted(() => {
 **Props:**
 - `orders`: OrderListItem[]
 - `orderItemsMap`: Map<number, OrderDetailItem[]>
+- `showStatusActions?`: boolean (p. ej. desactivo en *Reservas hoy*)
+- `combinedMode?`: si es true, un solo bloque «Tomado + En preparación» por categoría, sin *Seleccionar todos* / *Limpiar* (solo botón «Marcar como Listo» cuando aplica, selección en tarjeta). La confirmación encadena en el modal vía `chainTakenToReady`
 
 **Emits:**
 - `change-status`: [orderIds: number[], newStatus: OrderStatus]
 
 **Funcionalidad:**
-- Grid responsive (1/2/3/4 columnas según pantalla)
-- Muestra pedidos separados por estado (Taken / En Preparación)
+- Grid responsive (1 / 2 / 5 columnas: `sm` / `lg`; gap compacto)
+- Sin `combinedMode`: secciones Tomado y En Preparación; con `combinedMode`: sección unificada
 - Selección múltiple con botones "Seleccionar todos" / "Limpiar"
 - Botones de acción condicionales según estado y permisos
 - Usa `useOrderPermissions.canChangeStatus()` para validar
@@ -179,6 +181,7 @@ onMounted(() => {
 - `isOpen`: boolean
 - `orders`: OrderListItem[]
 - `orderItemsMap`: Map<number, OrderDetailItem[]>
+- `chainTakenToReady?`: si true (modo combinado al abrir), encadena in_preparation → listo para pedidos aún en Tomado vía `applyMarkReadySequence` en el composable `kitchenMarkReadySequence.ts`
 
 **Emits:**
 - `close`: []
@@ -186,7 +189,7 @@ onMounted(() => {
 
 **Funcionalidad:**
 - Modal autónomo que maneja su propia actualización
-- Llama directamente a `ordersDataStore.updateStatus()`
+- Llama directamente a `ordersDataStore.updateStatus()` (o secuencia indicada)
 - Muestra preview de pedidos a confirmar
 - Mensaje sobre impresión automática (placeholder)
 

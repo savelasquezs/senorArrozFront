@@ -50,6 +50,8 @@ class BranchApi extends BaseApi {
 			| 'businessName'
 			| 'nit'
 			| 'maxFreeDeliveryDiscount'
+			| 'posCopyEtaMinMinutes'
+			| 'posCopyEtaRangeMinutes'
 		>
 	): Promise<ApiResponse<Branch>> {
 		return this.post<ApiResponse<Branch>>('/Branches', payload);
@@ -68,6 +70,8 @@ class BranchApi extends BaseApi {
 			| 'businessName'
 			| 'nit'
 			| 'maxFreeDeliveryDiscount'
+			| 'posCopyEtaMinMinutes'
+			| 'posCopyEtaRangeMinutes'
 		>
 	): Promise<ApiResponse<Branch>> {
 		return this.put<ApiResponse<Branch>>(`/Branches/${id}`, payload);

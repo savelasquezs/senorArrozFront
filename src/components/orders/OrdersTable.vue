@@ -164,6 +164,20 @@
                     <!-- Pagos -->
                     <td class="min-w-0 px-3 py-2">
                         <div class="space-y-1">
+                            <!-- Abonos de reserva (anticipos) -->
+                            <div
+                                v-if="order.type === 'reservation' && (order.reservationDeposits?.length ?? 0) > 0"
+                                class="space-y-1"
+                            >
+                                <ReservationDepositCompactRow
+                                    v-for="d in (order.reservationDeposits ?? [])"
+                                    :key="d.id"
+                                    :deposit="d"
+                                    :show-edit-remove="permissions.canEditPayments(order)"
+                                    @edit="(dep) => emit('edit-reservation-deposit', order, dep)"
+                                    @remove="(dep) => emit('remove-reservation-deposit', order, dep)"
+                                />
+                            </div>
                             <!-- Bank Payments -->
                             <div v-if="order.bankPayments && order.bankPayments.length > 0" class="space-y-1">
                                 <OrderBankPaymentRow v-for="payment in order.bankPayments" :key="payment.id"
@@ -261,6 +275,7 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import type { OrderListItem, OrderBankPaymentDetail, OrderAppPaymentDetail } from '@/types/order'
+import type { ReservationDeposit } from '@/types/reservationDeposit'
 import type { Bank } from '@/types/bank'
 import OrderStatusBadge from './OrderStatusBadge.vue'
 import OrderTypeBadge from './OrderTypeBadge.vue'
@@ -268,6 +283,7 @@ import BaseLoading from '@/components/ui/BaseLoading.vue'
 import OrderBankPaymentRow from '@/components/payments/OrderBankPaymentRow.vue'
 import OrderAppPaymentRow from '@/components/payments/OrderAppPaymentRow.vue'
 import PaidInStoreCashCompactRow from '@/components/orders/PaidInStoreCashCompactRow.vue'
+import ReservationDepositCompactRow from '@/components/reservations/ReservationDepositCompactRow.vue'
 import { useFormatting, getStatusTimeFromRecord } from '@/composables/useFormatting'
 import { useOrderPermissions } from '@/composables/useOrderPermissions'
 import {
@@ -317,6 +333,8 @@ const emit = defineEmits<{
     'remove-bank-payment': [order: OrderListItem, payment: OrderBankPaymentDetail]
     'quick-bank-transfer': [order: OrderListItem, bankId: number]
     'add-deposit': [order: OrderListItem]
+    'edit-reservation-deposit': [order: OrderListItem, deposit: ReservationDeposit]
+    'remove-reservation-deposit': [order: OrderListItem, deposit: ReservationDeposit]
     'paid-in-store-updated': [order: OrderListItem]
     'edit-paid-in-store-cash': [order: OrderListItem]
     'remove-paid-in-store-cash': [order: OrderListItem]

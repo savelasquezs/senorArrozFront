@@ -8,11 +8,11 @@
                             <div class="flex flex-wrap items-end gap-3">
                                 <div class="w-28 sm:w-32 shrink-0">
                                     <BaseInput v-model="filters.totalQuery" type="text" inputmode="numeric"
-                                        placeholder="Total (dígitos)" class="w-full" @input="applyFilters" />
+                                        placeholder="Total (dígitos)" class="w-full" @input="onOrdersTextFilterInput" />
                                 </div>
                                 <div class="flex-1 min-w-[180px]">
                                     <BaseInput v-model="filters.search" placeholder="Cliente, teléfono, invitado…"
-                                        @input="applyFilters">
+                                        @input="onOrdersTextFilterInput">
                                         <template #icon>
                                             <MagnifyingGlassIcon class="w-4 h-4" />
                                         </template>
@@ -22,29 +22,37 @@
                                 <div class="flex flex-wrap items-end gap-2">
                                     <div class="w-36 sm:w-40">
                                         <BaseSelect v-model="filters.type" :options="typeOptions" value-key="value"
-                                            display-key="label" placeholder="Tipo" @update:model-value="applyFilters" />
+                                            display-key="label" placeholder="Tipo"
+                                            @update:model-value="onOrdersSelectFilterChange" />
                                     </div>
                                     <div class="w-36 sm:w-44">
                                         <BaseSelect v-model="filters.status" :options="statusOptions" value-key="value"
                                             display-key="label" placeholder="Estado"
-                                            @update:model-value="applyFilters" />
+                                            @update:model-value="onOrdersSelectFilterChange" />
                                     </div>
                                     <div class="w-44 sm:w-52">
                                         <BaseSelect v-model="bankFilterId" :options="bankFilterOptions" value-key="value"
                                             display-key="label" placeholder="Banco (pagos)"
                                             @update:model-value="onBankFilterChange" />
                                     </div>
-                                    <div class="w-40 sm:w-44">
-                                        <BaseSelect v-model="filters.appPayments" :options="appPaymentsFilterOptions"
-                                            value-key="value" display-key="label" placeholder="Apps (pagos)"
-                                            @update:model-value="applyFilters" />
+                                    <div class="w-44 sm:w-52">
+                                        <BaseSelect v-model="appFilterId" :options="appFilterOptions" value-key="value"
+                                            display-key="label" placeholder="App (pagos)"
+                                            @update:model-value="onAppFilterChange" />
                                     </div>
+                                    <label
+                                        class="flex items-center gap-2 text-xs text-gray-700 cursor-pointer shrink-0">
+                                        <input v-model="appUnsettledOnly" type="checkbox"
+                                            class="rounded border-gray-300 text-emerald-600 focus:ring-emerald-500"
+                                            @change="onAppUnsettledChange" />
+                                        Solo app no liquidados
+                                    </label>
                                     <div class="flex items-center gap-2 flex-wrap">
                                         <BaseInput v-model="dateFilters.fromDate" type="date" placeholder="Desde"
-                                            class="w-32 sm:w-36" @change="fetchOrders" />
+                                            class="w-32 sm:w-36" @change="onDateFiltersChange" />
                                         <span class="text-gray-400">-</span>
                                         <BaseInput v-model="dateFilters.toDate" type="date" placeholder="Hasta"
-                                            class="w-32 sm:w-36" @change="fetchOrders" />
+                                            class="w-32 sm:w-36" @change="onDateFiltersChange" />
                                     </div>
                                     <BaseButton v-if="hasActiveFilters" variant="ghost" size="sm" class="shrink-0"
                                         @click="clearFilters">
@@ -73,8 +81,8 @@
                                     </button>
                                 </div>
                                 <div class="text-sm text-gray-600 min-w-0">
-                                    <span v-if="!loading && filteredOrders.length > 0">
-                                        Mostrando <span class="font-medium">{{ filteredOrders.length }}</span>
+                                    <span v-if="!loading && orders.length > 0">
+                                        Mostrando <span class="font-medium">{{ orders.length }}</span>
                                         de <span class="font-medium">{{ totalCount }}</span> pedidos
                                     </span>
                                     <span v-else-if="!loading" class="text-gray-400">No hay pedidos</span>
@@ -104,7 +112,7 @@
                     <div class="bg-white rounded-lg shadow overflow-hidden min-w-0 flex flex-col max-h-[min(75vh,42rem)]">
                         <div class="overflow-y-auto overflow-x-auto min-h-0 min-w-0 flex-1">
                             <template v-if="!groupByRoute">
-                                <OrdersTable :orders="filteredOrders" :loading="loading" :sort-by="sortBy"
+                                <OrdersTable :orders="orders" :loading="loading" :sort-by="sortBy"
                                     :sort-order="sortOrder" :quick-banks="quickBanks"
                                     enable-paid-in-store-quick-action enable-app-settle-quick-action
                                     @edit-customer="handleEditCustomer" @edit-address="handleEditAddress"
@@ -114,6 +122,8 @@
                                     @edit-bank-payment="handleEditBankPaymentFromList"
                                     @remove-bank-payment="handleRemoveBankPaymentFromList"
                                     @quick-bank-transfer="handleQuickBankTransfer" @add-deposit="handleOpenDeposit"
+                                    @edit-reservation-deposit="handleEditReservationDepositFromList"
+                                    @remove-reservation-deposit="handleRemoveReservationDepositFromList"
                                     @paid-in-store-updated="handlePaidInStoreUpdated"
                                     @edit-paid-in-store-cash="handleEditPaidInStoreFromList"
                                     @remove-paid-in-store-cash="handleRemovePaidInStoreFromList"
@@ -136,9 +146,11 @@
                                         @settle-app-payment="handleSettleAppPayment"
                                         @edit-bank-payment="handleEditBankPaymentFromList"
                                         @remove-bank-payment="handleRemoveBankPaymentFromList"
-                                        @quick-bank-transfer="handleQuickBankTransfer"
-                                        @add-deposit="handleOpenDeposit"
-                                        @paid-in-store-updated="handlePaidInStoreUpdated"
+                                    @quick-bank-transfer="handleQuickBankTransfer"
+                                    @add-deposit="handleOpenDeposit"
+                                    @edit-reservation-deposit="handleEditReservationDepositFromList"
+                                    @remove-reservation-deposit="handleRemoveReservationDepositFromList"
+                                    @paid-in-store-updated="handlePaidInStoreUpdated"
                                         @edit-paid-in-store-cash="handleEditPaidInStoreFromList"
                                         @remove-paid-in-store-cash="handleRemovePaidInStoreFromList"
                                         @sort="handleSort" />
@@ -277,6 +289,8 @@
                             <ReservationsTable :reservations="resFilteredItems" :loading="resLoading"
                                 :sort-by="resSortBy" :sort-order="resSortOrder" @edit-customer="handleEditCustomer"
                                 @edit-address="handleEditAddress" @add-deposit="handleOpenDeposit"
+                                @edit-reservation-deposit="handleEditReservationDepositFromList"
+                                @remove-reservation-deposit="handleRemoveReservationDepositFromList"
                                 @cancel-reservation="handleCancelReservation" @sort="handleResSort" />
                         </div>
 
@@ -415,14 +429,58 @@
                 </BaseButton>
             </template>
         </BaseDialog>
+
+        <BaseDialog v-model="showRemoveReservationDepositDialog" title="Eliminar abono de reserva" size="sm">
+            <p v-if="removeReservationDepositTarget" class="text-sm text-gray-600">
+                ¿Eliminar el abono de
+                <span class="font-medium tabular-nums">{{
+                    formatCurrency(removeReservationDepositTarget.deposit.amount)
+                }}</span>
+                ?
+            </p>
+            <template #footer>
+                <BaseButton variant="secondary" size="sm" :disabled="removeReservationDepositLoading"
+                    @click="closeRemoveReservationDepositDialog">
+                    Cancelar
+                </BaseButton>
+                <BaseButton variant="primary" size="sm" class="bg-red-600 hover:bg-red-700"
+                    :loading="removeReservationDepositLoading" @click="confirmRemoveReservationDeposit">
+                    Eliminar
+                </BaseButton>
+            </template>
+        </BaseDialog>
+
+        <BaseDialog v-model="showEditReservationDepositDialog" title="Editar monto — abono de reserva" size="sm">
+            <div v-if="editReservationDepositTarget" class="space-y-3">
+                <p class="text-sm text-gray-600">
+                    Máximo permitido {{ formatCurrency(maxEditReservationDepositAmount) }}
+                </p>
+                <BaseInput v-model.number="editReservationDepositAmount" type="number"
+                    :max="maxEditReservationDepositAmount" placeholder="Monto" class="w-full" />
+            </div>
+            <template #footer>
+                <BaseButton variant="secondary" size="sm" :disabled="editReservationDepositLoading"
+                    @click="closeEditReservationDepositDialog">
+                    Cancelar
+                </BaseButton>
+                <BaseButton variant="primary" size="sm" :loading="editReservationDepositLoading"
+                    @click="confirmEditReservationDeposit">
+                    Guardar
+                </BaseButton>
+            </template>
+        </BaseDialog>
     </MainLayout>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import type { OrderListItem, Order, OrderStatus, OrderBankPaymentDetail, OrderAppPaymentDetail } from '@/types/order'
+import type { ReservationDeposit } from '@/types/reservationDeposit'
 import { orderApi } from '@/services/MainAPI/orderApi'
-import { useOrderFilters, type OrderFilterState } from '@/composables/useOrderFilters'
+import { reservationDepositApi } from '@/services/MainAPI/reservationDepositApi'
+import { type OrderFilterState } from '@/composables/useOrderFilters'
+import { buildOrderSearchBody } from '@/composables/useOrderSearchPayload'
+import { useDebouncedCallback } from '@/composables/useDebouncedCallback'
 import { useOrderPermissions } from '@/composables/useOrderPermissions'
 import { useToast } from '@/composables/useToast'
 import { getOrderStatusDisplayName, getOrderTypeDisplayName, useFormatting } from '@/composables/useFormatting'
@@ -433,6 +491,7 @@ import { appPaymentApi } from '@/services/MainAPI/appPaymentApi'
 import { appPaymentIsSettled } from '@/utils/orderListPayments'
 import type { BankPayment } from '@/types/bank'
 import { useBanksStore } from '@/store/banks'
+import { useAppsStore } from '@/store/apps'
 import MainLayout from '@/components/layout/MainLayout.vue'
 import OrdersTable from '@/components/orders/OrdersTable.vue'
 import EditCustomerModal from '@/components/orders/EditCustomerModal.vue'
@@ -456,7 +515,10 @@ import {
 } from '@heroicons/vue/24/outline'
 
 const banksStore = useBanksStore()
-const { applyAllFilters, sortOrders } = useOrderFilters()
+const appsStore = useAppsStore()
+const debouncedRefetchOrders = useDebouncedCallback(() => {
+    void fetchOrders()
+}, 300)
 const { getNextAllowedStatus, canChangeStatus } = useOrderPermissions()
 
 // ===== TABS =====
@@ -491,11 +553,16 @@ const filters = ref<OrderFilterState>({
     type: null,
     status: null,
     customer: '',
-    appPayments: null,
 })
 
 /** Filtro servidor: pedidos con pago en este banco */
 const bankFilterId = ref<number | null>(null)
+
+/** Filtro servidor: pedidos con pago registrado en esta app */
+const appFilterId = ref<number | null>(null)
+
+/** Filtro servidor: al menos un pago por app no liquidado (opcionalmente para la app elegida) */
+const appUnsettledOnly = ref(false)
 
 const groupByRoute = ref(false)
 
@@ -522,6 +589,15 @@ const editBankPaymentTarget = ref<{ order: OrderListItem; payment: OrderBankPaym
 const editBankPaymentAmount = ref(0)
 const editBankPaymentLoading = ref(false)
 
+const showRemoveReservationDepositDialog = ref(false)
+const removeReservationDepositTarget = ref<{ order: OrderListItem; deposit: ReservationDeposit } | null>(null)
+const removeReservationDepositLoading = ref(false)
+
+const showEditReservationDepositDialog = ref(false)
+const editReservationDepositTarget = ref<{ order: OrderListItem; deposit: ReservationDeposit } | null>(null)
+const editReservationDepositAmount = ref(0)
+const editReservationDepositLoading = ref(false)
+
 const showRemovePaidInStoreDialog = ref(false)
 const removePaidInStoreTarget = ref<{ order: OrderListItem; displayAmount: number } | null>(null)
 const removePaidInStoreLoading = ref(false)
@@ -545,18 +621,18 @@ const maxEditBankPaymentAmount = computed(() => {
     return t.order.total - totalPay + t.payment.amount
 })
 
+const maxEditReservationDepositAmount = computed(() => {
+    const t = editReservationDepositTarget.value
+    if (!t) return 0
+    return t.order.total - t.order.totalDeposited + t.deposit.amount
+})
+
 // Opciones de filtros
 const typeOptions: Array<{ value: string | null; label: string }> = [
     { value: null, label: 'Todos los tipos' },
     { value: 'onsite', label: 'En el local' },
     { value: 'delivery', label: 'Domicilio' },
     { value: 'reservation', label: 'Reserva' },
-]
-
-const appPaymentsFilterOptions: Array<{ value: OrderFilterState['appPayments']; label: string }> = [
-    { value: null, label: 'Todas (apps)' },
-    { value: 'with', label: 'Con pago por app' },
-    { value: 'without', label: 'Sin pago por app' },
 ]
 
 const statusOptions: Array<{ value: string | null; label: string }> = [
@@ -578,15 +654,18 @@ const bankFilterOptions = computed(() => {
     ]
 })
 
-// Computed
-const filteredOrders = computed(() => {
-    let filtered = applyAllFilters(orders.value, filters.value)
-    return sortOrders(filtered, sortBy.value, sortOrder.value)
+const appFilterOptions = computed(() => {
+    const items = appsStore.list?.items || []
+    const active = items.filter((a) => a.active).sort((a, b) => a.name.localeCompare(b.name))
+    return [
+        { value: null as number | null, label: 'Todas las apps' },
+        ...active.map((a) => ({ value: a.id, label: a.name })),
+    ]
 })
 
 /** Bloques por deliveryRouteId para vista agrupada (mismo criterio que en detalle domiciliario). */
 const orderRouteBlocks = computed(() => {
-    const list = filteredOrders.value
+    const list = orders.value
     const buckets = new Map<string, OrderListItem[]>()
     const keyFor = (o: OrderListItem) =>
         o.deliveryRouteId != null ? `r:${o.deliveryRouteId}` : 'none'
@@ -652,8 +731,9 @@ const hasActiveFilters = computed(() => {
         filters.value.type ||
         filters.value.status ||
         filters.value.customer ||
-        filters.value.appPayments ||
         bankFilterId.value != null ||
+        appFilterId.value != null ||
+        appUnsettledOnly.value ||
         fromDiffers ||
         dateFilters.value.toDate
     )
@@ -663,20 +743,27 @@ const hasActiveFilters = computed(() => {
 const fetchOrders = async () => {
     loading.value = true
     try {
-        const body: Record<string, any> = {
+        const searchParts = [filters.value.search, filters.value.customer]
+            .map((s) => s.trim())
+            .filter(Boolean)
+        const combinedSearch = searchParts.join(' ').trim()
+
+        const body = buildOrderSearchBody({
             page: currentPage.value,
             pageSize: pageSize.value,
             sortBy: sortBy.value,
             sortOrder: sortOrder.value,
             excludeFutureReservations: true,
-        }
-        // Solo YYYY-MM-DD: el API interpreta el día en hora Colombia (evita UTC midnight de toISOString)
-        if (dateFilters.value.fromDate) body.fromDate = dateFilters.value.fromDate
-        if (dateFilters.value.toDate) body.toDate = dateFilters.value.toDate
-
-        if (bankFilterId.value != null) {
-            body.bankId = bankFilterId.value
-        }
+            fromDate: dateFilters.value.fromDate || undefined,
+            toDate: dateFilters.value.toDate || undefined,
+            bankId: bankFilterId.value,
+            appId: appFilterId.value,
+            appPaymentsUnsettledOnly: appUnsettledOnly.value,
+            search: combinedSearch,
+            totalQuery: filters.value.totalQuery,
+            type: filters.value.type,
+            status: filters.value.status,
+        })
 
         const response = await orderApi.searchOrders(body)
         orders.value = response.items
@@ -688,8 +775,33 @@ const fetchOrders = async () => {
     }
 }
 
-const applyFilters = () => {
+const onOrdersTextFilterInput = () => {
     currentPage.value = 1
+    debouncedRefetchOrders.schedule()
+}
+
+const onOrdersSelectFilterChange = () => {
+    currentPage.value = 1
+    debouncedRefetchOrders.cancel()
+    void fetchOrders()
+}
+
+const onAppFilterChange = () => {
+    currentPage.value = 1
+    debouncedRefetchOrders.cancel()
+    void fetchOrders()
+}
+
+const onAppUnsettledChange = () => {
+    currentPage.value = 1
+    debouncedRefetchOrders.cancel()
+    void fetchOrders()
+}
+
+const onDateFiltersChange = () => {
+    currentPage.value = 1
+    debouncedRefetchOrders.cancel()
+    void fetchOrders()
 }
 
 const clearFilters = () => {
@@ -699,20 +811,23 @@ const clearFilters = () => {
         type: null,
         status: null,
         customer: '',
-        appPayments: null,
     }
     bankFilterId.value = null
+    appFilterId.value = null
+    appUnsettledOnly.value = false
     dateFilters.value = {
         fromDate: todayYmd(),
         toDate: '',
     }
     currentPage.value = 1
-    fetchOrders()
+    debouncedRefetchOrders.cancel()
+    void fetchOrders()
 }
 
 const onBankFilterChange = () => {
     currentPage.value = 1
-    fetchOrders()
+    debouncedRefetchOrders.cancel()
+    void fetchOrders()
 }
 
 const changePage = (page: number) => {
@@ -966,6 +1081,97 @@ const confirmEditBankPayment = async () => {
         error('Error al actualizar pago', err.message)
     } finally {
         editBankPaymentLoading.value = false
+    }
+}
+
+function patchReservationDepositsInList(
+    list: OrderListItem[],
+    orderId: number,
+    updater: (prev: ReservationDeposit[]) => ReservationDeposit[],
+): OrderListItem[] {
+    const idx = list.findIndex((o) => o.id === orderId)
+    if (idx === -1) return list
+    const o = list[idx]
+    const prevDeps = o.reservationDeposits ?? []
+    const nextDeps = updater(prevDeps)
+    const totalDeposited = nextDeps.reduce((s, d) => s + d.amount, 0)
+    const next = [...list]
+    next[idx] = { ...o, reservationDeposits: nextDeps, totalDeposited }
+    return next
+}
+
+const closeRemoveReservationDepositDialog = () => {
+    showRemoveReservationDepositDialog.value = false
+    removeReservationDepositTarget.value = null
+}
+
+const handleRemoveReservationDepositFromList = (order: OrderListItem, deposit: ReservationDeposit) => {
+    removeReservationDepositTarget.value = { order, deposit }
+    showRemoveReservationDepositDialog.value = true
+}
+
+const confirmRemoveReservationDeposit = async () => {
+    const t = removeReservationDepositTarget.value
+    if (!t) return
+    removeReservationDepositLoading.value = true
+    try {
+        await reservationDepositApi.remove(t.deposit.id)
+        success('Abono eliminado', 4000, 'El abono fue eliminado')
+        reservations.value = patchReservationDepositsInList(reservations.value, t.order.id, (deps) =>
+            deps.filter((d) => d.id !== t.deposit.id),
+        )
+        orders.value = patchReservationDepositsInList(orders.value, t.order.id, (deps) =>
+            deps.filter((d) => d.id !== t.deposit.id),
+        )
+        closeRemoveReservationDepositDialog()
+    } catch (err: any) {
+        error('Error al eliminar abono', err.message)
+    } finally {
+        removeReservationDepositLoading.value = false
+    }
+}
+
+const closeEditReservationDepositDialog = () => {
+    showEditReservationDepositDialog.value = false
+    editReservationDepositTarget.value = null
+    editReservationDepositAmount.value = 0
+}
+
+const handleEditReservationDepositFromList = (order: OrderListItem, deposit: ReservationDeposit) => {
+    editReservationDepositTarget.value = { order, deposit }
+    editReservationDepositAmount.value = deposit.amount
+    showEditReservationDepositDialog.value = true
+}
+
+const confirmEditReservationDeposit = async () => {
+    const t = editReservationDepositTarget.value
+    if (!t) return
+    const amount = Number(editReservationDepositAmount.value)
+    const max = maxEditReservationDepositAmount.value
+    if (!Number.isFinite(amount) || amount <= 0) {
+        error('Monto inválido', 'Ingresa un monto mayor a cero.')
+        return
+    }
+    if (amount > max) {
+        error('Monto inválido', `El máximo permitido es ${formatCurrency(max)}.`)
+        return
+    }
+    editReservationDepositLoading.value = true
+    try {
+        const u = await reservationDepositApi.updateAmount(t.deposit.id, amount)
+        const merged: ReservationDeposit = { ...t.deposit, ...u, amount: Number(u.amount) }
+        reservations.value = patchReservationDepositsInList(reservations.value, t.order.id, (deps) =>
+            deps.map((d) => (d.id === merged.id ? merged : d)),
+        )
+        orders.value = patchReservationDepositsInList(orders.value, t.order.id, (deps) =>
+            deps.map((d) => (d.id === merged.id ? merged : d)),
+        )
+        success('Abono actualizado', 4000, 'El monto fue guardado')
+        closeEditReservationDepositDialog()
+    } catch (err: any) {
+        error('Error al actualizar abono', err.message)
+    } finally {
+        editReservationDepositLoading.value = false
     }
 }
 
@@ -1332,8 +1538,13 @@ const handleOpenDeposit = (order: OrderListItem) => {
     showDepositModal.value = true
 }
 
-const handleDeposited = () => {
+const handleDeposited = (deposit: ReservationDeposit) => {
     success('Abono registrado', 3000, 'El abono fue registrado correctamente')
+    reservations.value = patchReservationDepositsInList(reservations.value, deposit.orderId, (deps) => [
+        ...deps,
+        deposit,
+    ])
+    orders.value = patchReservationDepositsInList(orders.value, deposit.orderId, (deps) => [...deps, deposit])
 }
 
 // ===== RESERVACIONES TAB =====
@@ -1485,6 +1696,6 @@ const handleCancelReservation = async (order: OrderListItem) => {
 
 // Lifecycle
 onMounted(async () => {
-    await Promise.all([fetchOrders(), banksStore.ensureListLoaded()])
+    await Promise.all([fetchOrders(), banksStore.ensureListLoaded(), appsStore.ensureListLoaded()])
 })
 </script>

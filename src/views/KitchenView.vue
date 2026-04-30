@@ -1,15 +1,68 @@
 <template>
     <MainLayout>
         <div class="p-3 sm:p-4 md:p-5 space-y-3 sm:space-y-4">
-            <!-- Header: título + barra de cocina (solo rol Kitchen) -->
-            <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
-                <div class="min-w-0">
-                    <h1 class="text-xl sm:text-2xl font-bold text-gray-900 leading-tight">Cocina</h1>
-                    <p class="text-xs sm:text-sm text-gray-600 mt-0.5">Gestión de pedidos en preparación</p>
+            <!-- Pestañas + barra de cocina (solo rol Kitchen) en la misma franja -->
+            <div
+                class="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between sm:gap-3 border-b border-gray-200 -mx-3 px-3 sm:mx-0 sm:px-0"
+            >
+                <!-- Pestañas: scroll solo en esta franja (sin envolver al checkbox) para no mostrar barra rara entre check y "Conectado" -->
+                <div class="-mb-px flex min-w-0 flex-1 items-end gap-2 sm:gap-3">
+                    <nav
+                        class="kitchen-tabs-nav min-w-0 flex-1 flex items-end space-x-4 sm:space-x-6 overflow-x-auto overflow-y-hidden"
+                        aria-label="Vistas de cocina">
+                        <button type="button" @click="activeTab = 'scheduled'" :class="[
+                            'py-2 sm:py-2.5 px-1 border-b-2 font-medium text-xs sm:text-sm transition-colors whitespace-nowrap flex-shrink-0',
+                            activeTab === 'scheduled'
+                                ? 'border-indigo-500 text-indigo-600'
+                                : 'border-transparent text-gray-500 hover:text-gray-700'
+                        ]">
+                            <span>Reservas hoy</span>
+                            <span v-if="scheduledReservationOrders.length > 0"
+                                class="ml-1.5 sm:ml-2 py-0.5 px-1.5 sm:px-2 rounded-full text-[10px] sm:text-xs bg-indigo-100 text-indigo-700">
+                                {{ scheduledReservationOrders.length }}
+                            </span>
+                        </button>
+
+                        <button type="button" @click="activeTab = 'active'" :class="[
+                            'py-2 sm:py-2.5 px-1 border-b-2 font-medium text-xs sm:text-sm transition-colors whitespace-nowrap flex-shrink-0',
+                            activeTab === 'active'
+                                ? 'border-emerald-500 text-emerald-600'
+                                : 'border-transparent text-gray-500 hover:text-gray-700'
+                        ]">
+                            <span>Pedidos Activos</span>
+                            <span v-if="activeOrders.length > 0"
+                                class="ml-1.5 sm:ml-2 py-0.5 px-1.5 sm:px-2 rounded-full text-[10px] sm:text-xs bg-emerald-100 text-emerald-600">
+                                {{ activeOrders.length }}
+                            </span>
+                        </button>
+
+                        <button type="button" @click="activeTab = 'ready'" :class="[
+                            'py-2 sm:py-2.5 px-1 border-b-2 font-medium text-xs sm:text-sm transition-colors whitespace-nowrap flex-shrink-0',
+                            activeTab === 'ready'
+                                ? 'border-emerald-500 text-emerald-600'
+                                : 'border-transparent text-gray-500 hover:text-gray-700'
+                        ]">
+                            <span>Pedidos Listos</span>
+                            <span v-if="readyOrders.length > 0"
+                                class="ml-1.5 sm:ml-2 py-0.5 px-1.5 sm:px-2 rounded-full text-[10px] sm:text-xs bg-green-100 text-green-600">
+                                {{ readyOrders.length }}
+                            </span>
+                        </button>
+                    </nav>
+
+                    <div v-if="activeTab === 'active'" class="flex flex-shrink-0 items-end pb-2 sm:pb-2.5 -mb-px">
+                        <label
+                            class="inline-flex items-center gap-1.5 text-[11px] sm:text-xs text-gray-800 cursor-pointer select-none whitespace-nowrap"
+                            title="Agrupa Tomado y En preparación en un solo bloque">
+                            <input v-model="combinedKitchenMode" type="checkbox"
+                                class="rounded border-gray-300 text-emerald-600 focus:ring-emerald-500" />
+                            <span class="font-medium">Modo combinado</span>
+                        </label>
+                    </div>
                 </div>
 
                 <div v-if="authStore.isKitchen"
-                    class="flex flex-wrap items-center gap-1.5 sm:gap-2">
+                    class="flex flex-wrap items-center justify-end gap-1.5 sm:gap-2 sm:pb-0.5 sm:flex-shrink-0">
                     <div :class="[
                         'flex items-center gap-1 px-1.5 sm:px-2 py-0.5 rounded-md text-[11px] sm:text-xs',
                         isConnected ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
@@ -47,49 +100,6 @@
                 </div>
             </div>
 
-            <div class="border-b border-gray-200 -mx-3 px-3 sm:mx-0 sm:px-0">
-                <nav class="-mb-px flex space-x-4 sm:space-x-6 overflow-x-auto">
-                    <button type="button" @click="activeTab = 'scheduled'" :class="[
-                        'py-2 sm:py-2.5 px-1 border-b-2 font-medium text-xs sm:text-sm transition-colors whitespace-nowrap flex-shrink-0',
-                        activeTab === 'scheduled'
-                            ? 'border-indigo-500 text-indigo-600'
-                            : 'border-transparent text-gray-500 hover:text-gray-700'
-                    ]">
-                        <span>Reservas hoy</span>
-                        <span v-if="scheduledReservationOrders.length > 0"
-                            class="ml-1.5 sm:ml-2 py-0.5 px-1.5 sm:px-2 rounded-full text-[10px] sm:text-xs bg-indigo-100 text-indigo-700">
-                            {{ scheduledReservationOrders.length }}
-                        </span>
-                    </button>
-
-                    <button type="button" @click="activeTab = 'active'" :class="[
-                        'py-2 sm:py-2.5 px-1 border-b-2 font-medium text-xs sm:text-sm transition-colors whitespace-nowrap flex-shrink-0',
-                        activeTab === 'active'
-                            ? 'border-emerald-500 text-emerald-600'
-                            : 'border-transparent text-gray-500 hover:text-gray-700'
-                    ]">
-                        <span>Pedidos Activos</span>
-                        <span v-if="activeOrders.length > 0"
-                            class="ml-1.5 sm:ml-2 py-0.5 px-1.5 sm:px-2 rounded-full text-[10px] sm:text-xs bg-emerald-100 text-emerald-600">
-                            {{ activeOrders.length }}
-                        </span>
-                    </button>
-
-                    <button type="button" @click="activeTab = 'ready'" :class="[
-                        'py-2 sm:py-2.5 px-1 border-b-2 font-medium text-xs sm:text-sm transition-colors whitespace-nowrap flex-shrink-0',
-                        activeTab === 'ready'
-                            ? 'border-emerald-500 text-emerald-600'
-                            : 'border-transparent text-gray-500 hover:text-gray-700'
-                    ]">
-                        <span>Pedidos Listos</span>
-                        <span v-if="readyOrders.length > 0"
-                            class="ml-1.5 sm:ml-2 py-0.5 px-1.5 sm:px-2 rounded-full text-[10px] sm:text-xs bg-green-100 text-green-600">
-                            {{ readyOrders.length }}
-                        </span>
-                    </button>
-                </nav>
-            </div>
-
             <div v-if="activeTab === 'scheduled'">
                 <p v-if="scheduledReservationOrders.length === 0" class="text-sm text-gray-500 mb-3">
                     No hay reservas del día en «Tomado» pendientes de hora. Al llegar la hora de cocina o al pasar a preparación aparecen en Pedidos activos.
@@ -101,7 +111,7 @@
 
             <div v-else-if="activeTab === 'active'">
                 <OrderCardGrid ref="cardGridRef" :orders="activeOrders" :order-items-map="orderItemsMap"
-                    @change-status="handleChangeStatus" />
+                    :combined-mode="combinedKitchenMode" @change-status="handleChangeStatus" />
             </div>
 
             <div v-else-if="activeTab === 'ready'">
@@ -110,12 +120,12 @@
         </div>
 
         <ConfirmStatusChangeModal :is-open="showConfirmModal" :orders="ordersToConfirm" :order-items-map="orderItemsMap"
-            @close="closeConfirmModal" @updated="handleModalUpdated" />
+            :chain-taken-to-ready="confirmChainTakenToReady" @close="closeConfirmModal" @updated="handleModalUpdated" />
     </MainLayout>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/store/auth'
 import { useOrdersDataStore } from '@/store/ordersData'
@@ -144,11 +154,21 @@ const { permission, requestPermission, notify } = useNotifications()
 const SIGNALR_HUB_URL = import.meta.env.VITE_SIGNALR_HUB_URL || 'http://localhost:5000/hubs/orders'
 const { isConnected, on, off } = useSignalR(SIGNALR_HUB_URL)
 
+const KITCHEN_COMBINED_MODE_KEY = 'senorarroz.kitchen.combinedMode'
+const combinedKitchenMode = ref(
+    typeof localStorage !== 'undefined' && localStorage.getItem(KITCHEN_COMBINED_MODE_KEY) === '1'
+)
+watch(combinedKitchenMode, (v) => {
+    localStorage.setItem(KITCHEN_COMBINED_MODE_KEY, v ? '1' : '0')
+})
+
 const activeTab = ref<'scheduled' | 'active' | 'ready'>('active')
 const soundEnabled = ref(true)
 const isLoading = ref(false)
 const showConfirmModal = ref(false)
 const ordersToConfirm = ref<OrderListItem[]>([])
+/** Copia de `combinedKitchenMode` al abrir el modal (confirmación encadenada a Listo). */
+const confirmChainTakenToReady = ref(false)
 const orderItemsMap = ref(new Map<number, OrderDetailItem[]>())
 const cardGridRef = ref<InstanceType<typeof OrderCardGrid> | null>(null)
 
@@ -343,6 +363,7 @@ const handleChangeStatus = (orderIds: number[], newStatus: OrderStatus) => {
     const selectedOrders = allOrders.value.filter(o => orderIds.includes(o.id))
 
     if (newStatus === 'ready') {
+        confirmChainTakenToReady.value = combinedKitchenMode.value
         ordersToConfirm.value = selectedOrders
         showConfirmModal.value = true
     } else {
@@ -381,6 +402,7 @@ const handleModalUpdated = async () => {
 const closeConfirmModal = () => {
     showConfirmModal.value = false
     ordersToConfirm.value = []
+    confirmChainTakenToReady.value = false
 }
 
 const refreshOrders = async () => {
@@ -438,3 +460,14 @@ onMounted(async () => {
     on('OrderCancelled', handleOrderCancelled)
 })
 </script>
+
+<style scoped>
+/* Scroll horizontal solo en las pestañas, sin barra/rueditas nativas visibles (no aporta y confunde). */
+.kitchen-tabs-nav {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+}
+.kitchen-tabs-nav::-webkit-scrollbar {
+    display: none;
+}
+</style>

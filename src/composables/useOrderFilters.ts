@@ -1,31 +1,26 @@
 // src/composables/useOrderFilters.ts
 import type { OrderListItem, OrderType, OrderStatus } from '@/types/order'
 
-/**
- * Estado de filtros para órdenes (filtros locales sobre la página cargada).
- * bankId se aplica en el servidor vía searchOrders, no aquí.
- */
-/** Filtro por pagos vía apps (Rappi, etc.): con al menos un appPayment, sin ninguno, o todos. */
-export type AppPaymentsFilter = null | 'with' | 'without'
+/** Solo dígitos del campo de total (ignora $, miles, comas, espacios). Reutilizado en payload de búsqueda al servidor. */
+export function digitPrefixFromTotalQuery(raw: string): string {
+    return raw.replace(/\D/g, '')
+}
 
+/**
+ * Estado de filtros UI para órdenes (la mayoría se envían al API en /orders/search).
+ */
 export interface OrderFilterState {
     /** Dígitos del total: al tipear se acota por prefijo (ej. 3 → 30 → 300 para 30000). */
     totalQuery: string
     search: string
     type: OrderType | null
     status: OrderStatus | null
+    /** Campo opcional; si hay texto se concatena a search en el payload. */
     customer: string
-    /** null = todos; with = pedidos con al menos un pago por app; without = solo banco / sin appPayments */
-    appPayments: AppPaymentsFilter
 }
 
-/**
- * Composable para filtrar órdenes localmente
- */
+/** Utilidades de filtrado/orden local de filas (p. ej. otras vistas); el listado principal filtra en el API. */
 export function useOrderFilters() {
-    /** Solo dígitos del campo (ignora $, puntos de miles, comas, espacios). */
-    const digitPrefixFromTotalQuery = (raw: string): string => raw.replace(/\D/g, '')
-
     /** Total redondeado a entero como string (en la práctica no hay decimales). */
     const orderTotalAsDigitString = (total: number): string => String(Math.round(total))
 
@@ -78,48 +73,6 @@ export function useOrderFilters() {
         })
     }
 
-    const filterByAppPayments = (
-        orders: OrderListItem[],
-        mode: AppPaymentsFilter
-    ): OrderListItem[] => {
-        if (!mode) return orders
-        return orders.filter((order) => {
-            const has = Array.isArray(order.appPayments) && order.appPayments.length > 0
-            return mode === 'with' ? has : !has
-        })
-    }
-
-    const applyAllFilters = (
-        orders: OrderListItem[],
-        filters: OrderFilterState
-    ): OrderListItem[] => {
-        let filtered = orders
-
-        filtered = filterByTotal(filtered, filters.totalQuery ?? '')
-
-        if (filters.search) {
-            filtered = filterBySearch(filtered, filters.search)
-        }
-
-        if (filters.type) {
-            filtered = filterByType(filtered, filters.type)
-        }
-
-        if (filters.status) {
-            filtered = filterByStatus(filtered, filters.status)
-        }
-
-        if (filters.customer) {
-            filtered = filterByCustomer(filtered, filters.customer)
-        }
-
-        if (filters.appPayments) {
-            filtered = filterByAppPayments(filtered, filters.appPayments)
-        }
-
-        return filtered
-    }
-
     const sortOrders = (
         orders: OrderListItem[],
         sortBy: 'id' | 'total' | 'createdAt',
@@ -152,8 +105,6 @@ export function useOrderFilters() {
         filterByType,
         filterByStatus,
         filterByCustomer,
-        filterByAppPayments,
-        applyAllFilters,
         sortOrders,
     }
 }

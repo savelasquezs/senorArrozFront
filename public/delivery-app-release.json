@@ -1,8 +1,8 @@
 {
-  "versionName": "1.2.0",
-  "buildNumber": 4,
+  "versionName": "1.2.1",
+  "buildNumber": 5,
   "apkFileName": "senor-arroz-domiciliarios.apk",
   "apkUrl": "/senor-arroz-domiciliarios.apk",
   "minimumBuild": 1,
-  "message": "Versión 1.2.0: aviso de nueva versión en inicio cuando hay un APK más reciente publicado (configurable por URL del manifiesto); descarga del APK en el navegador. Descarga el APK e instálalo encima de la actual (no hace falta desinstalar)."
+  "message": "1.2.1: manifiesto de actualización con URL por defecto (sin configurar). En preparación: domicilios Tomado y En preparación, más urgentes arriba, por barrio. Descarga e instala encima (no hace falta desinstalar)."
 }

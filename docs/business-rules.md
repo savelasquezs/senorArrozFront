@@ -78,7 +78,16 @@ enum UserRole {
 - **Estado limitado**: Solo puede cambiar pedidos a "Ready"
 - **Filtrado**: Pedidos desaparecen de su vista al pasarlos a "Ready"
 - **Cabecera en `/kitchen`**: La franja con estado de conexión (SignalR), permiso de notificaciones del navegador, activación de sonido TTS y botón «Actualizar» se muestra **solo** al usuario con rol **Kitchen**. Quien entre con **Admin** o **Superadmin** sigue pudiendo usar el módulo según la matriz, pero sin esa barra en cabecera.
-- **Nombre corto de producto en pantalla**: En las tarjetas de cocina se usa la misma lógica de abreviación que en la comanda impresa: backend `KitchenProductNameFormatter`; frontend `formatKitchenProductDisplayName` (`useKitchenProductDisplayName.ts`).
+- **Modo combinado (solo UI)**: El interruptor «Modo combinado» va en la **misma franja que las pestañas** (solo con *Pedidos activos* seleccionado) para ahorrar altura. Se ocultan *Seleccionar todos* / *Limpiar*; la selección es por toque en las tarjetas. Se muestran juntos *Tomado* y *En preparación* en un solo bloque, agrupados por la categoría del primer ítem de cada pedido. La **fuente de verdad** del estado del pedido sigue siendo la API/BD. «Marcar como listo» en este modo, al confirmar, aplica consecutivamente las mismas transiciones que el flujo en dos pasos: *Tomado* → *En preparación* → *Listo* si aplica, o solo *Listo* si el pedido ya estaba *En preparación*. La preferencia se guarda en `localStorage` (`senorarroz.kitchen.combinedMode`). Los eventos en tiempo real (SignalR) y el refresco de listado se comportan igual que en el modo de dos secciones.
+- **Nombre corto de producto en cocina (pantalla y comanda)**: Misma lógica en `KitchenProductNameFormatter` (API / tickets) y `formatKitchenProductDisplayName` en `useKitchenProductDisplayName.ts` (vue cocina). Reglas, en orden de aplicación razonable:
+  - Se omiten como conectores o relleno: `arroz`, `con`, `de`, `unidades` (comparación **sin tildes** en minúsculas).
+  - Frase fija `a la francesa` (tolerar `francésa` / typo `fransesa`): se quita.
+  - `chicharron` / `chicharrón` (y variantes) en cualquier parte de un token: se sustituye por `chich` (p. ej. compuesto *Combochicharrón* → *Combochich*).
+  - Secuencia `ropa` + `vieja` (dos palabras) → una palabra: `ropa`.
+  - Si en el **mismo** nombre de producto aparecen `Súper` y `Familiar` (cada una como token), se elimina `Familiar` y `Súper` pasa a `super` (p. ej. *… Súper Familiar* → … **super** …).
+  - Si el nombre contiene el tamaño `Súper` (token `super` tras normalizar), `super` se muestra **al inicio** del nombre corto (lectura en cocina: tamaño primero; p. ej. *Arroz ropa vieja con chicharrón Súper* → *super ropa chich*).
+  - Postproceso en la cadena mostrada: “número + gr” (con o sin espacio) pasa a “número + g” (p. ej. *500 gr* → *500g*); un token *x* seguido de dígitos (*x5*, *X10*) pasa a *x 5*, *x 10* (separar cantidad de la *x*).
+- Si tras todas las reglas no quedara ningún token, se conserva el nombre original (trim) para no dejar el ítem en blanco (p. ej. solo *arroz con*).
 
 #### Deliveryman
 - **Pedidos listos**: Solo ve pedidos en estado "Ready" y los suyos propios
@@ -110,7 +119,7 @@ enum UserRole {
 #### Onsite (En el local)
 - **Cliente**: Opcional
 - **Dirección**: No aplica
-- **Delivery Fee**: No aplica
+- **Delivery Fee**: No aplica. En el **borrador del POS**, al pasar a onsite el monto de envío se pone en **0**; al volver a **delivery** se reajusta a la tarifa de la **dirección** si ya está seleccionada. Las **reservas** no cambian el envío solo por el selector de tipo.
 - **guestName**: Campo opcional
 - **Fidelización**: Se aplica si se asigna cliente
 - **Status inicial**: `'taken'`
@@ -149,6 +158,19 @@ enum UserRole {
 - **Reparto**: el presupuesto se reparte en **partes enteras COP** entre las líneas de producto de forma equitativa, respetando que el descuento por línea no supere `cantidad × precio_unitario − descuento_manual` en esa línea (sin subtotales negativos). La suma del descuento repartido coincide exactamente con el presupuesto (salvo si la suma de capacidades de líneas es menor que el presupuesto, en cuyo caso se descuenta solo hasta esa suma).
 - **Persistencia API**: el precio unitario no se altera; en cada línea se envía `discount` = descuento manual + descuento de domicilio gratis (un solo campo en `order_details`).
 - **Persistencia EF**: esos tres campos deben **persistirse y leerse** en el modelo EF como valores de aplicación (no como “solo generados por BD ignorados tras guardar”). Si la entidad `Order` quedara con `total = 0` en memoria justo después del insert, el tope de efectivo en tienda sería 0 y fallaría la validación aunque el cliente enviara un monto parcial correcto. En PostgreSQL pueden seguir existiendo triggers que recalculan totales al cambiar líneas; deben ser coherentes con la misma fórmula.
+
+### Mensaje copiable al cliente (borrador POS)
+
+El botón **Copiar mensaje** en el resumen de ítems del borrador genera un texto listo para pegar (p. ej. WhatsApp) según el tipo y la programación.
+
+- **Ventana de tiempo (configurable por sucursal)**: en `branch` se guardan `pos_copy_eta_minutes` (mínimo, por defecto 30) y `pos_copy_eta_range_minutes` (margen al tope, por defecto 15). El texto mostrado es `"{mínimo}-{mínimo+margen} min"` (p. ej. 30+15 → `30-45 min`); si el margen es 0, solo `"{mínimo} min"`. Editable en ficha de sucursal (Admin o Superadmin). Aplica a recogida inmediata, entrega inmediata a domicilio y variantes con promo **domicilio gratis**; no altera frases con hora o fecha concretas.
+
+- **En el local (`onsite`)**: total, ventana aproximada de recogida usando el texto de sucursal si el pedido no es «para más tarde»; si es «para más tarde» y hay hora de entrega (`reservedFor`), se usa **«a las {hora}»** en su lugar. Cierre: **reclamar a nombre de** `guestName` si está informado; si no, se indica identificarse al recoger.
+- **Domicilio (`delivery`)** — mismo criterio de costos y promoción **domicilio gratis** que antes (ver arriba): con **entrega inmediata** (sin «para más tarde») el cierre usa la ventana configurada (**«llega en {texto}»**); con **para más tarde** y `reservedFor`, el cierre pasa a **«allá estaremos entonces a las {hora}»** (misma estructura en todas las variantes con promo: sin promo, domi gratis, o remanente de envío con «pesitos»).
+- **Reserva con entrega a domicilio** (`reservation` y dirección): mismo bloque de domicilio y promociones, pero el cierre de entrega usa **fecha y hora** de `reservedFor`: **«allá estaremos entonces el {fecha} a las {hora}»**.
+- **Reserva sin entrega a domicilio** (sin dirección): total, fecha/hora del evento (`reservedFor`); si aún no hay fecha en el borrador, solo el total y la línea de **reclamar a nombre** / identificación, alineada con `guestName`.
+
+Los formatos de fecha/hora usan el calendario de negocio del front (`useFormatting` / zona de negocio), coherentes con el resto del POS.
 
 ### Estados del Pedido
 
@@ -221,7 +243,7 @@ CANCELLED  CANCELLED   CANCELLED  CANCELLED
 - **Movimientos internos**: Entre bancos y caja-bancos usando `bank_payment` (income) y `expense_bank_payment` (outcome)
 
 ### Cuadre de caja (total esperado global)
-- **Fórmula esperada**: `(C0 + B0 + L0 + A0) + ventas del período − gastos del período`, donde `C0+B0+L0+A0` es la apertura del último cierre: efectivo contado + saldos reales por banco (incluye cuentas operativas, apps y caja mayor según bancos configurados) + snapshot de préstamos informales + **snapshot de apps pendientes por liquidar** (`A0`, JSON por app guardado en el cierre anterior). Si el cierre anterior no tenía snapshot de apps, `A0 = 0`.
+- **Fórmula esperada**: `(C0 + B0 + L0 + A0) + ventas del período − gastos del período + Σ abonos de reserva (en el período por `ReceivedAt`) cuyo **día de entrega/programación del pedido** en calendario Colombia no es hoy (`PrepareAt` si existe; si no, `CreatedAt`)`, donde `C0+B0+L0+A0` es la apertura del último cierre: efectivo contado + saldos reales por banco (incluye cuentas operativas, apps y caja mayor según bancos configurados) + snapshot de préstamos informales + **snapshot de apps pendientes por liquidar** (`A0`, JSON por app guardado en el cierre anterior). Si el cierre anterior no tenía snapshot de apps, `A0 = 0`. Los abonos siguen reflejándose en el esperado por banco; la suma al global ajusta el total esperado cuando la entrega de la reserva no cae en el día actual (CO).
 - **Total contado al cerrar** (debe coincidir con el esperado): efectivo físico (`closingCash`) + suma de saldos reales por banco del cuadre + **suma actual de pagos vía app no liquidados** (pedidos entregados) + préstamos informales activos (`L1`). Los bancos incluyen la fila de caja mayor efectivo cuando aplique. El **pendiente en apps** no es un campo aparte que el usuario edita: se toma del sistema en el momento del cierre y se persiste como snapshot para `A0` del siguiente período.
 - El esperado **no** “dobla” préstamos: el snapshot `L0` en apertura ya fija la parte de préstamos reconocida al cierre anterior; al cerrar se comparan préstamos activos actuales con el esperado global según la misma fórmula anterior. El API sigue devolviendo `informalLoansActiveTotal` y el desglose de apps pendientes para la UI.
 
@@ -375,6 +397,16 @@ Validaciones implementadas antes de enviar un pedido al backend:
 - **Tracking pausado**: Pausa del seguimiento (modo ahorro de batería)
 - **Sin permisos**: Estado cuando no se han otorgado permisos de ubicación
 - **Error de ubicación**: Manejo de errores de GPS/red
+
+### App móvil domiciliarios (Flutter)
+
+- **Pestaña «En preparación»**: muestra pedidos **delivery** con estado **Tomado** o **En preparación** (unión de dos consultas a `POST /orders/search` con el mismo criterio de tipo/estado que el resto del sistema; sin duplicados; si un id figurara en ambas listas, prevalece **En preparación**). **No** se aplica la regla de «Reservas hoy» de cocina (esa exclusión es solo para `type === reservation` en la web). El orden de la lista y de los bloques por barrio sigue la **ancla de urgencia** del repartidor: `prepareAt`, si no existe hora de `taken` en `statusTimes`, y si no `createdAt` (coherente con el semáforo en pantalla), de más a menos urgente.
+
+### Listado de pedidos (/orders)
+
+- **Filtros en servidor**: Estado, tipo, rango de fechas (día operativo Colombia vía API), banco con pago, app con pago, total por prefijo de dígitos y texto de búsqueda (cliente, teléfonos, invitado, notas, id) se aplican en `POST /orders/search`; la paginación y el total reflejan ese conjunto filtrado.
+- **App (pagos)**: Igual que el filtro por banco: se elige una app; opcionalmente “solo app no liquidados” restringe a pedidos con al menos un `AppPayment` no liquidado (`is_setted = false`), y si hay app elegida solo cuentan líneas de esa app.
+- **Debounce**: Los campos de texto que disparan la búsqueda (búsqueda y total por dígitos) usan un retardo corto (~300 ms) para no saturar el API; selects y fechas disparan la petición al cambiar.
 
 ## 📱 Reglas de UI/UX
 

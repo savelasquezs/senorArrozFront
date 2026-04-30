@@ -79,9 +79,17 @@ export function useOrderTabs() {
         const order = store.draftOrders.get(store.currentTabId)
         if (!order) return
 
+        let deliveryFee = order.deliveryFee
+        if (type === 'onsite') {
+            deliveryFee = 0
+        } else if (type === 'delivery') {
+            deliveryFee = store.resolveDeliveryFeeFromSelectedAddress(order)
+        }
+
         const updated = {
             ...order,
             type,
+            deliveryFee,
             updatedAt: new Date(),
             ...(type === 'onsite' ? { freeDeliveryRequested: false } : {}),
         }

@@ -74,11 +74,11 @@
                     <span class="text-sm font-bold">Total:</span>
                     <span class="text-sm font-bold text-emerald-600">{{ formatCurrency(total) }}</span>
                 </div>
-                <BaseButton v-if="isDeliveryOrder" type="button" variant="outline" size="sm"
-                    class="w-full mt-1.5 justify-center" @click="copyDeliverySummaryText">
+                <BaseButton type="button" variant="outline" size="sm" class="w-full mt-1.5 justify-center"
+                    @click="copyOrderSummaryToClipboard">
                     <span class="flex items-center justify-center gap-1.5">
                         <ClipboardDocumentIcon class="w-4 h-4" />
-                        Copiar mensaje domicilio
+                        Copiar mensaje
                     </span>
                 </BaseButton>
             </div>
@@ -94,7 +94,8 @@ import { useBranchPosSettingsStore } from '@/store/branchPosSettings'
 import { useOrderItems } from '@/composables/useOrderItems'
 import { useFormatting } from '@/composables/useFormatting'
 import { useToast } from '@/composables/useToast'
-import { buildDeliveryCopyMessage, deliveryDiscountBudget } from '@/composables/useFreeDeliveryDiscount'
+import { deliveryDiscountBudget } from '@/composables/useFreeDeliveryDiscount'
+import { buildPosOrderCopyMessage } from '@/composables/useOrderCopyMessage'
 
 // Components
 import BaseButton from '@/components/ui/BaseButton.vue'
@@ -123,7 +124,7 @@ const emit = defineEmits<{
 }>()
 
 // Composables
-const { formatCurrency } = useFormatting()
+const { formatCurrency, formatTime, formatDateShort } = useFormatting()
 const { success, error: showError } = useToast()
 const ordersStore = useOrdersDraftsStore()
 const authStore = useAuthStore()
@@ -138,8 +139,6 @@ const subtotal = computed(() => currentOrder.value?.subtotal || 0)
 const discountTotal = computed(() => currentOrder.value?.discountTotal || 0)
 const deliveryFee = computed(() => currentOrder.value?.deliveryFee || 0)
 const total = computed(() => currentOrder.value?.total || 0)
-const isDeliveryOrder = computed(() => currentOrder.value?.type === 'delivery')
-
 const showFreeDeliveryCheckbox = computed(() => {
     const o = currentOrder.value
     if (!o) return false
@@ -172,9 +171,6 @@ watch(
         if (o) ordersStore.recalculateTotals(o)
     },
 )
-
-/** Texto fijo de tiempo de entrega para el mensaje copiable (WhatsApp, etc.). */
-const DELIVERY_ETA_PHRASE = '30-40 min'
 
 // Local state
 const localDeliveryFee = ref(deliveryFee.value)
@@ -226,20 +222,27 @@ const handleDeliveryFeeChange = () => {
     }
 }
 
-async function copyDeliverySummaryText() {
-    if (!isDeliveryOrder.value) return
+async function copyOrderSummaryToClipboard() {
     const o = currentOrder.value
-    const msg = buildDeliveryCopyMessage({
-        deliveryFee: deliveryFee.value,
+    if (!o) return
+    const msg = buildPosOrderCopyMessage({
+        orderType: o.type,
+        isLater: o.isLater === true,
+        addressId: o.addressId,
+        reservedFor: o.reservedFor,
         orderTotal: total.value,
-        freeDeliveryRequested: o?.freeDeliveryRequested === true,
+        deliveryFee: deliveryFee.value,
+        freeDeliveryRequested: o.freeDeliveryRequested === true,
         maxBranchCap: branchPosSettings.maxFreeDeliveryDiscount,
         formatCurrency,
-        etaPhrase: DELIVERY_ETA_PHRASE,
+        formatTime,
+        formatDateShort,
+        guestName: o.guestName,
+        etaPhrase: branchPosSettings.posCopyMessageEtaPhrase,
     })
     try {
         await navigator.clipboard.writeText(msg)
-        success('Copiado', 2500, 'Mensaje de domicilio listo para pegar.')
+        success('Copiado', 2500, 'Mensaje listo para pegar.')
     } catch {
         showError('No se pudo copiar', 'Permite el portapapeles en el navegador o copia manualmente.')
     }

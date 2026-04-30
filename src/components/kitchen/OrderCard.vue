@@ -14,36 +14,44 @@
             <CheckIcon class="w-3 h-3 text-white" />
         </div>
 
-        <div class="flex items-center justify-between mb-1 sm:mb-1.5">
-            <div class="flex items-center gap-1 sm:gap-1.5">
+        <div class="flex items-center justify-between gap-1.5 mb-1 sm:mb-1.5">
+            <div class="flex items-center flex-wrap gap-x-1.5 sm:gap-2 gap-y-0.5 min-w-0">
                 <span class="text-base sm:text-lg font-bold text-gray-900">#{{ order.id }}</span>
-                <BaseBadge :variant="getStatusVariant()"
+                <BaseBadge v-if="variant !== 'kitchen'" :variant="getStatusVariant()"
                     class="text-[10px] sm:text-xs px-1 sm:px-1.5 py-0.5">
                     {{ order.statusDisplayName }}
                 </BaseBadge>
+                <div v-else
+                    class="flex items-center gap-1 text-[10px] sm:text-xs text-gray-700 min-w-0">
+                    <ClockIcon class="w-3 h-3 sm:w-3.5 sm:h-3.5 flex-shrink-0" />
+                    <span class="font-medium tabular-nums">Tiempo: {{ formattedElapsedTime }}</span>
+                </div>
             </div>
             <component :is="orderTypeIcon"
                 class="w-3.5 h-3.5 sm:w-4 sm:h-4 text-gray-400 flex-shrink-0" />
         </div>
 
-        <div class="mb-1 sm:mb-1.5 text-[10px] sm:text-xs">
-            <div class="flex items-center gap-1 text-gray-700">
+        <div
+            v-if="variant === 'delivery' || (variant === 'kitchen' && (formattedPrepareAtStart || readyByTime || kitchenPickupName))"
+            class="mb-1 sm:mb-1.5 text-[10px] sm:text-xs space-y-0.5"
+        >
+            <div v-if="variant === 'delivery'" class="flex items-center gap-1 text-gray-700">
                 <ClockIcon class="w-3 h-3 sm:w-3.5 sm:h-3.5 flex-shrink-0" />
                 <span class="font-medium">Tiempo: {{ formattedElapsedTime }}</span>
             </div>
 
             <div v-if="variant === 'kitchen' && formattedPrepareAtStart"
-                class="text-[10px] text-indigo-700 mt-0.5 font-medium">
+                class="text-[10px] text-indigo-700 font-medium">
                 Cocina desde: {{ formattedPrepareAtStart }}
             </div>
 
             <div v-if="variant === 'kitchen' && readyByTime"
-                class="text-[10px] text-emerald-600 mt-0.5 font-medium">
+                class="text-[10px] text-emerald-600 font-medium">
                 Listo para: {{ formattedReadyByTime }}
             </div>
 
             <div v-if="variant === 'kitchen' && kitchenPickupName"
-                class="flex items-start gap-1 text-[10px] sm:text-xs text-gray-700 mt-0.5">
+                class="flex items-start gap-1 text-[10px] sm:text-xs text-gray-700">
                 <UserIcon class="w-3 h-3 sm:w-3.5 sm:h-3.5 text-gray-500 flex-shrink-0 mt-0.5" />
                 <span class="font-medium break-words min-w-0">Recoge: {{ kitchenPickupName }}</span>
             </div>

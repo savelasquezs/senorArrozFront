@@ -2,6 +2,10 @@
     <BaseDialog :model-value="isOpen" @update:model-value="$emit('close')" title="Confirmar cambio a Listo">
         <div class="space-y-4">
             <p class="text-gray-700">¿Estás seguro de marcar los siguientes pedidos como listos?</p>
+            <p v-if="chainTakenToReady" class="text-sm text-amber-800 bg-amber-50 border border-amber-100 rounded-md px-3 py-2">
+                Los que están en <strong>Tomado</strong> pasarán primero a <strong>En preparación</strong> y luego a
+                <strong>Listo</strong> (mismas transiciones que en la vista clásica, en un solo paso).
+            </p>
 
             <div class="bg-gray-50 rounded-lg p-4 max-h-96 overflow-y-auto">
                 <div v-for="order in orders" :key="order.id" class="mb-3 pb-3 border-b border-gray-200 last:border-0">
@@ -45,9 +49,10 @@
 
 <script setup lang="ts">
 import { ref } from 'vue'
-import type { OrderListItem, OrderDetailItem } from '@/types/order'
+import type { OrderListItem, OrderDetailItem, OrderStatus } from '@/types/order'
 import { useOrdersDataStore } from '@/store/ordersData'
 import { useToast } from '@/composables/useToast'
+import { applyMarkReadySequence } from '@/composables/kitchenMarkReadySequence'
 import BaseDialog from '@/components/ui/BaseDialog.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseBadge from '@/components/ui/BaseBadge.vue'
@@ -56,9 +61,16 @@ interface Props {
     isOpen: boolean
     orders: OrderListItem[]
     orderItemsMap: Map<number, OrderDetailItem[]>
+    /**
+     * Modo cocina combinado: encadena in_preparation → listo para pedidos aún en Tomado.
+     * Si false, solo hace `ready` (pedidos en preparación, vista clásica).
+     */
+    chainTakenToReady?: boolean
 }
 
-const props = defineProps<Props>()
+const props = withDefaults(defineProps<Props>(), {
+    chainTakenToReady: false,
+})
 const emit = defineEmits<{ close: [], updated: [] }>()
 
 const ordersStore = useOrdersDataStore()
@@ -73,12 +85,25 @@ const orderNotes = (order: OrderListItem): string => {
     return (order.notes ?? '').trim()
 }
 
+const getStatusForId = (id: number): OrderListItem['status'] | undefined => {
+    const fromList = ordersStore.list?.items.find((o) => o.id === id)?.status
+    if (fromList !== undefined) return fromList
+    return props.orders.find((o) => o.id === id)?.status
+}
+
 const confirmAndUpdate = async () => {
     try {
         isLoading.value = true
 
-        for (const order of props.orders) {
-            await ordersStore.updateStatus(order.id, 'ready')
+        const ids = props.orders.map((o) => o.id)
+        if (props.chainTakenToReady) {
+            await applyMarkReadySequence(ids, getStatusForId, (id, s: OrderStatus) =>
+                ordersStore.updateStatus(id, s)
+            )
+        } else {
+            for (const order of props.orders) {
+                await ordersStore.updateStatus(order.id, 'ready')
+            }
         }
 
         success(`${props.orders.length} pedido(s) marcado(s) como listos`, 5000)

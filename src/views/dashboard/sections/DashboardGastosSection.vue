@@ -42,6 +42,19 @@
 						</option>
 					</select>
 				</div>
+				<div v-if="filterCategoryId != null" class="min-w-[200px]">
+					<label class="block text-xs font-medium text-gray-600 mb-1">
+						Ítems de catálogo a listar (por suma total)
+					</label>
+					<select
+						v-model.number="topLinesLimit"
+						class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 bg-white"
+					>
+						<option v-for="n in topLineLimitOptions" :key="n" :value="n">
+							{{ n === 500 ? 'Hasta 500 (máx.)' : `Top ${n}` }}
+						</option>
+					</select>
+				</div>
 			</div>
 
 			<div v-if="payload?.summary" class="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4 mt-4">
@@ -78,6 +91,86 @@
 						{{ formatCop(Math.round(payload.summary.avgTicketCop)) }}
 					</p>
 				</BaseCard>
+			</div>
+
+			<div
+				v-if="filterCategoryId != null"
+				class="rounded-xl border border-gray-200 bg-white p-3 shadow-sm space-y-4"
+			>
+				<div class="flex flex-wrap items-center justify-between gap-2">
+					<div>
+						<p class="text-sm font-medium text-gray-800">Gastos de catálogo (suma en el periodo)</p>
+						<p class="text-[11px] text-gray-500 mt-0.5">
+							Varias compras del mismo ítem (p. ej. arroz) se agrupan en una fila. Mismas fechas y
+							sucursal del panel. Orden: mayor suma total.
+						</p>
+					</div>
+					<p v-if="topLinesLoading" class="text-xs text-gray-500">Cargando…</p>
+				</div>
+				<div
+					v-if="!topLinesLoading && topLines.length === 0"
+					class="text-sm text-gray-500 py-4 text-center"
+				>
+					Sin movimientos en este rango y filtros.
+				</div>
+				<template v-else>
+					<div
+						v-if="topLines.length > 0"
+						class="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start w-full -mx-1 px-1"
+					>
+						<div class="relative min-h-[220px] min-w-0">
+							<p class="text-xs font-medium text-gray-600 mb-2">Comparativo (mismos datos que la tabla)</p>
+							<DashboardBarChart
+								:labels="topCatalogBarLabels"
+								:datasets="topCatalogBarDatasets"
+								y-format="currency"
+							/>
+						</div>
+						<div class="min-w-0">
+							<p class="text-xs font-medium text-gray-600 mb-2">
+								Participación en la categoría (top {{ PIE_CATALOG_NAMED_MAX }} + Otros)
+							</p>
+							<p class="text-[11px] text-gray-500 mb-1">
+								Porcentajes sobre el total de los ítems listados (mismo rango y filtros).
+							</p>
+							<DashboardRevenueShareDonut
+								:labels="topCatalogPieLabels"
+								:values="topCatalogPieValues"
+								:percents="topCatalogPiePercents"
+							/>
+						</div>
+					</div>
+					<div class="overflow-x-auto -mx-1">
+						<table class="min-w-full text-left text-xs text-gray-800">
+							<thead>
+								<tr
+									class="border-b border-gray-200 text-[10px] uppercase tracking-wide text-gray-500"
+								>
+									<th class="py-2 pr-2">Gasto (catálogo)</th>
+									<th class="py-2 pr-2 hidden sm:table-cell">Categoría</th>
+									<th class="py-2 pr-2 text-right">Líneas en periodo</th>
+									<th class="py-2 text-right">Suma total</th>
+								</tr>
+							</thead>
+							<tbody>
+								<tr
+									v-for="row in topLines"
+									:key="row.expenseId"
+									class="border-b border-gray-100 last:border-0"
+								>
+									<td class="py-1.5 pr-2 font-medium">{{ row.expenseName }}</td>
+									<td class="py-1.5 pr-2 hidden sm:table-cell text-gray-600">
+										{{ row.categoryName || '—' }}
+									</td>
+									<td class="py-1.5 pr-2 text-right tabular-nums">{{ row.lineCount }}</td>
+									<td class="py-1.5 text-right font-medium tabular-nums">
+										{{ formatCurrency(row.totalCop) }}
+									</td>
+								</tr>
+							</tbody>
+						</table>
+					</div>
+				</template>
 			</div>
 
 			<div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
@@ -139,26 +232,45 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue';
+import { computed, ref, watch, withDefaults } from 'vue';
 import BaseCard from '@/components/ui/BaseCard.vue';
-import { DashboardLineChart, DashboardRevenueShareDonut } from '@/components/dashboard';
+import {
+	DashboardBarChart,
+	DashboardLineChart,
+	DashboardRevenueShareDonut,
+} from '@/components/dashboard';
 import MenuCategoryCostingPanel from '@/components/dashboard/MenuCategoryCostingPanel.vue';
-import type { LineChartDataset } from '@/components/dashboard';
+import type { BarChartDataset, LineChartDataset } from '@/components/dashboard';
 import { expenseCategoryApi } from '@/services/MainAPI/expenseCategoryApi';
 import { expenseApi } from '@/services/MainAPI/expenseApi';
 import type { Expense } from '@/types/expense';
-import type { GastosDashboardPayload } from '@/composables/dashboard/useDashboardGastosSection';
+import type {
+	GastosDashboardPayload,
+	GastosTopCatalogItem,
+} from '@/composables/dashboard/useDashboardGastosSection';
+import { formatCurrency } from '@/composables/useFormatting';
 import { defaultBusinessCalendar } from '@/utils/datetime';
 
-const props = defineProps<{
-	loading: boolean;
-	seriesBusy: boolean;
-	error: string | null | undefined;
-	/** `null` hasta la primera carga exitosa. */
-	payload: GastosDashboardPayload | null | undefined;
-	branchId: number | null;
-	dateRange: [Date, Date];
-}>();
+const props = withDefaults(
+	defineProps<{
+		loading: boolean;
+		seriesBusy: boolean;
+		error: string | null | undefined;
+		/** `null` hasta la primera carga exitosa. */
+		payload: GastosDashboardPayload | null | undefined;
+		branchId: number | null;
+		dateRange: [Date, Date];
+		topLines?: GastosTopCatalogItem[];
+		topLinesLoading?: boolean;
+	}>(),
+	{
+		topLines: () => [],
+		topLinesLoading: false,
+	},
+);
+
+const topLineLimitOptions = [5, 10, 15, 25, 50, 100, 500] as const;
+const topLinesLimit = defineModel<number>('topLinesLimit', { default: 15 });
 
 const branchId = computed(() => props.branchId);
 const dateRange = computed(() => props.dateRange);
@@ -266,5 +378,44 @@ const lineDatasets = computed((): LineChartDataset[] => {
 			data: amounts.map((n) => Number(n)),
 		},
 	];
+});
+
+const topCatalogBarLabels = computed(() => props.topLines.map((r) => r.expenseName));
+const topCatalogBarDatasets = computed((): BarChartDataset[] => [
+	{
+		label: 'Suma en el periodo',
+		data: props.topLines.map((r) => r.totalCop),
+	},
+]);
+
+/** Máx. rebanadas con nombre en la torta; el resto se agrupa en "Otros" (7 u 8 porciones en total). */
+const PIE_CATALOG_NAMED_MAX = 6;
+
+const topCatalogPieLabels = computed(() => topCatalogPieBundle.value.labels);
+const topCatalogPieValues = computed(() => topCatalogPieBundle.value.values);
+const topCatalogPiePercents = computed(() => topCatalogPieBundle.value.percents);
+
+const topCatalogPieBundle = computed(() => {
+	const rows = props.topLines;
+	if (rows.length === 0) {
+		return { labels: [] as string[], values: [] as number[], percents: [] as number[] };
+	}
+	const total = rows.reduce((s, r) => s + r.totalCop, 0);
+	if (total <= 0) {
+		return { labels: [] as string[], values: [] as number[], percents: [] as number[] };
+	}
+	const head = rows.slice(0, PIE_CATALOG_NAMED_MAX);
+	const tail = rows.slice(PIE_CATALOG_NAMED_MAX);
+	const othersCop = tail.reduce((s, r) => s + r.totalCop, 0);
+	const labels: string[] = head.map((r) => r.expenseName);
+	const values: number[] = head.map((r) => r.totalCop);
+	if (othersCop > 0) {
+		labels.push('Otros');
+		values.push(othersCop);
+	}
+	const percents = values.map((v) =>
+		Math.round((1000 * v) / total) / 10,
+	);
+	return { labels, values, percents };
 });
 </script>

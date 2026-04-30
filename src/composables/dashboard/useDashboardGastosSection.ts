@@ -39,6 +39,17 @@ export type GastosDashboardPayload = {
 	timeSeries: GastosTimeSeriesPayload | null;
 };
 
+/** Top ítems de catálogo: suma de líneas en el rango, agrupado por ítem de catálogo (mismo criterio que el gráfico). */
+export type GastosTopCatalogItem = {
+	expenseId: number;
+	expenseName: string;
+	categoryName: string;
+	totalCop: number;
+	lineCount: number;
+};
+
+const DEFAULT_TOP_LINES_LIMIT = 15;
+
 function mapSummary(raw: {
 	totalCop: number;
 	headerCount: number;
@@ -89,11 +100,15 @@ export function useDashboardGastosSection(
 
 	const filterCategoryId = ref<number | null>(null);
 	const filterExpenseId = ref<number | null>(null);
+	const topLinesLimit = ref(DEFAULT_TOP_LINES_LIMIT);
+	const topLines = ref<GastosTopCatalogItem[]>([]);
+	const topLinesLoading = ref(false);
 
 	const isActive = computed(() => activeSection.value === 'gastos');
 
 	let coreSeq = 0;
 	let seriesSeq = 0;
+	let topSeq = 0;
 
 	watch(filterCategoryId, () => {
 		filterExpenseId.value = null;
@@ -200,6 +215,55 @@ export function useDashboardGastosSection(
 		}
 	}
 
+	async function loadTopLines() {
+		if (!isActive.value) {
+			topLines.value = [];
+			return;
+		}
+		if (filterCategoryId.value == null) {
+			topLines.value = [];
+			return;
+		}
+		const seq = ++topSeq;
+		topLinesLoading.value = true;
+		try {
+			const { from, to } = encodeDashboardRangeToApi(dateRange.value);
+			const raw = await dashboardApi.getExpenseTopLines(branchId.value, from, to, {
+				categoryId: filterCategoryId.value,
+				expenseId: filterExpenseId.value,
+				limit: topLinesLimit.value,
+			});
+			if (seq !== topSeq) return;
+			topLines.value = (raw.items ?? []).map((r) => ({
+				expenseId: r.expenseId,
+				expenseName: r.expenseName,
+				categoryName: r.categoryName,
+				totalCop: r.totalCop,
+				lineCount: r.lineCount,
+			}));
+		} catch {
+			if (seq !== topSeq) return;
+			topLines.value = [];
+		} finally {
+			if (seq === topSeq) topLinesLoading.value = false;
+		}
+	}
+
+	watch(
+		[
+			isActive,
+			branchId,
+			() => rangeKey(dateRange.value),
+			filterCategoryId,
+			filterExpenseId,
+			topLinesLimit,
+		],
+		() => {
+			void loadTopLines();
+		},
+		{ immediate: true },
+	);
+
 	watch(
 		[isActive, branchId, () => rangeKey(dateRange.value), timeGranularity],
 		() => {
@@ -224,5 +288,8 @@ export function useDashboardGastosSection(
 		error,
 		filterCategoryId,
 		filterExpenseId,
+		topLines,
+		topLinesLoading,
+		topLinesLimit,
 	};
 }

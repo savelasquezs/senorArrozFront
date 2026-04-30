@@ -144,8 +144,8 @@
                     </td>
 
                     <!-- Total / Abonos -->
-                    <td class="px-4 py-4 whitespace-nowrap">
-                        <div class="space-y-1">
+                    <td class="px-4 py-4 min-w-[11rem] max-w-[14rem]">
+                        <div class="space-y-1.5">
                             <div class="flex items-baseline gap-1">
                                 <span class="text-sm font-medium text-gray-900">{{ formatCurrency(order.total) }}</span>
                                 <span class="text-xs text-gray-400">total</span>
@@ -154,10 +154,20 @@
                                 {{ formatCurrency(order.totalDeposited) }} abonado
                             </div>
                             <!-- Barra de progreso -->
-                            <div v-if="order.total > 0" class="w-20 h-1.5 bg-gray-200 rounded-full overflow-hidden">
+                            <div v-if="order.total > 0" class="w-full max-w-[5.5rem] h-1.5 bg-gray-200 rounded-full overflow-hidden">
                                 <div
                                     class="h-full bg-amber-400 rounded-full transition-all"
                                     :style="{ width: `${Math.min(100, (order.totalDeposited / order.total) * 100)}%` }"
+                                />
+                            </div>
+                            <div v-if="(order.reservationDeposits?.length ?? 0) > 0" class="space-y-1">
+                                <ReservationDepositCompactRow
+                                    v-for="d in (order.reservationDeposits ?? [])"
+                                    :key="d.id"
+                                    :deposit="d"
+                                    :show-edit-remove="permissions.canEditPayments(order)"
+                                    @edit="(dep) => $emit('edit-reservation-deposit', order, dep)"
+                                    @remove="(dep) => $emit('remove-reservation-deposit', order, dep)"
                                 />
                             </div>
                             <!-- Botón abono -->
@@ -202,8 +212,11 @@
 
 <script setup lang="ts">
 import type { OrderListItem } from '@/types/order'
+import type { ReservationDeposit } from '@/types/reservationDeposit'
 import BaseLoading from '@/components/ui/BaseLoading.vue'
+import ReservationDepositCompactRow from '@/components/reservations/ReservationDepositCompactRow.vue'
 import { useFormatting } from '@/composables/useFormatting'
+import { useOrderPermissions } from '@/composables/useOrderPermissions'
 import { defaultBusinessCalendar } from '@/utils/datetime'
 import {
     orderListRecipientDisplayName,
@@ -230,10 +243,13 @@ const emit = defineEmits<{
     'edit-customer': [order: OrderListItem]
     'edit-address': [order: OrderListItem]
     'add-deposit': [order: OrderListItem]
+    'edit-reservation-deposit': [order: OrderListItem, deposit: ReservationDeposit]
+    'remove-reservation-deposit': [order: OrderListItem, deposit: ReservationDeposit]
     'cancel-reservation': [order: OrderListItem]
     sort: [column: string]
 }>()
 
+const permissions = useOrderPermissions()
 const { formatCurrency } = useFormatting()
 
 const formatDate = (dateString: string | Date | null): string => {

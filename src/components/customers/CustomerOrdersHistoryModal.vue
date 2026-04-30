@@ -47,6 +47,7 @@ import { ref, watch, computed } from 'vue'
 import type { Customer } from '@/types/customer'
 import type { OrderListItem, OrderDetailItem } from '@/types/order'
 import { orderApi } from '@/services/MainAPI/orderApi'
+import { buildOrderSearchBody } from '@/composables/useOrderSearchPayload'
 import BaseDialog from '@/components/ui/BaseDialog.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseLoading from '@/components/ui/BaseLoading.vue'
@@ -120,19 +121,24 @@ async function fetchOrders() {
     loading.value = true
     loadError.value = ''
     try {
-        const body: Record<string, unknown> = {
-            customerId: props.customer.id,
-            branchId: props.customer.branchId > 0 ? props.customer.branchId : undefined,
+        const body = buildOrderSearchBody({
             page: page.value,
             pageSize,
-            sortBy: 'CreatedAt',
+            sortBy: 'createdAt',
             sortOrder: 'desc',
             excludeFutureReservations: false,
-        }
-        if (!unrestrictedDateRange.value && props.customer.createdAt) {
-            body.fromDate = formatYmd(props.customer.createdAt)
-            body.toDate = todayStr()
-        }
+            search: '',
+            totalQuery: '',
+            type: null,
+            status: null,
+            customerId: props.customer.id,
+            branchId: props.customer.branchId > 0 ? props.customer.branchId : undefined,
+            fromDate:
+                !unrestrictedDateRange.value && props.customer.createdAt
+                    ? formatYmd(props.customer.createdAt)
+                    : undefined,
+            toDate: !unrestrictedDateRange.value && props.customer.createdAt ? todayStr() : undefined,
+        })
 
         const res = await orderApi.searchOrders(body)
         orders.value = res.items ?? []

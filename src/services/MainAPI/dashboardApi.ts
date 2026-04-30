@@ -245,6 +245,25 @@ class DashboardApi extends BaseApi {
 		return this.get<DashboardExpenseTimeSeriesApiResponse>('/dashboard/expenses/timeseries', { params });
 	}
 
+	/** Top ítems de catálogo por suma de importes de línea (agrupa varias compras del mismo ítem). `limit` 1–500, por defecto 15. */
+	async getExpenseTopLines(
+		branchId: number | null,
+		fromIso: string,
+		toIso: string,
+		opts: { categoryId: number; expenseId?: number | null; limit?: number },
+	): Promise<DashboardExpenseTopLinesApiResponse> {
+		const params: Record<string, string> = {
+			from: fromIso,
+			to: toIso,
+			categoryId: String(opts.categoryId),
+		};
+		if (branchId != null) params.branchId = String(branchId);
+		if (opts.expenseId != null && opts.expenseId !== undefined)
+			params.expenseId = String(opts.expenseId);
+		if (opts.limit != null && opts.limit !== undefined) params.limit = String(opts.limit);
+		return this.get<DashboardExpenseTopLinesApiResponse>('/dashboard/expenses/top-lines', { params });
+	}
+
 	/** Principal — ventas vs gastos (gastos apilados por categoría). */
 	async getPrincipalSalesVsExpenses(
 		branchId: number | null,
@@ -359,6 +378,19 @@ export type DashboardExpenseTimeSeriesApiResponse = {
 	amountsCop: number[];
 	granularity: string;
 	seriesLabel: string;
+};
+
+export type DashboardExpenseTopLineItemApi = {
+	expenseId: number;
+	expenseName: string;
+	categoryName: string;
+	totalCop: number;
+	lineCount: number;
+};
+
+export type DashboardExpenseTopLinesApiResponse = {
+	items: DashboardExpenseTopLineItemApi[];
+	limitApplied: number;
 };
 
 export type DashboardPrincipalSalesVsExpensesApiResponse = {
