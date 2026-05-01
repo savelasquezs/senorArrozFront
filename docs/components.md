@@ -242,7 +242,7 @@ Componente minimalista para mostrar productos individuales.
 - **Click para agregar**: Click en cualquier parte de la card agrega el producto
 - **Hover effect**: Background `emerald-50` y borde `emerald-500` al pasar el mouse
 - **Stock ilimitado**: Productos de categoría "arroces" nunca están deshabilitados por stock
-- **Cursor adaptativo**: `not-allowed` para productos sin stock
+- **Puntero adaptativo**: `not-allowed` para productos sin stock
 - **Responsive**: Se adapta al tamaño del contenedor
 
 **Events:**

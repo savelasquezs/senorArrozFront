@@ -645,5 +645,5 @@ export default defineConfig({
 - [docs/patterns.md](./patterns.md) - Patrones de arquitectura
 - [docs/components.md](./components.md) - Guía de componentes
 - [docs/development.md](./development.md) - Convenciones de desarrollo
-- [.cursorrules](../.cursorrules) - Reglas para agentes IA
+- [AGENTS.md](../AGENTS.md) - Reglas para Codex y otros agentes
 
