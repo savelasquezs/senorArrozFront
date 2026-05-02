@@ -6,4 +6,5 @@ export interface KitchenOrderModificationSummary {
     productReplacements?: Array<{ previousProductName: string; newProductName: string }>
     scheduleChanged?: boolean
     notesChanged?: boolean
+    scheduleChangeKind?: 'reservation' | 'prepare_now' | 'updated'
 }

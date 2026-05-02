@@ -188,7 +188,15 @@ export class KitchenService {
                     `Ya no es ${this.qtyWord(q.previousQuantity)} de ${q.productName}, ${dir} a ${this.qtyWord(q.newQuantity)}.`
                 )
             }
-            if (changes.scheduleChanged) parts.push('Cambio de horario del pedido.')
+            if (changes.scheduleChanged) {
+                if (changes.scheduleChangeKind === 'prepare_now') {
+                    parts.push('Se cambió la hora del pedido. Queda para preparar ya.')
+                } else if (changes.scheduleChangeKind === 'reservation') {
+                    parts.push('Se cambió la hora del pedido. Queda como reserva.')
+                } else {
+                    parts.push('Se cambió la hora del pedido.')
+                }
+            }
             if (changes.notesChanged) {
                 const spoken = this.formatOrderNotesForVoice(orderNotes)
                 if (spoken) {

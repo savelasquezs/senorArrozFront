@@ -1,1338 +1,1667 @@
 <template>
+	<div class="space-y-4 md:space-y-6" v-if="order">
+		<!-- Header con ID y acciones -->
+		<div
+			class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-0"
+		>
+			<div>
+				<div
+					class="flex flex-col sm:flex-row items-start sm:items-center space-y-2 sm:space-y-0 sm:space-x-3"
+				>
+					<h1 class="text-2xl sm:text-3xl font-bold text-gray-900">
+						#{{ order.id }}
+					</h1>
+					<OrderTypeBadge
+						:type="order.type"
+						:display-name="order.typeDisplayName"
+					/>
+				</div>
+				<p class="mt-1 text-xs sm:text-sm text-gray-500">
+					Creado el {{ formatDateTime(order.createdAt) }}
+				</p>
+			</div>
 
-    <div class="space-y-4 md:space-y-6" v-if="order">
-        <!-- Header con ID y acciones -->
-        <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-0">
-            <div>
-                <div class="flex flex-col sm:flex-row items-start sm:items-center space-y-2 sm:space-y-0 sm:space-x-3">
-                    <h1 class="text-2xl sm:text-3xl font-bold text-gray-900">#{{ order.id }}</h1>
-                    <OrderTypeBadge :type="order.type" :display-name="order.typeDisplayName" />
-                </div>
-                <p class="mt-1 text-xs sm:text-sm text-gray-500">
-                    Creado el {{ formatDateTime(order.createdAt) }}
-                </p>
-            </div>
+			<div
+				class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto flex-wrap"
+			>
+				<BaseButton
+					v-if="!isDeliveryman"
+					variant="secondary"
+					size="sm"
+					class="w-full sm:w-auto"
+					@click="$router.push({ name: 'OrdersList' })"
+				>
+					<ArrowLeftIcon class="w-4 h-4 mr-1" />
+					Volver
+				</BaseButton>
+				<template v-if="permissions.canReprintThermalTickets() && order">
+					<BaseButton
+						variant="outline"
+						size="sm"
+						class="w-full sm:w-auto"
+						:loading="reprintKitchenLoading"
+						title="Reimprimir comanda de cocina"
+						@click="onReprintKitchen"
+					>
+						<PrinterIcon class="w-4 h-4 mr-1" />
+						Comanda cocina
+					</BaseButton>
+					<BaseButton
+						variant="outline"
+						size="sm"
+						class="w-full sm:w-auto"
+						:loading="reprintDeliveryLoading"
+						title="Reimprimir ticket de domicilio"
+						@click="onReprintDelivery"
+					>
+						<PrinterIcon class="w-4 h-4 mr-1" />
+						Ticket domicilio
+					</BaseButton>
+				</template>
+				<BaseButton
+					v-if="permissions.canCancel(order)"
+					variant="danger"
+					size="sm"
+					class="w-full sm:w-auto"
+					@click="showCancelModal = true"
+				>
+					<XCircleIcon class="w-4 h-4 mr-1" />
+					Cancelar Pedido
+				</BaseButton>
+			</div>
+		</div>
 
-            <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto flex-wrap">
-                <BaseButton v-if="!isDeliveryman" variant="secondary" size="sm" class="w-full sm:w-auto"
-                    @click="$router.push({ name: 'OrdersList' })">
-                    <ArrowLeftIcon class="w-4 h-4 mr-1" />
-                    Volver
-                </BaseButton>
-                <template v-if="permissions.canReprintThermalTickets() && order">
-                    <BaseButton
-                        variant="outline"
-                        size="sm"
-                        class="w-full sm:w-auto"
-                        :loading="reprintKitchenLoading"
-                        title="Reimprimir comanda de cocina"
-                        @click="onReprintKitchen"
-                    >
-                        <PrinterIcon class="w-4 h-4 mr-1" />
-                        Comanda cocina
-                    </BaseButton>
-                    <BaseButton
-                        variant="outline"
-                        size="sm"
-                        class="w-full sm:w-auto"
-                        :loading="reprintDeliveryLoading"
-                        title="Reimprimir ticket de domicilio"
-                        @click="onReprintDelivery"
-                    >
-                        <PrinterIcon class="w-4 h-4 mr-1" />
-                        Ticket domicilio
-                    </BaseButton>
-                </template>
-                <BaseButton v-if="permissions.canCancel(order)" variant="danger" size="sm" class="w-full sm:w-auto"
-                    @click="showCancelModal = true">
-                    <XCircleIcon class="w-4 h-4 mr-1" />
-                    Cancelar Pedido
-                </BaseButton>
-            </div>
-        </div>
+		<!-- Barra de progreso -->
+		<div v-if="!isDeliveryman" class="bg-white rounded-lg shadow p-4 md:p-6">
+			<OrderProgressBar
+				:current-status="order.status"
+				:status-times="order.statusTimes"
+				:order-type="order.type"
+				:clickable="true"
+				@status-click="handleStatusChange"
+			/>
+		</div>
 
-        <!-- Barra de progreso -->
-        <div v-if="!isDeliveryman" class="bg-white rounded-lg shadow p-4 md:p-6">
-            <OrderProgressBar :current-status="order.status" :status-times="order.statusTimes" :order-type="order.type"
-                :clickable="true" @status-click="handleStatusChange" />
-        </div>
+		<!-- Tabs de contenido -->
+		<div class="bg-white rounded-lg shadow overflow-hidden">
+			<!-- Tab headers -->
+			<div class="border-b border-gray-200 overflow-x-auto">
+				<nav
+					class="-mb-px flex space-x-4 sm:space-x-8 px-3 sm:px-6 flex-nowrap"
+					aria-label="Tabs"
+				>
+					<button
+						v-for="tab in visibleTabs"
+						:key="tab.id"
+						:class="[
+							'whitespace-nowrap py-3 sm:py-4 px-2 sm:px-1 border-b-2 font-medium text-xs sm:text-sm flex items-center gap-1 sm:gap-2',
+							activeTab === tab.id
+								? 'border-emerald-500 text-emerald-600'
+								: 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300',
+						]"
+						@click="activeTab = tab.id"
+					>
+						<component
+							:is="tab.icon"
+							class="w-4 h-4 sm:w-5 sm:h-5 inline-block"
+						/>
+						<span class="hidden sm:inline">{{ tab.name }}</span>
+					</button>
+				</nav>
+			</div>
 
-        <!-- Tabs de contenido -->
-        <div class="bg-white rounded-lg shadow overflow-hidden">
-            <!-- Tab headers -->
-            <div class="border-b border-gray-200 overflow-x-auto">
-                <nav class="-mb-px flex space-x-4 sm:space-x-8 px-3 sm:px-6 flex-nowrap" aria-label="Tabs">
-                    <button v-for="tab in visibleTabs" :key="tab.id" :class="[
-                        'whitespace-nowrap py-3 sm:py-4 px-2 sm:px-1 border-b-2 font-medium text-xs sm:text-sm flex items-center gap-1 sm:gap-2',
-                        activeTab === tab.id
-                            ? 'border-emerald-500 text-emerald-600'
-                            : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300',
-                    ]" @click="activeTab = tab.id">
-                        <component :is="tab.icon" class="w-4 h-4 sm:w-5 sm:h-5 inline-block" />
-                        <span class="hidden sm:inline">{{ tab.name }}</span>
-                    </button>
-                </nav>
-            </div>
+			<!-- Tab content -->
+			<div class="p-4 sm:p-6">
+				<!-- Tab: Información General -->
+				<div v-if="activeTab === 'info'" class="space-y-6">
+					<div class="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
+						<!-- Cliente -->
+						<div class="space-y-2">
+							<label class="text-xs sm:text-sm font-medium text-gray-700"
+								>Cliente</label
+							>
+							<div class="flex flex-col gap-2 bg-gray-50 rounded-lg p-2 sm:p-3">
+								<div class="flex items-center justify-between">
+									<div class="flex-1">
+										<p class="text-xs sm:text-sm font-medium text-gray-900">
+											{{
+												order.customerName || order.guestName || 'Sin cliente'
+											}}
+										</p>
+									</div>
+									<BaseButton
+										v-if="permissions.canEditOrder(order)"
+										size="sm"
+										variant="ghost"
+										@click="showEditCustomerModal = true"
+									>
+										<PencilIcon class="w-4 h-4" />
+									</BaseButton>
+								</div>
 
-            <!-- Tab content -->
-            <div class="p-4 sm:p-6">
-                <!-- Tab: Información General -->
-                <div v-if="activeTab === 'info'" class="space-y-6">
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
-                        <!-- Cliente -->
-                        <div class="space-y-2">
-                            <label class="text-xs sm:text-sm font-medium text-gray-700">Cliente</label>
-                            <div class="flex flex-col gap-2 bg-gray-50 rounded-lg p-2 sm:p-3">
-                                <div class="flex items-center justify-between">
-                                    <div class="flex-1">
-                                        <p class="text-xs sm:text-sm font-medium text-gray-900">
-                                            {{ order.customerName || order.guestName || 'Sin cliente' }}
-                                        </p>
-                                    </div>
-                                    <BaseButton v-if="permissions.canEditOrder(order)" size="sm" variant="ghost"
-                                        @click="showEditCustomerModal = true">
-                                        <PencilIcon class="w-4 h-4" />
-                                    </BaseButton>
-                                </div>
+								<!-- Teléfonos del cliente -->
+								<div v-if="order.customerId && customer" class="space-y-1 mt-2">
+									<PhoneNumberItem :phone-number="customer.phone1" />
+									<PhoneNumberItem
+										v-if="customer.phone2"
+										:phone-number="customer.phone2"
+									/>
+								</div>
+								<!-- Fallback: mostrar customerPhone si no hay cliente cargado -->
+								<div v-else-if="order.customerPhone" class="mt-2">
+									<PhoneNumberItem :phone-number="order.customerPhone" />
+								</div>
+								<!-- Loading state -->
+								<div
+									v-if="order.customerId && customerLoading"
+									class="mt-2 flex items-center gap-2 text-xs text-gray-500"
+								>
+									<BaseLoading size="sm" />
+									<span>Cargando teléfonos...</span>
+								</div>
+								<!-- Error state -->
+								<div
+									v-if="order.customerId && customerError"
+									class="mt-2 text-xs text-red-500"
+								>
+									{{ customerError }}
+								</div>
+							</div>
+						</div>
 
-                                <!-- Teléfonos del cliente -->
-                                <div v-if="order.customerId && customer" class="space-y-1 mt-2">
-                                    <PhoneNumberItem :phone-number="customer.phone1" />
-                                    <PhoneNumberItem v-if="customer.phone2" :phone-number="customer.phone2" />
-                                </div>
-                                <!-- Fallback: mostrar customerPhone si no hay cliente cargado -->
-                                <div v-else-if="order.customerPhone" class="mt-2">
-                                    <PhoneNumberItem :phone-number="order.customerPhone" />
-                                </div>
-                                <!-- Loading state -->
-                                <div v-if="order.customerId && customerLoading"
-                                    class="mt-2 flex items-center gap-2 text-xs text-gray-500">
-                                    <BaseLoading size="sm" />
-                                    <span>Cargando teléfonos...</span>
-                                </div>
-                                <!-- Error state -->
-                                <div v-if="order.customerId && customerError" class="mt-2 text-xs text-red-500">
-                                    {{ customerError }}
-                                </div>
-                            </div>
-                        </div>
+						<!-- Guest Name -->
+						<div class="space-y-2">
+							<label class="text-xs sm:text-sm font-medium text-gray-700"
+								>Nombre del invitado</label
+							>
+							<BaseInput
+								v-model="editableGuestName"
+								placeholder="Nombre de quien recibe"
+								:disabled="!permissions.canEditOrder(order)"
+								@blur="updateGuestName"
+							/>
+						</div>
 
+						<!-- Tipo de pedido - CLICKEABLE -->
+						<div class="space-y-2">
+							<label class="text-xs sm:text-sm font-medium text-gray-700"
+								>Tipo de pedido</label
+							>
+							<button
+								v-if="permissions.canEditOrder(order)"
+								@click="showEditOrderTypeModal = true"
+								class="w-full flex items-center justify-between bg-gray-50 hover:bg-gray-100 rounded-lg p-3 transition-colors cursor-pointer"
+							>
+								<OrderTypeBadge
+									:type="order.type"
+									:display-name="order.typeDisplayName"
+								/>
+								<PencilIcon class="w-4 h-4 text-gray-400" />
+							</button>
+							<div v-else class="bg-gray-50 rounded-lg p-3">
+								<OrderTypeBadge
+									:type="order.type"
+									:display-name="order.typeDisplayName"
+								/>
+							</div>
+						</div>
 
-                        <!-- Guest Name -->
-                        <div class="space-y-2">
-                            <label class="text-xs sm:text-sm font-medium text-gray-700">Nombre del invitado</label>
-                            <BaseInput v-model="editableGuestName" placeholder="Nombre de quien recibe"
-                                :disabled="!permissions.canEditOrder(order)" @blur="updateGuestName" />
-                        </div>
+						<!-- Dirección - SOLO SI DELIVERY O RESERVATION -->
+						<div
+							v-if="order.type === 'delivery' || order.type === 'reservation'"
+							class="space-y-2"
+						>
+							<label class="text-xs sm:text-sm font-medium text-gray-700"
+								>Dirección de entrega</label
+							>
+							<div
+								class="flex items-center justify-between bg-gray-50 rounded-lg p-2 sm:p-3 gap-2"
+							>
+								<div class="min-w-0 flex-1">
+									<p class="text-xs sm:text-sm text-gray-900">
+										{{ order.addressDescription || 'Sin dirección' }}
+									</p>
+									<p
+										v-if="order.addressAdditionalInfo"
+										class="mt-1 text-xs text-gray-600"
+									>
+										{{ order.addressAdditionalInfo }}
+									</p>
+								</div>
+								<BaseButton
+									v-if="permissions.canEditOrder(order)"
+									size="sm"
+									variant="ghost"
+									@click="showEditCustomerModal = true"
+								>
+									<PencilIcon class="w-4 h-4" />
+								</BaseButton>
+							</div>
+						</div>
 
-                        <!-- Tipo de pedido - CLICKEABLE -->
-                        <div class="space-y-2">
-                            <label class="text-xs sm:text-sm font-medium text-gray-700">Tipo de pedido</label>
-                            <button v-if="permissions.canEditOrder(order)" @click="showEditOrderTypeModal = true"
-                                class="w-full flex items-center justify-between bg-gray-50 hover:bg-gray-100 rounded-lg p-3 transition-colors cursor-pointer">
-                                <OrderTypeBadge :type="order.type" :display-name="order.typeDisplayName" />
-                                <PencilIcon class="w-4 h-4 text-gray-400" />
-                            </button>
-                            <div v-else class="bg-gray-50 rounded-lg p-3">
-                                <OrderTypeBadge :type="order.type" :display-name="order.typeDisplayName" />
-                            </div>
-                        </div>
+						<!-- Domiciliario: delivery y onsite (onsite puede llevarlo un domiciliario asignado desde caja) -->
+						<div
+							v-if="order.type === 'delivery' || order.type === 'onsite'"
+							class="space-y-2"
+						>
+							<label class="text-xs sm:text-sm font-medium text-gray-700"
+								>Domiciliario</label
+							>
+							<div
+								class="flex items-center justify-between bg-gray-50 rounded-lg p-2 sm:p-3"
+							>
+								<p class="text-xs sm:text-sm text-gray-900">
+									{{ order.deliveryManName || 'Sin asignar' }}
+								</p>
+								<BaseButton
+									v-if="!isDeliveryman"
+									size="sm"
+									variant="ghost"
+									@click="showAssignDeliveryModal = true"
+								>
+									<PencilIcon class="w-4 h-4" />
+								</BaseButton>
+							</div>
+						</div>
 
-                        <!-- Dirección - SOLO SI DELIVERY O RESERVATION -->
-                        <div v-if="order.type === 'delivery' || order.type === 'reservation'" class="space-y-2">
-                            <label class="text-xs sm:text-sm font-medium text-gray-700">Dirección de entrega</label>
-                            <div class="flex items-center justify-between bg-gray-50 rounded-lg p-2 sm:p-3 gap-2">
-                                <div class="min-w-0 flex-1">
-                                    <p class="text-xs sm:text-sm text-gray-900">
-                                        {{ order.addressDescription || 'Sin dirección' }}
-                                    </p>
-                                    <p v-if="order.addressAdditionalInfo" class="mt-1 text-xs text-gray-600">
-                                        {{ order.addressAdditionalInfo }}
-                                    </p>
-                                </div>
-                                <BaseButton v-if="permissions.canEditOrder(order)" size="sm" variant="ghost"
-                                    @click="showEditCustomerModal = true">
-                                    <PencilIcon class="w-4 h-4" />
-                                </BaseButton>
-                            </div>
-                        </div>
+						<!-- Delivery Fee - SOLO SI DELIVERY -->
+						<div v-if="order.type === 'delivery'" class="space-y-2">
+							<label class="text-xs sm:text-sm font-medium text-gray-700"
+								>Tarifa de domicilio</label
+							>
+							<div
+								v-if="permissions.canEditDeliveryFee(order)"
+								class="flex flex-col sm:flex-row sm:items-end gap-2 bg-gray-50 rounded-lg p-2 sm:p-3"
+							>
+								<BaseInput
+									v-model="editableDeliveryFee"
+									type="number"
+									:min="0"
+									:max="50000"
+									:step="100"
+									class="flex-1 min-w-0"
+									placeholder="0"
+									:hint="`Actual: ${formatCurrency(order?.deliveryFee || 0)}`"
+									@blur="updateDeliveryFee"
+								/>
+								<BaseButton
+									size="sm"
+									variant="secondary"
+									class="shrink-0 w-full sm:w-auto"
+									:loading="savingDeliveryFee"
+									@click="updateDeliveryFee"
+								>
+									Guardar tarifa
+								</BaseButton>
+							</div>
+							<div v-else class="bg-gray-50 rounded-lg p-2 sm:p-3">
+								<p class="text-xs sm:text-sm text-gray-900">
+									{{ formatCurrency(order?.deliveryFee || 0) }}
+								</p>
+							</div>
+						</div>
 
-                        <!-- Domiciliario: delivery y onsite (onsite puede llevarlo un domiciliario asignado desde caja) -->
-                        <div v-if="order.type === 'delivery' || order.type === 'onsite'" class="space-y-2">
-                            <label class="text-xs sm:text-sm font-medium text-gray-700">Domiciliario</label>
-                            <div class="flex items-center justify-between bg-gray-50 rounded-lg p-2 sm:p-3">
-                                <p class="text-xs sm:text-sm text-gray-900">
-                                    {{ order.deliveryManName || 'Sin asignar' }}
-                                </p>
-                                <BaseButton v-if="!isDeliveryman" size="sm" variant="ghost"
-                                    @click="showAssignDeliveryModal = true">
-                                    <PencilIcon class="w-4 h-4" />
-                                </BaseButton>
-                            </div>
-                        </div>
+						<!-- Horarios de reserva / programación (edición admin/cajero) -->
+						<div
+							v-if="showScheduleEditor"
+							class="space-y-3 rounded-lg border border-amber-100 bg-amber-50/40 p-3 sm:p-4"
+						>
+							<p class="text-xs font-medium text-amber-900">
+								Horarios de entrega y preparación
+							</p>
+							<div class="space-y-1.5">
+								<label class="text-xs font-medium text-gray-700"
+									>Inicio de preparación (opcional)</label
+								>
+								<VueDatePicker
+									v-model="editablePrepareAtDate"
+									placeholder="Cuándo empezar en cocina"
+									:min-date="new Date()"
+									auto-apply
+									class="order-detail-picker w-full"
+								/>
+								<p class="text-[11px] text-gray-500">
+									Si lo dejas vacío, el sistema usa una hora antes de la
+									entrega. Debe haber al menos 40 minutos entre preparación y
+									entrega.
+								</p>
+							</div>
+							<div class="space-y-1.5">
+								<label class="text-xs font-medium text-gray-700"
+									>Tener listo (entrega al cliente)</label
+								>
+								<VueDatePicker
+									v-model="editableReservedForDate"
+									placeholder="Fecha y hora de entrega"
+									:min-date="new Date()"
+									auto-apply
+									class="order-detail-picker w-full"
+								/>
+							</div>
 
-                        <!-- Delivery Fee - SOLO SI DELIVERY -->
-                        <div v-if="order.type === 'delivery'" class="space-y-2">
-                            <label class="text-xs sm:text-sm font-medium text-gray-700">Tarifa de domicilio</label>
-                            <div v-if="permissions.canEditDeliveryFee(order)"
-                                class="flex flex-col sm:flex-row sm:items-end gap-2 bg-gray-50 rounded-lg p-2 sm:p-3">
-                                <BaseInput v-model="editableDeliveryFee" type="number" :min="0" :max="50000"
-                                    :step="100" class="flex-1 min-w-0" placeholder="0"
-                                    :hint="`Actual: ${formatCurrency(order?.deliveryFee || 0)}`"
-                                    @blur="updateDeliveryFee" />
-                                <BaseButton size="sm" variant="secondary" class="shrink-0 w-full sm:w-auto"
-                                    :loading="savingDeliveryFee" @click="updateDeliveryFee">
-                                    Guardar tarifa
-                                </BaseButton>
-                            </div>
-                            <div v-else class="bg-gray-50 rounded-lg p-2 sm:p-3">
-                                <p class="text-xs sm:text-sm text-gray-900">{{ formatCurrency(order?.deliveryFee || 0) }}
-                                </p>
-                            </div>
-                        </div>
+							<div class="flex flex-col sm:flex-row gap-2 flex-wrap">
+								<BaseButton
+									size="sm"
+									variant="secondary"
+									class="w-full sm:w-auto"
+									:loading="savingSchedule"
+									@click="saveSchedule"
+								>
+									Guardar horarios
+								</BaseButton>
+								<BaseButton
+									v-if="showPrepareNowButton"
+									size="sm"
+									variant="primary"
+									class="w-full sm:w-auto"
+									:loading="savingPrepareNow"
+									@click="onPrepareNowClick"
+								>
+									Preparar ya
+								</BaseButton>
+							</div>
+						</div>
 
-                        <!-- Horarios de reserva / programación (edición admin/cajero) -->
-                        <div
-                            v-if="showScheduleEditor"
-                            class="space-y-3 rounded-lg border border-amber-100 bg-amber-50/40 p-3 sm:p-4"
-                        >
-                            <p class="text-xs font-medium text-amber-900">Horarios de entrega y preparación</p>
-                            <div class="space-y-1.5">
-                                <label class="text-xs font-medium text-gray-700">Tener listo (entrega al cliente)</label>
-                                <VueDatePicker
-                                    v-model="editableReservedForDate"
-                                    placeholder="Fecha y hora de entrega"
-                                    :min-date="new Date()"
-                                    auto-apply
-                                    class="order-detail-picker w-full"
-                                />
-                            </div>
-                            <div class="space-y-1.5">
-                                <label class="text-xs font-medium text-gray-700">Inicio de preparación (opcional)</label>
-                                <VueDatePicker
-                                    v-model="editablePrepareAtDate"
-                                    placeholder="Cuándo empezar en cocina"
-                                    :min-date="new Date()"
-                                    auto-apply
-                                    class="order-detail-picker w-full"
-                                />
-                                <p class="text-[11px] text-gray-500">
-                                    Si lo dejas vacío, el sistema usa una hora antes de la entrega. Debe haber al menos
-                                    40 minutos entre preparación y entrega.
-                                </p>
-                            </div>
-                            <div class="flex flex-col sm:flex-row gap-2 flex-wrap">
-                                <BaseButton
-                                    size="sm"
-                                    variant="secondary"
-                                    class="w-full sm:w-auto"
-                                    :loading="savingSchedule"
-                                    @click="saveSchedule"
-                                >
-                                    Guardar horarios
-                                </BaseButton>
-                                <BaseButton
-                                    v-if="showPrepareNowButton"
-                                    size="sm"
-                                    variant="primary"
-                                    class="w-full sm:w-auto"
-                                    :loading="savingPrepareNow"
-                                    @click="onPrepareNowClick"
-                                >
-                                    Preparar ya
-                                </BaseButton>
-                            </div>
-                        </div>
+						<!-- Solo lectura si el usuario no puede editar pero hay fechas -->
+						<template v-else>
+							<div
+								v-if="order.type === 'reservation' && order.reservedFor"
+								class="space-y-2"
+							>
+								<label class="text-xs sm:text-sm font-medium text-gray-700"
+									>Tener listo a esta hora</label
+								>
+								<div class="bg-gray-50 rounded-lg p-2 sm:p-3">
+									<p class="text-xs sm:text-sm text-gray-900">
+										{{ formatDateTime(order.reservedFor) }}
+									</p>
+								</div>
+							</div>
+							<div v-if="order.prepareAt" class="space-y-2">
+								<label class="text-xs sm:text-sm font-medium text-gray-700"
+									>Preparar a esta hora</label
+								>
+								<div class="bg-gray-50 rounded-lg p-2 sm:p-3">
+									<p class="text-xs sm:text-sm text-gray-900">
+										{{ formatDateTime(order.prepareAt) }}
+									</p>
+								</div>
+							</div>
+						</template>
 
-                        <!-- Solo lectura si el usuario no puede editar pero hay fechas -->
-                        <template v-else>
-                            <div v-if="order.type === 'reservation' && order.reservedFor" class="space-y-2">
-                                <label class="text-xs sm:text-sm font-medium text-gray-700">Tener listo a esta hora</label>
-                                <div class="bg-gray-50 rounded-lg p-2 sm:p-3">
-                                    <p class="text-xs sm:text-sm text-gray-900">{{ formatDateTime(order.reservedFor) }}</p>
-                                </div>
-                            </div>
-                            <div v-if="order.prepareAt" class="space-y-2">
-                                <label class="text-xs sm:text-sm font-medium text-gray-700">Preparar a esta hora</label>
-                                <div class="bg-gray-50 rounded-lg p-2 sm:p-3">
-                                    <p class="text-xs sm:text-sm text-gray-900">{{ formatDateTime(order.prepareAt) }}</p>
-                                </div>
-                            </div>
-                        </template>
+						<!-- Tomado por -->
+						<div class="space-y-2">
+							<label class="text-xs sm:text-sm font-medium text-gray-700"
+								>Tomado por</label
+							>
+							<div class="bg-gray-50 rounded-lg p-2 sm:p-3">
+								<p class="text-xs sm:text-sm text-gray-900">
+									{{ order.takenByName }}
+								</p>
+							</div>
+						</div>
 
-                        <!-- Tomado por -->
-                        <div class="space-y-2">
-                            <label class="text-xs sm:text-sm font-medium text-gray-700">Tomado por</label>
-                            <div class="bg-gray-50 rounded-lg p-2 sm:p-3">
-                                <p class="text-xs sm:text-sm text-gray-900">{{ order.takenByName }}</p>
-                            </div>
-                        </div>
+						<!-- Sucursal -->
+						<div class="space-y-2">
+							<label class="text-xs sm:text-sm font-medium text-gray-700"
+								>Sucursal</label
+							>
+							<div class="bg-gray-50 rounded-lg p-2 sm:p-3">
+								<p class="text-xs sm:text-sm text-gray-900">
+									{{ order.branchName }}
+								</p>
+							</div>
+						</div>
+					</div>
 
-                        <!-- Sucursal -->
-                        <div class="space-y-2">
-                            <label class="text-xs sm:text-sm font-medium text-gray-700">Sucursal</label>
-                            <div class="bg-gray-50 rounded-lg p-2 sm:p-3">
-                                <p class="text-xs sm:text-sm text-gray-900">{{ order.branchName }}</p>
-                            </div>
-                        </div>
-                    </div>
+					<!-- Notas -->
+					<div class="space-y-2">
+						<label class="text-xs sm:text-sm font-medium text-gray-700"
+							>Notas del pedido</label
+						>
+						<textarea
+							v-model="editableNotes"
+							rows="3"
+							class="w-full rounded-lg border-gray-300 shadow-sm focus:border-emerald-500 focus:ring-emerald-500 text-sm sm:text-base"
+							placeholder="Agregar notas..."
+							:disabled="!permissions.canEditOrder(order)"
+							@blur="updateNotes"
+						/>
+					</div>
+				</div>
 
-                    <!-- Notas -->
-                    <div class="space-y-2">
-                        <label class="text-xs sm:text-sm font-medium text-gray-700">Notas del pedido</label>
-                        <textarea v-model="editableNotes" rows="3"
-                            class="w-full rounded-lg border-gray-300 shadow-sm focus:border-emerald-500 focus:ring-emerald-500 text-sm sm:text-base"
-                            placeholder="Agregar notas..." :disabled="!permissions.canEditOrder(order)"
-                            @blur="updateNotes" />
-                    </div>
-                </div>
+				<!-- Tab: Productos -->
+				<div v-if="activeTab === 'products'">
+					<OrderDetailProductsList
+						v-if="order"
+						:products="order?.orderDetails"
+						:delivery-fee="order?.deliveryFee ?? 0"
+						:show-delivery-fee-line="
+							order.type === 'delivery' || order.type === 'reservation'
+						"
+						:can-edit="permissions.canEditProducts(order)"
+						:saving="savingProducts"
+						@save="handleProductsUpdate"
+						@request-cancel-order="handleRequestCancelOrderFromProducts"
+					/>
+				</div>
 
-                <!-- Tab: Productos -->
-                <div v-if="activeTab === 'products'">
-                    <OrderDetailProductsList v-if="order" :products="order?.orderDetails"
-                        :delivery-fee="order?.deliveryFee ?? 0"
-                        :show-delivery-fee-line="order.type === 'delivery' || order.type === 'reservation'"
-                        :can-edit="permissions.canEditProducts(order)"
-                        :saving="savingProducts" @save="handleProductsUpdate"
-                        @request-cancel-order="handleRequestCancelOrderFromProducts" />
-                </div>
+				<!-- Tab: Pagos -->
+				<div v-if="activeTab === 'payments'" ref="paymentsSectionRef">
+					<div class="mb-6">
+						<h3
+							class="text-base sm:text-lg font-medium text-gray-900 mb-3 sm:mb-4"
+						>
+							Gestión de Pagos
+						</h3>
+						<p class="text-xs sm:text-sm text-gray-600 mb-3 sm:mb-4">
+							<span v-if="isDeliveryman"
+								>Visualiza los pagos del pedido para saber cuánto debes
+								cobrar.</span
+							>
+							<span v-else
+								>Administra los pagos del pedido. Los pagos bancarios pueden ser
+								verificados y los pagos por app pueden ser liquidados.</span
+							>
+						</p>
+						<PaidInStoreCashPanel
+							v-if="showPaidInStoreDetailPanel"
+							:input-id="'paid-in-store-' + order.id"
+							:paid-in-store-cash="order.paidInStoreCash === true"
+							:paid-in-store-cash-amount="order.paidInStoreCashAmount ?? null"
+							:max-paid-in-store-amount="paidInStoreCap"
+							:editable="permissions.canEditPayments(order)"
+							:disabled="savingPaidInStore"
+							density="comfortable"
+							extra-class="mb-4"
+							:helper-text="'El domiciliario no cobra efectivo en la entrega. Queda registrado para el cuadre de caja.'"
+							@update:paid-in-store-cash="onPaidInStoreChange"
+							@edit-paid-in-store-cash="openEditPaidInStoreDetail"
+							@remove-paid-in-store-cash="openRemovePaidInStoreDetail"
+						/>
+						<PersistedPaymentSelector
+							v-if="order"
+							:order="order"
+							:bank-options="bankOptions"
+							:app-options="appOptions"
+							@updated="handlePaymentUpdated"
+						/>
+					</div>
+				</div>
+			</div>
+		</div>
 
-                <!-- Tab: Pagos -->
-                <div v-if="activeTab === 'payments'" ref="paymentsSectionRef">
-                    <div class="mb-6">
-                        <h3 class="text-base sm:text-lg font-medium text-gray-900 mb-3 sm:mb-4">Gestión de Pagos</h3>
-                        <p class="text-xs sm:text-sm text-gray-600 mb-3 sm:mb-4">
-                            <span v-if="isDeliveryman">Visualiza los pagos del pedido para saber cuánto debes
-                                cobrar.</span>
-                            <span v-else>Administra los pagos del pedido. Los pagos bancarios pueden ser verificados y
-                                los pagos por app pueden ser liquidados.</span>
-                        </p>
-                        <PaidInStoreCashPanel
-                            v-if="showPaidInStoreDetailPanel"
-                            :input-id="'paid-in-store-' + order.id"
-                            :paid-in-store-cash="order.paidInStoreCash === true"
-                            :paid-in-store-cash-amount="order.paidInStoreCashAmount ?? null"
-                            :max-paid-in-store-amount="paidInStoreCap"
-                            :editable="permissions.canEditPayments(order)"
-                            :disabled="savingPaidInStore"
-                            density="comfortable"
-                            extra-class="mb-4"
-                            :helper-text="'El domiciliario no cobra efectivo en la entrega. Queda registrado para el cuadre de caja.'"
-                            @update:paid-in-store-cash="onPaidInStoreChange"
-                            @edit-paid-in-store-cash="openEditPaidInStoreDetail"
-                            @remove-paid-in-store-cash="openRemovePaidInStoreDetail" />
-                        <PersistedPaymentSelector v-if="order" :order="order" :bank-options="bankOptions"
-                            :app-options="appOptions" @updated="handlePaymentUpdated" />
-                    </div>
-                </div>
-            </div>
-        </div>
+		<!-- Sección de entrega para domiciliarios -->
+		<div
+			v-if="isDeliveryman && order && order.status === 'on_the_way'"
+			class="sticky bottom-0 bg-white border-t-2 border-emerald-500 shadow-lg p-4 md:p-6 mt-4 md:mt-6 z-10"
+		>
+			<div class="flex flex-col sm:flex-row items-center justify-between gap-4">
+				<!-- Valor a cobrar -->
+				<div class="flex-1 text-center sm:text-left w-full sm:w-auto">
+					<p class="text-xs sm:text-sm text-gray-600 mb-1">Valor a cobrar</p>
+					<p
+						class="text-2xl sm:text-3xl md:text-4xl font-bold text-emerald-600"
+					>
+						{{ formatCurrency(cashAmount) }}
+					</p>
+				</div>
 
-        <!-- Sección de entrega para domiciliarios -->
-        <div v-if="isDeliveryman && order && order.status === 'on_the_way'"
-            class="sticky bottom-0 bg-white border-t-2 border-emerald-500 shadow-lg p-4 md:p-6 mt-4 md:mt-6 z-10">
-            <div class="flex flex-col sm:flex-row items-center justify-between gap-4">
-                <!-- Valor a cobrar -->
-                <div class="flex-1 text-center sm:text-left w-full sm:w-auto">
-                    <p class="text-xs sm:text-sm text-gray-600 mb-1">Valor a cobrar</p>
-                    <p class="text-2xl sm:text-3xl md:text-4xl font-bold text-emerald-600">
-                        {{ formatCurrency(cashAmount) }}
-                    </p>
-                </div>
+				<!-- Botón entregar -->
+				<BaseButton
+					variant="success"
+					size="lg"
+					class="w-full sm:w-auto px-6 sm:px-8 py-3 text-base sm:text-lg font-semibold"
+					@click="handleDeliverOrder"
+				>
+					<CheckCircleIcon class="w-5 h-5 sm:w-6 sm:h-6 mr-2" />
+					Entregar Pedido
+				</BaseButton>
+			</div>
+		</div>
+	</div>
 
-                <!-- Botón entregar -->
-                <BaseButton variant="success" size="lg"
-                    class="w-full sm:w-auto px-6 sm:px-8 py-3 text-base sm:text-lg font-semibold"
-                    @click="handleDeliverOrder">
-                    <CheckCircleIcon class="w-5 h-5 sm:w-6 sm:h-6 mr-2" />
-                    Entregar Pedido
-                </BaseButton>
-            </div>
-        </div>
-    </div>
+	<!-- Modales -->
+	<EditCustomerModal
+		v-if="showEditCustomerModal && order"
+		:open="showEditCustomerModal"
+		:order="order"
+		:delete-reservation-associated-payments-confirmed="
+			pendingDeleteReservationAssociations
+		"
+		@close="handleCustomerModalClose"
+		@updated="(o, snap) => handleCustomerUpdated(o, snap)"
+	/>
 
-    <!-- Modales -->
-    <EditCustomerModal v-if="showEditCustomerModal && order" :open="showEditCustomerModal" :order="order"
-        :delete-reservation-associated-payments-confirmed="pendingDeleteReservationAssociations"
-        @close="handleCustomerModalClose" @updated="(o, snap) => handleCustomerUpdated(o, snap)" />
+	<AssignDeliveryModal
+		v-if="showAssignDeliveryModal && order"
+		:open="showAssignDeliveryModal"
+		:order="order"
+		:pending-status-change="pendingStatusChange || undefined"
+		@close="handleAssignDeliveryModalClose"
+		@updated="handleDeliverymanUpdated"
+		@status-changed="handleStatusChanged"
+	/>
 
-    <AssignDeliveryModal v-if="showAssignDeliveryModal && order" :open="showAssignDeliveryModal" :order="order"
-        :pending-status-change="pendingStatusChange || undefined" @close="handleAssignDeliveryModalClose"
-        @updated="handleDeliverymanUpdated" @status-changed="handleStatusChanged" />
+	<CancelOrderModal
+		v-if="showCancelModal && order"
+		:open="showCancelModal"
+		:order="order"
+		@close="showCancelModal = false"
+		@cancelled="handleOrderCancelled"
+	/>
 
-    <CancelOrderModal v-if="showCancelModal && order" :open="showCancelModal" :order="order"
-        @close="showCancelModal = false" @cancelled="handleOrderCancelled" />
+	<!-- Modal de cambio de tipo -->
+	<EditOrderTypeModal
+		v-if="showEditOrderTypeModal && order"
+		:open="showEditOrderTypeModal"
+		:order="order"
+		@close="showEditOrderTypeModal = false"
+		@updated="(o, snap) => handleOrderTypeUpdated(o, snap)"
+		@type-changed-pending="handleTypePendingChange"
+		@reservation-associated-delete-confirmed="
+			handleReservationAssociatedDeleteConfirmed
+		"
+		@open-customer-modal="handleOpenCustomerModalFromType"
+	/>
 
-    <!-- Modal de cambio de tipo -->
-    <EditOrderTypeModal v-if="showEditOrderTypeModal && order" :open="showEditOrderTypeModal" :order="order"
-        @close="showEditOrderTypeModal = false" @updated="(o, snap) => handleOrderTypeUpdated(o, snap)"
-        @type-changed-pending="handleTypePendingChange"
-        @reservation-associated-delete-confirmed="handleReservationAssociatedDeleteConfirmed"
-        @open-customer-modal="handleOpenCustomerModalFromType" />
+	<OrderBankPaymentSyncDialog
+		:open="showBankSyncDialog"
+		:prompt="bankSyncPrompt"
+		:adjusting="bankSyncAdjusting"
+		@close="showBankSyncDialog = false"
+		@confirm-adjust="onConfirmBankPaymentAdjust"
+		@go-to-payments="scrollToPaymentsTab"
+	/>
 
-    <OrderBankPaymentSyncDialog
-        :open="showBankSyncDialog"
-        :prompt="bankSyncPrompt"
-        :adjusting="bankSyncAdjusting"
-        @close="showBankSyncDialog = false"
-        @confirm-adjust="onConfirmBankPaymentAdjust"
-        @go-to-payments="scrollToPaymentsTab"
-    />
+	<BaseDialog
+		v-model="showKitchenScheduleConfirm"
+		title="Pedido en cocina"
+		size="md"
+	>
+		<p class="text-sm text-gray-700">
+			Este pedido está en cocina (tomado o en preparación). Al guardar los
+			horarios puede salir de la cola de cocina y se avisará por notificación.
+			¿Continuar?
+		</p>
+		<template #footer>
+			<BaseButton
+				variant="secondary"
+				@click="showKitchenScheduleConfirm = false"
+				>Cancelar</BaseButton
+			>
+			<BaseButton
+				variant="primary"
+				:loading="savingSchedule"
+				@click="confirmKitchenScheduleSave"
+				>Continuar</BaseButton
+			>
+		</template>
+	</BaseDialog>
 
-    <BaseDialog
-        v-model="showKitchenScheduleConfirm"
-        title="Pedido en cocina"
-        size="md"
-    >
-        <p class="text-sm text-gray-700">
-            Este pedido está en cocina (tomado o en preparación). Al guardar los horarios puede salir de la cola de
-            cocina y se avisará por notificación. ¿Continuar?
-        </p>
-        <template #footer>
-            <BaseButton variant="secondary" @click="showKitchenScheduleConfirm = false">Cancelar</BaseButton>
-            <BaseButton variant="primary" :loading="savingSchedule" @click="confirmKitchenScheduleSave">Continuar</BaseButton>
-        </template>
-    </BaseDialog>
+	<BaseDialog v-model="showPrepareNowConfirm" title="Preparar ya" size="md">
+		<p class="text-sm text-gray-700 space-y-2">
+			<span class="block">
+				Se fijará la hora de preparación a <strong>ahora</strong> y el pedido
+				pasará a <strong>{{ prepareNowTargetTypeLabel }}</strong
+				>.
+			</span>
+			<span v-if="order?.addressId" class="block text-xs text-gray-600">
+				Hay dirección: quedará como domicilio.
+			</span>
+			<span v-else class="block text-xs text-gray-600">
+				Sin dirección: quedará como en el local (se quitará dirección de
+				entrega).
+			</span>
+			<span
+				v-if="
+					order &&
+					(order.status === 'taken' || order.status === 'in_preparation')
+				"
+				class="block text-amber-800 text-xs"
+			>
+				Está en cocina: puede salir de la lista y se notificará.
+			</span>
+		</p>
+		<template #footer>
+			<BaseButton variant="secondary" @click="showPrepareNowConfirm = false"
+				>Cancelar</BaseButton
+			>
+			<BaseButton
+				variant="primary"
+				:loading="savingPrepareNow"
+				@click="executePrepareNow"
+				>Confirmar</BaseButton
+			>
+		</template>
+	</BaseDialog>
 
-    <BaseDialog
-        v-model="showPrepareNowConfirm"
-        title="Preparar ya"
-        size="md"
-    >
-        <p class="text-sm text-gray-700 space-y-2">
-            <span class="block">
-                Se fijará la hora de preparación a <strong>ahora</strong> y el pedido pasará a
-                <strong>{{ prepareNowTargetTypeLabel }}</strong
-                >.
-            </span>
-            <span v-if="(order?.addressId)" class="block text-xs text-gray-600">
-                Hay dirección: quedará como domicilio.
-            </span>
-            <span v-else class="block text-xs text-gray-600"> Sin dirección: quedará como en el local (se quitará dirección de entrega). </span>
-            <span
-                v-if="order && (order.status === 'taken' || order.status === 'in_preparation')"
-                class="block text-amber-800 text-xs"
-            >
-                Está en cocina: puede salir de la lista y se notificará.
-            </span>
-        </p>
-        <template #footer>
-            <BaseButton variant="secondary" @click="showPrepareNowConfirm = false">Cancelar</BaseButton>
-            <BaseButton variant="primary" :loading="savingPrepareNow" @click="executePrepareNow">Confirmar</BaseButton>
-        </template>
-    </BaseDialog>
+	<BaseDialog
+		v-model="showRemovePaidInStoreDetailDialog"
+		title="Quitar cobro en tienda"
+		size="sm"
+	>
+		<p v-if="order" class="text-sm text-gray-600">
+			Se quitará el registro de efectivo cobrado en sucursal (<span
+				class="font-medium tabular-nums"
+				>{{ formatCurrency(paidInStoreDisplayAmountDetail) }}</span
+			>).
+		</p>
+		<template #footer>
+			<BaseButton
+				variant="secondary"
+				:disabled="removePaidInStoreDetailLoading"
+				@click="showRemovePaidInStoreDetailDialog = false"
+			>
+				Cancelar
+			</BaseButton>
+			<BaseButton
+				variant="primary"
+				class="bg-red-600 hover:bg-red-700"
+				:loading="removePaidInStoreDetailLoading"
+				@click="confirmRemovePaidInStoreDetail"
+			>
+				Quitar
+			</BaseButton>
+		</template>
+	</BaseDialog>
 
-    <BaseDialog v-model="showRemovePaidInStoreDetailDialog" title="Quitar cobro en tienda" size="sm">
-        <p v-if="order" class="text-sm text-gray-600">
-            Se quitará el registro de efectivo cobrado en sucursal
-            (<span class="font-medium tabular-nums">{{ formatCurrency(paidInStoreDisplayAmountDetail) }}</span>).
-        </p>
-        <template #footer>
-            <BaseButton variant="secondary" :disabled="removePaidInStoreDetailLoading"
-                @click="showRemovePaidInStoreDetailDialog = false">
-                Cancelar
-            </BaseButton>
-            <BaseButton variant="primary" class="bg-red-600 hover:bg-red-700" :loading="removePaidInStoreDetailLoading"
-                @click="confirmRemovePaidInStoreDetail">
-                Quitar
-            </BaseButton>
-        </template>
-    </BaseDialog>
-
-    <BaseDialog v-model="showEditPaidInStoreDetailDialog" title="Editar monto — efectivo en tienda" size="sm">
-        <div v-if="order" class="space-y-3">
-            <p class="text-sm text-gray-600">
-                Máximo permitido {{ formatCurrency(maxEditPaidInStoreDetailAmount) }}
-            </p>
-            <BaseInput v-model.number="editPaidInStoreDetailAmount" type="number" :max="maxEditPaidInStoreDetailAmount"
-                placeholder="Monto" class="w-full" />
-        </div>
-        <template #footer>
-            <BaseButton variant="secondary" :disabled="editPaidInStoreDetailLoading"
-                @click="showEditPaidInStoreDetailDialog = false">
-                Cancelar
-            </BaseButton>
-            <BaseButton variant="primary" :loading="editPaidInStoreDetailLoading" @click="confirmEditPaidInStoreDetail">
-                Guardar
-            </BaseButton>
-        </template>
-    </BaseDialog>
+	<BaseDialog
+		v-model="showEditPaidInStoreDetailDialog"
+		title="Editar monto — efectivo en tienda"
+		size="sm"
+	>
+		<div v-if="order" class="space-y-3">
+			<p class="text-sm text-gray-600">
+				Máximo permitido {{ formatCurrency(maxEditPaidInStoreDetailAmount) }}
+			</p>
+			<BaseInput
+				v-model.number="editPaidInStoreDetailAmount"
+				type="number"
+				:max="maxEditPaidInStoreDetailAmount"
+				placeholder="Monto"
+				class="w-full"
+			/>
+		</div>
+		<template #footer>
+			<BaseButton
+				variant="secondary"
+				:disabled="editPaidInStoreDetailLoading"
+				@click="showEditPaidInStoreDetailDialog = false"
+			>
+				Cancelar
+			</BaseButton>
+			<BaseButton
+				variant="primary"
+				:loading="editPaidInStoreDetailLoading"
+				@click="confirmEditPaidInStoreDetail"
+			>
+				Guardar
+			</BaseButton>
+		</template>
+	</BaseDialog>
 </template>
 
 <script setup lang="ts">
-import OrderTypeBadge from '@/components/orders/OrderTypeBadge.vue'
-import OrderProgressBar from '@/components/orders/OrderProgressBar.vue'
-import OrderDetailProductsList from '@/components/orders/OrderDetailProductsList.vue'
-import PaidInStoreCashPanel from '@/components/orders/PaidInStoreCashPanel.vue'
-import EditCustomerModal from '@/components/orders/EditCustomerModal.vue'
-import AssignDeliveryModal from '@/components/orders/AssignDeliveryModal.vue'
-import CancelOrderModal from '@/components/orders/CancelOrderModal.vue'
-import EditOrderTypeModal from '@/components/orders/EditOrderTypeModal.vue'
-import OrderBankPaymentSyncDialog from '@/components/orders/OrderBankPaymentSyncDialog.vue'
-import BaseDialog from '@/components/ui/BaseDialog.vue'
-import BaseInput from '@/components/ui/BaseInput.vue'
-import { VueDatePicker } from '@vuepic/vue-datepicker'
-import '@vuepic/vue-datepicker/dist/main.css'
-import PersistedPaymentSelector from '@/components/payments/PersistedPaymentSelector.vue'
-import PhoneNumberItem from '@/components/customers/PhoneNumberItem.vue'
-import { useFormatting } from '@/composables/useFormatting'
-import { useOrderPermissions } from '@/composables/useOrderPermissions'
-import { useToast } from '@/composables/useToast'
-import { getOrderTypeDisplayName } from '@/composables/useFormatting'
-import { useOrderStatusChange } from '@/composables/useOrderStatusChange'
-import { useRouter } from 'vue-router'
-import type { OrderDetailView, OrderStatus, UpdateOrderDetailDto } from '@/types/order'
-import type { Customer } from '@/types/customer'
-import { useOrdersDraftsStore } from '@/store/ordersDrafts'
-import { useOrdersDataStore } from '@/store/ordersData'
-import { useAuthStore } from '@/store/auth'
-import { customerApi } from '@/services/MainAPI/customerApi'
-import { orderApi } from '@/services/MainAPI/orderApi'
-import { bankPaymentApi } from '@/services/MainAPI/bankPaymentApi'
-import { printJobsApi } from '@/services/MainAPI/printJobsApi'
+import OrderTypeBadge from '@/components/orders/OrderTypeBadge.vue';
+import OrderProgressBar from '@/components/orders/OrderProgressBar.vue';
+import OrderDetailProductsList from '@/components/orders/OrderDetailProductsList.vue';
+import PaidInStoreCashPanel from '@/components/orders/PaidInStoreCashPanel.vue';
+import EditCustomerModal from '@/components/orders/EditCustomerModal.vue';
+import AssignDeliveryModal from '@/components/orders/AssignDeliveryModal.vue';
+import CancelOrderModal from '@/components/orders/CancelOrderModal.vue';
+import EditOrderTypeModal from '@/components/orders/EditOrderTypeModal.vue';
+import OrderBankPaymentSyncDialog from '@/components/orders/OrderBankPaymentSyncDialog.vue';
+import BaseDialog from '@/components/ui/BaseDialog.vue';
+import BaseInput from '@/components/ui/BaseInput.vue';
+import { VueDatePicker } from '@vuepic/vue-datepicker';
+import '@vuepic/vue-datepicker/dist/main.css';
+import PersistedPaymentSelector from '@/components/payments/PersistedPaymentSelector.vue';
+import PhoneNumberItem from '@/components/customers/PhoneNumberItem.vue';
+import { useFormatting } from '@/composables/useFormatting';
+import { useOrderPermissions } from '@/composables/useOrderPermissions';
+import { useToast } from '@/composables/useToast';
+import { getOrderTypeDisplayName } from '@/composables/useFormatting';
+import { useOrderStatusChange } from '@/composables/useOrderStatusChange';
+import { useRouter } from 'vue-router';
+import type {
+	OrderDetailView,
+	OrderStatus,
+	UpdateOrderDetailDto,
+} from '@/types/order';
+import type { Customer } from '@/types/customer';
+import { useOrdersDraftsStore } from '@/store/ordersDrafts';
+import { useOrdersDataStore } from '@/store/ordersData';
+import { useAuthStore } from '@/store/auth';
+import { customerApi } from '@/services/MainAPI/customerApi';
+import { orderApi } from '@/services/MainAPI/orderApi';
+import { bankPaymentApi } from '@/services/MainAPI/bankPaymentApi';
+import { printJobsApi } from '@/services/MainAPI/printJobsApi';
 import {
-    toPaymentSnapshot,
-    evaluateBankSyncAfterTotalChange,
-    type OrderPaymentSnapshot,
-    type BankSyncPrompt,
-} from '@/utils/orderPaymentCoverage'
-import { orderCashToCollect, sumPaymentsAmounts } from '@/utils/orderCashToCollect'
+	toPaymentSnapshot,
+	evaluateBankSyncAfterTotalChange,
+	type OrderPaymentSnapshot,
+	type BankSyncPrompt,
+} from '@/utils/orderPaymentCoverage';
+import {
+	orderCashToCollect,
+	sumPaymentsAmounts,
+} from '@/utils/orderCashToCollect';
 
-import type { OrderListItem } from '@/types/order'
+import type { OrderListItem } from '@/types/order';
 
-
-import BaseButton from '@/components/ui/BaseButton.vue'
-import BaseLoading from '@/components/ui/BaseLoading.vue'
+import BaseButton from '@/components/ui/BaseButton.vue';
+import BaseLoading from '@/components/ui/BaseLoading.vue';
 
 import {
-    ArrowLeftIcon,
-    XCircleIcon,
-    PencilIcon,
-    InformationCircleIcon,
-    ShoppingBagIcon,
-    CreditCardIcon,
-    CheckCircleIcon,
-    PrinterIcon,
-} from '@heroicons/vue/24/outline'
-import { ref, computed, watch, onMounted, nextTick } from 'vue'
-const permissions = useOrderPermissions()
-const authStore = useAuthStore()
-const isDeliveryman = computed(() => authStore.userRole === 'Deliveryman')
-const pendingOrderType = ref<'onsite' | 'delivery' | 'reservation' | null>(null)
-const originalOrderType = ref<'onsite' | 'delivery' | 'reservation' | null>(null)
-const pendingDeleteReservationAssociations = ref(false)
+	ArrowLeftIcon,
+	XCircleIcon,
+	PencilIcon,
+	InformationCircleIcon,
+	ShoppingBagIcon,
+	CreditCardIcon,
+	CheckCircleIcon,
+	PrinterIcon,
+} from '@heroicons/vue/24/outline';
+import { ref, computed, watch, onMounted, nextTick } from 'vue';
+const permissions = useOrderPermissions();
+const authStore = useAuthStore();
+const isDeliveryman = computed(() => authStore.userRole === 'Deliveryman');
+const pendingOrderType = ref<'onsite' | 'delivery' | 'reservation' | null>(
+	null,
+);
+const originalOrderType = ref<'onsite' | 'delivery' | 'reservation' | null>(
+	null,
+);
+const pendingDeleteReservationAssociations = ref(false);
 // Estado local (solo lo que no está en el store)
-const editableGuestName = ref('')
-const editableNotes = ref('')
-const editableDeliveryFee = ref<number | null>(null)
-const savingDeliveryFee = ref(false)
-const editableReservedForDate = ref<Date | null>(null)
-const editablePrepareAtDate = ref<Date | null>(null)
-const savingSchedule = ref(false)
-const savingPrepareNow = ref(false)
-const savingPaidInStore = ref(false)
-const showRemovePaidInStoreDetailDialog = ref(false)
-const removePaidInStoreDetailLoading = ref(false)
-const showEditPaidInStoreDetailDialog = ref(false)
-const editPaidInStoreDetailAmount = ref(0)
-const editPaidInStoreDetailLoading = ref(false)
-const showKitchenScheduleConfirm = ref(false)
-const showPrepareNowConfirm = ref(false)
-const reprintKitchenLoading = ref(false)
-const reprintDeliveryLoading = ref(false)
+const editableGuestName = ref('');
+const editableNotes = ref('');
+const editableDeliveryFee = ref<number | null>(null);
+const savingDeliveryFee = ref(false);
+const editableReservedForDate = ref<Date | null>(null);
+const editablePrepareAtDate = ref<Date | null>(null);
+const savingSchedule = ref(false);
+const savingPrepareNow = ref(false);
+const savingPaidInStore = ref(false);
+const showRemovePaidInStoreDetailDialog = ref(false);
+const removePaidInStoreDetailLoading = ref(false);
+const showEditPaidInStoreDetailDialog = ref(false);
+const editPaidInStoreDetailAmount = ref(0);
+const editPaidInStoreDetailLoading = ref(false);
+const showKitchenScheduleConfirm = ref(false);
+const showPrepareNowConfirm = ref(false);
+const reprintKitchenLoading = ref(false);
+const reprintDeliveryLoading = ref(false);
 
 function parseOrderDate(iso: string | Date | undefined | null): Date | null {
-    if (iso === undefined || iso === null || iso === '') return null
-    const d = typeof iso === 'string' ? new Date(iso) : iso
-    if (Number.isNaN(d.getTime())) return null
-    return d
+	if (iso === undefined || iso === null || iso === '') return null;
+	const d = typeof iso === 'string' ? new Date(iso) : iso;
+	if (Number.isNaN(d.getTime())) return null;
+	return d;
 }
 
-const customer = ref<Customer | null>(null)
-const customerLoading = ref(false)
-const customerError = ref<string | null>(null)
+const customer = ref<Customer | null>(null);
+const customerLoading = ref(false);
+const customerError = ref<string | null>(null);
 
 const props = defineProps<{
-    flatOrder: OrderListItem
-}>()
+	flatOrder: OrderListItem;
+}>();
 
 const emit = defineEmits<{
-    (e: 'delivered', orderId: number): void
-}>()
+	(e: 'delivered', orderId: number): void;
+}>();
 
-const order = ref<OrderDetailView | null>(null)
+const order = ref<OrderDetailView | null>(null);
 
 const showScheduleEditor = computed(() => {
-    const o = order.value
-    if (!o || isDeliveryman.value) return false
-    if (!permissions.canEditOrder(o)) return false
-    if (o.status === 'delivered' || o.status === 'cancelled') return false
-    return true
-})
+	const o = order.value;
+	if (!o || isDeliveryman.value) return false;
+	if (!permissions.canEditOrder(o)) return false;
+	if (o.status === 'delivered' || o.status === 'cancelled') return false;
+	return true;
+});
 
 const showPrepareNowButton = computed(() => {
-    const o = order.value
-    if (!o || !showScheduleEditor.value) return false
-    return o.type === 'reservation' || !!o.reservedFor || !!o.prepareAt
-})
+	const o = order.value;
+	if (!o || !showScheduleEditor.value) return false;
+	return o.type === 'reservation' || !!o.reservedFor || !!o.prepareAt;
+});
 
-const prepareNowTargetTypeLabel = computed(() => (order.value?.addressId ? 'Domicilio' : 'En el local'))
+const prepareNowTargetTypeLabel = computed(() =>
+	order.value?.addressId ? 'Domicilio' : 'En el local',
+);
 
-const { formatDateTime, formatCurrency } = useFormatting()
-const activeTab = ref('info')
-const router = useRouter()
+const { formatDateTime, formatCurrency } = useFormatting();
+const activeTab = ref('info');
+const router = useRouter();
 
-const { success, error } = useToast()
+const { success, error } = useToast();
 
 async function onReprintKitchen() {
-    const o = order.value
-    if (!o) return
-    const branchId = o.branchId
-    if (!branchId) {
-        error('Sin sucursal', 'El pedido no tiene sucursal asociada.')
-        return
-    }
-    reprintKitchenLoading.value = true
-    try {
-        const res = await printJobsApi.enqueueKitchenJob(branchId, [o.id])
-        if (!res.isSuccess) {
-            error('Reimpresión', res.message || 'No se pudo encolar la comanda.')
-            return
-        }
-        success('Comanda en cola', 3500, 'El agente de impresión la emitirá en breve.')
-    } catch (err: unknown) {
-        const msg = err instanceof Error ? err.message : 'No se pudo encolar la reimpresión.'
-        error('Reimpresión', msg)
-    } finally {
-        reprintKitchenLoading.value = false
-    }
+	const o = order.value;
+	if (!o) return;
+	const branchId = o.branchId;
+	if (!branchId) {
+		error('Sin sucursal', 'El pedido no tiene sucursal asociada.');
+		return;
+	}
+	reprintKitchenLoading.value = true;
+	try {
+		const res = await printJobsApi.enqueueKitchenJob(branchId, [o.id]);
+		if (!res.isSuccess) {
+			error('Reimpresión', res.message || 'No se pudo encolar la comanda.');
+			return;
+		}
+		success(
+			'Comanda en cola',
+			3500,
+			'El agente de impresión la emitirá en breve.',
+		);
+	} catch (err: unknown) {
+		const msg =
+			err instanceof Error ? err.message : 'No se pudo encolar la reimpresión.';
+		error('Reimpresión', msg);
+	} finally {
+		reprintKitchenLoading.value = false;
+	}
 }
 
 async function onReprintDelivery() {
-    const o = order.value
-    if (!o) return
-    const branchId = o.branchId
-    if (!branchId) {
-        error('Sin sucursal', 'El pedido no tiene sucursal asociada.')
-        return
-    }
-    reprintDeliveryLoading.value = true
-    try {
-        const res = await printJobsApi.enqueueDeliveryJob(branchId, [o.id])
-        if (!res.isSuccess) {
-            error('Reimpresión', res.message || 'No se pudo encolar el ticket.')
-            return
-        }
-        success('Ticket en cola', 3500, 'El agente lo imprimirá en breve.')
-    } catch (err: unknown) {
-        const msg = err instanceof Error ? err.message : 'No se pudo encolar la reimpresión.'
-        error('Reimpresión', msg)
-    } finally {
-        reprintDeliveryLoading.value = false
-    }
+	const o = order.value;
+	if (!o) return;
+	const branchId = o.branchId;
+	if (!branchId) {
+		error('Sin sucursal', 'El pedido no tiene sucursal asociada.');
+		return;
+	}
+	reprintDeliveryLoading.value = true;
+	try {
+		const res = await printJobsApi.enqueueDeliveryJob(branchId, [o.id]);
+		if (!res.isSuccess) {
+			error('Reimpresión', res.message || 'No se pudo encolar el ticket.');
+			return;
+		}
+		success('Ticket en cola', 3500, 'El agente lo imprimirá en breve.');
+	} catch (err: unknown) {
+		const msg =
+			err instanceof Error ? err.message : 'No se pudo encolar la reimpresión.';
+		error('Reimpresión', msg);
+	} finally {
+		reprintDeliveryLoading.value = false;
+	}
 }
 
 // Modales
-const showEditCustomerModal = ref(false)
+const showEditCustomerModal = ref(false);
 
-const { pendingStatusChange, showAssignDeliveryModal, handleStatusChange: handleStatusChangeComposable, executeStatusChange, clearPendingStatusChange } = useOrderStatusChange()
+const {
+	pendingStatusChange,
+	showAssignDeliveryModal,
+	handleStatusChange: handleStatusChangeComposable,
+	executeStatusChange,
+	clearPendingStatusChange,
+} = useOrderStatusChange();
 
-const ordersStore = useOrdersDraftsStore()
+const ordersStore = useOrdersDraftsStore();
 
 // Store
-const ordersDataStore = useOrdersDataStore()
+const ordersDataStore = useOrdersDataStore();
 
 // Opciones para selectores de pagos
 const bankOptions = computed(() => {
-    return ordersStore.banks
-        .filter(bank => bank.active)
-        .map(bank => ({ value: bank.id, label: bank.name }))
-})
+	return ordersStore.banks
+		.filter((bank) => bank.active)
+		.map((bank) => ({ value: bank.id, label: bank.name }));
+});
 
 const appOptions = computed(() => {
-    return ordersStore.apps
-        .filter(app => app.active)
-        .map(app => ({ value: app.id, label: app.name }))
-})
+	return ordersStore.apps
+		.filter((app) => app.active)
+		.map((app) => ({ value: app.id, label: app.name }));
+});
 
-const showCancelModal = ref(false)
-const showEditOrderTypeModal = ref(false)
+const showCancelModal = ref(false);
+const showEditOrderTypeModal = ref(false);
 
-const paymentsSectionRef = ref<HTMLElement | null>(null)
-const showBankSyncDialog = ref(false)
-const bankSyncPrompt = ref<BankSyncPrompt>({ kind: 'none' })
-const bankSyncAdjusting = ref(false)
+const paymentsSectionRef = ref<HTMLElement | null>(null);
+const showBankSyncDialog = ref(false);
+const bankSyncPrompt = ref<BankSyncPrompt>({ kind: 'none' });
+const bankSyncAdjusting = ref(false);
 
 function captureOrderPaymentSnapshot(): OrderPaymentSnapshot | null {
-    if (!order.value) return null
-    return toPaymentSnapshot(order.value)
+	if (!order.value) return null;
+	return toPaymentSnapshot(order.value);
 }
 
 async function promptBankSyncIfNeeded(snapshot: OrderPaymentSnapshot | null) {
-    await nextTick()
-    const current = ordersDataStore.current
-    if (!snapshot || !current) return
-    if (!permissions.canEditPayments(current)) return
-    const prompt = evaluateBankSyncAfterTotalChange(snapshot, current)
-    if (prompt.kind === 'none') return
-    bankSyncPrompt.value = prompt
-    showBankSyncDialog.value = true
+	await nextTick();
+	const current = ordersDataStore.current;
+	if (!snapshot || !current) return;
+	if (!permissions.canEditPayments(current)) return;
+	const prompt = evaluateBankSyncAfterTotalChange(snapshot, current);
+	if (prompt.kind === 'none') return;
+	bankSyncPrompt.value = prompt;
+	showBankSyncDialog.value = true;
 }
 
 function scrollToPaymentsTab() {
-    activeTab.value = 'payments'
-    void nextTick(() => {
-        paymentsSectionRef.value?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-    })
-    showBankSyncDialog.value = false
+	activeTab.value = 'payments';
+	void nextTick(() => {
+		paymentsSectionRef.value?.scrollIntoView({
+			behavior: 'smooth',
+			block: 'start',
+		});
+	});
+	showBankSyncDialog.value = false;
 }
 
 async function onConfirmBankPaymentAdjust() {
-    const p = bankSyncPrompt.value
-    if (p.kind !== 'adjust' || !order.value) return
-    bankSyncAdjusting.value = true
-    try {
-        const updated = await bankPaymentApi.updateBankPayment(p.paymentId, p.newTotal)
-        const newPayments = order.value.bankPayments.map((bp) =>
-            bp.id === p.paymentId ? { ...bp, ...(updated as object) } : bp,
-        ) as OrderDetailView['bankPayments']
-        handlePaymentUpdated({ bankPayments: newPayments })
-        success('Pago actualizado', 4000, 'El monto bancario coincide con el nuevo total')
-        showBankSyncDialog.value = false
-        bankSyncPrompt.value = { kind: 'none' }
-    } catch (err: any) {
-        error('Error al actualizar pago', err.message)
-    } finally {
-        bankSyncAdjusting.value = false
-    }
+	const p = bankSyncPrompt.value;
+	if (p.kind !== 'adjust' || !order.value) return;
+	bankSyncAdjusting.value = true;
+	try {
+		const updated = await bankPaymentApi.updateBankPayment(
+			p.paymentId,
+			p.newTotal,
+		);
+		const newPayments = order.value.bankPayments.map((bp) =>
+			bp.id === p.paymentId ? { ...bp, ...(updated as object) } : bp,
+		) as OrderDetailView['bankPayments'];
+		handlePaymentUpdated({ bankPayments: newPayments });
+		success(
+			'Pago actualizado',
+			4000,
+			'El monto bancario coincide con el nuevo total',
+		);
+		showBankSyncDialog.value = false;
+		bankSyncPrompt.value = { kind: 'none' };
+	} catch (err: any) {
+		error('Error al actualizar pago', err.message);
+	} finally {
+		bankSyncAdjusting.value = false;
+	}
 }
 
 // Tabs
 const tabs = [
-    { id: 'info', name: 'Información General', icon: InformationCircleIcon },
-    { id: 'products', name: 'Productos', icon: ShoppingBagIcon },
-    { id: 'payments', name: 'Pagos', icon: CreditCardIcon },
-]
+	{ id: 'info', name: 'Información General', icon: InformationCircleIcon },
+	{ id: 'products', name: 'Productos', icon: ShoppingBagIcon },
+	{ id: 'payments', name: 'Pagos', icon: CreditCardIcon },
+];
 
 // Filtrar tabs para domiciliarios (los domiciliarios pueden ver pagos pero no editarlos)
 const visibleTabs = computed(() => {
-    // Todos los tabs están disponibles para todos los usuarios
-    // Los permisos de edición se manejan dentro de cada componente
-    return tabs
-})
+	// Todos los tabs están disponibles para todos los usuarios
+	// Los permisos de edición se manejan dentro de cada componente
+	return tabs;
+});
 const loadCustomer = async (customerId: number) => {
-    if (!customerId) return
+	if (!customerId) return;
 
-    customerLoading.value = true
-    customerError.value = null
+	customerLoading.value = true;
+	customerError.value = null;
 
-    try {
-        const response = await customerApi.getCustomerById(customerId)
-        customer.value = response.data
-    } catch (err: any) {
-        console.error('Error loading customer:', err)
-        customerError.value = 'No se pudieron cargar los teléfonos'
-        customer.value = null
-    } finally {
-        customerLoading.value = false
-    }
-}
+	try {
+		const response = await customerApi.getCustomerById(customerId);
+		customer.value = response.data;
+	} catch (err: any) {
+		console.error('Error loading customer:', err);
+		customerError.value = 'No se pudieron cargar los teléfonos';
+		customer.value = null;
+	} finally {
+		customerLoading.value = false;
+	}
+};
 
 const cashAmount = computed(() => {
-    if (!order.value) return 0
-    return orderCashToCollect(
-        order.value.total,
-        {
-            bankPayments: order.value.bankPayments,
-            appPayments: order.value.appPayments,
-        },
-        {
-            floorAtZero: true,
-            paidInStoreCash: order.value.paidInStoreCash === true,
-            paidInStoreCashAmount: order.value.paidInStoreCashAmount ?? null,
-        }
-    )
-})
+	if (!order.value) return 0;
+	return orderCashToCollect(
+		order.value.total,
+		{
+			bankPayments: order.value.bankPayments,
+			appPayments: order.value.appPayments,
+		},
+		{
+			floorAtZero: true,
+			paidInStoreCash: order.value.paidInStoreCash === true,
+			paidInStoreCashAmount: order.value.paidInStoreCashAmount ?? null,
+		},
+	);
+});
 
 /** Remanente antes de efectivo en tienda (alineado con borrador / selector de pagos). */
 const detailNonStoreCashRemainder = computed(() => {
-    const o = order.value
-    if (!o) return 0
-    return orderCashToCollect(
-        o.total,
-        { bankPayments: o.bankPayments, appPayments: o.appPayments },
-        { floorAtZero: true },
-    )
-})
+	const o = order.value;
+	if (!o) return 0;
+	return orderCashToCollect(
+		o.total,
+		{ bankPayments: o.bankPayments, appPayments: o.appPayments },
+		{ floorAtZero: true },
+	);
+});
 
 const showPaidInStoreDetailPanel = computed(() => {
-    const o = order.value
-    if (!o) return false
-    if (o.paidInStoreCash === true) return true
-    return permissions.canEditPayments(o) && detailNonStoreCashRemainder.value > 0
-})
+	const o = order.value;
+	if (!o) return false;
+	if (o.paidInStoreCash === true) return true;
+	return (
+		permissions.canEditPayments(o) && detailNonStoreCashRemainder.value > 0
+	);
+});
 
 const paidInStoreCap = computed(() => {
-    const o = order.value
-    if (!o) return 0
-    return Math.max(
-        0,
-        o.total - sumPaymentsAmounts(o.bankPayments) - sumPaymentsAmounts(o.appPayments),
-    )
-})
+	const o = order.value;
+	if (!o) return 0;
+	return Math.max(
+		0,
+		o.total -
+			sumPaymentsAmounts(o.bankPayments) -
+			sumPaymentsAmounts(o.appPayments),
+	);
+});
 
 const paidInStoreDisplayAmountDetail = computed(() => {
-    const o = order.value
-    if (!o) return 0
-    if (typeof o.paidInStoreCashAmount === 'number' && Number.isFinite(o.paidInStoreCashAmount)) {
-        return o.paidInStoreCashAmount
-    }
-    return paidInStoreCap.value
-})
+	const o = order.value;
+	if (!o) return 0;
+	if (
+		typeof o.paidInStoreCashAmount === 'number' &&
+		Number.isFinite(o.paidInStoreCashAmount)
+	) {
+		return o.paidInStoreCashAmount;
+	}
+	return paidInStoreCap.value;
+});
 
-const maxEditPaidInStoreDetailAmount = computed(() => paidInStoreCap.value)
+const maxEditPaidInStoreDetailAmount = computed(() => paidInStoreCap.value);
 
 function openRemovePaidInStoreDetail() {
-    showRemovePaidInStoreDetailDialog.value = true
+	showRemovePaidInStoreDetailDialog.value = true;
 }
 
 function openEditPaidInStoreDetail() {
-    const o = order.value
-    if (!o) return
-    const cap = paidInStoreCap.value
-    const seed =
-        typeof o.paidInStoreCashAmount === 'number' && Number.isFinite(o.paidInStoreCashAmount)
-            ? o.paidInStoreCashAmount
-            : Math.max(1, cap)
-    editPaidInStoreDetailAmount.value = cap < 1 ? 0 : Math.min(seed, cap)
-    showEditPaidInStoreDetailDialog.value = true
+	const o = order.value;
+	if (!o) return;
+	const cap = paidInStoreCap.value;
+	const seed =
+		typeof o.paidInStoreCashAmount === 'number' &&
+		Number.isFinite(o.paidInStoreCashAmount)
+			? o.paidInStoreCashAmount
+			: Math.max(1, cap);
+	editPaidInStoreDetailAmount.value = cap < 1 ? 0 : Math.min(seed, cap);
+	showEditPaidInStoreDetailDialog.value = true;
 }
 
 async function confirmRemovePaidInStoreDetail() {
-    if (!order.value) return
-    removePaidInStoreDetailLoading.value = true
-    try {
-        const updated = await orderApi.setPaidInStoreCash(order.value.id, false)
-        const u = updated as unknown as {
-            paidInStoreCash?: boolean
-            paidInStoreCashAt?: string | null
-            paidInStoreCashAmount?: number | null
-            updatedAt?: string
-        }
-        handleModalUpdated({
-            paidInStoreCash: Boolean(u.paidInStoreCash),
-            paidInStoreCashAt: u.paidInStoreCashAt ?? null,
-            paidInStoreCashAmount:
-                typeof u.paidInStoreCashAmount === 'number' ? u.paidInStoreCashAmount : null,
-            updatedAt: u.updatedAt ?? order.value.updatedAt,
-        })
-        success('Actualizado', 4000, 'Se quitó el cobro en tienda')
-        showRemovePaidInStoreDetailDialog.value = false
-    } catch (err: unknown) {
-        const msg = err instanceof Error ? err.message : 'No se pudo actualizar'
-        error('Error', msg)
-    } finally {
-        removePaidInStoreDetailLoading.value = false
-    }
+	if (!order.value) return;
+	removePaidInStoreDetailLoading.value = true;
+	try {
+		const updated = await orderApi.setPaidInStoreCash(order.value.id, false);
+		const u = updated as unknown as {
+			paidInStoreCash?: boolean;
+			paidInStoreCashAt?: string | null;
+			paidInStoreCashAmount?: number | null;
+			updatedAt?: string;
+		};
+		handleModalUpdated({
+			paidInStoreCash: Boolean(u.paidInStoreCash),
+			paidInStoreCashAt: u.paidInStoreCashAt ?? null,
+			paidInStoreCashAmount:
+				typeof u.paidInStoreCashAmount === 'number'
+					? u.paidInStoreCashAmount
+					: null,
+			updatedAt: u.updatedAt ?? order.value.updatedAt,
+		});
+		success('Actualizado', 4000, 'Se quitó el cobro en tienda');
+		showRemovePaidInStoreDetailDialog.value = false;
+	} catch (err: unknown) {
+		const msg = err instanceof Error ? err.message : 'No se pudo actualizar';
+		error('Error', msg);
+	} finally {
+		removePaidInStoreDetailLoading.value = false;
+	}
 }
 
 async function confirmEditPaidInStoreDetail() {
-    const o = order.value
-    if (!o) return
-    const amount = Number(editPaidInStoreDetailAmount.value)
-    const max = maxEditPaidInStoreDetailAmount.value
-    if (!Number.isFinite(amount) || amount < 1) {
-        error('Monto inválido', 'Ingresa un monto mayor a cero.')
-        return
-    }
-    if (amount > max) {
-        error('Monto inválido', `El máximo permitido es ${formatCurrency(max)}.`)
-        return
-    }
-    editPaidInStoreDetailLoading.value = true
-    try {
-        const updated = await orderApi.setPaidInStoreCash(o.id, true, amount)
-        const u = updated as unknown as {
-            paidInStoreCash?: boolean
-            paidInStoreCashAt?: string | null
-            paidInStoreCashAmount?: number | null
-            updatedAt?: string
-        }
-        handleModalUpdated({
-            paidInStoreCash: Boolean(u.paidInStoreCash),
-            paidInStoreCashAt: u.paidInStoreCashAt ?? null,
-            paidInStoreCashAmount:
-                typeof u.paidInStoreCashAmount === 'number' ? u.paidInStoreCashAmount : amount,
-            updatedAt: u.updatedAt ?? o.updatedAt,
-        })
-        success('Monto actualizado', 4000, 'Efectivo en tienda guardado')
-        showEditPaidInStoreDetailDialog.value = false
-    } catch (err: unknown) {
-        const msg = err instanceof Error ? err.message : 'No se pudo actualizar'
-        error('Error', msg)
-    } finally {
-        editPaidInStoreDetailLoading.value = false
-    }
+	const o = order.value;
+	if (!o) return;
+	const amount = Number(editPaidInStoreDetailAmount.value);
+	const max = maxEditPaidInStoreDetailAmount.value;
+	if (!Number.isFinite(amount) || amount < 1) {
+		error('Monto inválido', 'Ingresa un monto mayor a cero.');
+		return;
+	}
+	if (amount > max) {
+		error('Monto inválido', `El máximo permitido es ${formatCurrency(max)}.`);
+		return;
+	}
+	editPaidInStoreDetailLoading.value = true;
+	try {
+		const updated = await orderApi.setPaidInStoreCash(o.id, true, amount);
+		const u = updated as unknown as {
+			paidInStoreCash?: boolean;
+			paidInStoreCashAt?: string | null;
+			paidInStoreCashAmount?: number | null;
+			updatedAt?: string;
+		};
+		handleModalUpdated({
+			paidInStoreCash: Boolean(u.paidInStoreCash),
+			paidInStoreCashAt: u.paidInStoreCashAt ?? null,
+			paidInStoreCashAmount:
+				typeof u.paidInStoreCashAmount === 'number'
+					? u.paidInStoreCashAmount
+					: amount,
+			updatedAt: u.updatedAt ?? o.updatedAt,
+		});
+		success('Monto actualizado', 4000, 'Efectivo en tienda guardado');
+		showEditPaidInStoreDetailDialog.value = false;
+	} catch (err: unknown) {
+		const msg = err instanceof Error ? err.message : 'No se pudo actualizar';
+		error('Error', msg);
+	} finally {
+		editPaidInStoreDetailLoading.value = false;
+	}
 }
 
 // Sincronizar order del store
-const ordersDataStoreCurrent = computed(() => ordersDataStore.current)
-watch(ordersDataStoreCurrent, (newOrder) => {
-    if (newOrder) {
-        order.value = newOrder
-        editableGuestName.value = newOrder.guestName || ''
-        editableNotes.value = newOrder.notes || ''
-        editableDeliveryFee.value =
-            newOrder.deliveryFee !== null && newOrder.deliveryFee !== undefined
-                ? Number(newOrder.deliveryFee)
-                : 0
-        editableReservedForDate.value = parseOrderDate(newOrder.reservedFor as string | Date | undefined)
-        editablePrepareAtDate.value = parseOrderDate(newOrder.prepareAt as string | Date | undefined)
-        // Cargar cliente completo si hay customerId
-        if (newOrder.customerId) {
-            loadCustomer(newOrder.customerId)
-        } else {
-            customer.value = null
-        }
-    }
-}, { immediate: true })
+const ordersDataStoreCurrent = computed(() => ordersDataStore.current);
+watch(
+	ordersDataStoreCurrent,
+	(newOrder) => {
+		if (newOrder) {
+			order.value = newOrder;
+			editableGuestName.value = newOrder.guestName || '';
+			editableNotes.value = newOrder.notes || '';
+			editableDeliveryFee.value =
+				newOrder.deliveryFee !== null && newOrder.deliveryFee !== undefined
+					? Number(newOrder.deliveryFee)
+					: 0;
+			editableReservedForDate.value = parseOrderDate(
+				newOrder.reservedFor as string | Date | undefined,
+			);
+			editablePrepareAtDate.value = parseOrderDate(
+				newOrder.prepareAt as string | Date | undefined,
+			);
+			// Cargar cliente completo si hay customerId
+			if (newOrder.customerId) {
+				loadCustomer(newOrder.customerId);
+			} else {
+				customer.value = null;
+			}
+		}
+	},
+	{ immediate: true },
+);
 
 // Cargar bancos y apps para el selector de pagos (solo se cargan en /orders, no en /orders/:id)
 onMounted(() => {
-    ordersStore.loadBanks()
-    ordersStore.loadApps()
-})
+	ordersStore.loadBanks();
+	ordersStore.loadApps();
+});
 
 const handleStatusChange = async (newStatus: OrderStatus) => {
-    if (!order.value) return
+	if (!order.value) return;
 
-    await handleStatusChangeComposable(
-        order.value,
-        newStatus,
-        (updatedOrder) => {
-            // ✅ Actualización optimista usando helper
-            updateOrderStatus(updatedOrder)
-        }
-    )
-}
+	await handleStatusChangeComposable(order.value, newStatus, (updatedOrder) => {
+		// ✅ Actualización optimista usando helper
+		updateOrderStatus(updatedOrder);
+	});
+};
 
 const handleDeliverOrder = async () => {
-    if (!order.value) return
-    emit('delivered', order.value.id)
-
-}
+	if (!order.value) return;
+	emit('delivered', order.value.id);
+};
 
 const updateGuestName = async () => {
-    if (!order.value || editableGuestName.value === order.value.guestName) return
+	if (!order.value || editableGuestName.value === order.value.guestName) return;
 
-    try {
-        await ordersDataStore.update(order.value.id, {
-            guestName: editableGuestName.value || undefined,
-        })
-        success('Actualizado', 5000, 'Nombre del invitado actualizado')
-        // ✅ No necesita recargar, update ya actualizó current
-    } catch (err: any) {
-        error('Error', err.message)
-    }
-}
+	try {
+		await ordersDataStore.update(order.value.id, {
+			guestName: editableGuestName.value || undefined,
+		});
+		success('Actualizado', 5000, 'Nombre del invitado actualizado');
+		// ✅ No necesita recargar, update ya actualizó current
+	} catch (err: any) {
+		error('Error', err.message);
+	}
+};
 
 const updateNotes = async () => {
-    if (!order.value || editableNotes.value === order.value.notes) return
+	if (!order.value || editableNotes.value === order.value.notes) return;
 
-    try {
-        await ordersDataStore.update(order.value.id, {
-            notes: editableNotes.value || undefined,
-        })
-        success('Actualizado', 5000, 'Notas actualizadas')
-        // ✅ No necesita recargar
-    } catch (err: any) {
-        error('Error', err.message)
-    }
-}
+	try {
+		await ordersDataStore.update(order.value.id, {
+			notes: editableNotes.value || undefined,
+		});
+		success('Actualizado', 5000, 'Notas actualizadas');
+		// ✅ No necesita recargar
+	} catch (err: any) {
+		error('Error', err.message);
+	}
+};
 
 const saveSchedule = () => {
-    if (!order.value || !showScheduleEditor.value) return
-    if (!editableReservedForDate.value) {
-        error('Horarios', 'Indica fecha y hora de entrega (tener listo).')
-        return
-    }
+	if (!order.value || !showScheduleEditor.value) return;
+	if (!editableReservedForDate.value) {
+		error('Horarios', 'Indica fecha y hora de entrega (tener listo).');
+		return;
+	}
 
-    const st = order.value.status
-    if (st === 'taken' || st === 'in_preparation') {
-        showKitchenScheduleConfirm.value = true
-        return
-    }
+	const st = order.value.status;
+	if (st === 'taken' || st === 'in_preparation') {
+		showKitchenScheduleConfirm.value = true;
+		return;
+	}
 
-    void doSaveSchedule()
-}
+	void doSaveSchedule();
+};
 
 function confirmKitchenScheduleSave() {
-    showKitchenScheduleConfirm.value = false
-    void doSaveSchedule()
+	showKitchenScheduleConfirm.value = false;
+	void doSaveSchedule();
 }
 
 async function doSaveSchedule() {
-    if (!order.value || !showScheduleEditor.value || !editableReservedForDate.value) return
+	if (
+		!order.value ||
+		!showScheduleEditor.value ||
+		!editableReservedForDate.value
+	)
+		return;
 
-    savingSchedule.value = true
-    try {
-        const reservedIso = editableReservedForDate.value.toISOString()
-        const payload: { reservedFor: string; prepareAt?: string } = { reservedFor: reservedIso }
-        if (editablePrepareAtDate.value) {
-            payload.prepareAt = editablePrepareAtDate.value.toISOString()
-        }
-        await ordersDataStore.update(order.value.id, payload as any)
-        success('Horarios actualizados', 5000, 'Cocina y domiciliario recibirán aviso si aplica.')
-    } catch (err: any) {
-        error('Error al guardar horarios', err.message)
-    } finally {
-        savingSchedule.value = false
-    }
+	savingSchedule.value = true;
+	try {
+		const reservedIso = editableReservedForDate.value.toISOString();
+		const payload: { reservedFor: string; prepareAt?: string } = {
+			reservedFor: reservedIso,
+		};
+		if (editablePrepareAtDate.value) {
+			payload.prepareAt = editablePrepareAtDate.value.toISOString();
+		}
+		await ordersDataStore.update(order.value.id, payload as any);
+		success(
+			'Horarios actualizados',
+			5000,
+			'Cocina y domiciliario recibirán aviso si aplica.',
+		);
+	} catch (err: any) {
+		error('Error al guardar horarios', err.message);
+	} finally {
+		savingSchedule.value = false;
+	}
 }
 
 function onPrepareNowClick() {
-    const o = order.value
-    if (!o || !showPrepareNowButton.value) return
-    if (o.addressId) {
-        if (!o.customerId || !o.guestName?.trim()) {
-            error(
-                'Datos incompletos',
-                'Para dejarlo como domicilio se requiere cliente, dirección y nombre de quien recibe.',
-            )
-            return
-        }
-    }
-    showPrepareNowConfirm.value = true
+	const o = order.value;
+	if (!o || !showPrepareNowButton.value) return;
+	if (o.addressId) {
+		if (!o.customerId || !o.guestName?.trim()) {
+			error(
+				'Datos incompletos',
+				'Para dejarlo como domicilio se requiere cliente, dirección y nombre de quien recibe.',
+			);
+			return;
+		}
+	}
+	showPrepareNowConfirm.value = true;
 }
 
 async function executePrepareNow() {
-    const o = order.value
-    if (!o) return
-    showPrepareNowConfirm.value = false
-    savingPrepareNow.value = true
-    try {
-        const useDelivery = !!o.addressId
-        if (useDelivery && (!o.customerId || !o.guestName?.trim())) {
-            error('Datos incompletos', 'Completa cliente, dirección y nombre para domicilio.')
-            return
-        }
-        const now = new Date()
-        await ordersDataStore.update(o.id, {
-            type: useDelivery ? 'delivery' : 'onsite',
-            prepareAt: now,
-            reservedFor: null as unknown as undefined,
-        } as any)
-        success(
-            'Preparar ya',
-            5000,
-            `${useDelivery ? 'Domicilio' : 'En el local'}: preparación desde este momento. Cocina recibirá aviso si aplica.`,
-        )
-    } catch (err: any) {
-        error('Error', err.message)
-    } finally {
-        savingPrepareNow.value = false
-    }
+	const o = order.value;
+	if (!o) return;
+	showPrepareNowConfirm.value = false;
+	savingPrepareNow.value = true;
+	try {
+		const useDelivery = !!o.addressId;
+		if (useDelivery && (!o.customerId || !o.guestName?.trim())) {
+			error(
+				'Datos incompletos',
+				'Completa cliente, dirección y nombre para domicilio.',
+			);
+			return;
+		}
+		const now = new Date();
+		await ordersDataStore.update(o.id, {
+			type: useDelivery ? 'delivery' : 'onsite',
+			prepareAt: now,
+			reservedFor: null as unknown as undefined,
+		} as any);
+		success(
+			'Preparar ya',
+			5000,
+			`${useDelivery ? 'Domicilio' : 'En el local'}: preparación desde este momento. Cocina recibirá aviso si aplica.`,
+		);
+	} catch (err: any) {
+		error('Error', err.message);
+	} finally {
+		savingPrepareNow.value = false;
+	}
 }
 
 const updateDeliveryFee = async () => {
-    if (!order.value || !permissions.canEditDeliveryFee(order.value)) return
+	if (!order.value || !permissions.canEditDeliveryFee(order.value)) return;
 
-    const raw = editableDeliveryFee.value
-    const next = raw === null || raw === undefined || Number.isNaN(Number(raw)) ? 0 : Math.max(0, Math.round(Number(raw)))
-    const current = order.value.deliveryFee !== null && order.value.deliveryFee !== undefined
-        ? Math.round(Number(order.value.deliveryFee))
-        : 0
-    if (next === current) return
+	const raw = editableDeliveryFee.value;
+	const next =
+		raw === null || raw === undefined || Number.isNaN(Number(raw))
+			? 0
+			: Math.max(0, Math.round(Number(raw)));
+	const current =
+		order.value.deliveryFee !== null && order.value.deliveryFee !== undefined
+			? Math.round(Number(order.value.deliveryFee))
+			: 0;
+	if (next === current) return;
 
-    if (next > 50000) {
-        error('Tarifa inválida', 'El valor no puede superar $50.000')
-        editableDeliveryFee.value = current
-        return
-    }
+	if (next > 50000) {
+		error('Tarifa inválida', 'El valor no puede superar $50.000');
+		editableDeliveryFee.value = current;
+		return;
+	}
 
-    savingDeliveryFee.value = true
-    const paymentSnapshotBefore = captureOrderPaymentSnapshot()
-    try {
-        await ordersDataStore.update(order.value.id, { deliveryFee: next })
-        success('Tarifa actualizada', 4000, 'Se recalculó el total del pedido')
-        await promptBankSyncIfNeeded(paymentSnapshotBefore)
-    } catch (err: any) {
-        error('Error al guardar tarifa', err.message)
-        editableDeliveryFee.value = current
-    } finally {
-        savingDeliveryFee.value = false
-    }
-}
+	savingDeliveryFee.value = true;
+	const paymentSnapshotBefore = captureOrderPaymentSnapshot();
+	try {
+		await ordersDataStore.update(order.value.id, { deliveryFee: next });
+		success('Tarifa actualizada', 4000, 'Se recalculó el total del pedido');
+		await promptBankSyncIfNeeded(paymentSnapshotBefore);
+	} catch (err: any) {
+		error('Error al guardar tarifa', err.message);
+		editableDeliveryFee.value = current;
+	} finally {
+		savingDeliveryFee.value = false;
+	}
+};
 
-const savingProducts = ref(false)
+const savingProducts = ref(false);
 const handleProductsUpdate = async (products: UpdateOrderDetailDto[]) => {
-    if (!order.value) return
+	if (!order.value) return;
 
-    savingProducts.value = true
-    const paymentSnapshotBefore = captureOrderPaymentSnapshot()
-    try {
-        await ordersDataStore.update(order.value.id, {
-            orderDetails: products,
-        })
-        success('Productos actualizados', 5000, 'Los productos del pedido han sido actualizados')
-        await promptBankSyncIfNeeded(paymentSnapshotBefore)
-    } catch (err: any) {
-        error('Error al actualizar productos', err.message)
-    } finally {
-        savingProducts.value = false
-    }
-}
+	savingProducts.value = true;
+	const paymentSnapshotBefore = captureOrderPaymentSnapshot();
+	try {
+		await ordersDataStore.update(order.value.id, {
+			orderDetails: products,
+		});
+		success(
+			'Productos actualizados',
+			5000,
+			'Los productos del pedido han sido actualizados',
+		);
+		await promptBankSyncIfNeeded(paymentSnapshotBefore);
+	} catch (err: any) {
+		error('Error al actualizar productos', err.message);
+	} finally {
+		savingProducts.value = false;
+	}
+};
 
 const handleRequestCancelOrderFromProducts = () => {
-    if (!order.value || !permissions.canCancel(order.value)) return
-    showCancelModal.value = true
-}
+	if (!order.value || !permissions.canCancel(order.value)) return;
+	showCancelModal.value = true;
+};
 
 const handlePaymentUpdated = (updates: Partial<OrderDetailView>) => {
-    ordersDataStore.updateCurrent(updates)
-}
+	ordersDataStore.updateCurrent(updates);
+};
 
 const onPaidInStoreChange = async (checked: boolean) => {
-    if (!order.value || order.value.paidInStoreCash === checked) return
-    savingPaidInStore.value = true
-    try {
-        const updated = await orderApi.setPaidInStoreCash(order.value.id, checked)
-        const u = updated as unknown as {
-            paidInStoreCash?: boolean
-            paidInStoreCashAt?: string | null
-            paidInStoreCashAmount?: number | null
-            updatedAt?: string
-        }
-        handleModalUpdated({
-            paidInStoreCash: Boolean(u.paidInStoreCash),
-            paidInStoreCashAt: u.paidInStoreCashAt ?? null,
-            paidInStoreCashAmount:
-                typeof u.paidInStoreCashAmount === 'number' ? u.paidInStoreCashAmount : null,
-            updatedAt: u.updatedAt ?? order.value.updatedAt,
-        })
-        success(
-            'Actualizado',
-            4000,
-            checked ? 'Marcado como pagado en efectivo en tienda' : 'Marcador de pago en tienda quitado',
-        )
-    } catch (err: unknown) {
-        const msg = err instanceof Error ? err.message : 'No se pudo actualizar'
-        error('Error', msg)
-    } finally {
-        savingPaidInStore.value = false
-    }
-}
+	if (!order.value || order.value.paidInStoreCash === checked) return;
+	savingPaidInStore.value = true;
+	try {
+		const updated = await orderApi.setPaidInStoreCash(order.value.id, checked);
+		const u = updated as unknown as {
+			paidInStoreCash?: boolean;
+			paidInStoreCashAt?: string | null;
+			paidInStoreCashAmount?: number | null;
+			updatedAt?: string;
+		};
+		handleModalUpdated({
+			paidInStoreCash: Boolean(u.paidInStoreCash),
+			paidInStoreCashAt: u.paidInStoreCashAt ?? null,
+			paidInStoreCashAmount:
+				typeof u.paidInStoreCashAmount === 'number'
+					? u.paidInStoreCashAmount
+					: null,
+			updatedAt: u.updatedAt ?? order.value.updatedAt,
+		});
+		success(
+			'Actualizado',
+			4000,
+			checked
+				? 'Marcado como pagado en efectivo en tienda'
+				: 'Marcador de pago en tienda quitado',
+		);
+	} catch (err: unknown) {
+		const msg = err instanceof Error ? err.message : 'No se pudo actualizar';
+		error('Error', msg);
+	} finally {
+		savingPaidInStore.value = false;
+	}
+};
 
 const handleAssignDeliveryModalClose = () => {
-    clearPendingStatusChange()
-}
+	clearPendingStatusChange();
+};
 
 const handleDeliverymanUpdated = (updatedOrder?: any) => {
-    if (!order.value || !updatedOrder) return
-    updateOrderDeliveryman(updatedOrder)
-}
+	if (!order.value || !updatedOrder) return;
+	updateOrderDeliveryman(updatedOrder);
+};
 
 const handleStatusChanged = async (newStatus: OrderStatus) => {
-    if (!order.value) return
+	if (!order.value) return;
 
-    await executeStatusChange(
-        order.value.id,
-        newStatus,
-        (updatedOrder) => {
-            updateOrderDeliveryman(updatedOrder)
-        }
-    )
-}
+	await executeStatusChange(order.value.id, newStatus, (updatedOrder) => {
+		updateOrderDeliveryman(updatedOrder);
+	});
+};
 
 const handleOrderCancelled = () => {
-    router.push({ name: 'Orders' })
-}
+	router.push({ name: 'Orders' });
+};
 
 // Handlers optimistas para actualización sin recarga
-const handleOrderTypeUpdated = (updatedOrder?: any, paymentSnapshotBefore?: OrderPaymentSnapshot | null) => {
-    if (!updatedOrder) return
+const handleOrderTypeUpdated = (
+	updatedOrder?: any,
+	paymentSnapshotBefore?: OrderPaymentSnapshot | null,
+) => {
+	if (!updatedOrder) return;
 
-    const orderAny = updatedOrder as any
-    const snapshot = paymentSnapshotBefore ?? captureOrderPaymentSnapshot()
-    handleModalUpdated({
-        type: orderAny.type,
-        typeDisplayName: orderAny.typeDisplayName ?? getOrderTypeDisplayName(orderAny.type),
-        deliveryFee: orderAny.deliveryFee ?? null,
-        reservedFor: orderAny.reservedFor || null,
-        prepareAt: orderAny.prepareAt || null,
-        addressId: orderAny.addressId ?? null,
-        addressDescription: orderAny.addressDescription || null,
-        addressAdditionalInfo: orderAny.addressAdditionalInfo ?? null,
-        updatedAt: orderAny.updatedAt,
-        ...(typeof orderAny.total === 'number'
-            ? {
-                  total: orderAny.total,
-                  ...(typeof orderAny.subtotal === 'number' ? { subtotal: orderAny.subtotal } : {}),
-                  ...(typeof orderAny.discountTotal === 'number' ? { discountTotal: orderAny.discountTotal } : {}),
-              }
-            : {}),
-    })
+	const orderAny = updatedOrder as any;
+	const snapshot = paymentSnapshotBefore ?? captureOrderPaymentSnapshot();
+	handleModalUpdated({
+		type: orderAny.type,
+		typeDisplayName:
+			orderAny.typeDisplayName ?? getOrderTypeDisplayName(orderAny.type),
+		deliveryFee: orderAny.deliveryFee ?? null,
+		reservedFor: orderAny.reservedFor || null,
+		prepareAt: orderAny.prepareAt || null,
+		addressId: orderAny.addressId ?? null,
+		addressDescription: orderAny.addressDescription || null,
+		addressAdditionalInfo: orderAny.addressAdditionalInfo ?? null,
+		updatedAt: orderAny.updatedAt,
+		...(typeof orderAny.total === 'number'
+			? {
+					total: orderAny.total,
+					...(typeof orderAny.subtotal === 'number'
+						? { subtotal: orderAny.subtotal }
+						: {}),
+					...(typeof orderAny.discountTotal === 'number'
+						? { discountTotal: orderAny.discountTotal }
+						: {}),
+				}
+			: {}),
+	});
 
-    pendingOrderType.value = null
-    originalOrderType.value = null
-    pendingDeleteReservationAssociations.value = false
-    void promptBankSyncIfNeeded(snapshot)
-}
+	pendingOrderType.value = null;
+	originalOrderType.value = null;
+	pendingDeleteReservationAssociations.value = false;
+	void promptBankSyncIfNeeded(snapshot);
+};
 
-const handleTypePendingChange = (newType: 'onsite' | 'delivery' | 'reservation') => {
-    if (!order.value) return
+const handleTypePendingChange = (
+	newType: 'onsite' | 'delivery' | 'reservation',
+) => {
+	if (!order.value) return;
 
-    // Guardar tipo original si es la primera vez
-    if (!originalOrderType.value) {
-        originalOrderType.value = order.value.type
-    }
+	// Guardar tipo original si es la primera vez
+	if (!originalOrderType.value) {
+		originalOrderType.value = order.value.type;
+	}
 
-    // Actualizar temporalmente el tipo en la UI
-    pendingOrderType.value = newType
-    updateOrderType(newType)
-}
+	// Actualizar temporalmente el tipo en la UI
+	pendingOrderType.value = newType;
+	updateOrderType(newType);
+};
 
 const handleReservationAssociatedDeleteConfirmed = () => {
-    pendingDeleteReservationAssociations.value = true
-}
+	pendingDeleteReservationAssociations.value = true;
+};
 
 const handleOpenCustomerModalFromType = () => {
-    showEditCustomerModal.value = true
-}
+	showEditCustomerModal.value = true;
+};
 
 const handleCustomerModalClose = () => {
-    // Si había un cambio de tipo pendiente y se canceló el modal de cliente
-    if (pendingOrderType.value && originalOrderType.value && order.value) {
-        // Revertir el tipo
-        updateOrderType(originalOrderType.value)
-        pendingOrderType.value = null
-        originalOrderType.value = null
-        pendingDeleteReservationAssociations.value = false
-    }
-    showEditCustomerModal.value = false
-}
+	// Si había un cambio de tipo pendiente y se canceló el modal de cliente
+	if (pendingOrderType.value && originalOrderType.value && order.value) {
+		// Revertir el tipo
+		updateOrderType(originalOrderType.value);
+		pendingOrderType.value = null;
+		originalOrderType.value = null;
+		pendingDeleteReservationAssociations.value = false;
+	}
+	showEditCustomerModal.value = false;
+};
 const updateOrderStatus = (updatedOrder: any) => {
-    const orderAny = updatedOrder as any
-    ordersDataStore.updateCurrent({
-        status: updatedOrder.status,
-        statusDisplayName: orderAny.statusDisplayName,
-        statusTimes: orderAny.statusTimes || order.value!.statusTimes,
-        updatedAt: orderAny.updatedAt
-    })
-}
+	const orderAny = updatedOrder as any;
+	ordersDataStore.updateCurrent({
+		status: updatedOrder.status,
+		statusDisplayName: orderAny.statusDisplayName,
+		statusTimes: orderAny.statusTimes || order.value!.statusTimes,
+		updatedAt: orderAny.updatedAt,
+	});
+};
 
 const updateOrderDeliveryman = (updatedOrder: any) => {
-    const orderAny = updatedOrder as any
-    ordersDataStore.updateCurrent({
-        deliveryManId: orderAny.deliveryManId || null,
-        deliveryManName: orderAny.deliveryManName || null,
-        status: orderAny.status,
-        statusDisplayName: orderAny.statusDisplayName,
-        statusTimes: orderAny.statusTimes || order.value!.statusTimes,
-        updatedAt: orderAny.updatedAt
-    })
-}
+	const orderAny = updatedOrder as any;
+	ordersDataStore.updateCurrent({
+		deliveryManId: orderAny.deliveryManId || null,
+		deliveryManName: orderAny.deliveryManName || null,
+		status: orderAny.status,
+		statusDisplayName: orderAny.statusDisplayName,
+		statusTimes: orderAny.statusTimes || order.value!.statusTimes,
+		updatedAt: orderAny.updatedAt,
+	});
+};
 
 const updateOrderType = (newType: 'onsite' | 'delivery' | 'reservation') => {
-    ordersDataStore.updateCurrent({
-        type: newType,
-        typeDisplayName: getOrderTypeDisplayName(newType)
-    })
-}
+	ordersDataStore.updateCurrent({
+		type: newType,
+		typeDisplayName: getOrderTypeDisplayName(newType),
+	});
+};
 const handleCustomerUpdated = async (
-    updatedOrder?: any,
-    paymentSnapshotBefore?: OrderPaymentSnapshot | null,
+	updatedOrder?: any,
+	paymentSnapshotBefore?: OrderPaymentSnapshot | null,
 ) => {
-    if (!updatedOrder) return
-    const orderAny = updatedOrder as any
-    const snapshot = paymentSnapshotBefore ?? captureOrderPaymentSnapshot()
+	if (!updatedOrder) return;
+	const orderAny = updatedOrder as any;
+	const snapshot = paymentSnapshotBefore ?? captureOrderPaymentSnapshot();
 
-    // Si había un cambio de tipo pendiente, guardarlo junto con los datos del cliente
-    if (pendingOrderType.value) {
-        try {
-            // ✅ Enviar tipo + datos del cliente en una sola petición
-            const finalUpdate = await ordersDataStore.update(order.value!.id, {
-                type: pendingOrderType.value,
-                customerId: orderAny.customerId,
-                addressId: orderAny.addressId,
-                guestName: orderAny.guestName,
-                deliveryFee: orderAny.deliveryFee,
-                ...(pendingDeleteReservationAssociations.value
-                    ? { deleteReservationAssociatedPayments: true }
-                    : {}),
-            })
+	// Si había un cambio de tipo pendiente, guardarlo junto con los datos del cliente
+	if (pendingOrderType.value) {
+		try {
+			// ✅ Enviar tipo + datos del cliente en una sola petición
+			const finalUpdate = await ordersDataStore.update(order.value!.id, {
+				type: pendingOrderType.value,
+				customerId: orderAny.customerId,
+				addressId: orderAny.addressId,
+				guestName: orderAny.guestName,
+				deliveryFee: orderAny.deliveryFee,
+				...(pendingDeleteReservationAssociations.value
+					? { deleteReservationAssociatedPayments: true }
+					: {}),
+			});
 
-            // Actualización optimista con la respuesta del backend
-            updateOrderCustomer(finalUpdate)
+			// Actualización optimista con la respuesta del backend
+			updateOrderCustomer(finalUpdate);
 
-            // Limpiar estado temporal
-            pendingOrderType.value = null
-            originalOrderType.value = null
-            pendingDeleteReservationAssociations.value = false
-            await promptBankSyncIfNeeded(snapshot)
-        } catch (err: any) {
-            error('Error al actualizar pedido', err.message)
-        }
-    } else {
-        // Actualización normal (sin cambio de tipo) - usar handler unificado
-        handleModalUpdated({
-            customerId: orderAny.customerId,
-            customerName: orderAny.customerName,
-            customerPhone: orderAny.customerPhone,
-            guestName: orderAny.guestName,
-            deliveryFee: orderAny.deliveryFee || order.value?.deliveryFee || 0,
-            updatedAt: orderAny.updatedAt,
-            ...(typeof orderAny.total === 'number'
-                ? {
-                      total: orderAny.total,
-                      ...(typeof orderAny.subtotal === 'number' ? { subtotal: orderAny.subtotal } : {}),
-                      ...(typeof orderAny.discountTotal === 'number' ? { discountTotal: orderAny.discountTotal } : {}),
-                  }
-                : {}),
-        })
-        await promptBankSyncIfNeeded(snapshot)
-    }
+			// Limpiar estado temporal
+			pendingOrderType.value = null;
+			originalOrderType.value = null;
+			pendingDeleteReservationAssociations.value = false;
+			await promptBankSyncIfNeeded(snapshot);
+		} catch (err: any) {
+			error('Error al actualizar pedido', err.message);
+		}
+	} else {
+		// Actualización normal (sin cambio de tipo) - usar handler unificado
+		handleModalUpdated({
+			customerId: orderAny.customerId,
+			customerName: orderAny.customerName,
+			customerPhone: orderAny.customerPhone,
+			guestName: orderAny.guestName,
+			deliveryFee: orderAny.deliveryFee || order.value?.deliveryFee || 0,
+			updatedAt: orderAny.updatedAt,
+			...(typeof orderAny.total === 'number'
+				? {
+						total: orderAny.total,
+						...(typeof orderAny.subtotal === 'number'
+							? { subtotal: orderAny.subtotal }
+							: {}),
+						...(typeof orderAny.discountTotal === 'number'
+							? { discountTotal: orderAny.discountTotal }
+							: {}),
+					}
+				: {}),
+		});
+		await promptBankSyncIfNeeded(snapshot);
+	}
 
-    // Recargar cliente completo si hay customerId nuevo o cambiado
-    if (orderAny.customerId) {
-        await loadCustomer(orderAny.customerId)
-    } else {
-        customer.value = null
-    }
+	// Recargar cliente completo si hay customerId nuevo o cambiado
+	if (orderAny.customerId) {
+		await loadCustomer(orderAny.customerId);
+	} else {
+		customer.value = null;
+	}
 
-    // ✅ Cerrar el modal después de actualizar exitosamente
-    showEditCustomerModal.value = false
-}
+	// ✅ Cerrar el modal después de actualizar exitosamente
+	showEditCustomerModal.value = false;
+};
 
 // Handler unificado para todos los modales autónomos
 const handleModalUpdated = (updates: Partial<OrderDetailView>) => {
-    ordersDataStore.updateCurrent(updates)
-}
+	ordersDataStore.updateCurrent(updates);
+};
 
 const updateOrderCustomer = (updatedOrder: any) => {
-    const orderAny = updatedOrder as any
-    ordersDataStore.updateCurrent({
-        type: orderAny.type,
-        typeDisplayName: getOrderTypeDisplayName(orderAny.type),
-        customerId: orderAny.customerId || null,
-        customerName: orderAny.customerName || null,
-        customerPhone: orderAny.customerPhone || null,
-        addressId: orderAny.addressId || null,
-        addressDescription: orderAny.addressDescription || null,
-        addressAdditionalInfo: orderAny.addressAdditionalInfo ?? null,
-        guestName: orderAny.guestName || null,
-        deliveryFee: orderAny.deliveryFee ?? null,
-        updatedAt: orderAny.updatedAt,
-        ...(typeof orderAny.total === 'number'
-            ? {
-                  total: orderAny.total,
-                  ...(typeof orderAny.subtotal === 'number' ? { subtotal: orderAny.subtotal } : {}),
-                  ...(typeof orderAny.discountTotal === 'number' ? { discountTotal: orderAny.discountTotal } : {}),
-              }
-            : {}),
-    })
-}
-
-
-
+	const orderAny = updatedOrder as any;
+	ordersDataStore.updateCurrent({
+		type: orderAny.type,
+		typeDisplayName: getOrderTypeDisplayName(orderAny.type),
+		customerId: orderAny.customerId || null,
+		customerName: orderAny.customerName || null,
+		customerPhone: orderAny.customerPhone || null,
+		addressId: orderAny.addressId || null,
+		addressDescription: orderAny.addressDescription || null,
+		addressAdditionalInfo: orderAny.addressAdditionalInfo ?? null,
+		guestName: orderAny.guestName || null,
+		deliveryFee: orderAny.deliveryFee ?? null,
+		updatedAt: orderAny.updatedAt,
+		...(typeof orderAny.total === 'number'
+			? {
+					total: orderAny.total,
+					...(typeof orderAny.subtotal === 'number'
+						? { subtotal: orderAny.subtotal }
+						: {}),
+					...(typeof orderAny.discountTotal === 'number'
+						? { discountTotal: orderAny.discountTotal }
+						: {}),
+				}
+			: {}),
+	});
+};
 </script>
