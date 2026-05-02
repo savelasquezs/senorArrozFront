@@ -254,7 +254,11 @@ const notifyOrderShownInKitchen = async (orderData: any, isReservation: boolean)
         }))
         const title = isReservation ? `Reserva #${order.id} en cocina` : `Nuevo pedido #${order.id}`
         const bodyText = KitchenService.generateOrderNotificationText(order, products)
-        const speechText = KitchenService.generateOrderSpeechText(order, products)
+        const speechText = KitchenService.generateOrderSpeechText(
+            order,
+            products,
+            ordersStore.current.notes ?? null
+        )
 
         if (soundEnabled.value) {
             if (permission.value === 'granted') {
