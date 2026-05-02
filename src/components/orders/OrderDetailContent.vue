@@ -353,6 +353,7 @@
 
     <!-- Modales -->
     <EditCustomerModal v-if="showEditCustomerModal && order" :open="showEditCustomerModal" :order="order"
+        :delete-reservation-associated-payments-confirmed="pendingDeleteReservationAssociations"
         @close="handleCustomerModalClose" @updated="(o, snap) => handleCustomerUpdated(o, snap)" />
 
     <AssignDeliveryModal v-if="showAssignDeliveryModal && order" :open="showAssignDeliveryModal" :order="order"
@@ -365,7 +366,9 @@
     <!-- Modal de cambio de tipo -->
     <EditOrderTypeModal v-if="showEditOrderTypeModal && order" :open="showEditOrderTypeModal" :order="order"
         @close="showEditOrderTypeModal = false" @updated="(o, snap) => handleOrderTypeUpdated(o, snap)"
-        @type-changed-pending="handleTypePendingChange" @open-customer-modal="handleOpenCustomerModalFromType" />
+        @type-changed-pending="handleTypePendingChange"
+        @reservation-associated-delete-confirmed="handleReservationAssociatedDeleteConfirmed"
+        @open-customer-modal="handleOpenCustomerModalFromType" />
 
     <OrderBankPaymentSyncDialog
         :open="showBankSyncDialog"
@@ -517,6 +520,7 @@ const authStore = useAuthStore()
 const isDeliveryman = computed(() => authStore.userRole === 'Deliveryman')
 const pendingOrderType = ref<'onsite' | 'delivery' | 'reservation' | null>(null)
 const originalOrderType = ref<'onsite' | 'delivery' | 'reservation' | null>(null)
+const pendingDeleteReservationAssociations = ref(false)
 // Estado local (solo lo que no está en el store)
 const editableGuestName = ref('')
 const editableNotes = ref('')
@@ -1171,6 +1175,7 @@ const handleOrderTypeUpdated = (updatedOrder?: any, paymentSnapshotBefore?: Orde
 
     pendingOrderType.value = null
     originalOrderType.value = null
+    pendingDeleteReservationAssociations.value = false
     void promptBankSyncIfNeeded(snapshot)
 }
 
@@ -1187,6 +1192,10 @@ const handleTypePendingChange = (newType: 'onsite' | 'delivery' | 'reservation')
     updateOrderType(newType)
 }
 
+const handleReservationAssociatedDeleteConfirmed = () => {
+    pendingDeleteReservationAssociations.value = true
+}
+
 const handleOpenCustomerModalFromType = () => {
     showEditCustomerModal.value = true
 }
@@ -1198,6 +1207,7 @@ const handleCustomerModalClose = () => {
         updateOrderType(originalOrderType.value)
         pendingOrderType.value = null
         originalOrderType.value = null
+        pendingDeleteReservationAssociations.value = false
     }
     showEditCustomerModal.value = false
 }
@@ -1246,7 +1256,10 @@ const handleCustomerUpdated = async (
                 customerId: orderAny.customerId,
                 addressId: orderAny.addressId,
                 guestName: orderAny.guestName,
-                deliveryFee: orderAny.deliveryFee
+                deliveryFee: orderAny.deliveryFee,
+                ...(pendingDeleteReservationAssociations.value
+                    ? { deleteReservationAssociatedPayments: true }
+                    : {}),
             })
 
             // Actualización optimista con la respuesta del backend
@@ -1255,6 +1268,7 @@ const handleCustomerUpdated = async (
             // Limpiar estado temporal
             pendingOrderType.value = null
             originalOrderType.value = null
+            pendingDeleteReservationAssociations.value = false
             await promptBankSyncIfNeeded(snapshot)
         } catch (err: any) {
             error('Error al actualizar pedido', err.message)

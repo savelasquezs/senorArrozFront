@@ -267,6 +267,12 @@ CANCELLED  CANCELLED   CANCELLED  CANCELLED
 - **Condiciones**: Solo se aplica si se asigna cliente al pedido
 - **Cancelación**: Pedidos cancelados no suman puntos de fidelización
 
+### Reservas con abonos o transferencias
+
+- Al cancelar una reserva que tenga abonos (`reservationDeposits`) y/o transferencias bancarias (`bankPayments`), la UI debe mostrar confirmación indicando que también se eliminarán esos registros asociados.
+- Al modificar una reserva desde los modales de edición de cliente/dirección o tipo/horario, si existen abonos y/o transferencias, la UI debe pedir confirmación antes de guardar.
+- Si el usuario confirma la operación, el backend elimina todos los abonos de reserva y transferencias bancarias asociados al pedido.
+
 ## 🏪 Gestión de Sucursales
 
 ### Configuración de Sucursal

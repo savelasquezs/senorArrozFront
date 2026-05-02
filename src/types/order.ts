@@ -389,6 +389,7 @@ export interface UpdateOrderDto {
     total?: number
     discountTotal?: number
     orderDetails?: UpdateOrderDetailDto[]
+    deleteReservationAssociatedPayments?: boolean
 }
 
 export interface UpdateOrderDetailDto {

@@ -70,6 +70,22 @@
     <!-- Modal de detalle del cliente -->
     <CustomerDetailModal v-if="selectedCustomer" :show="showCustomerDetail" :customer="selectedCustomer"
         @close="handleCloseCustomerDetail" />
+
+    <BaseDialog v-model="showReservationAssociationsConfirm" title="Modificar reserva" size="sm">
+        <p class="text-sm text-gray-600">
+            Esta reserva tiene abonos y/o transferencias asociadas. Al confirmar tambiÃ©n se eliminarÃ¡n las
+            transferencias y abonos asociados.
+        </p>
+        <template #footer>
+            <BaseButton variant="secondary" :disabled="saving" @click="showReservationAssociationsConfirm = false">
+                Cancelar
+            </BaseButton>
+            <BaseButton variant="primary" class="bg-red-600 hover:bg-red-700" :loading="saving"
+                @click="confirmSaveDeletingAssociations">
+                Confirmar
+            </BaseButton>
+        </template>
+    </BaseDialog>
 </template>
 
 <script setup lang="ts">
@@ -91,6 +107,7 @@ import { toPaymentSnapshot, type OrderPaymentSnapshot } from '@/utils/orderPayme
 interface Props {
     open: boolean
     order: OrderListItem
+    deleteReservationAssociatedPaymentsConfirmed?: boolean
 }
 
 const props = defineProps<Props>()
@@ -110,6 +127,7 @@ const displayCustomer = ref<Customer | null>(null)
 
 // Estado
 const saving = ref(false)
+const showReservationAssociationsConfirm = ref(false)
 const selectedCustomerId = ref<number | null>(props.order.customerId)
 const selectedAddressId = ref<number | null>(props.order.addressId)
 const selectedGuestName = ref<string | null>(props.order.guestName || props.order.customerName || null)
@@ -179,6 +197,12 @@ const deliveryFeeError = computed(() => {
     }
     return ''
 })
+
+const hasReservationAssociatedPayments = computed(() =>
+    props.order.type === 'reservation' &&
+    !props.deleteReservationAssociatedPaymentsConfirmed &&
+    ((props.order.reservationDeposits?.length ?? 0) > 0 || (props.order.bankPayments?.length ?? 0) > 0)
+)
 
 async function hydrateCustomerWithAddresses(customer: Customer): Promise<void> {
     try {
@@ -270,6 +294,20 @@ const handleCloseCustomerDetail = () => {
 }
 
 const handleSave = async () => {
+    if (hasReservationAssociatedPayments.value) {
+        showReservationAssociationsConfirm.value = true
+        return
+    }
+
+    await saveOrderChanges(false)
+}
+
+const confirmSaveDeletingAssociations = async () => {
+    showReservationAssociationsConfirm.value = false
+    await saveOrderChanges(true)
+}
+
+const saveOrderChanges = async (deleteReservationAssociatedPayments: boolean) => {
     saving.value = true
     try {
         const updateData: Record<string, unknown> = {}
@@ -299,6 +337,10 @@ const handleSave = async () => {
         } else {
             // Si es onsite, eliminar addressId
             updateData.addressId = null
+        }
+
+        if (deleteReservationAssociatedPayments || props.deleteReservationAssociatedPaymentsConfirmed) {
+            updateData.deleteReservationAssociatedPayments = true
         }
 
         const paymentSnapshotBefore = toPaymentSnapshot(props.order)

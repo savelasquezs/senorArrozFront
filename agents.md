@@ -4,6 +4,8 @@
 
 Este es un sistema de gestion de restaurante desarrollado en Vue 3 + TypeScript + Tailwind CSS. El proyecto maneja pedidos, clientes, productos, pagos y multiples roles de usuario.
 
+si ves algun archivo que contenga alerts nativos vamos a cambiarlos por los modales ya existentes.
+
 ## Documentacion principal
 
 - `agents.md` - documentacion amplia del frontend
@@ -41,27 +43,27 @@ Despues de mutaciones `CREATE`, `UPDATE` y `DELETE`, actualiza el estado local i
 ### CREATE
 
 ```ts
-const created = await api.create(data)
-items.value.unshift(created)
-if (totalCount.value !== undefined) totalCount.value++
+const created = await api.create(data);
+items.value.unshift(created);
+if (totalCount.value !== undefined) totalCount.value++;
 ```
 
 ### UPDATE
 
 ```ts
-const updated = await api.update(id, data)
-const index = items.value.findIndex(item => item.id === id)
+const updated = await api.update(id, data);
+const index = items.value.findIndex((item) => item.id === id);
 if (index !== -1) {
-    items.value[index] = { ...items.value[index], ...updated }
+	items.value[index] = { ...items.value[index], ...updated };
 }
 ```
 
 ### DELETE
 
 ```ts
-await api.delete(id)
-items.value = items.value.filter(item => item.id !== id)
-if (totalCount.value !== undefined) totalCount.value--
+await api.delete(id);
+items.value = items.value.filter((item) => item.id !== id);
+if (totalCount.value !== undefined) totalCount.value--;
 ```
 
 ### Cuando si recargar
@@ -86,9 +88,9 @@ Usar prop `mode` cuando el mismo componente tenga comportamiento distinto entre 
 
 ```ts
 if (props.mode === 'draft') {
-    store.updateData(data)
+	store.updateData(data);
 } else {
-    emit('data-updated', data)
+	emit('data-updated', data);
 }
 ```
 
