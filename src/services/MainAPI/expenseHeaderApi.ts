@@ -7,35 +7,40 @@ import type {
     UpdateExpenseHeaderDto,
 } from '@/types/expense'
 import { BaseApi } from './baseApi'
+import { toNumberFilterList, toStringFilterList } from '@/utils/filterNormalization'
+
+export function buildExpenseHeaderQueryParams(filters?: ExpenseHeaderFilters): URLSearchParams {
+    const params = new URLSearchParams()
+
+    if (!filters) return params
+
+    if (filters.fromDate) params.append('FromDate', filters.fromDate)
+    if (filters.toDate) params.append('ToDate', filters.toDate)
+
+    for (const supplierId of toNumberFilterList(filters.supplierIds)) {
+        params.append('SupplierIds', String(supplierId))
+    }
+
+    for (const bankName of toStringFilterList(filters.bankNames)) {
+        params.append('BankNames', bankName)
+    }
+
+    for (const categoryName of toStringFilterList(filters.categoryNames)) {
+        params.append('CategoryNames', categoryName)
+    }
+
+    if (filters.expenseName?.trim()) params.append('ExpenseName', filters.expenseName.trim())
+    params.append('Page', String(filters.page ?? 1))
+    params.append('PageSize', String(filters.pageSize ?? 10))
+    if (filters.sortBy) params.append('SortBy', filters.sortBy)
+    if (filters.sortOrder) params.append('SortOrder', filters.sortOrder)
+
+    return params
+}
 
 class ExpenseHeaderApi extends BaseApi {
     async getExpenseHeaders(filters?: ExpenseHeaderFilters): Promise<ExpenseHeaderListResult> {
-        const params = new URLSearchParams()
-
-        if (filters) {
-            if (filters.fromDate) params.append('FromDate', filters.fromDate)
-            if (filters.toDate) params.append('ToDate', filters.toDate)
-
-            for (const supplierId of filters.supplierIds ?? []) {
-                params.append('SupplierIds', String(supplierId))
-            }
-
-            for (const bankName of filters.bankNames ?? []) {
-                if (bankName?.trim()) params.append('BankNames', bankName)
-            }
-
-            for (const categoryName of filters.categoryNames ?? []) {
-                if (categoryName?.trim()) params.append('CategoryNames', categoryName)
-            }
-
-            if (filters.expenseName?.trim()) params.append('ExpenseName', filters.expenseName.trim())
-            params.append('Page', String(filters.page ?? 1))
-            params.append('PageSize', String(filters.pageSize ?? 10))
-            if (filters.sortBy) params.append('SortBy', filters.sortBy)
-            if (filters.sortOrder) params.append('SortOrder', filters.sortOrder)
-        }
-
-        const config: AxiosRequestConfig = { params }
+        const config: AxiosRequestConfig = { params: buildExpenseHeaderQueryParams(filters) }
         return this.get<ExpenseHeaderListResult>('/expenseheaders', config)
     }
 

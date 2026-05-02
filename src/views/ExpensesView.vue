@@ -138,6 +138,7 @@ import type { ExpenseHeader, UpdateExpenseHeaderDto } from '@/types/expense'
 import { defaultBusinessCalendar } from '@/utils/datetime'
 import type { DashboardPeriodPresetId } from '@/utils/dashboardPeriodPresets'
 import { presetToExpenseApiDateRange } from '@/utils/expensesDateRange'
+import { toNumberFilterList, toStringFilterList } from '@/utils/filterNormalization'
 import { flattenExpenseHeadersToGridRows } from '@/utils/expenseGridFlatten'
 
 const { success, error } = useToast()
@@ -238,6 +239,13 @@ const categoryOptions = computed(() => availableCategoryOptions.value)
 const bankOptions = computed(() => availableBankOptions.value)
 const supplierOptions = computed(() => availableSupplierOptions.value)
 
+const normalizedFilters = computed<ExpenseFilterState>(() => ({
+    categoryNames: toStringFilterList(localFilters.value.categoryNames),
+    bankNames: toStringFilterList(localFilters.value.bankNames),
+    supplierIds: toNumberFilterList(localFilters.value.supplierIds),
+    expenseName: localFilters.value.expenseName || '',
+}))
+
 const totalPages = computed(() => Math.ceil(totalCount.value / pageSize.value))
 
 const visiblePages = computed(() => {
@@ -259,10 +267,10 @@ const visiblePages = computed(() => {
 
 const hasActiveFilters = computed(() => {
     return !!(
-        localFilters.value.categoryNames.length > 0 ||
-        localFilters.value.bankNames.length > 0 ||
-        localFilters.value.supplierIds.length > 0 ||
-        localFilters.value.expenseName.trim()
+        normalizedFilters.value.categoryNames.length > 0 ||
+        normalizedFilters.value.bankNames.length > 0 ||
+        normalizedFilters.value.supplierIds.length > 0 ||
+        normalizedFilters.value.expenseName.trim()
     )
 })
 
@@ -300,7 +308,7 @@ watch(
 )
 
 watch(
-    () => [...localFilters.value.categoryNames],
+    () => normalizedFilters.value.categoryNames,
     () => {
         currentPage.value = 1
         debouncedFetchExpenses.cancel()
@@ -309,7 +317,7 @@ watch(
 )
 
 watch(
-    () => [...localFilters.value.bankNames],
+    () => normalizedFilters.value.bankNames,
     () => {
         currentPage.value = 1
         debouncedFetchExpenses.cancel()
@@ -318,7 +326,7 @@ watch(
 )
 
 watch(
-    () => [...localFilters.value.supplierIds],
+    () => normalizedFilters.value.supplierIds,
     () => {
         currentPage.value = 1
         debouncedFetchExpenses.cancel()
@@ -382,10 +390,10 @@ const fetchExpenses = async () => {
         const response = await expenseHeaderApi.getExpenseHeaders({
             fromDate: dateFilters.value.fromDate || undefined,
             toDate: dateFilters.value.toDate || undefined,
-            supplierIds: localFilters.value.supplierIds,
-            bankNames: localFilters.value.bankNames,
-            categoryNames: localFilters.value.categoryNames,
-            expenseName: localFilters.value.expenseName,
+            supplierIds: normalizedFilters.value.supplierIds,
+            bankNames: normalizedFilters.value.bankNames,
+            categoryNames: normalizedFilters.value.categoryNames,
+            expenseName: normalizedFilters.value.expenseName,
             page: currentPage.value,
             pageSize: pageSize.value,
             sortBy: sortBy.value,
