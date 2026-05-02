@@ -243,6 +243,10 @@ CANCELLED  CANCELLED   CANCELLED  CANCELLED
 - **Efectivo puro**: Si no hay `expense_bank_payment` → 100% efectivo
 - **Movimientos internos**: Entre bancos y caja-bancos usando `bank_payment` (income) y `expense_bank_payment` (outcome)
 
+- **Listado de gastos (`/expenseheaders`)**: Los filtros por rango de fechas, proveedor, banco, categorÃ­a y texto de nombre del gasto se aplican en servidor; la paginaciÃ³n y el total reflejan ese conjunto filtrado.
+- **LÃ­neas filtradas**: Si el filtro incluye categorÃ­a o texto de nombre de gasto, cada factura devuelve solo las `expenseDetails` que coinciden para que la grilla no muestre lÃ­neas fuera del criterio.
+- **Debounce**: Los filtros escritos del listado de gastos usan debounce corto (~300 ms); selects, fechas y orden consultan inmediatamente.
+
 ### Cuadre de caja (total esperado global)
 - **Fórmula esperada**: `(C0 + B0 + L0 + A0) + ventas del período − gastos del período + Σ abonos de reserva (en el período por `ReceivedAt`) cuyo **día de entrega/programación del pedido** en calendario Colombia no es hoy (`PrepareAt` si existe; si no, `CreatedAt`)`, donde `C0+B0+L0+A0` es la apertura del último cierre: efectivo contado + saldos reales por banco (incluye cuentas operativas, apps y caja mayor según bancos configurados) + snapshot de préstamos informales + **snapshot de apps pendientes por liquidar** (`A0`, JSON por app guardado en el cierre anterior). Si el cierre anterior no tenía snapshot de apps, `A0 = 0`. Los abonos siguen reflejándose en el esperado por banco; la suma al global ajusta el total esperado cuando la entrega de la reserva no cae en el día actual (CO).
 - **Total contado al cerrar** (debe coincidir con el esperado): efectivo físico (`closingCash`) + suma de saldos reales por banco del cuadre + **suma actual de pagos vía app no liquidados** (pedidos entregados) + préstamos informales activos (`L1`). Los bancos incluyen la fila de caja mayor efectivo cuando aplique. El **pendiente en apps** no es un campo aparte que el usuario edita: se toma del sistema en el momento del cierre y se persiste como snapshot para `A0` del siguiente período.

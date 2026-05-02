@@ -63,7 +63,7 @@ const gridContext: ExpensesGridContext = {
 }
 
 const noRowsHtml =
-    '<span class="ag-overlay-no-rows-center text-gray-500 text-sm">Sin resultados con los filtros actuales</span>'
+    '<span class="ag-overlay-no-rows-center text-gray-500 text-sm">Sin resultados con los filtros aplicados</span>'
 
 function getRowId(p: { data: ExpenseDetailGridRow }) {
     return String(p.data.detailId)

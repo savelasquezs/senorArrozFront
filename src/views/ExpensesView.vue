@@ -1,12 +1,11 @@
 <template>
     <MainLayout>
         <div class="flex flex-col min-h-0 h-[calc(100vh-5.75rem)] max-h-[calc(100vh-3.5rem)]">
-            <!-- Encabezado compacto -->
             <div class="flex-shrink-0 mb-2 flex items-center justify-between gap-2">
                 <div class="min-w-0">
                     <h1 class="text-lg font-semibold text-gray-900 tracking-tight">Gastos</h1>
                     <p class="text-[11px] text-gray-500 leading-tight mt-0.5 hidden sm:block">
-                        Líneas por factura · columna ▾ = filtro (página actual)
+                        Líneas por factura · filtros desde servidor y columnas de la grilla
                     </p>
                 </div>
                 <BaseButton variant="primary" size="sm" class="shrink-0" @click="openCreateModal">
@@ -25,9 +24,9 @@
                 @toggle-sort-order="toggleSortOrder" @clear-filters="clearFilters" @refresh="fetchExpenses">
                 <template #result-hint>
                     <span v-if="!loading && totalCount > 0">
-                        Facturas con líneas que coinciden (pág.):
-                        <span class="font-medium">{{ filteredExpenses.length }}</span>
-                        · Total servidor:
+                        Facturas en página:
+                        <span class="font-medium">{{ expenses.length }}</span>
+                        · Total filtrado:
                         <span class="font-medium">{{ totalCount }}</span>
                     </span>
                     <span v-else-if="!loading" class="text-gray-400">Sin facturas en el rango</span>
@@ -114,35 +113,34 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import type { ColumnState } from 'ag-grid-community'
-import type { ExpenseHeader, UpdateExpenseHeaderDto } from '@/types/expense'
-import { expenseHeaderApi } from '@/services/MainAPI/expenseHeaderApi'
-import { useExpenseFilters, type ExpenseFilterState } from '@/composables/useExpenseFilters'
+import { ChevronLeftIcon, ChevronRightIcon, PlusIcon } from '@heroicons/vue/24/outline'
+import ExpenseDetailModal from '@/components/expenses/ExpenseDetailModal.vue'
+import ExpenseDetailsAgGrid from '@/components/expenses/ExpenseDetailsAgGrid.vue'
+import ExpenseFormModal from '@/components/expenses/ExpenseFormModal.vue'
+import ExpensesFilters from '@/components/expenses/ExpensesFilters.vue'
+import ExpensesSummary from '@/components/expenses/ExpensesSummary.vue'
+import MainLayout from '@/components/layout/MainLayout.vue'
+import BaseButton from '@/components/ui/BaseButton.vue'
+import BaseDialog from '@/components/ui/BaseDialog.vue'
+import BaseSelect from '@/components/ui/BaseSelect.vue'
+import { type ExpenseFilterState } from '@/composables/useExpenseFilters'
+import { loadExpensesViewState, saveExpensesViewState } from '@/composables/useExpensesViewPersistence'
+import { useDebouncedCallback } from '@/composables/useDebouncedCallback'
 import { useToast } from '@/composables/useToast'
-import {
-    loadExpensesViewState,
-    saveExpensesViewState,
-} from '@/composables/useExpensesViewPersistence'
+import { defaultDateRangeThisMonth } from '@/components/dashboard/dashboardDateUtils'
+import { bankApi } from '@/services/MainAPI/bankApi'
+import { expenseCategoryApi } from '@/services/MainAPI/expenseCategoryApi'
+import { expenseHeaderApi } from '@/services/MainAPI/expenseHeaderApi'
+import { supplierApi } from '@/services/MainAPI/supplierApi'
+import type { ExpenseHeader, UpdateExpenseHeaderDto } from '@/types/expense'
+import { defaultBusinessCalendar } from '@/utils/datetime'
 import type { DashboardPeriodPresetId } from '@/utils/dashboardPeriodPresets'
 import { presetToExpenseApiDateRange } from '@/utils/expensesDateRange'
 import { flattenExpenseHeadersToGridRows } from '@/utils/expenseGridFlatten'
-import { defaultBusinessCalendar } from '@/utils/datetime'
-import { defaultDateRangeThisMonth } from '@/components/dashboard/dashboardDateUtils'
-import MainLayout from '@/components/layout/MainLayout.vue'
-import ExpenseDetailsAgGrid from '@/components/expenses/ExpenseDetailsAgGrid.vue'
-import ExpensesFilters from '@/components/expenses/ExpensesFilters.vue'
-import ExpensesSummary from '@/components/expenses/ExpensesSummary.vue'
-import ExpenseDetailModal from '@/components/expenses/ExpenseDetailModal.vue'
-import ExpenseFormModal from '@/components/expenses/ExpenseFormModal.vue'
-import BaseSelect from '@/components/ui/BaseSelect.vue'
-import BaseButton from '@/components/ui/BaseButton.vue'
-import BaseDialog from '@/components/ui/BaseDialog.vue'
-import { PlusIcon, ChevronLeftIcon, ChevronRightIcon } from '@heroicons/vue/24/outline'
 
-const { applyAllFilters } = useExpenseFilters()
 const { success, error } = useToast()
-
 const stored = loadExpensesViewState()
 
 const loading = ref(false)
@@ -178,16 +176,12 @@ const showDetailModal = ref(false)
 const showFormModal = ref(false)
 const selectedExpense = ref<ExpenseHeader | null>(null)
 const editingExpense = ref<ExpenseHeader | null>(null)
-/** Línea de detalle a enfocar al abrir el formulario desde la grilla. */
 const formFocusDetailId = ref<number | null>(null)
-
 const summary = ref({ totalAmount: 0, rowCount: 0 })
 const columnState = ref<ColumnState[] | null>(stored.columnState)
-
-function parseYmd(ymd: string): Date {
-    const [y, m, d] = ymd.split('-').map(Number)
-    return defaultBusinessCalendar.zonedDayFromPickerLocalDate(new Date(y, m - 1, d))
-}
+const availableCategoryOptions = ref<Array<{ value: string; label: string }>>([])
+const availableBankOptions = ref<Array<{ value: string; label: string }>>([])
+const availableSupplierOptions = ref<Array<{ value: number; label: string }>>([])
 
 const pageSizeOptions = [
     { value: 10, label: '10' },
@@ -197,38 +191,10 @@ const pageSizeOptions = [
     { value: 200, label: '200' },
 ]
 
-const toStringArray = (value: unknown): string[] => {
-    if (Array.isArray(value)) {
-        return value.filter((item): item is string => typeof item === 'string' && item.trim().length > 0)
-    }
-    if (typeof value === 'string' && value.trim().length > 0) {
-        return [value]
-    }
-    return []
+function parseYmd(ymd: string): Date {
+    const [y, m, d] = ymd.split('-').map(Number)
+    return defaultBusinessCalendar.zonedDayFromPickerLocalDate(new Date(y, m - 1, d))
 }
-
-const toNumberArray = (value: unknown): number[] => {
-    if (Array.isArray(value)) {
-        return value
-            .map(item => (typeof item === 'number' ? item : Number(item)))
-            .filter(item => !Number.isNaN(item))
-    }
-    if (typeof value === 'number' && !Number.isNaN(value)) {
-        return [value]
-    }
-    if (typeof value === 'string' && value.trim().length > 0) {
-        const parsed = Number(value)
-        return Number.isNaN(parsed) ? [] : [parsed]
-    }
-    return []
-}
-
-const normalizedFilters = computed<ExpenseFilterState>(() => ({
-    categoryNames: toStringArray(localFilters.value.categoryNames),
-    bankNames: toStringArray(localFilters.value.bankNames),
-    supplierIds: toNumberArray(localFilters.value.supplierIds),
-    expenseName: localFilters.value.expenseName || '',
-}))
 
 const normalizeExpense = (header: ExpenseHeader): ExpenseHeader => {
     const normalizedDetails = header.expenseDetails.map(detail => {
@@ -236,59 +202,41 @@ const normalizeExpense = (header: ExpenseHeader): ExpenseHeader => {
         const computedTotal = hasLineTotal
             ? Number(detail.total)
             : Number(detail.amount) * Number(detail.quantity)
+
         return {
             ...detail,
             total: computedTotal,
         }
     })
 
-    const total = normalizedDetails.reduce((sum, detail) => sum + (detail.total || 0), 0)
+    const detailTotal = normalizedDetails.reduce((sum, detail) => sum + (detail.total || 0), 0)
+    const effectiveTotal = Number(header.total ?? detailTotal)
     const derivedCategories = normalizedDetails
         .map(detail => detail.expenseCategoryName)
         .filter((name): name is string => Boolean(name))
     const derivedBanks = header.expenseBankPayments
         .map(payment => payment.bankName)
         .filter((name): name is string => Boolean(name))
+    const derivedExpenses = normalizedDetails
+        .map(detail => detail.expenseName)
+        .filter((name): name is string => Boolean(name))
 
     return {
         ...header,
         expenseDetails: normalizedDetails,
-        total,
+        total: effectiveTotal,
         categoryNames:
             header.categoryNames.length > 0 ? header.categoryNames : Array.from(new Set(derivedCategories)),
         bankNames: header.bankNames.length > 0 ? header.bankNames : Array.from(new Set(derivedBanks)),
+        expenseNames: header.expenseNames.length > 0 ? header.expenseNames : Array.from(new Set(derivedExpenses)),
     }
 }
 
-const filteredExpenses = computed(() => applyAllFilters(expenses.value, normalizedFilters.value))
+const gridRowData = computed(() => flattenExpenseHeadersToGridRows(expenses.value))
 
-const gridRowData = computed(() => flattenExpenseHeadersToGridRows(filteredExpenses.value))
-
-const categoryOptions = computed(() => {
-    const categories = new Set<string>()
-    expenses.value.forEach(expense => {
-        expense.categoryNames.forEach(cat => categories.add(cat))
-    })
-    return Array.from(categories).map(cat => ({ value: cat, label: cat }))
-})
-
-const bankOptions = computed(() => {
-    const banks = new Set<string>()
-    expenses.value.forEach(expense => {
-        expense.bankNames.forEach(bank => banks.add(bank))
-    })
-    return Array.from(banks).map(bank => ({ value: bank, label: bank }))
-})
-
-const supplierOptions = computed(() => {
-    const suppliers = new Map<number, string>()
-    expenses.value.forEach(expense => {
-        if (!suppliers.has(expense.supplierId)) {
-            suppliers.set(expense.supplierId, expense.supplierName)
-        }
-    })
-    return Array.from(suppliers.entries()).map(([id, name]) => ({ value: id, label: name }))
-})
+const categoryOptions = computed(() => availableCategoryOptions.value)
+const bankOptions = computed(() => availableBankOptions.value)
+const supplierOptions = computed(() => availableSupplierOptions.value)
 
 const totalPages = computed(() => Math.ceil(totalCount.value / pageSize.value))
 
@@ -305,15 +253,16 @@ const visiblePages = computed(() => {
     for (let i = start; i <= end; i++) {
         pages.push(i)
     }
+
     return pages
 })
 
 const hasActiveFilters = computed(() => {
     return !!(
-        normalizedFilters.value.categoryNames.length > 0 ||
-        normalizedFilters.value.bankNames.length > 0 ||
-        normalizedFilters.value.supplierIds.length > 0 ||
-        normalizedFilters.value.expenseName.trim()
+        localFilters.value.categoryNames.length > 0 ||
+        localFilters.value.bankNames.length > 0 ||
+        localFilters.value.supplierIds.length > 0 ||
+        localFilters.value.expenseName.trim()
     )
 })
 
@@ -338,11 +287,51 @@ watch(
     { deep: true },
 )
 
+const debouncedFetchExpenses = useDebouncedCallback(() => {
+    void fetchExpenses()
+}, 300)
+
+watch(
+    () => localFilters.value.expenseName,
+    () => {
+        currentPage.value = 1
+        debouncedFetchExpenses.schedule()
+    },
+)
+
+watch(
+    () => [...localFilters.value.categoryNames],
+    () => {
+        currentPage.value = 1
+        debouncedFetchExpenses.cancel()
+        void fetchExpenses()
+    },
+)
+
+watch(
+    () => [...localFilters.value.bankNames],
+    () => {
+        currentPage.value = 1
+        debouncedFetchExpenses.cancel()
+        void fetchExpenses()
+    },
+)
+
+watch(
+    () => [...localFilters.value.supplierIds],
+    () => {
+        currentPage.value = 1
+        debouncedFetchExpenses.cancel()
+        void fetchExpenses()
+    },
+)
+
 function syncDatesFromPresetAndFetch() {
     const r = presetToExpenseApiDateRange(presetId.value, new Date(), customRange.value)
     dateFilters.value = { fromDate: r.fromDate, toDate: r.toDate }
     currentPage.value = 1
-    fetchExpenses()
+    debouncedFetchExpenses.cancel()
+    void fetchExpenses()
 }
 
 function onPresetIdChange(id: DashboardPeriodPresetId) {
@@ -352,10 +341,12 @@ function onPresetIdChange(id: DashboardPeriodPresetId) {
         const pair = defaultDateRangeThisMonth(new Date())
         customRange.value = [pair[0], pair[1]]
     }
+
     const r = presetToExpenseApiDateRange(id, new Date(), id === 'custom' ? customRange.value : null)
     dateFilters.value = { fromDate: r.fromDate, toDate: r.toDate }
     currentPage.value = 1
-    fetchExpenses()
+    debouncedFetchExpenses.cancel()
+    void fetchExpenses()
 }
 
 function onCustomRangeChange(v: [Date, Date] | null) {
@@ -364,29 +355,37 @@ function onCustomRangeChange(v: [Date, Date] | null) {
         const r = presetToExpenseApiDateRange('custom', new Date(), v)
         dateFilters.value = { fromDate: r.fromDate, toDate: r.toDate }
         currentPage.value = 1
-        fetchExpenses()
+        debouncedFetchExpenses.cancel()
+        void fetchExpenses()
     }
 }
 
 function onSortByChange(v: 'id' | 'total' | 'createdAt') {
     sortBy.value = v
     currentPage.value = 1
-    fetchExpenses()
+    debouncedFetchExpenses.cancel()
+    void fetchExpenses()
 }
 
 function toggleSortOrder() {
     sortOrder.value = sortOrder.value === 'asc' ? 'desc' : 'asc'
     currentPage.value = 1
-    fetchExpenses()
+    debouncedFetchExpenses.cancel()
+    void fetchExpenses()
 }
 
 const fetchExpenses = async () => {
     loading.value = true
     summary.value = { totalAmount: 0, rowCount: 0 }
+
     try {
         const response = await expenseHeaderApi.getExpenseHeaders({
             fromDate: dateFilters.value.fromDate || undefined,
             toDate: dateFilters.value.toDate || undefined,
+            supplierIds: localFilters.value.supplierIds,
+            bankNames: localFilters.value.bankNames,
+            categoryNames: localFilters.value.categoryNames,
+            expenseName: localFilters.value.expenseName,
             page: currentPage.value,
             pageSize: pageSize.value,
             sortBy: sortBy.value,
@@ -400,6 +399,31 @@ const fetchExpenses = async () => {
         error('Error al cargar gastos', msg)
     } finally {
         loading.value = false
+    }
+}
+
+const loadFilterOptions = async () => {
+    try {
+        const [categoriesResponse, suppliers, banksResponse] = await Promise.all([
+            expenseCategoryApi.getAllExpenseCategories(),
+            supplierApi.getSuppliersByBranch(),
+            bankApi.getBanks({ page: 1, pageSize: 200, active: true }),
+        ])
+
+        availableCategoryOptions.value = (categoriesResponse.data || [])
+            .map(category => ({ value: category.name, label: category.name }))
+            .sort((a, b) => a.label.localeCompare(b.label))
+
+        availableSupplierOptions.value = suppliers
+            .map(supplier => ({ value: supplier.id, label: supplier.name }))
+            .sort((a, b) => a.label.localeCompare(b.label))
+
+        availableBankOptions.value = (banksResponse.items || [])
+            .map(bank => ({ value: bank.name, label: bank.name }))
+            .sort((a, b) => a.label.localeCompare(b.label))
+    } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : 'Error desconocido'
+        error('Error al cargar filtros', msg)
     }
 }
 
@@ -418,13 +442,15 @@ const clearFilters = () => {
 const changePage = (page: number) => {
     if (page >= 1 && page <= totalPages.value) {
         currentPage.value = page
-        fetchExpenses()
+        debouncedFetchExpenses.cancel()
+        void fetchExpenses()
     }
 }
 
 const handlePageSizeChange = () => {
     currentPage.value = 1
-    fetchExpenses()
+    debouncedFetchExpenses.cancel()
+    void fetchExpenses()
 }
 
 function onSummaryChange(p: { totalAmount: number; rowCount: number }) {
@@ -438,6 +464,7 @@ function onColumnStateChange(state: ColumnState[]) {
 const handleViewDetailByHeaderId = async (headerId: number) => {
     loadingDetail.value = true
     showDetailModal.value = true
+
     try {
         const detail = await expenseHeaderApi.getExpenseHeaderById(headerId)
         selectedExpense.value = normalizeExpense(detail)
@@ -452,6 +479,7 @@ const handleViewDetailByHeaderId = async (headerId: number) => {
 
 const handleEditByHeaderId = async (headerId: number, opts?: { focusDetailId?: number | null }) => {
     formFocusDetailId.value = opts?.focusDetailId ?? null
+
     try {
         const fresh = await expenseHeaderApi.getExpenseHeaderById(headerId)
         editingExpense.value = normalizeExpense(fresh)
@@ -497,9 +525,11 @@ function onDeleteLineDialogUpdate(open: boolean) {
 
 const handleDeleteDetailLine = async (payload: { headerId: number; detailId: number }) => {
     const { headerId, detailId } = payload
+
     try {
         const header = normalizeExpense(await expenseHeaderApi.getExpenseHeaderById(headerId))
         const line = header.expenseDetails.find(d => d.id === detailId)
+
         if (!line) {
             error('Línea no encontrada', 'Recarga la lista e inténtalo de nuevo.')
             return
@@ -524,6 +554,7 @@ const confirmDeleteDetailLine = async () => {
 
     const { headerId, detailId, header, mode } = pending
     deleteLineExecuting.value = true
+
     try {
         if (mode === 'full') {
             await expenseHeaderApi.deleteExpenseHeader(headerId)
@@ -561,10 +592,12 @@ const confirmDeleteDetailLine = async () => {
                 next[idx] = updated
                 expenses.value = next
             }
+
             if (selectedExpense.value?.id === headerId) {
                 selectedExpense.value = updated
             }
         }
+
         showDeleteLineConfirm.value = false
         deleteLinePending.value = null
     } catch (err: unknown) {
@@ -594,8 +627,8 @@ const closeFormModal = () => {
 
 const handleSubmitExpense = (expense: ExpenseHeader) => {
     const enrichedExpense = normalizeExpense(expense)
-
     const index = expenses.value.findIndex(e => e.id === enrichedExpense.id)
+
     if (index !== -1) {
         const updatedExpenses = [...expenses.value]
         updatedExpenses.splice(index, 1, enrichedExpense)
@@ -618,6 +651,7 @@ onMounted(() => {
         const r = presetToExpenseApiDateRange(presetId.value, new Date(), customRange.value)
         dateFilters.value = { fromDate: r.fromDate, toDate: r.toDate }
     }
-    fetchExpenses()
+    void loadFilterOptions()
+    void fetchExpenses()
 })
 </script>
