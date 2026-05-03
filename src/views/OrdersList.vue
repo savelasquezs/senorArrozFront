@@ -328,7 +328,9 @@
 
         <!-- Modales -->
         <EditCustomerModal v-if="showEditCustomerModal && selectedOrder" :open="showEditCustomerModal"
-            :order="selectedOrder" @close="handleCustomerModalClose" @updated="handleOrderUpdated" />
+            :order="selectedOrder"
+            :delete-reservation-associated-payments-confirmed="pendingDeleteReservationAssociations"
+            @close="handleCustomerModalClose" @updated="handleOrderUpdated" />
 
         <AssignDeliveryModal v-if="selectedOrder" :open="showAssignDeliveryModal" :order="selectedOrder"
             :pending-status-change="pendingStatusChange || undefined" @updated="handleAssignDeliveryUpdated"
@@ -337,7 +339,9 @@
         <!-- Modal de cambio de tipo -->
         <EditOrderTypeModal v-if="showEditOrderTypeModal && selectedOrder" :open="showEditOrderTypeModal"
             :order="selectedOrder" @close="showEditOrderTypeModal = false" @updated="handleOrderTypeUpdated"
-            @type-changed-pending="handleTypePendingChange" @open-customer-modal="handleOpenCustomerModalFromType" />
+            @type-changed-pending="handleTypePendingChange"
+            @reservation-associated-delete-confirmed="handleReservationAssociatedDeleteConfirmed"
+            @open-customer-modal="handleOpenCustomerModalFromType" />
 
         <!-- Modal de abonos de reservas -->
         <ReservationDepositModal
@@ -469,6 +473,28 @@
                 </BaseButton>
             </template>
         </BaseDialog>
+        <BaseDialog v-model="showCancelReservationDialog" title="Cancelar reserva" size="sm">
+            <div v-if="cancelReservationTarget" class="space-y-3 text-sm text-gray-600">
+                <p>
+                    ¿Cancelar la reserva
+                    <span class="font-medium text-gray-900">#{{ cancelReservationTarget.id }}</span>?
+                </p>
+                <p v-if="reservationHasAssociatedPayments(cancelReservationTarget)" class="text-red-700">
+                    Esta reserva tiene abonos y/o transferencias asociadas. Al confirmar también se eliminarán las
+                    transferencias y abonos asociados.
+                </p>
+            </div>
+            <template #footer>
+                <BaseButton variant="secondary" size="sm" :disabled="cancelReservationLoading"
+                    @click="closeCancelReservationDialog">
+                    Cancelar
+                </BaseButton>
+                <BaseButton variant="primary" size="sm" class="bg-red-600 hover:bg-red-700"
+                    :loading="cancelReservationLoading" @click="confirmCancelReservation">
+                    Confirmar
+                </BaseButton>
+            </template>
+        </BaseDialog>
     </MainLayout>
 </template>
 
@@ -579,6 +605,7 @@ const selectedOrder = ref<OrderListItem | null>(null)
 const pendingStatusChange = ref<OrderStatus | null>(null)
 const pendingOrderType = ref<'onsite' | 'delivery' | 'reservation' | null>(null)
 const originalOrderType = ref<'onsite' | 'delivery' | 'reservation' | null>(null)
+const pendingDeleteReservationAssociations = ref(false)
 
 const showRemoveBankPaymentDialog = ref(false)
 const removeBankPaymentTarget = ref<{ order: OrderListItem; payment: OrderBankPaymentDetail } | null>(null)
@@ -606,6 +633,10 @@ const showEditPaidInStoreDialog = ref(false)
 const editPaidInStoreTarget = ref<OrderListItem | null>(null)
 const editPaidInStoreAmount = ref(0)
 const editPaidInStoreLoading = ref(false)
+
+const showCancelReservationDialog = ref(false)
+const cancelReservationTarget = ref<OrderListItem | null>(null)
+const cancelReservationLoading = ref(false)
 
 const maxEditPaidInStoreAmount = computed(() => {
     const t = editPaidInStoreTarget.value
@@ -1316,6 +1347,7 @@ const handleOrderTypeUpdated = (updatedOrder?: Order) => {
     // Limpiar estado temporal
     pendingOrderType.value = null
     originalOrderType.value = null
+    pendingDeleteReservationAssociations.value = false
 }
 
 const handleTypePendingChange = (newType: 'onsite' | 'delivery' | 'reservation') => {
@@ -1339,6 +1371,10 @@ const handleTypePendingChange = (newType: 'onsite' | 'delivery' | 'reservation')
     }
 }
 
+const handleReservationAssociatedDeleteConfirmed = () => {
+    pendingDeleteReservationAssociations.value = true
+}
+
 const handleOpenCustomerModalFromType = () => {
     showEditCustomerModal.value = true
 }
@@ -1358,6 +1394,7 @@ const handleCustomerModalClose = () => {
         }
         pendingOrderType.value = null
         originalOrderType.value = null
+        pendingDeleteReservationAssociations.value = false
     }
     showEditCustomerModal.value = false
 }
@@ -1378,7 +1415,10 @@ const handleOrderUpdated = async (updatedOrder?: Order) => {
                         customerId: orderAny.customerId,
                         addressId: orderAny.addressId,
                         guestName: orderAny.guestName,
-                        deliveryFee: orderAny.deliveryFee
+                        deliveryFee: orderAny.deliveryFee,
+                        ...(pendingDeleteReservationAssociations.value
+                            ? { deleteReservationAssociatedPayments: true }
+                            : {}),
                     })
 
                     // Actualización optimista con la respuesta del backend
@@ -1404,6 +1444,7 @@ const handleOrderUpdated = async (updatedOrder?: Order) => {
                     // Limpiar estado temporal
                     pendingOrderType.value = null
                     originalOrderType.value = null
+                    pendingDeleteReservationAssociations.value = false
                 } catch (err: any) {
                     error('Error al actualizar pedido', err.message)
                 }
@@ -1683,14 +1724,32 @@ const clearResFilters = () => {
     fetchReservations()
 }
 
-const handleCancelReservation = async (order: OrderListItem) => {
-    if (!confirm(`¿Cancelar la reserva #${order.id}?`)) return
+const reservationHasAssociatedPayments = (order: OrderListItem): boolean =>
+    (order.reservationDeposits?.length ?? 0) > 0 || (order.bankPayments?.length ?? 0) > 0
+
+const closeCancelReservationDialog = () => {
+    showCancelReservationDialog.value = false
+    cancelReservationTarget.value = null
+}
+
+const handleCancelReservation = (order: OrderListItem) => {
+    cancelReservationTarget.value = order
+    showCancelReservationDialog.value = true
+}
+
+const confirmCancelReservation = async () => {
+    const order = cancelReservationTarget.value
+    if (!order) return
+    cancelReservationLoading.value = true
     try {
         await orderApi.cancel(order.id, 'Cancelada manualmente')
         success('Reserva cancelada', 3000)
-        await fetchReservations()
+        await Promise.all([fetchReservations(), fetchOrders()])
+        closeCancelReservationDialog()
     } catch (err: any) {
         error('Error al cancelar', err.message || 'No se pudo cancelar la reserva')
+    } finally {
+        cancelReservationLoading.value = false
     }
 }
 

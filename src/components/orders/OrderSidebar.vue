@@ -231,7 +231,7 @@ const draftEditPaidInStoreAmount = ref(0)
 // Computed
 const currentOrder = computed(() => ordersStore.currentOrder)
 const currentTabId = computed(() => ordersStore.currentTabId)
-const { canSubmitOrder, orderErrors } = useOrderValidation(currentOrder.value || undefined)
+const { canSubmitOrder, orderErrors } = useOrderValidation()
 
 const showCopyAddressesButton = computed(() => {
     const o = currentOrder.value
@@ -446,11 +446,9 @@ const getAddress = (addressId: number | null, customer: Customer | null) => {
 
 const handlePaymentUpdated = () => {
     // Payment updated, totals recalculate automatically
-    console.log('Payment updated')
 }
 
 const handleViewCustomerDetail = (customer: any) => {
-    console.log('handleViewCustomerDetail', customer)
     selectedCustomer.value = customer
     showCustomerDetail.value = true
 }
@@ -460,9 +458,8 @@ const closeCustomerDetail = () => {
     selectedCustomer.value = null
 }
 
-const handleCustomerUpdated = (customer: any) => {
+const handleCustomerUpdated = () => {
     // Customer updated, refresh if needed
-    console.log('Customer updated:', customer)
 }
 
 const updateOrderNotes = (notes: string) => {
@@ -482,7 +479,6 @@ const updateIsLater = (value: boolean) => {
 
 const handleAddProducts = () => {
     // This would focus on the product grid or open a product selector
-    console.log('Add products from grid')
 }
 
 const handleSubmitOrder = async () => {
@@ -498,7 +494,7 @@ const handleSubmitOrder = async () => {
 
             // Show individual errors if multiple
             if (orderErrors.value.length > 1) {
-                orderErrors.value.slice(0, 3).forEach((error, index) => {
+                orderErrors.value.slice(0, 3).forEach((error: string, index: number) => {
                     setTimeout(() => {
                         showError('Requisito', error)
                     }, (index + 1) * 600)

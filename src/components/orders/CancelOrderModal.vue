@@ -14,7 +14,10 @@
                             <ul class="list-disc list-inside space-y-1">
                                 <li>El pedido pasará a estado "Cancelado"</li>
                                 <li>No se podrá revertir esta acción</li>
-                                <li>Los pagos asociados se marcarán como cancelados</li>
+                                <li v-if="hasReservationAssociatedPayments">
+                                    También se eliminarán las transferencias y abonos asociados
+                                </li>
+                                <li v-else>Los pagos asociados se marcarán como cancelados</li>
                             </ul>
                         </div>
                     </div>
@@ -113,6 +116,11 @@ const confirmed = ref(false)
 const canCancel = computed(() => {
     return cancelReason.value.trim().length > 10 && confirmed.value
 })
+
+const hasReservationAssociatedPayments = computed(() =>
+    props.order.type === 'reservation' &&
+    ((props.order.reservationDeposits?.length ?? 0) > 0 || (props.order.bankPayments?.length ?? 0) > 0)
+)
 
 // Métodos
 const handleCancel = async () => {

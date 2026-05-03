@@ -151,8 +151,8 @@ const handleCustomerSelected = (customer: Customer) => {
         if (currentOrderType !== 'reservation' && customer && customer.addresses && customer.addresses.length > 0) {
             const primaryAddress = customer.addresses.find(a => a.isPrimary)
             const addressToSelect = primaryAddress || customer.addresses[0]
+            ordersDraftsStore!.addAddressToCustomer(customer.id, addressToSelect, customer)
             ordersDraftsStore!.updateAddress(addressToSelect)
-            ordersDraftsStore!.addAddressToCustomer(customer.id, addressToSelect)
         } else {
             ordersDraftsStore!.updateAddress(null)
         }
@@ -173,10 +173,14 @@ const handleCustomerSelected = (customer: Customer) => {
 
 const handleAddressSelected = (address: CustomerAddress | undefined) => {
     if (props.mode === 'draft') {
-        ordersDraftsStore!.updateAddress(address || null)
         if (address && props.selectedCustomer) {
-            ordersDraftsStore!.addAddressToCustomer(props.selectedCustomer.id, address)
+            ordersDraftsStore!.addAddressToCustomer(
+                props.selectedCustomer.id,
+                address,
+                props.selectedCustomer,
+            )
         }
+        ordersDraftsStore!.updateAddress(address || null)
     } else {
         emit('address-selected', address || null)
     }

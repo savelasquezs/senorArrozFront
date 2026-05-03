@@ -254,7 +254,11 @@ const notifyOrderShownInKitchen = async (orderData: any, isReservation: boolean)
         }))
         const title = isReservation ? `Reserva #${order.id} en cocina` : `Nuevo pedido #${order.id}`
         const bodyText = KitchenService.generateOrderNotificationText(order, products)
-        const speechText = KitchenService.generateOrderSpeechText(order, products)
+        const speechText = KitchenService.generateOrderSpeechText(
+            order,
+            products,
+            ordersStore.current.notes ?? null
+        )
 
         if (soundEnabled.value) {
             if (permission.value === 'granted') {
@@ -289,11 +293,12 @@ const notifyKitchenOrderModified = async (
 ) => {
     const oid = orderData?.id
     const prev = oid ? allOrders.value.find((o) => o.id === oid) : undefined
+    const scheduleAnnouncement = kitchenChanges?.scheduleChanged === true
     let skip = ''
     if (!oid) skip = 'no_order_id'
-    else if (!prev) skip = 'no_prev_in_list'
-    else if (prev.status !== 'taken' && prev.status !== 'in_preparation') skip = `bad_status:${prev.status}`
-    else if (!KitchenService.isVisibleToActiveKitchenForAlerts(prev)) skip = 'not_visible_reservation_window'
+    else if (!prev && !scheduleAnnouncement) skip = 'no_prev_in_list'
+    else if (!scheduleAnnouncement && prev && prev.status !== 'taken' && prev.status !== 'in_preparation') skip = `bad_status:${prev.status}`
+    else if (!scheduleAnnouncement && prev && !KitchenService.isVisibleToActiveKitchenForAlerts(prev)) skip = 'not_visible_reservation_window'
     if (skip || !prev) return
 
     try {
@@ -335,7 +340,7 @@ const handleOrderModified = async (payload: any) => {
     const prev = data?.id ? allOrders.value.find((o) => o.id === data.id) : undefined
     const visible = prev ? KitchenService.isVisibleToActiveKitchenForAlerts(prev) : false
     if (!data?.id) return
-    if (prev && visible) {
+    if ((prev && visible) || kitchenChanges?.scheduleChanged) {
         await notifyKitchenOrderModified(data, kind, kitchenChanges)
     }
     await loadOrders()

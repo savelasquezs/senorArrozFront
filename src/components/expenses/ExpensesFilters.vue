@@ -80,6 +80,7 @@ import BaseButton from '@/components/ui/BaseButton.vue'
 import { DASHBOARD_PERIOD_PRESET_OPTIONS } from '@/utils/dashboardPeriodPresets'
 import type { DashboardPeriodPresetId } from '@/utils/dashboardPeriodPresets'
 import type { ExpenseFilterState } from '@/composables/useExpenseFilters'
+import { toNumberFilterList, toStringFilterList } from '@/utils/filterNormalization'
 import { zonedDayFromPickerLocalDate } from '@/utils/datetime'
 
 const esLocale = es
@@ -142,10 +143,16 @@ function onCustomRangeUpdate(v: Date[] | Date | null) {
 }
 
 function updateLocal<K extends keyof ExpenseFilterState>(key: K, value: ExpenseFilterState[K] | string | number | null) {
-    const normalized =
-        key === 'expenseName'
-            ? (value === null || value === undefined ? '' : String(value))
-            : value
+    let normalized: ExpenseFilterState[K]
+
+    if (key === 'expenseName') {
+        normalized = (value === null || value === undefined ? '' : String(value)) as ExpenseFilterState[K]
+    } else if (key === 'supplierIds') {
+        normalized = toNumberFilterList(value) as ExpenseFilterState[K]
+    } else {
+        normalized = toStringFilterList(value) as ExpenseFilterState[K]
+    }
+
     emit('update:localFilters', { ...props.localFilters, [key]: normalized as ExpenseFilterState[K] })
 }
 </script>

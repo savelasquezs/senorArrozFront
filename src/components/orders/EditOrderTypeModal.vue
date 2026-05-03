@@ -94,6 +94,21 @@
             <BaseButton variant="primary" :loading="saving" @click="confirmKitchenReservationSave">Continuar</BaseButton>
         </template>
     </BaseDialog>
+    <BaseDialog v-model="showReservationAssociationsConfirm" title="Modificar reserva" size="sm">
+        <p class="text-sm text-gray-600">
+            Esta reserva tiene abonos y/o transferencias asociadas. Al confirmar tambiÃ©n se eliminarÃ¡n las
+            transferencias y abonos asociados.
+        </p>
+        <template #footer>
+            <BaseButton variant="secondary" :disabled="saving" @click="showReservationAssociationsConfirm = false">
+                Cancelar
+            </BaseButton>
+            <BaseButton variant="primary" class="bg-red-600 hover:bg-red-700" :loading="saving"
+                @click="confirmReservationAssociationsSave">
+                Confirmar
+            </BaseButton>
+        </template>
+    </BaseDialog>
 </template>
 
 <script setup lang="ts">
@@ -119,6 +134,7 @@ const emit = defineEmits<{
     close: []
     updated: [order?: Order, paymentSnapshotBefore?: OrderPaymentSnapshot]
     'type-changed-pending': [newType: 'onsite' | 'delivery' | 'reservation']
+    'reservation-associated-delete-confirmed': []
     'open-customer-modal': []
 }>()
 
@@ -130,6 +146,8 @@ const selectedType = ref<'onsite' | 'delivery' | 'reservation'>(props.order.type
 const reservedForDate = ref<Date | null>(null)
 const prepareAtDate = ref<Date | null>(null)
 const showKitchenReservationWarn = ref(false)
+const showReservationAssociationsConfirm = ref(false)
+const pendingDeleteReservationAssociations = ref(false)
 
 function datesCloseEqual(a: Date | null, b: Date | null): boolean {
     if (!a && !b) return true
@@ -189,6 +207,11 @@ const validationWarning = computed(() => {
     return ''
 })
 
+const hasReservationAssociatedPayments = computed(() =>
+    props.order.type === 'reservation' &&
+    ((props.order.reservationDeposits?.length ?? 0) > 0 || (props.order.bankPayments?.length ?? 0) > 0)
+)
+
 watch(selectedType, (newType) => {
     if (newType !== 'reservation') {
         reservedForDate.value = null
@@ -227,7 +250,7 @@ watch(
     { immediate: true },
 )
 
-async function persistTypeChange() {
+async function persistTypeChange(deleteReservationAssociatedPayments = false) {
     const updateData: Record<string, unknown> = {
         type: selectedType.value,
     }
@@ -254,6 +277,10 @@ async function persistTypeChange() {
         updateData.addressId = null
     }
 
+    if (deleteReservationAssociatedPayments) {
+        updateData.deleteReservationAssociatedPayments = true
+    }
+
     const paymentSnapshotBefore = toPaymentSnapshot(props.order)
     const updatedOrder = await ordersStore.update(props.order.id, updateData as any)
 
@@ -266,17 +293,63 @@ async function confirmKitchenReservationSave() {
     showKitchenReservationWarn.value = false
     saving.value = true
     try {
-        await persistTypeChange()
+        await persistTypeChange(pendingDeleteReservationAssociations.value)
     } catch (err: any) {
         error('Error al actualizar tipo', err.message)
     } finally {
         saving.value = false
+        pendingDeleteReservationAssociations.value = false
+    }
+}
+
+async function confirmReservationAssociationsSave() {
+    showReservationAssociationsConfirm.value = false
+    pendingDeleteReservationAssociations.value = true
+    emit('reservation-associated-delete-confirmed')
+    await continueSaveAfterAssociationConfirmation()
+}
+
+async function continueSaveAfterAssociationConfirmation() {
+    const needsCustomerSetup =
+        selectedType.value === 'delivery' &&
+        (!props.order.customerId || !props.order.addressId || !props.order.guestName)
+
+    const needsReservationSetup =
+        selectedType.value === 'reservation' && (!props.order.guestName || !reservedForDate.value)
+
+    if (needsCustomerSetup || needsReservationSetup) {
+        emit('type-changed-pending', selectedType.value)
+        emit('open-customer-modal')
+        emit('close')
+        return
+    }
+
+    const inKitchen = props.order.status === 'taken' || props.order.status === 'in_preparation'
+    if (inKitchen && selectedType.value === 'reservation') {
+        showKitchenReservationWarn.value = true
+        return
+    }
+
+    saving.value = true
+    try {
+        await persistTypeChange(pendingDeleteReservationAssociations.value)
+    } catch (err: any) {
+        error('Error al actualizar tipo', err.message)
+    } finally {
+        saving.value = false
+        pendingDeleteReservationAssociations.value = false
     }
 }
 
 const handleSave = async () => {
     saving.value = true
     try {
+        if (!pendingDeleteReservationAssociations.value && hasReservationAssociatedPayments.value) {
+            saving.value = false
+            showReservationAssociationsConfirm.value = true
+            return
+        }
+
         const needsCustomerSetup =
             selectedType.value === 'delivery' &&
             (!props.order.customerId || !props.order.addressId || !props.order.guestName)
@@ -285,6 +358,9 @@ const handleSave = async () => {
             selectedType.value === 'reservation' && (!props.order.guestName || !reservedForDate.value)
 
         if (needsCustomerSetup || needsReservationSetup) {
+            if (pendingDeleteReservationAssociations.value) {
+                emit('reservation-associated-delete-confirmed')
+            }
             emit('type-changed-pending', selectedType.value)
             emit('open-customer-modal')
             emit('close')
@@ -297,11 +373,12 @@ const handleSave = async () => {
             return
         }
 
-        await persistTypeChange()
+        await persistTypeChange(pendingDeleteReservationAssociations.value)
     } catch (err: any) {
         error('Error al actualizar tipo', err.message)
     } finally {
         saving.value = false
+        pendingDeleteReservationAssociations.value = false
     }
 }
 </script>

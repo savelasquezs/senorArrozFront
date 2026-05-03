@@ -1,4 +1,3 @@
-<!-- src/components/ui/BaseSelect.vue -->
 <template>
 	<div class="relative" ref="selectRef">
 		<label v-if="label" :for="id" :class="labelClass">
@@ -7,7 +6,6 @@
 		</label>
 
 		<div class="relative" ref="triggerWrapRef">
-			<!-- Input/Button -->
 			<button type="button" :id="id" @click="toggleDropdown" @keydown.enter.space.prevent="toggleDropdown"
 				@keydown.escape="closeDropdown" @keydown.up.prevent="highlightPrevious"
 				@keydown.down.prevent="highlightNext" @keydown.enter.prevent="selectHighlighted"
@@ -19,8 +17,8 @@
 				]" :disabled="disabled" :aria-expanded="isOpen" :aria-haspopup="true">
 				<span class="flex items-center min-h-[1.25rem]">
 					<slot name="icon" />
-					<span class="block truncate" :class="[{ 'text-gray-500': !selectedOption }, textSizeClass]">
-						{{ selectedOption ? selectedOption[displayKey] : placeholder }}
+					<span class="block truncate" :class="[{ 'text-gray-500': !hasSelection }, textSizeClass]">
+						{{ selectedLabel }}
 					</span>
 				</span>
 				<span class="absolute inset-y-0 right-0 flex items-center pointer-events-none" :class="chevronPadClass">
@@ -37,7 +35,6 @@
 							dropdownTextClass,
 						]"
 						:style="teleportDropdown ? floatingStyle : undefined">
-						<!-- Search Input -->
 						<div v-if="searchable" :class="searchWrapClass">
 							<input ref="searchInput" v-model="searchQuery" type="text"
 								:placeholder="`Buscar ${label?.toLowerCase() || 'opción'}...`"
@@ -47,7 +44,6 @@
 								@keydown.enter.prevent="selectHighlighted" @keydown.escape="closeDropdown" />
 						</div>
 
-						<!-- Options -->
 						<div v-if="filteredOptions.length > 0">
 							<div v-for="(option, index) in filteredOptions" :key="option[valueKey]"
 								@click="selectOption(option)" @mouseenter="highlightedIndex = index"
@@ -73,7 +69,6 @@
 							</div>
 						</div>
 
-						<!-- Create Option -->
 						<div v-if="showCreateOption" @click="handleCreateOption"
 							@mouseenter="highlightedIndex = filteredOptions.length"
 							class="relative cursor-pointer select-none hover:bg-blue-50 border-t border-gray-200"
@@ -91,7 +86,6 @@
 							</div>
 						</div>
 
-						<!-- No options -->
 						<div v-else-if="filteredOptions.length === 0"
 							class="relative cursor-default select-none text-gray-500" :class="optionRowClass">
 							{{
@@ -110,8 +104,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, nextTick, onMounted, onUnmounted } from 'vue'
-import { ChevronUpDownIcon, CheckIcon, PlusIcon } from '@heroicons/vue/24/outline'
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
+import { CheckIcon, ChevronUpDownIcon, PlusIcon } from '@heroicons/vue/24/outline'
 
 interface Option {
 	[key: string]: any
@@ -131,9 +125,8 @@ interface Props {
 	id?: string
 	allowCreate?: boolean
 	createLabel?: string
-	/** Si es true, el panel se renderiza en `body` con posición fija (evita quedar bajo AG Grid u overflow). */
+	multiple?: boolean
 	teleportDropdown?: boolean
-	/** `sm`: trigger y lista más compactos. */
 	size?: 'md' | 'sm'
 }
 
@@ -144,38 +137,11 @@ const props = withDefaults(defineProps<Props>(), {
 	searchable: true,
 	allowCreate: false,
 	createLabel: 'Crear',
+	multiple: false,
 	teleportDropdown: false,
 	size: 'md',
 	id: () => `select-${Math.random().toString(36).substr(2, 9)}`,
 })
-
-const labelClass = computed(() =>
-	props.size === 'sm'
-		? 'block text-xs font-medium text-gray-600 mb-0.5'
-		: 'block text-sm font-medium text-gray-700 mb-1',
-)
-
-const triggerSizeClass = computed(() =>
-	props.size === 'sm' ? 'pl-2 pr-7 py-1.5 text-xs leading-tight' : 'pl-3 pr-10 py-2 sm:text-sm',
-)
-
-const textSizeClass = computed(() => (props.size === 'sm' ? 'text-xs' : ''))
-
-const chevronPadClass = computed(() => (props.size === 'sm' ? 'pr-1' : 'pr-2'))
-
-const chevronIconClass = computed(() => (props.size === 'sm' ? 'w-4 h-4' : 'w-5 h-5'))
-
-const dropdownTextClass = computed(() => (props.size === 'sm' ? 'text-xs' : 'sm:text-sm'))
-
-const searchWrapClass = computed(() => (props.size === 'sm' ? 'p-1.5' : 'p-2'))
-
-const searchInputClass = computed(() =>
-	props.size === 'sm' ? 'px-2 py-1 text-xs' : 'px-3 py-2 text-sm',
-)
-
-const optionRowClass = computed(() => (props.size === 'sm' ? 'py-1.5 px-2' : 'py-2 px-3'))
-
-const descTextClass = computed(() => (props.size === 'sm' ? 'text-[11px]' : 'text-sm'))
 
 const emit = defineEmits<{
 	'update:modelValue': [value: any]
@@ -189,8 +155,76 @@ const searchInput = ref<HTMLInputElement>()
 const isOpen = ref(false)
 const searchQuery = ref('')
 const highlightedIndex = ref(-1)
-
 const floatingStyle = ref<Record<string, string>>({})
+
+const labelClass = computed(() =>
+	props.size === 'sm'
+		? 'block text-xs font-medium text-gray-600 mb-0.5'
+		: 'block text-sm font-medium text-gray-700 mb-1',
+)
+
+const triggerSizeClass = computed(() =>
+	props.size === 'sm' ? 'pl-2 pr-7 py-1.5 text-xs leading-tight' : 'pl-3 pr-10 py-2 sm:text-sm',
+)
+
+const textSizeClass = computed(() => (props.size === 'sm' ? 'text-xs' : ''))
+const chevronPadClass = computed(() => (props.size === 'sm' ? 'pr-1' : 'pr-2'))
+const chevronIconClass = computed(() => (props.size === 'sm' ? 'w-4 h-4' : 'w-5 h-5'))
+const dropdownTextClass = computed(() => (props.size === 'sm' ? 'text-xs' : 'sm:text-sm'))
+const searchWrapClass = computed(() => (props.size === 'sm' ? 'p-1.5' : 'p-2'))
+const searchInputClass = computed(() =>
+	props.size === 'sm' ? 'px-2 py-1 text-xs' : 'px-3 py-2 text-sm',
+)
+const optionRowClass = computed(() => (props.size === 'sm' ? 'py-1.5 px-2' : 'py-2 px-3'))
+const descTextClass = computed(() => (props.size === 'sm' ? 'text-[11px]' : 'text-sm'))
+
+const selectedValues = computed<any[]>(() => {
+	if (!props.multiple) {
+		return props.modelValue === null || props.modelValue === undefined ? [] : [props.modelValue]
+	}
+	return Array.isArray(props.modelValue) ? props.modelValue : []
+})
+
+const selectedOptions = computed(() =>
+	props.options.filter((option) => selectedValues.value.includes(option[props.valueKey])),
+)
+
+const hasSelection = computed(() => selectedValues.value.length > 0)
+
+const selectedLabel = computed(() => {
+	if (!hasSelection.value) return props.placeholder
+	if (!props.multiple) return selectedOptions.value[0]?.[props.displayKey] ?? props.placeholder
+	return selectedOptions.value.map((option) => option[props.displayKey]).join(', ')
+})
+
+const filteredOptions = computed(() => {
+	if (!props.searchable || !searchQuery.value) {
+		return props.options
+	}
+
+	const query = searchQuery.value.toLowerCase()
+	return props.options.filter(
+		(option) =>
+			String(option[props.displayKey]).toLowerCase().includes(query) ||
+			(option.description && String(option.description).toLowerCase().includes(query)),
+	)
+})
+
+const showCreateOption = computed(() => {
+	if (!props.allowCreate || !props.searchable || !searchQuery.value.trim()) {
+		return false
+	}
+
+	const exactMatch = props.options.find(option =>
+		String(option[props.displayKey]).toLowerCase() === searchQuery.value.toLowerCase(),
+	)
+
+	return !exactMatch && searchQuery.value.length >= 2
+})
+
+function isSelected(option: Option) {
+	return selectedValues.value.includes(option[props.valueKey])
+}
 
 function syncFloatingPosition() {
 	if (!props.teleportDropdown || !triggerWrapRef.value) return
@@ -211,45 +245,7 @@ function onScrollOrResize() {
 	}
 }
 
-const selectedOption = computed(() => {
-	if (props.modelValue === null || props.modelValue === undefined) return null
-	return (
-		props.options.find(
-			(option) => option[props.valueKey] === props.modelValue,
-		) || null
-	)
-})
-
-const filteredOptions = computed(() => {
-	if (!props.searchable || !searchQuery.value) {
-		return props.options
-	}
-
-	const query = searchQuery.value.toLowerCase()
-	return props.options.filter(
-		(option) =>
-			option[props.displayKey].toLowerCase().includes(query) ||
-			(option.description && option.description.toLowerCase().includes(query)),
-	)
-})
-
-const showCreateOption = computed(() => {
-	if (!props.allowCreate || !props.searchable || !searchQuery.value.trim()) {
-		return false
-	}
-
-	const exactMatch = props.options.find(option =>
-		option[props.displayKey].toLowerCase() === searchQuery.value.toLowerCase(),
-	)
-
-	return !exactMatch && searchQuery.value.length >= 2
-})
-
-const isSelected = (option: Option) => {
-	return option[props.valueKey] === props.modelValue
-}
-
-const toggleDropdown = () => {
+function toggleDropdown() {
 	if (props.disabled) return
 	isOpen.value = !isOpen.value
 
@@ -265,31 +261,46 @@ const toggleDropdown = () => {
 	}
 }
 
-const closeDropdown = () => {
+function closeDropdown() {
 	isOpen.value = false
 	searchQuery.value = ''
 	highlightedIndex.value = -1
 }
 
-const selectOption = (option: Option) => {
-	emit('update:modelValue', option[props.valueKey])
-	closeDropdown()
+function selectOption(option: Option) {
+	if (!props.multiple) {
+		emit('update:modelValue', option[props.valueKey])
+		closeDropdown()
+		return
+	}
+
+	const value = option[props.valueKey]
+	const next = [...selectedValues.value]
+	const index = next.findIndex((item) => item === value)
+
+	if (index >= 0) {
+		next.splice(index, 1)
+	} else {
+		next.push(value)
+	}
+
+	emit('update:modelValue', next)
 }
 
-const highlightNext = () => {
+function highlightNext() {
 	const maxIndex = filteredOptions.value.length + (showCreateOption.value ? 1 : 0) - 1
 	if (highlightedIndex.value < maxIndex) {
 		highlightedIndex.value++
 	}
 }
 
-const highlightPrevious = () => {
+function highlightPrevious() {
 	if (highlightedIndex.value > 0) {
 		highlightedIndex.value--
 	}
 }
 
-const selectHighlighted = () => {
+function selectHighlighted() {
 	if (
 		highlightedIndex.value >= 0 &&
 		highlightedIndex.value < filteredOptions.value.length
@@ -300,12 +311,12 @@ const selectHighlighted = () => {
 	}
 }
 
-const handleCreateOption = () => {
+function handleCreateOption() {
 	emit('create', searchQuery.value)
 	closeDropdown()
 }
 
-const handleClickOutside = (event: Event) => {
+function handleClickOutside(event: Event) {
 	const t = event.target as Node
 	if (selectRef.value?.contains(t)) return
 	if (dropdownPanelRef.value?.contains(t)) return
@@ -314,9 +325,7 @@ const handleClickOutside = (event: Event) => {
 
 watch(isOpen, (newValue) => {
 	if (newValue) {
-		highlightedIndex.value = filteredOptions.value.findIndex(
-			(option) => option[props.valueKey] === props.modelValue,
-		)
+		highlightedIndex.value = filteredOptions.value.findIndex((option) => isSelected(option))
 		if (props.teleportDropdown) {
 			nextTick(() => syncFloatingPosition())
 			window.addEventListener('scroll', onScrollOrResize, true)

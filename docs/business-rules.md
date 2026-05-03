@@ -96,6 +96,7 @@ enum UserRole {
 - **Pedidos en curso**: Vista de los pedidos en ruta de entrega
 - **Geolocalización**: Vista con Google Maps de pedidos "OnTheWay" asignados
 - **Entrega automática**: Opción de marcar como entregado al estar a 20m o menos del destino 
+- **Push FCM “pedido listo” (`order_ready`)**: Solo reciben el push los domiciliarios activos de la sucursal que ese día calendario (**America/Bogota**) tienen al menos un pedido con instante de **asignación** incluido en `orders.status_times` (clave preferente `delivery_man_assigned`, guardada en cada asignación/reasignación; si falta en datos antiguos se usa como respaldo `ontheway` / `on_the_way`), que **no** tengan liquidación total del día (`deliveryman_day_states.blocked` para esa fecha), y que **no** estén “ocupados” con algún pedido en estado **OnTheWay** en esa sucursal. SignalR (`OrderReady` en el grupo de delivery de la sucursal) no cambia con esta regla.
 
 ## Zona horaria y fechas de negocio
 
@@ -244,6 +245,10 @@ CANCELLED  CANCELLED   CANCELLED  CANCELLED
 - **Efectivo puro**: Si no hay `expense_bank_payment` → 100% efectivo
 - **Movimientos internos**: Entre bancos y caja-bancos usando `bank_payment` (income) y `expense_bank_payment` (outcome)
 
+- **Listado de gastos (`/expenseheaders`)**: Los filtros por rango de fechas, proveedor, banco, categorÃ­a y texto de nombre del gasto se aplican en servidor; la paginaciÃ³n y el total reflejan ese conjunto filtrado.
+- **LÃ­neas filtradas**: Si el filtro incluye categorÃ­a o texto de nombre de gasto, cada factura devuelve solo las `expenseDetails` que coinciden para que la grilla no muestre lÃ­neas fuera del criterio.
+- **Debounce**: Los filtros escritos del listado de gastos usan debounce corto (~300 ms); selects, fechas y orden consultan inmediatamente.
+
 ### Cuadre de caja (total esperado global)
 - **Fórmula esperada**: `(C0 + B0 + L0 + A0) + ventas del período − gastos del período + Σ abonos de reserva (en el período por `ReceivedAt`) cuyo **día de entrega/programación del pedido** en calendario Colombia no es hoy (`PrepareAt` si existe; si no, `CreatedAt`)`, donde `C0+B0+L0+A0` es la apertura del último cierre: efectivo contado + saldos reales por banco (incluye cuentas operativas, apps y caja mayor según bancos configurados) + snapshot de préstamos informales + **snapshot de apps pendientes por liquidar** (`A0`, JSON por app guardado en el cierre anterior). Si el cierre anterior no tenía snapshot de apps, `A0 = 0`. Los abonos siguen reflejándose en el esperado por banco; la suma al global ajusta el total esperado cuando la entrega de la reserva no cae en el día actual (CO).
 - **Total contado al cerrar** (debe coincidir con el esperado): efectivo físico (`closingCash`) + suma de saldos reales por banco del cuadre + **suma actual de pagos vía app no liquidados** (pedidos entregados) + préstamos informales activos (`L1`). Los bancos incluyen la fila de caja mayor efectivo cuando aplique. El **pendiente en apps** no es un campo aparte que el usuario edita: se toma del sistema en el momento del cierre y se persiste como snapshot para `A0` del siguiente período.
@@ -267,6 +272,12 @@ CANCELLED  CANCELLED   CANCELLED  CANCELLED
 - **Aplicación**: Se aplica según `loyalty_rule` al momento de crear el pedido
 - **Condiciones**: Solo se aplica si se asigna cliente al pedido
 - **Cancelación**: Pedidos cancelados no suman puntos de fidelización
+
+### Reservas con abonos o transferencias
+
+- Al cancelar una reserva que tenga abonos (`reservationDeposits`) y/o transferencias bancarias (`bankPayments`), la UI debe mostrar confirmación indicando que también se eliminarán esos registros asociados.
+- Al modificar una reserva desde los modales de edición de cliente/dirección o tipo/horario, si existen abonos y/o transferencias, la UI debe pedir confirmación antes de guardar.
+- Si el usuario confirma la operación, el backend elimina todos los abonos de reserva y transferencias bancarias asociados al pedido.
 
 ## 🏪 Gestión de Sucursales
 

@@ -111,6 +111,10 @@ export interface UpdateExpenseDetailDto {
 export interface ExpenseHeaderFilters {
     fromDate?: string
     toDate?: string
+    supplierIds?: number[]
+    bankNames?: string[]
+    categoryNames?: string[]
+    expenseName?: string
     page?: number
     pageSize?: number
     sortBy?: string

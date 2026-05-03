@@ -652,5 +652,5 @@ if (soundEnabled.value) {
 - [docs/components.md](./components.md) - Guía completa de componentes
 - [docs/development.md](./development.md) - Convenciones de desarrollo
 - [docs/modules/kitchen.md](./modules/kitchen.md) - Módulo de cocina completo
-- [.cursorrules](../.cursorrules) - Reglas para agentes IA
+- [AGENTS.md](../AGENTS.md) - Reglas para Codex y otros agentes
 

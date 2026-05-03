@@ -7,7 +7,7 @@
                 'has-items': tab.itemCount > 0
             }" :title="tabTitle(tab)" @click="switchTab(tab.tabId)">
                 <span class="tab-label">{{ tabLabel(tab) }}</span>
-                <BaseButton @click.stop="closeTab(tab.tabId)" variant="ghost" size="sm" class="close-button"
+                <BaseButton @click.stop="handleCloseTabClick(tab.tabId)" variant="ghost" size="sm" class="close-button"
                     title="Cerrar pedido">
                     <XMarkIcon class="w-3 h-3" />
                 </BaseButton>
@@ -19,16 +19,33 @@
                 <PlusIcon class="w-4 h-4" />
             </BaseButton>
         </div>
+
+        <BaseDialog v-model="showCloseTabConfirmDialog" title="Cerrar pedido" size="sm">
+            <p class="text-sm text-gray-600">
+                ¿Estás seguro de que quieres cerrar {{ closeConfirmTargetPhrase }}?
+                Se perderán todos los productos (<span class="font-medium tabular-nums">{{ pendingCloseItemCount }}</span>)
+                del pedido.
+            </p>
+            <template #footer>
+                <BaseButton variant="secondary" size="sm" @click="cancelCloseTab">
+                    Cancelar
+                </BaseButton>
+                <BaseButton variant="primary" size="sm" class="bg-red-600 hover:bg-red-700" @click="confirmCloseTab">
+                    Cerrar pedido
+                </BaseButton>
+            </template>
+        </BaseDialog>
     </div>
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useOrdersDraftsStore } from '@/store/ordersDrafts'
 import { useOrderTabs } from '@/composables/useOrderTabs'
 
 // Components
 import BaseButton from '@/components/ui/BaseButton.vue'
+import BaseDialog from '@/components/ui/BaseDialog.vue'
 
 // Icons
 import {
@@ -62,6 +79,18 @@ function closeConfirmPhrase(tabId: string): string {
     return `"${title}"`
 }
 
+const showCloseTabConfirmDialog = ref(false)
+const pendingCloseTabId = ref<string | null>(null)
+
+const closeConfirmTargetPhrase = computed(() =>
+    pendingCloseTabId.value ? closeConfirmPhrase(pendingCloseTabId.value) : 'este pedido',
+)
+
+const pendingCloseItemCount = computed(() => {
+    if (!pendingCloseTabId.value) return 0
+    return ordersStore.draftOrders.get(pendingCloseTabId.value)?.orderItems.length ?? 0
+})
+
 const createNewTab = () => {
     orderTabsComposable.createNewTab()
 }
@@ -70,17 +99,28 @@ const switchTab = (tabId: string) => {
     orderTabsComposable.switchTab(tabId)
 }
 
-const closeTab = (tabId: string) => {
-    // Verificar si hay items en la orden
+const handleCloseTabClick = (tabId: string) => {
     const order = ordersStore.draftOrders.get(tabId)
     if (order && order.orderItems.length > 0) {
-        const confirmed = confirm(
-            `¿Estás seguro de que quieres cerrar ${closeConfirmPhrase(tabId)}? Se perderán todos los productos (${order.orderItems.length}) del pedido.`
-        )
-        if (!confirmed) return
+        pendingCloseTabId.value = tabId
+        showCloseTabConfirmDialog.value = true
+        return
     }
-
     orderTabsComposable.closeTab(tabId)
+}
+
+const cancelCloseTab = () => {
+    showCloseTabConfirmDialog.value = false
+}
+
+watch(showCloseTabConfirmDialog, (open) => {
+    if (!open) pendingCloseTabId.value = null
+})
+
+const confirmCloseTab = () => {
+    const tabId = pendingCloseTabId.value
+    showCloseTabConfirmDialog.value = false
+    if (tabId) orderTabsComposable.closeTab(tabId)
 }
 </script>
 
