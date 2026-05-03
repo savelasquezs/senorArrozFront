@@ -144,6 +144,7 @@ export interface BankPayment {
     branchId: number
     branchName: string
     amount: number
+    sourceReservationDepositId?: number | null
     verifiedAt?: string
     isVerified: boolean
     createdAt: string
