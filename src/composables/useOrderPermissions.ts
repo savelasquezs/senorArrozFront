@@ -1,5 +1,6 @@
 // src/composables/useOrderPermissions.ts
 import { useAuthStore } from '@/store/auth'
+import { defaultBusinessCalendar } from '@/utils/datetime'
 import type { OrderListItem, OrderStatus, OrderType } from '@/types/order'
 import type { OrderDetailView } from '@/types/order'
 /**
@@ -21,6 +22,10 @@ export function useOrderPermissions() {
             orderCreated.getDate() === today.getDate()
         )
     }
+
+    /** Mismo día calendario que «hoy» en zona de negocio (America/Bogota), alineado al backend. */
+    const isSameBusinessDay = (instant: string | Date): boolean =>
+        defaultBusinessCalendar.formatYmd(instant) === defaultBusinessCalendar.todayYmd()
 
     /**
      * Verifica si el usuario puede editar datos básicos del pedido
@@ -101,9 +106,13 @@ export function useOrderPermissions() {
         // Superadmin puede modificar pagos sin restricciones
         if (role === 'Superadmin') return true
 
-        // Admin y Cashier: solo pueden modificar pagos del mismo día
+        // Admin y Cashier: mismo día (CO) que creación o, si existe, que prepareAt (reservas anticipadas)
         if (role === 'Admin' || role === 'Cashier') {
-            return isSameDay(order.createdAt)
+            const sameDayCreated = isSameBusinessDay(order.createdAt)
+            const pa = order.prepareAt
+            const sameDayPrepare =
+                pa != null && pa !== '' && isSameBusinessDay(pa)
+            return sameDayCreated || sameDayPrepare
         }
 
         return false
@@ -148,7 +157,15 @@ export function useOrderPermissions() {
         if (role !== 'Admin' && role !== 'Superadmin') return false
         if (order.status === 'cancelled') return false
 
-        if (isScheduledReservationOrder(order)) return isSameDay(order.createdAt)
+        if (isScheduledReservationOrder(order)) {
+            const rf = order.reservedFor
+            const pa = order.prepareAt
+            return (
+                isSameBusinessDay(order.createdAt) ||
+                (pa != null && pa !== '' && isSameBusinessDay(pa)) ||
+                (rf != null && rf !== '' && isSameBusinessDay(rf))
+            )
+        }
 
         return true
     }

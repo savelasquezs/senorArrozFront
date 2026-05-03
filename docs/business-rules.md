@@ -200,6 +200,7 @@ CANCELLED  CANCELLED   CANCELLED  CANCELLED
 3. **READY → ON_THE_WAY**: Solo Deliveryman, Admin
 4. **ON_THE_WAY → DELIVERED**: Solo Deliveryman, Admin
 5. **Cualquier estado → CANCELLED**: Solo Admin, Superadmin (requiere motivo)
+- **Reserva con horario** (`prepare_at` y `reserved_for`): Admin/Superadmin pueden cancelar solo si el **día calendario en Colombia** coincide con el de **`createdAt`**, con el de **`prepareAt`** o con el de **`reservedFor`** (p. ej. reserva registrada con anticipación pero entrega hoy). Backend: `CancelOrderHandler`; POS: `useOrderPermissions.canCancel`.
 
 ## 💰 Sistema de Pagos
 
@@ -221,6 +222,7 @@ CANCELLED  CANCELLED   CANCELLED  CANCELLED
 - **Cálculo**: Diferencia no cubierta por apps/bancos
 - **Registro**: Se considera automáticamente como efectivo
 - **Validación**: Suma de pagos ≤ total del pedido
+- **Permisos de edición (banco/app, montos)**: Admin, Superadmin y Cajero pueden modificar pagos del pedido cuando el **día calendario en Colombia** coincide con el de **`createdAt`** **o**, si existe, con el de **`prepareAt`** (caso típico: reserva registrada días antes y pago el día de preparación). Superadmin no tiene esa limitación. Backend: `OrderBusinessRulesService.CanModifyPayments`; POS: `useOrderPermissions.canEditPayments`.
 
 #### Efectivo cobrado en tienda (`paid_in_store_cash`)
 - **Quién puede marcar, ajustar monto o quitar**: Admin, Superadmin y Cajero (misma autorización que el endpoint `PUT /orders/{id}/paid-in-store-cash`).
