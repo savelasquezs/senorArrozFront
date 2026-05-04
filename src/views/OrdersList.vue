@@ -284,8 +284,8 @@
                         </div>
                     </div>
 
-                    <div class="bg-white rounded-lg shadow overflow-hidden min-w-0">
-                        <div class="overflow-x-auto">
+                    <div class="bg-white rounded-lg shadow overflow-hidden min-w-0 flex flex-col max-h-[min(78vh,48rem)]">
+                        <div class="overflow-y-auto overflow-x-auto min-h-0 min-w-0 flex-1">
                             <ReservationsTable :reservations="resFilteredItems" :loading="resLoading"
                                 :sort-by="resSortBy" :sort-order="resSortOrder" @edit-customer="handleEditCustomer"
                                 @edit-address="handleEditAddress" @add-deposit="handleOpenDeposit"

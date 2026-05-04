@@ -81,14 +81,7 @@
                                 class="shrink-0 text-sm font-medium text-emerald-600 hover:text-emerald-700 hover:underline whitespace-nowrap tabular-nums">
                                 #{{ order.id }}
                             </router-link>
-                            <div v-if="productPreviewLines(order).length"
-                                class="min-w-0 flex-1 text-xs text-gray-600 leading-snug space-y-0.5">
-                                <div v-for="(line, idx) in productPreviewLines(order)" :key="idx"
-                                    :class="line === '....' ? 'text-gray-400' : 'line-clamp-2 break-words'"
-                                    :title="line === '....' ? undefined : line">
-                                    {{ line }}
-                                </div>
-                            </div>
+                            <OrderSummaryLines :lines="order.summaryLines" />
                         </div>
                     </td>
 
@@ -284,6 +277,7 @@ import OrderBankPaymentRow from '@/components/payments/OrderBankPaymentRow.vue'
 import OrderAppPaymentRow from '@/components/payments/OrderAppPaymentRow.vue'
 import PaidInStoreCashCompactRow from '@/components/orders/PaidInStoreCashCompactRow.vue'
 import ReservationDepositCompactRow from '@/components/reservations/ReservationDepositCompactRow.vue'
+import OrderSummaryLines from '@/components/orders/OrderSummaryLines.vue'
 import { useFormatting, getStatusTimeFromRecord } from '@/composables/useFormatting'
 import { useOrderPermissions } from '@/composables/useOrderPermissions'
 import {
@@ -431,12 +425,4 @@ function paidInStoreCashCap(order: OrderListItem): number {
     return Math.max(0, order.total - bank - app)
 }
 
-/** Hasta 2 líneas de producto × cantidad; si hay más ítems, tercera línea "....". */
-function productPreviewLines(order: OrderListItem): string[] {
-    const lines = order.summaryLines ?? []
-    if (lines.length === 0) return []
-    const formatted = lines.map((l) => `${l.productName} × ${l.quantity}`)
-    if (formatted.length <= 2) return formatted
-    return [...formatted.slice(0, 2), '....']
-}
 </script>
