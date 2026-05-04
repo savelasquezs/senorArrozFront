@@ -1,6 +1,6 @@
 <template>
     <div class="overflow-x-auto">
-        <table class="min-w-[92rem] w-full table-fixed divide-y divide-gray-200">
+        <table class="min-w-[96rem] w-full table-fixed divide-y divide-gray-200">
             <thead class="sticky top-0 z-10 bg-gray-50 shadow-sm">
                 <tr>
                     <th scope="col"
@@ -14,15 +14,19 @@
                         </div>
                     </th>
                     <th scope="col"
-                        class="w-[15%] px-2.5 py-2 text-left text-[10px] font-semibold uppercase tracking-[0.12em] text-gray-500">
+                        class="w-[13%] px-2.5 py-2 text-left text-[10px] font-semibold uppercase tracking-[0.12em] text-gray-500">
+                        Productos
+                    </th>
+                    <th scope="col"
+                        class="w-[13%] px-2.5 py-2 text-left text-[10px] font-semibold uppercase tracking-[0.12em] text-gray-500">
                         Cliente / tel.
                     </th>
                     <th scope="col"
-                        class="w-[15%] px-2.5 py-2 text-left text-[10px] font-semibold uppercase tracking-[0.12em] text-gray-500">
+                        class="w-[13%] px-2.5 py-2 text-left text-[10px] font-semibold uppercase tracking-[0.12em] text-gray-500">
                         Dirección / barrio
                     </th>
                     <th scope="col"
-                        class="w-[11%] px-2.5 py-2 text-left text-[10px] font-semibold uppercase tracking-[0.12em] text-gray-500 cursor-pointer hover:bg-gray-100"
+                        class="w-[10%] px-2.5 py-2 text-left text-[10px] font-semibold uppercase tracking-[0.12em] text-gray-500 cursor-pointer hover:bg-gray-100"
                         @click="$emit('sort', 'reservedFor')">
                         <div class="flex items-center gap-1">
                             <CalendarDaysIcon class="w-3.5 h-3.5 text-amber-500" />
@@ -33,19 +37,19 @@
                         </div>
                     </th>
                     <th scope="col"
-                        class="w-[11%] px-2.5 py-2 text-left text-[10px] font-semibold uppercase tracking-[0.12em] text-gray-500">
+                        class="w-[10%] px-2.5 py-2 text-left text-[10px] font-semibold uppercase tracking-[0.12em] text-gray-500">
                         Preparación
                     </th>
                     <th scope="col"
-                        class="w-[16%] px-2.5 py-2 text-left text-[10px] font-semibold uppercase tracking-[0.12em] text-gray-500">
-                        Productos
+                        class="w-[9%] px-2.5 py-2 text-left text-[10px] font-semibold uppercase tracking-[0.12em] text-gray-500">
+                        Total
                     </th>
                     <th scope="col"
-                        class="w-[11%] px-2.5 py-2 text-left text-[10px] font-semibold uppercase tracking-[0.12em] text-gray-500">
-                        Total / abonos
+                        class="w-[14%] px-2.5 py-2 text-left text-[10px] font-semibold uppercase tracking-[0.12em] text-gray-500">
+                        Abonos
                     </th>
                     <th scope="col"
-                        class="w-[7%] px-2.5 py-2 text-left text-[10px] font-semibold uppercase tracking-[0.12em] text-gray-500">
+                    class="w-[7%] px-2.5 py-2 text-left text-[10px] font-semibold uppercase tracking-[0.12em] text-gray-500">
                         Estado
                     </th>
                     <th scope="col"
@@ -60,14 +64,14 @@
             </thead>
             <tbody class="bg-white divide-y divide-gray-100">
                 <tr v-if="loading">
-                    <td colspan="10" class="px-4 py-10 text-center text-gray-500">
+                    <td colspan="11" class="px-4 py-10 text-center text-gray-500">
                         <div class="flex justify-center">
                             <BaseLoading size="md" />
                         </div>
                     </td>
                 </tr>
                 <tr v-else-if="!reservations || reservations.length === 0">
-                    <td colspan="10" class="px-4 py-10 text-center text-gray-500">
+                    <td colspan="11" class="px-4 py-10 text-center text-gray-500">
                         No se encontraron reservas
                     </td>
                 </tr>
@@ -78,6 +82,10 @@
                             class="text-sm font-medium text-emerald-600 hover:text-emerald-700 hover:underline tabular-nums">
                             #{{ reservation.id }}
                         </router-link>
+                    </td>
+
+                    <td class="px-2.5 py-2 align-top">
+                        <OrderSummaryLines :lines="reservation.summaryLines" :max-lines="2" />
                     </td>
 
                     <td class="px-2.5 py-2 align-top">
@@ -146,29 +154,18 @@
                     </td>
 
                     <td class="px-2.5 py-2 align-top">
-                        <OrderSummaryLines :lines="reservation.summaryLines" :max-lines="2" />
+                        <div class="space-y-0.5">
+                            <div class="text-sm font-semibold tabular-nums text-gray-900">
+                                {{ formatCurrency(reservation.total) }}
+                            </div>
+                            <div class="text-[10px] uppercase tracking-wide text-gray-400">
+                                total
+                            </div>
+                        </div>
                     </td>
 
                     <td class="px-2.5 py-2 align-top">
                         <div class="space-y-1">
-                            <div class="flex items-baseline gap-1">
-                                <span class="text-sm font-semibold tabular-nums text-gray-900">
-                                    {{ formatCurrency(reservation.total) }}
-                                </span>
-                                <span class="text-[10px] text-gray-400">total</span>
-                            </div>
-                            <div class="text-[11px] text-emerald-700 font-medium tabular-nums">
-                                Abonos {{ formatCurrency(reservation.totalDeposited) }}
-                            </div>
-                            <div class="text-[11px] font-medium tabular-nums"
-                                :class="pendingAmount(reservation) > 0 ? 'text-amber-700' : 'text-emerald-700'">
-                                Saldo {{ formatCurrency(pendingAmount(reservation)) }}
-                            </div>
-                            <div v-if="reservation.total > 0"
-                                class="h-1.5 w-full max-w-[6rem] overflow-hidden rounded-full bg-gray-200">
-                                <div class="h-full rounded-full bg-amber-400 transition-all"
-                                    :style="{ width: `${Math.min(100, (reservation.totalDeposited / reservation.total) * 100)}%` }" />
-                            </div>
                             <div v-if="(reservation.reservationDeposits?.length ?? 0) > 0" class="space-y-1">
                                 <ReservationDepositCompactRow
                                     v-for="d in (reservation.reservationDeposits ?? [])"
@@ -179,12 +176,19 @@
                                     @remove="(dep) => $emit('remove-reservation-deposit', reservation, dep)"
                                 />
                             </div>
-                            <button v-if="reservation.status !== 'cancelled' && reservation.status !== 'delivered'"
-                                type="button"
-                                class="inline-flex items-center gap-1 text-[11px] font-medium text-amber-700 hover:text-amber-900 underline decoration-dotted underline-offset-2"
-                                @click.stop="$emit('add-deposit', reservation)">
-                                + Abono
-                            </button>
+                            <div class="space-y-0.5">
+                                <div class="text-[11px] font-medium tabular-nums"
+                                    :class="pendingAmount(reservation) > 0 ? 'text-amber-700' : 'text-emerald-700'">
+                                    Saldo {{ formatCurrency(pendingAmount(reservation)) }}
+                                </div>
+                                <button v-if="pendingAmount(reservation) > 0 && reservation.status !== 'cancelled' && reservation.status !== 'delivered'"
+                                    type="button"
+                                    class="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700 transition-colors hover:border-emerald-300 hover:bg-emerald-100 hover:text-emerald-800"
+                                    @click.stop="$emit('add-deposit', reservation)">
+                                    <PlusIcon class="w-3.5 h-3.5" />
+                                    + Abono
+                                </button>
+                            </div>
                         </div>
                     </td>
 
@@ -240,6 +244,7 @@ import {
     ChevronDownIcon,
     CalendarDaysIcon,
     XMarkIcon,
+    PlusIcon,
 } from '@heroicons/vue/24/outline'
 
 interface Props {
