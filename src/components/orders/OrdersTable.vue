@@ -1,6 +1,6 @@
 <template>
     <div class="overflow-x-auto">
-        <table class="min-w-[72rem] w-full table-fixed divide-y divide-gray-200">
+        <table class="min-w-[78rem] w-full table-fixed divide-y divide-gray-200">
             <thead class="sticky top-0 z-10 bg-gray-50 shadow-sm">
                 <tr>
                     <th scope="col"
@@ -12,6 +12,10 @@
                             <ChevronUpIcon v-else-if="sortOrder === 'asc'" class="w-4 h-4" />
                             <ChevronDownIcon v-else class="w-4 h-4" />
                         </div>
+                    </th>
+                    <th scope="col"
+                        class="w-[10%] min-w-0 px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Prep / Ent
                     </th>
                     <th scope="col"
                         class="w-[10%] min-w-0 px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -62,14 +66,14 @@
             </thead>
             <tbody class="bg-white divide-y divide-gray-200">
                 <tr v-if="loading">
-                    <td colspan="9" class="px-3 py-12 text-center text-gray-500">
+                    <td colspan="10" class="px-3 py-12 text-center text-gray-500">
                         <div class="flex justify-center">
                             <BaseLoading size="md" />
                         </div>
                     </td>
                 </tr>
                 <tr v-else-if="!orders || orders.length === 0">
-                    <td colspan="9" class="px-3 py-12 text-center text-gray-500">
+                    <td colspan="10" class="px-3 py-12 text-center text-gray-500">
                         No se encontraron pedidos
                     </td>
                 </tr>
@@ -82,6 +86,21 @@
                                 #{{ order.id }}
                             </router-link>
                             <OrderSummaryLines :lines="order.summaryLines" />
+                        </div>
+                    </td>
+
+                    <!-- Prep / entrega -->
+                    <td class="min-w-0 px-3 py-2 align-top">
+                        <div class="space-y-0.5 text-[11px] leading-tight tabular-nums">
+                            <div v-if="order.prepareAt" class="flex items-center gap-1 text-gray-700">
+                                <span class="text-[10px] uppercase tracking-wide text-gray-400">Prep</span>
+                                <span>{{ formatTime(order.prepareAt) }}</span>
+                            </div>
+                            <div v-if="getDeliveryTime(order)" class="flex items-center gap-1 text-gray-700">
+                                <span class="text-[10px] uppercase tracking-wide text-gray-400">Ent</span>
+                                <span>{{ formatTime(getDeliveryTime(order)!) }}</span>
+                            </div>
+                            <span v-if="!order.prepareAt && !getDeliveryTime(order)" class="text-gray-300">—</span>
                         </div>
                     </td>
 
@@ -394,6 +413,10 @@ async function copyCustomerPhone(order: OrderListItem) {
 const formatDate = (dateString: string): string => defaultBusinessCalendar.formatDateShort(dateString)
 
 const formatTime = (dateString: string): string => defaultBusinessCalendar.formatTime12h(dateString)
+
+const getDeliveryTime = (order: OrderListItem): string | undefined => {
+    return getStatusTimeFromRecord(order.statusTimes, 'delivered')
+}
 
 const showVerifyBankActions = (order: OrderListItem): boolean =>
     permissions.canVerifyPayments() && order.status !== 'cancelled'
