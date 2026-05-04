@@ -176,17 +176,18 @@
                                     @remove="(dep) => $emit('remove-reservation-deposit', reservation, dep)"
                                 />
                             </div>
-                            <div class="space-y-0.5">
-                                <div class="text-[11px] font-medium tabular-nums"
+                            <div class="flex items-center justify-between gap-2 min-w-0">
+                                <div class="text-[11px] font-medium tabular-nums whitespace-nowrap"
                                     :class="pendingAmount(reservation) > 0 ? 'text-amber-700' : 'text-emerald-700'">
                                     Saldo {{ formatCurrency(pendingAmount(reservation)) }}
                                 </div>
                                 <button v-if="pendingAmount(reservation) > 0 && reservation.status !== 'cancelled' && reservation.status !== 'delivered'"
                                     type="button"
-                                    class="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700 transition-colors hover:border-emerald-300 hover:bg-emerald-100 hover:text-emerald-800"
+                                    class="inline-flex shrink-0 items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700 transition-colors hover:border-emerald-300 hover:bg-emerald-100 hover:text-emerald-800"
+                                    :title="'Agregar abono'"
                                     @click.stop="$emit('add-deposit', reservation)">
                                     <PlusIcon class="w-3.5 h-3.5" />
-                                    + Abono
+                                    <span class="hidden xl:inline">Abono</span>
                                 </button>
                             </div>
                         </div>
