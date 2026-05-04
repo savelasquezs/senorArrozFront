@@ -89,18 +89,18 @@
                         </div>
                     </td>
 
-                    <!-- Prep / entrega -->
+                    <!-- Hora de reserva / preparación -->
                     <td class="min-w-0 px-3 py-2 align-top">
                         <div class="space-y-0.5 text-[11px] leading-tight tabular-nums">
+                            <div v-if="order.reservedFor" class="flex items-center gap-1 text-gray-700">
+                                <span class="text-[10px] uppercase tracking-wide text-gray-400">Res</span>
+                                <span>{{ formatTime(order.reservedFor) }}</span>
+                            </div>
                             <div v-if="order.prepareAt" class="flex items-center gap-1 text-gray-700">
                                 <span class="text-[10px] uppercase tracking-wide text-gray-400">Prep</span>
                                 <span>{{ formatTime(order.prepareAt) }}</span>
                             </div>
-                            <div v-if="getDeliveryTime(order)" class="flex items-center gap-1 text-gray-700">
-                                <span class="text-[10px] uppercase tracking-wide text-gray-400">Ent</span>
-                                <span>{{ formatTime(getDeliveryTime(order)!) }}</span>
-                            </div>
-                            <span v-if="!order.prepareAt && !getDeliveryTime(order)" class="text-gray-300">—</span>
+                            <span v-if="!order.reservedFor && !order.prepareAt" class="text-gray-300">—</span>
                         </div>
                     </td>
 
@@ -413,10 +413,6 @@ async function copyCustomerPhone(order: OrderListItem) {
 const formatDate = (dateString: string): string => defaultBusinessCalendar.formatDateShort(dateString)
 
 const formatTime = (dateString: string): string => defaultBusinessCalendar.formatTime12h(dateString)
-
-const getDeliveryTime = (order: OrderListItem): string | undefined => {
-    return getStatusTimeFromRecord(order.statusTimes, 'delivered')
-}
 
 const showVerifyBankActions = (order: OrderListItem): boolean =>
     permissions.canVerifyPayments() && order.status !== 'cancelled'
