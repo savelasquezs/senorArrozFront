@@ -113,7 +113,7 @@
                     <input
                         type="checkbox"
                         class="rounded border-gray-300 text-emerald-600 focus:ring-emerald-500"
-                        :disabled="!editing"
+                        :disabled="!canEdit"
                         :checked="localFreeDeliveryRequested"
                         @change="onFreeDeliveryCheckboxChange"
                     />
@@ -281,9 +281,31 @@ const applyFreeDeliveryDiscount = (enabled: boolean) => {
 }
 
 const onFreeDeliveryCheckboxChange = (e: Event) => {
+    if (!props.canEdit) return
     const el = e.target as HTMLInputElement
     localFreeDeliveryRequested.value = el.checked
+
+    // En detalle: permitir cambio inmediato como en sidebar, sin obligar a entrar a "Editar productos".
+    if (!editing.value) {
+        localProducts.value = JSON.parse(JSON.stringify(props.products))
+        freeDeliveryAppliedByIndex.value = localProducts.value.map(() => 0)
+    }
     applyFreeDeliveryDiscount(localFreeDeliveryRequested.value)
+
+    if (!editing.value) {
+        const updateDto: UpdateOrderDetailDto[] = localProducts.value.map((item) => ({
+            id: item.id,
+            productId: item.productId,
+            quantity: item.quantity,
+            unitPrice: item.unitPrice,
+            discount: item.discount,
+            notes: item.notes || undefined,
+        }))
+        emit('save', {
+            products: updateDto,
+            freeDeliveryRequested: localFreeDeliveryRequested.value,
+        })
+    }
 }
 
 // Métodos
