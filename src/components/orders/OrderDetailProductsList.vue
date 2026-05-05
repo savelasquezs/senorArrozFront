@@ -108,6 +108,25 @@
                 <span class="text-gray-600">Domicilio:</span>
                 <span class="font-medium text-gray-900">{{ formatCurrency(deliveryFee) }}</span>
             </div>
+            <div v-if="showFreeDeliveryCheckbox" class="flex items-start justify-between gap-3 text-sm">
+                <label class="flex items-center gap-2 cursor-pointer text-xs text-gray-700">
+                    <input
+                        type="checkbox"
+                        class="rounded border-gray-300 text-emerald-600 focus:ring-emerald-500"
+                        :disabled="!editing"
+                        :checked="localFreeDeliveryRequested"
+                        @change="onFreeDeliveryCheckboxChange"
+                    />
+                    Domicilio gratis
+                </label>
+                <span class="text-[10px] text-gray-400 text-right max-w-[10rem] leading-tight">
+                    Hasta {{ formatCurrency(freeDeliveryBudgetCap) }} sobre el envío
+                </span>
+            </div>
+            <div v-if="freeDeliveryAppliedTotal > 0" class="flex justify-between text-xs text-emerald-700">
+                <span>Domicilio gratis aplicado</span>
+                <span>−{{ formatCurrency(freeDeliveryAppliedTotal) }}</span>
+            </div>
             <div class="flex justify-between text-base font-bold pt-2 border-t border-gray-200">
                 <span class="text-gray-900">Total:</span>
                 <span class="text-emerald-600">{{ formatCurrency(calculatedTotal) }}</span>
@@ -149,6 +168,11 @@ import { ref, computed, watch } from 'vue'
 import type { OrderDetailItem, UpdateOrderDetailDto } from '@/types/order'
 import { useFormatting } from '@/composables/useFormatting'
 import { useToast } from '@/composables/useToast'
+import {
+    deliveryDiscountBudget,
+    distributeEqualWithCaps,
+    lineCapacityCop,
+} from '@/composables/useFreeDeliveryDiscount'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseInput from '@/components/ui/BaseInput.vue'
 import BaseDialog from '@/components/ui/BaseDialog.vue'
@@ -160,16 +184,24 @@ interface Props {
     deliveryFee: number
     /** Mostrar fila de domicilio (incluye tarifa $0) */
     showDeliveryFeeLine?: boolean
+    orderType?: 'onsite' | 'delivery' | 'reservation'
+    addressId?: number | null
+    maxFreeDeliveryDiscount?: number
+    freeDeliveryRequested?: boolean
     canEdit: boolean
     saving?: boolean
 }
 
 const props = withDefaults(defineProps<Props>(), {
     showDeliveryFeeLine: false,
+    orderType: 'onsite',
+    addressId: null,
+    maxFreeDeliveryDiscount: 0,
+    freeDeliveryRequested: false,
 })
 
 const emit = defineEmits<{
-    save: [products: UpdateOrderDetailDto[]]
+    save: [payload: { products: UpdateOrderDetailDto[]; freeDeliveryRequested: boolean }]
     requestCancelOrder: []
 }>()
 
@@ -183,6 +215,8 @@ const showAddProductModal = ref(false)
 const showLastProductWarningModal = ref(false)
 const localProducts = ref<OrderDetailItem[]>([])
 const originalProducts = ref<OrderDetailItem[]>([])
+const localFreeDeliveryRequested = ref(false)
+const freeDeliveryAppliedByIndex = ref<number[]>([])
 
 // Computed
 const calculatedSubtotal = computed(() => {
@@ -197,9 +231,60 @@ const calculatedTotal = computed(() => {
     return calculatedSubtotal.value + (props.deliveryFee ?? 0)
 })
 
+const showFreeDeliveryCheckbox = computed(() => {
+    return props.orderType === 'delivery' || (props.orderType === 'reservation' && props.addressId != null)
+})
+
+const freeDeliveryBudgetCap = computed(() =>
+    deliveryDiscountBudget(props.deliveryFee ?? 0, props.maxFreeDeliveryDiscount ?? 0),
+)
+
+const freeDeliveryAppliedTotal = computed(() =>
+    freeDeliveryAppliedByIndex.value.reduce((s, v) => s + Math.max(0, v || 0), 0),
+)
+
 const existingProductIds = computed(() => {
     return localProducts.value.map(p => p.productId)
 })
+
+const applyFreeDeliveryDiscount = (enabled: boolean) => {
+    const currentShares = freeDeliveryAppliedByIndex.value
+    // Quitar reparto previo
+    localProducts.value = localProducts.value.map((item, idx) => {
+        const prev = Math.max(0, currentShares[idx] ?? 0)
+        const nextDiscount = Math.max(0, (item.discount ?? 0) - prev)
+        const nextSubtotal = Math.max(0, item.quantity * item.unitPrice - nextDiscount)
+        return { ...item, discount: nextDiscount, subtotal: nextSubtotal }
+    })
+
+    if (!enabled || !showFreeDeliveryCheckbox.value) {
+        freeDeliveryAppliedByIndex.value = localProducts.value.map(() => 0)
+        return
+    }
+
+    const budget = freeDeliveryBudgetCap.value
+    const caps = localProducts.value.map((item) =>
+        lineCapacityCop({
+            quantity: item.quantity,
+            unitPrice: item.unitPrice,
+            manualDiscount: item.discount ?? 0,
+        }),
+    )
+    const shares = distributeEqualWithCaps(budget, caps)
+    freeDeliveryAppliedByIndex.value = shares
+    localProducts.value = localProducts.value.map((item, idx) => {
+        const add = shares[idx] ?? 0
+        const nextDiscount = (item.discount ?? 0) + add
+        const nextSubtotal = Math.max(0, item.quantity * item.unitPrice - nextDiscount)
+        return { ...item, discount: nextDiscount, subtotal: nextSubtotal }
+    })
+}
+
+const onFreeDeliveryCheckboxChange = (e: Event) => {
+    const el = e.target as HTMLInputElement
+    localFreeDeliveryRequested.value = el.checked
+    applyFreeDeliveryDiscount(localFreeDeliveryRequested.value)
+}
 
 // Métodos
 const recalculateSubtotal = (item: OrderDetailItem) => {
@@ -210,11 +295,16 @@ const enterEditMode = () => {
     // Hacer copia profunda de los productos
     originalProducts.value = JSON.parse(JSON.stringify(props.products))
     localProducts.value = JSON.parse(JSON.stringify(props.products))
+    localFreeDeliveryRequested.value = props.freeDeliveryRequested === true
+    freeDeliveryAppliedByIndex.value = localProducts.value.map(() => 0)
+    applyFreeDeliveryDiscount(localFreeDeliveryRequested.value)
     editing.value = true
 }
 
 const cancelEdit = () => {
     localProducts.value = JSON.parse(JSON.stringify(originalProducts.value))
+    localFreeDeliveryRequested.value = props.freeDeliveryRequested === true
+    freeDeliveryAppliedByIndex.value = localProducts.value.map(() => 0)
     editing.value = false
 }
 
@@ -265,7 +355,10 @@ const saveChanges = async () => {
         notes: item.notes || undefined,
     }))
 
-    emit('save', updateDto)
+    emit('save', {
+        products: updateDto,
+        freeDeliveryRequested: localFreeDeliveryRequested.value,
+    })
 }
 
 /** Sincroniza con el padre cuando llegan datos del API (tras guardar, o carga inicial). Así los id reales y las líneas eliminadas no quedan desfasados en una segunda edición. */
@@ -275,8 +368,11 @@ watch(
         const list = next ?? []
         const copy = JSON.parse(JSON.stringify(list)) as OrderDetailItem[]
         localProducts.value = copy
+        localFreeDeliveryRequested.value = props.freeDeliveryRequested === true
+        freeDeliveryAppliedByIndex.value = copy.map(() => 0)
         if (editing.value) {
             originalProducts.value = JSON.parse(JSON.stringify(list)) as OrderDetailItem[]
+            applyFreeDeliveryDiscount(localFreeDeliveryRequested.value)
         }
     },
     { deep: true, immediate: true }

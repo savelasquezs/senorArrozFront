@@ -436,6 +436,10 @@
 						v-if="order"
 						:products="order?.orderDetails"
 						:delivery-fee="order?.deliveryFee ?? 0"
+						:order-type="order?.type"
+						:address-id="order?.addressId ?? null"
+						:max-free-delivery-discount="branchPosSettings.maxFreeDeliveryDiscount"
+						:free-delivery-requested="order?.freeDeliveryRequested === true"
 						:show-delivery-fee-line="
 							order.type === 'delivery' || order.type === 'reservation'
 						"
@@ -732,6 +736,7 @@ import type {
 import type { Customer } from '@/types/customer';
 import { useOrdersDraftsStore } from '@/store/ordersDrafts';
 import { useOrdersDataStore } from '@/store/ordersData';
+import { useBranchPosSettingsStore } from '@/store/branchPosSettings';
 import { useAuthStore } from '@/store/auth';
 import { customerApi } from '@/services/MainAPI/customerApi';
 import { orderApi } from '@/services/MainAPI/orderApi';
@@ -766,6 +771,7 @@ import {
 import { ref, computed, watch, onMounted, nextTick } from 'vue';
 const permissions = useOrderPermissions();
 const authStore = useAuthStore();
+const branchPosSettings = useBranchPosSettingsStore();
 const isDeliveryman = computed(() => authStore.userRole === 'Deliveryman');
 const pendingOrderType = ref<'onsite' | 'delivery' | 'reservation' | null>(
 	null,
@@ -1198,6 +1204,7 @@ watch(
 onMounted(() => {
 	ordersStore.loadBanks();
 	ordersStore.loadApps();
+	void branchPosSettings.ensureForBranch(authStore.branchId ?? undefined);
 });
 
 const handleStatusChange = async (newStatus: OrderStatus) => {
@@ -1375,14 +1382,18 @@ const updateDeliveryFee = async () => {
 };
 
 const savingProducts = ref(false);
-const handleProductsUpdate = async (products: UpdateOrderDetailDto[]) => {
+const handleProductsUpdate = async (payload: {
+	products: UpdateOrderDetailDto[];
+	freeDeliveryRequested: boolean;
+}) => {
 	if (!order.value) return;
 
 	savingProducts.value = true;
 	const paymentSnapshotBefore = captureOrderPaymentSnapshot();
 	try {
 		await ordersDataStore.update(order.value.id, {
-			orderDetails: products,
+			orderDetails: payload.products,
+			freeDeliveryRequested: payload.freeDeliveryRequested,
 		});
 		success(
 			'Productos actualizados',

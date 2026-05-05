@@ -253,6 +253,8 @@ export interface OrderListItem {
     type: OrderType
     typeDisplayName: string
     deliveryFee: number | null
+    /** Flag de promo "domicilio gratis" para recalcular descuentos en líneas. */
+    freeDeliveryRequested?: boolean
     reservedFor: string | null
     prepareAt: string | null
     status: OrderStatus
@@ -389,6 +391,7 @@ export interface UpdateOrderDto {
     total?: number
     discountTotal?: number
     orderDetails?: UpdateOrderDetailDto[]
+    freeDeliveryRequested?: boolean
     deleteReservationAssociatedPayments?: boolean
 }
 
