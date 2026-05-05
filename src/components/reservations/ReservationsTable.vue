@@ -1,6 +1,6 @@
 <template>
     <div class="overflow-x-auto">
-        <table class="min-w-[96rem] w-full table-fixed divide-y divide-gray-200">
+        <table class="min-w-[84rem] w-full table-fixed divide-y divide-gray-200">
             <thead class="sticky top-0 z-10 bg-gray-50 shadow-sm">
                 <tr>
                     <th scope="col"
@@ -14,19 +14,19 @@
                         </div>
                     </th>
                     <th scope="col"
-                        class="w-[13%] px-2.5 py-2 text-left text-[10px] font-semibold uppercase tracking-[0.12em] text-gray-500">
+                        class="w-[14%] px-2.5 py-2 text-left text-[10px] font-semibold uppercase tracking-[0.12em] text-gray-500">
                         Productos
                     </th>
                     <th scope="col"
-                        class="w-[13%] px-2.5 py-2 text-left text-[10px] font-semibold uppercase tracking-[0.12em] text-gray-500">
+                        class="w-[14%] px-2.5 py-2 text-left text-[10px] font-semibold uppercase tracking-[0.12em] text-gray-500">
                         Cliente / tel.
                     </th>
                     <th scope="col"
-                        class="w-[13%] px-2.5 py-2 text-left text-[10px] font-semibold uppercase tracking-[0.12em] text-gray-500">
-                        Dirección / barrio
+                        class="w-[14%] px-2.5 py-2 text-left text-[10px] font-semibold uppercase tracking-[0.12em] text-gray-500">
+                        Dirección
                     </th>
                     <th scope="col"
-                        class="w-[10%] px-2.5 py-2 text-left text-[10px] font-semibold uppercase tracking-[0.12em] text-gray-500 cursor-pointer hover:bg-gray-100"
+                        class="w-[11%] px-2.5 py-2 text-left text-[10px] font-semibold uppercase tracking-[0.12em] text-gray-500 cursor-pointer hover:bg-gray-100"
                         @click="$emit('sort', 'reservedFor')">
                         <div class="flex items-center gap-1">
                             <CalendarDaysIcon class="w-3.5 h-3.5 text-amber-500" />
@@ -37,41 +37,33 @@
                         </div>
                     </th>
                     <th scope="col"
-                        class="w-[10%] px-2.5 py-2 text-left text-[10px] font-semibold uppercase tracking-[0.12em] text-gray-500">
+                        class="w-[11%] px-2.5 py-2 text-left text-[10px] font-semibold uppercase tracking-[0.12em] text-gray-500">
                         Preparación
                     </th>
                     <th scope="col"
-                        class="w-[9%] px-2.5 py-2 text-left text-[10px] font-semibold uppercase tracking-[0.12em] text-gray-500">
+                        class="w-[10%] px-2.5 py-2 text-left text-[10px] font-semibold uppercase tracking-[0.12em] text-gray-500">
                         Total
                     </th>
                     <th scope="col"
-                        class="w-[14%] px-2.5 py-2 text-left text-[10px] font-semibold uppercase tracking-[0.12em] text-gray-500">
+                        class="w-[12%] px-2.5 py-2 text-left text-[10px] font-semibold uppercase tracking-[0.12em] text-gray-500">
                         Abonos
-                    </th>
-                    <th scope="col"
-                    class="w-[7%] px-2.5 py-2 text-left text-[10px] font-semibold uppercase tracking-[0.12em] text-gray-500">
-                        Estado
                     </th>
                     <th scope="col"
                         class="w-[7%] px-2.5 py-2 text-left text-[10px] font-semibold uppercase tracking-[0.12em] text-gray-500">
                         Registro
                     </th>
-                    <th scope="col"
-                        class="w-[10%] px-2.5 py-2 text-left text-[10px] font-semibold uppercase tracking-[0.12em] text-gray-500">
-                        Acciones
-                    </th>
                 </tr>
             </thead>
             <tbody class="bg-white divide-y divide-gray-100">
                 <tr v-if="loading">
-                    <td colspan="11" class="px-4 py-10 text-center text-gray-500">
+                    <td colspan="9" class="px-4 py-10 text-center text-gray-500">
                         <div class="flex justify-center">
                             <BaseLoading size="md" />
                         </div>
                     </td>
                 </tr>
                 <tr v-else-if="!reservations || reservations.length === 0">
-                    <td colspan="11" class="px-4 py-10 text-center text-gray-500">
+                    <td colspan="9" class="px-4 py-10 text-center text-gray-500">
                         No se encontraron reservas
                     </td>
                 </tr>
@@ -91,66 +83,49 @@
                     <td class="px-2.5 py-2 align-top">
                         <button class="block w-full min-w-0 text-left hover:text-emerald-600 transition-colors"
                             @click.stop="$emit('edit-customer', reservation)">
-                            <div v-if="orderListRecipientDisplayName(reservation)"
-                                class="truncate text-sm font-medium text-gray-900 hover:underline"
+                            <div class="truncate text-xs text-gray-600 tabular-nums hover:underline"
                                 :title="orderListRecipientDisplayTitle(reservation)">
-                                {{ orderListRecipientDisplayName(reservation) }}
-                            </div>
-                            <div v-else class="text-sm text-gray-400 italic hover:underline">
-                                Sin nombre
-                            </div>
-                            <div v-if="reservation.customerPhone" class="truncate text-[11px] text-gray-500 tabular-nums">
-                                {{ reservation.customerPhone }}
+                                <span v-if="orderListRecipientDisplayName(reservation)" class="font-medium text-gray-900">
+                                    {{ orderListRecipientDisplayName(reservation) }}
+                                </span>
+                                <span v-else class="italic">Sin nombre</span>
+                                <span v-if="reservation.customerPhone"> · {{ reservation.customerPhone }}</span>
                             </div>
                         </button>
                     </td>
 
                     <td class="px-2.5 py-2 align-top">
-                        <button v-if="reservation.addressDescription || reservation.addressAdditionalInfo"
+                        <button v-if="reservation.addressDescription"
                             class="block w-full min-w-0 text-left hover:text-emerald-600 transition-colors"
                             @click.stop="$emit('edit-address', reservation)">
-                            <div class="truncate text-sm text-gray-900 hover:underline">
-                                {{ reservation.addressDescription || '—' }}
-                            </div>
-                            <div v-if="reservation.addressAdditionalInfo"
-                                class="truncate text-[11px] text-gray-500">
-                                {{ reservation.addressAdditionalInfo }}
+                            <div class="truncate text-xs text-gray-900 hover:underline">
+                                {{ reservation.addressDescription || '-' }}
                             </div>
                         </button>
-                        <div v-if="reservation.neighborhoodName" class="truncate text-[11px] text-gray-400">
-                            {{ reservation.neighborhoodName }}
-                        </div>
-                        <span v-if="!reservation.addressDescription && !reservation.addressAdditionalInfo && !reservation.neighborhoodName"
-                            class="text-sm text-gray-400 italic">
-                            —
+                        <span v-else class="text-xs text-gray-400 italic">
+                            -
                         </span>
                     </td>
 
                     <td class="px-2.5 py-2 align-top">
-                        <div v-if="reservation.reservedFor" class="space-y-0.5">
+                        <div v-if="reservation.reservedFor">
                             <div :class="[
-                                'text-sm font-semibold leading-tight',
+                                'truncate text-xs font-semibold leading-tight',
                                 isUpcoming(reservation.reservedFor) ? 'text-amber-700' : 'text-gray-700',
                             ]">
-                                {{ formatDate(reservation.reservedFor) }}
-                            </div>
-                            <div class="text-[11px] text-gray-500 tabular-nums">
-                                {{ formatTime(reservation.reservedFor) }}
+                                {{ formatDate(reservation.reservedFor) }} · <span class="text-gray-500">{{ formatTime(reservation.reservedFor) }}</span>
                             </div>
                         </div>
-                        <span v-else class="text-sm text-gray-400 italic">—</span>
+                        <span v-else class="text-xs text-gray-400 italic">-</span>
                     </td>
 
                     <td class="px-2.5 py-2 align-top">
-                        <div v-if="reservation.prepareAt" class="space-y-0.5">
-                            <div class="text-sm text-gray-700 leading-tight">
-                                {{ formatDate(reservation.prepareAt) }}
-                            </div>
-                            <div class="text-[11px] text-gray-500 tabular-nums">
-                                {{ formatTime(reservation.prepareAt) }}
+                        <div v-if="reservation.prepareAt">
+                            <div class="truncate text-xs text-gray-700 leading-tight">
+                                {{ formatDate(reservation.prepareAt) }} · <span class="text-gray-500">{{ formatTime(reservation.prepareAt) }}</span>
                             </div>
                         </div>
-                        <span v-else class="text-sm text-gray-400 italic">—</span>
+                        <span v-else class="text-xs text-gray-400 italic">-</span>
                     </td>
 
                     <td class="px-2.5 py-2 align-top">
@@ -194,31 +169,11 @@
                     </td>
 
                     <td class="px-2.5 py-2 align-top">
-                        <span :class="statusBadgeClass(reservation.status)">
-                            {{ reservation.statusDisplayName }}
-                        </span>
-                    </td>
-
-                    <td class="px-2.5 py-2 align-top">
-                        <div class="space-y-0.5">
-                            <div class="text-xs text-gray-700 tabular-nums">
-                                {{ formatDate(reservation.createdAt) }}
-                            </div>
-                            <div class="text-[11px] text-gray-500 tabular-nums">
-                                {{ formatTime(reservation.createdAt) }}
+                        <div>
+                            <div class="truncate text-xs text-gray-700 tabular-nums">
+                                {{ formatDate(reservation.createdAt) }} · <span class="text-gray-500">{{ formatTime(reservation.createdAt) }}</span>
                             </div>
                         </div>
-                    </td>
-
-                    <td class="px-2.5 py-2 align-top">
-                        <button v-if="reservation.status !== 'cancelled' && reservation.status !== 'delivered'"
-                            type="button"
-                            class="inline-flex items-center gap-1 rounded-md border border-red-200 px-2 py-1 text-[11px] font-medium text-red-600 transition-colors hover:border-red-300 hover:bg-red-50 hover:text-red-700"
-                            @click.stop="$emit('cancel-reservation', reservation)">
-                            <XMarkIcon class="w-3.5 h-3.5" />
-                            Cancelar
-                        </button>
-                        <span v-else class="text-xs text-gray-400 italic">—</span>
                     </td>
                 </tr>
             </tbody>
@@ -244,7 +199,6 @@ import {
     ChevronUpIcon,
     ChevronDownIcon,
     CalendarDaysIcon,
-    XMarkIcon,
     PlusIcon,
 } from '@heroicons/vue/24/outline'
 
@@ -263,7 +217,6 @@ defineEmits<{
     'add-deposit': [order: OrderListItem]
     'edit-reservation-deposit': [order: OrderListItem, deposit: ReservationDeposit]
     'remove-reservation-deposit': [order: OrderListItem, deposit: ReservationDeposit]
-    'cancel-reservation': [order: OrderListItem]
     sort: [column: string]
 }>()
 
@@ -271,7 +224,7 @@ const permissions = useOrderPermissions()
 const { formatCurrency } = useFormatting()
 
 const formatDate = (dateString: string | Date | null): string => {
-    if (!dateString) return '—'
+    if (!dateString) return '-'
     return defaultBusinessCalendar.formatDateShort(dateString as string)
 }
 
@@ -287,21 +240,5 @@ const isUpcoming = (dateString: string | null): boolean => {
 
 const pendingAmount = (order: OrderListItem): number => {
     return Math.max(0, order.total - order.totalDeposited)
-}
-
-const statusBadgeClass = (status: string): string => {
-    const map: Record<string, string> = {
-        taken: 'bg-blue-50 text-blue-700 border-blue-200',
-        in_preparation: 'bg-orange-50 text-orange-700 border-orange-200',
-        ready: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-        on_the_way: 'bg-purple-50 text-purple-700 border-purple-200',
-        delivered: 'bg-gray-100 text-gray-600 border-gray-200',
-        cancelled: 'bg-red-50 text-red-700 border-red-200',
-    }
-
-    return [
-        'inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide',
-        map[status] ?? 'bg-gray-100 text-gray-600 border-gray-200',
-    ].join(' ')
 }
 </script>

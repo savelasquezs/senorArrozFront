@@ -291,7 +291,7 @@
                                 @edit-address="handleEditAddress" @add-deposit="handleOpenDeposit"
                                 @edit-reservation-deposit="handleEditReservationDepositFromList"
                                 @remove-reservation-deposit="handleRemoveReservationDepositFromList"
-                                @cancel-reservation="handleCancelReservation" @sort="handleResSort" />
+                                @sort="handleResSort" />
                         </div>
 
                         <div v-if="!resLoading && resTotalPages > 1"
