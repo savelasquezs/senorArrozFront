@@ -1685,7 +1685,7 @@ const fetchReservations = async () => {
         }
 
         reservations.value = items
-        resTotalCount.value = response.totalCount
+        resTotalCount.value = resStatus.value === null ? items.length : response.totalCount
     } catch (err: any) {
         error('Error al cargar reservas', err.message)
     } finally {
