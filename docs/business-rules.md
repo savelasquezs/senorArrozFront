@@ -355,6 +355,7 @@ Validaciones implementadas antes de enviar un pedido al backend:
 - **Al menos 1 producto**: El pedido debe tener al menos un producto
 - **Suma de pagos**: Suma de pagos (app + bank) debe ser ≤ total del pedido
 - **Status inicial**: Todos los pedidos nuevos se crean con `status: 'taken'`
+- **Cliente con pedido en misma fecha (confirmación previa)**: Antes de enviar un pedido con cliente, si ya existe otro pedido del mismo cliente en la misma fecha calendario (zona `America/Bogota`), el sistema pide confirmación. Para la comparación se usa `prepareAt` cuando el pedido actual tiene `prepareAt`; en caso contrario se usa `createdAt`. Si el usuario cancela, no se crea el pedido.
 
 #### Validaciones por Tipo de Pedido
 

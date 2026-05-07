@@ -117,7 +117,7 @@
                     <!-- Action Buttons -->
                     <div class="flex gap-2">
                         <BaseButton @click="handleSubmitOrder" variant="primary" size="sm" class="w-full"
-                            :disabled="!canSubmitOrder" :title="submitButtonTooltip">
+                            :disabled="submitButtonDisabled" :title="submitButtonTooltip">
                             <span class="flex items-center justify-center">
                                 <PaperAirplaneIcon class="w-4 h-4 mr-2" />
                                 Enviar Pedido
@@ -163,6 +163,35 @@
             </template>
         </BaseDialog>
 
+        <BaseDialog v-model="showDuplicateOrderConfirmDialog" title="Pedido ya registrado para esta fecha" size="sm">
+            <p class="text-sm text-gray-600">
+                Este cliente ya tiene un pedido registrado para esta fecha. ¿Deseas continuar?
+            </p>
+            <div v-if="duplicateConflictOrders.length" class="space-y-2 max-h-52 overflow-y-auto pr-1">
+                <div
+                    v-for="conflict in duplicateConflictOrders"
+                    :key="conflict.id"
+                    class="border border-gray-200 rounded-md px-3 py-2 flex items-center justify-between gap-3"
+                >
+                    <div class="text-xs text-gray-600">
+                        <p class="font-medium text-gray-800">Pedido #{{ conflict.id }}</p>
+                        <p>{{ formatDateTime(conflict.compareDate) }}</p>
+                    </div>
+                    <BaseButton variant="outline" size="sm" @click="goToOrderDetail(conflict.id)">
+                        Ver detalle
+                    </BaseButton>
+                </div>
+            </div>
+            <template #footer>
+                <BaseButton variant="secondary" size="sm" @click="cancelDuplicateOrderAndSubmit">
+                    Cancelar
+                </BaseButton>
+                <BaseButton variant="primary" size="sm" @click="confirmDuplicateOrderAndSubmit">
+                    Continuar
+                </BaseButton>
+            </template>
+        </BaseDialog>
+
         <!-- Customer Detail Modal -->
         <CustomerDetailModal v-if="selectedCustomer" :show="showCustomerDetail" :customer="selectedCustomer"
             @close="closeCustomerDetail" @customer-updated="handleCustomerUpdated" />
@@ -175,13 +204,16 @@ import { useOrderPersistence } from '@/composables/useOrderPersistence'
 import { useOrderValidation } from '@/composables/useOrderValidation'
 import { useOrderTabs } from '@/composables/useOrderTabs'
 import { useOrderSubmission } from '@/composables/useOrderSubmission'
+import { findCustomerOrdersOnSameBusinessDate, type CustomerOrderDateConflictItem } from '@/composables/useCustomerOrderDateConflict'
 import { VueDatePicker } from '@vuepic/vue-datepicker';
 import '@vuepic/vue-datepicker/dist/main.css'
+import { useRouter } from 'vue-router'
 
 import { useToast } from '@/composables/useToast'
 import { useFormatting } from '@/composables/useFormatting'
 import { orderCashToCollect, sumPaymentsAmounts } from '@/utils/orderCashToCollect'
 import type { Customer, CustomerAddress } from '@/types/customer'
+import type { DraftOrder } from '@/types/order'
 
 // Components
 import BaseButton from '@/components/ui/BaseButton.vue'
@@ -212,7 +244,8 @@ const { ordersStore } = useOrderPersistence()
 const { createNewTab, closeTab } = useOrderTabs()
 const { submitOrder } = useOrderSubmission()
 const { success, error: showError } = useToast()
-const { formatCurrency } = useFormatting()
+const { formatCurrency, formatDateTime } = useFormatting()
+const router = useRouter()
 
 // State
 const showCustomerDetail = ref(false)
@@ -227,6 +260,12 @@ const reservedForDateLocal = ref<Date | null>(null)
 const showDraftRemovePaidInStoreDialog = ref(false)
 const showDraftEditPaidInStoreDialog = ref(false)
 const draftEditPaidInStoreAmount = ref(0)
+const showDuplicateOrderConfirmDialog = ref(false)
+const pendingDuplicateConfirmOrder = ref<DraftOrder | null>(null)
+const pendingDuplicateConfirmTabId = ref<string | null>(null)
+const duplicateConflictOrders = ref<CustomerOrderDateConflictItem[]>([])
+const isSubmittingOrder = ref(false)
+const isCheckingDuplicateOrderDate = ref(false)
 
 // Computed
 const currentOrder = computed(() => ordersStore.currentOrder)
@@ -384,6 +423,10 @@ const submitButtonTooltip = computed(() => {
     return `Faltan ${errors.length} requisitos (click para ver detalles)`
 })
 
+const submitButtonDisabled = computed(() => {
+    return !canSubmitOrder.value || isSubmittingOrder.value || isCheckingDuplicateOrderDate.value
+})
+
 const onPrepareAtInput = (time: LocalHour | undefined) => {
     if (!time) {
         reservedForLocal.value = null
@@ -481,6 +524,72 @@ const handleAddProducts = () => {
     // This would focus on the product grid or open a product selector
 }
 
+function resolveDraftAnchorDate(order: DraftOrder): Date | null {
+    const source = order?.prepareAt ?? order?.createdAt ?? null
+    if (!source) return null
+    const date = source instanceof Date ? source : new Date(source)
+    return Number.isNaN(date.getTime()) ? null : date
+}
+
+async function loadDuplicateCustomerOrderDateConflicts(order: DraftOrder): Promise<CustomerOrderDateConflictItem[]> {
+    if (!order?.customerId) return []
+    const anchorDate = resolveDraftAnchorDate(order)
+    if (!anchorDate) return []
+    const compareByPrepareAt = !!order?.prepareAt
+    isCheckingDuplicateOrderDate.value = true
+    try {
+        return await findCustomerOrdersOnSameBusinessDate({
+            customerId: Number(order.customerId),
+            targetDate: anchorDate,
+            compareByPrepareAt,
+        })
+    } finally {
+        isCheckingDuplicateOrderDate.value = false
+    }
+}
+
+async function performSubmitOrder(order: DraftOrder, tabToClose: string | null) {
+    if (isSubmittingOrder.value) return
+    isSubmittingOrder.value = true
+    try {
+        await submitOrder(order)
+        if (tabToClose) {
+            closeTab(tabToClose)
+        }
+        success('Pedido creado exitosamente', 3000)
+    } catch (error: any) {
+        console.error('Error submitting order:', error)
+        showError(
+            'Error al crear pedido',
+            error?.message || ordersStore.error || 'No se pudo crear el pedido. Intenta nuevamente.'
+        )
+    } finally {
+        isSubmittingOrder.value = false
+    }
+}
+
+async function confirmDuplicateOrderAndSubmit() {
+    const order = pendingDuplicateConfirmOrder.value
+    const tabToClose = pendingDuplicateConfirmTabId.value
+    showDuplicateOrderConfirmDialog.value = false
+    pendingDuplicateConfirmOrder.value = null
+    pendingDuplicateConfirmTabId.value = null
+    duplicateConflictOrders.value = []
+    if (!order) return
+    await performSubmitOrder(order, tabToClose)
+}
+
+function cancelDuplicateOrderAndSubmit() {
+    showDuplicateOrderConfirmDialog.value = false
+    pendingDuplicateConfirmOrder.value = null
+    pendingDuplicateConfirmTabId.value = null
+    duplicateConflictOrders.value = []
+}
+
+function goToOrderDetail(orderId: number) {
+    router.push({ name: 'OrderDetail', params: { id: orderId } })
+}
+
 const handleSubmitOrder = async () => {
     // Show errors if not valid
     if (!canSubmitOrder.value) {
@@ -506,40 +615,32 @@ const handleSubmitOrder = async () => {
 
     // If valid, submit
     if (!currentOrder.value) return
+    if (isSubmittingOrder.value || isCheckingDuplicateOrderDate.value) return
 
     const tabToClose = currentTabId.value
-    try {
-        if (currentOrder.value.type === 'reservation') {
-            // reservedFor es obligatorio (ya validado), prepareAt es opcional
-            if (reservedForDateLocal.value) {
-                currentOrder.value.reservedFor = reservedForDateLocal.value
-            }
-            if (prepareAtDateLocal.value) {
-                currentOrder.value.prepareAt = prepareAtDateLocal.value
-            }
-        } else if (currentOrder.value.isLater) {
-            if (!prepareAtLocal.value || !reservedForLocal.value) return
-            currentOrder.value.prepareAt = DateTimeService.localHourToDate(prepareAtLocal.value)
-            currentOrder.value.reservedFor = DateTimeService.localHourToDate(reservedForLocal.value)
+    if (currentOrder.value.type === 'reservation') {
+        if (reservedForDateLocal.value) {
+            currentOrder.value.reservedFor = reservedForDateLocal.value
         }
-        await submitOrder(currentOrder.value)
-
-        // Close the current tab and clean up
-        if (tabToClose) {
-            closeTab(tabToClose)
+        if (prepareAtDateLocal.value) {
+            currentOrder.value.prepareAt = prepareAtDateLocal.value
         }
-
-        success(
-            'Pedido creado exitosamente',
-            3000
-        )
-    } catch (error: any) {
-        console.error('Error submitting order:', error)
-        showError(
-            'Error al crear pedido',
-            error?.message || ordersStore.error || 'No se pudo crear el pedido. Intenta nuevamente.'
-        )
+    } else if (currentOrder.value.isLater) {
+        if (!prepareAtLocal.value || !reservedForLocal.value) return
+        currentOrder.value.prepareAt = DateTimeService.localHourToDate(prepareAtLocal.value)
+        currentOrder.value.reservedFor = DateTimeService.localHourToDate(reservedForLocal.value)
     }
+
+    const conflicts = await loadDuplicateCustomerOrderDateConflicts(currentOrder.value)
+    if (conflicts.length > 0) {
+        pendingDuplicateConfirmOrder.value = currentOrder.value
+        pendingDuplicateConfirmTabId.value = tabToClose
+        duplicateConflictOrders.value = conflicts
+        showDuplicateOrderConfirmDialog.value = true
+        return
+    }
+
+    await performSubmitOrder(currentOrder.value, tabToClose)
 }
 
 
