@@ -284,8 +284,8 @@
                         </div>
                     </div>
 
-                    <div class="bg-white rounded-lg shadow overflow-hidden min-w-0 flex flex-col max-h-[min(78vh,48rem)]">
-                        <div class="overflow-y-auto overflow-x-auto min-h-0 min-w-0 flex-1">
+                    <div class="bg-white rounded-lg shadow overflow-hidden min-w-0 flex flex-col max-h-[calc(100vh-15rem)]">
+                        <div class="overflow-y-auto overflow-x-auto overscroll-contain min-h-0 min-w-0 flex-1">
                             <ReservationsTable :reservations="resFilteredItems" :loading="resLoading"
                                 :sort-by="resSortBy" :sort-order="resSortOrder" @edit-customer="handleEditCustomer"
                                 @edit-address="handleEditAddress" @add-deposit="handleOpenDeposit"
@@ -1593,9 +1593,9 @@ const reservations = ref<OrderListItem[]>([])
 const resLoading = ref(false)
 const resTotalCount = ref(0)
 const resCurrentPage = ref(1)
-const resPageSize = ref(10)
-const resSortBy = ref('reservedFor')
-const resSortOrder = ref<'asc' | 'desc'>('desc')
+const resPageSize = ref(150)
+const resSortBy = ref('prepareAt')
+const resSortOrder = ref<'asc' | 'desc'>('asc')
 const resSearch = ref('')
 const resStatus = ref<string | null>(null)
 const colombiaDateInput = () => todayYmd()
@@ -1662,7 +1662,14 @@ const fetchReservations = async () => {
             type: 'reservation',
             page: resCurrentPage.value,
             pageSize: resPageSize.value,
-            sortBy: resSortBy.value === 'createdAt' ? 'ReservedFor' : resSortBy.value,
+            sortBy:
+                resSortBy.value === 'prepareAt'
+                    ? 'PrepareAt'
+                    : resSortBy.value === 'reservedFor'
+                      ? 'ReservedFor'
+                      : resSortBy.value === 'createdAt'
+                        ? 'CreatedAt'
+                        : resSortBy.value,
             sortOrder: resSortOrder.value,
         }
 
@@ -1696,7 +1703,7 @@ const handleResSort = (field: string) => {
         resSortOrder.value = resSortOrder.value === 'asc' ? 'desc' : 'asc'
     } else {
         resSortBy.value = field
-        resSortOrder.value = field === 'reservedFor' ? 'desc' : 'asc'
+        resSortOrder.value = field === 'prepareAt' || field === 'reservedFor' ? 'asc' : 'desc'
     }
     fetchReservations()
 }
