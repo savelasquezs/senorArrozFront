@@ -1,5 +1,5 @@
 <template>
-    <div class="overflow-x-auto">
+    <div class="min-h-0 h-full overflow-x-auto">
         <table class="min-w-[84rem] w-full table-fixed divide-y divide-gray-200">
             <thead class="sticky top-0 z-10 bg-gray-50 shadow-sm">
                 <tr>
@@ -37,8 +37,14 @@
                         </div>
                     </th>
                     <th scope="col"
-                        class="w-[11%] px-2.5 py-2 text-left text-[10px] font-semibold uppercase tracking-[0.12em] text-gray-500">
-                        Preparación
+                        class="w-[11%] px-2.5 py-2 text-left text-[10px] font-semibold uppercase tracking-[0.12em] text-gray-500 cursor-pointer hover:bg-gray-100"
+                        @click="$emit('sort', 'prepareAt')">
+                        <div class="flex items-center gap-1">
+                            <span>Preparación</span>
+                            <ArrowsUpDownIcon v-if="sortBy !== 'prepareAt'" class="w-3 h-3" />
+                            <ChevronUpIcon v-else-if="sortOrder === 'asc'" class="w-3 h-3" />
+                            <ChevronDownIcon v-else class="w-3 h-3" />
+                        </div>
                     </th>
                     <th scope="col"
                         class="w-[10%] px-2.5 py-2 text-left text-[10px] font-semibold uppercase tracking-[0.12em] text-gray-500">
