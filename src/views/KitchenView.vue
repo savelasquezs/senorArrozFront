@@ -1,11 +1,11 @@
-<template>
+﻿<template>
     <MainLayout>
         <div class="p-3 sm:p-4 md:p-5 space-y-3 sm:space-y-4">
-            <!-- Pestañas + barra de cocina (solo rol Kitchen) en la misma franja -->
+            <!-- PestaÃ±as + barra de cocina (solo rol Kitchen) en la misma franja -->
             <div
                 class="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between sm:gap-3 border-b border-gray-200 -mx-3 px-3 sm:mx-0 sm:px-0"
             >
-                <!-- Pestañas: scroll solo en esta franja (sin envolver al checkbox) para no mostrar barra rara entre check y "Conectado" -->
+                <!-- PestaÃ±as: scroll solo en esta franja (sin envolver al checkbox) para no mostrar barra rara entre check y "Conectado" -->
                 <div class="-mb-px flex min-w-0 flex-1 items-end gap-2 sm:gap-3">
                     <nav
                         class="kitchen-tabs-nav min-w-0 flex-1 flex items-end space-x-4 sm:space-x-6 overflow-x-auto overflow-y-hidden"
@@ -48,12 +48,25 @@
                                 {{ readyOrders.length }}
                             </span>
                         </button>
+
+                        <button type="button" @click="activeTab = 'hourly_summary'" :class="[
+                            'py-2 sm:py-2.5 px-1 border-b-2 font-medium text-xs sm:text-sm transition-colors whitespace-nowrap flex-shrink-0',
+                            activeTab === 'hourly_summary'
+                                ? 'border-amber-500 text-amber-600'
+                                : 'border-transparent text-gray-500 hover:text-gray-700'
+                        ]">
+                            <span>Resumen por hora</span>
+                            <span v-if="hourlySummary.hourSlots.length > 0"
+                                class="ml-1.5 sm:ml-2 py-0.5 px-1.5 sm:px-2 rounded-full text-[10px] sm:text-xs bg-amber-100 text-amber-700">
+                                {{ hourlySummary.hourSlots.length }}
+                            </span>
+                        </button>
                     </nav>
 
                     <div v-if="activeTab === 'active'" class="flex flex-shrink-0 items-end pb-2 sm:pb-2.5 -mb-px">
                         <label
                             class="inline-flex items-center gap-1.5 text-[11px] sm:text-xs text-gray-800 cursor-pointer select-none whitespace-nowrap"
-                            title="Agrupa Tomado y En preparación en un solo bloque">
+                            title="Agrupa Tomado y En preparaciÃ³n en un solo bloque">
                             <input v-model="combinedKitchenMode" type="checkbox"
                                 class="rounded border-gray-300 text-emerald-600 focus:ring-emerald-500" />
                             <span class="font-medium">Modo combinado</span>
@@ -102,7 +115,7 @@
 
             <div v-if="activeTab === 'scheduled'">
                 <p v-if="scheduledReservationOrders.length === 0" class="text-sm text-gray-500 mb-3">
-                    No hay reservas del día en «Tomado» pendientes de hora. Al llegar la hora de cocina o al pasar a preparación aparecen en Pedidos activos.
+                    No hay reservas del dÃ­a en Â«TomadoÂ» pendientes de hora. Al llegar la hora de cocina o al pasar a preparaciÃ³n aparecen en Pedidos activos.
                 </p>
                 <OrderCardGrid v-else ref="cardGridRef" :orders="scheduledReservationOrders"
                     :order-items-map="orderItemsMap" :show-status-actions="false"
@@ -116,6 +129,98 @@
 
             <div v-else-if="activeTab === 'ready'">
                 <ReadyOrdersTable :orders="readyOrders" :order-items-map="orderItemsMap" @reprint="handleReprint" />
+            </div>
+
+            <div v-else-if="activeTab === 'hourly_summary'" class="space-y-3 sm:space-y-4">
+                <div class="rounded-xl border border-gray-200 bg-white p-3 sm:p-4">
+                    <div class="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+                        <div class="w-full sm:w-52">
+                            <BaseInput v-model="summaryDate" type="date" label="Fecha" />
+                        </div>
+                        <div class="text-xs sm:text-sm text-gray-500">
+                            <span v-if="hourlySummary.totalOrderCount > 0">
+                                {{ hourlySummary.totalOrderCount }} pedido(s) en Tomado / En preparación
+                            </span>
+                            <span v-else-if="!summaryLoading">
+                                No hay pedidos para la fecha seleccionada.
+                            </span>
+                            <span v-else>
+                                Cargando resumen...
+                            </span>
+                        </div>
+                    </div>
+                </div>
+
+                <div v-if="summaryLoading"
+                    class="rounded-xl border border-dashed border-gray-200 bg-gray-50 px-4 py-8 text-sm text-gray-500">
+                    Cargando resumen por hora...
+                </div>
+
+                <template v-else>
+                    <div v-if="hourlySummary.hourSlots.length > 0"
+                        class="rounded-xl border border-gray-200 bg-white p-3 sm:p-4">
+                        <p class="text-xs font-medium uppercase tracking-wide text-gray-500">
+                            Horas con pedidos
+                        </p>
+                        <div class="mt-3 flex flex-wrap gap-2">
+                            <button
+                                v-for="slot in hourlySummary.hourSlots"
+                                :key="slot.key"
+                                type="button"
+                                @click="selectedSummaryHourKey = slot.key"
+                                :class="[
+                                    'inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs sm:text-sm font-medium transition-colors',
+                                    selectedSummaryHourKey === slot.key
+                                        ? 'border-amber-500 bg-amber-50 text-amber-700'
+                                        : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300 hover:text-gray-800',
+                                ]">
+                                <span>{{ slot.label }}</span>
+                                <span class="rounded-full bg-black/5 px-1.5 py-0.5 text-[10px] sm:text-xs">
+                                    {{ slot.orderCount }}
+                                </span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div v-if="selectedSummaryGroups.length > 0"
+                        class="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                        <article v-for="group in selectedSummaryGroups" :key="group.key"
+                            class="rounded-xl border border-gray-200 bg-white p-3 sm:p-4">
+                            <div class="flex items-start justify-between gap-3 border-b border-gray-100 pb-2">
+                                <div class="min-w-0">
+                                    <h3 class="text-sm sm:text-base font-semibold text-gray-900 break-words">
+                                        {{ group.title }}
+                                    </h3>
+                                </div>
+                                <span class="shrink-0 rounded-full bg-gray-100 px-2 py-0.5 text-[10px] sm:text-xs font-medium text-gray-600">
+                                    {{ group.totalQuantity }}
+                                </span>
+                            </div>
+
+                            <div class="mt-3 space-y-2">
+                                <div v-for="line in group.lines" :key="line.name"
+                                    class="flex items-start justify-between gap-3 text-sm">
+                                    <span class="font-semibold text-gray-900 tabular-nums">
+                                        {{ line.quantity }}
+                                    </span>
+                                    <span class="min-w-0 flex-1 text-right text-gray-700 break-words">
+                                        {{ line.name }}
+                                    </span>
+                                </div>
+                            </div>
+                        </article>
+                    </div>
+
+                    <div v-else-if="hourlySummary.hourSlots.length > 0"
+                        class="rounded-xl border border-dashed border-gray-200 bg-gray-50 px-4 py-8 text-sm text-gray-500">
+                        La hora seleccionada no tiene líneas para resumir.
+                    </div>
+
+                    <div v-else
+                        class="rounded-xl border border-dashed border-gray-200 bg-gray-50 px-4 py-8 text-sm text-gray-500">
+                        No hay horas con pedidos en Tomado o En preparación para la fecha seleccionada.
+                    </div>
+                </template>
             </div>
         </div>
 
@@ -133,14 +238,18 @@ import { useSignalR } from '@/composables/useSignalR'
 import { useTextToSpeech } from '@/composables/useTextToSpeech'
 import { useNotifications } from '@/composables/useNotifications'
 import { useToast } from '@/composables/useToast'
+import { buildKitchenHourlySummary } from '@/composables/useKitchenHourlySummary'
 import { KitchenService } from '@/services/domain/KitchenService'
+import { orderApi } from '@/services/MainAPI/orderApi'
 import type { KitchenOrderModificationSummary } from '@/types/kitchenModification'
 import { printJobsApi } from '@/services/MainAPI/printJobsApi'
 import type { OrderListItem, OrderDetailItem, OrderStatus } from '@/types/order'
+import { defaultBusinessCalendar } from '@/utils/datetime'
 import MainLayout from '@/components/layout/MainLayout.vue'
 import OrderCardGrid from '@/components/kitchen/OrderCardGrid.vue'
 import ReadyOrdersTable from '@/components/kitchen/ReadyOrdersTable.vue'
 import ConfirmStatusChangeModal from '@/components/kitchen/ConfirmStatusChangeModal.vue'
+import BaseInput from '@/components/ui/BaseInput.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import { ArrowPathIcon, SpeakerWaveIcon, SpeakerXMarkIcon, BellIcon } from '@heroicons/vue/24/outline'
 
@@ -162,22 +271,26 @@ watch(combinedKitchenMode, (v) => {
     localStorage.setItem(KITCHEN_COMBINED_MODE_KEY, v ? '1' : '0')
 })
 
-const activeTab = ref<'scheduled' | 'active' | 'ready'>('active')
+const activeTab = ref<'scheduled' | 'active' | 'ready' | 'hourly_summary'>('active')
 const soundEnabled = ref(true)
 const isLoading = ref(false)
+const summaryLoading = ref(false)
 const showConfirmModal = ref(false)
 const ordersToConfirm = ref<OrderListItem[]>([])
-/** Copia de `combinedKitchenMode` al abrir el modal (confirmación encadenada a Listo). */
+/** Copia de `combinedKitchenMode` al abrir el modal (confirmaciÃ³n encadenada a Listo). */
 const confirmChainTakenToReady = ref(false)
 const orderItemsMap = ref(new Map<number, OrderDetailItem[]>())
 const cardGridRef = ref<InstanceType<typeof OrderCardGrid> | null>(null)
+const summaryOrders = ref<OrderListItem[]>([])
+const summaryDate = ref(defaultBusinessCalendar.todayYmd())
+const selectedSummaryHourKey = ref('')
 
-/** Ids cuyo due de cocina ya anunció el servidor (ReservationReady) pero el reloj local podría aún considerar “pendiente de hora”. Alinea lista activa con el backend. */
+/** Ids cuyo due de cocina ya anunciÃ³ el servidor (ReservationReady) pero el reloj local podrÃ­a aÃºn considerar â€œpendiente de horaâ€. Alinea lista activa con el backend. */
 const reservationServerDue = ref<Set<number>>(new Set())
 
 const allOrders = computed(() => ordersStore.list?.items || [])
 
-/** Reservas del día en «Tomado» cuya hora de cocina aún no llegó (prepareAt o reservedFor−1h); luego pasan a Pedidos activos. */
+/** Reservas del dÃ­a en Â«TomadoÂ» cuya hora de cocina aÃºn no llegÃ³ (prepareAt o reservedForâˆ’1h); luego pasan a Pedidos activos. */
 const scheduledReservationOrders = computed(() => {
     const list = allOrders.value.filter(
         (o) =>
@@ -201,6 +314,12 @@ const activeOrders = computed(() => {
 })
 
 const readyOrders = computed(() => allOrders.value.filter(o => o.status === 'ready'))
+const hourlySummary = computed(() =>
+    buildKitchenHourlySummary(summaryOrders.value, orderItemsMap.value, summaryDate.value),
+)
+const selectedSummaryGroups = computed(
+    () => hourlySummary.value.groupedByHour[selectedSummaryHourKey.value] ?? [],
+)
 
 const loadOrders = async () => {
     try {
@@ -212,7 +331,7 @@ const loadOrders = async () => {
             forKitchen: true
         })
         await loadOrderDetails()
-        // Quitar override cuando el cliente ya considera vencida la hora de cocina (reloj alineado o usuario pasó a preparación).
+        // Quitar override cuando el cliente ya considera vencida la hora de cocina (reloj alineado o usuario pasÃ³ a preparaciÃ³n).
         reservationServerDue.value = new Set(
             [...reservationServerDue.value].filter((id) => {
                 const o = allOrders.value.find((x) => x.id === id)
@@ -220,6 +339,9 @@ const loadOrders = async () => {
                 return KitchenService.isReservationTakenPendingKitchenTime(o)
             })
         )
+        if (activeTab.value === 'hourly_summary') {
+            await loadSummaryOrders()
+        }
     } catch (err: any) {
         error('Error al cargar pedidos', err.message)
     } finally {
@@ -227,16 +349,68 @@ const loadOrders = async () => {
     }
 }
 
-const loadOrderDetails = async () => {
-    for (const order of allOrders.value) {
-        try {
-            await ordersStore.fetchById(order.id)
-            if (ordersStore.current) {
-                orderItemsMap.value.set(order.id, [...(ordersStore.current.orderDetails || [])])
-            }
-        } catch (err) {
-            console.error(`Error loading details for order ${order.id}:`, err)
+const ensureOrderDetails = async (orderIds: number[]) => {
+    const uniqueIds = [...new Set(orderIds)]
+    const idsToFetch = uniqueIds.filter((id) => !orderItemsMap.value.has(id))
+    if (idsToFetch.length === 0) return
+
+    const results = await Promise.allSettled(idsToFetch.map((id) => orderApi.fetchDetail(id)))
+    results.forEach((result, index) => {
+        if (result.status === 'fulfilled') {
+            orderItemsMap.value.set(idsToFetch[index]!, [...(result.value.orderDetails || [])])
+        } else {
+            console.error(`Error loading details for order ${idsToFetch[index]}:`, result.reason)
         }
+    })
+}
+
+const loadOrderDetails = async () => {
+    await ensureOrderDetails(allOrders.value.map((order) => order.id))
+}
+
+const loadSummaryOrders = async () => {
+    const branchId = authStore.user?.branchId
+    if (!branchId) {
+        summaryOrders.value = []
+        selectedSummaryHourKey.value = ''
+        return
+    }
+
+    const merged = new Map<number, OrderListItem>()
+    const pageSize = 200
+
+    try {
+        summaryLoading.value = true
+
+        for (const status of ['taken', 'inPreparation']) {
+            let page = 1
+            let totalPages = 1
+
+            do {
+                const response = await orderApi.searchOrders({
+                    branchId,
+                    status,
+                    page,
+                    pageSize,
+                })
+
+                for (const order of response.items) {
+                    merged.set(order.id, order)
+                }
+
+                totalPages = response.totalPages || 1
+                page += 1
+            } while (page <= totalPages)
+        }
+
+        summaryOrders.value = [...merged.values()]
+        await ensureOrderDetails(summaryOrders.value.map((order) => order.id))
+    } catch (err: any) {
+        summaryOrders.value = []
+        selectedSummaryHourKey.value = ''
+        error('Error al cargar resumen cocina', err.message)
+    } finally {
+        summaryLoading.value = false
     }
 }
 
@@ -285,7 +459,7 @@ const handleReservationReady = async (orderData: any) => {
     await notifyOrderShownInKitchen(orderData, true)
 }
 
-/** Notificación TTS + navegador; actualiza ítems en mapa desde API. */
+/** NotificaciÃ³n TTS + navegador; actualiza Ã­tems en mapa desde API. */
 const notifyKitchenOrderModified = async (
     orderData: any,
     modificationKind: string,
@@ -329,7 +503,7 @@ const notifyKitchenOrderModified = async (
             speak(speechText)
         }
     } catch (err) {
-        console.error('Error notificación pedido modificado:', err)
+        console.error('Error notificaciÃ³n pedido modificado:', err)
     }
 }
 
@@ -359,7 +533,7 @@ const handleOrderCancelled = async (payload: any) => {
         8000
     )
     if (soundEnabled.value) {
-        speak(`Pedido número ${orderId} cancelado.`)
+        speak(`Pedido nÃºmero ${orderId} cancelado.`)
     }
     await loadOrders()
 }
@@ -432,13 +606,13 @@ const handleReprint = async (orderId: number) => {
     try {
         const res = await printJobsApi.enqueueKitchenJob(branchId, [orderId])
         if (!res.isSuccess) {
-            error('Reimpresión', res.message || 'No se pudo encolar la comanda.')
+            error('ReimpresiÃ³n', res.message || 'No se pudo encolar la comanda.')
             return
         }
-        success('Comanda en cola', 3500, 'El agente de impresión la emitirá en breve.')
+        success('Comanda en cola', 3500, 'El agente de impresiÃ³n la emitirÃ¡ en breve.')
     } catch (err: unknown) {
-        const msg = err instanceof Error ? err.message : 'No se pudo encolar la reimpresión.'
-        error('Reimpresión', msg)
+        const msg = err instanceof Error ? err.message : 'No se pudo encolar la reimpresiÃ³n.'
+        error('ReimpresiÃ³n', msg)
     }
 }
 
@@ -464,10 +638,31 @@ onMounted(async () => {
     on('OrderModified', handleOrderModified)
     on('OrderCancelled', handleOrderCancelled)
 })
+watch(
+    () => hourlySummary.value.defaultHourKey,
+    (defaultHourKey) => {
+        if (!hourlySummary.value.hourSlots.length) {
+            selectedSummaryHourKey.value = ''
+            return
+        }
+        if (!hourlySummary.value.hourSlots.some((slot) => slot.key === selectedSummaryHourKey.value)) {
+            selectedSummaryHourKey.value = defaultHourKey
+        }
+    },
+    { immediate: true },
+)
+
+watch(
+    [activeTab, summaryDate],
+    async ([tab]) => {
+        if (tab !== 'hourly_summary') return
+        await loadSummaryOrders()
+    },
+)
 </script>
 
 <style scoped>
-/* Scroll horizontal solo en las pestañas, sin barra/rueditas nativas visibles (no aporta y confunde). */
+/* Scroll horizontal solo en las pestaÃ±as, sin barra/rueditas nativas visibles (no aporta y confunde). */
 .kitchen-tabs-nav {
     scrollbar-width: none;
     -ms-overflow-style: none;
@@ -476,3 +671,9 @@ onMounted(async () => {
     display: none;
 }
 </style>
+
+
+
+
+
+
