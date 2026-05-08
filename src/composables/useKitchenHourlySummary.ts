@@ -33,6 +33,11 @@ export interface KitchenHourlySummaryResult {
     totalOrderCount: number
 }
 
+type KitchenSummaryCategoryAccumulator = Map<
+    string,
+    { title: string; lines: Map<string, number>; totalQuantity: number }
+>
+
 function getBusinessDateKey(instant: string | null | undefined): string | null {
     if (!instant) return null
     const date = new Date(instant)
@@ -87,51 +92,89 @@ function sortCategoryCards(cards: KitchenHourlySummaryCategoryCard[]): KitchenHo
     })
 }
 
+function createCategoryAccumulator(): KitchenSummaryCategoryAccumulator {
+    return new Map()
+}
+
+function getSummaryEligibleOrders(orders: OrderListItem[], selectedDate: string): OrderListItem[] {
+    return orders.filter(
+        (order) => ACTIVE_SUMMARY_STATUSES.has(order.status) && orderMatchesSelectedDate(order, selectedDate),
+    )
+}
+
+function accumulateOrderItems(
+    categories: KitchenSummaryCategoryAccumulator,
+    orderItems: OrderDetailItem[],
+): void {
+    for (const item of orderItems) {
+        const categoryKey = (item.productCategoryName?.trim() || NO_CATEGORY_LABEL).toLocaleLowerCase('es')
+        const categoryTitle = getCategoryTitle(item.productCategoryName)
+        const lineName = getProductLineName(item.productName)
+
+        if (!categories.has(categoryKey)) {
+            categories.set(categoryKey, {
+                title: categoryTitle,
+                lines: new Map(),
+                totalQuantity: 0,
+            })
+        }
+
+        const category = categories.get(categoryKey)!
+        category.lines.set(lineName, (category.lines.get(lineName) ?? 0) + item.quantity)
+        category.totalQuantity += item.quantity
+    }
+}
+
+function buildCategoryCards(
+    categories: KitchenSummaryCategoryAccumulator,
+): KitchenHourlySummaryCategoryCard[] {
+    const cards = [...categories.entries()].map(([categoryKey, category]) => ({
+        key: categoryKey,
+        title: category.title,
+        totalQuantity: category.totalQuantity,
+        lines: sortProductsByPortionOrder(
+            [...category.lines.entries()].map(([name, quantity]) => ({ name, quantity })),
+        ),
+    }))
+
+    return sortCategoryCards(cards)
+}
+
+export function buildKitchenDailyCategorySummary(
+    orders: OrderListItem[],
+    orderItemsMap: Map<number, OrderDetailItem[]>,
+    selectedDate: string,
+): KitchenHourlySummaryCategoryCard[] {
+    const categories = createCategoryAccumulator()
+
+    for (const order of getSummaryEligibleOrders(orders, selectedDate)) {
+        accumulateOrderItems(categories, orderItemsMap.get(order.id) ?? [])
+    }
+
+    return buildCategoryCards(categories)
+}
+
 export function buildKitchenHourlySummary(
     orders: OrderListItem[],
     orderItemsMap: Map<number, OrderDetailItem[]>,
     selectedDate: string,
     now: Date = new Date(),
 ): KitchenHourlySummaryResult {
-    const perHourCategories = new Map<
-        string,
-        Map<string, { title: string; lines: Map<string, number>; totalQuantity: number }>
-    >()
+    const perHourCategories = new Map<string, KitchenSummaryCategoryAccumulator>()
     const hourOrderCount = new Map<string, number>()
     const currentHourKey = hourKeyFromHour(getBusinessHour(now) ?? 0)
 
-    for (const order of orders) {
-        if (!ACTIVE_SUMMARY_STATUSES.has(order.status)) continue
-        if (!orderMatchesSelectedDate(order, selectedDate)) continue
-
+    for (const order of getSummaryEligibleOrders(orders, selectedDate)) {
         const hourKey = getOrderHourKey(order, now)
         if (!hourKey) continue
 
         hourOrderCount.set(hourKey, (hourOrderCount.get(hourKey) ?? 0) + 1)
 
-        const orderItems = orderItemsMap.get(order.id) ?? []
         if (!perHourCategories.has(hourKey)) {
-            perHourCategories.set(hourKey, new Map())
+            perHourCategories.set(hourKey, createCategoryAccumulator())
         }
         const categoriesForHour = perHourCategories.get(hourKey)!
-
-        for (const item of orderItems) {
-            const categoryKey = (item.productCategoryName?.trim() || NO_CATEGORY_LABEL).toLocaleLowerCase('es')
-            const categoryTitle = getCategoryTitle(item.productCategoryName)
-            const lineName = getProductLineName(item.productName)
-
-            if (!categoriesForHour.has(categoryKey)) {
-                categoriesForHour.set(categoryKey, {
-                    title: categoryTitle,
-                    lines: new Map(),
-                    totalQuantity: 0,
-                })
-            }
-
-            const category = categoriesForHour.get(categoryKey)!
-            category.lines.set(lineName, (category.lines.get(lineName) ?? 0) + item.quantity)
-            category.totalQuantity += item.quantity
-        }
+        accumulateOrderItems(categoriesForHour, orderItemsMap.get(order.id) ?? [])
     }
 
     const hourSlots = [...hourOrderCount.entries()]
@@ -148,15 +191,7 @@ export function buildKitchenHourlySummary(
 
     const groupedByHour = Object.fromEntries(
         [...perHourCategories.entries()].map(([hourKey, categories]) => {
-            const cards = [...categories.entries()].map(([categoryKey, category]) => ({
-                key: categoryKey,
-                title: category.title,
-                totalQuantity: category.totalQuantity,
-                lines: sortProductsByPortionOrder(
-                    [...category.lines.entries()].map(([name, quantity]) => ({ name, quantity })),
-                ),
-            }))
-            return [hourKey, sortCategoryCards(cards)]
+            return [hourKey, buildCategoryCards(categories)]
         }),
     ) as Record<string, KitchenHourlySummaryCategoryCard[]>
 

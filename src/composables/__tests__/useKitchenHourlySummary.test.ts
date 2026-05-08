@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildKitchenHourlySummary } from '@/composables/useKitchenHourlySummary'
+import { buildKitchenDailyCategorySummary, buildKitchenHourlySummary } from '@/composables/useKitchenHourlySummary'
 import type { OrderDetailItem, OrderListItem } from '@/types/order'
 
 const makeOrder = (overrides: Partial<OrderListItem> = {}): OrderListItem => ({
@@ -146,6 +146,122 @@ describe('buildKitchenHourlySummary', () => {
             { name: 'super', quantity: 3 },
             { name: 'Trío', quantity: 1 },
             { name: 'Personal', quantity: 6 },
+        ])
+    })
+})
+
+describe('buildKitchenDailyCategorySummary', () => {
+    it('acumula todo el día por categoría sin separar por hora', () => {
+        const orders = [
+            makeOrder({
+                id: 1,
+                status: 'taken',
+                prepareAt: '2026-05-07T10:20:00.000-05:00',
+            }),
+            makeOrder({
+                id: 2,
+                status: 'in_preparation',
+                prepareAt: '2026-05-07T14:40:00.000-05:00',
+            }),
+        ]
+        const items = new Map<number, OrderDetailItem[]>([
+            [1, [
+                makeItem({
+                    orderId: 1,
+                    productCategoryName: 'Arroz ropa vieja con chicharrón Súper',
+                    productName: 'Trío',
+                    quantity: 3,
+                }),
+                makeItem({
+                    id: 2,
+                    orderId: 1,
+                    productCategoryName: 'Arroz paisa',
+                    productName: 'Súper Familiar',
+                    quantity: 2,
+                }),
+            ]],
+            [2, [
+                makeItem({
+                    id: 3,
+                    orderId: 2,
+                    productCategoryName: 'Arroz ropa vieja con chicharrón Súper',
+                    productName: 'Súper Familiar',
+                    quantity: 5,
+                }),
+                makeItem({
+                    id: 4,
+                    orderId: 2,
+                    productCategoryName: 'Arroz paisa',
+                    productName: 'Familiar',
+                    quantity: 4,
+                }),
+            ]],
+        ])
+
+        const result = buildKitchenDailyCategorySummary(orders, items, '2026-05-07')
+
+        expect(result).toEqual([
+            {
+                key: 'arroz paisa',
+                title: 'paisa',
+                totalQuantity: 6,
+                lines: [
+                    { name: 'super', quantity: 2 },
+                    { name: 'Familiar', quantity: 4 },
+                ],
+            },
+            {
+                key: 'arroz ropa vieja con chicharrón súper',
+                title: 'super ropa chich',
+                totalQuantity: 8,
+                lines: [
+                    { name: 'super', quantity: 5 },
+                    { name: 'Trío', quantity: 3 },
+                ],
+            },
+        ])
+    })
+
+    it('reutiliza el mismo filtrado por estado y fecha operativa', () => {
+        const orders = [
+            makeOrder({
+                id: 1,
+                status: 'taken',
+                prepareAt: '2026-05-07T10:20:00.000-05:00',
+                createdAt: '2026-05-01T08:00:00.000-05:00',
+            }),
+            makeOrder({
+                id: 2,
+                status: 'in_preparation',
+                prepareAt: null,
+                createdAt: '2026-05-07T18:15:00.000-05:00',
+            }),
+            makeOrder({
+                id: 3,
+                status: 'ready',
+                prepareAt: '2026-05-07T19:00:00.000-05:00',
+            }),
+            makeOrder({
+                id: 4,
+                status: 'taken',
+                prepareAt: null,
+                createdAt: '2026-05-06T23:55:00.000-05:00',
+            }),
+        ]
+        const items = new Map<number, OrderDetailItem[]>([
+            [1, [makeItem({ orderId: 1, quantity: 2 })]],
+            [2, [makeItem({ id: 2, orderId: 2, quantity: 3, productName: 'Familiar' })]],
+            [3, [makeItem({ id: 3, orderId: 3, quantity: 4, productName: 'Trío' })]],
+            [4, [makeItem({ id: 4, orderId: 4, quantity: 5, productName: 'Personal' })]],
+        ])
+
+        const result = buildKitchenDailyCategorySummary(orders, items, '2026-05-07')
+
+        expect(result).toHaveLength(1)
+        expect(result[0]?.totalQuantity).toBe(5)
+        expect(result[0]?.lines).toEqual([
+            { name: 'super', quantity: 2 },
+            { name: 'Familiar', quantity: 3 },
         ])
     })
 })

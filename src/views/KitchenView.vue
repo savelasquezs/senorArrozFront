@@ -157,6 +157,57 @@
                 </div>
 
                 <template v-else>
+                    <div v-if="canViewDailyCategorySummary"
+                        class="rounded-xl border border-gray-200 bg-white p-3 sm:p-4">
+                        <div class="flex items-start justify-between gap-3">
+                            <div>
+                                <h2 class="text-sm sm:text-base font-semibold text-gray-900">
+                                    Resumen del día
+                                </h2>
+                                <p class="mt-1 text-xs sm:text-sm text-gray-500">
+                                    Acumulado por categoría para la fecha seleccionada
+                                </p>
+                            </div>
+                            <span v-if="dailyCategorySummary.length > 0"
+                                class="shrink-0 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] sm:text-xs font-medium text-amber-700">
+                                {{ dailyCategorySummary.length }} categoría(s)
+                            </span>
+                        </div>
+
+                        <div v-if="dailyCategorySummary.length > 0"
+                            class="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                            <article v-for="group in dailyCategorySummary" :key="group.key"
+                                class="rounded-xl border border-gray-200 bg-gray-50 p-3">
+                                <div class="flex items-start justify-between gap-3 border-b border-gray-200 pb-2">
+                                    <div class="min-w-0">
+                                        <h3 class="text-sm font-semibold text-gray-900 break-words">
+                                            {{ group.title }}
+                                        </h3>
+                                    </div>
+                                    <span class="shrink-0 rounded-full bg-white px-2 py-0.5 text-[10px] sm:text-xs font-medium text-gray-600">
+                                        {{ group.totalQuantity }}
+                                    </span>
+                                </div>
+
+                                <div class="mt-3 space-y-2">
+                                    <div v-for="line in group.lines" :key="line.name"
+                                        class="flex items-start justify-between gap-3 text-sm">
+                                        <span class="font-semibold text-gray-900 tabular-nums">
+                                            {{ line.quantity }}
+                                        </span>
+                                        <span class="min-w-0 flex-1 text-right text-gray-700 break-words">
+                                            {{ line.name }}
+                                        </span>
+                                    </div>
+                                </div>
+                            </article>
+                        </div>
+
+                        <p v-else class="mt-3 text-sm text-gray-500">
+                            No hay productos para resumir en la fecha seleccionada.
+                        </p>
+                    </div>
+
                     <div v-if="hourlySummary.hourSlots.length > 0"
                         class="rounded-xl border border-gray-200 bg-white p-3 sm:p-4">
                         <p class="text-xs font-medium uppercase tracking-wide text-gray-500">
@@ -238,7 +289,7 @@ import { useSignalR } from '@/composables/useSignalR'
 import { useTextToSpeech } from '@/composables/useTextToSpeech'
 import { useNotifications } from '@/composables/useNotifications'
 import { useToast } from '@/composables/useToast'
-import { buildKitchenHourlySummary } from '@/composables/useKitchenHourlySummary'
+import { buildKitchenHourlySummary, buildKitchenDailyCategorySummary } from '@/composables/useKitchenHourlySummary'
 import { KitchenService } from '@/services/domain/KitchenService'
 import { orderApi } from '@/services/MainAPI/orderApi'
 import type { KitchenOrderModificationSummary } from '@/types/kitchenModification'
@@ -284,6 +335,7 @@ const cardGridRef = ref<InstanceType<typeof OrderCardGrid> | null>(null)
 const summaryOrders = ref<OrderListItem[]>([])
 const summaryDate = ref(defaultBusinessCalendar.todayYmd())
 const selectedSummaryHourKey = ref('')
+const canViewDailyCategorySummary = computed(() => authStore.isAdmin || authStore.isSuperadmin)
 
 /** Ids cuyo due de cocina ya anunciÃ³ el servidor (ReservationReady) pero el reloj local podrÃ­a aÃºn considerar â€œpendiente de horaâ€. Alinea lista activa con el backend. */
 const reservationServerDue = ref<Set<number>>(new Set())
@@ -316,6 +368,9 @@ const activeOrders = computed(() => {
 const readyOrders = computed(() => allOrders.value.filter(o => o.status === 'ready'))
 const hourlySummary = computed(() =>
     buildKitchenHourlySummary(summaryOrders.value, orderItemsMap.value, summaryDate.value),
+)
+const dailyCategorySummary = computed(() =>
+    buildKitchenDailyCategorySummary(summaryOrders.value, orderItemsMap.value, summaryDate.value),
 )
 const selectedSummaryGroups = computed(
     () => hourlySummary.value.groupedByHour[selectedSummaryHourKey.value] ?? [],
