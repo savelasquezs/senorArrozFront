@@ -13,6 +13,23 @@
             </BaseButton>
         </div>
 
+        <div class="inline-flex rounded-lg border border-gray-200 bg-gray-50 p-1">
+            <button
+                type="button"
+                class="px-3 py-1.5 text-sm font-medium rounded-md transition-colors"
+                :class="usersTab === 'active' ? 'bg-white text-emerald-700 shadow-sm' : 'text-gray-600 hover:text-gray-800'"
+                @click="usersTab = 'active'">
+                Activos ({{ activeUsersCount }})
+            </button>
+            <button
+                type="button"
+                class="px-3 py-1.5 text-sm font-medium rounded-md transition-colors"
+                :class="usersTab === 'inactive' ? 'bg-white text-red-700 shadow-sm' : 'text-gray-600 hover:text-gray-800'"
+                @click="usersTab = 'inactive'">
+                Inactivos ({{ inactiveUsersCount }})
+            </button>
+        </div>
+
         <!-- Users Table -->
         <div class="overflow-hidden bg-white shadow ring-1 ring-black ring-opacity-5 rounded-lg">
             <table class="min-w-full divide-y divide-gray-200">
@@ -36,14 +53,16 @@
                     </tr>
                 </thead>
                 <tbody class="bg-white divide-y divide-gray-200">
-                    <tr v-if="users.length === 0">
+                    <tr v-if="filteredUsers.length === 0">
                         <td colspan="5" class="px-6 py-8 text-center text-gray-500">
                             <UserGroupIcon class="mx-auto h-12 w-12 text-gray-400" />
-                            <p class="mt-2">No hay usuarios en esta sucursal</p>
+                            <p class="mt-2">
+                                {{ usersTab === 'active' ? 'No hay usuarios activos en esta sucursal' : 'No hay usuarios inactivos en esta sucursal' }}
+                            </p>
                         </td>
                     </tr>
 
-                    <tr v-for="user in users" :key="user.id" class="hover:bg-gray-50">
+                    <tr v-for="user in filteredUsers" :key="user.id" class="hover:bg-gray-50">
                         <!-- User Info -->
                         <td class="px-6 py-4 whitespace-nowrap">
                             <div class="flex items-center">
@@ -181,6 +200,15 @@ onMounted(async () => {
 // Dialog state
 const showDialog = ref(false)
 const editingUser = ref<BranchUserSummary | null>(null)
+const usersTab = ref<'active' | 'inactive'>('active')
+
+const activeUsersCount = computed(() => props.users.filter(user => user.active).length)
+const inactiveUsersCount = computed(() => props.users.filter(user => !user.active).length)
+const filteredUsers = computed(() =>
+    usersTab.value === 'active'
+        ? props.users.filter(user => user.active)
+        : props.users.filter(user => !user.active)
+)
 
 const canManageUsers = computed(() => {
     const role = authStore.user?.role

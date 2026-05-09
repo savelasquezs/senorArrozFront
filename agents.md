@@ -1,135 +1,143 @@
-# Senor Arroz Frontend - Codex Rules
+# Señor Arroz Frontend - Codex Guide
 
-## Contexto del proyecto
+## Objetivo
 
-Este es un sistema de gestion de restaurante desarrollado en Vue 3 + TypeScript + Tailwind CSS. El proyecto maneja pedidos, clientes, productos, pagos y multiples roles de usuario.
-
-si ves algun archivo que contenga alerts nativos vamos a cambiarlos por los modales ya existentes.
-
-## Documentacion principal
-
-- `agents.md` - documentacion amplia del frontend
-- `docs/README.md` - overview y navegacion
-- `docs/architecture.md` - arquitectura tecnica
-- `docs/components.md` - guia de componentes UI
-- `docs/business-rules.md` - reglas de negocio
-- `docs/api-reference.md` - referencia de APIs
-- `docs/development.md` - guias y convenciones
-- `docs/patterns.md` - patrones de arquitectura
-- `docs/recommendations.md` - mejores practicas
+Este archivo ayuda a Codex a encontrar rápido dónde hacer cambios sin escanear todo el frontend.
 
 ## Stack
 
-- Frontend: Vue 3 + Composition API + TypeScript
-- Styling: Tailwind CSS
-- Estado: Pinia
-- Routing: Vue Router
-- HTTP: Axios con interceptores JWT
-- Build: Vite
-- Testing: Vitest
+- Vue 3
+- Pinia
+- Vue Router
+- Vite
+- Tailwind
+- Axios
 
-## Roles
+## Lectura obligatoria antes de modificar
 
-- `SUPERADMIN`
-- `ADMIN`
-- `CASHIER`
-- `KITCHEN`
-- `DELIVERYMAN`
+1. Identificar módulo en `src/views`
+2. Identificar store en `src/store`
+3. Identificar componentes en `src/components`
+4. Confirmar impacto en backend (`SenorArroz`)
 
-## Regla critica: reactividad optimista
+## Estructura general
 
-Despues de mutaciones `CREATE`, `UPDATE` y `DELETE`, actualiza el estado local inmediatamente sin recargar desde el servidor salvo que exista una razon real para refrescar.
+### Vistas
 
-### CREATE
-
-```ts
-const created = await api.create(data);
-items.value.unshift(created);
-if (totalCount.value !== undefined) totalCount.value++;
+```text
+src/views/
 ```
 
-### UPDATE
+Responsables de:
 
-```ts
-const updated = await api.update(id, data);
-const index = items.value.findIndex((item) => item.id === id);
-if (index !== -1) {
-	items.value[index] = { ...items.value[index], ...updated };
-}
+- Pantallas completas
+- Layouts
+- Orquestación de componentes
+
+### Stores (Pinia)
+
+```text
+src/store/
 ```
 
-### DELETE
+Responsables de:
 
-```ts
-await api.delete(id);
-items.value = items.value.filter((item) => item.id !== id);
-if (totalCount.value !== undefined) totalCount.value--;
+- Estado global
+- Llamadas HTTP
+- Manejo de listas, filtros y paginación
+
+Regla:
+
+- La lógica de negocio ligera puede vivir aquí
+- No duplicar lógica del backend
+
+### Componentes
+
+```text
+src/components/
 ```
 
-### Cuando si recargar
+Responsables de:
 
-- cambios que afectan multiples items
-- operaciones con agregaciones o totales calculados por backend
-- cambio de pagina
-- filtros nuevos
-- desincronizacion detectada
+- UI reutilizable
+- Tarjetas
+- Tablas
+- Inputs
 
-## Patrones de componentes
+## Módulos principales
 
-- Usar Composition API con `<script setup lang="ts">`
-- Props y emits tipados
-- Seguir el orden: imports, props/emits, composables, state, computed, methods, lifecycle
-- Preferir componentes base reutilizables
-- Mantener consistencia con el sistema de diseno existente
+### Orders
 
-## Componentes autonomos
+Buscar en:
 
-Usar prop `mode` cuando el mismo componente tenga comportamiento distinto entre draft y persisted.
+- `views/orders`
+- `store/orders.ts`
+- componentes relacionados
 
-```ts
-if (props.mode === 'draft') {
-	store.updateData(data);
-} else {
-	emit('data-updated', data);
-}
-```
+Reglas:
 
-Los modales autonomos deben manejar internamente:
+- Filtros pueden hacerse en frontend para agilidad
+- Cambios de fecha deben consultar backend
+- No romper paginación
 
-- llamadas a API
-- validacion
-- estados de carga y error
-- actualizacion optimista del store
+### Kitchen
 
-Y emitir `updated` con el objeto actualizado cuando aplique.
+Buscar en:
 
-## Convenciones
+- vista de cocina
 
-- Componentes: PascalCase
-- Servicios y variables: camelCase
-- Constantes: UPPER_SNAKE_CASE
-- Tipos e interfaces: PascalCase
-- Eventos: kebab-case
+Reglas:
 
-## Reglas de negocio importantes
+- Mantener agrupación por categoría
+- Mantener comportamiento responsive
+- No romper flujo de estados
 
-### Pedidos
+### Expenses
 
-- `delivery`: cliente + direccion obligatorios
-- `reservation`: fecha/hora obligatoria
-- `app payments`: maximo 1 por pedido
-- `bank payments`: multiples permitidos
-- cancelacion: requiere motivo
+Buscar en:
 
-### Usuarios
+- `views/expenses`
 
-- solo 1 superadmin
-- 1 admin/cocina por sucursal
-- los usuarios ven datos de su sucursal salvo superadmin
+Reglas:
 
-## Para Codex
+- Tabla tipo Excel
+- Filtros locales rápidos
+- Backend solo para cambios de fecha
 
-- Usa este archivo como reglas base del frontend.
-- Consulta `agents.md` para contexto amplio del modulo.
-- Sigue `docs/patterns.md` y `docs/recommendations.md` antes de introducir patrones nuevos.
-- Prefiere cambios pequenos y consistentes con la implementacion existente.
+## Multitenancy
+
+Reglas:
+
+- El frontend NO decide el tenant
+- Nunca enviar `TenantId` manualmente
+- El backend determina el tenant
+
+## Reglas para Codex
+
+Antes de cambiar algo:
+
+1. Identificar vista
+2. Identificar store
+3. Identificar endpoint backend
+4. Ver impacto en UX
+
+Evitar:
+
+- Buscar en todo el repo sin contexto
+- Cambiar múltiples módulos a la vez
+- Romper contratos con backend
+
+## Buenas prácticas
+
+- Reutilizar componentes
+- Mantener stores consistentes
+- Evitar duplicación
+- Mantener naming consistente
+
+## Checklist
+
+- ¿Rompe alguna vista existente?
+- ¿Rompe filtros?
+- ¿Rompe cocina?
+- ¿Rompe pedidos?
+- ¿Sigue funcionando con backend actual?
