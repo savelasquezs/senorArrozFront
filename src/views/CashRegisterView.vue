@@ -366,7 +366,7 @@
                   <div v-if="movementsBankId != null && expected" class="mt-2">
                     <BankMovementsPanel :key="movementsBankId" :bank-id="movementsBankId"
                       :branch-id="authStore.branchId ?? undefined" embedded lock-date-range
-                      :initial-from-date="closureFromYmd" :initial-to-date="closureToYmd" />
+                      :initial-from-date="todayBankMovementsYmd" :initial-to-date="todayBankMovementsYmd" />
                   </div>
                 </div>
               </div>
@@ -732,18 +732,7 @@ const saveBlockReason = computed(() => {
   return ''
 })
 
-const closureFromYmd = computed(() => {
-  if (!expected.value) return ''
-  const d = expected.value.lastClosureAt
-    ? new Date(expected.value.lastClosureAt)
-    : new Date(expected.value.asOf)
-  return formatYmdBogota(d)
-})
-
-const closureToYmd = computed(() => {
-  if (!expected.value) return ''
-  return formatYmdBogota(new Date(expected.value.asOf))
-})
+const todayBankMovementsYmd = computed(() => formatYmdBogota(new Date()))
 
 /** Mismo día calendario (CO) que el snapshot actual: ya hubo un cierre hoy; advertir antes de un segundo guardado. */
 const hasClosureRecordedToday = computed(() => {

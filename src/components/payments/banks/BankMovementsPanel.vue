@@ -142,6 +142,35 @@
                     </table>
                 </div>
 
+                <div v-else-if="activeTab === 'deposits'" class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200 text-sm">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-3 py-2 text-left text-xs font-medium text-gray-500">ID</th>
+                                <th class="px-3 py-2 text-left text-xs font-medium text-gray-500">Pedido</th>
+                                <th class="px-3 py-2 text-right text-xs font-medium text-gray-500">Monto</th>
+                                <th class="px-3 py-2 text-left text-xs font-medium text-gray-500">Recibido por</th>
+                                <th class="px-3 py-2 text-left text-xs font-medium text-gray-500">Fecha</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-100">
+                            <tr v-for="row in reservationDeposits.items" :key="row.id" class="hover:bg-gray-50">
+                                <td class="px-3 py-2 whitespace-nowrap">{{ row.id }}</td>
+                                <td class="px-3 py-2 whitespace-nowrap">
+                                    <button type="button" class="text-indigo-600 hover:underline"
+                                        @click="router.push(`/orders/${row.orderId}`)">
+                                        #{{ row.orderId }}
+                                    </button>
+                                </td>
+                                <td class="px-3 py-2 text-right tabular-nums">{{ formatCurrency(row.amount) }}</td>
+                                <td class="px-3 py-2">{{ row.receivedByName }}</td>
+                                <td class="px-3 py-2 whitespace-nowrap text-gray-600">{{ formatDateTime(row.receivedAt) }}
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
                 <div v-else-if="activeTab === 'out'" class="overflow-x-auto">
                     <table class="min-w-full divide-y divide-gray-200 text-sm">
                         <thead class="bg-gray-50">
@@ -241,14 +270,16 @@ import { useRouter } from 'vue-router'
 import { bankApi } from '@/services/MainAPI/bankApi'
 import { bankPaymentApi } from '@/services/MainAPI/bankPaymentApi'
 import { bankTransferApi } from '@/services/MainAPI/bankTransferApi'
+import { reservationDepositApi } from '@/services/MainAPI/reservationDepositApi'
 import type { BankBalanceBreakdown, BankPayment, DeliverymanBankAdvanceLine, ExpenseBankPaymentLine } from '@/types/bank'
 import type { BankTransfer } from '@/types/cashRegister'
+import type { ReservationDeposit } from '@/types/reservationDeposit'
 import { formatYmdBogota } from '@/utils/colombiaDate'
 import { defaultBusinessCalendar } from '@/utils/datetime'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseLoading from '@/components/ui/BaseLoading.vue'
 
-type TabId = 'orders' | 'expenses' | 'out' | 'in' | 'delivery'
+type TabId = 'orders' | 'expenses' | 'out' | 'in' | 'delivery' | 'deposits'
 
 const props = withDefaults(
     defineProps<{
@@ -267,6 +298,7 @@ const pageSize = 15
 
 const tabs: { id: TabId; label: string }[] = [
     { id: 'orders', label: 'Pagos órdenes' },
+    { id: 'deposits', label: 'Abonos reserva' },
     { id: 'expenses', label: 'Pagos gastos' },
     { id: 'out', label: 'Transf. salida' },
     { id: 'in', label: 'Transf. entrada' },
@@ -298,6 +330,7 @@ const expenseLines = ref(emptyPaged<ExpenseBankPaymentLine>())
 const transfersOut = ref(emptyPaged<BankTransfer>())
 const transfersIn = ref(emptyPaged<BankTransfer>())
 const deliveryLines = ref(emptyPaged<DeliverymanBankAdvanceLine>())
+const reservationDeposits = ref(emptyPaged<ReservationDeposit>())
 
 const pagination = computed(() => {
     switch (activeTab.value) {
@@ -312,6 +345,12 @@ const pagination = computed(() => {
                 page: expenseLines.value.page,
                 totalPages: Math.max(1, expenseLines.value.totalPages),
                 totalCount: expenseLines.value.totalCount,
+            }
+        case 'deposits':
+            return {
+                page: reservationDeposits.value.page,
+                totalPages: Math.max(1, reservationDeposits.value.totalPages),
+                totalCount: reservationDeposits.value.totalCount,
             }
         case 'out':
             return {
@@ -396,6 +435,34 @@ async function loadActiveTab(page = 1) {
                     page: r.page,
                     totalPages: r.totalPages,
                     totalCount: r.totalCount,
+                }
+                break
+            }
+            case 'deposits': {
+                const rows: ReservationDeposit[] = []
+                let currentPage = 1
+                let totalPages = 1
+                do {
+                    const r = await reservationDepositApi.getPaged({
+                        fromDate: from,
+                        toDate: to,
+                        page: currentPage,
+                        pageSize: 100,
+                        ...(bf !== undefined ? { branchId: bf } : {}),
+                    })
+                    rows.push(...(r.items || []))
+                    totalPages = r.totalPages || 1
+                    currentPage += 1
+                } while (currentPage <= totalPages)
+
+                const byBank = rows.filter((x) => Number(x.bankId) === props.bankId)
+                const start = (page - 1) * pageSize
+                const end = start + pageSize
+                reservationDeposits.value = {
+                    items: byBank.slice(start, end),
+                    page,
+                    totalPages: Math.max(1, Math.ceil(byBank.length / pageSize)),
+                    totalCount: byBank.length,
                 }
                 break
             }
