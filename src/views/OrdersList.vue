@@ -224,7 +224,7 @@
                         <div class="p-4 border-b border-gray-200">
                             <div class="flex flex-wrap items-end gap-3">
                                 <div class="flex-1 min-w-[200px]">
-                                    <BaseInput v-model="resSearch" placeholder="Buscar por ID, cliente, notas..."
+                                    <BaseInput v-model="resSearch" placeholder="Buscar por ID, cliente, teléfono, notas..."
                                         @input="resCurrentPage = 1">
                                         <template #icon><MagnifyingGlassIcon class="w-4 h-4" /></template>
                                     </BaseInput>
@@ -1625,9 +1625,12 @@ const resVisiblePages = computed(() => {
 const resFilteredItems = computed(() => {
     if (!resSearch.value.trim()) return reservations.value
     const q = resSearch.value.toLowerCase()
+    const qDigits = q.replace(/\D/g, '')
     return reservations.value.filter(o =>
         String(o.id).includes(q) ||
         (o.customerName || '').toLowerCase().includes(q) ||
+        (o.customerPhone || '').toLowerCase().includes(q) ||
+        (!!qDigits && (o.customerPhone || '').replace(/\D/g, '').includes(qDigits)) ||
         (o.guestName || '').toLowerCase().includes(q) ||
         (o.notes || '').toLowerCase().includes(q)
     )
