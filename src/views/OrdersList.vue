@@ -277,10 +277,13 @@
                                     <span v-else class="text-gray-400">Cargando...</span>
                                 </div>
                             </div>
-                            <BaseButton variant="secondary" size="sm" class="shrink-0" :loading="resLoading"
-                                @click="fetchReservations">
-                                <ArrowPathIcon class="w-4 h-4" />
-                            </BaseButton>
+                            <div class="flex items-center gap-2 shrink-0">
+                                <ReservationDepositsOverviewModal />
+                                <BaseButton variant="secondary" size="sm" class="shrink-0" :loading="resLoading"
+                                    @click="fetchReservations">
+                                    <ArrowPathIcon class="w-4 h-4" />
+                                </BaseButton>
+                            </div>
                         </div>
                     </div>
 
@@ -525,6 +528,7 @@ import AssignDeliveryModal from '@/components/orders/AssignDeliveryModal.vue'
 import EditOrderTypeModal from '@/components/orders/EditOrderTypeModal.vue'
 import ReservationDepositModal from '@/components/reservations/ReservationDepositModal.vue'
 import ReservationsTable from '@/components/reservations/ReservationsTable.vue'
+import ReservationDepositsOverviewModal from '@/components/reservations/ReservationDepositsOverviewModal.vue'
 import BaseInput from '@/components/ui/BaseInput.vue'
 import BaseSelect from '@/components/ui/BaseSelect.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
