@@ -140,14 +140,6 @@ export function useOrderPermissions() {
         return role === 'Superadmin' || role === 'Admin'
     }
 
-    /** Reserva con horario de preparación y entrega (misma regla de “mismo día” que el backend). */
-    const isScheduledReservationOrder = (order: OrderListItem | OrderDetailView): boolean =>
-        order.type === 'reservation' &&
-        order.prepareAt != null &&
-        order.prepareAt !== '' &&
-        order.reservedFor != null &&
-        order.reservedFor !== ''
-
     /**
      * Verifica si el usuario puede cancelar el pedido
      */
@@ -156,16 +148,6 @@ export function useOrderPermissions() {
 
         if (role !== 'Admin' && role !== 'Superadmin') return false
         if (order.status === 'cancelled') return false
-
-        if (isScheduledReservationOrder(order)) {
-            const rf = order.reservedFor
-            const pa = order.prepareAt
-            return (
-                isSameBusinessDay(order.createdAt) ||
-                (pa != null && pa !== '' && isSameBusinessDay(pa)) ||
-                (rf != null && rf !== '' && isSameBusinessDay(rf))
-            )
-        }
 
         return true
     }

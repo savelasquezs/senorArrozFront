@@ -117,23 +117,29 @@ describe('useOrderPermissions — canCancel', () => {
         }
     })
 
-    it('reserva programada: permite cancelar el día de prepareAt/entrega aunque createdAt sea anterior', () => {
-        const { canCancel } = useOrderPermissions()
-        const order = baseOrder({
-            prepareAt: '2026-04-15T20:00:00.000Z',
-            reservedFor: '2026-04-15T23:00:00.000Z',
-        })
-        expect(canCancel(order)).toBe(true)
-    })
-
-    it('reserva programada: no permite cancelar si ninguna fecha coincide con hoy (CO)', () => {
+    it('reserva programada: Admin puede cancelar aunque no coincida con ninguna fecha del día', () => {
         const { canCancel } = useOrderPermissions()
         const order = baseOrder({
             createdAt: '2026-04-10T12:00:00.000Z',
             prepareAt: '2026-04-14T20:00:00.000Z',
             reservedFor: '2026-04-14T23:00:00.000Z',
         })
-        expect(canCancel(order)).toBe(false)
+        expect(canCancel(order)).toBe(true)
+    })
+
+    it('reserva programada: Superadmin también puede cancelar en cualquier momento', () => {
+        const auth = useAuthStore()
+        const u = auth.user
+        if (!u) throw new Error('expected user')
+        auth.user = { ...u, role: UserRole.SUPERADMIN }
+
+        const { canCancel } = useOrderPermissions()
+        const order = baseOrder({
+            createdAt: '2026-04-10T12:00:00.000Z',
+            prepareAt: '2026-04-14T20:00:00.000Z',
+            reservedFor: '2026-04-14T23:00:00.000Z',
+        })
+        expect(canCancel(order)).toBe(true)
     })
 
     it('Cajero no puede cancelar aunque sea el día programado', () => {
