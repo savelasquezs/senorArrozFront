@@ -212,6 +212,7 @@ import { useRouter } from 'vue-router'
 import { useToast } from '@/composables/useToast'
 import { useFormatting } from '@/composables/useFormatting'
 import { orderCashToCollect, sumPaymentsAmounts } from '@/utils/orderCashToCollect'
+import { customerApi } from '@/services/MainAPI/customerApi'
 import type { Customer, CustomerAddress } from '@/types/customer'
 import type { DraftOrder } from '@/types/order'
 
@@ -275,9 +276,7 @@ const { canSubmitOrder, orderErrors } = useOrderValidation()
 const showCopyAddressesButton = computed(() => {
     const o = currentOrder.value
     if (!o || (o.type !== 'delivery' && o.type !== 'reservation')) return false
-    const c = getCustomer(o.customerId)
-    const n = c?.addresses?.filter((a) => a.address?.trim())?.length ?? 0
-    return n > 0
+    return o.customerId != null && o.customerId > 0
 })
 
 /** Remanente a cubrir en efectivo (total − banco − app); mismo criterio que PaymentSelector. */
@@ -368,9 +367,20 @@ function formatAddressLineForCopy(a: CustomerAddress): string {
 
 async function copyDeliveryAddressesText() {
     const o = currentOrder.value
-    if (!o) return
+    if (!o?.customerId) return
     const customer = getCustomer(o.customerId)
-    const addrs = customer?.addresses?.filter((a) => a.address?.trim()) ?? []
+    let addresses: CustomerAddress[] = []
+    try {
+        const res = await customerApi.getCustomerAddresses(o.customerId)
+        addresses = res.isSuccess ? res.data ?? [] : []
+    } catch {
+        showError('Direcciones', 'No se pudieron cargar las direcciones del cliente.')
+        return
+    }
+
+    ordersStore.replaceCustomerAddresses(o.customerId, addresses, customer)
+
+    const addrs = addresses.filter((a) => a.address?.trim())
     if (addrs.length === 0) {
         showError('Sin direcciones', 'El cliente no tiene direcciones guardadas.')
         return

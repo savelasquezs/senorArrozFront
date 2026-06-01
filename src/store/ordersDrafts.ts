@@ -244,6 +244,23 @@ export const useOrdersDraftsStore = defineStore('ordersDrafts', () => {
         )
     }
 
+    const replaceCustomerAddresses = (
+        customerId: number,
+        addresses: CustomerAddress[],
+        hintCustomer?: Customer | null,
+    ) => {
+        const idx = customers.value.findIndex((c) => c.id === customerId)
+        if (idx === -1) {
+            if (!hintCustomer || hintCustomer.id !== customerId) return
+            customers.value = [{ ...hintCustomer, addresses }, ...customers.value]
+            return
+        }
+
+        customers.value = customers.value.map((c, i) =>
+            i === idx ? { ...c, addresses } : c
+        )
+    }
+
     /** Añade un cliente a la lista del store si no está (p. ej. recién creado), para que getCustomer lo encuentre. */
     const ensureCustomerInList = (customer: Customer) => {
         const exists = customers.value.some((c) => c.id === customer.id)
@@ -723,6 +740,7 @@ export const useOrdersDraftsStore = defineStore('ordersDrafts', () => {
         updateCustomer,
         updateAddress,
         addAddressToCustomer,
+        replaceCustomerAddresses,
         ensureCustomerInList,
         updateOrderNotes,
         updateGuestName,
