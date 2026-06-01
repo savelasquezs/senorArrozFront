@@ -330,7 +330,7 @@
                   <div v-else class="space-y-2">
                     <div v-for="recon in bankReconciliations" :key="recon.bankId"
                       class="grid grid-cols-4 gap-2 items-center p-2 rounded-lg"
-                      :class="recon.actualBalance - recon.expectedBalance === 0 ? 'bg-green-50' : 'bg-red-50'">
+                      :class="bankDifference(recon) === 0 ? 'bg-green-50' : 'bg-red-50'">
                       <div class="col-span-1 min-w-0">
                         <p class="text-xs sm:text-sm font-medium text-gray-800 truncate">{{ recon.bankName }}</p>
                         <p class="text-[10px] sm:text-xs text-gray-400 tabular-nums">
@@ -346,13 +346,13 @@
                         <p class="text-[10px] text-gray-500">Dif.</p>
                         <p :class="[
                           'text-sm sm:text-base font-bold tabular-nums',
-                          recon.actualBalance - recon.expectedBalance === 0 ? 'text-green-700' : 'text-red-600',
+                          bankDifference(recon) === 0 ? 'text-green-700' : 'text-red-600',
                         ]">
-                          {{ formatCurrency(recon.actualBalance - recon.expectedBalance) }}
+                          {{ formatCurrency(bankDifference(recon)) }}
                         </p>
                       </div>
                       <div class="col-span-1 flex flex-col items-center gap-0.5">
-                        <CheckCircleIcon v-if="recon.actualBalance - recon.expectedBalance === 0"
+                        <CheckCircleIcon v-if="bankDifference(recon) === 0"
                           class="w-5 h-5 text-green-500" />
                         <ExclamationCircleIcon v-else class="w-5 h-5 text-red-500" />
                         <BaseButton variant="outline" size="sm" class="text-[10px] px-1.5 py-0.5 min-h-0 h-auto"
@@ -687,7 +687,7 @@ const countedGlobalTotal = computed(() => {
 })
 
 const globalDifference = computed(
-  () => countedGlobalTotal.value - (expected.value?.expectedGlobalTotal ?? 0)
+  () => moneyDifference(countedGlobalTotal.value, expected.value?.expectedGlobalTotal ?? 0)
 )
 
 const globalCuadred = computed(
@@ -699,7 +699,7 @@ const totalActiveLoans = computed(() =>
 )
 
 const allBanksCuadred = computed(() =>
-  bankReconciliations.value.every((r) => r.actualBalance - r.expectedBalance === 0)
+  bankReconciliations.value.every((r) => bankDifference(r) === 0)
 )
 
 const undeliveredCount = computed(() => expected.value?.undeliveredOrdersCount ?? 0)
@@ -771,6 +771,19 @@ function recalcClosingCash() {
     (sum, d) => sum + d * (denominationCounts.value[d] || 0),
     0
   )
+}
+
+function toWholePeso(value: number): number {
+  const n = Number(value)
+  return Number.isFinite(n) ? Math.round(n) : 0
+}
+
+function moneyDifference(actual: number, expected: number): number {
+  return toWholePeso(actual) - toWholePeso(expected)
+}
+
+function bankDifference(recon: CloseBankReconciliationDto): number {
+  return moneyDifference(recon.actualBalance, recon.expectedBalance)
 }
 
 async function refreshExpectedPreservingBankActuals() {
