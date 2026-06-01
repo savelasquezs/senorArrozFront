@@ -68,6 +68,16 @@
 					<XCircleIcon class="w-4 h-4 mr-1" />
 					Cancelar Pedido
 				</BaseButton>
+				<BaseButton
+					v-if="permissions.canUncancel(order)"
+					variant="primary"
+					size="sm"
+					class="w-full sm:w-auto"
+					@click="showUncancelConfirm = true"
+				>
+					<CheckCircleIcon class="w-4 h-4 mr-1" />
+					Descancelar
+				</BaseButton>
 			</div>
 		</div>
 
@@ -77,7 +87,7 @@
 				:current-status="order.status"
 				:status-times="order.statusTimes"
 				:order-type="order.type"
-				:clickable="true"
+				:clickable="order.status !== 'cancelled'"
 				@status-click="handleStatusChange"
 			/>
 		</div>
@@ -640,6 +650,35 @@
 		</template>
 	</BaseDialog>
 
+	<BaseDialog v-model="showUncancelConfirm" title="Descancelar pedido" size="sm">
+		<div v-if="order" class="space-y-3 text-sm text-gray-600">
+			<p>
+				Descancelar el pedido
+				<span class="font-medium text-gray-900">#{{ order.id }}</span>
+				y dejarlo como <span class="font-medium text-gray-900">Listo</span>?
+			</p>
+			<p class="text-amber-700">
+				Los pagos, abonos y rutas eliminados al cancelar no se restauran automaticamente.
+			</p>
+		</div>
+		<template #footer>
+			<BaseButton
+				variant="secondary"
+				:disabled="uncancelLoading"
+				@click="showUncancelConfirm = false"
+			>
+				Cancelar
+			</BaseButton>
+			<BaseButton
+				variant="primary"
+				:loading="uncancelLoading"
+				@click="confirmUncancelOrder"
+			>
+				Descancelar
+			</BaseButton>
+		</template>
+	</BaseDialog>
+
 	<BaseDialog
 		v-model="showRemovePaidInStoreDetailDialog"
 		title="Quitar cobro en tienda"
@@ -797,6 +836,8 @@ const editPaidInStoreDetailAmount = ref(0);
 const editPaidInStoreDetailLoading = ref(false);
 const showKitchenScheduleConfirm = ref(false);
 const showPrepareNowConfirm = ref(false);
+const showUncancelConfirm = ref(false);
+const uncancelLoading = ref(false);
 const reprintKitchenLoading = ref(false);
 const reprintDeliveryLoading = ref(false);
 
@@ -1214,6 +1255,32 @@ const handleStatusChange = async (newStatus: OrderStatus) => {
 		// ✅ Actualización optimista usando helper
 		updateOrderStatus(updatedOrder);
 	});
+};
+
+const confirmUncancelOrder = async () => {
+	if (!order.value) return;
+
+	uncancelLoading.value = true;
+	try {
+		const updatedOrder = await orderApi.updateStatus(order.value.id, 'ready');
+		const orderAny = updatedOrder as any;
+		ordersDataStore.updateCurrent({
+			status: updatedOrder.status,
+			statusDisplayName: orderAny.statusDisplayName,
+			statusTimes: orderAny.statusTimes || order.value.statusTimes,
+			type: orderAny.type ?? order.value.type,
+			typeDisplayName: orderAny.typeDisplayName ?? order.value.typeDisplayName,
+			cancelledReason: null,
+			updatedAt: orderAny.updatedAt,
+		});
+		success('Pedido descancelado', 4000, 'El pedido quedo como Listo');
+		showUncancelConfirm.value = false;
+	} catch (err: unknown) {
+		const msg = err instanceof Error ? err.message : 'No se pudo descancelar el pedido';
+		error('Error al descancelar', msg);
+	} finally {
+		uncancelLoading.value = false;
+	}
 };
 
 const handleDeliverOrder = async () => {

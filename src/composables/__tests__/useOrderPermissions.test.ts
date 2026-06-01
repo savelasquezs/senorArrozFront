@@ -95,6 +95,62 @@ describe('useOrderPermissions — canEditPayments', () => {
     })
 })
 
+describe('useOrderPermissions - canUncancel', () => {
+    beforeEach(() => {
+        setActivePinia(createPinia())
+        const auth = useAuthStore()
+        auth.user = {
+            id: 2,
+            name: 'A',
+            email: 'a@test.com',
+            phone: '',
+            active: true,
+            role: UserRole.ADMIN,
+            branchId: 1,
+            branchName: 'B',
+        }
+    })
+
+    it('Admin puede descancelar un pedido cancelado', () => {
+        const { canUncancel } = useOrderPermissions()
+        expect(canUncancel(baseOrder({ status: 'cancelled' }))).toBe(true)
+    })
+
+    it('Superadmin puede descancelar un pedido cancelado', () => {
+        const auth = useAuthStore()
+        const u = auth.user
+        if (!u) throw new Error('expected user')
+        auth.user = { ...u, role: UserRole.SUPERADMIN }
+
+        const { canUncancel } = useOrderPermissions()
+        expect(canUncancel(baseOrder({ status: 'cancelled' }))).toBe(true)
+    })
+
+    it('Cajero no puede descancelar un pedido cancelado', () => {
+        const auth = useAuthStore()
+        const u = auth.user
+        if (!u) throw new Error('expected user')
+        auth.user = { ...u, role: UserRole.CASHIER }
+
+        const { canUncancel } = useOrderPermissions()
+        expect(canUncancel(baseOrder({ status: 'cancelled' }))).toBe(false)
+    })
+
+    it('no muestra descancelar para pedidos activos', () => {
+        const { canUncancel } = useOrderPermissions()
+        expect(canUncancel(baseOrder({ status: 'ready' }))).toBe(false)
+    })
+
+    it('solo permite cambiar de cancelado a listo', () => {
+        const { canChangeStatus, getAllowedStatusTransitions } = useOrderPermissions()
+        const order = baseOrder({ status: 'cancelled' })
+
+        expect(canChangeStatus(order, 'ready')).toBe(true)
+        expect(canChangeStatus(order, 'taken')).toBe(false)
+        expect(getAllowedStatusTransitions('cancelled')).toEqual(['ready'])
+    })
+})
+
 describe('useOrderPermissions — canCancel', () => {
     afterEach(() => {
         vi.useRealTimers()

@@ -127,6 +127,7 @@
                                     @paid-in-store-updated="handlePaidInStoreUpdated"
                                     @edit-paid-in-store-cash="handleEditPaidInStoreFromList"
                                     @remove-paid-in-store-cash="handleRemovePaidInStoreFromList"
+                                    @uncancel-order="handleOpenUncancelOrder"
                                     @sort="handleSort" />
                             </template>
                             <template v-else>
@@ -153,6 +154,7 @@
                                     @paid-in-store-updated="handlePaidInStoreUpdated"
                                         @edit-paid-in-store-cash="handleEditPaidInStoreFromList"
                                         @remove-paid-in-store-cash="handleRemovePaidInStoreFromList"
+                                        @uncancel-order="handleOpenUncancelOrder"
                                         @sort="handleSort" />
                                 </div>
                             </template>
@@ -476,6 +478,29 @@
                 </BaseButton>
             </template>
         </BaseDialog>
+        <BaseDialog v-model="showUncancelOrderDialog" title="Descancelar pedido" size="sm">
+            <div v-if="uncancelOrderTarget" class="space-y-3 text-sm text-gray-600">
+                <p>
+                    Descancelar el pedido
+                    <span class="font-medium text-gray-900">#{{ uncancelOrderTarget.id }}</span>
+                    y dejarlo como <span class="font-medium text-gray-900">Listo</span>?
+                </p>
+                <p class="text-amber-700">
+                    Los pagos, abonos y rutas eliminados al cancelar no se restauran automaticamente.
+                </p>
+            </div>
+            <template #footer>
+                <BaseButton variant="secondary" size="sm" :disabled="uncancelOrderLoading"
+                    @click="closeUncancelOrderDialog">
+                    Cancelar
+                </BaseButton>
+                <BaseButton variant="primary" size="sm" :loading="uncancelOrderLoading"
+                    @click="confirmUncancelOrder">
+                    Descancelar
+                </BaseButton>
+            </template>
+        </BaseDialog>
+
         <BaseDialog v-model="showCancelReservationDialog" title="Cancelar reserva" size="sm">
             <div v-if="cancelReservationTarget" class="space-y-3 text-sm text-gray-600">
                 <p>
@@ -632,6 +657,10 @@ const editReservationDepositLoading = ref(false)
 const showRemovePaidInStoreDialog = ref(false)
 const removePaidInStoreTarget = ref<{ order: OrderListItem; displayAmount: number } | null>(null)
 const removePaidInStoreLoading = ref(false)
+
+const showUncancelOrderDialog = ref(false)
+const uncancelOrderTarget = ref<OrderListItem | null>(null)
+const uncancelOrderLoading = ref(false)
 
 const showEditPaidInStoreDialog = ref(false)
 const editPaidInStoreTarget = ref<OrderListItem | null>(null)
@@ -949,6 +978,33 @@ const handleChangeStatus = async (order: OrderListItem) => {
 const handleAssignDelivery = (order: OrderListItem) => {
     selectedOrder.value = order
     showAssignDeliveryModal.value = true
+}
+
+const handleOpenUncancelOrder = (order: OrderListItem) => {
+    uncancelOrderTarget.value = order
+    showUncancelOrderDialog.value = true
+}
+
+const closeUncancelOrderDialog = () => {
+    showUncancelOrderDialog.value = false
+    uncancelOrderTarget.value = null
+}
+
+const confirmUncancelOrder = async () => {
+    const order = uncancelOrderTarget.value
+    if (!order) return
+
+    uncancelOrderLoading.value = true
+    try {
+        const updatedOrder = await orderApi.updateStatus(order.id, 'ready')
+        updateOrderInList(updatedOrder)
+        success('Pedido descancelado', 4000, 'El pedido quedo como Listo')
+        closeUncancelOrderDialog()
+    } catch (err: any) {
+        error('Error al descancelar', err.message || 'No se pudo descancelar el pedido')
+    } finally {
+        uncancelOrderLoading.value = false
+    }
 }
 
 const handleAssignDeliveryUpdated = async (updatedOrder?: Order) => {

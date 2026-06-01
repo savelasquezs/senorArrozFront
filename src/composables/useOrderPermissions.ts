@@ -152,6 +152,11 @@ export function useOrderPermissions() {
         return true
     }
 
+    const canUncancel = (order: OrderListItem | OrderDetailView): boolean => {
+        const role = authStore.userRole
+        return order.status === 'cancelled' && (role === 'Admin' || role === 'Superadmin')
+    }
+
     /**
      * Obtiene el siguiente estado permitido según el estado actual y tipo de pedido
      * Devuelve null si no hay siguiente estado o si el usuario no tiene permisos
@@ -212,11 +217,15 @@ export function useOrderPermissions() {
         const role = authStore.userRole
         const currentStatus = order.status
 
+        if (currentStatus === 'cancelled') {
+            return newStatus === 'ready' && (role === 'Admin' || role === 'Superadmin')
+        }
+
         // Superadmin puede cambiar a cualquier estado (incluso retroceder)
         if (role === 'Superadmin') return true
 
-        // No se puede cambiar desde cancelled o delivered (excepto Superadmin)
-        if (currentStatus === 'cancelled' || currentStatus === 'delivered') {
+        // No se puede cambiar desde delivered (excepto Superadmin)
+        if (currentStatus === 'delivered') {
             return false
         }
 
@@ -277,13 +286,17 @@ export function useOrderPermissions() {
             'delivered',
         ]
 
+        if (currentStatus === 'cancelled') {
+            return role === 'Admin' || role === 'Superadmin' ? ['ready'] : []
+        }
+
         // Superadmin puede ir a cualquier estado
         if (role === 'Superadmin') {
             return allStatuses.filter((s) => s !== currentStatus)
         }
 
-        // Pedidos cancelados o entregados no pueden cambiar (excepto Superadmin)
-        if (currentStatus === 'cancelled' || currentStatus === 'delivered') {
+        // Pedidos entregados no pueden cambiar (excepto Superadmin)
+        if (currentStatus === 'delivered') {
             return []
         }
 
@@ -324,6 +337,7 @@ export function useOrderPermissions() {
         canVerifyPayments,
         canReprintThermalTickets,
         canSettleAppPayments,
+        canUncancel,
         canChangeStatus,
         canCancel,
         getNextAllowedStatus,

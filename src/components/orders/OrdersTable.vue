@@ -162,8 +162,16 @@
                     <!-- Estado (clickeable para cambiar) -->
                     <td class="min-w-0 px-3 py-2 whitespace-nowrap">
                         <OrderStatusBadge :status="order.status" :display-name="order.statusDisplayName"
-                            :status-time="getStatusTime(order)" :clickable="true"
+                            :status-time="getStatusTime(order)" :clickable="order.status !== 'cancelled'"
                             @click="$emit('change-status', order)" />
+                        <button
+                            v-if="permissions.canUncancel(order)"
+                            type="button"
+                            class="mt-1 block text-[11px] font-medium text-emerald-700 hover:text-emerald-900 underline decoration-dotted"
+                            @click.stop="$emit('uncancel-order', order)"
+                        >
+                            Descancelar
+                        </button>
                     </td>
 
                     <!-- Total -->
@@ -338,6 +346,7 @@ const emit = defineEmits<{
     'edit-customer': [order: OrderListItem]
     'edit-address': [order: OrderListItem]
     'change-status': [order: OrderListItem]
+    'uncancel-order': [order: OrderListItem]
     'assign-delivery': [order: OrderListItem]
     'edit-type': [order: OrderListItem]
     'verify-bank-payment': [order: OrderListItem, payment: OrderBankPaymentDetail]
