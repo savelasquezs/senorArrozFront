@@ -1007,12 +1007,8 @@ const confirmUncancelOrder = async () => {
     }
 }
 
-const handleAssignDeliveryUpdated = async (updatedOrder?: Order) => {
-    await handleOrderUpdated(updatedOrder)
-    // Recargar la lista para reflejar domiciliario y estado en la UI
-    if (updatedOrder) {
-        await fetchOrders()
-    }
+const handleAssignDeliveryUpdated = (updatedOrder?: Order) => {
+    void handleOrderUpdated(updatedOrder)
 }
 
 const handleEditType = (order: OrderListItem) => {
@@ -1380,6 +1376,8 @@ const updateOrderInList = (updatedOrder: Order) => {
     const index = orders.value.findIndex(o => o.id === orderAny.id)
     if (index !== -1) {
         const current = orders.value[index]
+        const hasDeliveryManId = Object.prototype.hasOwnProperty.call(orderAny, 'deliveryManId')
+        const hasDeliveryManName = Object.prototype.hasOwnProperty.call(orderAny, 'deliveryManName')
         const merged = {
             ...current,
             ...orderAny,
@@ -1387,8 +1385,8 @@ const updateOrderInList = (updatedOrder: Order) => {
             statusDisplayName: orderAny.status != null
                 ? getOrderStatusDisplayName(String(orderAny.status))
                 : current.statusDisplayName,
-            deliveryManId: orderAny.deliveryManId ?? current.deliveryManId,
-            deliveryManName: orderAny.deliveryManName ?? current.deliveryManName,
+            deliveryManId: hasDeliveryManId ? orderAny.deliveryManId : current.deliveryManId,
+            deliveryManName: hasDeliveryManName ? orderAny.deliveryManName : current.deliveryManName,
             status: orderAny.status ?? current.status,
             updatedAt: orderAny.updatedAt ?? current.updatedAt
         }
