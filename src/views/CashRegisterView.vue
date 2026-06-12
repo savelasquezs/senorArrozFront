@@ -270,35 +270,6 @@
                           Total activos: {{ formatCurrency(totalActiveLoans) }}
                         </span>
                       </div>
-
-                      <div v-if="false" class="mt-4 pt-3 border-t border-gray-100">
-                        <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between mb-2">
-                          <p class="text-xs font-semibold text-gray-600 uppercase tracking-wide">
-                            Registrar préstamo
-                          </p>
-                          <BaseButton variant="outline" size="sm"
-                            class="text-xs shrink-0 border-orange-200 text-orange-800"
-                            @click="openDeliveryAdvanceModal">
-                            Pedidos domicilio…
-                          </BaseButton>
-                        </div>
-                        <div class="flex flex-col gap-2 sm:flex-row sm:items-end">
-                          <div class="flex-1 min-w-0">
-                            <label class="text-xs text-gray-500 block mb-0.5">Concepto</label>
-                            <input v-model="newLoanConcept" type="text" placeholder="Ej. Domiciliario ruta noche"
-                              class="w-full border border-gray-300 rounded-md px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-orange-300" />
-                          </div>
-                          <div class="w-full sm:w-36 shrink-0">
-                            <label class="text-xs text-gray-500 block mb-0.5">Monto (COP)</label>
-                            <input v-model.number="newLoanAmount" type="number" step="1000" placeholder="0"
-                              class="w-full border border-gray-300 rounded-md px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-orange-300" />
-                          </div>
-                          <BaseButton variant="primary" class="shrink-0" size="sm" :loading="savingLoan"
-                            @click="submitNewLoan">
-                            <PlusIcon class="w-4 h-4 mr-1" /> Registrar
-                          </BaseButton>
-                        </div>
-                      </div>
                     </template>
                   </div>
                 </div>
@@ -964,13 +935,13 @@ async function submitEditLoan() {
 
   const concept = editLoanConcept.value.trim()
   if (!concept) {
-    toastError('Concepto obligatorio', 'Escribe un concepto para el prÃ©stamo.')
+    toastError('Concepto obligatorio', 'Escribe un concepto para el préstamo.')
     return
   }
 
   const amount = Number(editLoanAmount.value)
   if (!Number.isFinite(amount)) {
-    toastError('Monto invÃ¡lido', 'Indica un monto vÃ¡lido.')
+    toastError('Monto inválido', 'Indica un monto válido.')
     return
   }
 
@@ -983,7 +954,7 @@ async function submitEditLoan() {
     )
     editLoanDialogOpen.value = false
     loanToEdit.value = null
-    toastSuccess('PrÃ©stamo actualizado', 4000)
+    toastSuccess('Préstamo actualizado', 4000)
     await refreshExpectedPreservingBankActuals()
     await loadBranchInformalLoans()
   } catch (e: any) {
