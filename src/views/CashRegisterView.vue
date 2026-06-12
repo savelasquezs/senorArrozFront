@@ -184,7 +184,20 @@
                 </p>
 
                 <div v-show="loansSectionExpanded" class="border-t border-orange-100/60">
-                  <div class="px-4 py-2 flex flex-wrap justify-end">
+                  <div class="px-4 py-2 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                    <div class="flex flex-wrap gap-2" v-if="loansTab === 'active'">
+                      <BaseButton variant="primary" size="sm" class="text-xs shrink-0" @click="openCreateLoanModal">
+                        <PlusIcon class="w-4 h-4 mr-1" /> Registrar préstamo
+                      </BaseButton>
+                      <BaseButton variant="outline" size="sm"
+                        class="text-xs shrink-0 border-orange-200 text-orange-800"
+                        @click="openDeliveryAdvanceModal">
+                        Pedidos domicilio…
+                      </BaseButton>
+                    </div>
+                    <div v-else class="text-xs text-gray-500">
+                      Historial de préstamos dados de baja
+                    </div>
                     <div class="flex rounded-md border border-orange-200/80 bg-gray-50/80 p-0.5 text-xs sm:text-sm">
                       <button type="button" :class="[
                         'px-2 sm:px-3 py-1 rounded font-medium transition-colors',
@@ -215,12 +228,18 @@
                         {{ loansTab === 'active' ? 'Sin préstamos activos' : 'Sin préstamos dados de baja' }}
                       </div>
 
-                      <div v-else class="space-y-1.5">
+                      <div v-else :class="[
+                        'space-y-1.5 pr-1',
+                        loansTab === 'inactive' ? 'max-h-80 overflow-y-auto' : '',
+                      ]">
                         <div v-for="loan in branchInformalLoans" :key="loan.id"
-                          class="flex flex-col gap-1 p-2 bg-gray-50 rounded-lg sm:flex-row sm:items-center sm:gap-2">
+                          class="flex flex-col gap-2 p-2 bg-gray-50 rounded-lg border border-gray-100 sm:flex-row sm:items-center sm:gap-2">
                           <div class="flex-1 min-w-0">
                             <p class="text-sm font-medium text-gray-900">{{ loan.concept }}</p>
-                            <p class="text-xs text-gray-500 tabular-nums">{{ formatCurrency(loan.amount) }}</p>
+                            <div class="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-gray-500">
+                              <span class="tabular-nums font-medium text-gray-700">{{ formatCurrency(loan.amount) }}</span>
+                              <span v-if="loan.updatedAt">Modificado: {{ formatDate(loan.updatedAt) }}</span>
+                            </div>
                             <p v-if="loansTab === 'inactive' && loan.deactivatedAt"
                               class="text-xs text-gray-400 mt-0.5">
                               Baja: {{ formatDate(loan.deactivatedAt) }}
@@ -231,8 +250,14 @@
                               {{ loan.deactivationNotes }}
                             </p>
                           </div>
-                          <div v-if="loansTab === 'active'" class="shrink-0">
+                          <div class="shrink-0 flex flex-wrap gap-1.5">
+                            <BaseButton variant="outline" size="sm"
+                              class="text-orange-800 border-orange-200 text-xs py-0.5"
+                              @click="openEditLoan(loan)">
+                              <PencilSquareIcon class="w-4 h-4 mr-1" /> Editar
+                            </BaseButton>
                             <BaseButton variant="outline" size="sm" class="text-red-700 border-red-200 text-xs py-0.5"
+                              v-if="loansTab === 'active'"
                               @click="openDeactivateLoan(loan)">
                               Dar de baja
                             </BaseButton>
@@ -246,7 +271,7 @@
                         </span>
                       </div>
 
-                      <div v-if="loansTab === 'active'" class="mt-4 pt-3 border-t border-gray-100">
+                      <div v-if="false" class="mt-4 pt-3 border-t border-gray-100">
                         <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between mb-2">
                           <p class="text-xs font-semibold text-gray-600 uppercase tracking-wide">
                             Registrar préstamo
@@ -461,6 +486,50 @@
       </template>
     </BaseDialog>
 
+    <BaseDialog v-model="createLoanDialogOpen" title="Registrar préstamo informal" size="sm"
+      @update:model-value="onCreateLoanDialogToggle">
+      <div class="space-y-3">
+        <div>
+          <label class="text-xs text-gray-500 block mb-1">Concepto</label>
+          <input v-model="newLoanConcept" type="text" maxlength="500" placeholder="Ej. Domiciliario ruta noche"
+            class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-300" />
+        </div>
+        <div>
+          <label class="text-xs text-gray-500 block mb-1">Monto (COP)</label>
+          <input v-model.number="newLoanAmount" type="number" step="1000" placeholder="0"
+            class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-300" />
+        </div>
+      </div>
+      <template #footer>
+        <BaseButton variant="outline" @click="createLoanDialogOpen = false">Cancelar</BaseButton>
+        <BaseButton variant="primary" :loading="savingLoan" @click="submitNewLoan">
+          Registrar
+        </BaseButton>
+      </template>
+    </BaseDialog>
+
+    <BaseDialog v-model="editLoanDialogOpen" title="Editar préstamo informal" size="sm"
+      @update:model-value="onEditLoanDialogToggle">
+      <div class="space-y-3">
+        <div>
+          <label class="text-xs text-gray-500 block mb-1">Concepto</label>
+          <input v-model="editLoanConcept" type="text" maxlength="500"
+            class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-300" />
+        </div>
+        <div>
+          <label class="text-xs text-gray-500 block mb-1">Monto (COP)</label>
+          <input v-model.number="editLoanAmount" type="number" step="1000"
+            class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-300" />
+        </div>
+      </div>
+      <template #footer>
+        <BaseButton variant="outline" @click="editLoanDialogOpen = false">Cancelar</BaseButton>
+        <BaseButton variant="primary" :loading="savingLoanEdit" @click="submitEditLoan">
+          Guardar cambios
+        </BaseButton>
+      </template>
+    </BaseDialog>
+
     <DeliveryAdvanceLoanModal v-model="deliveryAdvanceModalOpen" :branch-id="authStore.branchId"
       @success="onDeliveryAdvanceSuccess" />
 
@@ -510,6 +579,7 @@ import {
   ChevronDownIcon,
   ClockIcon,
   PlusIcon,
+  PencilSquareIcon,
   CheckCircleIcon,
   ExclamationCircleIcon,
   InformationCircleIcon,
@@ -541,9 +611,15 @@ const loansTab = ref<'active' | 'inactive'>('active')
 const loansSectionExpanded = ref(false)
 const branchInformalLoans = ref<BranchInformalLoan[]>([])
 const informalLoansLoading = ref(false)
+const createLoanDialogOpen = ref(false)
 const newLoanConcept = ref('')
 const newLoanAmount = ref<number>(0)
 const savingLoan = ref(false)
+const editLoanDialogOpen = ref(false)
+const editLoanConcept = ref('')
+const editLoanAmount = ref<number>(0)
+const loanToEdit = ref<BranchInformalLoan | null>(null)
+const savingLoanEdit = ref(false)
 const deliveryAdvanceModalOpen = ref(false)
 const deactivateDialogOpen = ref(false)
 const secondClosureConfirmOpen = ref(false)
@@ -813,6 +889,19 @@ watch(loansTab, () => {
   void loadBranchInformalLoans()
 })
 
+function openCreateLoanModal() {
+  loansSectionExpanded.value = true
+  createLoanDialogOpen.value = true
+}
+
+function onCreateLoanDialogToggle(open: boolean) {
+  if (!open && !savingLoan.value) {
+    newLoanConcept.value = ''
+    newLoanAmount.value = 0
+    createLoanDialogOpen.value = false
+  }
+}
+
 function openDeliveryAdvanceModal() {
   loansSectionExpanded.value = true
   deliveryAdvanceModalOpen.value = true
@@ -837,6 +926,7 @@ async function submitNewLoan() {
     )
     newLoanConcept.value = ''
     newLoanAmount.value = 0
+    createLoanDialogOpen.value = false
     toastSuccess('Préstamo registrado', 4000)
     await refreshExpectedPreservingBankActuals()
     await loadBranchInformalLoans()
@@ -851,6 +941,56 @@ function openDeactivateLoan(loan: BranchInformalLoan) {
   loanToDeactivate.value = loan
   deactivateNotes.value = ''
   deactivateDialogOpen.value = true
+}
+
+function openEditLoan(loan: BranchInformalLoan) {
+  loanToEdit.value = loan
+  editLoanConcept.value = loan.concept
+  editLoanAmount.value = Number(loan.amount) || 0
+  editLoanDialogOpen.value = true
+}
+
+function onEditLoanDialogToggle(open: boolean) {
+  if (!open && !savingLoanEdit.value) {
+    loanToEdit.value = null
+    editLoanConcept.value = ''
+    editLoanAmount.value = 0
+  }
+}
+
+async function submitEditLoan() {
+  const loan = loanToEdit.value
+  if (!loan) return
+
+  const concept = editLoanConcept.value.trim()
+  if (!concept) {
+    toastError('Concepto obligatorio', 'Escribe un concepto para el prÃ©stamo.')
+    return
+  }
+
+  const amount = Number(editLoanAmount.value)
+  if (!Number.isFinite(amount)) {
+    toastError('Monto invÃ¡lido', 'Indica un monto vÃ¡lido.')
+    return
+  }
+
+  savingLoanEdit.value = true
+  try {
+    await cashRegisterApi.updateInformalLoan(
+      loan.id,
+      { concept, amount },
+      authStore.branchId ?? undefined
+    )
+    editLoanDialogOpen.value = false
+    loanToEdit.value = null
+    toastSuccess('PrÃ©stamo actualizado', 4000)
+    await refreshExpectedPreservingBankActuals()
+    await loadBranchInformalLoans()
+  } catch (e: any) {
+    toastError('No se pudo actualizar', e.message || 'Error')
+  } finally {
+    savingLoanEdit.value = false
+  }
 }
 
 function onDeactivateDialogToggle(open: boolean) {

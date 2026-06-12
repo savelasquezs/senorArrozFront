@@ -119,6 +119,7 @@ export interface BranchInformalLoan {
   concept: string
   amount: number
   createdAt: string
+  updatedAt: string
   createdById: number
   createdByName: string
   deactivatedAt?: string | null
@@ -157,6 +158,11 @@ export interface LiquidatedDeliverymanOption {
 
 export interface DeactivateBranchInformalLoanDto {
   notes?: string | null
+}
+
+export interface UpdateBranchInformalLoanDto {
+  concept: string
+  amount: number
 }
 
 /** Movimiento Caja Mayor Efectivo (API enum snake_case). */
