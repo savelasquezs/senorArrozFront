@@ -21,6 +21,7 @@ export interface Bank {
 /** Desglose del saldo acumulado (misma fórmula que el backend). */
 export interface BankBalanceBreakdown {
     bankPaymentsIn: number
+    reservationDepositsIn: number
     expenseBankPaymentsOut: number
     outgoingTransfers: number
     incomingTransfers: number

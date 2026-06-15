@@ -115,6 +115,11 @@
                                     formatCurrency(detailStats.balanceBreakdown.bankPaymentsIn) }}</dd>
                             </div>
                             <div class="flex justify-between gap-4">
+                                <dt class="text-gray-600">+ Abonos de reserva</dt>
+                                <dd class="font-medium text-emerald-700 tabular-nums">{{
+                                    formatCurrency(detailStats.balanceBreakdown.reservationDepositsIn) }}</dd>
+                            </div>
+                            <div class="flex justify-between gap-4">
                                 <dt class="text-gray-600">− Pagos de gastos</dt>
                                 <dd class="font-medium text-rose-700 tabular-nums">{{
                                     formatCurrency(detailStats.balanceBreakdown.expenseBankPaymentsOut) }}</dd>

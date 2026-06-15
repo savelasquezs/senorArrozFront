@@ -38,11 +38,16 @@
             <BaseLoading v-if="summaryLoading && !periodBreakdown" />
             <p v-else-if="summaryError" class="text-sm text-red-600">{{ summaryError }}</p>
 
-            <div v-if="periodBreakdown" class="grid grid-cols-2 lg:grid-cols-6 gap-2 text-xs">
+            <div v-if="periodBreakdown" class="grid grid-cols-2 lg:grid-cols-7 gap-2 text-xs">
                 <div class="rounded-lg bg-gray-50 p-2 border border-gray-100">
                     <p class="text-gray-500">+ Pagos órdenes</p>
                     <p class="font-semibold text-gray-900 tabular-nums">{{ formatCurrency(periodBreakdown.bankPaymentsIn) }}
                     </p>
+                </div>
+                <div class="rounded-lg bg-gray-50 p-2 border border-gray-100">
+                    <p class="text-gray-500">+ Abonos reserva</p>
+                    <p class="font-semibold text-emerald-700 tabular-nums">{{
+                        formatCurrency(periodBreakdown.reservationDepositsIn) }}</p>
                 </div>
                 <div class="rounded-lg bg-gray-50 p-2 border border-gray-100">
                     <p class="text-gray-500">− Gastos</p>
