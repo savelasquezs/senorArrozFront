@@ -300,6 +300,9 @@
                     </div>
                   </div>
                   <div class="flex flex-wrap gap-1.5 shrink-0">
+                    <BaseButton variant="outline" size="sm" class="text-xs py-1" @click="showVaultHistoryModal = true">
+                      Historial
+                    </BaseButton>
                     <BaseButton variant="outline" size="sm" class="text-xs py-1" @click="openVaultAbono">Abonar
                     </BaseButton>
                     <BaseButton variant="outline" size="sm" class="text-xs py-1 text-amber-800 border-amber-200"
@@ -403,6 +406,7 @@
     </div>
 
     <CashClosureHistoryModal v-model="showHistoryModal" :branch-id="authStore.branchId" />
+    <CashVaultMovementHistoryModal v-model="showVaultHistoryModal" :branch-id="authStore.branchId" />
 
     <BaseDialog v-model="vaultAbonoOpen" title="Abonar a caja mayor (efectivo)" size="md"
       @update:model-value="onVaultAbonoToggle">
@@ -541,6 +545,7 @@ import MainLayout from '@/components/layout/MainLayout.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseDialog from '@/components/ui/BaseDialog.vue'
 import CashClosureHistoryModal from '@/components/cashRegister/CashClosureHistoryModal.vue'
+import CashVaultMovementHistoryModal from '@/components/cashRegister/CashVaultMovementHistoryModal.vue'
 import DeliveryAdvanceLoanModal from '@/components/cashRegister/DeliveryAdvanceLoanModal.vue'
 import BankMovementsPanel from '@/components/payments/banks/BankMovementsPanel.vue'
 import { useAuthStore } from '@/store/auth'
@@ -567,6 +572,7 @@ const authStore = useAuthStore()
 const { success: toastSuccess, error: toastError } = useToast()
 
 const showHistoryModal = ref(false)
+const showVaultHistoryModal = ref(false)
 const canViewClosureHistory = computed(() => authStore.isAdmin || authStore.isSuperadmin)
 
 function emptyDenominationCounts(): Record<number, number> {

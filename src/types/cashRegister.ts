@@ -186,6 +186,7 @@ export interface CashVaultMovement {
   note?: string | null
   createdAt: string
   createdById: number
+  createdByName?: string | null
 }
 
 // ===== DTO PARA ENVIAR CUADRE =====

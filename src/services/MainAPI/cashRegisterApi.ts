@@ -88,6 +88,12 @@ class CashRegisterApi extends BaseApi {
     return this.post<CashVaultMovement>('/cash-register/cash-vault-movements', dto, { params })
   }
 
+  async getCashVaultMovements(branchId?: number, page = 1, pageSize = 10): Promise<PagedResult<CashVaultMovement>> {
+    const params: Record<string, any> = { Page: page, PageSize: pageSize }
+    if (branchId !== undefined) params.BranchId = branchId
+    return this.get<PagedResult<CashVaultMovement>>('/cash-register/cash-vault-movements', { params })
+  }
+
   async closeCashRegister(dto: CloseCashRegisterDto, branchId?: number): Promise<CashClosure> {
     const params: Record<string, any> = {}
     if (branchId !== undefined) params.BranchId = branchId
