@@ -64,6 +64,9 @@
                   }}<template v-if="(expected.reservationDepositsAddedToGlobalTotal ?? 0) !== 0">
                     + abonos reserva (entrega pedido ≠ hoy CO)
                     {{ formatCurrency(expected.reservationDepositsAddedToGlobalTotal ?? 0) }}
+                  </template><template v-if="(expected.bankPaymentsAddedToGlobalTotal ?? 0) !== 0">
+                    + transferencias
+                    {{ formatCurrency(expected.bankPaymentsAddedToGlobalTotal ?? 0) }}
                   </template>. El global contado suma préstamos activos y pendiente en apps no liquidado.
                 </p>
               </div>
