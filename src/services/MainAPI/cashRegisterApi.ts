@@ -1,9 +1,9 @@
-// src/services/MainAPI/cashRegisterApi.ts
 import { BaseApi } from './baseApi'
 import type { PagedResult } from '@/types/common'
 import type {
   BranchInformalLoan,
   CashClosure,
+  CashClosureAuditSummary,
   CashRegisterExpected,
   CashVaultMovement,
   CloseCashRegisterDto,
@@ -45,11 +45,7 @@ class CashRegisterApi extends BaseApi {
     return this.post<BranchInformalLoan>('/cash-register/informal-loans', dto, { params })
   }
 
-  async updateInformalLoan(
-    id: number,
-    dto: UpdateBranchInformalLoanDto,
-    branchId?: number
-  ): Promise<BranchInformalLoan> {
+  async updateInformalLoan(id: number, dto: UpdateBranchInformalLoanDto, branchId?: number): Promise<BranchInformalLoan> {
     const params: Record<string, any> = {}
     if (branchId !== undefined) params.BranchId = branchId
     return this.put<BranchInformalLoan>(`/cash-register/informal-loans/${id}`, dto, { params })
@@ -69,20 +65,13 @@ class CashRegisterApi extends BaseApi {
     })
   }
 
-  async deactivateInformalLoan(
-    id: number,
-    dto: DeactivateBranchInformalLoanDto,
-    branchId?: number
-  ): Promise<BranchInformalLoan> {
+  async deactivateInformalLoan(id: number, dto: DeactivateBranchInformalLoanDto, branchId?: number): Promise<BranchInformalLoan> {
     const params: Record<string, any> = {}
     if (branchId !== undefined) params.BranchId = branchId
     return this.post<BranchInformalLoan>(`/cash-register/informal-loans/${id}/deactivate`, dto, { params })
   }
 
-  async createCashVaultMovement(
-    dto: CreateCashVaultMovementDto,
-    branchId?: number
-  ): Promise<CashVaultMovement> {
+  async createCashVaultMovement(dto: CreateCashVaultMovementDto, branchId?: number): Promise<CashVaultMovement> {
     const params: Record<string, any> = {}
     if (branchId !== undefined) params.BranchId = branchId
     return this.post<CashVaultMovement>('/cash-register/cash-vault-movements', dto, { params })
@@ -108,6 +97,10 @@ class CashRegisterApi extends BaseApi {
 
   async getClosureById(id: number): Promise<CashClosure> {
     return this.get<CashClosure>(`/cash-register/closures/${id}`)
+  }
+
+  async getClosureAuditSummary(id: number): Promise<CashClosureAuditSummary> {
+    return this.get<CashClosureAuditSummary>(`/cash-register/closures/${id}/audit-summary`)
   }
 }
 
