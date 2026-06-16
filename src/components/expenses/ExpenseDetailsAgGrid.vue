@@ -77,12 +77,15 @@ function actionsCellRenderer() {
         const data = params.data
         if (!data || !ctx) return wrap
 
-        const mkBtn = (label: string, className: string, onClick: () => void) => {
+        const mkBtn = (label: string, className: string, onClick: () => void, disabled = false, title?: string) => {
             const b = document.createElement('button')
             b.type = 'button'
             b.textContent = label
-            b.className = className
+            b.className = `${className} ${disabled ? 'opacity-50 cursor-not-allowed hover:bg-inherit' : ''}`
+            b.disabled = disabled
+            if (title) b.title = title
             b.addEventListener('click', e => {
+                if (disabled) return
                 e.stopPropagation()
                 onClick()
             })
@@ -101,6 +104,8 @@ function actionsCellRenderer() {
                 'Editar',
                 'px-2 py-1 text-xs font-medium rounded-lg border border-emerald-200 bg-emerald-50 text-emerald-800 hover:bg-emerald-100',
                 () => ctx.onEditDetail(data.headerId, data.detailId),
+                !data.canEdit,
+                data.canEdit ? undefined : 'Solo puedes modificar gastos de hoy',
             ),
         )
         wrap.appendChild(
@@ -108,6 +113,8 @@ function actionsCellRenderer() {
                 'Eliminar',
                 'px-2 py-1 text-xs font-medium rounded-lg border border-red-100 bg-red-50 text-red-700 hover:bg-red-100',
                 () => ctx.onDeleteDetail(data.headerId, data.detailId),
+                !data.canDelete,
+                data.canDelete ? undefined : 'Solo puedes eliminar gastos de hoy',
             ),
         )
         return wrap

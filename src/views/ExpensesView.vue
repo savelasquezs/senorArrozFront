@@ -81,8 +81,8 @@
         </div>
 
         <ExpenseDetailModal v-if="showDetailModal && selectedExpense" :is-open="showDetailModal"
-            :expense="selectedExpense" :loading="loadingDetail" @close="closeDetailModal"
-            @edit="handleEditFromDetail" />
+            :expense="selectedExpense" :loading="loadingDetail" :can-edit="canEditExpenseHeader(selectedExpense)"
+            @close="closeDetailModal" @edit="handleEditFromDetail" />
 
         <ExpenseFormModal v-if="showFormModal" :is-open="showFormModal" :editing-expense="editingExpense"
             :focus-detail-id="formFocusDetailId" :loading="submitting" @close="closeFormModal"
@@ -128,6 +128,7 @@ import BaseSelect from '@/components/ui/BaseSelect.vue'
 import { type ExpenseFilterState } from '@/composables/useExpenseFilters'
 import { loadExpensesViewState, saveExpensesViewState } from '@/composables/useExpensesViewPersistence'
 import { useDebouncedCallback } from '@/composables/useDebouncedCallback'
+import { useExpensePermissions } from '@/composables/useExpensePermissions'
 import { useToast } from '@/composables/useToast'
 import { defaultDateRangeThisMonth } from '@/components/dashboard/dashboardDateUtils'
 import { bankApi } from '@/services/MainAPI/bankApi'
@@ -142,6 +143,7 @@ import { toNumberFilterList, toStringFilterList } from '@/utils/filterNormalizat
 import { flattenExpenseHeadersToGridRows } from '@/utils/expenseGridFlatten'
 
 const { success, error } = useToast()
+const expensePermissions = useExpensePermissions()
 const stored = loadExpensesViewState()
 
 const loading = ref(false)
@@ -233,7 +235,13 @@ const normalizeExpense = (header: ExpenseHeader): ExpenseHeader => {
     }
 }
 
-const gridRowData = computed(() => flattenExpenseHeadersToGridRows(expenses.value))
+const gridRowData = computed(() =>
+    flattenExpenseHeadersToGridRows(expenses.value).map(row => ({
+        ...row,
+        canEdit: expensePermissions.canEditExpense({ createdAt: row.createdAt }),
+        canDelete: expensePermissions.canDeleteExpense({ createdAt: row.createdAt }),
+    })),
+)
 
 const categoryOptions = computed(() => availableCategoryOptions.value)
 const bankOptions = computed(() => availableBankOptions.value)
@@ -469,6 +477,18 @@ function onColumnStateChange(state: ColumnState[]) {
     columnState.value = state
 }
 
+function canEditExpenseHeader(expense: Pick<ExpenseHeader, 'createdAt'>): boolean {
+    return expensePermissions.canEditExpense(expense)
+}
+
+function canDeleteExpenseHeader(expense: Pick<ExpenseHeader, 'createdAt'>): boolean {
+    return expensePermissions.canDeleteExpense(expense)
+}
+
+function showCashierExpenseRestrictionMessage(action: 'modificar' | 'eliminar') {
+    error('Acción no permitida', `El cajero solo puede ${action} gastos de la fecha actual.`)
+}
+
 const handleViewDetailByHeaderId = async (headerId: number) => {
     loadingDetail.value = true
     showDetailModal.value = true
@@ -490,6 +510,11 @@ const handleEditByHeaderId = async (headerId: number, opts?: { focusDetailId?: n
 
     try {
         const fresh = await expenseHeaderApi.getExpenseHeaderById(headerId)
+        if (!canEditExpenseHeader(fresh)) {
+            formFocusDetailId.value = null
+            showCashierExpenseRestrictionMessage('modificar')
+            return
+        }
         editingExpense.value = normalizeExpense(fresh)
         showFormModal.value = true
     } catch (err: unknown) {
@@ -536,6 +561,10 @@ const handleDeleteDetailLine = async (payload: { headerId: number; detailId: num
 
     try {
         const header = normalizeExpense(await expenseHeaderApi.getExpenseHeaderById(headerId))
+        if (!canDeleteExpenseHeader(header)) {
+            showCashierExpenseRestrictionMessage('eliminar')
+            return
+        }
         const line = header.expenseDetails.find(d => d.id === detailId)
 
         if (!line) {

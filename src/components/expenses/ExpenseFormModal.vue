@@ -379,6 +379,7 @@ import { expenseApi } from '@/services/MainAPI/expenseApi'
 import { expenseCategoryApi } from '@/services/MainAPI/expenseCategoryApi'
 import { supplierApi } from '@/services/MainAPI/supplierApi'
 import { deliverymanApi } from '@/services/MainAPI/deliverymanApi'
+import { useExpensePermissions } from '@/composables/useExpensePermissions'
 import { useFormatting } from '@/composables/useFormatting'
 import { useToast } from '@/composables/useToast'
 import { useAuthStore } from '@/store/auth'
@@ -421,6 +422,7 @@ const emit = defineEmits<{
 const { formatCurrency } = useFormatting()
 const { error, success } = useToast()
 const authStore = useAuthStore()
+const expensePermissions = useExpensePermissions()
 
 const EXPENSE_VAT_RATE = 0.19
 
@@ -874,11 +876,17 @@ const cashDifference = computed(() => {
     return invoiceGrossTotal.value - totalBankPayments.value
 })
 
+const canSaveEditingExpense = computed(() => {
+    if (!props.editingExpense) return true
+    return expensePermissions.canEditExpense(props.editingExpense)
+})
+
 const isFormValid = computed(() => {
     return formData.value.supplierId !== null &&
         formData.value.expenseDetails.length > 0 &&
         formData.value.expenseDetails.every(d => d.expenseId > 0 && d.quantity > 0 && lineTotal(d) > 0) &&
-        cashDifference.value >= 0
+        cashDifference.value >= 0 &&
+        canSaveEditingExpense.value
 })
 
 watch(invoiceGrossTotal, (gross) => {
@@ -1211,6 +1219,11 @@ async function onConfirmExpenseAdvanceSync() {
 }
 
 const handleSubmit = async () => {
+    if (props.editingExpense && !canSaveEditingExpense.value) {
+        error('Edición no permitida', 'El cajero solo puede modificar gastos de la fecha actual.')
+        return
+    }
+
     if (!isFormValid.value) {
         error('Formulario inválido', 'Por favor completa todos los campos requeridos')
         return

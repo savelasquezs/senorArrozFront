@@ -244,6 +244,7 @@ CANCELLED  CANCELLED   CANCELLED  CANCELLED
 #### Gastos
 - **Efectivo puro**: Si no hay `expense_bank_payment` → 100% efectivo
 - **Movimientos internos**: Entre bancos y caja-bancos usando `bank_payment` (income) y `expense_bank_payment` (outcome)
+- **Cajero en gastos**: Puede entrar al módulo, crear gastos y ver el historial. Solo puede **editar o eliminar** gastos cuyo `createdAt` caiga en el **día calendario actual de `America/Bogota`**. Admin y Superadmin no tienen esa restricción.
 
 - **Listado de gastos (`/expenseheaders`)**: Los filtros por rango de fechas, proveedor, banco, categorÃ­a y texto de nombre del gasto se aplican en servidor; la paginaciÃ³n y el total reflejan ese conjunto filtrado.
 - **LÃ­neas filtradas**: Si el filtro incluye categorÃ­a o texto de nombre de gasto, cada factura devuelve solo las `expenseDetails` que coinciden para que la grilla no muestre lÃ­neas fuera del criterio.

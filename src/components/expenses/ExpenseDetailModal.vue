@@ -128,7 +128,7 @@
             <BaseButton @click="$emit('close')" variant="secondary">
                 Cerrar
             </BaseButton>
-            <BaseButton v-if="expense" @click="$emit('edit')" variant="primary">
+            <BaseButton v-if="expense && canEdit" @click="$emit('edit')" variant="primary">
                 Editar
             </BaseButton>
         </template>
@@ -148,9 +148,12 @@ interface Props {
     isOpen: boolean
     expense: ExpenseHeader | null
     loading?: boolean
+    canEdit?: boolean
 }
 
-const props = defineProps<Props>()
+const props = withDefaults(defineProps<Props>(), {
+    canEdit: true,
+})
 
 defineEmits<{
     'close': []

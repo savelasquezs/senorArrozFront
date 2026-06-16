@@ -25,6 +25,8 @@ export function flattenExpenseHeadersToGridRows(headers: ExpenseHeader[]): Expen
                 total: lineTotal(d.quantity, d.amount, d.total),
                 notes: d.notes?.trim() ? String(d.notes) : '',
                 createdByName: h.createdByName ?? '',
+                canEdit: true,
+                canDelete: true,
             })
         }
     }

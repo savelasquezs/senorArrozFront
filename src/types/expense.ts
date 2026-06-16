@@ -57,6 +57,8 @@ export interface ExpenseDetailGridRow {
     total: number
     notes: string
     createdByName: string
+    canEdit: boolean
+    canDelete: boolean
 }
 
 export interface ExpenseBankPayment {
