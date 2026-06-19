@@ -1263,7 +1263,7 @@ async function executeExpenseSave() {
                     bankId: p.bankId,
                     amount: p.amount,
                 }))
-                : undefined,
+                : [],
         }
 
         let result: ExpenseHeader
