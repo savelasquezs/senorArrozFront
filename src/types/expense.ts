@@ -95,6 +95,7 @@ export interface CreateExpenseBankPaymentDto {
 
 export interface UpdateExpenseHeaderDto {
     supplierId?: number
+    deliverymanId?: number | null
     notes?: string | null
     expenseDetails?: UpdateExpenseDetailDto[]
     expenseBankPayments?: CreateExpenseBankPaymentDto[]

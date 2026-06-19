@@ -885,6 +885,7 @@ const isFormValid = computed(() => {
     return formData.value.supplierId !== null &&
         formData.value.expenseDetails.length > 0 &&
         formData.value.expenseDetails.every(d => d.expenseId > 0 && d.quantity > 0 && lineTotal(d) > 0) &&
+        (!isDeliverymanAdvance.value || selectedDeliverymanId.value != null) &&
         cashDifference.value >= 0 &&
         canSaveEditingExpense.value
 })
@@ -1286,10 +1287,18 @@ async function executeExpenseSave() {
             result = await expenseHeaderApi.createExpenseHeader(payload as CreateExpenseHeaderDto)
         }
 
-        if (!props.skipAutoAdvance && !props.editingExpense && isDeliverymanAdvance.value && selectedDeliverymanId.value) {
+        const deliverymanForAdvance = selectedDeliverymanId.value
+        const shouldCreateExpenseOffsetAdvance =
+            !props.skipAutoAdvance &&
+            isDeliverymanAdvance.value &&
+            deliverymanForAdvance != null &&
+            !result.linkedDeliverymanAdvanceId &&
+            (!props.editingExpense || !props.editingExpense.deliverymanId)
+
+        if (shouldCreateExpenseOffsetAdvance) {
             const amount = invoiceGrossTotal.value
             try {
-                const advance = await deliverymanApi.createAdvance(selectedDeliverymanId.value, {
+                const advance = await deliverymanApi.createAdvance(deliverymanForAdvance, {
                     amount,
                     notes: `gasto #${result.id} - ${result.supplierName}`,
                     paymentMethod: 'expense_offset',
@@ -1299,7 +1308,7 @@ async function executeExpenseSave() {
                     ...result,
                     linkedDeliverymanAdvanceId: advance.id,
                     linkedDeliverymanAdvanceAmount: Number(advance.amount),
-                    deliverymanId: selectedDeliverymanId.value,
+                    deliverymanId: deliverymanForAdvance,
                     deliverymanName: advance.deliverymanName ?? result.deliverymanName,
                 }
             } catch (advanceError: any) {
