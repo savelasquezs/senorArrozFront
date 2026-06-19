@@ -244,6 +244,9 @@ CANCELLED  CANCELLED   CANCELLED  CANCELLED
 #### Gastos
 - **Efectivo puro**: Si no hay `expense_bank_payment` → 100% efectivo
 - **Movimientos internos**: Entre bancos y caja-bancos usando `bank_payment` (income) y `expense_bank_payment` (outcome)
+- **Cajero en gastos**: Puede entrar al módulo, crear gastos y ver el historial. Solo puede **editar o eliminar** gastos cuyo `createdAt` caiga en el **día calendario actual de `America/Bogota`**. Admin y Superadmin no tienen esa restricción.
+- **Auditoría monetaria**: En pedidos y gastos solo se auditan eventos con impacto monetario o de caja. En pedidos entran cancelación, eliminación y cambios de líneas que alteren cantidad, valor, descuento o total. En gastos entran eliminación y cambios monetarios de líneas o pagos. Cliente, domiciliario, notas y otros campos operativos sin impacto económico no entran.
+- **Disparo de auditoría**: El resumen monetario se envía desde el cuadre de caja solo una vez por sucursal y día calendario Colombia. Lo reciben el Admin activo de la sucursal y los Superadmin activos. Admin y Superadmin lo consultan en el historial de cuadres; Cashier no.
 
 - **Listado de gastos (`/expenseheaders`)**: Los filtros por rango de fechas, proveedor, banco, categorÃ­a y texto de nombre del gasto se aplican en servidor; la paginaciÃ³n y el total reflejan ese conjunto filtrado.
 - **LÃ­neas filtradas**: Si el filtro incluye categorÃ­a o texto de nombre de gasto, cada factura devuelve solo las `expenseDetails` que coinciden para que la grilla no muestre lÃ­neas fuera del criterio.

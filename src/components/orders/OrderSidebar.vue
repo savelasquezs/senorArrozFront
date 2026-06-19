@@ -128,7 +128,7 @@
             </div>
         </div>
 
-        <BaseDialog v-model="showDraftRemovePaidInStoreDialog" title="Quitar cobro en tienda (borrador)" size="sm">
+        <BaseDialog v-model="showDraftRemovePaidInStoreDialog" title="Quitar cobro en tienda (borrador)" size="sm"> 
             <p v-if="currentOrder" class="text-sm text-gray-600">
                 Se quitará el marcador de efectivo en tienda
                 (<span class="font-medium tabular-nums">{{ formatCurrency(draftPaidInStoreDisplayAmount) }}</span>).

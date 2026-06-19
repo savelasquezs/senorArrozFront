@@ -1,11 +1,7 @@
-// src/types/cashRegister.ts
-
-// ===== DENOMINACIONES =====
 export const DENOMINATIONS = [50000, 20000, 10000, 5000, 2000, 1000, 500, 200, 100, 50] as const
 export type Denomination = (typeof DENOMINATIONS)[number]
 export type DenominationCounts = Record<Denomination, number>
 
-// ===== BANK TRANSFERS =====
 export interface BankTransfer {
   id: number
   fromBankId: number | null
@@ -38,7 +34,6 @@ export interface CreateBankTransferDto {
   note?: string
 }
 
-// ===== CASH REGISTER CLOSURE =====
 export interface CashClosureBankReconciliation {
   id: number
   bankId: number
@@ -65,18 +60,55 @@ export interface CashClosure {
   openingCash: number
   closingCash: number
   denominationCounts: string
-  /** JSON: snapshot de apps pendientes al cerrar (base siguiente período). */
   pendingAppPaymentsSnapshot?: string
+  auditBusinessDate: string
+  auditDispatchStatus: string
+  auditDispatchError?: string | null
+  auditDispatchedAt?: string | null
   bankReconciliations: CashClosureBankReconciliation[]
   informalLoans: CashClosureInformalLoan[]
   createdAt: string
 }
 
-// ===== EXPECTED (para iniciar el cuadre) =====
+export interface CashClosureAuditGroup {
+  key: string
+  title: string
+  eventCount: number
+  netDifference: number
+  details: string[]
+}
+
+export interface CashClosureAuditEvent {
+  id: number
+  changedAt: string
+  userName: string
+  entityType: string
+  entityId: number
+  operationType: string
+  summaryText: string
+  totalBefore?: number | null
+  totalAfter?: number | null
+  difference: number
+}
+
+export interface CashClosureAuditSummary {
+  cashClosureId: number
+  branchId: number
+  branchName: string
+  businessDate: string
+  dispatchStatus: string
+  dispatchError?: string | null
+  dispatchedAt?: string | null
+  periodStartUtc: string
+  periodEndUtc: string
+  recipientEmails: string[]
+  groups: CashClosureAuditGroup[]
+  events: CashClosureAuditEvent[]
+}
+
 export interface BankExpectedBalance {
   bankId: number
   bankName: string
-  /** snake_case desde API: normal | cash_vault | real_vault */
   bankType?: string
   openingBalance: number
   expectedBalance: number
@@ -90,30 +122,22 @@ export interface UnsettledAppLine {
 
 export interface CashRegisterExpected {
   openingCash: number
-  /** Efectivo + bancos + snapshot préstamos + snapshot apps pendientes al último cierre. */
   openingGlobalTotal: number
-  /** Parte de apertura global que viene del snapshot de apps del último cierre. */
   openingUnsettledAppsTotal?: number
-  /** Ventas (pedidos entregados) en el período por instante PrepareAt/CreatedAt. */
   salesInPeriodTotal: number
   expensesInPeriodTotal: number
-  /** Abonos de reserva del período con fecha entrega/programación del pedido (CO) distinta a hoy; sumados al esperado global. */
   reservationDepositsAddedToGlobalTotal?: number
   bankPaymentsAddedToGlobalTotal?: number
   expectedGlobalTotal: number
-  /** Préstamos informales activos: suman al total global contado (efectivo del negocio fuera del cajón). */
   informalLoansActiveTotal: number
-  /** Pedidos sin entregar ni cancelar en la sucursal; si hay alguno no se permite guardar el cuadre. */
   undeliveredOrdersCount: number
   asOf: string
   lastClosureAt?: string
   banks: BankExpectedBalance[]
-  /** Pagos vía app aún no liquidados (pedidos entregados). */
   unsettledAppLines?: UnsettledAppLine[]
   unsettledAppsTotal?: number
 }
 
-/** Préstamo informal por sucursal (tabla branch_informal_loan). */
 export interface BranchInformalLoan {
   id: number
   branchId: number
@@ -166,7 +190,6 @@ export interface UpdateBranchInformalLoanDto {
   amount: number
 }
 
-/** Movimiento Caja Mayor Efectivo (API enum snake_case). */
 export type CashVaultMovementKind = 'abono_to_vault' | 'withdraw_from_vault'
 
 export interface CreateCashVaultMovementDto {
@@ -189,7 +212,6 @@ export interface CashVaultMovement {
   createdByName?: string | null
 }
 
-// ===== DTO PARA ENVIAR CUADRE =====
 export interface CloseBankReconciliationDto {
   bankId: number
   expectedBalance: number

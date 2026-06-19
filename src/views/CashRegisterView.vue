@@ -1148,8 +1148,17 @@ async function saveClosure() {
       })),
     }
 
-    await cashRegisterApi.closeCashRegister(dto, authStore.branchId ?? undefined)
-    toastSuccess('Cuadre guardado', 5000)
+    const closure = await cashRegisterApi.closeCashRegister(dto, authStore.branchId ?? undefined)
+    if (closure.auditDispatchStatus === 'sent') {
+      toastSuccess('Cuadre guardado y auditoría enviada', 5000)
+    } else if (closure.auditDispatchStatus === 'already_sent') {
+      toastSuccess('Cuadre guardado. La auditoría ya había sido enviada hoy.', 5000)
+    } else if (closure.auditDispatchStatus === 'failed') {
+      toastSuccess('Cuadre guardado', 5000)
+      toastError('Falló el envío de auditoría', closure.auditDispatchError || 'El cuadre sí quedó guardado.')
+    } else {
+      toastSuccess('Cuadre guardado', 5000)
+    }
     await loadData()
   } catch (e: any) {
     toastError('No se pudo guardar el cuadre', e.message || 'Error desconocido')

@@ -196,7 +196,7 @@ const navigationItems = computed((): NavItem[] => [
 		name: 'Gastos',
 		to: '/expenses',
 		icon: CurrencyDollarIcon,
-		roles: ['Superadmin', 'Admin'],
+		roles: ['Superadmin', 'Admin', 'Cashier'],
 		exactPath: true,
 	},
 	{
