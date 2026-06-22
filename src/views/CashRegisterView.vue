@@ -15,6 +15,9 @@
           </p>
         </div>
         <div class="flex items-center gap-2">
+          <BaseButton variant="primary" size="sm" @click="openCreateExpenseModal">
+            <PlusIcon class="w-4 h-4 mr-1" /> Nuevo gasto
+          </BaseButton>
           <BaseButton v-if="canViewClosureHistory" variant="outline" size="sm" @click="showHistoryModal = true">
             Historial de cuadres
           </BaseButton>
@@ -408,6 +411,8 @@
 
     <CashClosureHistoryModal v-model="showHistoryModal" :branch-id="authStore.branchId" />
     <CashVaultMovementHistoryModal v-model="showVaultHistoryModal" :branch-id="authStore.branchId" />
+    <ExpenseFormModal v-if="showExpenseFormModal" :is-open="showExpenseFormModal" @close="closeExpenseFormModal"
+      @submit="onExpenseSaved" />
 
     <BaseDialog v-model="vaultAbonoOpen" title="Abonar a caja mayor (efectivo)" size="md"
       @update:model-value="onVaultAbonoToggle">
@@ -548,6 +553,7 @@ import BaseDialog from '@/components/ui/BaseDialog.vue'
 import CashClosureHistoryModal from '@/components/cashRegister/CashClosureHistoryModal.vue'
 import CashVaultMovementHistoryModal from '@/components/cashRegister/CashVaultMovementHistoryModal.vue'
 import DeliveryAdvanceLoanModal from '@/components/cashRegister/DeliveryAdvanceLoanModal.vue'
+import ExpenseFormModal from '@/components/expenses/ExpenseFormModal.vue'
 import BankMovementsPanel from '@/components/payments/banks/BankMovementsPanel.vue'
 import { useAuthStore } from '@/store/auth'
 import { formatYmdBogota } from '@/utils/colombiaDate'
@@ -567,6 +573,7 @@ import {
 import { cashRegisterApi } from '@/services/MainAPI/cashRegisterApi'
 import { useToast } from '@/composables/useToast'
 import type { BranchInformalLoan, CashRegisterExpected, CloseBankReconciliationDto } from '@/types/cashRegister'
+import type { ExpenseHeader } from '@/types/expense'
 import { DENOMINATIONS } from '@/types/cashRegister'
 
 const authStore = useAuthStore()
@@ -574,6 +581,7 @@ const { success: toastSuccess, error: toastError } = useToast()
 
 const showHistoryModal = ref(false)
 const showVaultHistoryModal = ref(false)
+const showExpenseFormModal = ref(false)
 const canViewClosureHistory = computed(() => authStore.isAdmin || authStore.isSuperadmin)
 
 function emptyDenominationCounts(): Record<number, number> {
@@ -948,9 +956,35 @@ async function refreshExpectedPreservingBankActuals() {
   const branchId = authStore.branchId ?? undefined
   const exp = await cashRegisterApi.getExpected(branchId)
   expected.value = exp
-  for (const b of exp.banks) {
-    const row = bankReconciliations.value.find((r) => r.bankId === b.bankId)
-    if (row) row.expectedBalance = b.expectedBalance
+  const existingRows = new Map(bankReconciliations.value.map((r) => [r.bankId, r]))
+  bankReconciliations.value = exp.banks.map((b) => {
+    const row = existingRows.get(b.bankId)
+    return {
+      bankId: b.bankId,
+      bankName: b.bankName,
+      expectedBalance: b.expectedBalance,
+      actualBalance: row?.actualBalance ?? b.expectedBalance,
+      adjustments: row?.adjustments ?? '[]',
+    }
+  })
+}
+
+function openCreateExpenseModal() {
+  showExpenseFormModal.value = true
+}
+
+function closeExpenseFormModal() {
+  showExpenseFormModal.value = false
+}
+
+async function onExpenseSaved(_expense: ExpenseHeader) {
+  showExpenseFormModal.value = false
+  toastSuccess('Gasto guardado', 5000, 'El cuadre se actualizó con el nuevo gasto.')
+  try {
+    await refreshExpectedPreservingBankActuals()
+  } catch (e: any) {
+    console.error('Error actualizando cuadre tras guardar gasto:', e)
+    toastError('No se pudo actualizar el cuadre', e.message || 'Actualiza manualmente para ver el nuevo gasto.')
   }
 }
 
