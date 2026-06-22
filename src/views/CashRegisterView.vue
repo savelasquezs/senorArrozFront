@@ -342,6 +342,7 @@
                       <div class="col-span-1">
                         <label class="text-[10px] text-gray-500 block mb-0.5">Saldo real</label>
                         <input v-model.number="recon.actualBalance" type="number" min="0" step="100"
+                          @input="onBankActualInput" @blur="onBankActualBlur(recon)"
                           class="w-full border border-gray-300 rounded-md px-2 py-1 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-blue-300" />
                       </div>
                       <div class="col-span-1 text-center">
@@ -626,6 +627,10 @@ function denomsStorageKey(): string {
   return `senor-arroz:cash-register-denoms:${authStore.branchId ?? 0}`
 }
 
+function bankActualsStorageKey(): string {
+  return `senor-arroz:cash-register-bank-actuals:${authStore.branchId ?? 0}`
+}
+
 /** Identifica el periodo entre el último cuadre y el próximo; si cambia, el borrador guardado no aplica. */
 function closureContext(exp: CashRegisterExpected): string {
   return exp.lastClosureAt ?? ''
@@ -633,6 +638,7 @@ function closureContext(exp: CashRegisterExpected): string {
 
 const PERSIST_DENOMS_DEBOUNCE_MS = 250
 let persistDenomsTimer: ReturnType<typeof setTimeout> | null = null
+let persistBankActualsTimer: ReturnType<typeof setTimeout> | null = null
 
 function schedulePersistDenominationDraft() {
   if (typeof window === 'undefined') return
@@ -656,6 +662,30 @@ function cancelPersistDenominationDraftTimer() {
 function flushPersistDenominationDraft() {
   cancelPersistDenominationDraftTimer()
   persistDenominationDraft()
+}
+
+function schedulePersistBankActualsDraft() {
+  if (typeof window === 'undefined') return
+  if (persistBankActualsTimer !== null) {
+    clearTimeout(persistBankActualsTimer)
+    persistBankActualsTimer = null
+  }
+  persistBankActualsTimer = window.setTimeout(() => {
+    persistBankActualsTimer = null
+    persistBankActualsDraft()
+  }, PERSIST_DENOMS_DEBOUNCE_MS)
+}
+
+function cancelPersistBankActualsDraftTimer() {
+  if (persistBankActualsTimer !== null) {
+    clearTimeout(persistBankActualsTimer)
+    persistBankActualsTimer = null
+  }
+}
+
+function flushPersistBankActualsDraft() {
+  cancelPersistBankActualsDraftTimer()
+  persistBankActualsDraft()
 }
 
 function persistDenominationDraft() {
@@ -718,6 +748,68 @@ function hydrateDenominationDraft(exp: CashRegisterExpected) {
   if (parsed.context !== ctx) persistDenominationDraft()
 }
 
+function persistBankActualsDraft() {
+  const exp = expected.value
+  if (!exp || typeof localStorage === 'undefined') return
+  const actuals: Record<string, number> = {}
+  for (const recon of bankReconciliations.value) {
+    const n = Number(recon.actualBalance)
+    actuals[String(recon.bankId)] = Number.isFinite(n) ? n : 0
+  }
+  try {
+    localStorage.setItem(
+      bankActualsStorageKey(),
+      JSON.stringify({
+        v: 1,
+        context: closureContext(exp),
+        actuals,
+      })
+    )
+  } catch {
+    /* quota u otro error: ignorar */
+  }
+}
+
+function hydrateBankActualsDraft(exp: CashRegisterExpected) {
+  if (typeof localStorage === 'undefined') return
+  let raw: string | null
+  try {
+    raw = localStorage.getItem(bankActualsStorageKey())
+  } catch {
+    return
+  }
+  if (!raw) return
+
+  let parsed: { v?: number; context?: string; actuals?: Record<string, number> }
+  try {
+    parsed = JSON.parse(raw)
+  } catch {
+    try {
+      localStorage.removeItem(bankActualsStorageKey())
+    } catch {
+      /* ignore */
+    }
+    return
+  }
+
+  if (parsed.context !== closureContext(exp)) {
+    try {
+      localStorage.removeItem(bankActualsStorageKey())
+    } catch {
+      /* ignore */
+    }
+    return
+  }
+  if (!parsed.actuals || typeof parsed.actuals !== 'object') return
+
+  for (const recon of bankReconciliations.value) {
+    const v = parsed.actuals[String(recon.bankId)]
+    if (typeof v === 'number' && Number.isFinite(v) && v >= 0) {
+      recon.actualBalance = v
+    }
+  }
+}
+
 function onDenominationInput() {
   recalcClosingCash()
   schedulePersistDenominationDraft()
@@ -731,6 +823,16 @@ function onDenominationBlur(denom: number) {
   denominationCounts.value[denom] = n
   recalcClosingCash()
   flushPersistDenominationDraft()
+}
+
+function onBankActualInput() {
+  schedulePersistBankActualsDraft()
+}
+
+function onBankActualBlur(recon: CloseBankReconciliationDto) {
+  const n = Number(recon.actualBalance)
+  recon.actualBalance = Number.isFinite(n) && n >= 0 ? Math.round(n) : 0
+  flushPersistBankActualsDraft()
 }
 
 // ===== COMPUTED =====
@@ -1101,6 +1203,7 @@ async function loadData() {
     }))
 
     hydrateDenominationDraft(expected.value)
+    hydrateBankActualsDraft(expected.value)
     await loadBranchInformalLoans()
   } catch (e: any) {
     console.error('Error cargando datos del cuadre:', e)
@@ -1127,6 +1230,7 @@ async function confirmSecondClosureSave() {
 async function saveClosure() {
   if (!canSave.value || !expected.value) return
   cancelPersistDenominationDraftTimer()
+  cancelPersistBankActualsDraftTimer()
   saving.value = true
   try {
     const dto = {
@@ -1173,5 +1277,6 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   flushPersistDenominationDraft()
+  flushPersistBankActualsDraft()
 })
 </script>
