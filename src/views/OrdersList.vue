@@ -5,12 +5,19 @@
                 <template v-if="activeTab === 'orders'">
                     <div class="bg-white rounded-lg shadow mb-6">
                         <div class="p-4 border-b border-gray-200">
-                            <div class="flex flex-wrap items-end gap-3">
-                                <div class="w-28 sm:w-32 shrink-0">
+	                            <div class="flex flex-wrap items-end gap-3">
+	                                <div class="w-[8.5rem] shrink-0">
+	                                    <BaseSelect v-model="datePresetId" :options="datePresetOptions" value-key="value"
+	                                        display-key="label" placeholder="Periodo"
+	                                        @update:model-value="onDatePresetChange" />
+	                                </div>
+	                                <BaseDateRangePicker :model-value="visibleDateRange" variant="compact"
+	                                    @update:model-value="onOrdersRangeChange" />
+	                                <div class="w-28 sm:w-32 shrink-0">
                                     <BaseInput v-model="filters.totalQuery" type="text" inputmode="numeric"
                                         placeholder="Total (dígitos)" class="w-full" @input="onOrdersTextFilterInput" />
                                 </div>
-                                <div class="flex-1 min-w-[180px]">
+                                <div class="flex-1 min-w-[220px]">
                                     <BaseInput v-model="filters.search" placeholder="Cliente, teléfono, invitado…"
                                         @input="onOrdersTextFilterInput">
                                         <template #icon>
@@ -19,7 +26,20 @@
                                     </BaseInput>
                                 </div>
 
-                                <div class="flex flex-wrap items-end gap-2">
+                                <BaseButton type="button" variant="outline" size="sm" class="shrink-0"
+                                    :class="showAdvancedFilters ? 'border-emerald-500 bg-emerald-50 text-emerald-700' : ''"
+                                    @click="toggleAdvancedFilters">
+                                    {{ showAdvancedFilters ? 'Ocultar filtros' : 'Ver filtros avanzados' }}
+                                </BaseButton>
+                                <BaseButton v-if="hasActiveFilters" variant="ghost" size="sm" class="shrink-0"
+                                    @click="clearFilters">
+                                    <span class="inline-flex items-center gap-1">
+                                        <XMarkIcon class="w-4 h-4" />
+                                        Limpiar filtros
+                                    </span>
+                                </BaseButton>
+
+                                <div v-if="showAdvancedFilters" class="flex flex-wrap items-end gap-2">
                                     <div class="w-36 sm:w-40">
                                         <BaseSelect v-model="filters.type" :options="typeOptions" value-key="value"
                                             display-key="label" placeholder="Tipo"
@@ -30,38 +50,29 @@
                                             display-key="label" placeholder="Estado"
                                             @update:model-value="onOrdersSelectFilterChange" />
                                     </div>
-                                    <div class="w-44 sm:w-52">
-                                        <BaseSelect v-model="bankFilterId" :options="bankFilterOptions" value-key="value"
-                                            display-key="label" placeholder="Banco (pagos)"
-                                            @update:model-value="onBankFilterChange" />
+	                                    <div class="w-44 sm:w-52">
+	                                        <BaseSelect v-model="deliveryManFilterId" :options="deliveryManFilterOptions"
+	                                            value-key="value" display-key="label" placeholder="Domiciliario"
+	                                            @update:model-value="onDeliveryManFilterChange" />
+	                                    </div>
+	                                    <div class="w-44 sm:w-52">
+	                                        <BaseSelect v-model="bankFilterId" :options="bankFilterOptions" value-key="value"
+	                                            display-key="label" placeholder="Banco (pagos)"
+	                                            @update:model-value="onBankFilterChange" />
                                     </div>
                                     <div class="w-44 sm:w-52">
                                         <BaseSelect v-model="appFilterId" :options="appFilterOptions" value-key="value"
                                             display-key="label" placeholder="App (pagos)"
                                             @update:model-value="onAppFilterChange" />
                                     </div>
-                                    <label
-                                        class="flex items-center gap-2 text-xs text-gray-700 cursor-pointer shrink-0">
-                                        <input v-model="appUnsettledOnly" type="checkbox"
-                                            class="rounded border-gray-300 text-emerald-600 focus:ring-emerald-500"
-                                            @change="onAppUnsettledChange" />
-                                        Solo app no liquidados
-                                    </label>
-                                    <div class="flex items-center gap-2 flex-wrap">
-                                        <BaseInput v-model="dateFilters.fromDate" type="date" placeholder="Desde"
-                                            class="w-32 sm:w-36" @change="onDateFiltersChange" />
-                                        <span class="text-gray-400">-</span>
-                                        <BaseInput v-model="dateFilters.toDate" type="date" placeholder="Hasta"
-                                            class="w-32 sm:w-36" @change="onDateFiltersChange" />
-                                    </div>
-                                    <BaseButton v-if="hasActiveFilters" variant="ghost" size="sm" class="shrink-0"
-                                        @click="clearFilters">
-                                        <span class="inline-flex items-center gap-1">
-                                            <XMarkIcon class="w-4 h-4" />
-                                            Limpiar filtros
-                                        </span>
-                                    </BaseButton>
-                                </div>
+	                                    <label
+	                                        class="flex items-center gap-2 text-xs text-gray-700 cursor-pointer shrink-0">
+	                                        <input v-model="appUnsettledOnly" type="checkbox"
+	                                            class="rounded border-gray-300 text-emerald-600 focus:ring-emerald-500"
+	                                            @change="onAppUnsettledChange" />
+	                                        Solo app no liquidados
+	                                    </label>
+	                                </div>
                             </div>
                         </div>
 
@@ -527,7 +538,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import type { OrderListItem, Order, OrderStatus, OrderBankPaymentDetail, OrderAppPaymentDetail } from '@/types/order'
 import type { ReservationDeposit } from '@/types/reservationDeposit'
 import { orderApi } from '@/services/MainAPI/orderApi'
@@ -539,7 +550,8 @@ import { useOrderPermissions } from '@/composables/useOrderPermissions'
 import { useToast } from '@/composables/useToast'
 import { getOrderStatusDisplayName, getOrderTypeDisplayName, useFormatting } from '@/composables/useFormatting'
 import { sumPaymentsAmounts } from '@/utils/orderCashToCollect'
-import { todayYmd } from '@/utils/datetime'
+import { defaultBusinessCalendar, todayYmd } from '@/utils/datetime'
+import { getDateRangeForPreset, type DashboardPeriodPresetId } from '@/utils/dashboardPeriodPresets'
 import { bankPaymentApi } from '@/services/MainAPI/bankPaymentApi'
 import { appPaymentApi } from '@/services/MainAPI/appPaymentApi'
 import { appPaymentIsSettled } from '@/utils/orderListPayments'
@@ -558,6 +570,7 @@ import BaseInput from '@/components/ui/BaseInput.vue'
 import BaseSelect from '@/components/ui/BaseSelect.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseDialog from '@/components/ui/BaseDialog.vue'
+import BaseDateRangePicker from '@/components/ui/BaseDateRangePicker.vue'
 import {
     MagnifyingGlassIcon,
     ArrowPathIcon,
@@ -600,6 +613,7 @@ const currentPage = ref(1)
 const pageSize = ref(100)
 const sortBy = ref<'id' | 'total' | 'createdAt'>('id')
 const sortOrder = ref<'asc' | 'desc'>('desc')
+const showAdvancedFilters = ref(false)
 
 // Filtros
 const filters = ref<OrderFilterState>({
@@ -612,6 +626,8 @@ const filters = ref<OrderFilterState>({
 
 /** Filtro servidor: pedidos con pago en este banco */
 const bankFilterId = ref<number | null>(null)
+const deliveryManFilterId = ref<number | null>(null)
+const deliverymenInRange = ref<Array<{ value: number; label: string }>>([])
 
 /** Filtro servidor: pedidos con pago registrado en esta app */
 const appFilterId = ref<number | null>(null)
@@ -621,9 +637,11 @@ const appUnsettledOnly = ref(false)
 
 const groupByRoute = ref(false)
 
+const datePresetId = ref<DashboardPeriodPresetId>('today')
+const customDateRange = ref<[Date, Date] | null>(null)
 const dateFilters = ref({
     fromDate: todayYmd(),
-    toDate: '',
+    toDate: todayYmd(),
 })
 
 // Modales
@@ -709,6 +727,22 @@ const statusOptions: Array<{ value: string | null; label: string }> = [
     { value: 'cancelled', label: 'Cancelado' },
 ]
 
+const datePresetOptions = [
+    { value: 'today' as DashboardPeriodPresetId, label: 'Hoy' },
+    { value: 'yesterday' as DashboardPeriodPresetId, label: 'Ayer' },
+    { value: 'this_fortnight' as DashboardPeriodPresetId, label: 'Esta quincena' },
+    { value: 'last_fortnight' as DashboardPeriodPresetId, label: 'Quincena pasada' },
+    { value: 'this_month' as DashboardPeriodPresetId, label: 'Este mes' },
+    { value: 'last_month' as DashboardPeriodPresetId, label: 'Mes pasado' },
+    { value: 'this_year' as DashboardPeriodPresetId, label: 'Este año' },
+    { value: 'custom' as DashboardPeriodPresetId, label: 'Rango personalizado' },
+]
+
+const deliveryManFilterOptions = computed(() => [
+    { value: null as number | null, label: 'Todos los domiciliarios' },
+    ...deliverymenInRange.value,
+])
+
 const bankFilterOptions = computed(() => {
     const items = banksStore.list?.items || []
     const active = items.filter((b) => b.active).sort((a, b) => a.name.localeCompare(b.name))
@@ -786,22 +820,71 @@ const visiblePages = computed(() => {
     return pages
 })
 
+const visibleDateRange = computed<[Date, Date]>(() => {
+    if (datePresetId.value === 'custom' && customDateRange.value) {
+        return customDateRange.value
+    }
+
+    const [from, to] = getDateRangeForPreset(datePresetId.value, new Date())
+    return [from, to]
+})
+
+const hasAdvancedFiltersActive = computed(() => !!(
+    filters.value.type ||
+    filters.value.status ||
+    bankFilterId.value != null ||
+    appFilterId.value != null ||
+    appUnsettledOnly.value ||
+    deliveryManFilterId.value != null
+))
+
 const hasActiveFilters = computed(() => {
     const defaultFrom = todayYmd()
+    const toDiffers = dateFilters.value.toDate && dateFilters.value.toDate !== defaultFrom
     const fromDiffers = dateFilters.value.fromDate && dateFilters.value.fromDate !== defaultFrom
     return !!(
         filters.value.totalQuery?.trim() ||
         filters.value.search ||
-        filters.value.type ||
-        filters.value.status ||
         filters.value.customer ||
-        bankFilterId.value != null ||
-        appFilterId.value != null ||
-        appUnsettledOnly.value ||
+        hasAdvancedFiltersActive.value ||
         fromDiffers ||
-        dateFilters.value.toDate
+        toDiffers
     )
 })
+
+watch(
+    hasAdvancedFiltersActive,
+    (active) => {
+        if (active) {
+            showAdvancedFilters.value = true
+        }
+    },
+    { immediate: true },
+)
+
+const toYmd = (date: Date) => defaultBusinessCalendar.formatYmd(date)
+
+const currentDateRangeFromFilters = (): [Date, Date] => {
+    const from = dateFilters.value.fromDate || todayYmd()
+    const to = dateFilters.value.toDate || from
+    const fromParts = from.split('-').map(Number)
+    const toParts = to.split('-').map(Number)
+    return [
+        defaultBusinessCalendar.zonedDayFromPickerLocalDate(new Date(fromParts[0], fromParts[1] - 1, fromParts[2])),
+        defaultBusinessCalendar.zonedDayFromPickerLocalDate(new Date(toParts[0], toParts[1] - 1, toParts[2])),
+    ]
+}
+
+const applyDateRange = (range: [Date, Date]) => {
+    dateFilters.value = {
+        fromDate: toYmd(range[0]),
+        toDate: toYmd(range[1]),
+    }
+}
+
+const toggleAdvancedFilters = () => {
+    showAdvancedFilters.value = !showAdvancedFilters.value
+}
 
 // Métodos
 const fetchOrders = async () => {
@@ -827,6 +910,7 @@ const fetchOrders = async () => {
             totalQuery: filters.value.totalQuery,
             type: filters.value.type,
             status: filters.value.status,
+            deliveryManId: deliveryManFilterId.value ?? undefined,
         })
 
         const response = await orderApi.searchOrders(body)
@@ -850,6 +934,12 @@ const onOrdersSelectFilterChange = () => {
     void fetchOrders()
 }
 
+const onDeliveryManFilterChange = () => {
+    currentPage.value = 1
+    debouncedRefetchOrders.cancel()
+    void fetchOrders()
+}
+
 const onAppFilterChange = () => {
     currentPage.value = 1
     debouncedRefetchOrders.cancel()
@@ -862,10 +952,92 @@ const onAppUnsettledChange = () => {
     void fetchOrders()
 }
 
+const onDatePresetChange = (value: DashboardPeriodPresetId) => {
+    void applyOrdersDateFilters(value)
+}
+
+const onOrdersRangeChange = (range: [Date, Date]) => {
+    void applyOrdersDateFilters('custom', range)
+}
+
 const onDateFiltersChange = () => {
     currentPage.value = 1
     debouncedRefetchOrders.cancel()
     void fetchOrders()
+}
+
+const buildDeliverymenInRangeSearchBody = (page: number, pageSizeValue: number) =>
+    buildOrderSearchBody({
+        page,
+        pageSize: pageSizeValue,
+        sortBy: 'createdAt',
+        sortOrder: 'desc',
+        excludeFutureReservations: true,
+        fromDate: dateFilters.value.fromDate || undefined,
+        toDate: dateFilters.value.toDate || undefined,
+        search: '',
+        totalQuery: '',
+        type: 'delivery',
+        status: null,
+    })
+
+const loadDeliverymenInRange = async () => {
+    try {
+        const pageSizeValue = 200
+        let page = 1
+        let totalPagesCount = 1
+        const unique = new Map<number, string>()
+
+        while (page <= totalPagesCount) {
+            const response = await orderApi.searchOrders(buildDeliverymenInRangeSearchBody(page, pageSizeValue))
+
+            for (const order of response.items) {
+                if (order.deliveryManId == null) continue
+                const label = order.deliveryManName?.trim() || `Domiciliario #${order.deliveryManId}`
+                if (!unique.has(order.deliveryManId)) {
+                    unique.set(order.deliveryManId, label)
+                }
+            }
+
+            totalPagesCount = Math.max(1, Math.ceil(response.totalCount / pageSizeValue))
+            page += 1
+        }
+
+        deliverymenInRange.value = [...unique.entries()]
+            .map(([value, label]) => ({ value, label }))
+            .sort((a, b) => a.label.localeCompare(b.label))
+
+        if (
+            deliveryManFilterId.value != null &&
+            !deliverymenInRange.value.some((item) => item.value === deliveryManFilterId.value)
+        ) {
+            deliveryManFilterId.value = null
+        }
+    } catch (err: any) {
+        deliverymenInRange.value = []
+        error('Error al cargar domiciliarios', err.message)
+    }
+}
+
+const applyOrdersDateFilters = async (
+    value: DashboardPeriodPresetId,
+    range?: [Date, Date],
+) => {
+    datePresetId.value = value
+
+    if (value === 'custom') {
+        const nextRange = range ?? customDateRange.value ?? currentDateRangeFromFilters()
+        customDateRange.value = nextRange
+        applyDateRange(nextRange)
+    } else {
+        customDateRange.value = null
+        applyDateRange(getDateRangeForPreset(value, new Date()))
+    }
+
+    currentPage.value = 1
+    debouncedRefetchOrders.cancel()
+    await loadDeliverymenInRange()
+    await fetchOrders()
 }
 
 const clearFilters = () => {
@@ -877,15 +1049,18 @@ const clearFilters = () => {
         customer: '',
     }
     bankFilterId.value = null
+    deliveryManFilterId.value = null
     appFilterId.value = null
     appUnsettledOnly.value = false
+    datePresetId.value = 'today'
+    customDateRange.value = null
     dateFilters.value = {
         fromDate: todayYmd(),
-        toDate: '',
+        toDate: todayYmd(),
     }
     currentPage.value = 1
     debouncedRefetchOrders.cancel()
-    void fetchOrders()
+    void applyOrdersDateFilters('today')
 }
 
 const onBankFilterChange = () => {
@@ -1823,6 +1998,11 @@ const confirmCancelReservation = async () => {
 
 // Lifecycle
 onMounted(async () => {
-    await Promise.all([fetchOrders(), banksStore.ensureListLoaded(), appsStore.ensureListLoaded()])
+    await Promise.all([
+        banksStore.ensureListLoaded(),
+        appsStore.ensureListLoaded(),
+    ])
+    await loadDeliverymenInRange()
+    await fetchOrders()
 })
 </script>

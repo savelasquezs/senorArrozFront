@@ -43,7 +43,7 @@ class AuthApi extends BaseApi {
 
 	async forgotPassword(email: string): Promise<{ message: string }> {
 		try {
-			const response = await this.api.post('/auth/forgot-password', { email });
+			const response = await this.api.post('/auth/forgot-password', { email }, { timeout: 30000 });
 			return response.data;
 		} catch (error: any) {
 			throw this.handleError(error);
@@ -57,7 +57,7 @@ class AuthApi extends BaseApi {
 		confirmPassword: string;
 	}): Promise<void> {
 		try {
-			await this.api.post('/auth/reset-password', resetData);
+			await this.api.post('/auth/reset-password', resetData, { timeout: 30000 });
 		} catch (error: any) {
 			throw this.handleError(error);
 		}

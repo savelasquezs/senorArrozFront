@@ -81,6 +81,14 @@
 			</div>
 		</div>
 
+		<div
+			v-if="order.status === 'cancelled' && order.cancelledReason"
+			class="rounded-lg border border-red-200 bg-red-50 px-4 py-3"
+		>
+			<p class="text-sm font-semibold text-red-800">Motivo de cancelación</p>
+			<p class="mt-1 text-sm text-red-700">{{ order.cancelledReason }}</p>
+		</div>
+
 		<!-- Barra de progreso -->
 		<div v-if="!isDeliveryman" class="bg-white rounded-lg shadow p-4 md:p-6">
 			<OrderProgressBar
