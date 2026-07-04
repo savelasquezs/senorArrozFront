@@ -1,0 +1,80 @@
+export type WhatsAppSettingStatus =
+  | 'not_configured'
+  | 'configured_inactive'
+  | 'configured_unverified'
+  | 'connected'
+
+export interface WhatsAppBranchSetting {
+  id?: number | null
+  branchId: number
+  phoneNumberId: string
+  businessAccountId: string
+  displayPhoneNumber: string
+  accessTokenConfigured: boolean
+  accessTokenMasked?: string | null
+  webhookVerifyToken: string
+  appSecretConfigured: boolean
+  isActive: boolean
+  isVerified: boolean
+  lastVerifiedAt?: string | null
+  createdAt?: string | null
+  updatedAt?: string | null
+  status: WhatsAppSettingStatus
+}
+
+export interface UpsertWhatsAppBranchSetting {
+  phoneNumberId: string
+  businessAccountId: string
+  displayPhoneNumber: string
+  accessToken: string
+  webhookVerifyToken: string
+  appSecret: string
+  isActive: boolean
+}
+
+export interface WhatsAppTestConnectionResult {
+  success: boolean
+  message: string
+  setting?: WhatsAppBranchSetting | null
+}
+
+export interface WhatsAppStatus {
+  enabled: boolean
+  branchIds: number[]
+}
+
+export interface WhatsAppConversation {
+  id: number
+  branchId: number
+  branchName?: string | null
+  customerId?: number | null
+  customerName?: string | null
+  phoneNumber: string
+  contactName?: string | null
+  status: 'open' | 'pending' | 'closed' | 'archived'
+  lastMessageAt?: string | null
+  lastMessagePreview?: string | null
+  unreadCount: number
+  createdAt: string
+  updatedAt: string
+}
+
+export interface WhatsAppMessage {
+  id: number
+  conversationId: number
+  whatsAppMessageId?: string | null
+  direction: 'inbound' | 'outbound'
+  type: 'text'
+  textBody: string
+  status: 'received' | 'sent' | 'delivered' | 'read' | 'failed'
+  sentByUserId?: number | null
+  timestamp: string
+  createdAt: string
+}
+
+export interface WhatsAppConversationFilters {
+  branchId?: number
+  search?: string
+  status?: WhatsAppConversation['status']
+  unreadOnly?: boolean
+}

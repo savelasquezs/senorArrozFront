@@ -177,6 +177,10 @@
                     </div>
                 </BaseCard>
 
+                <BaseCard v-if="canEditBranchProfile">
+                    <BranchWhatsAppSettingsForm :branch-id="branchId" @saved="handleWhatsAppSettingsSaved" />
+                </BaseCard>
+
                 <!-- Users Section -->
                 <BaseCard>
                     <BranchUsersTable :users="branch.users" :branch-id="branch.id" @user-created="handleUserCreated"
@@ -638,6 +642,7 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useBranchesStore } from '@/store/branches'
 import { useBranchPosSettingsStore } from '@/store/branchPosSettings'
+import { useWhatsAppStore } from '@/store/whatsapp'
 import { useBanksStore } from '@/store/banks'
 import { useAppsStore } from '@/store/apps'
 import { useAuthStore } from '@/store/auth'
@@ -653,6 +658,7 @@ import BaseBadge from '@/components/ui/BaseBadge.vue'
 import PhoneNumberItem from '@/components/customers/PhoneNumberItem.vue'
 import BranchUsersTable from '@/components/branches/BranchUsersTable.vue'
 import BranchPrintSettingsForm from '@/components/branches/BranchPrintSettingsForm.vue'
+import BranchWhatsAppSettingsForm from '@/components/whatsapp/BranchWhatsAppSettingsForm.vue'
 import BranchForm from '@/components/branches/BranchForm.vue'
 import NeighborhoodForm from '@/components/neighborhoods/NeighborhoodForm.vue'
 import BankForm from '@/components/payments/banks/BankForm.vue'
@@ -698,6 +704,7 @@ const route = useRoute()
 const router = useRouter()
 const branchesStore = useBranchesStore()
 const branchPosSettings = useBranchPosSettingsStore()
+const whatsappStore = useWhatsAppStore()
 const banksStore = useBanksStore()
 const appsStore = useAppsStore()
 const expenseCategoriesCatalogStore = useExpenseCategoriesCatalogStore()
@@ -752,6 +759,10 @@ const branchId = computed(() => Number(route.params.id))
 
 const handlePrintSettingsSaved = () => {
     void branchesStore.fetchById(branchId.value, { silent: true })
+}
+
+const handleWhatsAppSettingsSaved = () => {
+    void whatsappStore.refreshStatus()
 }
 
 const testPrintLoading = ref<'kitchen' | 'delivery' | null>(null)

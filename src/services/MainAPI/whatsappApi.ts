@@ -1,0 +1,48 @@
+import { BaseApi } from './baseApi'
+import type { ApiResponse } from '@/types/common'
+import type {
+  UpsertWhatsAppBranchSetting,
+  WhatsAppBranchSetting,
+  WhatsAppConversation,
+  WhatsAppConversationFilters,
+  WhatsAppMessage,
+  WhatsAppStatus,
+  WhatsAppTestConnectionResult,
+} from '@/types/whatsapp'
+
+export function whatsappWebhookUrl(): string {
+  const api = import.meta.env.VITE_API_URL || 'http://localhost:8080/api'
+  return `${api.replace(/\/$/, '')}/whatsapp/webhook`
+}
+
+class WhatsAppApi extends BaseApi {
+  getStatus(): Promise<ApiResponse<WhatsAppStatus>> {
+    return this.get<ApiResponse<WhatsAppStatus>>('/whatsapp/status')
+  }
+
+  getBranchSetting(branchId: number): Promise<ApiResponse<WhatsAppBranchSetting>> {
+    return this.get<ApiResponse<WhatsAppBranchSetting>>(`/branches/${branchId}/whatsapp-settings`)
+  }
+
+  saveBranchSetting(branchId: number, payload: UpsertWhatsAppBranchSetting): Promise<ApiResponse<WhatsAppBranchSetting>> {
+    return this.put<ApiResponse<WhatsAppBranchSetting>>(`/branches/${branchId}/whatsapp-settings`, payload)
+  }
+
+  testBranchConnection(branchId: number): Promise<ApiResponse<WhatsAppTestConnectionResult>> {
+    return this.post<ApiResponse<WhatsAppTestConnectionResult>>(`/branches/${branchId}/whatsapp-settings/test-connection`, {})
+  }
+
+  getConversations(filters?: WhatsAppConversationFilters): Promise<ApiResponse<WhatsAppConversation[]>> {
+    return this.get<ApiResponse<WhatsAppConversation[]>>('/whatsapp/conversations', { params: filters })
+  }
+
+  getMessages(conversationId: number): Promise<ApiResponse<WhatsAppMessage[]>> {
+    return this.get<ApiResponse<WhatsAppMessage[]>>(`/whatsapp/conversations/${conversationId}/messages`)
+  }
+
+  sendMessage(conversationId: number, text: string): Promise<ApiResponse<WhatsAppMessage>> {
+    return this.post<ApiResponse<WhatsAppMessage>>(`/whatsapp/conversations/${conversationId}/messages`, { text })
+  }
+}
+
+export const whatsappApi = new WhatsAppApi()

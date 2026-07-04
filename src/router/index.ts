@@ -276,6 +276,16 @@ const routes: RouteRecordRaw[] = [
         }
     },
     {
+        path: '/whatsapp',
+        name: 'WhatsApp',
+        component: () => import('@/views/WhatsAppView.vue'),
+        meta: {
+            requiresAuth: true,
+            requiresRole: [UserRole.SUPERADMIN, UserRole.ADMIN, UserRole.CASHIER],
+            title: 'WhatsApp'
+        }
+    },
+    {
         path: '/bank-transfers',
         name: 'BankTransfers',
         component: () => import('@/views/BankTransfersView.vue'),

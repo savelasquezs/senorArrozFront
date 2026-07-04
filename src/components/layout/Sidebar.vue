@@ -46,7 +46,7 @@
 			<!-- Navigation -->
 			<nav class="flex-1 px-2 space-y-1">
 				<template v-for="item in navigationItems" :key="item.name">
-					<router-link v-if="hasPermission(item.roles)" :to="item.to" :class="[
+					<router-link v-if="hasPermission(item.roles, item)" :to="item.to" :class="[
 						navItemActive(item)
 							? 'bg-emerald-600 text-white hover:bg-emerald-700'
 							: 'text-gray-600 hover:text-gray-900 hover:bg-gray-100',
@@ -62,10 +62,11 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick } from 'vue';
+import { computed, nextTick, onMounted, watch } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import { useAuthStore } from '@/store/auth';
 import { useDeliveryStore } from '@/store/delivery';
+import { useWhatsAppStore } from '@/store/whatsapp';
 import DeliverymanBranchSidebarBlock from '@/components/delivery/DeliverymanBranchSidebarBlock.vue';
 import {
 	HomeIcon,
@@ -81,6 +82,7 @@ import {
 	BanknotesIcon,
 	ArrowsRightLeftIcon,
 	ClipboardDocumentListIcon,
+	ChatBubbleLeftRightIcon,
 } from '@heroicons/vue/24/outline';
 import { UserRole } from '@/types/auth';
 
@@ -90,6 +92,7 @@ interface Props {
 const emit = defineEmits<{ close: [] }>();
 const props = defineProps<Props>();
 const authStore = useAuthStore();
+const whatsappStore = useWhatsAppStore();
 const route = useRoute();
 
 type NavItem = {
@@ -99,6 +102,7 @@ type NavItem = {
 	roles: string[];
 	/** Si true, solo activo en ruta exacta (evita marcar "Gastos" en /expenses/menu-attribution). */
 	exactPath?: boolean;
+	requiresWhatsApp?: boolean;
 };
 
 function navItemActive(item: NavItem): boolean {
@@ -212,6 +216,13 @@ const navigationItems = computed((): NavItem[] => [
 		roles: ['Superadmin', 'Admin', 'Cashier'],
 	},
 	{
+		name: 'WhatsApp',
+		to: '/whatsapp',
+		icon: ChatBubbleLeftRightIcon,
+		roles: ['Superadmin', 'Admin', 'Cashier'],
+		requiresWhatsApp: true,
+	},
+	{
 		name: 'Movimientos Bancos',
 		to: '/bank-transfers',
 		icon: ArrowsRightLeftIcon,
@@ -219,6 +230,20 @@ const navigationItems = computed((): NavItem[] => [
 	},
 ]);
 
-const hasPermission = (roles: string[]): boolean =>
-	roles.includes(authStore.userRole || '');
+const hasPermission = (roles: string[], item?: NavItem): boolean => {
+	if (!roles.includes(authStore.userRole || '')) return false;
+	if (item?.requiresWhatsApp) return whatsappStore.enabled;
+	return true;
+};
+
+function loadWhatsAppStatus() {
+	if (!authStore.isAuthenticated) return;
+	const role = authStore.userRole;
+	if (!role || !['Superadmin', 'Admin', 'Cashier'].includes(role)) return;
+	void whatsappStore.ensureStatus();
+}
+
+onMounted(loadWhatsAppStatus);
+
+watch(() => authStore.isAuthenticated, loadWhatsAppStatus);
 </script>
