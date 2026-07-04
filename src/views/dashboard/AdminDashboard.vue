@@ -4,6 +4,7 @@
             v-model="activeSection"
             v-model:date-range="globalDashboardDateRange"
             v-model:time-granularity="globalTimeGranularity"
+            v-model:day-of-week="globalDayOfWeek"
             :branch-id="adminBranchId"
             :branch-options="deliveryBranchOptions"
             :show-branch-filter="false"
@@ -52,6 +53,8 @@
                     :orders-by-month="ordersByMonth"
                     :orders-by-year="ordersByYear"
                     :products-payload="ventasProducts"
+                    :hourly-payload="ventasHourly"
+                    :day-of-week="globalDayOfWeek"
                     :branch-id="adminBranchId"
                 />
                 <DashboardGastosSection
@@ -112,7 +115,10 @@ import { useDashboardGastosSection } from '@/composables/dashboard/useDashboardG
 import { useDashboardDomiciliosSection } from '@/composables/dashboard/useDashboardDomiciliosSection'
 import { useDashboardShellMockState } from '@/composables/dashboard/useDashboardShellMockState'
 import type { VentasProductsGroupBy } from '@/services/MainAPI/dashboardSectionApi'
-import type { DashboardTimeGranularity } from '@/views/dashboard/dashboardGlobalFilters'
+import type {
+    DashboardDayOfWeekFilter,
+    DashboardTimeGranularity,
+} from '@/views/dashboard/dashboardGlobalFilters'
 import {
 	aggregateSalesBlockByFortnight,
 	aggregateOrdersBlockByFortnight,
@@ -146,6 +152,7 @@ const activeSection = ref<DashboardSectionId>('principal')
 
 const globalDashboardDateRange = ref<[Date, Date]>(defaultDateRangeToday())
 const globalTimeGranularity = ref<DashboardTimeGranularity>('day')
+const globalDayOfWeek = ref<DashboardDayOfWeekFilter>('all')
 
 watch(
 	globalDashboardDateRange,
@@ -183,6 +190,7 @@ const ventasSection = useDashboardVentasSection(
 	adminBranchIdWritable,
 	globalDashboardDateRange,
 	ventasProductsGroupBy,
+	globalDayOfWeek,
 )
 const domiciliosSection = useDashboardDomiciliosSection(
 	activeSection,
@@ -230,6 +238,7 @@ const ventasComparisonRows = computed(() => {
 })
 
 const ventasProducts = computed(() => ventasSection.data.value?.products ?? null)
+const ventasHourly = computed(() => ventasSection.data.value?.hourly ?? null)
 
 const {
     deliveryBranchOptions,

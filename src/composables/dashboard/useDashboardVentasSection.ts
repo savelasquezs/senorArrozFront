@@ -7,6 +7,7 @@ import {
 	type VentasProductsGroupBy,
 } from '@/services/MainAPI/dashboardSectionApi';
 import type { DashboardSectionId } from '@/views/dashboard/dashboardSectionIds';
+import type { DashboardDayOfWeekFilter } from '@/views/dashboard/dashboardGlobalFilters';
 
 function rangeKey(range: [Date, Date]) {
 	const [a, b] = range;
@@ -22,6 +23,7 @@ export function useDashboardVentasSection(
 	branchId: Ref<number | null>,
 	dateRange: Ref<[Date, Date]>,
 	productsGroupBy: Ref<VentasProductsGroupBy>,
+	dayOfWeek: Ref<DashboardDayOfWeekFilter>,
 ) {
 	const data = ref<VentasDashboardPayload | null>(null);
 	const loading = ref(false);
@@ -46,6 +48,7 @@ export function useDashboardVentasSection(
 				branchId.value,
 				dateRange.value,
 				groupByForThisFetch,
+				dayOfWeek.value,
 			);
 			if (seq !== fullLoadSeq) return;
 			data.value = result;
@@ -74,6 +77,7 @@ export function useDashboardVentasSection(
 				branchId.value,
 				dateRange.value,
 				productsGroupBy.value,
+				dayOfWeek.value,
 			);
 			if (seq !== productsOnlySeq) return;
 			if (!data.value) return;
@@ -84,7 +88,7 @@ export function useDashboardVentasSection(
 	}
 
 	watch(
-		[isActive, branchId, () => rangeKey(dateRange.value)],
+		[isActive, branchId, () => rangeKey(dateRange.value), dayOfWeek],
 		() => void loadFull(),
 		{ immediate: true },
 	);

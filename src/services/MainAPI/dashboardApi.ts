@@ -159,9 +159,11 @@ class DashboardApi extends BaseApi {
 		branchId: number | null,
 		fromIso: string,
 		toIso: string,
+		dayOfWeek?: number | null,
 	): Promise<DashboardSalesComparisonApiResponse> {
 		const params: Record<string, string | number> = { from: fromIso, to: toIso };
 		if (branchId != null) params.branchId = branchId;
+		if (dayOfWeek != null) params.dayOfWeek = dayOfWeek;
 		return this.get<DashboardSalesComparisonApiResponse>('/dashboard/sales/comparison', { params });
 	}
 
@@ -170,10 +172,24 @@ class DashboardApi extends BaseApi {
 		branchId: number | null,
 		fromIso: string,
 		toIso: string,
+		dayOfWeek?: number | null,
 	): Promise<DashboardSalesEvolutionApiResponse> {
 		const params: Record<string, string | number> = { from: fromIso, to: toIso };
 		if (branchId != null) params.branchId = branchId;
+		if (dayOfWeek != null) params.dayOfWeek = dayOfWeek;
 		return this.get<DashboardSalesEvolutionApiResponse>('/dashboard/sales/evolution', { params });
+	}
+
+	async getSalesHourly(
+		branchId: number | null,
+		fromIso: string,
+		toIso: string,
+		dayOfWeek?: number | null,
+	): Promise<DashboardSalesHourlyApiResponse> {
+		const params: Record<string, string | number> = { from: fromIso, to: toIso };
+		if (branchId != null) params.branchId = branchId;
+		if (dayOfWeek != null) params.dayOfWeek = dayOfWeek;
+		return this.get<DashboardSalesHourlyApiResponse>('/dashboard/sales/hourly', { params });
 	}
 
 	/** Ventas — ranking productos o categorías + participación recaudo. */
@@ -183,9 +199,11 @@ class DashboardApi extends BaseApi {
 		toIso: string,
 		top = 10,
 		groupBy: 'product' | 'category' = 'product',
+		dayOfWeek?: number | null,
 	): Promise<DashboardSalesProductsApiResponse> {
 		const params: Record<string, string | number> = { from: fromIso, to: toIso, top, groupBy };
 		if (branchId != null) params.branchId = branchId;
+		if (dayOfWeek != null) params.dayOfWeek = dayOfWeek;
 		return this.get<DashboardSalesProductsApiResponse>('/dashboard/sales/products', { params });
 	}
 
@@ -195,6 +213,7 @@ class DashboardApi extends BaseApi {
 		fromIso: string,
 		toIso: string,
 		opts: { granularity: 'day' | 'month' | 'year'; categoryId?: number | null },
+		dayOfWeek?: number | null,
 	): Promise<DashboardCategoryWeightsApiResponse> {
 		const params: Record<string, string | number> = {
 			from: fromIso,
@@ -204,6 +223,7 @@ class DashboardApi extends BaseApi {
 		if (branchId != null) params.branchId = branchId;
 		if (opts.categoryId != null && opts.categoryId !== undefined)
 			params.categoryId = opts.categoryId;
+		if (dayOfWeek != null) params.dayOfWeek = dayOfWeek;
 		return this.get<DashboardCategoryWeightsApiResponse>('/dashboard/sales/category-weights', { params });
 	}
 
@@ -313,6 +333,34 @@ export type DashboardSalesEvolutionApiResponse = {
 	ordersByHour: DashboardOrdersTimelineApiBlock;
 	ordersByMonth: DashboardOrdersTimelineApiBlock;
 	ordersByYear: DashboardOrdersTimelineApiBlock;
+};
+
+export type DashboardSalesHourlyApiResponse = {
+	points: Array<{
+		hour: number;
+		label: string;
+		orderCount: number;
+		totalSalesCop: number;
+		averageDailySalesCop: number;
+		medianDailySalesCop: number;
+		averageTicketCop: number;
+	}>;
+	summary: {
+		highestTotalSalesHour: DashboardSalesBestHourApi | null;
+		highestMedianSalesHour: DashboardSalesBestHourApi | null;
+		dayOfWeek: number | null;
+		dayOfWeekLabel: string;
+		medianDailySalesCop: number;
+		averageDailySalesCop: number;
+		totalSalesCop: number;
+	};
+};
+
+export type DashboardSalesBestHourApi = {
+	hour: number;
+	label: string;
+	totalSalesCop: number;
+	medianDailySalesCop: number;
 };
 
 export type DashboardCategoryWeightsApiResponse = {

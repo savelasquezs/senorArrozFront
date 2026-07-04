@@ -13,6 +13,14 @@
 			{{ error }}
 		</div>
 		<template v-else>
+			<section class="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
+				<BaseCard v-for="card in summaryCards" :key="card.label" :padding="'md'" :shadow="'sm'">
+					<p class="text-xs font-medium uppercase tracking-wide text-gray-500">{{ card.label }}</p>
+					<p class="mt-1 truncate text-lg font-semibold text-gray-900">{{ card.value }}</p>
+					<p v-if="card.hint" class="mt-1 text-xs text-gray-500">{{ card.hint }}</p>
+				</BaseCard>
+			</section>
+
 			<BranchComparisonPanel v-if="showBranchComparison" :rows="comparisonRows" />
 
 			<TimeEvolutionPanel
@@ -25,7 +33,19 @@
 				:orders-by-fortnight="ordersByFortnight"
 				:orders-by-month="ordersByMonth"
 				:orders-by-year="ordersByYear"
+				:sales-median-cop="dailyMedianLine"
 			/>
+
+			<BaseCard title="Ventas por hora" :padding="'md'">
+				<div v-if="!hasHourlyPoints" class="h-56 flex items-center justify-center text-sm text-gray-500">
+					Sin pedidos para las horas del rango filtrado.
+				</div>
+				<DashboardSalesHourlyChart
+					v-else
+					:points="hourlyPoints"
+					:median-line-cop="dailyMedianLine"
+				/>
+			</BaseCard>
 
 			<section class="space-y-4">
 				<div class="flex flex-wrap items-center justify-between gap-3">
@@ -85,6 +105,7 @@
 				:date-range="dateRange"
 				:time-granularity="timeGranularity"
 				:branch-id="branchId"
+				:day-of-week="dayOfWeek"
 			/>
 
 			<BaseCard title="Pedidos por estado" class="col-span-1">
@@ -108,13 +129,21 @@ import {
 	DashboardRevenueShareDonut,
 	DashboardSegmentedTabs,
 	CategoryWeightAnalyticsPanel,
+	DashboardSalesHourlyChart,
 	type BranchComparisonRow,
 	type SalesTimeSeriesBlock,
 	type OrdersPerHourBlock,
 	type BarChartDataset,
 } from '@/components/dashboard';
-import type { VentasProductsGroupBy, VentasProductsPayload } from '@/services/MainAPI/dashboardSectionApi';
-import type { DashboardTimeGranularity } from '@/views/dashboard/dashboardGlobalFilters';
+import type {
+	VentasProductsGroupBy,
+	VentasProductsPayload,
+	VentasSalesHourlyPayload,
+} from '@/services/MainAPI/dashboardSectionApi';
+import type {
+	DashboardDayOfWeekFilter,
+	DashboardTimeGranularity,
+} from '@/views/dashboard/dashboardGlobalFilters';
 
 const props = withDefaults(
 	defineProps<{
@@ -133,6 +162,8 @@ const props = withDefaults(
 		ordersByYear: OrdersPerHourBlock;
 		/** Desde API; null con mock o sin ventas. */
 		productsPayload: VentasProductsPayload | null;
+		hourlyPayload: VentasSalesHourlyPayload | null;
+		dayOfWeek: DashboardDayOfWeekFilter;
 		/** Sucursal del filtro global (peso por categoría usa API real). */
 		branchId: number | null;
 	}>(),
@@ -188,4 +219,56 @@ const productBarDatasets = computed((): BarChartDataset[] => [
 const participationLabels = computed(() => props.productsPayload?.participationLabels ?? []);
 const participationValues = computed(() => props.productsPayload?.participationValues ?? []);
 const participationPercents = computed(() => props.productsPayload?.participationPercents ?? []);
+
+const hourlyPoints = computed(() => props.hourlyPayload?.points ?? []);
+const hasHourlyPoints = computed(() => hourlyPoints.value.length > 0);
+const dailyMedianLine = computed(() => props.hourlyPayload?.summary.medianDailySalesCop ?? null);
+
+function formatCop(value: number | null | undefined): string {
+	if (value == null || Number.isNaN(Number(value))) return '-';
+	return new Intl.NumberFormat('es-CO', {
+		style: 'currency',
+		currency: 'COP',
+		minimumFractionDigits: 0,
+		maximumFractionDigits: 0,
+	}).format(Number(value));
+}
+
+const summaryCards = computed(() => {
+	const summary = props.hourlyPayload?.summary;
+	const bestTotal = summary?.highestTotalSalesHour;
+	const bestMedian = summary?.highestMedianSalesHour;
+	return [
+		{
+			label: 'Hora mayor venta total',
+			value: bestTotal ? bestTotal.label : '-',
+			hint: bestTotal ? formatCop(bestTotal.totalSalesCop) : '',
+		},
+		{
+			label: 'Hora mayor mediana',
+			value: bestMedian ? bestMedian.label : '-',
+			hint: bestMedian ? formatCop(bestMedian.medianDailySalesCop) : '',
+		},
+		{
+			label: 'Dia seleccionado',
+			value: summary?.dayOfWeekLabel ?? 'Todos los dias',
+			hint: '',
+		},
+		{
+			label: 'Mediana ventas dia',
+			value: formatCop(summary?.medianDailySalesCop),
+			hint: '',
+		},
+		{
+			label: 'Promedio ventas dia',
+			value: formatCop(summary?.averageDailySalesCop),
+			hint: '',
+		},
+		{
+			label: 'Total vendido rango',
+			value: formatCop(summary?.totalSalesCop),
+			hint: '',
+		},
+	];
+});
 </script>
