@@ -4,7 +4,6 @@
             v-model="activeSection"
             v-model:date-range="globalDashboardDateRange"
             v-model:time-granularity="globalTimeGranularity"
-            v-model:day-of-week="globalDayOfWeek"
             v-model:branch-id="globalDashboardBranchId"
             :branch-options="deliveryBranchOptions"
             :show-branch-filter="authStore.isSuperadmin"
@@ -46,7 +45,6 @@
                     :orders-by-year="ordersByYear"
                     :products-payload="ventasProducts"
                     :hourly-payload="ventasHourly"
-                    :day-of-week="globalDayOfWeek"
                     :branch-id="globalDashboardBranchId"
                 />
                 <DashboardGastosSection
@@ -108,7 +106,6 @@ import { useDashboardDomiciliosSection } from '@/composables/dashboard/useDashbo
 import { useDashboardShellMockState } from '@/composables/dashboard/useDashboardShellMockState'
 import type { VentasProductsGroupBy } from '@/services/MainAPI/dashboardSectionApi'
 import type {
-    DashboardDayOfWeekFilter,
     DashboardTimeGranularity,
 } from '@/views/dashboard/dashboardGlobalFilters'
 import {
@@ -133,7 +130,6 @@ const globalDashboardBranchId = ref<number | null>(null)
 /** Periodo global (sidebar): principal, ventas, domicilios, peso por categoría y gastos. Por defecto: hoy. */
 const globalDashboardDateRange = ref<[Date, Date]>(defaultDateRangeToday())
 const globalTimeGranularity = ref<DashboardTimeGranularity>('day')
-const globalDayOfWeek = ref<DashboardDayOfWeekFilter>('all')
 
 watch(
 	globalDashboardDateRange,
@@ -170,7 +166,6 @@ const ventasSection = useDashboardVentasSection(
 	globalDashboardBranchId,
 	globalDashboardDateRange,
 	ventasProductsGroupBy,
-	globalDayOfWeek,
 )
 const domiciliosSection = useDashboardDomiciliosSection(
 	activeSection,

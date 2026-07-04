@@ -26,10 +26,6 @@ import {
 } from './dashboardApi';
 import type { SalesTimeSeriesBlock, OrdersPerHourBlock } from '@/components/dashboard';
 import { endOfZonedDayAsDate, startOfZonedDayAsDate } from '@/utils/datetime';
-import {
-	dashboardDayOfWeekToApi,
-	type DashboardDayOfWeekFilter,
-} from '@/views/dashboard/dashboardGlobalFilters';
 
 const MOCK_LATENCY_MS = 60;
 
@@ -251,6 +247,23 @@ export type VentasSalesHourlyPayload = {
 		averageDailySalesCop: number;
 		medianDailySalesCop: number;
 		averageTicketCop: number;
+		participationPercent: number;
+	}>;
+	dailyHistory: Array<{
+		day: string;
+		label: string;
+		dayOfWeek: number;
+		dayOfWeekLabel: string;
+		totalSalesCop: number;
+		orderCount: number;
+		averageTicketCop: number;
+	}>;
+	heatmap: Array<{
+		dayOfWeek: number;
+		dayOfWeekLabel: string;
+		hour: number;
+		hourLabel: string;
+		medianDailySalesCop: number;
 	}>;
 	summary: {
 		highestTotalSalesHour: {
@@ -356,6 +369,23 @@ function mapHourlyFromApi(raw: DashboardSalesHourlyApiResponse): VentasSalesHour
 			averageDailySalesCop: Number(p.averageDailySalesCop),
 			medianDailySalesCop: Number(p.medianDailySalesCop),
 			averageTicketCop: Number(p.averageTicketCop),
+			participationPercent: Number(p.participationPercent),
+		})),
+		dailyHistory: (raw.dailyHistory ?? []).map((p) => ({
+			day: p.day,
+			label: p.label,
+			dayOfWeek: p.dayOfWeek,
+			dayOfWeekLabel: p.dayOfWeekLabel,
+			totalSalesCop: Number(p.totalSalesCop),
+			orderCount: p.orderCount,
+			averageTicketCop: Number(p.averageTicketCop),
+		})),
+		heatmap: (raw.heatmap ?? []).map((p) => ({
+			dayOfWeek: p.dayOfWeek,
+			dayOfWeekLabel: p.dayOfWeekLabel,
+			hour: p.hour,
+			hourLabel: p.hourLabel,
+			medianDailySalesCop: Number(p.medianDailySalesCop),
 		})),
 		summary: {
 			highestTotalSalesHour: raw.summary.highestTotalSalesHour,
@@ -403,7 +433,6 @@ export async function fetchVentasDashboard(
 	branchId: number | null,
 	dateRange: [Date, Date],
 	productsGroupBy: VentasProductsGroupBy = 'product',
-	dayOfWeek: DashboardDayOfWeekFilter = 'all',
 ): Promise<VentasDashboardPayload> {
 	if (USE_VENTAS_MOCK) {
 		await delay();
@@ -415,12 +444,11 @@ export async function fetchVentasDashboard(
 		};
 	}
 	const { from, to } = encodeDashboardRangeToApi(dateRange);
-	const day = dashboardDayOfWeekToApi(dayOfWeek);
 	const [comp, evo, hourly, prod] = await Promise.all([
-		dashboardApi.getSalesComparison(branchId, from, to, day),
-		dashboardApi.getSalesEvolution(branchId, from, to, day),
-		dashboardApi.getSalesHourly(branchId, from, to, day),
-		dashboardApi.getSalesProducts(branchId, from, to, 10, productsGroupBy, day),
+		dashboardApi.getSalesComparison(branchId, from, to),
+		dashboardApi.getSalesEvolution(branchId, from, to),
+		dashboardApi.getSalesHourly(branchId, from, to),
+		dashboardApi.getSalesProducts(branchId, from, to, 10, productsGroupBy),
 	]);
 	return {
 		comparisonRows: mapComparisonFromApi(comp),
@@ -435,7 +463,6 @@ export async function fetchVentasProductsOnly(
 	branchId: number | null,
 	dateRange: [Date, Date],
 	productsGroupBy: VentasProductsGroupBy,
-	dayOfWeek: DashboardDayOfWeekFilter = 'all',
 ): Promise<VentasProductsPayload | null> {
 	if (USE_VENTAS_MOCK) return null;
 	const { from, to } = encodeDashboardRangeToApi(dateRange);
@@ -445,7 +472,6 @@ export async function fetchVentasProductsOnly(
 		to,
 		10,
 		productsGroupBy,
-		dashboardDayOfWeekToApi(dayOfWeek),
 	);
 	return mapProductsFromApi(raw);
 }

@@ -344,6 +344,23 @@ export type DashboardSalesHourlyApiResponse = {
 		averageDailySalesCop: number;
 		medianDailySalesCop: number;
 		averageTicketCop: number;
+		participationPercent: number;
+	}>;
+	dailyHistory: Array<{
+		day: string;
+		label: string;
+		dayOfWeek: number;
+		dayOfWeekLabel: string;
+		totalSalesCop: number;
+		orderCount: number;
+		averageTicketCop: number;
+	}>;
+	heatmap: Array<{
+		dayOfWeek: number;
+		dayOfWeekLabel: string;
+		hour: number;
+		hourLabel: string;
+		medianDailySalesCop: number;
 	}>;
 	summary: {
 		highestTotalSalesHour: DashboardSalesBestHourApi | null;

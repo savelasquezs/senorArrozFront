@@ -20,72 +20,34 @@ export type SalesHourlyChartPoint = {
 	averageDailySalesCop: number;
 	medianDailySalesCop: number;
 	averageTicketCop: number;
+	participationPercent: number;
 };
 
-const props = defineProps<{
-	points: SalesHourlyChartPoint[];
-	medianLineCop: number | null;
-}>();
+const props = withDefaults(
+	defineProps<{
+		points: SalesHourlyChartPoint[];
+		mode?: 'median' | 'total';
+	}>(),
+	{ mode: 'median' },
+);
 
 const chartData = computed(() => {
 	const labels = props.points.map((p) => p.label);
-	const medianLine =
-		props.medianLineCop != null && props.medianLineCop > 0
-			? props.points.map(() => props.medianLineCop)
-			: [];
+	const data =
+		props.mode === 'total'
+			? props.points.map((p) => p.totalSalesCop)
+			: props.points.map((p) => p.medianDailySalesCop);
 
 	return {
 		labels,
 		datasets: [
 			{
-				type: 'bar' as const,
-				label: 'Venta total',
-				data: props.points.map((p) => p.totalSalesCop),
+				label: props.mode === 'total' ? 'Venta total acumulada' : 'Mediana diaria',
+				data,
 				backgroundColor: 'rgba(5, 120, 90, 0.82)',
 				borderRadius: 6,
 				maxBarThickness: 44,
-				order: 3,
 			},
-			{
-				type: 'line' as const,
-				label: 'Mediana por hora',
-				data: props.points.map((p) => p.medianDailySalesCop),
-				borderColor: 'rgba(15, 23, 42, 0.9)',
-				backgroundColor: 'rgba(15, 23, 42, 0)',
-				pointBackgroundColor: 'rgba(15, 23, 42, 0.9)',
-				pointRadius: 3,
-				borderWidth: 2,
-				tension: 0.25,
-				order: 1,
-			},
-			{
-				type: 'line' as const,
-				label: 'Ticket promedio',
-				data: props.points.map((p) => p.averageTicketCop),
-				borderColor: 'rgba(37, 99, 235, 0.85)',
-				backgroundColor: 'rgba(37, 99, 235, 0)',
-				pointBackgroundColor: 'rgba(37, 99, 235, 0.85)',
-				pointRadius: 2,
-				borderWidth: 2,
-				tension: 0.25,
-				order: 2,
-			},
-			...(medianLine.length
-				? [
-						{
-							type: 'line' as const,
-							label: 'Mediana venta por hora',
-							data: medianLine,
-							borderColor: 'rgba(220, 38, 38, 0.85)',
-							backgroundColor: 'rgba(220, 38, 38, 0)',
-							pointRadius: 0,
-							borderWidth: 2,
-							borderDash: [6, 5],
-							tension: 0,
-							order: 0,
-						},
-					]
-				: []),
 		],
 	};
 });
@@ -96,12 +58,13 @@ const chartOptions = computed<ChartOptions<'bar'>>(() => ({
 	interaction: { mode: 'index', intersect: false },
 	plugins: {
 		legend: {
-			display: true,
+			display: false,
 			position: 'bottom',
 			labels: { boxWidth: 12, usePointStyle: true },
 		},
 		tooltip: {
 			callbacks: {
+				title: (items) => items[0]?.label ?? '',
 				label: (ctx) => {
 					const v = Number(ctx.parsed.y);
 					if (Number.isNaN(v)) return '';
@@ -112,7 +75,14 @@ const chartOptions = computed<ChartOptions<'bar'>>(() => ({
 					const idx = items[0]?.dataIndex;
 					const p = idx == null ? null : props.points[idx];
 					if (!p) return '';
-					return `Promedio por dia: ${formatTooltipCurrency(p.averageDailySalesCop)}`;
+					return [
+						`Venta total: ${formatTooltipCurrency(p.totalSalesCop)}`,
+						`Mediana diaria: ${formatTooltipCurrency(p.medianDailySalesCop)}`,
+						`Promedio diario: ${formatTooltipCurrency(p.averageDailySalesCop)}`,
+						`Cantidad de pedidos: ${new Intl.NumberFormat('es-CO').format(p.orderCount)}`,
+						`Ticket promedio: ${formatTooltipCurrency(p.averageTicketCop)}`,
+						`Participacion: ${new Intl.NumberFormat('es-CO', { maximumFractionDigits: 2 }).format(p.participationPercent)} %`,
+					];
 				},
 			},
 		},

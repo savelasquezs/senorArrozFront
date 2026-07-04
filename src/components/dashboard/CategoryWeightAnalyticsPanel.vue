@@ -111,8 +111,6 @@ import { encodeDashboardRangeToApi, USE_VENTAS_MOCK } from '@/services/MainAPI/d
 import type { LineChartDataset } from './lineChart.types';
 import {
 	weightApiGranularity,
-	dashboardDayOfWeekToApi,
-	type DashboardDayOfWeekFilter,
 	type DashboardTimeGranularity,
 } from '@/views/dashboard/dashboardGlobalFilters';
 import {
@@ -125,7 +123,6 @@ const props = defineProps<{
 	branchId: number | null;
 	dateRange: [Date, Date];
 	timeGranularity: DashboardTimeGranularity;
-	dayOfWeek: DashboardDayOfWeekFilter;
 }>();
 
 /** Carga inicial del panel (sin datos aún). Las actualizaciones por categoría usan `chartBusy`. */
@@ -304,7 +301,7 @@ async function load() {
 		const raw = await dashboardApi.getSalesCategoryWeights(props.branchId, from, to, {
 			granularity: weightEvolutionGranularity.value,
 			categoryId: selectedCategoryId.value,
-		}, dashboardDayOfWeekToApi(props.dayOfWeek));
+		});
 		payload.value = {
 			...raw,
 			evolutionsByCategory: raw.evolutionsByCategory ?? [],
@@ -330,7 +327,6 @@ watch(
 			props.dateRange[0].getTime(),
 			props.dateRange[1].getTime(),
 			props.timeGranularity,
-			props.dayOfWeek,
 			selectedCategoryId.value,
 		] as const,
 	() => void load(),

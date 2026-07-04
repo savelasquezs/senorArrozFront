@@ -33,28 +33,6 @@
 					aria-label="Escala temporal global del dashboard"
 				/>
 			</div>
-			<div>
-				<label
-					class="block text-xs font-semibold uppercase tracking-wide text-gray-500"
-					for="dashboard-day-of-week"
-				>
-					Dia semana
-				</label>
-				<select
-					id="dashboard-day-of-week"
-					class="mt-1.5 w-full rounded-lg border border-gray-200 bg-white px-2 py-2 text-sm text-gray-900 shadow-sm focus:border-emerald-600 focus:outline-none focus:ring-1 focus:ring-emerald-600"
-					:value="String(dayOfWeek)"
-					@change="onDayOfWeekChange"
-				>
-					<option
-						v-for="option in dashboardDayOfWeekOptions"
-						:key="String(option.value)"
-						:value="String(option.value)"
-					>
-						{{ option.label }}
-					</option>
-				</select>
-			</div>
 			<p class="text-[10px] leading-snug text-gray-500">
 				Las opciones dependen del <strong>periodo</strong> (p. ej. un solo día: día y año; quincena
 				preset: sin mes). <strong>Año</strong> siempre está disponible. <strong>Quincena</strong> agrupa
@@ -91,11 +69,7 @@ import type { DeliveryBranchOption } from './operation.types';
 import DashboardPeriodPanel from './DashboardPeriodPanel.vue';
 import DashboardSegmentedTabs from './DashboardSegmentedTabs.vue';
 import { getAllowedGranularityTabs } from '@/views/dashboard/dashboardGranularityBuckets';
-import {
-	dashboardDayOfWeekOptions,
-	type DashboardDayOfWeekFilter,
-	type DashboardTimeGranularity,
-} from '@/views/dashboard/dashboardGlobalFilters';
+import type { DashboardTimeGranularity } from '@/views/dashboard/dashboardGlobalFilters';
 
 const props = withDefaults(
 	defineProps<{
@@ -106,10 +80,9 @@ const props = withDefaults(
 		/** Filtro global de fechas (compartido entre secciones). */
 		dateRange: [Date, Date];
 		timeGranularity: DashboardTimeGranularity;
-		dayOfWeek: DashboardDayOfWeekFilter;
 		showGlobalFilters?: boolean;
 	}>(),
-	{ showGlobalFilters: true, dayOfWeek: 'all' },
+	{ showGlobalFilters: true },
 );
 
 const emit = defineEmits<{
@@ -117,7 +90,6 @@ const emit = defineEmits<{
 	'update:branchId': [value: number | null];
 	'update:dateRange': [value: [Date, Date]];
 	'update:timeGranularity': [value: DashboardTimeGranularity];
-	'update:dayOfWeek': [value: DashboardDayOfWeekFilter];
 }>();
 
 const dateRangeModel = computed({
@@ -139,15 +111,5 @@ const timeGranularityModel = computed({
 function onBranchChange(e: Event) {
 	const v = (e.target as HTMLSelectElement).value;
 	emit('update:branchId', v === '' ? null : Number(v));
-}
-
-function onDayOfWeekChange(e: Event) {
-	const v = (e.target as HTMLSelectElement).value;
-	if (v === 'all') {
-		emit('update:dayOfWeek', 'all');
-		return;
-	}
-	const n = Number(v);
-	if (n >= 1 && n <= 7) emit('update:dayOfWeek', n as DashboardDayOfWeekFilter);
 }
 </script>
