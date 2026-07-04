@@ -468,11 +468,30 @@ function heatmapValue(dayOfWeek: number, hour: number): number {
 function heatmapCellStyle(dayOfWeek: number, hour: number): Record<string, string> {
 	const value = heatmapValue(dayOfWeek, hour);
 	const intensity = heatmapMax.value <= 0 ? 0 : Math.min(1, value / heatmapMax.value);
-	const alpha = 0.08 + intensity * 0.72;
+	const color = heatmapGradientColor(intensity);
 	return {
-		backgroundColor: `rgba(5, 120, 90, ${alpha})`,
-		color: intensity > 0.55 ? '#ffffff' : '#064e3b',
+		backgroundColor: color,
+		color: intensity > 0.72 ? '#ffffff' : '#1f2937',
 	};
+}
+
+function heatmapGradientColor(intensity: number): string {
+	if (intensity <= 0) return '#f3f4f6';
+	const stops = [
+		{ at: 0, color: [34, 197, 94] },
+		{ at: 0.35, color: [250, 204, 21] },
+		{ at: 0.68, color: [249, 115, 22] },
+		{ at: 1, color: [220, 38, 38] },
+	] as const;
+
+	const upper = stops.find((stop) => intensity <= stop.at) ?? stops[stops.length - 1];
+	const lower = stops[Math.max(0, stops.indexOf(upper) - 1)];
+	const range = upper.at - lower.at || 1;
+	const t = (intensity - lower.at) / range;
+	const rgb = lower.color.map((channel, index) =>
+		Math.round(channel + (upper.color[index] - channel) * t),
+	);
+	return `rgb(${rgb[0]}, ${rgb[1]}, ${rgb[2]})`;
 }
 
 function formatCop(value: number | null | undefined): string {
