@@ -74,7 +74,7 @@ const chartData = computed(() => {
 				? [
 						{
 							type: 'line' as const,
-							label: 'Mediana del periodo',
+							label: 'Mediana venta por hora',
 							data: medianLine,
 							borderColor: 'rgba(220, 38, 38, 0.85)',
 							backgroundColor: 'rgba(220, 38, 38, 0)',
@@ -102,12 +102,6 @@ const chartOptions = computed<ChartOptions<'bar'>>(() => ({
 		},
 		tooltip: {
 			callbacks: {
-				afterTitle: (items) => {
-					const idx = items[0]?.dataIndex;
-					const p = idx == null ? null : props.points[idx];
-					if (!p) return '';
-					return `Pedidos: ${new Intl.NumberFormat('es-CO').format(p.orderCount)}`;
-				},
 				label: (ctx) => {
 					const v = Number(ctx.parsed.y);
 					if (Number.isNaN(v)) return '';

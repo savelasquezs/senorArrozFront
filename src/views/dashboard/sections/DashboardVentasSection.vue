@@ -36,16 +36,30 @@
 				:sales-median-cop="dailyMedianLine"
 			/>
 
-			<BaseCard title="Ventas por hora" :padding="'md'">
-				<div v-if="!hasHourlyPoints" class="h-56 flex items-center justify-center text-sm text-gray-500">
-					Sin pedidos para las horas del rango filtrado.
-				</div>
-				<DashboardSalesHourlyChart
-					v-else
-					:points="hourlyPoints"
-					:median-line-cop="dailyMedianLine"
-				/>
-			</BaseCard>
+			<section class="grid grid-cols-1 gap-6 xl:grid-cols-2">
+				<BaseCard title="Ventas por hora" :padding="'md'">
+					<div v-if="!hasHourlyPoints" class="h-56 flex items-center justify-center text-sm text-gray-500">
+						Sin pedidos para las horas del rango filtrado.
+					</div>
+					<DashboardSalesHourlyChart
+						v-else
+						:points="hourlyPoints"
+						:median-line-cop="hourlyTotalMedianLine"
+					/>
+				</BaseCard>
+
+				<BaseCard title="Pedidos por hora" :padding="'md'">
+					<div v-if="!hasHourlyPoints" class="h-56 flex items-center justify-center text-sm text-gray-500">
+						Sin pedidos para las horas del rango filtrado.
+					</div>
+					<DashboardBarChart
+						v-else
+						:labels="hourlyOrderLabels"
+						:datasets="hourlyOrderDatasets"
+						y-format="number"
+					/>
+				</BaseCard>
+			</section>
 
 			<section class="space-y-4">
 				<div class="flex flex-wrap items-center justify-between gap-3">
@@ -125,6 +139,7 @@ import BaseCard from '@/components/ui/BaseCard.vue';
 import {
 	BranchComparisonPanel,
 	TimeEvolutionPanel,
+	DashboardBarChart,
 	DashboardHorizontalBarChart,
 	DashboardRevenueShareDonut,
 	DashboardSegmentedTabs,
@@ -223,6 +238,26 @@ const participationPercents = computed(() => props.productsPayload?.participatio
 const hourlyPoints = computed(() => props.hourlyPayload?.points ?? []);
 const hasHourlyPoints = computed(() => hourlyPoints.value.length > 0);
 const dailyMedianLine = computed(() => props.hourlyPayload?.summary.medianDailySalesCop ?? null);
+const hourlyOrderLabels = computed(() => hourlyPoints.value.map((p) => p.label));
+const hourlyOrderDatasets = computed((): BarChartDataset[] => [
+	{
+		label: 'Pedidos',
+		data: hourlyPoints.value.map((p) => p.orderCount),
+		backgroundColor: 'rgba(37, 99, 235, 0.78)',
+	},
+]);
+
+function median(values: number[]): number | null {
+	const sorted = values.filter((v) => Number.isFinite(v)).sort((a, b) => a - b);
+	if (sorted.length === 0) return null;
+	const middle = Math.floor(sorted.length / 2);
+	if (sorted.length % 2 === 1) return sorted[middle];
+	return (sorted[middle - 1] + sorted[middle]) / 2;
+}
+
+const hourlyTotalMedianLine = computed(() =>
+	median(hourlyPoints.value.map((p) => p.totalSalesCop)),
+);
 
 function formatCop(value: number | null | undefined): string {
 	if (value == null || Number.isNaN(Number(value))) return '-';
