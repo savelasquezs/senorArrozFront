@@ -234,6 +234,16 @@
 
                 <BaseButton
                   class="w-full"
+                  variant="outline"
+                  :disabled="!selectedCustomerAddresses.length || sendingAddressConfirmation"
+                  :loading="sendingAddressConfirmation"
+                  @click="sendAddressConfirmationRequest"
+                >
+                  Confirmar dirección por WhatsApp
+                </BaseButton>
+
+                <BaseButton
+                  class="w-full"
                   variant="primary"
                   :disabled="!selectedAddress || takingOrder"
                   :loading="takingOrder"
@@ -307,6 +317,7 @@ const sending = ref(false)
 const contextLoading = ref(false)
 const creatingCustomer = ref(false)
 const takingOrder = ref(false)
+const sendingAddressConfirmation = ref(false)
 const contextPanelCollapsed = ref(false)
 const sendError = ref('')
 const contextError = ref('')
@@ -324,6 +335,8 @@ const initialCustomerPhone = computed(() => {
   const digits = selectedConversation.value?.phoneNumber?.replace(/\D/g, '') ?? ''
   return digits.length > 10 ? digits.slice(-10) : digits
 })
+
+const selectedCustomerAddresses = computed(() => selectedCustomer.value?.addresses ?? [])
 
 const branchOptions = computed(() => {
   const labels = new Map<number, string>()
@@ -401,6 +414,59 @@ async function loadConversationContext(conversation: WhatsAppConversation) {
 
 function onContextAddressSelected(address?: CustomerAddress) {
   selectedAddress.value = address ?? null
+  if (address && selectedCustomer.value) {
+    const addresses = selectedCustomer.value.addresses ?? []
+    const exists = addresses.some(a => a.id === address.id)
+    selectedCustomer.value = {
+      ...selectedCustomer.value,
+      addresses: exists
+        ? addresses.map(a => a.id === address.id ? address : a)
+        : [...addresses, address],
+    }
+  }
+}
+
+function formatAddressLineForWhatsApp(address: CustomerAddress): string {
+  const street = (address.address || '').trim()
+  const extra = (address.additionalInfo || '').trim()
+  const neighborhood = (address.neighborhoodName || address.neighborhood?.name || '').trim()
+  const main = [street, extra].filter(Boolean).join(', ')
+  return neighborhood ? `${main}, ${neighborhood}` : main
+}
+
+function buildAddressConfirmationText(addresses: CustomerAddress[]) {
+  const validAddresses = addresses.filter(a => a.address?.trim())
+  if (validAddresses.length === 0) return ''
+  if (validAddresses.length === 1) {
+    return `¿Entregamos en esta dirección?\n${formatAddressLineForWhatsApp(validAddresses[0])}`
+  }
+
+  return [
+    '¿Dónde entregamos?',
+    ...validAddresses.map((address, index) => `${index + 1}- ${formatAddressLineForWhatsApp(address)}`),
+  ].join('\n')
+}
+
+async function sendAddressConfirmationRequest() {
+  if (!selectedConversation.value || !selectedCustomer.value) return
+  const text = buildAddressConfirmationText(selectedCustomerAddresses.value)
+  if (!text) {
+    contextError.value = 'El cliente no tiene direcciones guardadas.'
+    return
+  }
+
+  try {
+    sendingAddressConfirmation.value = true
+    contextError.value = ''
+    await whatsappStore.sendMessage(selectedConversation.value.id, text)
+    await scrollToBottom()
+    success('Mensaje enviado', 2500, 'Se solicitó confirmación de dirección por WhatsApp.')
+  } catch (error: any) {
+    contextError.value = error.message || 'No se pudo enviar la confirmación de dirección.'
+    showError('WhatsApp', contextError.value)
+  } finally {
+    sendingAddressConfirmation.value = false
+  }
 }
 
 async function createCustomerFromConversation(data: CustomerFormData) {
