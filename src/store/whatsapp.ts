@@ -5,6 +5,8 @@ import type {
   WhatsAppConversation,
   WhatsAppConversationFilters,
   WhatsAppMessage,
+  WhatsAppQuickReply,
+  WhatsAppQuickReplyFilters,
   WhatsAppRealtimeMessagePayload,
   WhatsAppStatus,
   WhatsAppUnreadSummary,
@@ -15,9 +17,11 @@ export const useWhatsAppStore = defineStore('whatsapp', () => {
   const unreadSummary = ref<WhatsAppUnreadSummary>({ totalUnread: 0, unreadConversations: 0, latestMessageAt: null })
   const conversations = ref<WhatsAppConversation[]>([])
   const messages = ref<Record<number, WhatsAppMessage[]>>({})
+  const quickReplies = ref<WhatsAppQuickReply[]>([])
   const isLoadingStatus = ref(false)
   const isLoadingConversations = ref(false)
   const isLoadingMessages = ref(false)
+  const isLoadingQuickReplies = ref(false)
   const error = ref<string | null>(null)
   let statusLoadedAt = 0
 
@@ -113,6 +117,26 @@ export const useWhatsAppStore = defineStore('whatsapp', () => {
     return message
   }
 
+  async function sendQuickReply(conversationId: number, quickReplyId: number) {
+    const res = await whatsappApi.sendQuickReply(conversationId, quickReplyId)
+    const message = res.data
+    if (message) {
+      upsertMessage(conversationId, message)
+      const conversation = conversations.value.find(c => c.id === conversationId)
+      if (conversation) {
+        conversation.lastMessageAt = message.timestamp
+        conversation.lastMessagePreview = message.textBody
+      }
+      const reply = quickReplies.value.find(x => x.id === quickReplyId)
+      if (reply) {
+        reply.usageCount += 1
+        reply.lastUsedAt = message.timestamp
+      }
+      quickReplies.value = [...quickReplies.value].sort((a, b) => b.usageCount - a.usageCount || a.shortcut.localeCompare(b.shortcut))
+    }
+    return message
+  }
+
   async function sendMediaMessage(conversationId: number, file: File, caption?: string) {
     const res = await whatsappApi.sendMediaMessage(conversationId, file, caption)
     const message = res.data
@@ -125,6 +149,53 @@ export const useWhatsAppStore = defineStore('whatsapp', () => {
       }
     }
     return message
+  }
+
+  async function fetchQuickReplies(filters?: WhatsAppQuickReplyFilters) {
+    try {
+      isLoadingQuickReplies.value = true
+      error.value = null
+      const res = await whatsappApi.getQuickReplies(filters)
+      quickReplies.value = res.data ?? []
+      return quickReplies.value
+    } catch (err: any) {
+      error.value = err.message || 'No se pudieron cargar las respuestas rápidas'
+      throw err
+    } finally {
+      isLoadingQuickReplies.value = false
+    }
+  }
+
+  async function saveQuickReply(payload: {
+    id?: number | null
+    branchId?: number | null
+    shortcut: string
+    messageTemplate: string
+    isActive: boolean
+  }) {
+    const body = {
+      branchId: payload.branchId,
+      shortcut: payload.shortcut,
+      messageTemplate: payload.messageTemplate,
+      isActive: payload.isActive,
+    }
+    const res = payload.id
+      ? await whatsappApi.updateQuickReply(payload.id, body)
+      : await whatsappApi.createQuickReply(body)
+    const reply = res.data
+    if (reply) {
+      const index = quickReplies.value.findIndex(x => x.id === reply.id)
+      quickReplies.value = index >= 0
+        ? quickReplies.value.map(x => x.id === reply.id ? reply : x)
+        : [reply, ...quickReplies.value]
+      quickReplies.value = [...quickReplies.value].sort((a, b) => b.usageCount - a.usageCount || a.shortcut.localeCompare(b.shortcut))
+    }
+    return reply
+  }
+
+  async function deleteQuickReply(id: number) {
+    await whatsappApi.deleteQuickReply(id)
+    quickReplies.value = quickReplies.value.filter(x => x.id !== id)
   }
 
   function mediaPreviewLabel(type: WhatsAppMessage['type']) {
@@ -200,6 +271,7 @@ export const useWhatsAppStore = defineStore('whatsapp', () => {
   function clear() {
     conversations.value = []
     messages.value = {}
+    quickReplies.value = []
     unreadSummary.value = { totalUnread: 0, unreadConversations: 0, latestMessageAt: null }
     error.value = null
   }
@@ -209,9 +281,11 @@ export const useWhatsAppStore = defineStore('whatsapp', () => {
     unreadSummary,
     conversations,
     messages,
+    quickReplies,
     isLoadingStatus,
     isLoadingConversations,
     isLoadingMessages,
+    isLoadingQuickReplies,
     error,
     enabled,
     enabledBranchIds,
@@ -223,7 +297,11 @@ export const useWhatsAppStore = defineStore('whatsapp', () => {
     fetchConversations,
     fetchMessages,
     sendMessage,
+    sendQuickReply,
     sendMediaMessage,
+    fetchQuickReplies,
+    saveQuickReply,
+    deleteQuickReply,
     applyRealtimeMessage,
     clear,
   }

@@ -49,6 +49,32 @@ export interface WhatsAppUnreadSummary {
   latestMessageAt?: string | null
 }
 
+export interface WhatsAppQuickReply {
+  id: number
+  branchId: number
+  branchName?: string | null
+  shortcut: string
+  messageTemplate: string
+  isActive: boolean
+  usageCount: number
+  lastUsedAt?: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+export interface UpsertWhatsAppQuickReply {
+  branchId?: number | null
+  shortcut: string
+  messageTemplate: string
+  isActive: boolean
+}
+
+export interface WhatsAppQuickReplyFilters {
+  branchId?: number
+  activeOnly?: boolean
+  search?: string
+}
+
 export interface WhatsAppConversation {
   id: number
   branchId: number

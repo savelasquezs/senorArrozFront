@@ -2,10 +2,13 @@ import { BaseApi } from './baseApi'
 import type { ApiResponse } from '@/types/common'
 import type {
   UpsertWhatsAppBranchSetting,
+  UpsertWhatsAppQuickReply,
   WhatsAppBranchSetting,
   WhatsAppConversation,
   WhatsAppConversationFilters,
   WhatsAppMessage,
+  WhatsAppQuickReply,
+  WhatsAppQuickReplyFilters,
   WhatsAppStatus,
   WhatsAppTestConnectionResult,
   WhatsAppUnreadSummary,
@@ -53,11 +56,31 @@ class WhatsAppApi extends BaseApi {
     return this.post<ApiResponse<WhatsAppMessage>>(`/whatsapp/conversations/${conversationId}/messages`, { text })
   }
 
+  sendQuickReply(conversationId: number, quickReplyId: number): Promise<ApiResponse<WhatsAppMessage>> {
+    return this.post<ApiResponse<WhatsAppMessage>>(`/whatsapp/conversations/${conversationId}/messages/quick-reply`, { quickReplyId })
+  }
+
   sendMediaMessage(conversationId: number, file: File, caption?: string): Promise<ApiResponse<WhatsAppMessage>> {
     const fd = new FormData()
     fd.append('file', file)
     if (caption?.trim()) fd.append('caption', caption.trim())
     return this.post<ApiResponse<WhatsAppMessage>>(`/whatsapp/conversations/${conversationId}/messages/media`, fd)
+  }
+
+  getQuickReplies(filters?: WhatsAppQuickReplyFilters): Promise<ApiResponse<WhatsAppQuickReply[]>> {
+    return this.get<ApiResponse<WhatsAppQuickReply[]>>('/whatsapp/quick-replies', { params: filters })
+  }
+
+  createQuickReply(payload: UpsertWhatsAppQuickReply): Promise<ApiResponse<WhatsAppQuickReply>> {
+    return this.post<ApiResponse<WhatsAppQuickReply>>('/whatsapp/quick-replies', payload)
+  }
+
+  updateQuickReply(id: number, payload: UpsertWhatsAppQuickReply): Promise<ApiResponse<WhatsAppQuickReply>> {
+    return this.put<ApiResponse<WhatsAppQuickReply>>(`/whatsapp/quick-replies/${id}`, payload)
+  }
+
+  deleteQuickReply(id: number): Promise<ApiResponse<string>> {
+    return this.delete<ApiResponse<string>>(`/whatsapp/quick-replies/${id}`)
   }
 }
 

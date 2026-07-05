@@ -10,6 +10,9 @@
           <p class="text-sm text-gray-500">Conversaciones de WhatsApp Cloud API</p>
         </div>
         <div v-if="whatsappStore.enabled" class="flex flex-col gap-2 sm:flex-row">
+          <BaseButton variant="secondary" size="sm" @click="openQuickRepliesModal">
+            Respuestas rápidas
+          </BaseButton>
           <select
             v-if="showBranchFilter"
             v-model="selectedBranchId"
@@ -174,6 +177,20 @@
             </div>
 
             <form class="border-t border-gray-200 bg-white p-3" @submit.prevent="sendMessage">
+              <div v-if="topQuickReplies.length" class="mb-2 flex flex-wrap items-center gap-2">
+                <span class="text-xs font-medium text-gray-500">Rápidas</span>
+                <button
+                  v-for="reply in topQuickReplies"
+                  :key="reply.id"
+                  type="button"
+                  class="rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-800 hover:bg-emerald-100 disabled:opacity-50"
+                  :disabled="sending"
+                  :title="reply.messageTemplate"
+                  @click="sendQuickReply(reply)"
+                >
+                  /{{ reply.shortcut }}
+                </button>
+              </div>
               <div v-if="selectedFile" class="mb-2 flex items-center justify-between gap-3 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-900">
                 <div class="min-w-0">
                   <p class="truncate font-medium">{{ selectedFile.name }}</p>
@@ -199,6 +216,21 @@
                 <BaseButton type="submit" :loading="sending" :disabled="!draft.trim() && !selectedFile" :icon="PaperAirplaneIcon">
                   Enviar
                 </BaseButton>
+              </div>
+              <div
+                v-if="slashQuickReplyMatches.length"
+                class="mt-2 rounded-lg border border-gray-200 bg-gray-50 p-2 shadow-sm"
+              >
+                <button
+                  v-for="reply in slashQuickReplyMatches"
+                  :key="reply.id"
+                  type="button"
+                  class="flex w-full items-start gap-3 rounded-md px-2 py-1.5 text-left hover:bg-white"
+                  @click="sendQuickReply(reply)"
+                >
+                  <span class="shrink-0 rounded bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-800">/{{ reply.shortcut }}</span>
+                  <span class="min-w-0 flex-1 truncate text-xs text-gray-600">{{ reply.messageTemplate }}</span>
+                </button>
               </div>
               <p v-if="sendError" class="mt-2 text-sm text-red-600">{{ sendError }}</p>
             </form>
@@ -282,6 +314,96 @@
           </div>
         </aside>
       </div>
+
+      <BaseDialog v-model="showQuickRepliesModal" title="Respuestas rápidas" size="4xl">
+        <div class="grid gap-4 lg:grid-cols-[minmax(0,1fr)_340px]">
+          <div class="min-h-[260px] rounded-lg border border-gray-200">
+            <div class="flex items-center justify-between border-b border-gray-100 px-3 py-2">
+              <span class="text-sm font-semibold text-gray-800">Guardadas</span>
+              <BaseButton size="sm" variant="ghost" :loading="whatsappStore.isLoadingQuickReplies" @click="loadQuickReplies">
+                Actualizar
+              </BaseButton>
+            </div>
+            <div class="max-h-[420px] overflow-y-auto divide-y divide-gray-100">
+              <div
+                v-for="reply in whatsappStore.quickReplies"
+                :key="reply.id"
+                class="flex items-start justify-between gap-3 px-3 py-3"
+              >
+                <div class="min-w-0">
+                  <div class="flex flex-wrap items-center gap-2">
+                    <span class="rounded bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-800">/{{ reply.shortcut }}</span>
+                    <span v-if="reply.branchName" class="text-xs text-gray-500">{{ reply.branchName }}</span>
+                    <span class="text-xs" :class="reply.isActive ? 'text-emerald-700' : 'text-gray-400'">
+                      {{ reply.isActive ? 'Activa' : 'Inactiva' }}
+                    </span>
+                    <span class="text-xs text-gray-400">{{ reply.usageCount }} usos</span>
+                  </div>
+                  <p class="mt-2 line-clamp-2 text-sm text-gray-700">{{ reply.messageTemplate }}</p>
+                </div>
+                <div class="flex shrink-0 gap-1">
+                  <BaseButton size="sm" variant="ghost" @click="editQuickReply(reply)">Editar</BaseButton>
+                  <BaseButton size="sm" variant="danger" @click="removeQuickReply(reply)">Eliminar</BaseButton>
+                </div>
+              </div>
+              <div v-if="!whatsappStore.isLoadingQuickReplies && !whatsappStore.quickReplies.length" class="p-6 text-center text-sm text-gray-500">
+                No hay respuestas rápidas creadas.
+              </div>
+            </div>
+          </div>
+
+          <form class="space-y-3 rounded-lg border border-gray-200 p-3" @submit.prevent="saveQuickReply">
+            <div class="flex items-center justify-between">
+              <p class="text-sm font-semibold text-gray-800">{{ editingQuickReply ? 'Editar' : 'Nueva respuesta' }}</p>
+              <BaseButton v-if="editingQuickReply" type="button" size="sm" variant="ghost" @click="resetQuickReplyForm">
+                Nueva
+              </BaseButton>
+            </div>
+
+            <label v-if="showBranchFilter" class="block text-sm font-medium text-gray-700">
+              Sucursal
+              <select
+                v-model.number="quickReplyForm.branchId"
+                class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-emerald-500 focus:ring-emerald-500"
+              >
+                <option v-for="branch in branchOptions" :key="branch.id" :value="branch.id">{{ branch.label }}</option>
+              </select>
+            </label>
+
+            <BaseInput
+              v-model="quickReplyForm.shortcut"
+              label="Palabra reservada"
+              placeholder="/saludo"
+              :maxlength="40"
+              hint="Se usa escribiendo /palabra en el chat."
+            />
+
+            <label class="block text-sm font-medium text-gray-700">
+              Mensaje
+              <textarea
+                v-model="quickReplyForm.messageTemplate"
+                rows="6"
+                maxlength="4096"
+                class="mt-1 w-full resize-none rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-emerald-500 focus:ring-emerald-500"
+                placeholder="Hola {{nombre_cliente}}, muy buenos días."
+              />
+            </label>
+            <p v-pre class="text-xs text-gray-500">
+              Variables disponibles: <span class="font-mono">{{nombre_cliente}}</span>, <span class="font-mono">{{guestName}}</span>, <span class="font-mono">{{telefono}}</span>.
+            </p>
+
+            <label class="inline-flex items-center gap-2 text-sm text-gray-700">
+              <input v-model="quickReplyForm.isActive" type="checkbox" class="h-4 w-4 rounded border-gray-300 text-emerald-600" />
+              Activa
+            </label>
+
+            <p v-if="quickReplyError" class="text-sm text-red-600">{{ quickReplyError }}</p>
+            <BaseButton class="w-full" type="submit" :loading="quickReplySaving">
+              Guardar respuesta
+            </BaseButton>
+          </form>
+        </div>
+      </BaseDialog>
     </div>
   </MainLayout>
 </template>
@@ -299,6 +421,8 @@ import {
 } from '@heroicons/vue/24/outline'
 import MainLayout from '@/components/layout/MainLayout.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
+import BaseDialog from '@/components/ui/BaseDialog.vue'
+import BaseInput from '@/components/ui/BaseInput.vue'
 import BaseLoading from '@/components/ui/BaseLoading.vue'
 import CustomerForm from '@/components/customers/CustomerForm.vue'
 import AddressSelector from '@/components/customers/address/AddressSelector.vue'
@@ -309,7 +433,7 @@ import { whatsappApi } from '@/services/MainAPI/whatsappApi'
 import { useToast } from '@/composables/useToast'
 import { useSignalR } from '@/composables/useSignalR'
 import { WHATSAPP_SIGNALR_HUB_URL } from '@/config/signalr'
-import type { WhatsAppConversation, WhatsAppMessage, WhatsAppRealtimeMessagePayload } from '@/types/whatsapp'
+import type { WhatsAppConversation, WhatsAppMessage, WhatsAppQuickReply, WhatsAppRealtimeMessagePayload } from '@/types/whatsapp'
 import type { Customer, CustomerAddress, CustomerFormData } from '@/types/customer'
 
 const whatsappStore = useWhatsAppStore()
@@ -334,6 +458,17 @@ const creatingCustomer = ref(false)
 const takingOrder = ref(false)
 const sendingAddressConfirmation = ref(false)
 const contextPanelCollapsed = ref(false)
+const showQuickRepliesModal = ref(false)
+const editingQuickReply = ref<WhatsAppQuickReply | null>(null)
+const quickReplySaving = ref(false)
+const quickReplyError = ref('')
+const quickReplyForm = ref({
+  id: null as number | null,
+  branchId: null as number | null,
+  shortcut: '',
+  messageTemplate: '',
+  isActive: true,
+})
 const sendError = ref('')
 const contextError = ref('')
 const addressSelectionNote = ref('')
@@ -362,6 +497,24 @@ const branchOptions = computed(() => {
     id,
     label: labels.get(id) ?? `Sucursal ${id}`,
   }))
+})
+
+const activeQuickRepliesForConversation = computed(() => {
+  if (!selectedConversation.value) return []
+  return whatsappStore.quickReplies
+    .filter(reply => reply.isActive && reply.branchId === selectedConversation.value?.branchId)
+    .sort((a, b) => b.usageCount - a.usageCount || a.shortcut.localeCompare(b.shortcut))
+})
+
+const topQuickReplies = computed(() => activeQuickRepliesForConversation.value.slice(0, 6))
+
+const slashQuickReplyMatches = computed(() => {
+  const value = draft.value.trim()
+  if (!value.startsWith('/') || value.length < 2 || selectedFile.value) return []
+  const query = normalizeQuickReplyShortcut(value)
+  return activeQuickRepliesForConversation.value
+    .filter(reply => reply.shortcut.includes(query))
+    .slice(0, 8)
 })
 
 async function reloadConversations() {
@@ -602,6 +755,104 @@ async function sendAddressConfirmationRequest() {
   }
 }
 
+function normalizeQuickReplyShortcut(value: string) {
+  return value.trim().replace(/^\/+/, '').trim().toLowerCase()
+}
+
+function findQuickReplyCommand(value: string) {
+  const trimmed = value.trim()
+  if (!trimmed.startsWith('/') || /\s/.test(trimmed)) return null
+  const shortcut = normalizeQuickReplyShortcut(trimmed)
+  return activeQuickRepliesForConversation.value.find(reply => reply.shortcut === shortcut) ?? null
+}
+
+async function sendQuickReply(reply: WhatsAppQuickReply) {
+  if (!selectedConversation.value) return
+  try {
+    sending.value = true
+    sendError.value = ''
+    await whatsappStore.sendQuickReply(selectedConversation.value.id, reply.id)
+    draft.value = ''
+    await scrollToBottom()
+  } catch (error: any) {
+    sendError.value = error.message || 'No se pudo enviar la respuesta rápida.'
+  } finally {
+    sending.value = false
+  }
+}
+
+function defaultQuickReplyBranchId() {
+  return selectedConversation.value?.branchId
+    || selectedBranchId.value
+    || whatsappStore.enabledBranchIds[0]
+    || null
+}
+
+async function loadQuickReplies() {
+  await whatsappStore.fetchQuickReplies()
+}
+
+function resetQuickReplyForm() {
+  editingQuickReply.value = null
+  quickReplyError.value = ''
+  quickReplyForm.value = {
+    id: null,
+    branchId: defaultQuickReplyBranchId(),
+    shortcut: '',
+    messageTemplate: '',
+    isActive: true,
+  }
+}
+
+async function openQuickRepliesModal() {
+  resetQuickReplyForm()
+  showQuickRepliesModal.value = true
+  try {
+    await loadQuickReplies()
+  } catch (error: any) {
+    quickReplyError.value = error.message || 'No se pudieron cargar las respuestas rápidas.'
+  }
+}
+
+function editQuickReply(reply: WhatsAppQuickReply) {
+  editingQuickReply.value = reply
+  quickReplyError.value = ''
+  quickReplyForm.value = {
+    id: reply.id,
+    branchId: reply.branchId,
+    shortcut: reply.shortcut,
+    messageTemplate: reply.messageTemplate,
+    isActive: reply.isActive,
+  }
+}
+
+async function saveQuickReply() {
+  try {
+    quickReplySaving.value = true
+    quickReplyError.value = ''
+    await whatsappStore.saveQuickReply({
+      ...quickReplyForm.value,
+      shortcut: normalizeQuickReplyShortcut(quickReplyForm.value.shortcut),
+    })
+    resetQuickReplyForm()
+    success('Respuesta guardada', 2200)
+  } catch (error: any) {
+    quickReplyError.value = error.message || 'No se pudo guardar la respuesta rápida.'
+  } finally {
+    quickReplySaving.value = false
+  }
+}
+
+async function removeQuickReply(reply: WhatsAppQuickReply) {
+  if (!window.confirm(`¿Eliminar /${reply.shortcut}?`)) return
+  try {
+    await whatsappStore.deleteQuickReply(reply.id)
+    if (editingQuickReply.value?.id === reply.id) resetQuickReplyForm()
+  } catch (error: any) {
+    quickReplyError.value = error.message || 'No se pudo eliminar la respuesta rápida.'
+  }
+}
+
 async function createCustomerFromConversation(data: CustomerFormData) {
   if (!selectedConversation.value) return
   try {
@@ -670,6 +921,12 @@ async function takeOrderFromWhatsApp() {
 
 async function sendMessage() {
   if (!selectedConversation.value || (!draft.value.trim() && !selectedFile.value)) return
+  const quickReply = !selectedFile.value ? findQuickReplyCommand(draft.value) : null
+  if (quickReply) {
+    await sendQuickReply(quickReply)
+    return
+  }
+
   try {
     sending.value = true
     sendError.value = ''
@@ -773,6 +1030,7 @@ onMounted(async () => {
   try {
     await whatsappStore.ensureStatus(0)
     if (whatsappStore.enabled) {
+      await whatsappStore.fetchQuickReplies()
       await reloadConversations()
     }
   } finally {
