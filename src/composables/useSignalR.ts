@@ -6,9 +6,19 @@ export function useSignalR(hubUrl: string) {
     const connection = ref<signalR.HubConnection | null>(null)
     const isConnected = ref(false)
     const error = ref<string | null>(null)
+    const handlers = new Map<string, Set<(...args: any[]) => void>>()
+
+    const registerHandlers = () => {
+        if (!connection.value) return
+        handlers.forEach((callbacks, eventName) => {
+            connection.value?.off(eventName)
+            callbacks.forEach(callback => connection.value?.on(eventName, callback))
+        })
+    }
 
     const connect = async () => {
         try {
+            if (connection.value) return
             connection.value = new signalR.HubConnectionBuilder()
                 .withUrl(hubUrl, {
                     accessTokenFactory: () => {
@@ -20,6 +30,8 @@ export function useSignalR(hubUrl: string) {
                 })
                 .configureLogging(signalR.LogLevel.Information)
                 .build()
+
+            registerHandlers()
 
             connection.value.onreconnecting(() => {
                 isConnected.value = false
@@ -54,15 +66,21 @@ export function useSignalR(hubUrl: string) {
     }
 
     const on = (eventName: string, callback: (...args: any[]) => void) => {
-        if (connection.value) {
-            connection.value.on(eventName, callback)
-        }
+        const callbacks = handlers.get(eventName) ?? new Set<(...args: any[]) => void>()
+        callbacks.add(callback)
+        handlers.set(eventName, callbacks)
+        connection.value?.on(eventName, callback)
     }
 
-    const off = (eventName: string) => {
-        if (connection.value) {
-            connection.value.off(eventName)
+    const off = (eventName: string, callback?: (...args: any[]) => void) => {
+        if (callback) {
+            handlers.get(eventName)?.delete(callback)
+            connection.value?.off(eventName, callback)
+            return
         }
+
+        handlers.delete(eventName)
+        connection.value?.off(eventName)
     }
 
     onMounted(() => {

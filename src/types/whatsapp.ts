@@ -90,3 +90,9 @@ export interface WhatsAppConversationFilters {
   status?: WhatsAppConversation['status']
   unreadOnly?: boolean
 }
+
+export interface WhatsAppRealtimeMessagePayload {
+  branchId: number
+  conversation: WhatsAppConversation
+  message: WhatsAppMessage
+}

@@ -307,7 +307,9 @@ import { useOrdersDraftsStore } from '@/store/ordersDrafts'
 import { customerApi } from '@/services/MainAPI/customerApi'
 import { whatsappApi } from '@/services/MainAPI/whatsappApi'
 import { useToast } from '@/composables/useToast'
-import type { WhatsAppConversation, WhatsAppMessage } from '@/types/whatsapp'
+import { useSignalR } from '@/composables/useSignalR'
+import { WHATSAPP_SIGNALR_HUB_URL } from '@/config/signalr'
+import type { WhatsAppConversation, WhatsAppMessage, WhatsAppRealtimeMessagePayload } from '@/types/whatsapp'
 import type { Customer, CustomerAddress, CustomerFormData } from '@/types/customer'
 
 const whatsappStore = useWhatsAppStore()
@@ -315,6 +317,7 @@ const ordersStore = useOrdersDraftsStore()
 const router = useRouter()
 const route = useRoute()
 const { success, error: showError } = useToast()
+const { on: onSignalR, off: offSignalR } = useSignalR(WHATSAPP_SIGNALR_HUB_URL)
 const loadingStatus = ref(true)
 const selectedConversation = ref<WhatsAppConversation | null>(null)
 const selectedCustomer = ref<Customer | null>(null)
@@ -335,7 +338,6 @@ const sendError = ref('')
 const contextError = ref('')
 const addressSelectionNote = ref('')
 const messagesEnd = ref<HTMLElement | null>(null)
-let pollingId: number | undefined
 let searchTimeout: number | undefined
 
 const currentMessages = computed<WhatsAppMessage[]>(() =>
@@ -392,10 +394,41 @@ async function selectConversationFromRoute() {
   }
 }
 
-async function refreshSelectedMessages() {
-  if (!selectedConversation.value) return
-  await whatsappStore.fetchMessages(selectedConversation.value.id)
-  applyAddressSelectionFromLatestInboundMessage()
+function conversationMatchesCurrentFilters(conversation: WhatsAppConversation) {
+  if (selectedBranchId.value && conversation.branchId !== selectedBranchId.value) return false
+  if (unreadOnly.value && conversation.unreadCount <= 0) return false
+
+  const term = search.value.trim().toLowerCase()
+  if (!term) return true
+
+  return [
+    conversation.phoneNumber,
+    conversation.contactName,
+    conversation.customerName,
+    conversation.branchName,
+  ].some(value => (value || '').toLowerCase().includes(term))
+}
+
+async function handleRealtimeMessage(payload: WhatsAppRealtimeMessagePayload) {
+  if (!payload?.conversation?.id || !payload?.message?.id) return
+
+  const activeConversationId = selectedConversation.value?.id ?? null
+  const isActiveConversation = activeConversationId === payload.conversation.id
+  if (!isActiveConversation && !conversationMatchesCurrentFilters(payload.conversation)) return
+
+  whatsappStore.applyRealtimeMessage(payload, activeConversationId)
+
+  if (!isActiveConversation) return
+
+  const refreshed = whatsappStore.conversations.find(c => c.id === payload.conversation.id)
+  if (refreshed) {
+    selectedConversation.value = refreshed
+  }
+
+  if (payload.message.direction === 'inbound') {
+    applyAddressSelectionFromLatestInboundMessage()
+  }
+
   await scrollToBottom()
 }
 
@@ -736,14 +769,11 @@ function mediaFallbackLabel(message: WhatsAppMessage) {
 }
 
 onMounted(async () => {
+  onSignalR('WhatsAppMessageCreated', handleRealtimeMessage)
   try {
     await whatsappStore.ensureStatus(0)
     if (whatsappStore.enabled) {
       await reloadConversations()
-      pollingId = window.setInterval(() => {
-        void reloadConversations()
-        void refreshSelectedMessages()
-      }, 12000)
     }
   } finally {
     loadingStatus.value = false
@@ -751,7 +781,7 @@ onMounted(async () => {
 })
 
 onBeforeUnmount(() => {
-  if (pollingId) window.clearInterval(pollingId)
+  offSignalR('WhatsAppMessageCreated', handleRealtimeMessage)
   if (searchTimeout) window.clearTimeout(searchTimeout)
 })
 

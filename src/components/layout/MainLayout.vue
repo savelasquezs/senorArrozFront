@@ -65,6 +65,9 @@ import { PlusIcon } from '@heroicons/vue/24/outline';
 import { useToast } from '@/composables/useToast';
 import { useNotifications } from '@/composables/useNotifications';
 import { useNotificationSound } from '@/composables/useNotificationSound';
+import { useSignalR } from '@/composables/useSignalR';
+import { WHATSAPP_SIGNALR_HUB_URL } from '@/config/signalr';
+import type { WhatsAppRealtimeMessagePayload } from '@/types/whatsapp';
 
 interface Props {
 	pageTitle?: string;
@@ -79,6 +82,7 @@ const whatsappStore = useWhatsAppStore();
 const { toasts, removeToast } = useToast();
 const { permission, requestPermission, notify } = useNotifications();
 const { playWhatsAppMessageSound } = useNotificationSound();
+const { on: onWhatsAppSignalR, off: offWhatsAppSignalR } = useSignalR(WHATSAPP_SIGNALR_HUB_URL);
 
 const sidebarOpen = ref(false);
 let whatsAppPollingId: number | undefined;
@@ -103,6 +107,10 @@ const canTakeOrders = computed(() => {
 // Check if we're on orders page (don't show FAB there)
 const isOrdersPage = computed(() => {
 	return route.path.startsWith('/orders');
+});
+
+const isWhatsAppPage = computed(() => {
+	return route.path.startsWith('/whatsapp');
 });
 
 // Navigate to new order
@@ -154,6 +162,27 @@ async function refreshWhatsAppUnreadSummary(options?: { notifyNewMessages?: bool
 	}
 }
 
+async function handleWhatsAppRealtimeMessage(payload: WhatsAppRealtimeMessagePayload) {
+	if (!authStore.isAuthenticated || !canTakeOrders.value || !payload?.message?.id) return;
+	if (payload.message.direction !== 'inbound') return;
+
+	previousWhatsAppLatestMessageAt = payload.message.timestamp;
+	whatsAppSummaryInitialized = true;
+
+	if (!isWhatsAppPage.value) {
+		whatsappStore.applyRealtimeMessage(payload, null);
+	}
+
+	await playWhatsAppMessageSound();
+	if (permission.value === 'granted') {
+		const name = payload.conversation?.contactName || payload.conversation?.customerName || payload.conversation?.phoneNumber || 'WhatsApp';
+		notify('Nuevo mensaje de WhatsApp', {
+			body: String(name),
+			tag: `whatsapp-${payload.message.id}`,
+		});
+	}
+}
+
 function startWhatsAppUnreadPolling() {
 	if (!authStore.isAuthenticated || !canTakeOrders.value || whatsAppPollingId) return;
 
@@ -164,7 +193,7 @@ function startWhatsAppUnreadPolling() {
 
 	whatsAppPollingId = window.setInterval(() => {
 		void refreshWhatsAppUnreadSummary({ notifyNewMessages: true });
-	}, 12000);
+	}, 60000);
 }
 
 function stopWhatsAppUnreadPolling() {
@@ -178,6 +207,7 @@ onMounted(() => {
 	if (!authStore.isAuthenticated || !canTakeOrders.value) {
 		return;
 	}
+	onWhatsAppSignalR('WhatsAppMessageCreated', handleWhatsAppRealtimeMessage);
 	startWhatsAppUnreadPolling();
 	// En detalle de sucursal, el GET /Branches/:id es pesado; retrasar el prefetch evita competir por red/DB.
 	if (isBranchDetailPath(route.path)) {
@@ -188,6 +218,7 @@ onMounted(() => {
 });
 
 onBeforeUnmount(() => {
+	offWhatsAppSignalR('WhatsAppMessageCreated', handleWhatsAppRealtimeMessage);
 	stopWhatsAppUnreadPolling();
 });
 </script>

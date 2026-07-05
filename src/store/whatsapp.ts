@@ -5,6 +5,7 @@ import type {
   WhatsAppConversation,
   WhatsAppConversationFilters,
   WhatsAppMessage,
+  WhatsAppRealtimeMessagePayload,
   WhatsAppStatus,
   WhatsAppUnreadSummary,
 } from '@/types/whatsapp'
@@ -102,7 +103,7 @@ export const useWhatsAppStore = defineStore('whatsapp', () => {
     const res = await whatsappApi.sendMessage(conversationId, text)
     const message = res.data
     if (message) {
-      messages.value[conversationId] = [...(messages.value[conversationId] ?? []), message]
+      upsertMessage(conversationId, message)
       const conversation = conversations.value.find(c => c.id === conversationId)
       if (conversation) {
         conversation.lastMessageAt = message.timestamp
@@ -116,7 +117,7 @@ export const useWhatsAppStore = defineStore('whatsapp', () => {
     const res = await whatsappApi.sendMediaMessage(conversationId, file, caption)
     const message = res.data
     if (message) {
-      messages.value[conversationId] = [...(messages.value[conversationId] ?? []), message]
+      upsertMessage(conversationId, message)
       const conversation = conversations.value.find(c => c.id === conversationId)
       if (conversation) {
         conversation.lastMessageAt = message.timestamp
@@ -136,6 +137,64 @@ export const useWhatsAppStore = defineStore('whatsapp', () => {
       sticker: 'Sticker',
     }
     return labels[type] || 'Archivo'
+  }
+
+  function upsertMessage(conversationId: number, message: WhatsAppMessage) {
+    const existing = messages.value[conversationId] ?? []
+    const index = existing.findIndex(x => x.id === message.id)
+    messages.value[conversationId] = index >= 0
+      ? existing.map(x => x.id === message.id ? message : x)
+      : [...existing, message].sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime() || a.id - b.id)
+  }
+
+  function applyRealtimeMessage(payload: WhatsAppRealtimeMessagePayload, activeConversationId?: number | null) {
+    const incomingConversation = { ...payload.conversation }
+    const incomingMessage = payload.message
+    const existingConversation = conversations.value.find(c => c.id === incomingConversation.id)
+    const previousUnread = existingConversation?.unreadCount ?? 0
+    const isActiveConversation = activeConversationId === incomingConversation.id
+
+    if (isActiveConversation) {
+      incomingConversation.unreadCount = 0
+    }
+
+    if (existingConversation) {
+      Object.assign(existingConversation, incomingConversation)
+    } else {
+      conversations.value = [incomingConversation, ...conversations.value]
+    }
+
+    conversations.value = [...conversations.value].sort(
+      (a, b) =>
+        new Date(b.lastMessageAt ?? b.updatedAt ?? b.createdAt).getTime()
+        - new Date(a.lastMessageAt ?? a.updatedAt ?? a.createdAt).getTime(),
+    )
+
+    upsertMessage(incomingMessage.conversationId, incomingMessage)
+
+    if (incomingMessage.direction !== 'inbound') return
+
+    if (isActiveConversation) {
+      unreadSummary.value = {
+        ...unreadSummary.value,
+        totalUnread: Math.max(0, unreadSummary.value.totalUnread - previousUnread),
+        unreadConversations: Math.max(0, unreadSummary.value.unreadConversations - (previousUnread > 0 ? 1 : 0)),
+        latestMessageAt: incomingMessage.timestamp,
+      }
+      return
+    }
+
+    const nextUnread = incomingConversation.unreadCount
+    const delta = existingConversation ? Math.max(0, nextUnread - previousUnread) : Math.max(1, nextUnread)
+    unreadSummary.value = {
+      totalUnread: Math.max(0, unreadSummary.value.totalUnread + delta),
+      unreadConversations: Math.max(
+        0,
+        unreadSummary.value.unreadConversations
+          + (previousUnread === 0 && nextUnread > 0 ? 1 : 0),
+      ),
+      latestMessageAt: incomingMessage.timestamp,
+    }
   }
 
   function clear() {
@@ -165,6 +224,7 @@ export const useWhatsAppStore = defineStore('whatsapp', () => {
     fetchMessages,
     sendMessage,
     sendMediaMessage,
+    applyRealtimeMessage,
     clear,
   }
 })
