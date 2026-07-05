@@ -45,6 +45,10 @@ class WhatsAppApi extends BaseApi {
     return this.get<ApiResponse<WhatsAppMessage[]>>(`/whatsapp/conversations/${conversationId}/messages`)
   }
 
+  linkConversationCustomer(conversationId: number, customerId: number): Promise<ApiResponse<WhatsAppConversation>> {
+    return this.post<ApiResponse<WhatsAppConversation>>(`/whatsapp/conversations/${conversationId}/customer`, { customerId })
+  }
+
   sendMessage(conversationId: number, text: string): Promise<ApiResponse<WhatsAppMessage>> {
     return this.post<ApiResponse<WhatsAppMessage>>(`/whatsapp/conversations/${conversationId}/messages`, { text })
   }

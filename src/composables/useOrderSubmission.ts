@@ -13,7 +13,7 @@ export function useOrderSubmission() {
     const transformDraftToCreateDto = (draft: DraftOrder): CreateOrderDto => {
         // Get user and branch info
         const takenById = authStore.user?.id
-        const branchId = authStore.branchId
+        const branchId = draft.branchId || authStore.branchId
 
         if (!takenById || !branchId) {
             throw new Error('Usuario o sucursal no disponible')
@@ -128,4 +128,3 @@ export function useOrderSubmission() {
         submitOrder
     }
 }
-

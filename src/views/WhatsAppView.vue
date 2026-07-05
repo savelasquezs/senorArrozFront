@@ -47,7 +47,11 @@
         </div>
       </div>
 
-      <div v-else class="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-[360px_minmax(0,1fr)]">
+      <div
+        v-else
+        class="relative flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-[340px_minmax(0,1fr)]"
+        :class="selectedConversation && !contextPanelCollapsed ? 'xl:grid-cols-[340px_minmax(0,1fr)_360px]' : ''"
+      >
         <aside class="min-h-0 border-r border-gray-200 bg-white flex flex-col">
           <div class="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
             <span class="text-sm font-medium text-gray-700">Conversaciones</span>
@@ -84,12 +88,17 @@
         </aside>
 
         <section class="min-h-0 flex flex-col bg-gray-50">
-          <div v-if="selectedConversation" class="border-b border-gray-200 bg-white px-4 py-3">
+          <div v-if="selectedConversation" class="border-b border-gray-200 bg-white px-4 py-3 flex items-start justify-between gap-3">
+            <div>
             <p class="font-semibold text-gray-900">{{ conversationTitle(selectedConversation) }}</p>
             <p class="text-sm text-gray-500">
               {{ formatPhone(selectedConversation.phoneNumber) }}
               <span v-if="selectedConversation.branchName"> · {{ selectedConversation.branchName }}</span>
             </p>
+            </div>
+            <BaseButton variant="ghost" size="sm" @click="contextPanelCollapsed = !contextPanelCollapsed">
+              {{ contextPanelCollapsed ? 'Abrir pedido' : 'Contraer' }}
+            </BaseButton>
           </div>
 
           <div v-if="!selectedConversation" class="flex-1 grid place-items-center p-6 text-center text-gray-500">
@@ -187,13 +196,77 @@
             </form>
           </template>
         </section>
+
+        <button
+          v-if="selectedConversation && contextPanelCollapsed"
+          type="button"
+          class="absolute right-0 top-1/2 z-10 -translate-y-1/2 rounded-l-lg border border-emerald-200 bg-emerald-600 px-3 py-4 text-sm font-medium text-white shadow-lg hover:bg-emerald-700"
+          @click="contextPanelCollapsed = false"
+        >
+          Pedido
+        </button>
+
+        <aside v-if="selectedConversation && !contextPanelCollapsed" class="min-h-0 border-l border-gray-200 bg-white flex flex-col">
+          <div class="border-b border-gray-100 px-4 py-3">
+            <p class="text-sm font-semibold text-gray-900">Contexto del pedido</p>
+            <p class="mt-0.5 text-xs text-gray-500">{{ formatPhone(selectedConversation.phoneNumber) }}</p>
+          </div>
+
+          <div class="flex-1 min-h-0 overflow-y-auto p-4 space-y-4">
+            <div v-if="contextLoading">
+              <BaseLoading text="Cargando cliente..." />
+            </div>
+
+            <template v-else>
+              <div v-if="selectedCustomer" class="space-y-3">
+                <div class="rounded-lg border border-emerald-200 bg-emerald-50 p-3">
+                  <p class="text-sm font-semibold text-emerald-950">{{ selectedCustomer.name }}</p>
+                  <p class="mt-1 text-sm text-emerald-800">{{ selectedCustomer.phone1 }}</p>
+                  <p v-if="selectedCustomer.phone2" class="text-sm text-emerald-800">{{ selectedCustomer.phone2 }}</p>
+                </div>
+
+                <AddressSelector
+                  :customer-id="selectedCustomer.id"
+                  :selected-address="selectedAddress?.id || undefined"
+                  mode="persisted"
+                  @address-selected="onContextAddressSelected"
+                />
+
+                <BaseButton
+                  class="w-full"
+                  variant="primary"
+                  :disabled="!selectedAddress || takingOrder"
+                  :loading="takingOrder"
+                  @click="takeOrderFromWhatsApp"
+                >
+                  Tomar pedido
+                </BaseButton>
+              </div>
+
+              <div v-else class="space-y-3">
+                <div class="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950">
+                  No encontramos un cliente con este teléfono. Crea el cliente y su dirección para continuar.
+                </div>
+                <CustomerForm
+                  :initial-phone="initialCustomerPhone"
+                  submit-button-text="Crear cliente"
+                  :loading="creatingCustomer"
+                  @submit="createCustomerFromConversation"
+                />
+              </div>
+
+              <p v-if="contextError" class="text-sm text-red-600">{{ contextError }}</p>
+            </template>
+          </div>
+        </aside>
       </div>
     </div>
   </MainLayout>
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import {
   ChatBubbleLeftRightIcon,
   ChatBubbleOvalLeftEllipsisIcon,
@@ -205,12 +278,25 @@ import {
 import MainLayout from '@/components/layout/MainLayout.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseLoading from '@/components/ui/BaseLoading.vue'
+import CustomerForm from '@/components/customers/CustomerForm.vue'
+import AddressSelector from '@/components/customers/address/AddressSelector.vue'
 import { useWhatsAppStore } from '@/store/whatsapp'
+import { useOrdersDraftsStore } from '@/store/ordersDrafts'
+import { customerApi } from '@/services/MainAPI/customerApi'
+import { whatsappApi } from '@/services/MainAPI/whatsappApi'
+import { useToast } from '@/composables/useToast'
 import type { WhatsAppConversation, WhatsAppMessage } from '@/types/whatsapp'
+import type { Customer, CustomerAddress, CustomerFormData } from '@/types/customer'
 
 const whatsappStore = useWhatsAppStore()
+const ordersStore = useOrdersDraftsStore()
+const router = useRouter()
+const route = useRoute()
+const { success, error: showError } = useToast()
 const loadingStatus = ref(true)
 const selectedConversation = ref<WhatsAppConversation | null>(null)
+const selectedCustomer = ref<Customer | null>(null)
+const selectedAddress = ref<CustomerAddress | null>(null)
 const selectedBranchId = ref(0)
 const search = ref('')
 const unreadOnly = ref(false)
@@ -218,7 +304,12 @@ const draft = ref('')
 const selectedFile = ref<File | null>(null)
 const fileInput = ref<HTMLInputElement | null>(null)
 const sending = ref(false)
+const contextLoading = ref(false)
+const creatingCustomer = ref(false)
+const takingOrder = ref(false)
+const contextPanelCollapsed = ref(false)
 const sendError = ref('')
+const contextError = ref('')
 const messagesEnd = ref<HTMLElement | null>(null)
 let pollingId: number | undefined
 let searchTimeout: number | undefined
@@ -228,6 +319,11 @@ const currentMessages = computed<WhatsAppMessage[]>(() =>
 )
 
 const showBranchFilter = computed(() => whatsappStore.enabledBranchIds.length > 1)
+
+const initialCustomerPhone = computed(() => {
+  const digits = selectedConversation.value?.phoneNumber?.replace(/\D/g, '') ?? ''
+  return digits.length > 10 ? digits.slice(-10) : digits
+})
 
 const branchOptions = computed(() => {
   const labels = new Map<number, string>()
@@ -251,18 +347,125 @@ async function reloadConversations() {
     const refreshed = whatsappStore.conversations.find(c => c.id === selectedConversation.value?.id)
     selectedConversation.value = refreshed ?? null
   }
+  await selectConversationFromRoute()
 }
 
 async function selectConversation(conversation: WhatsAppConversation) {
   selectedConversation.value = conversation
   await whatsappStore.fetchMessages(conversation.id)
+  await loadConversationContext(conversation)
   await scrollToBottom()
+}
+
+async function selectConversationFromRoute() {
+  const id = Number(route.query.conversationId || 0)
+  if (!id || selectedConversation.value?.id === id) return
+  const conversation = whatsappStore.conversations.find(c => c.id === id)
+  if (conversation) {
+    await selectConversation(conversation)
+  }
 }
 
 async function refreshSelectedMessages() {
   if (!selectedConversation.value) return
   await whatsappStore.fetchMessages(selectedConversation.value.id)
   await scrollToBottom()
+}
+
+async function loadConversationContext(conversation: WhatsAppConversation) {
+  selectedCustomer.value = null
+  selectedAddress.value = null
+  contextError.value = ''
+  if (!conversation.customerId) return
+
+  try {
+    contextLoading.value = true
+    const customerRes = await customerApi.getCustomerById(conversation.customerId)
+    const customer = customerRes.data
+    if (!customer) return
+
+    let addresses: CustomerAddress[] = customer.addresses ?? []
+    if (addresses.length === 0) {
+      const addressRes = await customerApi.getCustomerAddresses(customer.id)
+      addresses = addressRes.data ?? []
+    }
+
+    selectedCustomer.value = { ...customer, addresses }
+    selectedAddress.value = addresses.find(a => a.isPrimary) ?? addresses[0] ?? null
+  } catch (error: any) {
+    contextError.value = error.message || 'No se pudo cargar el cliente.'
+  } finally {
+    contextLoading.value = false
+  }
+}
+
+function onContextAddressSelected(address?: CustomerAddress) {
+  selectedAddress.value = address ?? null
+}
+
+async function createCustomerFromConversation(data: CustomerFormData) {
+  if (!selectedConversation.value) return
+  try {
+    creatingCustomer.value = true
+    contextError.value = ''
+    const res = await customerApi.createCustomer({
+      name: data.name,
+      phone1: data.phone1,
+      phone2: data.phone2,
+      branchId: selectedConversation.value.branchId,
+      initialAddress: data.initialAddress
+        ? {
+            neighborhoodId: data.initialAddress.neighborhoodId,
+            address: data.initialAddress.address,
+            additionalInfo: data.initialAddress.additionalInfo,
+            latitude: data.initialAddress.latitude ?? 0,
+            longitude: data.initialAddress.longitude ?? 0,
+            isPrimary: data.initialAddress.isPrimary ?? true,
+            deliveryFee: data.initialAddress.deliveryFee,
+          }
+        : undefined,
+    })
+    const customer = res.data
+    if (!customer?.id) throw new Error('No se pudo crear el cliente.')
+
+    let addresses = customer.addresses ?? []
+    if (addresses.length === 0) {
+      const addressRes = await customerApi.getCustomerAddresses(customer.id)
+      addresses = addressRes.data ?? []
+    }
+
+    const linked = await whatsappApi.linkConversationCustomer(selectedConversation.value.id, customer.id)
+    selectedConversation.value = linked.data ?? { ...selectedConversation.value, customerId: customer.id, customerName: customer.name }
+    selectedCustomer.value = { ...customer, addresses }
+    selectedAddress.value = addresses.find(a => a.isPrimary) ?? addresses[0] ?? null
+    success('Cliente creado', 2500, 'La conversación quedó vinculada al cliente.')
+  } catch (error: any) {
+    contextError.value = error.message || 'No se pudo crear el cliente.'
+    showError('Cliente', contextError.value)
+  } finally {
+    creatingCustomer.value = false
+  }
+}
+
+async function takeOrderFromWhatsApp() {
+  if (!selectedConversation.value || !selectedCustomer.value || !selectedAddress.value) return
+  try {
+    takingOrder.value = true
+    const draftOrder = ordersStore.createOrReuseWhatsAppDraft({
+      conversationId: selectedConversation.value.id,
+      branchId: selectedConversation.value.branchId,
+      customer: selectedCustomer.value,
+      address: selectedAddress.value,
+    })
+    if (!draftOrder) {
+      showError('Pedido', ordersStore.error || 'No se pudo crear el borrador.')
+      return
+    }
+    localStorage.setItem('senor-arroz-whatsapp-conversation-tab', String(selectedConversation.value.id))
+    await router.push({ name: 'OrdersNew' })
+  } finally {
+    takingOrder.value = false
+  }
 }
 
 async function sendMessage() {
@@ -384,4 +587,11 @@ onBeforeUnmount(() => {
   if (pollingId) window.clearInterval(pollingId)
   if (searchTimeout) window.clearTimeout(searchTimeout)
 })
+
+watch(
+  () => route.query.conversationId,
+  () => {
+    void selectConversationFromRoute()
+  }
+)
 </script>
