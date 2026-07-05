@@ -43,6 +43,12 @@ export interface WhatsAppStatus {
   branchIds: number[]
 }
 
+export interface WhatsAppUnreadSummary {
+  totalUnread: number
+  unreadConversations: number
+  latestMessageAt?: string | null
+}
+
 export interface WhatsAppConversation {
   id: number
   branchId: number

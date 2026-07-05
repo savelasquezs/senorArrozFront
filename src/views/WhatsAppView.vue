@@ -193,6 +193,7 @@ async function reloadConversations() {
     search: search.value.trim() || undefined,
     unreadOnly: unreadOnly.value || undefined,
   })
+  await whatsappStore.fetchUnreadSummary()
   if (selectedConversation.value) {
     const refreshed = whatsappStore.conversations.find(c => c.id === selectedConversation.value?.id)
     selectedConversation.value = refreshed ?? null

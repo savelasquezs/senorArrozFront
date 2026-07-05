@@ -8,6 +8,7 @@ import type {
   WhatsAppMessage,
   WhatsAppStatus,
   WhatsAppTestConnectionResult,
+  WhatsAppUnreadSummary,
 } from '@/types/whatsapp'
 
 export function whatsappWebhookUrl(): string {
@@ -18,6 +19,10 @@ export function whatsappWebhookUrl(): string {
 class WhatsAppApi extends BaseApi {
   getStatus(): Promise<ApiResponse<WhatsAppStatus>> {
     return this.get<ApiResponse<WhatsAppStatus>>('/whatsapp/status')
+  }
+
+  getUnreadSummary(): Promise<ApiResponse<WhatsAppUnreadSummary>> {
+    return this.get<ApiResponse<WhatsAppUnreadSummary>>('/whatsapp/unread-summary')
   }
 
   getBranchSetting(branchId: number): Promise<ApiResponse<WhatsAppBranchSetting>> {

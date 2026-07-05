@@ -53,7 +53,14 @@
 						'group flex items-center px-3 py-2 text-sm font-medium rounded-xl transition-colors gap-3',
 					]" @click="$emit('close')">
 						<component :is="item.icon" class="h-4 w-4 flex-shrink-0" />
-						<span class="text-sm">{{ item.name }}</span>
+						<span class="text-sm flex-1">{{ item.name }}</span>
+						<span
+							v-if="item.requiresWhatsApp && whatsappStore.unreadTotal > 0"
+							class="min-w-5 rounded-full bg-red-600 px-1.5 py-0.5 text-center text-[10px] font-semibold leading-none text-white"
+							title="Conversaciones sin leer"
+						>
+							{{ unreadBadgeText }}
+						</span>
 					</router-link>
 				</template>
 			</nav>
@@ -235,6 +242,10 @@ const hasPermission = (roles: string[], item?: NavItem): boolean => {
 	if (item?.requiresWhatsApp) return whatsappStore.enabled;
 	return true;
 };
+
+const unreadBadgeText = computed(() =>
+	whatsappStore.unreadTotal > 99 ? '99+' : String(whatsappStore.unreadTotal),
+);
 
 function loadWhatsAppStatus() {
 	if (!authStore.isAuthenticated) return;

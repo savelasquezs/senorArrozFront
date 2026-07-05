@@ -6,10 +6,12 @@ import type {
   WhatsAppConversationFilters,
   WhatsAppMessage,
   WhatsAppStatus,
+  WhatsAppUnreadSummary,
 } from '@/types/whatsapp'
 
 export const useWhatsAppStore = defineStore('whatsapp', () => {
   const status = ref<WhatsAppStatus | null>(null)
+  const unreadSummary = ref<WhatsAppUnreadSummary>({ totalUnread: 0, unreadConversations: 0, latestMessageAt: null })
   const conversations = ref<WhatsAppConversation[]>([])
   const messages = ref<Record<number, WhatsAppMessage[]>>({})
   const isLoadingStatus = ref(false)
@@ -20,6 +22,8 @@ export const useWhatsAppStore = defineStore('whatsapp', () => {
 
   const enabled = computed(() => status.value?.enabled === true)
   const enabledBranchIds = computed(() => status.value?.branchIds ?? [])
+  const unreadTotal = computed(() => unreadSummary.value.totalUnread)
+  const unreadConversationCount = computed(() => unreadSummary.value.unreadConversations)
 
   async function refreshStatus() {
     try {
@@ -41,6 +45,17 @@ export const useWhatsAppStore = defineStore('whatsapp', () => {
   async function ensureStatus(maxAgeMs = 60000) {
     if (status.value && Date.now() - statusLoadedAt < maxAgeMs) return status.value
     return refreshStatus()
+  }
+
+  async function fetchUnreadSummary() {
+    if (!enabled.value) {
+      unreadSummary.value = { totalUnread: 0, unreadConversations: 0, latestMessageAt: null }
+      return unreadSummary.value
+    }
+
+    const res = await whatsappApi.getUnreadSummary()
+    unreadSummary.value = res.data ?? { totalUnread: 0, unreadConversations: 0, latestMessageAt: null }
+    return unreadSummary.value
   }
 
   async function fetchConversations(filters?: WhatsAppConversationFilters) {
@@ -65,7 +80,15 @@ export const useWhatsAppStore = defineStore('whatsapp', () => {
       const res = await whatsappApi.getMessages(conversationId)
       messages.value[conversationId] = res.data ?? []
       const conversation = conversations.value.find(c => c.id === conversationId)
-      if (conversation) conversation.unreadCount = 0
+      if (conversation && conversation.unreadCount > 0) {
+        const previousUnread = conversation.unreadCount
+        conversation.unreadCount = 0
+        unreadSummary.value = {
+          ...unreadSummary.value,
+          totalUnread: Math.max(0, unreadSummary.value.totalUnread - previousUnread),
+          unreadConversations: Math.max(0, unreadSummary.value.unreadConversations - 1),
+        }
+      }
       return messages.value[conversationId]
     } catch (err: any) {
       error.value = err.message || 'No se pudieron cargar los mensajes'
@@ -92,11 +115,13 @@ export const useWhatsAppStore = defineStore('whatsapp', () => {
   function clear() {
     conversations.value = []
     messages.value = {}
+    unreadSummary.value = { totalUnread: 0, unreadConversations: 0, latestMessageAt: null }
     error.value = null
   }
 
   return {
     status,
+    unreadSummary,
     conversations,
     messages,
     isLoadingStatus,
@@ -105,8 +130,11 @@ export const useWhatsAppStore = defineStore('whatsapp', () => {
     error,
     enabled,
     enabledBranchIds,
+    unreadTotal,
+    unreadConversationCount,
     refreshStatus,
     ensureStatus,
+    fetchUnreadSummary,
     fetchConversations,
     fetchMessages,
     sendMessage,
