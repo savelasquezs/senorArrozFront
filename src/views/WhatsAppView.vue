@@ -160,6 +160,14 @@
                     <span>{{ formatTime(message.timestamp) }}</span>
                     <span v-if="message.direction === 'outbound'">{{ statusLabel(message.status) }}</span>
                   </div>
+                  <button
+                    v-if="canUseMessageAsAddressSelection(message)"
+                    type="button"
+                    class="mt-2 rounded-md border border-gray-200 bg-gray-50 px-2 py-1 text-xs font-medium text-gray-700 hover:bg-gray-100"
+                    @click="useMessageAsAddressSelection(message)"
+                  >
+                    Usar respuesta para dirección
+                  </button>
                 </div>
               </div>
               <div ref="messagesEnd" />
@@ -231,6 +239,10 @@
                   mode="persisted"
                   @address-selected="onContextAddressSelected"
                 />
+
+                <p v-if="addressSelectionNote" class="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-900">
+                  {{ addressSelectionNote }}
+                </p>
 
                 <BaseButton
                   class="w-full"
@@ -321,6 +333,7 @@ const sendingAddressConfirmation = ref(false)
 const contextPanelCollapsed = ref(false)
 const sendError = ref('')
 const contextError = ref('')
+const addressSelectionNote = ref('')
 const messagesEnd = ref<HTMLElement | null>(null)
 let pollingId: number | undefined
 let searchTimeout: number | undefined
@@ -382,6 +395,7 @@ async function selectConversationFromRoute() {
 async function refreshSelectedMessages() {
   if (!selectedConversation.value) return
   await whatsappStore.fetchMessages(selectedConversation.value.id)
+  applyAddressSelectionFromLatestInboundMessage()
   await scrollToBottom()
 }
 
@@ -393,6 +407,7 @@ async function loadConversationContext(conversation: WhatsAppConversation) {
 
   try {
     contextLoading.value = true
+    addressSelectionNote.value = ''
     const customerRes = await customerApi.getCustomerById(conversation.customerId)
     const customer = customerRes.data
     if (!customer) return
@@ -405,6 +420,7 @@ async function loadConversationContext(conversation: WhatsAppConversation) {
 
     selectedCustomer.value = { ...customer, addresses }
     selectedAddress.value = addresses.find(a => a.isPrimary) ?? addresses[0] ?? null
+    applyAddressSelectionFromLatestInboundMessage()
   } catch (error: any) {
     contextError.value = error.message || 'No se pudo cargar el cliente.'
   } finally {
@@ -414,6 +430,7 @@ async function loadConversationContext(conversation: WhatsAppConversation) {
 
 function onContextAddressSelected(address?: CustomerAddress) {
   selectedAddress.value = address ?? null
+  addressSelectionNote.value = address ? 'Dirección seleccionada para el pedido.' : ''
   if (address && selectedCustomer.value) {
     const addresses = selectedCustomer.value.addresses ?? []
     const exists = addresses.some(a => a.id === address.id)
@@ -424,6 +441,89 @@ function onContextAddressSelected(address?: CustomerAddress) {
         : [...addresses, address],
     }
   }
+}
+
+function normalizeText(value?: string | null) {
+  return (value || '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9#\- ]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+function inferAddressFromChatText(text: string, addresses: CustomerAddress[]) {
+  const validAddresses = addresses.filter(a => a.address?.trim())
+  if (validAddresses.length === 0) return null
+
+  const normalized = normalizeText(text)
+  const numeric = normalized.match(/^(?:opcion\s*)?#?\s*(\d+)\b/)
+  if (numeric) {
+    const index = Number(numeric[1]) - 1
+    if (index >= 0 && index < validAddresses.length) return validAddresses[index]
+  }
+
+  if (
+    validAddresses.length === 1 &&
+    /\b(si|ok|okay|dale|correcto|confirmo|esa|esta|ahi|alli|alli es)\b/.test(normalized)
+  ) {
+    return validAddresses[0]
+  }
+
+  return validAddresses.find(address => {
+    const addressText = normalizeText(address.address)
+    const neighborhood = normalizeText(address.neighborhoodName || address.neighborhood?.name)
+    const fullLine = normalizeText(formatAddressLineForWhatsApp(address))
+    return (
+      (addressText.length >= 8 && normalized.includes(addressText.slice(0, Math.min(addressText.length, 18)))) ||
+      (neighborhood.length >= 4 && normalized.includes(neighborhood)) ||
+      (fullLine.length >= 8 && fullLine.includes(normalized) && normalized.length >= 6)
+    )
+  }) ?? null
+}
+
+function selectAddressFromChatText(text: string, manual = false) {
+  if (!selectedCustomer.value) return false
+  const address = inferAddressFromChatText(text, selectedCustomerAddresses.value)
+  if (!address) {
+    if (manual) {
+      contextError.value = 'No pude relacionar esa respuesta con una dirección guardada.'
+    }
+    return false
+  }
+
+  selectedAddress.value = address
+  addressSelectionNote.value = `Dirección seleccionada desde el chat: ${formatAddressLineForWhatsApp(address)}`
+  contextError.value = ''
+  return true
+}
+
+function latestInboundTextMessage() {
+  return [...currentMessages.value]
+    .reverse()
+    .find(message => message.direction === 'inbound' && message.type === 'text' && message.textBody?.trim())
+}
+
+function applyAddressSelectionFromLatestInboundMessage() {
+  if (!selectedCustomer.value || selectedCustomerAddresses.value.length === 0) return
+  const latest = latestInboundTextMessage()
+  if (!latest) return
+  selectAddressFromChatText(latest.textBody)
+}
+
+function canUseMessageAsAddressSelection(message: WhatsAppMessage) {
+  return (
+    message.direction === 'inbound' &&
+    message.type === 'text' &&
+    !!message.textBody?.trim() &&
+    !!selectedCustomer.value &&
+    selectedCustomerAddresses.value.length > 0
+  )
+}
+
+function useMessageAsAddressSelection(message: WhatsAppMessage) {
+  selectAddressFromChatText(message.textBody, true)
 }
 
 function formatAddressLineForWhatsApp(address: CustomerAddress): string {
@@ -504,6 +604,7 @@ async function createCustomerFromConversation(data: CustomerFormData) {
     selectedConversation.value = linked.data ?? { ...selectedConversation.value, customerId: customer.id, customerName: customer.name }
     selectedCustomer.value = { ...customer, addresses }
     selectedAddress.value = addresses.find(a => a.isPrimary) ?? addresses[0] ?? null
+    applyAddressSelectionFromLatestInboundMessage()
     success('Cliente creado', 2500, 'La conversación quedó vinculada al cliente.')
   } catch (error: any) {
     contextError.value = error.message || 'No se pudo crear el cliente.'
