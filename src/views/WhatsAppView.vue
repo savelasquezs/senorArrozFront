@@ -111,7 +111,42 @@
                   class="max-w-[78%] rounded-lg px-3 py-2 shadow-sm"
                   :class="message.direction === 'outbound' ? 'bg-emerald-600 text-white' : 'bg-white border border-gray-200 text-gray-900'"
                 >
-                  <p class="whitespace-pre-wrap break-words text-sm">{{ message.textBody }}</p>
+                  <div v-if="message.mediaUrl" class="mb-2">
+                    <img
+                      v-if="message.type === 'image' || message.type === 'sticker'"
+                      :src="message.mediaUrl"
+                      :alt="message.mediaFileName || 'Imagen de WhatsApp'"
+                      class="max-h-80 max-w-full rounded-md object-contain"
+                    />
+                    <audio
+                      v-else-if="message.type === 'audio'"
+                      :src="message.mediaUrl"
+                      controls
+                      class="w-72 max-w-full"
+                    />
+                    <video
+                      v-else-if="message.type === 'video'"
+                      :src="message.mediaUrl"
+                      controls
+                      class="max-h-80 max-w-full rounded-md"
+                    />
+                    <a
+                      v-else
+                      :href="message.mediaUrl"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      class="flex items-center gap-2 rounded-md border px-3 py-2 text-sm"
+                      :class="message.direction === 'outbound' ? 'border-emerald-200 bg-emerald-700 text-white' : 'border-gray-200 bg-gray-50 text-gray-800'"
+                    >
+                      <DocumentIcon class="h-5 w-5 shrink-0" />
+                      <span class="min-w-0 flex-1 truncate">{{ message.mediaFileName || 'Abrir archivo' }}</span>
+                      <span v-if="message.mediaFileSize" class="text-xs opacity-80">{{ formatFileSize(message.mediaFileSize) }}</span>
+                    </a>
+                  </div>
+                  <p v-if="message.textBody" class="whitespace-pre-wrap break-words text-sm">{{ message.textBody }}</p>
+                  <p v-else-if="message.type !== 'text' && !message.mediaUrl" class="text-sm opacity-80">
+                    {{ mediaFallbackLabel(message) }}
+                  </p>
                   <div class="mt-1 flex items-center justify-end gap-2 text-[11px]" :class="message.direction === 'outbound' ? 'text-emerald-50' : 'text-gray-400'">
                     <span>{{ formatTime(message.timestamp) }}</span>
                     <span v-if="message.direction === 'outbound'">{{ statusLabel(message.status) }}</span>
@@ -122,7 +157,20 @@
             </div>
 
             <form class="border-t border-gray-200 bg-white p-3" @submit.prevent="sendMessage">
+              <div v-if="selectedFile" class="mb-2 flex items-center justify-between gap-3 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-900">
+                <div class="min-w-0">
+                  <p class="truncate font-medium">{{ selectedFile.name }}</p>
+                  <p class="text-xs text-emerald-700">{{ selectedFile.type || 'Archivo' }} · {{ formatFileSize(selectedFile.size) }}</p>
+                </div>
+                <button type="button" class="rounded-full p-1 hover:bg-emerald-100" title="Quitar archivo" @click="clearSelectedFile">
+                  <XMarkIcon class="h-4 w-4" />
+                </button>
+              </div>
               <div class="flex items-end gap-2">
+                <input ref="fileInput" type="file" class="hidden" @change="onFileSelected" />
+                <BaseButton type="button" variant="secondary" :icon="PaperClipIcon" title="Adjuntar archivo" @click="openFilePicker">
+                  Archivo
+                </BaseButton>
                 <textarea
                   v-model="draft"
                   rows="2"
@@ -131,7 +179,7 @@
                   placeholder="Escribe un mensaje"
                   @keydown.enter.exact.prevent="sendMessage"
                 />
-                <BaseButton type="submit" :loading="sending" :disabled="!draft.trim()" :icon="PaperAirplaneIcon">
+                <BaseButton type="submit" :loading="sending" :disabled="!draft.trim() && !selectedFile" :icon="PaperAirplaneIcon">
                   Enviar
                 </BaseButton>
               </div>
@@ -149,7 +197,10 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 import {
   ChatBubbleLeftRightIcon,
   ChatBubbleOvalLeftEllipsisIcon,
+  DocumentIcon,
+  PaperClipIcon,
   PaperAirplaneIcon,
+  XMarkIcon,
 } from '@heroicons/vue/24/outline'
 import MainLayout from '@/components/layout/MainLayout.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
@@ -164,6 +215,8 @@ const selectedBranchId = ref(0)
 const search = ref('')
 const unreadOnly = ref(false)
 const draft = ref('')
+const selectedFile = ref<File | null>(null)
+const fileInput = ref<HTMLInputElement | null>(null)
 const sending = ref(false)
 const sendError = ref('')
 const messagesEnd = ref<HTMLElement | null>(null)
@@ -213,19 +266,38 @@ async function refreshSelectedMessages() {
 }
 
 async function sendMessage() {
-  if (!selectedConversation.value || !draft.value.trim()) return
+  if (!selectedConversation.value || (!draft.value.trim() && !selectedFile.value)) return
   try {
     sending.value = true
     sendError.value = ''
     const text = draft.value.trim()
+    if (selectedFile.value) {
+      await whatsappStore.sendMediaMessage(selectedConversation.value.id, selectedFile.value, text)
+      clearSelectedFile()
+    } else {
+      await whatsappStore.sendMessage(selectedConversation.value.id, text)
+    }
     draft.value = ''
-    await whatsappStore.sendMessage(selectedConversation.value.id, text)
     await scrollToBottom()
   } catch (error: any) {
     sendError.value = error.message || 'No se pudo enviar el mensaje.'
   } finally {
     sending.value = false
   }
+}
+
+function openFilePicker() {
+  fileInput.value?.click()
+}
+
+function onFileSelected(event: Event) {
+  const input = event.target as HTMLInputElement
+  selectedFile.value = input.files?.[0] ?? null
+}
+
+function clearSelectedFile() {
+  selectedFile.value = null
+  if (fileInput.value) fileInput.value.value = ''
 }
 
 function onSearchInput() {
@@ -267,6 +339,30 @@ function statusLabel(status: WhatsAppMessage['status']) {
     failed: 'Falló',
   }
   return labels[status] ?? status
+}
+
+function formatFileSize(bytes: number) {
+  if (!Number.isFinite(bytes) || bytes <= 0) return ''
+  const units = ['B', 'KB', 'MB', 'GB']
+  let value = bytes
+  let unitIndex = 0
+  while (value >= 1024 && unitIndex < units.length - 1) {
+    value /= 1024
+    unitIndex++
+  }
+  return `${value >= 10 || unitIndex === 0 ? Math.round(value) : value.toFixed(1)} ${units[unitIndex]}`
+}
+
+function mediaFallbackLabel(message: WhatsAppMessage) {
+  const labels: Record<WhatsAppMessage['type'], string> = {
+    text: '',
+    image: 'Imagen sin vista previa',
+    audio: 'Audio sin vista previa',
+    video: 'Video sin vista previa',
+    document: message.mediaFileName || 'Documento sin vista previa',
+    sticker: 'Sticker sin vista previa',
+  }
+  return labels[message.type] || 'Archivo sin vista previa'
 }
 
 onMounted(async () => {

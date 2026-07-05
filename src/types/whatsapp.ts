@@ -70,8 +70,14 @@ export interface WhatsAppMessage {
   conversationId: number
   whatsAppMessageId?: string | null
   direction: 'inbound' | 'outbound'
-  type: 'text'
+  type: 'text' | 'image' | 'audio' | 'video' | 'document' | 'sticker'
   textBody: string
+  mediaId?: string | null
+  mediaUrl?: string | null
+  mediaMimeType?: string | null
+  mediaFileName?: string | null
+  mediaFileSize?: number | null
+  mediaSha256?: string | null
   status: 'received' | 'sent' | 'delivered' | 'read' | 'failed'
   sentByUserId?: number | null
   timestamp: string

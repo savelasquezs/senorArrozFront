@@ -48,6 +48,13 @@ class WhatsAppApi extends BaseApi {
   sendMessage(conversationId: number, text: string): Promise<ApiResponse<WhatsAppMessage>> {
     return this.post<ApiResponse<WhatsAppMessage>>(`/whatsapp/conversations/${conversationId}/messages`, { text })
   }
+
+  sendMediaMessage(conversationId: number, file: File, caption?: string): Promise<ApiResponse<WhatsAppMessage>> {
+    const fd = new FormData()
+    fd.append('file', file)
+    if (caption?.trim()) fd.append('caption', caption.trim())
+    return this.post<ApiResponse<WhatsAppMessage>>(`/whatsapp/conversations/${conversationId}/messages/media`, fd)
+  }
 }
 
 export const whatsappApi = new WhatsAppApi()

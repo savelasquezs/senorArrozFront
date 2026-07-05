@@ -112,6 +112,32 @@ export const useWhatsAppStore = defineStore('whatsapp', () => {
     return message
   }
 
+  async function sendMediaMessage(conversationId: number, file: File, caption?: string) {
+    const res = await whatsappApi.sendMediaMessage(conversationId, file, caption)
+    const message = res.data
+    if (message) {
+      messages.value[conversationId] = [...(messages.value[conversationId] ?? []), message]
+      const conversation = conversations.value.find(c => c.id === conversationId)
+      if (conversation) {
+        conversation.lastMessageAt = message.timestamp
+        conversation.lastMessagePreview = message.textBody || mediaPreviewLabel(message.type)
+      }
+    }
+    return message
+  }
+
+  function mediaPreviewLabel(type: WhatsAppMessage['type']) {
+    const labels: Record<WhatsAppMessage['type'], string> = {
+      text: '',
+      image: 'Imagen',
+      audio: 'Audio',
+      video: 'Video',
+      document: 'Documento',
+      sticker: 'Sticker',
+    }
+    return labels[type] || 'Archivo'
+  }
+
   function clear() {
     conversations.value = []
     messages.value = {}
@@ -138,6 +164,7 @@ export const useWhatsAppStore = defineStore('whatsapp', () => {
     fetchConversations,
     fetchMessages,
     sendMessage,
+    sendMediaMessage,
     clear,
   }
 })
