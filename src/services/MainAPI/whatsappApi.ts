@@ -9,9 +9,14 @@ import type {
   WhatsAppMessage,
   WhatsAppQuickReply,
   WhatsAppQuickReplyFilters,
+  WhatsAppTemplate,
+  WhatsAppTemplateFilters,
+  WhatsAppTemplateSendResult,
+  WhatsAppTemplateSyncResult,
   WhatsAppStatus,
   WhatsAppTestConnectionResult,
   WhatsAppUnreadSummary,
+  SendWhatsAppTemplate,
 } from '@/types/whatsapp'
 
 export function whatsappWebhookUrl(): string {
@@ -81,6 +86,18 @@ class WhatsAppApi extends BaseApi {
 
   deleteQuickReply(id: number): Promise<ApiResponse<string>> {
     return this.delete<ApiResponse<string>>(`/whatsapp/quick-replies/${id}`)
+  }
+
+  syncTemplates(branchId?: number | null): Promise<ApiResponse<WhatsAppTemplateSyncResult>> {
+    return this.post<ApiResponse<WhatsAppTemplateSyncResult>>('/whatsapp/templates/sync', { branchId: branchId || null })
+  }
+
+  getTemplates(filters?: WhatsAppTemplateFilters): Promise<ApiResponse<WhatsAppTemplate[]>> {
+    return this.get<ApiResponse<WhatsAppTemplate[]>>('/whatsapp/templates', { params: filters })
+  }
+
+  sendTemplate(payload: SendWhatsAppTemplate): Promise<ApiResponse<WhatsAppTemplateSendResult>> {
+    return this.post<ApiResponse<WhatsAppTemplateSendResult>>('/whatsapp/send-template', payload)
   }
 }
 

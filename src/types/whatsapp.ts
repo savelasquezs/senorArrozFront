@@ -62,6 +62,51 @@ export interface WhatsAppQuickReply {
   updatedAt: string
 }
 
+export interface WhatsAppTemplate {
+  id: number
+  branchId?: number | null
+  branchName?: string | null
+  businessAccountId?: string | null
+  metaTemplateId: string
+  name: string
+  language: string
+  category: string
+  status: string
+  components: string
+  bodyParameterCount: number
+  createdAt: string
+  updatedAt: string
+}
+
+export interface WhatsAppTemplateFilters {
+  branchId?: number
+  status?: string
+  search?: string
+}
+
+export interface WhatsAppTemplateSyncResult {
+  synced: number
+  created: number
+  updated: number
+}
+
+export interface SendWhatsAppTemplate {
+  branchId?: number | null
+  to?: string
+  customerIds?: number[]
+  templateName: string
+  language: string
+  parameters: string[]
+}
+
+export interface WhatsAppTemplateSendResult {
+  success: boolean
+  sentCount: number
+  failedCount: number
+  messageIds: string[]
+  errors: string[]
+}
+
 export interface UpsertWhatsAppQuickReply {
   branchId?: number | null
   shortcut: string

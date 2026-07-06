@@ -223,11 +223,19 @@ const navigationItems = computed((): NavItem[] => [
 		roles: ['Superadmin', 'Admin', 'Cashier'],
 	},
 	{
+		name: 'Plantillas WA',
+		to: '/whatsapp/templates',
+		icon: ChatBubbleLeftRightIcon,
+		roles: ['Superadmin', 'Admin', 'Cashier'],
+		requiresWhatsApp: true,
+	},
+	{
 		name: 'WhatsApp',
 		to: '/whatsapp',
 		icon: ChatBubbleLeftRightIcon,
 		roles: ['Superadmin', 'Admin', 'Cashier'],
 		requiresWhatsApp: true,
+		exactPath: true,
 	},
 	{
 		name: 'Movimientos Bancos',
