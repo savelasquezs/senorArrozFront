@@ -67,21 +67,34 @@
               v-for="conversation in whatsappStore.conversations"
               :key="conversation.id"
               type="button"
-              class="w-full border-b border-gray-100 px-4 py-3 text-left hover:bg-gray-50"
+              class="w-full border-b border-gray-100 px-3 py-2 text-left hover:bg-gray-50"
               :class="selectedConversation?.id === conversation.id ? 'bg-emerald-50' : 'bg-white'"
               @click="selectConversation(conversation)"
             >
-              <div class="flex items-start justify-between gap-3">
-                <div class="min-w-0">
-                  <p class="truncate text-sm font-semibold text-gray-900">{{ conversationTitle(conversation) }}</p>
-                  <p class="truncate text-xs text-gray-500">{{ formatPhone(conversation.phoneNumber) }}</p>
+              <div class="flex items-center justify-between gap-2">
+                <div class="flex min-w-0 flex-1 items-baseline gap-1.5">
+                  <span class="min-w-0 truncate text-sm font-semibold text-gray-950">{{ conversationTitle(conversation) }}</span>
+                  <span class="shrink-0 text-xs text-gray-300">-</span>
+                  <span class="truncate text-xs font-medium text-gray-500">{{ formatConversationPhone(conversation.phoneNumber) }}</span>
                 </div>
-                <span v-if="conversation.unreadCount > 0" class="rounded-full bg-emerald-600 px-2 py-0.5 text-xs font-medium text-white">
+                <span v-if="conversation.unreadCount > 0" class="shrink-0 rounded-full bg-emerald-600 px-2 py-0.5 text-xs font-semibold text-white">
                   {{ conversation.unreadCount }}
                 </span>
               </div>
-              <p class="mt-2 line-clamp-2 text-sm text-gray-600">{{ conversation.lastMessagePreview || 'Sin mensajes' }}</p>
-              <p class="mt-1 text-xs text-gray-400">{{ formatDateTime(conversation.lastMessageAt || conversation.createdAt) }}</p>
+              <div class="mt-1 flex min-w-0 items-baseline gap-2 text-xs">
+                <span
+                  class="min-w-0 flex-1 truncate"
+                  :class="conversation.unreadCount > 0 ? 'font-semibold text-gray-800' : 'font-medium text-gray-600'"
+                >
+                  {{ shortConversationPreview(conversation.lastMessagePreview) }}
+                </span>
+                <span
+                  class="shrink-0 font-medium"
+                  :class="conversation.unreadCount > 0 ? 'text-emerald-700' : 'text-gray-400'"
+                >
+                  {{ formatRelativeConversationTime(conversation.lastMessageAt || conversation.createdAt) }}
+                </span>
+              </div>
             </button>
 
             <div v-if="!whatsappStore.isLoadingConversations && whatsappStore.conversations.length === 0" class="p-6 text-center text-sm text-gray-500">
@@ -124,12 +137,19 @@
                   :class="message.direction === 'outbound' ? 'bg-emerald-600 text-white' : 'bg-white border border-gray-200 text-gray-900'"
                 >
                   <div v-if="message.mediaUrl" class="mb-2">
-                    <img
+                    <button
                       v-if="message.type === 'image' || message.type === 'sticker'"
-                      :src="message.mediaUrl"
-                      :alt="message.mediaFileName || 'Imagen de WhatsApp'"
-                      class="max-h-80 max-w-full rounded-md object-contain"
-                    />
+                      type="button"
+                      class="block max-w-full overflow-hidden rounded-md focus:outline-none focus:ring-2 focus:ring-emerald-300"
+                      title="Ver imagen"
+                      @click="openImagePreview(message)"
+                    >
+                      <img
+                        :src="message.mediaUrl"
+                        :alt="message.mediaFileName || 'Imagen de WhatsApp'"
+                        class="max-h-80 max-w-full cursor-zoom-in object-contain"
+                      />
+                    </button>
                     <audio
                       v-else-if="message.type === 'audio'"
                       :src="message.mediaUrl"
@@ -163,14 +183,6 @@
                     <span>{{ formatTime(message.timestamp) }}</span>
                     <span v-if="message.direction === 'outbound'">{{ statusLabel(message.status) }}</span>
                   </div>
-                  <button
-                    v-if="canUseMessageAsAddressSelection(message)"
-                    type="button"
-                    class="mt-2 rounded-md border border-gray-200 bg-gray-50 px-2 py-1 text-xs font-medium text-gray-700 hover:bg-gray-100"
-                    @click="useMessageAsAddressSelection(message)"
-                  >
-                    Usar respuesta para dirección
-                  </button>
                 </div>
               </div>
               <div ref="messagesEnd" />
@@ -404,6 +416,37 @@
           </form>
         </div>
       </BaseDialog>
+
+      <Teleport to="body">
+        <div
+          v-if="imagePreview"
+          class="fixed inset-0 z-50 flex flex-col bg-black/90"
+          role="dialog"
+          aria-modal="true"
+          @click="closeImagePreview"
+        >
+          <div class="flex items-center justify-end px-4 py-3">
+            <button
+              type="button"
+              class="rounded-full bg-white/10 p-2 text-white hover:bg-white/20 focus:outline-none focus:ring-2 focus:ring-white/60"
+              title="Cerrar"
+              @click.stop="closeImagePreview"
+            >
+              <XMarkIcon class="h-6 w-6" />
+            </button>
+          </div>
+          <div class="grid min-h-0 flex-1 place-items-center px-4 pb-4" @click.stop>
+            <img
+              :src="imagePreview.mediaUrl || ''"
+              :alt="imagePreview.mediaFileName || 'Imagen de WhatsApp'"
+              class="max-h-[84vh] max-w-[96vw] rounded-lg object-contain shadow-2xl"
+            />
+          </div>
+          <p v-if="imagePreview.mediaFileName" class="px-4 pb-4 text-center text-sm font-medium text-white/80">
+            {{ imagePreview.mediaFileName }}
+          </p>
+        </div>
+      </Teleport>
     </div>
   </MainLayout>
 </template>
@@ -473,6 +516,7 @@ const sendError = ref('')
 const contextError = ref('')
 const addressSelectionNote = ref('')
 const messagesEnd = ref<HTMLElement | null>(null)
+const imagePreview = ref<WhatsAppMessage | null>(null)
 let searchTimeout: number | undefined
 
 const currentMessages = computed<WhatsAppMessage[]>(() =>
@@ -696,20 +740,6 @@ function applyAddressSelectionFromLatestInboundMessage() {
   const latest = latestInboundTextMessage()
   if (!latest) return
   selectAddressFromChatText(latest.textBody)
-}
-
-function canUseMessageAsAddressSelection(message: WhatsAppMessage) {
-  return (
-    message.direction === 'inbound' &&
-    message.type === 'text' &&
-    !!message.textBody?.trim() &&
-    !!selectedCustomer.value &&
-    selectedCustomerAddresses.value.length > 0
-  )
-}
-
-function useMessageAsAddressSelection(message: WhatsAppMessage) {
-  selectAddressFromChatText(message.textBody, true)
 }
 
 function formatAddressLineForWhatsApp(address: CustomerAddress): string {
@@ -960,6 +990,15 @@ function clearSelectedFile() {
   if (fileInput.value) fileInput.value.value = ''
 }
 
+function openImagePreview(message: WhatsAppMessage) {
+  if (!message.mediaUrl) return
+  imagePreview.value = message
+}
+
+function closeImagePreview() {
+  imagePreview.value = null
+}
+
 function onSearchInput() {
   window.clearTimeout(searchTimeout)
   searchTimeout = window.setTimeout(() => {
@@ -981,9 +1020,53 @@ function formatPhone(phone: string) {
   return phone.startsWith('+') ? phone : `+${phone}`
 }
 
-function formatDateTime(value?: string | null) {
+function formatConversationPhone(phone: string) {
+  const digits = phone.replace(/\D/g, '')
+  if (digits.startsWith('57') && digits.length === 12) return digits.slice(2)
+  return digits || phone
+}
+
+function shortConversationPreview(value?: string | null) {
+  const text = (value || 'Sin mensajes').replace(/\s+/g, ' ').trim()
+  if (text.length <= 30) return text
+  return `${text.slice(0, 30).trimEnd()}.....`
+}
+
+function formatRelativeConversationTime(value?: string | null) {
   if (!value) return ''
-  return new Intl.DateTimeFormat('es-CO', { dateStyle: 'short', timeStyle: 'short' }).format(new Date(value))
+  const date = new Date(value)
+  const timestamp = date.getTime()
+  if (!Number.isFinite(timestamp)) return ''
+
+  const now = new Date()
+  const diffMs = now.getTime() - timestamp
+  if (diffMs < 60_000) return 'ahora'
+
+  const diffMinutes = Math.floor(diffMs / 60_000)
+  if (diffMinutes < 60) return `hace ${diffMinutes} min`
+
+  const diffHours = Math.floor(diffMinutes / 60)
+  if (diffHours < 24) return `hace ${diffHours} h`
+
+  const yesterday = new Date(now)
+  yesterday.setDate(now.getDate() - 1)
+  if (
+    date.getFullYear() === yesterday.getFullYear() &&
+    date.getMonth() === yesterday.getMonth() &&
+    date.getDate() === yesterday.getDate()
+  ) {
+    return 'ayer'
+  }
+
+  const diffDays = Math.floor(diffHours / 24)
+  if (diffDays < 30) return `hace ${diffDays} dias`
+
+  const diffMonths = Math.floor(diffDays / 30)
+  if (diffMonths <= 1) return 'hace un mes'
+  if (diffMonths < 12) return `hace ${diffMonths} meses`
+
+  const diffYears = Math.floor(diffMonths / 12)
+  return diffYears <= 1 ? 'hace un ano' : `hace ${diffYears} anos`
 }
 
 function formatTime(value: string) {
