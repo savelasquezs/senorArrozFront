@@ -89,6 +89,7 @@
             placeholder="0.7"
             :min="0"
             :max="2"
+            step="0.1"
             hint="Opcional. Rango sugerido: 0 a 2."
           />
           <BaseInput
