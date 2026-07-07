@@ -127,6 +127,17 @@
                 <span>Domicilio gratis aplicado</span>
                 <span>−{{ formatCurrency(freeDeliveryAppliedTotal) }}</span>
             </div>
+            <div v-else-if="showLegacyFreeDeliveryRevert" class="flex items-center justify-between gap-3 rounded-md bg-amber-50 px-2 py-1.5 text-xs text-amber-900">
+                <span>Domi gratis posible en descuentos</span>
+                <button
+                    type="button"
+                    class="font-semibold text-amber-800 underline-offset-2 hover:underline disabled:opacity-50"
+                    :disabled="!canEdit"
+                    @click="revertLegacyFreeDelivery"
+                >
+                    Revertir
+                </button>
+            </div>
             <div class="flex justify-between text-base font-bold pt-2 border-t border-gray-200">
                 <span class="text-gray-900">Total:</span>
                 <span class="text-emerald-600">{{ formatCurrency(calculatedTotal) }}</span>
@@ -243,6 +254,54 @@ const freeDeliveryAppliedTotal = computed(() =>
     freeDeliveryAppliedByIndex.value.reduce((s, v) => s + Math.max(0, v || 0), 0),
 )
 
+const inferFreeDeliverySharesFromDiscounts = (products = localProducts.value) => {
+    const budget = freeDeliveryBudgetCap.value
+    if (budget <= 0 || products.length === 0) {
+        return zeroFreeDeliveryShares(products)
+    }
+
+    const discountCaps = products.map((item) => {
+        const gross = Math.max(0, item.quantity * item.unitPrice)
+        const currentDiscount = Math.max(0, Math.round(item.discount ?? 0))
+        return Math.min(gross, currentDiscount)
+    })
+
+    return distributeEqualWithCaps(budget, discountCaps)
+}
+
+const legacyFreeDeliveryRevertShares = computed(() => {
+    if (localFreeDeliveryRequested.value || !showFreeDeliveryCheckbox.value) {
+        return zeroFreeDeliveryShares()
+    }
+    return inferFreeDeliverySharesFromDiscounts()
+})
+
+const legacyFreeDeliveryRevertTotal = computed(() =>
+    legacyFreeDeliveryRevertShares.value.reduce((sum, value) => sum + Math.max(0, value || 0), 0),
+)
+
+const showLegacyFreeDeliveryRevert = computed(() =>
+    legacyFreeDeliveryRevertTotal.value > 0 && freeDeliveryBudgetCap.value > 0,
+)
+
+const zeroFreeDeliveryShares = (products = localProducts.value) => products.map(() => 0)
+
+const inferAppliedFreeDeliveryShares = (products = localProducts.value) => {
+    if (!props.freeDeliveryRequested || !showFreeDeliveryCheckbox.value) {
+        return zeroFreeDeliveryShares(products)
+    }
+
+    return inferFreeDeliverySharesFromDiscounts(products)
+}
+
+const resetLocalProductsFromProps = () => {
+    const copy = JSON.parse(JSON.stringify(props.products ?? [])) as OrderDetailItem[]
+    localProducts.value = copy
+    localFreeDeliveryRequested.value = props.freeDeliveryRequested === true
+    freeDeliveryAppliedByIndex.value = inferAppliedFreeDeliveryShares(copy)
+    return copy
+}
+
 const existingProductIds = computed(() => {
     return localProducts.value.map(p => p.productId)
 })
@@ -287,8 +346,8 @@ const onFreeDeliveryCheckboxChange = (e: Event) => {
 
     // En detalle: permitir cambio inmediato como en sidebar, sin obligar a entrar a "Editar productos".
     if (!editing.value) {
-        localProducts.value = JSON.parse(JSON.stringify(props.products))
-        freeDeliveryAppliedByIndex.value = localProducts.value.map(() => 0)
+        resetLocalProductsFromProps()
+        localFreeDeliveryRequested.value = el.checked
     }
     applyFreeDeliveryDiscount(localFreeDeliveryRequested.value)
 
@@ -309,6 +368,43 @@ const onFreeDeliveryCheckboxChange = (e: Event) => {
 }
 
 // Métodos
+const emitProductsSave = () => {
+    const updateDto: UpdateOrderDetailDto[] = localProducts.value.map((item) => ({
+        id: item.id,
+        productId: item.productId,
+        quantity: item.quantity,
+        unitPrice: item.unitPrice,
+        discount: item.discount,
+        notes: item.notes || undefined,
+    }))
+
+    emit('save', {
+        products: updateDto,
+        freeDeliveryRequested: localFreeDeliveryRequested.value,
+    })
+}
+
+const revertLegacyFreeDelivery = () => {
+    if (!props.canEdit || legacyFreeDeliveryRevertTotal.value <= 0) return
+    if (!editing.value) {
+        resetLocalProductsFromProps()
+    }
+
+    const shares = inferFreeDeliverySharesFromDiscounts(localProducts.value)
+    localProducts.value = localProducts.value.map((item, idx) => {
+        const remove = Math.max(0, shares[idx] ?? 0)
+        const nextDiscount = Math.max(0, (item.discount ?? 0) - remove)
+        const nextSubtotal = Math.max(0, item.quantity * item.unitPrice - nextDiscount)
+        return { ...item, discount: nextDiscount, subtotal: nextSubtotal }
+    })
+    localFreeDeliveryRequested.value = false
+    freeDeliveryAppliedByIndex.value = zeroFreeDeliveryShares()
+
+    if (!editing.value) {
+        emitProductsSave()
+    }
+}
+
 const recalculateSubtotal = (item: OrderDetailItem) => {
     item.subtotal = item.quantity * item.unitPrice - item.discount
 }
@@ -316,9 +412,7 @@ const recalculateSubtotal = (item: OrderDetailItem) => {
 const enterEditMode = () => {
     // Hacer copia profunda de los productos
     originalProducts.value = JSON.parse(JSON.stringify(props.products))
-    localProducts.value = JSON.parse(JSON.stringify(props.products))
-    localFreeDeliveryRequested.value = props.freeDeliveryRequested === true
-    freeDeliveryAppliedByIndex.value = localProducts.value.map(() => 0)
+    resetLocalProductsFromProps()
     applyFreeDeliveryDiscount(localFreeDeliveryRequested.value)
     editing.value = true
 }
@@ -326,7 +420,7 @@ const enterEditMode = () => {
 const cancelEdit = () => {
     localProducts.value = JSON.parse(JSON.stringify(originalProducts.value))
     localFreeDeliveryRequested.value = props.freeDeliveryRequested === true
-    freeDeliveryAppliedByIndex.value = localProducts.value.map(() => 0)
+    freeDeliveryAppliedByIndex.value = inferAppliedFreeDeliveryShares(localProducts.value)
     editing.value = false
 }
 
@@ -385,13 +479,10 @@ const saveChanges = async () => {
 
 /** Sincroniza con el padre cuando llegan datos del API (tras guardar, o carga inicial). Así los id reales y las líneas eliminadas no quedan desfasados en una segunda edición. */
 watch(
-    () => props.products,
-    (next) => {
-        const list = next ?? []
-        const copy = JSON.parse(JSON.stringify(list)) as OrderDetailItem[]
-        localProducts.value = copy
-        localFreeDeliveryRequested.value = props.freeDeliveryRequested === true
-        freeDeliveryAppliedByIndex.value = copy.map(() => 0)
+    () => [props.products, props.freeDeliveryRequested, props.deliveryFee, props.maxFreeDeliveryDiscount],
+    () => {
+        const list = props.products ?? []
+        resetLocalProductsFromProps()
         if (editing.value) {
             originalProducts.value = JSON.parse(JSON.stringify(list)) as OrderDetailItem[]
             applyFreeDeliveryDiscount(localFreeDeliveryRequested.value)

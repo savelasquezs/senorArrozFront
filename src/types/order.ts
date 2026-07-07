@@ -355,6 +355,7 @@ export interface CreateOrderDto {
     prepareAt?: Date
     notes?: string
     guestName?: string
+    freeDeliveryRequested?: boolean
     orderDetails: CreateOrderDetailDto[]
     bankPayments?: CreateBankPaymentDto[]
     appPayments?: CreateAppPaymentDto[]

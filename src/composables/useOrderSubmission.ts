@@ -54,6 +54,9 @@ export function useOrderSubmission() {
             status: 'taken',
             notes: draft.notes || undefined,
             guestName: draft.guestName || undefined,
+            freeDeliveryRequested:
+                draft.freeDeliveryRequested === true &&
+                (draft.type === 'delivery' || (draft.type === 'reservation' && draft.addressId != null)),
             orderDetails,
             bankPayments,
             appPayments,
