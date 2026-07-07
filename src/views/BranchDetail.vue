@@ -181,6 +181,8 @@
                     <BranchWhatsAppSettingsForm :branch-id="branchId" @saved="handleWhatsAppSettingsSaved" />
                 </BaseCard>
 
+                <BranchAiSettingsForm v-if="canEditBranchProfile" :branch-id="branchId" />
+
                 <!-- Users Section -->
                 <BaseCard>
                     <BranchUsersTable :users="branch.users" :branch-id="branch.id" @user-created="handleUserCreated"
@@ -658,6 +660,7 @@ import BaseBadge from '@/components/ui/BaseBadge.vue'
 import PhoneNumberItem from '@/components/customers/PhoneNumberItem.vue'
 import BranchUsersTable from '@/components/branches/BranchUsersTable.vue'
 import BranchPrintSettingsForm from '@/components/branches/BranchPrintSettingsForm.vue'
+import BranchAiSettingsForm from '@/components/branches/BranchAiSettingsForm.vue'
 import BranchWhatsAppSettingsForm from '@/components/whatsapp/BranchWhatsAppSettingsForm.vue'
 import BranchForm from '@/components/branches/BranchForm.vue'
 import NeighborhoodForm from '@/components/neighborhoods/NeighborhoodForm.vue'
