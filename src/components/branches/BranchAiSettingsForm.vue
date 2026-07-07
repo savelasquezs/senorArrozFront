@@ -68,6 +68,20 @@
             :required="!providerHasConfiguredKey"
             :maxlength="4096"
           />
+          <div class="lg:col-span-2 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <p class="text-sm text-gray-600">
+              Carga los modelos despues de seleccionar proveedor e ingresar la Api Key.
+            </p>
+            <BaseButton
+              type="button"
+              variant="secondary"
+              :loading="modelsLoading"
+              :disabled="!canLoadModels"
+              @click="loadModels"
+            >
+              Cargar modelos
+            </BaseButton>
+          </div>
           <BaseInput
             v-model="form.temperature"
             type="number"
@@ -94,7 +108,11 @@
           <p v-if="setting?.apiKeyConfigured" class="mt-2 text-xs text-gray-500">
             Api Key guardada: {{ setting.apiKeyMasked || '********' }}
           </p>
-          <p v-if="modelMessage" class="mt-2 text-xs text-gray-500">
+          <p
+            v-if="modelMessage"
+            class="mt-2 text-xs"
+            :class="modelMessageType === 'error' ? 'text-red-600' : 'text-gray-500'"
+          >
             {{ modelMessage }}
           </p>
         </div>
@@ -150,9 +168,10 @@ const testing = ref(false)
 const modelsLoading = ref(false)
 const loadError = ref('')
 const modelMessage = ref('')
+const modelMessageType = ref<'info' | 'error'>('info')
 const modelOptions = ref<AiProviderModel[]>([])
-const modelLookupTimer = ref<number | null>(null)
 const message = reactive<{ text: string; type: 'success' | 'warning' | 'error' | 'info' }>({ text: '', type: 'info' })
+let suppressModelReset = false
 
 const form = reactive<UpsertBranchAiSetting>({
   provider: 'openai',
@@ -174,6 +193,12 @@ const modelSelectOptions = computed(() =>
       ? `${model.displayName} (${model.id})`
       : model.id,
   })),
+)
+
+const canLoadModels = computed(() =>
+  !modelsLoading.value
+  && !!String(form.provider).trim()
+  && (!!form.apiKey.trim() || providerHasConfiguredKey.value),
 )
 
 const canSave = computed(() => {
@@ -199,6 +224,7 @@ const statusDescription = computed(() => {
 })
 
 function applySetting(next: BranchAiSetting) {
+  suppressModelReset = true
   setting.value = next
   form.provider = next.provider || 'openai'
   form.model = next.model || ''
@@ -206,6 +232,16 @@ function applySetting(next: BranchAiSetting) {
   form.isActive = next.isActive ?? false
   form.temperature = next.temperature ?? null
   form.maxContextMessages = next.maxContextMessages || 20
+  window.setTimeout(() => {
+    suppressModelReset = false
+  }, 0)
+}
+
+function clearLoadedModels(messageText = '') {
+  modelOptions.value = []
+  form.model = ''
+  modelMessageType.value = messageText ? 'info' : modelMessageType.value
+  modelMessage.value = messageText
 }
 
 async function load() {
@@ -215,7 +251,9 @@ async function load() {
     message.text = ''
     const res = await branchAiSettingsApi.getBranchSetting(props.branchId)
     applySetting(res.data)
-    await loadModels()
+    if (providerHasConfiguredKey.value) {
+      await loadModels()
+    }
   } catch (error: any) {
     loadError.value = error.message || 'No se pudo cargar la configuracion de IA.'
   } finally {
@@ -229,6 +267,7 @@ async function loadModels() {
 
   if (!form.apiKey.trim() && !providerHasConfiguredKey.value) {
     modelOptions.value = []
+    modelMessageType.value = 'info'
     modelMessage.value = 'Ingresa una Api Key para consultar los modelos disponibles del proveedor seleccionado.'
     return
   }
@@ -236,6 +275,7 @@ async function loadModels() {
   try {
     modelsLoading.value = true
     modelMessage.value = ''
+    modelMessageType.value = 'info'
     const res = await branchAiSettingsApi.getProviderModels(props.branchId, {
       provider,
       apiKey: form.apiKey.trim() || null,
@@ -243,6 +283,7 @@ async function loadModels() {
     modelOptions.value = res.data?.models ?? []
 
     if (modelOptions.value.length === 0) {
+      modelMessageType.value = 'error'
       modelMessage.value = 'El proveedor no retorno modelos disponibles para esta Api Key.'
       form.model = ''
       return
@@ -252,23 +293,16 @@ async function loadModels() {
     if (!selectedStillExists) {
       form.model = ''
     }
+    modelMessageType.value = 'info'
+    modelMessage.value = `${modelOptions.value.length} modelos cargados. Selecciona uno para guardar.`
   } catch (error: any) {
     modelOptions.value = []
+    form.model = ''
+    modelMessageType.value = 'error'
     modelMessage.value = error.message || 'No se pudieron consultar los modelos disponibles.'
   } finally {
     modelsLoading.value = false
   }
-}
-
-function scheduleModelLookup() {
-  if (modelLookupTimer.value !== null) {
-    window.clearTimeout(modelLookupTimer.value)
-  }
-
-  modelLookupTimer.value = window.setTimeout(() => {
-    modelLookupTimer.value = null
-    void loadModels()
-  }, 500)
 }
 
 async function save(options: { quiet?: boolean } = {}): Promise<BranchAiSetting | null> {
@@ -332,12 +366,12 @@ watch(() => props.branchId, () => {
 })
 
 watch(() => form.provider, () => {
-  form.model = ''
-  modelOptions.value = []
-  void loadModels()
+  if (suppressModelReset) return
+  clearLoadedModels('Proveedor cambiado. Carga los modelos disponibles para continuar.')
 })
 
 watch(() => form.apiKey, () => {
-  scheduleModelLookup()
+  if (suppressModelReset) return
+  clearLoadedModels('Api Key modificada. Vuelve a cargar modelos para usar la nueva credencial.')
 })
 </script>
