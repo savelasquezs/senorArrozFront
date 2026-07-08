@@ -84,19 +84,40 @@ function onUpdate(v: Date[] | Date | null) {
 :deep(.base-date-range .dp__input) {
 	width: 100%;
 	border: 1px solid rgb(229 231 235);
+	padding-left: 2.25rem;
+	padding-right: 2.25rem;
+	line-height: 1.25rem;
 }
 
 :deep(.base-date-range--default .dp__input) {
 	min-height: 2.5rem;
 	border-radius: 0.5rem;
 	font-size: 0.875rem;
-	padding: 0.375rem 0.75rem;
+	padding-top: 0.375rem;
+	padding-bottom: 0.375rem;
 }
 
 :deep(.base-date-range--compact .dp__input) {
 	min-height: 2rem;
 	border-radius: 0.375rem;
 	font-size: 0.75rem;
-	padding: 0.25rem 0.5rem;
+	padding-top: 0.25rem;
+	padding-bottom: 0.25rem;
+	padding-left: 2rem;
+	padding-right: 2rem;
+}
+
+:deep(.base-date-range .dp__input_icon) {
+	left: 0.625rem;
+	top: 50%;
+	transform: translateY(-50%);
+	margin: 0;
+}
+
+:deep(.base-date-range .dp__clear_icon) {
+	right: 0.625rem;
+	top: 50%;
+	transform: translateY(-50%);
+	margin: 0;
 }
 </style>
