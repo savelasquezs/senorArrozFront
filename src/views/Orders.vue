@@ -30,12 +30,21 @@
 
             <!-- Success Toast -->
             <!-- Toast component will be handled by useToast composable automatically -->
+            <button
+                v-if="whatsappReturnConversationId"
+                type="button"
+                class="fixed right-0 top-1/2 z-40 -translate-y-1/2 rounded-l-lg border border-emerald-200 bg-emerald-600 px-3 py-4 text-sm font-medium text-white shadow-lg hover:bg-emerald-700"
+                @click="openWhatsAppConversation"
+            >
+                WhatsApp
+            </button>
         </div>
     </MainLayout>
 </template>
 
 <script setup lang="ts">
-import { onMounted, onUnmounted, computed } from 'vue'
+import { onMounted, onUnmounted, computed, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import { useOrdersDraftsStore } from '@/store/ordersDrafts'
 import { useProductsStore } from '@/store/products'
 import { useProductCategoriesStore } from '@/store/productCategories'
@@ -58,6 +67,8 @@ const productsStore = useProductsStore()
 const productCategoriesStore = useProductCategoriesStore()
 const authStore = useAuthStore()
 const branchPosSettings = useBranchPosSettingsStore()
+const router = useRouter()
+const whatsappReturnConversationId = ref<number | null>(null)
 
 // Categorías transversales desde el store; respaldo por productos cargados en catálogo.
 const categories = computed(() => {
@@ -105,6 +116,16 @@ const refreshTotals = () => {
 const initializeData = async () => {
     await ensureOrderPageData()
     await branchPosSettings.ensureForBranch(authStore.branchId ?? undefined)
+    const conversationId = Number(localStorage.getItem('senor-arroz-whatsapp-conversation-tab') || 0)
+    whatsappReturnConversationId.value = conversationId > 0 ? conversationId : null
+}
+
+function openWhatsAppConversation() {
+    if (!whatsappReturnConversationId.value) return
+    router.push({
+        name: 'WhatsApp',
+        query: { conversationId: String(whatsappReturnConversationId.value) },
+    })
 }
 
 // Lifecycle

@@ -276,6 +276,26 @@ const routes: RouteRecordRaw[] = [
         }
     },
     {
+        path: '/whatsapp',
+        name: 'WhatsApp',
+        component: () => import('@/views/WhatsAppView.vue'),
+        meta: {
+            requiresAuth: true,
+            requiresRole: [UserRole.SUPERADMIN, UserRole.ADMIN, UserRole.CASHIER],
+            title: 'WhatsApp'
+        }
+    },
+    {
+        path: '/whatsapp/templates',
+        name: 'WhatsAppTemplates',
+        component: () => import('@/views/WhatsAppTemplatesView.vue'),
+        meta: {
+            requiresAuth: true,
+            requiresRole: [UserRole.SUPERADMIN, UserRole.ADMIN, UserRole.CASHIER],
+            title: 'Plantillas WhatsApp'
+        }
+    },
+    {
         path: '/bank-transfers',
         name: 'BankTransfers',
         component: () => import('@/views/BankTransfersView.vue'),

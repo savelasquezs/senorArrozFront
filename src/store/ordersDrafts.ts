@@ -27,6 +27,7 @@ import {
     sortProductsByPortionOrder,
 } from '@/config/orderPosCategories'
 import { useBranchPosSettingsStore } from '@/store/branchPosSettings'
+import { useAuthStore } from '@/store/auth'
 import {
     deliveryDiscountBudget,
     distributeEqualWithCaps,
@@ -573,6 +574,9 @@ export const useOrdersDraftsStore = defineStore('ordersDrafts', () => {
             // Cargar datos (migración: asegurar prepareAt e isLater en drafts antiguos)
             const migratedDrafts = data.draftOrders.map((order: any) => ({
                 ...order,
+                branchId: order.branchId ?? null,
+                source: order.source ?? null,
+                whatsappConversationId: order.whatsappConversationId ?? null,
                 prepareAt: order.prepareAt ?? null,
                 isLater: order.isLater ?? false,
                 paidInStoreCash: order.paidInStoreCash ?? false,
@@ -693,6 +697,76 @@ export const useOrdersDraftsStore = defineStore('ordersDrafts', () => {
         return a ? (a.deliveryFee ?? 0) : 0
     }
 
+    const createOrReuseWhatsAppDraft = (payload: {
+        conversationId: number
+        branchId: number
+        customer: Customer
+        address: CustomerAddress
+    }): DraftOrder | null => {
+        const existing = Array.from(draftOrders.value.values())
+            .find((order) => order.whatsappConversationId === payload.conversationId)
+        if (existing) {
+            currentTabId.value = existing.tabId
+            saveToLocalStorage()
+            return existing
+        }
+
+        if (draftOrders.value.size >= maxTabs.value) {
+            error.value = `Solo puedes tener ${maxTabs.value} pedidos abiertos.`
+            return null
+        }
+
+        const authStore = useAuthStore()
+        const tabId = `tab-${Date.now()}-${nextTabNumber.value}`
+        const tabName = `WhatsApp ${nextTabNumber.value}`
+        const deliveryFee = payload.address.deliveryFee || 0
+        const newOrder: DraftOrder = {
+            tabId,
+            tabName,
+            branchId: payload.branchId || authStore.branchId || null,
+            source: 'WhatsApp',
+            whatsappConversationId: payload.conversationId,
+            type: 'delivery',
+            customerId: payload.customer.id,
+            customerName: payload.customer.name,
+            customerPhone: payload.customer.phone1,
+            guestName: payload.customer.name,
+            addressId: payload.address.id,
+            addressDescription: payload.address.address,
+            addressAdditionalInfo: payload.address.additionalInfo ?? null,
+            deliveryFee,
+            freeDeliveryRequested: false,
+            reservedFor: null,
+            prepareAt: null,
+            isLater: false,
+            notes: '',
+            orderItems: [],
+            bankPayments: [],
+            appPayment: null,
+            subtotal: 0,
+            total: deliveryFee,
+            discountTotal: 0,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+            paidInStoreCash: false,
+            paidInStoreCashAmount: null,
+        }
+
+        const customerWithAddress = {
+            ...payload.customer,
+            addresses: payload.customer.addresses?.length
+                ? payload.customer.addresses
+                : [payload.address],
+        }
+        ensureCustomerInList(customerWithAddress)
+        addAddressToCustomer(payload.customer.id, payload.address, customerWithAddress)
+        draftOrders.value.set(tabId, newOrder)
+        currentTabId.value = tabId
+        nextTabNumber.value++
+        saveToLocalStorage()
+        return newOrder
+    }
+
     // Clear - COPIAR líneas 357-360
     const clear = () => {
         error.value = null
@@ -751,6 +825,7 @@ export const useOrdersDraftsStore = defineStore('ordersDrafts', () => {
         updateDeliveryFee,
         updateFreeDeliveryRequested,
         resolveDeliveryFeeFromSelectedAddress,
+        createOrReuseWhatsAppDraft,
         recalculateTotals,
         autoAdjustSinglePayment,
         saveToLocalStorage,

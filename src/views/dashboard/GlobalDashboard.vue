@@ -44,6 +44,7 @@
                     :orders-by-month="ordersByMonth"
                     :orders-by-year="ordersByYear"
                     :products-payload="ventasProducts"
+                    :hourly-payload="ventasHourly"
                     :branch-id="globalDashboardBranchId"
                 />
                 <DashboardGastosSection
@@ -104,7 +105,9 @@ import { useDashboardGastosSection } from '@/composables/dashboard/useDashboardG
 import { useDashboardDomiciliosSection } from '@/composables/dashboard/useDashboardDomiciliosSection'
 import { useDashboardShellMockState } from '@/composables/dashboard/useDashboardShellMockState'
 import type { VentasProductsGroupBy } from '@/services/MainAPI/dashboardSectionApi'
-import type { DashboardTimeGranularity } from '@/views/dashboard/dashboardGlobalFilters'
+import type {
+    DashboardTimeGranularity,
+} from '@/views/dashboard/dashboardGlobalFilters'
 import {
 	aggregateSalesBlockByFortnight,
 	aggregateOrdersBlockByFortnight,
@@ -210,6 +213,7 @@ const ventasComparisonRows = computed(() => {
 })
 
 const ventasProducts = computed(() => ventasSection.data.value?.products ?? null)
+const ventasHourly = computed(() => ventasSection.data.value?.hourly ?? null)
 
 const {
     deliveryBranchOptions,

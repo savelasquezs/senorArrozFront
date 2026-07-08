@@ -115,6 +115,18 @@
                     </div>
 
                     <!-- Action Buttons -->
+                    <div v-if="currentOrder.whatsappConversationId" class="flex gap-2">
+                        <BaseButton
+                            @click="sendWhatsAppConfirmation"
+                            variant="outline"
+                            size="sm"
+                            class="w-full"
+                            :loading="isSendingWhatsAppConfirmation"
+                        >
+                            Enviar confirmación por WhatsApp
+                        </BaseButton>
+                    </div>
+
                     <div class="flex gap-2">
                         <BaseButton @click="handleSubmitOrder" variant="primary" size="sm" class="w-full"
                             :disabled="submitButtonDisabled" :title="submitButtonTooltip">
@@ -213,6 +225,9 @@ import { useToast } from '@/composables/useToast'
 import { useFormatting } from '@/composables/useFormatting'
 import { orderCashToCollect, sumPaymentsAmounts } from '@/utils/orderCashToCollect'
 import { customerApi } from '@/services/MainAPI/customerApi'
+import { whatsappApi } from '@/services/MainAPI/whatsappApi'
+import { buildWhatsAppOrderConfirmationMessage } from '@/composables/useWhatsAppOrderConfirmation'
+import { useBranchPosSettingsStore } from '@/store/branchPosSettings'
 import type { Customer, CustomerAddress } from '@/types/customer'
 import type { DraftOrder } from '@/types/order'
 
@@ -247,6 +262,7 @@ const { submitOrder } = useOrderSubmission()
 const { success, error: showError } = useToast()
 const { formatCurrency, formatDateTime } = useFormatting()
 const router = useRouter()
+const branchPosSettings = useBranchPosSettingsStore()
 
 // State
 const showCustomerDetail = ref(false)
@@ -267,6 +283,7 @@ const pendingDuplicateConfirmTabId = ref<string | null>(null)
 const duplicateConflictOrders = ref<CustomerOrderDateConflictItem[]>([])
 const isSubmittingOrder = ref(false)
 const isCheckingDuplicateOrderDate = ref(false)
+const isSendingWhatsAppConfirmation = ref(false)
 
 // Computed
 const currentOrder = computed(() => ordersStore.currentOrder)
@@ -532,6 +549,32 @@ const updateIsLater = (value: boolean) => {
 
 const handleAddProducts = () => {
     // This would focus on the product grid or open a product selector
+}
+
+async function sendWhatsAppConfirmation() {
+    const order = currentOrder.value
+    if (!order?.whatsappConversationId) return
+    if (order.orderItems.length === 0) {
+        showError('WhatsApp', 'Agrega productos antes de enviar la confirmación.')
+        return
+    }
+
+    isSendingWhatsAppConfirmation.value = true
+    try {
+        await branchPosSettings.ensureForBranch(order.branchId)
+        const message = buildWhatsAppOrderConfirmationMessage(
+            order,
+            branchPosSettings.posCopyMessageEtaPhrase,
+        )
+        await whatsappApi.sendMessage(order.whatsappConversationId, message)
+        success('Confirmación enviada', 2500, 'El cliente recibió el resumen por WhatsApp.')
+        localStorage.setItem('senor-arroz-whatsapp-conversation-tab', String(order.whatsappConversationId))
+        await router.push({ name: 'WhatsApp', query: { conversationId: String(order.whatsappConversationId) } })
+    } catch (error: any) {
+        showError('WhatsApp', error?.message || 'No se pudo enviar la confirmación.')
+    } finally {
+        isSendingWhatsAppConfirmation.value = false
+    }
 }
 
 function resolveDraftAnchorDate(order: DraftOrder): Date | null {

@@ -56,21 +56,42 @@ const props = defineProps<{
 	ordersByFortnight: OrdersPerHourBlock;
 	ordersByMonth: OrdersPerHourBlock;
 	ordersByYear: OrdersPerHourBlock;
+	salesMedianCop?: number | null;
 }>();
 
 const timeGranularity = defineModel<string>('timeGranularity', { default: 'day' });
 
 const activeSalesBlock = computed((): SalesTimeSeriesBlock => {
+	let block: SalesTimeSeriesBlock;
 	switch (timeGranularity.value as string) {
 		case 'fortnight':
-			return props.salesByFortnight;
+			block = props.salesByFortnight;
+			break;
 		case 'month':
-			return props.salesByMonth;
+			block = props.salesByMonth;
+			break;
 		case 'year':
-			return props.salesByYear;
+			block = props.salesByYear;
+			break;
 		default:
-			return props.salesByDay;
+			block = props.salesByDay;
+			break;
 	}
+	if ((timeGranularity.value as string) !== 'day' || !props.salesMedianCop || props.salesMedianCop <= 0) {
+		return block;
+	}
+	return {
+		labels: block.labels,
+		datasets: [
+			...block.datasets,
+			{
+				label: 'Mediana periodo',
+				data: block.labels.map(() => props.salesMedianCop ?? 0),
+				borderColor: 'rgba(220, 38, 38, 0.85)',
+				backgroundColor: 'rgba(220, 38, 38, 0)',
+			},
+		],
+	};
 });
 
 const activeOrdersBlock = computed((): OrdersPerHourBlock => {

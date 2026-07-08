@@ -20,6 +20,8 @@ export interface Customer {
     loyaltyDeliveredCount?: number;
     loyaltyNextStepIndex?: number | null;
     loyaltyNextRewardLabel?: string | null;
+    loyaltyDeliveriesUntilNextReward?: number | null;
+    loyaltyRewardDueOnCurrentOrder?: boolean;
     /** Mensaje listo para mostrar al tomar pedido. */
     loyaltyNextRewardMessage?: string | null;
     addresses?: CustomerAddress[];

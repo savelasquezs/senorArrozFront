@@ -21,6 +21,7 @@ import {
 	type DashboardDeliveryRouteHistoryApiItem,
 	type DashboardSalesComparisonApiResponse,
 	type DashboardSalesEvolutionApiResponse,
+	type DashboardSalesHourlyApiResponse,
 	type DashboardSalesProductsApiResponse,
 } from './dashboardApi';
 import type { SalesTimeSeriesBlock, OrdersPerHourBlock } from '@/components/dashboard';
@@ -237,6 +238,54 @@ export type VentasSalesEvolutionPayload = {
 	ordersByYear: OrdersPerHourBlock;
 };
 
+export type VentasSalesHourlyPayload = {
+	points: Array<{
+		hour: number;
+		label: string;
+		orderCount: number;
+		totalSalesCop: number;
+		averageDailySalesCop: number;
+		medianDailySalesCop: number;
+		averageTicketCop: number;
+		participationPercent: number;
+	}>;
+	dailyHistory: Array<{
+		day: string;
+		label: string;
+		dayOfWeek: number;
+		dayOfWeekLabel: string;
+		totalSalesCop: number;
+		orderCount: number;
+		averageTicketCop: number;
+	}>;
+	heatmap: Array<{
+		dayOfWeek: number;
+		dayOfWeekLabel: string;
+		hour: number;
+		hourLabel: string;
+		medianDailySalesCop: number;
+	}>;
+	summary: {
+		highestTotalSalesHour: {
+			hour: number;
+			label: string;
+			totalSalesCop: number;
+			medianDailySalesCop: number;
+		} | null;
+		highestMedianSalesHour: {
+			hour: number;
+			label: string;
+			totalSalesCop: number;
+			medianDailySalesCop: number;
+		} | null;
+		dayOfWeek: number | null;
+		dayOfWeekLabel: string;
+		medianDailySalesCop: number;
+		averageDailySalesCop: number;
+		totalSalesCop: number;
+	};
+};
+
 export type VentasProductsGroupBy = 'product' | 'category';
 
 export type VentasProductsPayload = {
@@ -265,6 +314,7 @@ export type VentasDashboardPayload = {
 	comparisonRows: BranchComparisonRow[];
 	/** `null` si mock o error parcial: el padre usa series demo del shell. */
 	evolution: VentasSalesEvolutionPayload | null;
+	hourly: VentasSalesHourlyPayload | null;
 	products: VentasProductsPayload | null;
 };
 
@@ -309,6 +359,46 @@ function mapEvolutionFromApi(raw: DashboardSalesEvolutionApiResponse): VentasSal
 	};
 }
 
+function mapHourlyFromApi(raw: DashboardSalesHourlyApiResponse): VentasSalesHourlyPayload {
+	return {
+		points: raw.points.map((p) => ({
+			hour: p.hour,
+			label: p.label,
+			orderCount: p.orderCount,
+			totalSalesCop: Number(p.totalSalesCop),
+			averageDailySalesCop: Number(p.averageDailySalesCop),
+			medianDailySalesCop: Number(p.medianDailySalesCop),
+			averageTicketCop: Number(p.averageTicketCop),
+			participationPercent: Number(p.participationPercent),
+		})),
+		dailyHistory: (raw.dailyHistory ?? []).map((p) => ({
+			day: p.day,
+			label: p.label,
+			dayOfWeek: p.dayOfWeek,
+			dayOfWeekLabel: p.dayOfWeekLabel,
+			totalSalesCop: Number(p.totalSalesCop),
+			orderCount: p.orderCount,
+			averageTicketCop: Number(p.averageTicketCop),
+		})),
+		heatmap: (raw.heatmap ?? []).map((p) => ({
+			dayOfWeek: p.dayOfWeek,
+			dayOfWeekLabel: p.dayOfWeekLabel,
+			hour: p.hour,
+			hourLabel: p.hourLabel,
+			medianDailySalesCop: Number(p.medianDailySalesCop),
+		})),
+		summary: {
+			highestTotalSalesHour: raw.summary.highestTotalSalesHour,
+			highestMedianSalesHour: raw.summary.highestMedianSalesHour,
+			dayOfWeek: raw.summary.dayOfWeek,
+			dayOfWeekLabel: raw.summary.dayOfWeekLabel,
+			medianDailySalesCop: Number(raw.summary.medianDailySalesCop),
+			averageDailySalesCop: Number(raw.summary.averageDailySalesCop),
+			totalSalesCop: Number(raw.summary.totalSalesCop),
+		},
+	};
+}
+
 function mapProductsFromApi(raw: DashboardSalesProductsApiResponse): VentasProductsPayload {
 	const slices = raw.participationByRevenue ?? [];
 	const w = raw.weightByCategory ?? [];
@@ -349,18 +439,21 @@ export async function fetchVentasDashboard(
 		return {
 			comparisonRows: filterBranchComparisonRows(BASE_BRANCH_COMPARISON_ROWS, branchId),
 			evolution: null,
+			hourly: null,
 			products: null,
 		};
 	}
 	const { from, to } = encodeDashboardRangeToApi(dateRange);
-	const [comp, evo, prod] = await Promise.all([
+	const [comp, evo, hourly, prod] = await Promise.all([
 		dashboardApi.getSalesComparison(branchId, from, to),
 		dashboardApi.getSalesEvolution(branchId, from, to),
+		dashboardApi.getSalesHourly(branchId, from, to),
 		dashboardApi.getSalesProducts(branchId, from, to, 10, productsGroupBy),
 	]);
 	return {
 		comparisonRows: mapComparisonFromApi(comp),
 		evolution: mapEvolutionFromApi(evo),
+		hourly: mapHourlyFromApi(hourly),
 		products: mapProductsFromApi(prod),
 	};
 }
@@ -373,7 +466,13 @@ export async function fetchVentasProductsOnly(
 ): Promise<VentasProductsPayload | null> {
 	if (USE_VENTAS_MOCK) return null;
 	const { from, to } = encodeDashboardRangeToApi(dateRange);
-	const raw = await dashboardApi.getSalesProducts(branchId, from, to, 10, productsGroupBy);
+	const raw = await dashboardApi.getSalesProducts(
+		branchId,
+		from,
+		to,
+		10,
+		productsGroupBy,
+	);
 	return mapProductsFromApi(raw);
 }
 

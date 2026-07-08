@@ -52,9 +52,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onBeforeUnmount, onMounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useAuthStore } from '@/store/auth';
+import { useWhatsAppStore } from '@/store/whatsapp';
 import { bootstrapOrderCatalog } from '@/utils/orderCatalogBootstrap';
 import { UserRole } from '@/types/auth';
 import Sidebar from '@/components/layout/Sidebar.vue';
@@ -62,6 +63,11 @@ import TopNavigation from '@/components/layout/TopNavigation.vue';
 import Toast from '@/components/ui/Toast.vue';
 import { PlusIcon } from '@heroicons/vue/24/outline';
 import { useToast } from '@/composables/useToast';
+import { useNotifications } from '@/composables/useNotifications';
+import { useNotificationSound } from '@/composables/useNotificationSound';
+import { useSignalR } from '@/composables/useSignalR';
+import { WHATSAPP_SIGNALR_HUB_URL } from '@/config/signalr';
+import type { WhatsAppRealtimeMessagePayload } from '@/types/whatsapp';
 
 interface Props {
 	pageTitle?: string;
@@ -72,9 +78,16 @@ const props = defineProps<Props>();
 const route = useRoute();
 const router = useRouter();
 const authStore = useAuthStore();
+const whatsappStore = useWhatsAppStore();
 const { toasts, removeToast } = useToast();
+const { permission, requestPermission, notify } = useNotifications();
+const { playWhatsAppMessageSound } = useNotificationSound();
+const { on: onWhatsAppSignalR, off: offWhatsAppSignalR } = useSignalR(WHATSAPP_SIGNALR_HUB_URL);
 
 const sidebarOpen = ref(false);
+let whatsAppPollingId: number | undefined;
+let previousWhatsAppLatestMessageAt: string | null = null;
+let whatsAppSummaryInitialized = false;
 
 const mainContentClasses = computed(() => [
 	'flex flex-col flex-1 min-w-0 transition-all duration-300 ease-in-out',
@@ -96,6 +109,10 @@ const isOrdersPage = computed(() => {
 	return route.path.startsWith('/orders');
 });
 
+const isWhatsAppPage = computed(() => {
+	return route.path.startsWith('/whatsapp');
+});
+
 // Navigate to new order
 const navigateToNewOrder = () => {
 	router.push('/orders/new');
@@ -111,15 +128,97 @@ function prefetchOrderCatalog() {
 	void bootstrapOrderCatalog(authStore.userRole);
 }
 
+async function refreshWhatsAppUnreadSummary(options?: { notifyNewMessages?: boolean }) {
+	if (!authStore.isAuthenticated || !canTakeOrders.value) return;
+
+	try {
+		await whatsappStore.ensureStatus();
+		if (!whatsappStore.enabled) return;
+
+		const previousLatest = previousWhatsAppLatestMessageAt;
+		const previousTotal = whatsappStore.unreadTotal;
+		const summary = await whatsappStore.fetchUnreadSummary();
+		const currentLatest = summary.latestMessageAt ?? null;
+		const hasNewUnread =
+			whatsAppSummaryInitialized
+			&& !!currentLatest
+			&& currentLatest !== previousLatest
+			&& summary.totalUnread > previousTotal;
+
+		previousWhatsAppLatestMessageAt = currentLatest;
+		whatsAppSummaryInitialized = true;
+
+		if (!options?.notifyNewMessages || !hasNewUnread) return;
+
+		await playWhatsAppMessageSound();
+		if (permission.value === 'granted') {
+			notify('Nuevo mensaje de WhatsApp', {
+				body: `${summary.unreadConversations} conversación(es) sin leer`,
+				tag: `whatsapp-${currentLatest}`,
+			});
+		}
+	} catch (error) {
+		console.error('Error al consultar no leídos de WhatsApp:', error);
+	}
+}
+
+async function handleWhatsAppRealtimeMessage(payload: WhatsAppRealtimeMessagePayload) {
+	if (!authStore.isAuthenticated || !canTakeOrders.value || !payload?.message?.id) return;
+	if (payload.message.direction !== 'inbound') return;
+
+	previousWhatsAppLatestMessageAt = payload.message.timestamp;
+	whatsAppSummaryInitialized = true;
+
+	if (!isWhatsAppPage.value) {
+		whatsappStore.applyRealtimeMessage(payload, null);
+	}
+
+	await playWhatsAppMessageSound();
+	if (permission.value === 'granted') {
+		const name = payload.conversation?.contactName || payload.conversation?.customerName || payload.conversation?.phoneNumber || 'WhatsApp';
+		notify('Nuevo mensaje de WhatsApp', {
+			body: String(name),
+			tag: `whatsapp-${payload.message.id}`,
+		});
+	}
+}
+
+function startWhatsAppUnreadPolling() {
+	if (!authStore.isAuthenticated || !canTakeOrders.value || whatsAppPollingId) return;
+
+	void refreshWhatsAppUnreadSummary({ notifyNewMessages: false });
+	if (permission.value === 'default') {
+		void requestPermission();
+	}
+
+	whatsAppPollingId = window.setInterval(() => {
+		void refreshWhatsAppUnreadSummary({ notifyNewMessages: true });
+	}, 60000);
+}
+
+function stopWhatsAppUnreadPolling() {
+	if (whatsAppPollingId) {
+		window.clearInterval(whatsAppPollingId);
+		whatsAppPollingId = undefined;
+	}
+}
+
 onMounted(() => {
 	if (!authStore.isAuthenticated || !canTakeOrders.value) {
 		return;
 	}
+	onWhatsAppSignalR('WhatsAppMessageCreated', handleWhatsAppRealtimeMessage);
+	startWhatsAppUnreadPolling();
 	// En detalle de sucursal, el GET /Branches/:id es pesado; retrasar el prefetch evita competir por red/DB.
 	if (isBranchDetailPath(route.path)) {
 		window.setTimeout(() => prefetchOrderCatalog(), 2000);
 		return;
 	}
 	prefetchOrderCatalog();
+});
+
+onBeforeUnmount(() => {
+	offWhatsAppSignalR('WhatsAppMessageCreated', handleWhatsAppRealtimeMessage);
+	stopWhatsAppUnreadPolling();
 });
 </script>

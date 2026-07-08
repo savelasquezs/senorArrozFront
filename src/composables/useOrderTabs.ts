@@ -14,6 +14,9 @@ export function useOrderTabs() {
         const newOrder: DraftOrder = {
             tabId,
             tabName,
+            branchId: null,
+            source: null,
+            whatsappConversationId: null,
             type: 'delivery',
             customerId: null,
             customerName: null,

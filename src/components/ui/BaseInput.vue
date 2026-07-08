@@ -10,7 +10,7 @@
 		<div class="relative">
 			<input :id="inputId" :type="type" v-model="inputValue" :placeholder="placeholder" :required="required"
 				:disabled="disabled" :class="inputClasses" @blur="onBlur" @focus="onFocus" :minlength="minlength"
-				:maxlength="maxlength" :min="min" :max="max" @keyup.enter="onEnter" />
+				:maxlength="maxlength" :min="min" :max="max" :step="step" @keyup.enter="onEnter" />
 			<div v-if="$slots.icon"
 				class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
 				<slot name="icon" />
@@ -50,6 +50,7 @@ interface Props {
 	maxlength?: number;
 	min?: number;
 	max?: number;
+	step?: number | string;
 }
 
 const props = withDefaults(defineProps<Props>(), {

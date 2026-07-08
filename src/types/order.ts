@@ -83,6 +83,9 @@ export interface OrderAppPayment {
 export interface DraftOrder {
     tabId: string
     tabName: string
+    branchId?: number | null
+    source?: 'WhatsApp' | null
+    whatsappConversationId?: number | null
     type: OrderType
     customerId: number | null
     customerName: string | null
@@ -352,6 +355,7 @@ export interface CreateOrderDto {
     prepareAt?: Date
     notes?: string
     guestName?: string
+    freeDeliveryRequested?: boolean
     orderDetails: CreateOrderDetailDto[]
     bankPayments?: CreateBankPaymentDto[]
     appPayments?: CreateAppPaymentDto[]

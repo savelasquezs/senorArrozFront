@@ -41,7 +41,28 @@
                 </div>
             </div>
 
-            <div v-if="props.selectedCustomer.loyaltyNextRewardMessage"
+            <div v-if="loyaltyRewardDue"
+                class="relative overflow-hidden rounded-lg border-2 border-amber-300 bg-amber-50 px-3 py-3 text-amber-950 shadow-sm">
+                <div class="absolute right-2 top-2 text-amber-200">
+                    <SparklesIcon class="h-10 w-10" />
+                </div>
+                <div class="relative flex items-start gap-3">
+                    <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-amber-500 text-white shadow-sm">
+                        <GiftIcon class="h-6 w-6" />
+                    </div>
+                    <div class="min-w-0">
+                        <p class="text-xs font-bold uppercase text-amber-700">Regalo disponible en este pedido</p>
+                        <p class="mt-1 text-base font-extrabold leading-tight text-amber-950">
+                            {{ props.selectedCustomer.loyaltyNextRewardLabel || 'Premio de fidelidad' }}
+                        </p>
+                        <p class="mt-1 text-xs font-medium text-amber-800">
+                            Este cliente ya tiene {{ props.selectedCustomer.loyaltyDeliveredCount || 0 }} pedido(s) entregado(s). Aplica el regalo antes de cobrar.
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <div v-else-if="props.selectedCustomer.loyaltyNextRewardMessage"
                 class="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950">
                 {{ props.selectedCustomer.loyaltyNextRewardMessage }}
             </div>
@@ -64,6 +85,7 @@
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue'
 import type { Customer, CustomerAddress } from '@/types/customer'
 
 // Stores y composables (condicionales según modo)
@@ -79,7 +101,9 @@ import PhoneNumberItem from '@/components/customers/PhoneNumberItem.vue'
 
 // Icons
 import {
+    GiftIcon,
     EyeIcon,
+    SparklesIcon,
     ArrowPathIcon
 } from '@heroicons/vue/24/outline'
 
@@ -124,6 +148,11 @@ const orderTypeOptions = [
     { value: 'delivery', label: 'Domicilio' },
     { value: 'reservation', label: 'Reserva' },
 ]
+
+const loyaltyRewardDue = computed(() =>
+    props.selectedCustomer?.loyaltyRewardDueOnCurrentOrder === true ||
+    props.selectedCustomer?.loyaltyDeliveriesUntilNextReward === 1,
+)
 
 // Methods
 const handleCustomerSelected = (customer: Customer) => {

@@ -12,6 +12,20 @@
 					Pedidos
 				</RouterLink>
 				<RouterLink
+					v-if="canAccessWhatsApp"
+					to="/whatsapp"
+					title="WhatsApp"
+					class="relative inline-flex h-8 w-8 items-center justify-center rounded-full border border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 hover:text-emerald-800 transition-colors"
+				>
+					<ChatBubbleLeftRightIcon class="h-4 w-4" />
+					<span
+						v-if="whatsappStore.unreadTotal > 0"
+						class="absolute -right-1.5 -top-1.5 min-w-5 rounded-full bg-red-600 px-1.5 py-0.5 text-center text-[10px] font-semibold leading-none text-white ring-2 ring-white"
+					>
+						{{ unreadBadgeText }}
+					</span>
+				</RouterLink>
+				<RouterLink
 					to="/orders/new"
 					title="Nuevo pedido"
 					class="inline-flex items-center gap-1.5 rounded-md bg-emerald-600 px-2.5 py-1.5 text-sm font-medium text-white shadow-sm hover:bg-emerald-700 transition-colors"
@@ -28,17 +42,25 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import { RouterLink } from 'vue-router';
-import { PlusIcon } from '@heroicons/vue/24/outline';
+import { ChatBubbleLeftRightIcon, PlusIcon } from '@heroicons/vue/24/outline';
 import MobileMenuButton from './MobileMenuButton.vue';
 import Breadcrumbs from './Breadcrumbs.vue';
 import BranchSelector from './BranchSelector.vue';
 import UserMenu from './UserMenu.vue';
 import { useAuthStore } from '@/store/auth';
+import { useWhatsAppStore } from '@/store/whatsapp';
 
 defineEmits<{ toggleSidebar: [] }>();
 const authStore = useAuthStore();
+const whatsappStore = useWhatsAppStore();
 
 const canAccessOrders = computed(
 	() => authStore.isSuperadmin || authStore.isAdmin || authStore.isCashier,
+);
+
+const canAccessWhatsApp = computed(() => canAccessOrders.value && whatsappStore.enabled);
+
+const unreadBadgeText = computed(() =>
+	whatsappStore.unreadTotal > 99 ? '99+' : String(whatsappStore.unreadTotal),
 );
 </script>

@@ -29,7 +29,7 @@ const props = withDefaults(
 	defineProps<{
 		labels: string[];
 		datasets: BarChartDataset[];
-		yFormat?: 'currency' | 'number';
+		yFormat?: 'currency' | 'number' | 'percent';
 		/** Apila series en el eje de valores (útil para 70% / 30% en barras horizontales). */
 		stacked?: boolean;
 		/**
@@ -132,6 +132,9 @@ const chartOptions = computed<ChartOptions<'bar'>>(() => {
 					const n = Number(v);
 					const prefix = ctx.dataset.label ? `${ctx.dataset.label}: ` : '';
 					if (yFormat === 'currency') return `${prefix}${formatTooltipCurrency(n)}`;
+					if (yFormat === 'percent') {
+						return `${prefix}${new Intl.NumberFormat('es-CO', { maximumFractionDigits: 2 }).format(n)} %`;
+					}
 					return `${prefix}${new Intl.NumberFormat('es-CO').format(n)}`;
 				},
 				footer: (items) => {
@@ -159,6 +162,9 @@ const chartOptions = computed<ChartOptions<'bar'>>(() => {
 				callback: (val) => {
 					const n = Number(val);
 					if (yFormat === 'currency') return formatAxisCurrency(n);
+					if (yFormat === 'percent') {
+						return `${new Intl.NumberFormat('es-CO', { maximumFractionDigits: 1 }).format(n)} %`;
+					}
 					return new Intl.NumberFormat('es-CO').format(n);
 				},
 			},
