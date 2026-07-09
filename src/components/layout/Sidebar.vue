@@ -46,7 +46,40 @@
 			<!-- Navigation -->
 			<nav class="flex-1 px-2 space-y-1">
 				<template v-for="item in navigationItems" :key="item.name">
-					<router-link v-if="hasPermission(item.roles, item)" :to="item.to" :class="[
+					<div v-if="hasPermission(item.roles, item) && item.children?.length" class="space-y-1">
+						<button
+							type="button"
+							:class="[
+								navItemActive(item)
+									? 'bg-emerald-600 text-white hover:bg-emerald-700'
+									: 'text-gray-600 hover:text-gray-900 hover:bg-gray-100',
+								'group flex w-full items-center px-3 py-2 text-sm font-medium rounded-xl transition-colors gap-3',
+							]"
+							@click="toggleNavGroup(item.name)"
+						>
+							<component :is="item.icon" class="h-4 w-4 flex-shrink-0" />
+							<span class="text-sm flex-1 text-left">{{ item.name }}</span>
+							<ChevronDownIcon v-if="expandedGroups[item.name]" class="h-4 w-4" />
+							<ChevronRightIcon v-else class="h-4 w-4" />
+						</button>
+						<div v-if="expandedGroups[item.name]" class="ml-6 space-y-1">
+							<router-link
+								v-for="child in item.children"
+								:key="child.name"
+								:to="child.to"
+								:class="[
+									navChildActive(child)
+										? 'bg-emerald-50 text-emerald-700'
+										: 'text-gray-500 hover:bg-gray-100 hover:text-gray-900',
+									'block rounded-lg px-3 py-1.5 text-sm transition-colors',
+								]"
+								@click="$emit('close')"
+							>
+								{{ child.name }}
+							</router-link>
+						</div>
+					</div>
+					<router-link v-else-if="hasPermission(item.roles, item)" :to="item.to" :class="[
 						navItemActive(item)
 							? 'bg-emerald-600 text-white hover:bg-emerald-700'
 							: 'text-gray-600 hover:text-gray-900 hover:bg-gray-100',
@@ -69,7 +102,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onMounted, watch } from 'vue';
+import { computed, nextTick, onMounted, ref, watch } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import { useAuthStore } from '@/store/auth';
 import { useDeliveryStore } from '@/store/delivery';
@@ -90,6 +123,8 @@ import {
 	ArrowsRightLeftIcon,
 	ClipboardDocumentListIcon,
 	ChatBubbleLeftRightIcon,
+	ChevronDownIcon,
+	ChevronRightIcon,
 } from '@heroicons/vue/24/outline';
 import { UserRole } from '@/types/auth';
 
@@ -110,15 +145,32 @@ type NavItem = {
 	/** Si true, solo activo en ruta exacta (evita marcar "Gastos" en /expenses/menu-attribution). */
 	exactPath?: boolean;
 	requiresWhatsApp?: boolean;
+	children?: NavChild[];
+};
+
+type NavChild = {
+	name: string;
+	to: string;
+	section?: string;
 };
 
 function navItemActive(item: NavItem): boolean {
 	const p = route.path;
+	if (item.children?.length) {
+		return p === item.to || p.startsWith(item.to + '/') || item.children.some(navChildActive);
+	}
 	if (item.exactPath) return p === item.to;
 	return p === item.to || p.startsWith(item.to + '/');
 }
+
+function navChildActive(child: NavChild): boolean {
+	if (route.path !== child.to.split('?')[0]) return false;
+	if (!child.section) return !route.query.section;
+	return route.query.section === child.section;
+}
 const deliveryStore = useDeliveryStore();
 const router = useRouter();
+const expandedGroups = ref<Record<string, boolean>>({});
 
 async function onDeliverymanMiHistorial() {
 	emit('close');
@@ -134,6 +186,38 @@ const sidebarClasses = computed(() => [
 	'transform transition-transform duration-300 ease-in-out',
 	props.isOpen ? 'translate-x-0' : '-translate-x-full',
 ]);
+
+const currentBranchDetailId = computed(() => {
+	const match = route.path.match(/^\/branches\/(\d+)/);
+	return match?.[1] ?? null;
+});
+
+const branchMenuBase = computed(() => {
+	const branchId = currentBranchDetailId.value ?? authStore.user?.branchId;
+	return branchId ? `/branches/${branchId}` : '/branches';
+});
+
+const branchSectionChildren = computed<NavChild[]>(() => {
+	const base = branchMenuBase.value;
+	if (base === '/branches') {
+		return [{ name: 'Listado', to: '/branches' }];
+	}
+	return [
+		{ name: 'Info general', to: `${base}?section=general`, section: 'general' },
+		{ name: 'WhatsApp e IA', to: `${base}?section=whatsapp-ai`, section: 'whatsapp-ai' },
+		{ name: 'Bancos y apps', to: `${base}?section=banks-apps`, section: 'banks-apps' },
+		{ name: 'Gastos', to: `${base}?section=expenses`, section: 'expenses' },
+		{ name: 'Fidelizacion', to: `${base}?section=loyalty`, section: 'loyalty' },
+		{ name: 'Impresion', to: `${base}?section=printing`, section: 'printing' },
+	];
+});
+
+function toggleNavGroup(name: string) {
+	expandedGroups.value = {
+		...expandedGroups.value,
+		[name]: !expandedGroups.value[name],
+	};
+}
 
 // Ícono dinámico según el rol
 const roleIcon = computed(() => {
@@ -165,12 +249,14 @@ const navigationItems = computed((): NavItem[] => [
 		to: '/branches',
 		icon: BriefcaseIcon,
 		roles: ['Superadmin'],
+		children: branchSectionChildren.value,
 	},
 	{
 		name: 'Mi sucursal',
 		to: `/branches/${authStore.user?.branchId}`,
 		icon: BriefcaseIcon,
 		roles: ['Admin'],
+		children: branchSectionChildren.value,
 	},
 	{
 		name: 'Pedidos',
@@ -265,4 +351,18 @@ function loadWhatsAppStatus() {
 onMounted(loadWhatsAppStatus);
 
 watch(() => authStore.isAuthenticated, loadWhatsAppStatus);
+
+watch(
+	() => route.path,
+	(path) => {
+		if (path.startsWith('/branches')) {
+			expandedGroups.value = {
+				...expandedGroups.value,
+				Sucursales: true,
+				'Mi sucursal': true,
+			};
+		}
+	},
+	{ immediate: true },
+);
 </script>

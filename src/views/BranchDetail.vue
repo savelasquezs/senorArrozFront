@@ -47,7 +47,7 @@
                     </div>
 
                     <!-- Branch Info -->
-                    <div class="px-6 py-4">
+                    <div v-if="activeBranchSection === 'general'" class="px-6 py-4">
                         <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
                             <div v-if="branch.businessName" class="flex items-center md:col-span-3">
                                 <BuildingOffice2Icon class="w-5 h-5 text-gray-400 mr-3 flex-shrink-0" />
@@ -92,8 +92,12 @@
                     </div>
                 </div>
 
+                <div class="flex items-center justify-between">
+                    <h2 class="text-xl font-semibold text-gray-900">{{ activeBranchSectionTitle }}</h2>
+                </div>
+
                 <!-- Stats Cards -->
-                <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div v-if="activeBranchSection === 'general'" class="grid grid-cols-1 md:grid-cols-4 gap-4">
                     <BaseCard>
                         <div class="flex items-center">
                             <div class="flex-shrink-0">
@@ -145,7 +149,7 @@
                 </div>
 
                 <!-- Impresión térmica (agente local) -->
-                <BaseCard v-if="canEditBranchProfile">
+                <BaseCard v-if="canEditBranchProfile && activeBranchSection === 'printing'">
                     <div class="space-y-4">
                         <h3 class="text-lg font-semibold text-gray-900 flex items-center gap-2">
                             <PrinterIcon class="w-6 h-6 text-gray-600" />
@@ -177,23 +181,23 @@
                     </div>
                 </BaseCard>
 
-                <BaseCard v-if="canEditBranchProfile">
+                <BaseCard v-if="canEditBranchProfile && activeBranchSection === 'whatsapp-ai'">
                     <BranchWhatsAppSettingsForm :branch-id="branchId" @saved="handleWhatsAppSettingsSaved" />
                 </BaseCard>
 
-                <BranchAiSettingsForm v-if="canEditBranchProfile" :branch-id="branchId" />
+                <BranchAiSettingsForm v-if="canEditBranchProfile && activeBranchSection === 'whatsapp-ai'" :branch-id="branchId" />
 
-                <BranchLoyaltyCycleForm v-if="canEditBranchProfile" :branch-id="branchId" />
+                <BranchLoyaltyCycleForm v-if="canEditBranchProfile && activeBranchSection === 'loyalty'" :branch-id="branchId" />
 
                 <!-- Users Section -->
-                <BaseCard>
+                <BaseCard v-if="activeBranchSection === 'general'">
                     <BranchUsersTable :users="branch.users" :branch-id="branch.id" @user-created="handleUserCreated"
                         @user-updated="handleUserUpdated" @user-status-toggled="handleUserStatusToggled"
                         @error="handleUserError" />
                 </BaseCard>
 
                 <!-- Neighborhoods Section -->
-                <BaseCard>
+                <BaseCard v-if="activeBranchSection === 'general'">
                     <div class="space-y-4">
                         <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                             <h3 class="text-lg font-semibold text-gray-900">
@@ -279,7 +283,7 @@
                 </BaseCard>
 
                 <!-- Banks Section -->
-                <BaseCard>
+                <BaseCard v-if="activeBranchSection === 'banks-apps'">
                     <div class="space-y-4">
                         <div class="flex items-center justify-between">
                             <h3 class="text-lg font-semibold text-gray-900">
@@ -389,7 +393,7 @@
                 </BaseCard>
 
                 <!-- Apps Section -->
-                <BaseCard>
+                <BaseCard v-if="activeBranchSection === 'banks-apps'">
                     <div class="space-y-4">
                         <div class="flex items-center justify-between">
                             <h3 class="text-lg font-semibold text-gray-900">
@@ -510,7 +514,7 @@
                 </BaseCard>
 
                 <!-- Expenses Section -->
-                <BaseCard>
+                <BaseCard v-if="activeBranchSection === 'expenses'">
                     <div class="space-y-4">
                         <!-- Tabs -->
                         <div class="border-b border-gray-200">
@@ -762,6 +766,26 @@ const editingSupplier = ref<Supplier | null>(null)
 const supplierFormLoading = ref(false)
 
 const branchId = computed(() => Number(route.params.id))
+
+type BranchSectionId = 'general' | 'whatsapp-ai' | 'banks-apps' | 'expenses' | 'loyalty' | 'printing'
+
+const branchSections: Array<{ id: BranchSectionId; label: string }> = [
+    { id: 'general', label: 'Info general' },
+    { id: 'whatsapp-ai', label: 'WhatsApp e IA' },
+    { id: 'banks-apps', label: 'Bancos y apps' },
+    { id: 'expenses', label: 'Gastos' },
+    { id: 'loyalty', label: 'Fidelizacion' },
+    { id: 'printing', label: 'Impresion' },
+]
+
+const activeBranchSection = computed<BranchSectionId>(() => {
+    const raw = typeof route.query.section === 'string' ? route.query.section : 'general'
+    return branchSections.some((section) => section.id === raw) ? raw as BranchSectionId : 'general'
+})
+
+const activeBranchSectionTitle = computed(() =>
+    branchSections.find((section) => section.id === activeBranchSection.value)?.label ?? 'Info general',
+)
 
 const handlePrintSettingsSaved = () => {
     void branchesStore.fetchById(branchId.value, { silent: true })
@@ -1481,7 +1505,15 @@ watch(branchId, () => {
 })
 
 watch(expensesActiveTab, (tab) => {
-    void syncExpensesTabData(tab)
+    if (activeBranchSection.value === 'expenses') {
+        void syncExpensesTabData(tab)
+    }
+})
+
+watch(activeBranchSection, (section) => {
+    if (section === 'expenses') {
+        void syncExpensesTabData(expensesActiveTab.value)
+    }
 })
 
 onMounted(() => {
