@@ -186,7 +186,10 @@
                     :branch-id="branchId"
                 />
 
-                <BranchLoyaltyCycleForm v-if="canEditBranchProfile && activeBranchSection === 'loyalty'" :branch-id="branchId" />
+                <BranchLoyaltySection
+                    v-if="canEditBranchProfile && activeBranchSection === 'loyalty'"
+                    :branch-id="branchId"
+                />
 
                 <!-- Users Section -->
                 <BaseCard v-if="activeBranchSection === 'general'">
@@ -430,7 +433,7 @@ import BranchPrintSettingsForm from '@/components/branches/BranchPrintSettingsFo
 import BranchWhatsAppAiSettingsSection from '@/components/branches/BranchWhatsAppAiSettingsSection.vue'
 import BranchBanksAppsSection from '@/components/branches/BranchBanksAppsSection.vue'
 import BranchExpensesSection from '@/components/branches/BranchExpensesSection.vue'
-import BranchLoyaltyCycleForm from '@/components/branches/BranchLoyaltyCycleForm.vue'
+import BranchLoyaltySection from '@/components/branches/BranchLoyaltySection.vue'
 import BranchForm from '@/components/branches/BranchForm.vue'
 import NeighborhoodForm from '@/components/neighborhoods/NeighborhoodForm.vue'
 import BankForm from '@/components/payments/banks/BankForm.vue'
