@@ -3,7 +3,7 @@
     <div class="space-y-4">
       <h3 class="text-lg font-semibold text-gray-900 flex items-center gap-2">
         <PrinterIcon class="w-6 h-6 text-gray-600" />
-        Impresion termica
+        Impresión térmica
       </h3>
       <p class="text-sm text-gray-600">
         Nombres de cola Windows, reglas de encolado y token del agente que consulta la API en cada sucursal.
@@ -26,7 +26,7 @@
             :loading="testPrintLoading === 'kitchen'"
             @click="$emit('test-print', 'kitchen')"
           >
-            Impresion prueba (cocina)
+            Impresión prueba (cocina)
           </BaseButton>
           <BaseButton
             v-if="printSettings.enableDeliveryJobs"
@@ -35,7 +35,7 @@
             :loading="testPrintLoading === 'delivery'"
             @click="$emit('test-print', 'delivery')"
           >
-            Impresion prueba (domicilio)
+            Impresión prueba (domicilio)
           </BaseButton>
         </div>
       </div>
