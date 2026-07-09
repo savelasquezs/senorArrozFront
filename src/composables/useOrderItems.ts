@@ -15,12 +15,14 @@ export function useOrderItems() {
         discount: number
         dailyPromotionDiscount?: number | null
         loyaltyDiscount?: number | null
+        discountCodeDiscount?: number | null
         freeDeliveryDiscount?: number | null
     }) => {
         const daily = Math.max(0, Number(item.dailyPromotionDiscount ?? 0) || 0)
         const loyalty = Math.max(0, Number(item.loyaltyDiscount ?? 0) || 0)
+        const code = Math.max(0, Number(item.discountCodeDiscount ?? 0) || 0)
         const fd = Math.max(0, Number(item.freeDeliveryDiscount ?? 0) || 0)
-        return Math.max(0, item.quantity * item.unitPrice - item.discount - daily - loyalty - fd)
+        return Math.max(0, item.quantity * item.unitPrice - item.discount - daily - loyalty - code - fd)
     }
 
     const addProduct = (product: Product, quantity: number = 1) => {
@@ -37,7 +39,8 @@ export function useOrderItems() {
         const existingIndex = order.orderItems.findIndex(item =>
             item.productId === product.id &&
             item.isDailyPromotionGift !== true &&
-            item.isLoyaltyGift !== true,
+            item.isLoyaltyGift !== true &&
+            item.isDiscountCodeGift !== true,
         )
 
         let updatedItems: OrderItem[]
@@ -63,9 +66,14 @@ export function useOrderItems() {
                 dailyPromotionDiscountPercentage: null,
                 loyaltyDiscount: 0,
                 loyaltyDiscountPercentage: null,
+                discountCodeDiscount: 0,
+                discountCodeDiscountPercentage: null,
                 freeDeliveryDiscount: 0,
                 subtotal: product.price * quantity,
-                notes: ''
+                notes: '',
+                isDailyPromotionGift: false,
+                isLoyaltyGift: false,
+                isDiscountCodeGift: false,
             }
             updatedItems = [...order.orderItems, newItem]
         }
@@ -82,7 +90,10 @@ export function useOrderItems() {
         if (!order) return
 
         const removedItem = order.orderItems.find(item => item.tempId === itemTempId)
-        const removedBenefitGift = removedItem?.isDailyPromotionGift === true || removedItem?.isLoyaltyGift === true
+        const removedBenefitGift =
+            removedItem?.isDailyPromotionGift === true ||
+            removedItem?.isLoyaltyGift === true ||
+            removedItem?.isDiscountCodeGift === true
         const updated = {
             ...order,
             orderItems: order.orderItems.filter(item => item.tempId !== itemTempId),
@@ -98,10 +109,22 @@ export function useOrderItems() {
                 removedItem?.isDailyPromotionGift === true ? null : order.appliedDailyPromotionId,
             appliedLoyaltyStepId:
                 removedItem?.isLoyaltyGift === true ? null : order.appliedLoyaltyStepId,
+            appliedDiscountCodeId:
+                removedItem?.isDiscountCodeGift === true ? null : order.appliedDiscountCodeId,
             appliedBenefitType:
                 removedBenefitGift ? null : order.appliedBenefitType,
+            appliedBenefitSourceId:
+                removedBenefitGift ? null : order.appliedBenefitSourceId,
+            appliedBenefitCode:
+                removedBenefitGift ? null : order.appliedBenefitCode,
             appliedBenefitLabel:
                 removedBenefitGift ? null : order.appliedBenefitLabel,
+            appliedBenefitRewardType:
+                removedBenefitGift ? null : order.appliedBenefitRewardType,
+            appliedBenefitAmount:
+                removedBenefitGift ? null : order.appliedBenefitAmount,
+            appliedBenefitSnapshot:
+                removedBenefitGift ? null : order.appliedBenefitSnapshot,
             selectedBenefitType: removedBenefitGift ? 'None' : order.selectedBenefitType,
         }
         store.recalculateTotals(updated)

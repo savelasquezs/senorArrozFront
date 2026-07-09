@@ -88,6 +88,34 @@
                     </div>
 
                     <OrderItemList :tab-id="currentTabId || ''" @add-products="handleAddProducts" />
+                    <div class="mx-4 mb-3 rounded-md border border-gray-200 bg-white p-3 space-y-2">
+                        <label class="block text-xs font-medium text-gray-700">Codigo promocional</label>
+                        <div class="flex gap-2">
+                            <BaseInput
+                                :model-value="discountCodeInput"
+                                placeholder="Ej: ARROZ10"
+                                class="flex-1"
+                                @update:model-value="updateDiscountCodeInput"
+                                @keyup.enter="validateDiscountCode"
+                            />
+                            <BaseButton
+                                variant="outline"
+                                size="sm"
+                                :loading="isValidatingDiscountCode"
+                                :disabled="!discountCodeInput.trim() || isValidatingDiscountCode"
+                                @click="validateDiscountCode"
+                            >
+                                Aplicar
+                            </BaseButton>
+                        </div>
+                        <div v-if="currentOrder.activeDiscountCode" class="flex items-center justify-between gap-2 text-xs text-indigo-700">
+                            <span class="font-medium">Codigo valido: {{ currentOrder.activeDiscountCode.label || currentOrder.activeDiscountCode.code }}</span>
+                            <button type="button" class="text-red-600 hover:text-red-700" @click="removeDiscountCode">
+                                Quitar
+                            </button>
+                        </div>
+                        <p v-if="discountCodeError" class="text-xs text-red-600">{{ discountCodeError }}</p>
+                    </div>
                     <div
                         v-if="appliedBenefitText"
                         class="mx-4 mb-3 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-medium text-emerald-800"
@@ -230,7 +258,7 @@
         >
             <div class="space-y-4">
                 <p class="text-sm text-gray-700">
-                    Este pedido tiene Promo del dia y Fidelizacion disponibles. Solo se puede aplicar un beneficio.
+                    Este pedido tiene varios beneficios disponibles. Solo se puede aplicar uno.
                 </p>
                 <p class="text-xs text-gray-500">
                     Puedes cerrar este modal y resolverlo despues, pero no se podra enviar el pedido hasta elegir una opcion.
@@ -249,10 +277,13 @@
                 <BaseButton variant="outline" size="sm" @click="chooseNoBenefit">
                     No aplicar beneficio
                 </BaseButton>
-                <BaseButton variant="secondary" size="sm" @click="chooseLoyaltyBenefit">
+                <BaseButton v-if="activeLoyaltyStep" variant="secondary" size="sm" @click="chooseLoyaltyBenefit">
                     Aplicar fidelizacion
                 </BaseButton>
-                <BaseButton variant="primary" size="sm" @click="chooseDailyPromotionBenefit">
+                <BaseButton v-if="activeDiscountCode" variant="secondary" size="sm" @click="chooseDiscountCodeBenefit">
+                    Aplicar codigo
+                </BaseButton>
+                <BaseButton v-if="activeDailyPromotion" variant="primary" size="sm" @click="chooseDailyPromotionBenefit">
                     Aplicar promo del dia
                 </BaseButton>
             </template>
@@ -281,8 +312,10 @@ import { useFormatting } from '@/composables/useFormatting'
 import { orderCashToCollect, sumPaymentsAmounts } from '@/utils/orderCashToCollect'
 import { customerApi } from '@/services/MainAPI/customerApi'
 import { whatsappApi } from '@/services/MainAPI/whatsappApi'
+import { discountCodeApi } from '@/services/MainAPI/discountCodeApi'
 import { buildWhatsAppOrderConfirmationMessage } from '@/composables/useWhatsAppOrderConfirmation'
 import { useBranchPosSettingsStore } from '@/store/branchPosSettings'
+import { useAuthStore } from '@/store/auth'
 import type { Customer, CustomerAddress } from '@/types/customer'
 import type { DraftOrder } from '@/types/order'
 
@@ -317,15 +350,20 @@ const { submitOrder } = useOrderSubmission()
 const { success, error: showError } = useToast()
 const { formatCurrency, formatDateTime } = useFormatting()
 const {
+    activeDailyPromotion,
+    activeLoyaltyStep,
+    activeDiscountCode,
     conflictExists: benefitConflictExists,
     copyMessage: benefitCopyMessage,
     resolveBenefits,
     applyDailyPromotion,
     applyLoyaltyBenefit,
+    applyDiscountCode,
     clearAppliedBenefit,
 } = useOrderBenefitResolver()
 const router = useRouter()
 const branchPosSettings = useBranchPosSettingsStore()
+const authStore = useAuthStore()
 
 // State
 const showCustomerDetail = ref(false)
@@ -348,11 +386,14 @@ const isSubmittingOrder = ref(false)
 const isCheckingDuplicateOrderDate = ref(false)
 const isSendingWhatsAppConfirmation = ref(false)
 const showBenefitConflictDialog = ref(false)
+const isValidatingDiscountCode = ref(false)
 
 // Computed
 const currentOrder = computed(() => ordersStore.currentOrder)
 const currentTabId = computed(() => ordersStore.currentTabId)
 const { canSubmitOrder, orderErrors } = useOrderValidation()
+const discountCodeInput = computed(() => currentOrder.value?.discountCodeInput ?? '')
+const discountCodeError = computed(() => currentOrder.value?.discountCodeError ?? '')
 
 const appliedBenefitText = computed(() => {
     const order = currentOrder.value
@@ -362,6 +403,9 @@ const appliedBenefitText = computed(() => {
     }
     if (order.appliedBenefitType === 'Loyalty') {
         return 'Beneficio aplicado: Fidelizacion'
+    }
+    if (order.appliedBenefitType === 'DiscountCode') {
+        return 'Beneficio aplicado: Codigo promocional'
     }
     return 'Beneficio aplicado: Promo del dia'
 })
@@ -503,6 +547,54 @@ async function copyBenefitConflictMessage() {
     }
 }
 
+function purchasedProductsGrossSubtotal(order: DraftOrder): number {
+    return order.orderItems
+        .filter((item) =>
+            item.isDailyPromotionGift !== true &&
+            item.isLoyaltyGift !== true &&
+            item.isDiscountCodeGift !== true)
+        .reduce((sum, item) => sum + Math.max(0, item.quantity) * Math.max(0, item.unitPrice), 0)
+}
+
+function updateDiscountCodeInput(value: string | number | null) {
+    ordersStore.setCurrentOrderDiscountCodeInput(String(value || '').toUpperCase())
+}
+
+async function validateDiscountCode() {
+    const order = currentOrder.value
+    if (!order) return
+    const code = discountCodeInput.value.trim()
+    if (!code) {
+        ordersStore.setCurrentOrderActiveDiscountCode(null, 'Ingresa un codigo promocional.')
+        return
+    }
+    const branchId = order.branchId || authStore.branchId || branchPosSettings.loadedBranchId
+    if (!branchId) {
+        showError('Codigo promocional', 'No hay sucursal activa para validar el codigo.')
+        return
+    }
+
+    isValidatingDiscountCode.value = true
+    try {
+        const response = await discountCodeApi.validate(branchId, code, purchasedProductsGrossSubtotal(order))
+        if (!response.isSuccess || !response.data) {
+            ordersStore.setCurrentOrderActiveDiscountCode(null, response.message || 'Codigo promocional invalido.')
+            return
+        }
+        ordersStore.setCurrentOrderActiveDiscountCode(response.data, null)
+        await resolveBenefits()
+    } catch (err: any) {
+        ordersStore.setCurrentOrderActiveDiscountCode(null, err?.message || 'Codigo promocional invalido.')
+    } finally {
+        isValidatingDiscountCode.value = false
+    }
+}
+
+async function removeDiscountCode() {
+    ordersStore.clearCurrentOrderDiscountCode()
+    await resolveBenefits()
+}
+
 function openBenefitConflictDialog() {
     showBenefitConflictDialog.value = true
 }
@@ -514,6 +606,11 @@ async function chooseDailyPromotionBenefit() {
 
 async function chooseLoyaltyBenefit() {
     await applyLoyaltyBenefit()
+    showBenefitConflictDialog.value = false
+}
+
+async function chooseDiscountCodeBenefit() {
+    await applyDiscountCode()
     showBenefitConflictDialog.value = false
 }
 
@@ -753,7 +850,7 @@ const handleSubmitOrder = async () => {
         showBenefitConflictDialog.value = true
         showError(
             'Beneficio pendiente',
-            'Este pedido tiene Promo del dia y Fidelizacion disponibles. Elige una opcion antes de enviarlo.',
+            'Este pedido tiene varios beneficios disponibles. Elige una opcion antes de enviarlo.',
         )
         return
     }
@@ -829,7 +926,10 @@ watch(
         const order = currentOrder.value
         if (!order) return ''
         const items = order.orderItems
-            .filter((item) => item.isDailyPromotionGift !== true && item.isLoyaltyGift !== true)
+            .filter((item) =>
+                item.isDailyPromotionGift !== true &&
+                item.isLoyaltyGift !== true &&
+                item.isDiscountCodeGift !== true)
             .map((item) => `${item.productId}:${item.quantity}:${item.unitPrice}:${item.discount}`)
             .join('|')
         return [
@@ -840,6 +940,7 @@ watch(
             order.addressId ?? '',
             order.deliveryFee,
             order.selectedBenefitType ?? '',
+            order.activeDiscountCode?.id ?? '',
             items,
         ].join(';')
     },

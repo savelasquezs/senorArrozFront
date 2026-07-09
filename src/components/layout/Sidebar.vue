@@ -208,6 +208,7 @@ const branchSectionChildren = computed<NavChild[]>(() => {
 		{ name: 'Bancos y apps', to: `${base}?section=banks-apps`, section: 'banks-apps' },
 		{ name: 'Gastos', to: `${base}?section=expenses`, section: 'expenses' },
 		{ name: 'Fidelizacion', to: `${base}?section=loyalty`, section: 'loyalty' },
+		{ name: 'Codigos promo', to: `${base}?section=discount-codes`, section: 'discount-codes' },
 		{ name: 'Impresion', to: `${base}?section=printing`, section: 'printing' },
 	];
 });

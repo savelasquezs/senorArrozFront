@@ -15,10 +15,9 @@
                 <span class="font-medium">{{ formatCurrency(order.deliveryFee) }}</span>
             </div>
 
-            <!-- Premio / fidelidad aplicado al pedido (si existe) -->
-            <div v-if="order.loyaltyRuleName" class="flex justify-between text-sm text-green-700">
-                <span>Fidelidad:</span>
-                <span class="font-medium text-right">{{ order.loyaltyRuleName }}</span>
+            <div v-if="benefitLabel" class="flex justify-between text-sm text-green-700">
+                <span>Beneficio:</span>
+                <span class="font-medium text-right">{{ benefitLabel }}</span>
             </div>
 
             <!-- Items Count -->
@@ -109,6 +108,8 @@ interface Props {
 const props = defineProps<Props>()
 
 // Computed
+const benefitLabel = computed(() => props.order.appliedBenefitLabel || props.order.loyaltyRuleName || '')
+
 const itemCount = computed(() => {
     return props.order.orderDetails.reduce((sum, item) => sum + item.quantity, 0)
 })

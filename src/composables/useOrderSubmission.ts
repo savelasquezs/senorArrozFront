@@ -28,6 +28,7 @@ export function useOrderSubmission() {
                 (item.discount || 0) +
                 (item.dailyPromotionDiscount || 0) +
                 (item.loyaltyDiscount || 0) +
+                (item.discountCodeDiscount || 0) +
                 (item.freeDeliveryDiscount || 0),
             notes: item.notes || undefined
         }))
@@ -61,6 +62,13 @@ export function useOrderSubmission() {
             freeDeliveryRequested:
                 draft.freeDeliveryRequested === true &&
                 (draft.type === 'delivery' || (draft.type === 'reservation' && draft.addressId != null)),
+            appliedBenefitType: draft.appliedBenefitType ?? 'None',
+            appliedBenefitSourceId: draft.appliedBenefitSourceId ?? undefined,
+            appliedBenefitCode: draft.appliedBenefitCode ?? undefined,
+            appliedBenefitLabel: draft.appliedBenefitLabel ?? undefined,
+            appliedBenefitRewardType: draft.appliedBenefitRewardType ?? undefined,
+            appliedBenefitAmount: draft.appliedBenefitAmount ?? undefined,
+            appliedBenefitSnapshot: draft.appliedBenefitSnapshot ?? undefined,
             orderDetails,
             bankPayments,
             appPayments,

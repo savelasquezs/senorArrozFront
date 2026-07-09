@@ -78,7 +78,11 @@
                             :clickable="false" />
                     </td>
                     <td class="px-3 py-2 whitespace-nowrap text-xs font-medium text-gray-900 tabular-nums">
-                        {{ formatCurrency(order.total) }}
+                        <div>{{ formatCurrency(order.total) }}</div>
+                        <div v-if="order.appliedBenefitLabel || order.loyaltyRuleName" class="mt-1 max-w-[8rem] truncate text-[11px] text-emerald-700"
+                            :title="order.appliedBenefitLabel || order.loyaltyRuleName || ''">
+                            {{ order.appliedBenefitLabel || order.loyaltyRuleName }}
+                        </div>
                     </td>
                     <td class="px-3 py-2 text-[11px] text-gray-700 hidden lg:table-cell max-w-[10rem]">
                         <div v-if="order.bankPayments?.length" class="space-y-0.5">

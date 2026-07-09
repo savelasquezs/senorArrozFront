@@ -42,7 +42,12 @@ export function useOrderTabs() {
             paidInStoreCash: false,
             selectedBenefitType: null,
             appliedBenefitType: null,
+            appliedBenefitSourceId: null,
+            appliedBenefitCode: null,
             appliedBenefitLabel: null,
+            appliedBenefitRewardType: null,
+            appliedBenefitAmount: null,
+            appliedBenefitSnapshot: null,
             appliedDailyPromotionId: null,
             appliedDailyPromotionType: null,
             appliedDailyPromotionGiftProductId: null,
@@ -57,6 +62,15 @@ export function useOrderTabs() {
             appliedLoyaltyGiftProductName: null,
             appliedLoyaltyDiscountPercentage: null,
             ignoredLoyaltyStepId: null,
+            discountCodeInput: '',
+            activeDiscountCode: null,
+            discountCodeError: null,
+            appliedDiscountCodeId: null,
+            appliedDiscountCodeCode: null,
+            appliedDiscountCodeType: null,
+            appliedDiscountCodeGiftProductId: null,
+            appliedDiscountCodeGiftProductName: null,
+            appliedDiscountCodeDiscountPercentage: null,
         }
 
         store.draftOrders.set(tabId, newOrder)

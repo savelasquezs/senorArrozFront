@@ -7,9 +7,11 @@ import type { AppliedBenefitType, DraftOrder } from '@/types/order'
 import type { Customer } from '@/types/customer'
 import type { DailyPromotion } from '@/types/dailyPromotion'
 import type { LoyaltyCycleStep } from '@/types/loyaltyCycle'
+import type { DiscountCode } from '@/types/discountCode'
 
 const activeDailyPromotion = ref<DailyPromotion | null>(null)
 const activeLoyaltyStep = ref<LoyaltyCycleStep | null>(null)
+const activeDiscountCode = ref<DiscountCode | null>(null)
 const conflictExists = ref(false)
 const isResolving = ref(false)
 const cycleByBranch = new Map<number, LoyaltyCycleStep[]>()
@@ -21,18 +23,31 @@ const currency = new Intl.NumberFormat('es-CO', {
     maximumFractionDigits: 0,
 })
 
-const realItemsCount = (order: DraftOrder) =>
-    order.orderItems.filter((item) => item.isDailyPromotionGift !== true && item.isLoyaltyGift !== true).length
+const realItems = (order: DraftOrder) =>
+    order.orderItems.filter((item) =>
+        item.isDailyPromotionGift !== true &&
+        item.isLoyaltyGift !== true &&
+        item.isDiscountCodeGift !== true)
+
+const realItemsCount = (order: DraftOrder) => realItems(order).length
 
 const purchasedProductsGrossSubtotal = (order: DraftOrder) =>
-    order.orderItems
-        .filter((item) => item.isDailyPromotionGift !== true && item.isLoyaltyGift !== true)
-        .reduce((sum, item) => sum + Math.max(0, item.quantity) * Math.max(0, item.unitPrice), 0)
+    realItems(order).reduce((sum, item) => sum + Math.max(0, item.quantity) * Math.max(0, item.unitPrice), 0)
 
 const promotionMinimumReached = (order: DraftOrder, promo: DailyPromotion) => {
     const minimum = Math.max(0, Number(promo.minimumOrderValue ?? 0) || 0)
-    if (minimum <= 0) return true
-    return purchasedProductsGrossSubtotal(order) >= minimum
+    return minimum <= 0 || purchasedProductsGrossSubtotal(order) >= minimum
+}
+
+const discountCodeIsEligible = (order: DraftOrder, code: DiscountCode | null | undefined) => {
+    if (!code?.isActive) return false
+    const now = Date.now()
+    const startsAt = new Date(code.startsAt).getTime()
+    const endsAt = code.endsAt ? new Date(code.endsAt).getTime() : null
+    if (Number.isFinite(startsAt) && startsAt > now) return false
+    if (endsAt != null && Number.isFinite(endsAt) && endsAt <= now) return false
+    const minimum = Math.max(0, Number(code.minimumOrderValue ?? 0) || 0)
+    return minimum <= 0 || purchasedProductsGrossSubtotal(order) >= minimum
 }
 
 const summarizeDailyPromotion = (promo: DailyPromotion | null) => {
@@ -50,6 +65,15 @@ const summarizeDailyPromotion = (promo: DailyPromotion | null) => {
 const summarizeLoyaltyStep = (step: LoyaltyCycleStep | null) => {
     if (!step) return 'Premio de fidelizacion'
     return step.rewardLabel || step.stepName || 'Premio de fidelizacion'
+}
+
+const summarizeDiscountCode = (code: DiscountCode | null) => {
+    if (!code) return 'Codigo promocional'
+    if (code.label) return `${code.label} (${code.code})`
+    if (code.type === 'GiftProduct') return `${code.giftProductName ?? 'Producto gratis'} gratis (${code.code})`
+    if (code.type === 'FreeDelivery') return `Domicilio gratis (${code.code})`
+    if (code.type === 'PercentageDiscount') return `${Number(code.discountPercentage ?? 0) || 0}% de descuento (${code.code})`
+    return `Codigo ${code.code}`
 }
 
 const loadLoyaltyCycle = async (branchId: number) => {
@@ -101,11 +125,16 @@ export function useOrderBenefitResolver() {
 
     const copyMessage = computed(() => {
         if (!conflictExists.value) return ''
+        const options = [
+            activeDailyPromotion.value ? `- ${summarizeDailyPromotion(activeDailyPromotion.value)} (Promo del dia)` : null,
+            activeLoyaltyStep.value ? `- ${summarizeLoyaltyStep(activeLoyaltyStep.value)} (Fidelizacion)` : null,
+            activeDiscountCode.value ? `- ${summarizeDiscountCode(activeDiscountCode.value)} (Codigo promocional)` : null,
+        ].filter((item): item is string => Boolean(item))
+
         return [
             'Hoy puedes elegir entre:',
-            `- ${summarizeDailyPromotion(activeDailyPromotion.value)} (Promo del dia)`,
-            `- ${summarizeLoyaltyStep(activeLoyaltyStep.value)} (Fidelizacion)`,
-            '¿Cual quieres que te apliquemos?',
+            ...options,
+            'Cual quieres que te apliquemos?',
         ].join('\n')
     })
 
@@ -115,6 +144,7 @@ export function useOrderBenefitResolver() {
         if (!order) {
             activeDailyPromotion.value = null
             activeLoyaltyStep.value = null
+            activeDiscountCode.value = null
             conflictExists.value = false
             return
         }
@@ -122,6 +152,7 @@ export function useOrderBenefitResolver() {
         if (realItemsCount(order) === 0) {
             activeDailyPromotion.value = null
             activeLoyaltyStep.value = null
+            activeDiscountCode.value = null
             conflictExists.value = false
             if (order.appliedBenefitType) {
                 ordersStore.clearAppliedBenefitForCurrentOrder({ clearSelection: true })
@@ -139,11 +170,21 @@ export function useOrderBenefitResolver() {
                 dailyPromotionStore.loadActive(branchId),
                 resolveCustomerLoyaltyStep(branchId, customer),
             ])
+
             const eligibleDailyPromotion = promo && promotionMinimumReached(order, promo) ? promo : null
             const eligibleLoyaltyStep = loyaltyStep && loyaltyStep.isActive ? loyaltyStep : null
+            const eligibleDiscountCode = discountCodeIsEligible(order, order.activeDiscountCode)
+                ? order.activeDiscountCode ?? null
+                : null
 
             activeDailyPromotion.value = eligibleDailyPromotion
             activeLoyaltyStep.value = eligibleLoyaltyStep
+            activeDiscountCode.value = eligibleDiscountCode
+
+            if (order.activeDiscountCode && !eligibleDiscountCode) {
+                ordersStore.setCurrentOrderActiveDiscountCode(null, 'El codigo ya no cumple las condiciones del pedido.')
+                return
+            }
 
             const selected = order.selectedBenefitType ?? null
             if (selected === 'None') {
@@ -174,7 +215,18 @@ export function useOrderBenefitResolver() {
                 return
             }
 
-            if (eligibleDailyPromotion && eligibleLoyaltyStep) {
+            if (selected === 'DiscountCode') {
+                conflictExists.value = false
+                if (eligibleDiscountCode) {
+                    ordersStore.applyDiscountCodeBenefitToCurrentOrder(eligibleDiscountCode, 'DiscountCode')
+                } else if (order.appliedBenefitType === 'DiscountCode') {
+                    ordersStore.clearAppliedBenefitForCurrentOrder({ clearSelection: true })
+                }
+                return
+            }
+
+            const eligibleCount = [eligibleDailyPromotion, eligibleLoyaltyStep, eligibleDiscountCode].filter(Boolean).length
+            if (eligibleCount > 1) {
                 conflictExists.value = true
                 if (order.appliedBenefitType) {
                     ordersStore.clearAppliedBenefitForCurrentOrder({ selectedBenefitType: null })
@@ -183,6 +235,10 @@ export function useOrderBenefitResolver() {
             }
 
             conflictExists.value = false
+            if (eligibleDiscountCode) {
+                ordersStore.applyDiscountCodeBenefitToCurrentOrder(eligibleDiscountCode, null)
+                return
+            }
             if (eligibleDailyPromotion) {
                 ordersStore.applyDailyPromotionBenefitToCurrentOrder(eligibleDailyPromotion, null)
                 return
@@ -221,6 +277,17 @@ export function useOrderBenefitResolver() {
         }
     }
 
+    const applyDiscountCode = async () => {
+        ordersStore.setCurrentOrderSelectedBenefit('DiscountCode')
+        conflictExists.value = false
+        const code = activeDiscountCode.value
+        if (code) {
+            ordersStore.applyDiscountCodeBenefitToCurrentOrder(code, 'DiscountCode')
+        } else {
+            await resolveBenefits()
+        }
+    }
+
     const clearAppliedBenefit = () => {
         conflictExists.value = false
         ordersStore.clearAppliedBenefitForCurrentOrder({ selectedBenefitType: 'None' })
@@ -228,6 +295,7 @@ export function useOrderBenefitResolver() {
 
     const dailyPromotionSummary = computed(() => summarizeDailyPromotion(activeDailyPromotion.value))
     const loyaltySummary = computed(() => summarizeLoyaltyStep(activeLoyaltyStep.value))
+    const discountCodeSummary = computed(() => summarizeDiscountCode(activeDiscountCode.value))
     const minimumOrderHint = computed(() => {
         const promo = activeDailyPromotion.value
         if (!promo?.minimumOrderValue) return ''
@@ -237,15 +305,18 @@ export function useOrderBenefitResolver() {
     return {
         activeDailyPromotion,
         activeLoyaltyStep,
+        activeDiscountCode,
         selectedBenefitType,
         conflictExists,
         copyMessage,
         dailyPromotionSummary,
         loyaltySummary,
+        discountCodeSummary,
         minimumOrderHint,
         resolveBenefits,
         applyDailyPromotion,
         applyLoyaltyBenefit,
+        applyDiscountCode,
         clearAppliedBenefit,
     }
 }

@@ -167,6 +167,11 @@
                     :branch-id="branchId"
                 />
 
+                <BranchDiscountCodesSection
+                    v-if="canEditBranchProfile && activeBranchSection === 'discount-codes'"
+                    :branch-id="branchId"
+                />
+
                 <!-- Users Section -->
                 <BaseCard v-if="activeBranchSection === 'general'">
                     <BranchUsersTable :users="branch.users" :branch-id="branch.id" @user-created="handleUserCreated"
@@ -410,6 +415,7 @@ import BranchWhatsAppAiSettingsSection from '@/components/branches/BranchWhatsAp
 import BranchBanksAppsSection from '@/components/branches/BranchBanksAppsSection.vue'
 import BranchExpensesSection from '@/components/branches/BranchExpensesSection.vue'
 import BranchLoyaltySection from '@/components/branches/BranchLoyaltySection.vue'
+import BranchDiscountCodesSection from '@/components/branches/BranchDiscountCodesSection.vue'
 import BranchForm from '@/components/branches/BranchForm.vue'
 import NeighborhoodForm from '@/components/neighborhoods/NeighborhoodForm.vue'
 import BankForm from '@/components/payments/banks/BankForm.vue'
@@ -504,7 +510,7 @@ const supplierFormLoading = ref(false)
 
 const branchId = computed(() => Number(route.params.id))
 
-type BranchSectionId = 'general' | 'whatsapp-ai' | 'banks-apps' | 'expenses' | 'loyalty' | 'printing'
+type BranchSectionId = 'general' | 'whatsapp-ai' | 'banks-apps' | 'expenses' | 'loyalty' | 'discount-codes' | 'printing'
 
 const branchSections: Array<{ id: BranchSectionId; label: string }> = [
     { id: 'general', label: 'Info general' },
@@ -512,6 +518,7 @@ const branchSections: Array<{ id: BranchSectionId; label: string }> = [
     { id: 'banks-apps', label: 'Bancos y apps' },
     { id: 'expenses', label: 'Gastos' },
     { id: 'loyalty', label: 'Fidelizacion' },
+    { id: 'discount-codes', label: 'Codigos promo' },
     { id: 'printing', label: 'Impresion' },
 ]
 

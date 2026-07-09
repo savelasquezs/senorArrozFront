@@ -179,6 +179,10 @@
                         <div class="text-sm font-medium text-gray-900">
                             {{ formatCurrency(order.total) }}
                         </div>
+                        <div v-if="order.appliedBenefitLabel || order.loyaltyRuleName" class="mt-1 max-w-[8rem] truncate text-[11px] font-medium text-emerald-700"
+                            :title="order.appliedBenefitLabel || order.loyaltyRuleName || ''">
+                            {{ order.appliedBenefitLabel || order.loyaltyRuleName }}
+                        </div>
                     </td>
 
                     <!-- Pagos -->

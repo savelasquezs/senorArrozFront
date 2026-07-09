@@ -36,6 +36,7 @@ import {
 } from '@/composables/useFreeDeliveryDiscount'
 import type { DailyPromotion } from '@/types/dailyPromotion'
 import type { LoyaltyCycleStep } from '@/types/loyaltyCycle'
+import type { DiscountCode } from '@/types/discountCode'
 
 /** Si falla la API al rehidratar, reconstruye un cliente mínimo desde el borrador persistido. */
 function buildFallbackCustomerForDraft(customerId: number, drafts: DraftOrder[]): Customer | null {
@@ -440,14 +441,17 @@ export const useOrdersDraftsStore = defineStore('ordersDrafts', () => {
     const linePromotionDiscount = (item: {
         dailyPromotionDiscount?: number | null
         loyaltyDiscount?: number | null
+        discountCodeDiscount?: number | null
     }) =>
         Math.max(0, Math.round(Number(item.dailyPromotionDiscount ?? 0) || 0)) +
-        Math.max(0, Math.round(Number(item.loyaltyDiscount ?? 0) || 0))
+        Math.max(0, Math.round(Number(item.loyaltyDiscount ?? 0) || 0)) +
+        Math.max(0, Math.round(Number(item.discountCodeDiscount ?? 0) || 0))
 
     const lineBaseDiscount = (item: {
         discount: number
         dailyPromotionDiscount?: number | null
         loyaltyDiscount?: number | null
+        discountCodeDiscount?: number | null
     }) =>
         Math.max(0, Math.round(Number(item.discount ?? 0) || 0)) + linePromotionDiscount(item)
 
@@ -457,6 +461,7 @@ export const useOrdersDraftsStore = defineStore('ordersDrafts', () => {
         discount: number
         dailyPromotionDiscount?: number | null
         loyaltyDiscount?: number | null
+        discountCodeDiscount?: number | null
         freeDeliveryDiscount?: number | null
     }) => {
         const gross = Math.max(0, item.quantity) * Math.max(0, item.unitPrice)
@@ -466,7 +471,10 @@ export const useOrdersDraftsStore = defineStore('ordersDrafts', () => {
 
     const purchasedProductsGrossSubtotal = (order: DraftOrder) =>
         order.orderItems
-            .filter((item) => item.isDailyPromotionGift !== true && item.isLoyaltyGift !== true)
+            .filter((item) =>
+                item.isDailyPromotionGift !== true &&
+                item.isLoyaltyGift !== true &&
+                item.isDiscountCodeGift !== true)
             .reduce((sum, item) => sum + Math.max(0, item.quantity) * Math.max(0, item.unitPrice), 0)
 
     const applyFreeDeliveryToOrder = (order: DraftOrder): DraftOrder => {
@@ -552,9 +560,14 @@ export const useOrdersDraftsStore = defineStore('ordersDrafts', () => {
         options: { clearSelection?: boolean; ignoredDailyPromotionId?: number | null; ignoredLoyaltyStepId?: number | null } = {},
     ): DraftOrder => {
         const shouldClearFreeDelivery =
-            order.appliedDailyPromotionType === 'FreeDelivery' || order.appliedLoyaltyRewardType === 'FreeDelivery'
+            order.appliedDailyPromotionType === 'FreeDelivery' ||
+            order.appliedLoyaltyRewardType === 'FreeDelivery' ||
+            order.appliedDiscountCodeType === 'FreeDelivery'
         const orderItems = order.orderItems
-            .filter((item) => item.isDailyPromotionGift !== true && item.isLoyaltyGift !== true)
+            .filter((item) =>
+                item.isDailyPromotionGift !== true &&
+                item.isLoyaltyGift !== true &&
+                item.isDiscountCodeGift !== true)
             .map((item) => {
                 const next = {
                     ...item,
@@ -562,8 +575,11 @@ export const useOrdersDraftsStore = defineStore('ordersDrafts', () => {
                     dailyPromotionDiscountPercentage: null,
                     loyaltyDiscount: 0,
                     loyaltyDiscountPercentage: null,
+                    discountCodeDiscount: 0,
+                    discountCodeDiscountPercentage: null,
                     isDailyPromotionGift: false,
                     isLoyaltyGift: false,
+                    isDiscountCodeGift: false,
                 }
                 return { ...next, subtotal: lineSubtotal(next) }
             })
@@ -590,8 +606,19 @@ export const useOrdersDraftsStore = defineStore('ordersDrafts', () => {
             appliedLoyaltyDiscountPercentage: null,
             ignoredLoyaltyStepId:
                 options.ignoredLoyaltyStepId !== undefined ? options.ignoredLoyaltyStepId : order.ignoredLoyaltyStepId ?? null,
+            appliedDiscountCodeId: null,
+            appliedDiscountCodeCode: null,
+            appliedDiscountCodeType: null,
+            appliedDiscountCodeGiftProductId: null,
+            appliedDiscountCodeGiftProductName: null,
+            appliedDiscountCodeDiscountPercentage: null,
             appliedBenefitType: null,
+            appliedBenefitSourceId: null,
+            appliedBenefitCode: null,
             appliedBenefitLabel: null,
+            appliedBenefitRewardType: null,
+            appliedBenefitAmount: null,
+            appliedBenefitSnapshot: null,
             selectedBenefitType: options.clearSelection ? null : order.selectedBenefitType ?? null,
             updatedAt: new Date(),
         }
@@ -637,6 +664,8 @@ export const useOrdersDraftsStore = defineStore('ordersDrafts', () => {
         const orderItems = order.orderItems.map((item) => {
             const eligible =
                 item.isDailyPromotionGift !== true &&
+                item.isLoyaltyGift !== true &&
+                item.isDiscountCodeGift !== true &&
                 (eligibleIds == null || eligibleIds.has(item.productId))
 
             if (!eligible) {
@@ -670,7 +699,12 @@ export const useOrdersDraftsStore = defineStore('ordersDrafts', () => {
             appliedDailyPromotionDiscountPercentage: percentage,
             appliedDailyPromotionDiscountScope: promo.discountScope ?? null,
             appliedBenefitType: 'DailyPromotion',
+            appliedBenefitSourceId: promo.id,
+            appliedBenefitCode: null,
             appliedBenefitLabel: `Promocion del dia: ${percentage}% de descuento`,
+            appliedBenefitRewardType: promo.type,
+            appliedBenefitAmount: percentage,
+            appliedBenefitSnapshot: JSON.stringify(promo),
             updatedAt: new Date(),
         }
     }
@@ -694,7 +728,12 @@ export const useOrdersDraftsStore = defineStore('ordersDrafts', () => {
                     appliedDailyPromotionGiftProductId: promo.giftProductId,
                     appliedDailyPromotionGiftProductName: promo.giftProductName ?? null,
                     appliedBenefitType: 'DailyPromotion',
+                    appliedBenefitSourceId: promo.id,
+                    appliedBenefitCode: null,
                     appliedBenefitLabel: `Promocion del dia: ${promo.giftProductName ?? 'producto gratis'} gratis`,
+                    appliedBenefitRewardType: promo.type,
+                    appliedBenefitAmount: null,
+                    appliedBenefitSnapshot: JSON.stringify(promo),
                     updatedAt: new Date(),
                 }
             }
@@ -711,11 +750,14 @@ export const useOrdersDraftsStore = defineStore('ordersDrafts', () => {
                 dailyPromotionDiscountPercentage: null,
                 loyaltyDiscount: 0,
                 loyaltyDiscountPercentage: null,
+                discountCodeDiscount: 0,
+                discountCodeDiscountPercentage: null,
                 freeDeliveryDiscount: 0,
                 subtotal: 0,
                 notes: 'Promocion del dia',
                 isDailyPromotionGift: true,
                 isLoyaltyGift: false,
+                isDiscountCodeGift: false,
             }
 
             return {
@@ -728,7 +770,12 @@ export const useOrdersDraftsStore = defineStore('ordersDrafts', () => {
                 appliedDailyPromotionDiscountPercentage: null,
                 appliedDailyPromotionDiscountScope: null,
                 appliedBenefitType: 'DailyPromotion',
+                appliedBenefitSourceId: promo.id,
+                appliedBenefitCode: null,
                 appliedBenefitLabel: `Promocion del dia: ${promo.giftProductName ?? 'producto gratis'} gratis`,
+                appliedBenefitRewardType: promo.type,
+                appliedBenefitAmount: null,
+                appliedBenefitSnapshot: JSON.stringify(promo),
                 updatedAt: new Date(),
             }
         }
@@ -744,7 +791,12 @@ export const useOrdersDraftsStore = defineStore('ordersDrafts', () => {
                 appliedDailyPromotionDiscountPercentage: null,
                 appliedDailyPromotionDiscountScope: null,
                 appliedBenefitType: 'DailyPromotion',
+                appliedBenefitSourceId: promo.id,
+                appliedBenefitCode: null,
                 appliedBenefitLabel: 'Promocion del dia: Domicilio gratis',
+                appliedBenefitRewardType: promo.type,
+                appliedBenefitAmount: null,
+                appliedBenefitSnapshot: JSON.stringify(promo),
                 updatedAt: new Date(),
             }
         }
@@ -759,7 +811,10 @@ export const useOrdersDraftsStore = defineStore('ordersDrafts', () => {
     const applyDailyPromotionBenefitToCurrentOrder = (promo: DailyPromotion, selectedBenefitType: DraftOrder['selectedBenefitType'] = 'DailyPromotion') => {
         if (!currentTabId.value) return false
         const order = draftOrders.value.get(currentTabId.value)
-        if (!order || order.orderItems.filter((item) => item.isDailyPromotionGift !== true && item.isLoyaltyGift !== true).length === 0) return false
+        if (!order || order.orderItems.filter((item) =>
+            item.isDailyPromotionGift !== true &&
+            item.isLoyaltyGift !== true &&
+            item.isDiscountCodeGift !== true).length === 0) return false
 
         const updated = applyPromotionToOrder({ ...order, selectedBenefitType }, promo)
         if (!updated) {
@@ -775,7 +830,10 @@ export const useOrdersDraftsStore = defineStore('ordersDrafts', () => {
     const applyDailyPromotionToCurrentOrder = async () => {
         if (!currentTabId.value) return
         const order = draftOrders.value.get(currentTabId.value)
-        if (!order || order.orderItems.filter((item) => item.isDailyPromotionGift !== true && item.isLoyaltyGift !== true).length === 0) return
+        if (!order || order.orderItems.filter((item) =>
+            item.isDailyPromotionGift !== true &&
+            item.isLoyaltyGift !== true &&
+            item.isDiscountCodeGift !== true).length === 0) return
 
         const authStore = useAuthStore()
         const branchId = order.branchId || authStore.branchId
@@ -793,7 +851,7 @@ export const useOrdersDraftsStore = defineStore('ordersDrafts', () => {
     const applyLoyaltyPercentageBenefit = (order: DraftOrder, step: LoyaltyCycleStep): DraftOrder => {
         const percentage = Math.max(0, Number(step.discountPercentage ?? 0) || 0)
         const orderItems = order.orderItems.map((item) => {
-            if (item.isDailyPromotionGift === true || item.isLoyaltyGift === true) {
+            if (item.isDailyPromotionGift === true || item.isLoyaltyGift === true || item.isDiscountCodeGift === true) {
                 return item
             }
 
@@ -817,7 +875,12 @@ export const useOrdersDraftsStore = defineStore('ordersDrafts', () => {
             appliedLoyaltyGiftProductName: null,
             appliedLoyaltyDiscountPercentage: percentage,
             appliedBenefitType: 'Loyalty',
+            appliedBenefitSourceId: step.id,
+            appliedBenefitCode: null,
             appliedBenefitLabel: step.rewardLabel || `Fidelizacion: ${percentage}% de descuento`,
+            appliedBenefitRewardType: 'PercentageDiscount',
+            appliedBenefitAmount: percentage,
+            appliedBenefitSnapshot: JSON.stringify(step),
             updatedAt: new Date(),
         }
     }
@@ -825,7 +888,10 @@ export const useOrdersDraftsStore = defineStore('ordersDrafts', () => {
     const applyLoyaltyBenefitToCurrentOrder = (step: LoyaltyCycleStep, selectedBenefitType: DraftOrder['selectedBenefitType'] = 'Loyalty') => {
         if (!currentTabId.value) return false
         const order = draftOrders.value.get(currentTabId.value)
-        if (!order || order.orderItems.filter((item) => item.isDailyPromotionGift !== true && item.isLoyaltyGift !== true).length === 0) return false
+        if (!order || order.orderItems.filter((item) =>
+            item.isDailyPromotionGift !== true &&
+            item.isLoyaltyGift !== true &&
+            item.isDiscountCodeGift !== true).length === 0) return false
         if (order.ignoredLoyaltyStepId === step.id || step.isActive === false) return false
 
         const rewardType = step.rewardType ?? 'GiftProduct'
@@ -846,11 +912,14 @@ export const useOrdersDraftsStore = defineStore('ordersDrafts', () => {
                 dailyPromotionDiscountPercentage: null,
                 loyaltyDiscount: 0,
                 loyaltyDiscountPercentage: null,
+                discountCodeDiscount: 0,
+                discountCodeDiscountPercentage: null,
                 freeDeliveryDiscount: 0,
                 subtotal: 0,
                 notes: 'Fidelizacion',
                 isDailyPromotionGift: false,
                 isLoyaltyGift: true,
+                isDiscountCodeGift: false,
             }
             updated = {
                 ...orderWithoutBenefit,
@@ -862,7 +931,12 @@ export const useOrdersDraftsStore = defineStore('ordersDrafts', () => {
                 appliedLoyaltyGiftProductName: step.giftProductName ?? null,
                 appliedLoyaltyDiscountPercentage: null,
                 appliedBenefitType: 'Loyalty',
+                appliedBenefitSourceId: step.id,
+                appliedBenefitCode: null,
                 appliedBenefitLabel: step.rewardLabel || `Fidelizacion: ${step.giftProductName ?? 'producto gratis'} gratis`,
+                appliedBenefitRewardType: rewardType,
+                appliedBenefitAmount: null,
+                appliedBenefitSnapshot: JSON.stringify(step),
                 updatedAt: new Date(),
             }
         } else if (rewardType === 'FreeDelivery') {
@@ -876,7 +950,12 @@ export const useOrdersDraftsStore = defineStore('ordersDrafts', () => {
                 appliedLoyaltyGiftProductName: null,
                 appliedLoyaltyDiscountPercentage: null,
                 appliedBenefitType: 'Loyalty',
+                appliedBenefitSourceId: step.id,
+                appliedBenefitCode: null,
                 appliedBenefitLabel: step.rewardLabel || 'Fidelizacion: Domicilio gratis',
+                appliedBenefitRewardType: rewardType,
+                appliedBenefitAmount: null,
+                appliedBenefitSnapshot: JSON.stringify(step),
                 updatedAt: new Date(),
             }
         } else if (rewardType === 'PercentageDiscount') {
@@ -885,6 +964,198 @@ export const useOrdersDraftsStore = defineStore('ordersDrafts', () => {
 
         if (!updated) return false
         recalculateTotals({ ...updated, selectedBenefitType })
+        saveToLocalStorage()
+        return true
+    }
+
+    const discountCodeMinimumReached = (order: DraftOrder, code: DiscountCode) => {
+        const minimum = Math.max(0, Number(code.minimumOrderValue ?? 0) || 0)
+        if (minimum <= 0) return true
+        return purchasedProductsGrossSubtotal(order) >= minimum
+    }
+
+    const discountCodeIsCurrentlyValid = (order: DraftOrder, code: DiscountCode) => {
+        if (!code.isActive) return false
+        const now = Date.now()
+        const startsAt = new Date(code.startsAt).getTime()
+        const endsAt = code.endsAt ? new Date(code.endsAt).getTime() : null
+        if (Number.isFinite(startsAt) && startsAt > now) return false
+        if (endsAt != null && Number.isFinite(endsAt) && endsAt <= now) return false
+        return discountCodeMinimumReached(order, code)
+    }
+
+    const setCurrentOrderDiscountCodeInput = (value: string) => {
+        if (!currentTabId.value) return
+        const order = draftOrders.value.get(currentTabId.value)
+        if (!order) return
+        draftOrders.value.set(currentTabId.value, {
+            ...order,
+            discountCodeInput: value,
+            discountCodeError: null,
+            updatedAt: new Date(),
+        })
+        saveToLocalStorage()
+    }
+
+    const setCurrentOrderActiveDiscountCode = (code: DiscountCode | null, errorMessage: string | null = null) => {
+        if (!currentTabId.value) return
+        const order = draftOrders.value.get(currentTabId.value)
+        if (!order) return
+        let next = clearBenefitEffectsFromOrder(order, { clearSelection: code == null })
+        next = {
+            ...next,
+            activeDiscountCode: code,
+            discountCodeInput: code?.code ?? order.discountCodeInput ?? null,
+            discountCodeError: errorMessage,
+            selectedBenefitType: null,
+            updatedAt: new Date(),
+        }
+        recalculateTotals(next)
+        saveToLocalStorage()
+    }
+
+    const clearCurrentOrderDiscountCode = () => {
+        if (!currentTabId.value) return
+        const order = draftOrders.value.get(currentTabId.value)
+        if (!order) return
+        let next = clearBenefitEffectsFromOrder(order, { clearSelection: true })
+        next = {
+            ...next,
+            activeDiscountCode: null,
+            discountCodeInput: '',
+            discountCodeError: null,
+            selectedBenefitType: null,
+            updatedAt: new Date(),
+        }
+        recalculateTotals(next)
+        saveToLocalStorage()
+    }
+
+    const applyDiscountCodePercentageBenefit = (order: DraftOrder, code: DiscountCode): DraftOrder => {
+        const percentage = Math.max(0, Number(code.discountPercentage ?? 0) || 0)
+        const orderItems = order.orderItems.map((item) => {
+            if (item.isDailyPromotionGift === true || item.isLoyaltyGift === true || item.isDiscountCodeGift === true) {
+                return item
+            }
+
+            const gross = Math.max(0, item.quantity) * Math.max(0, item.unitPrice)
+            const discountCodeDiscount = Math.round((gross * percentage) / 100)
+            const next = {
+                ...item,
+                discountCodeDiscount,
+                discountCodeDiscountPercentage: percentage,
+            }
+            return { ...next, subtotal: lineSubtotal(next) }
+        })
+
+        return {
+            ...order,
+            orderItems,
+            appliedDiscountCodeId: code.id,
+            appliedDiscountCodeCode: code.code,
+            appliedDiscountCodeType: code.type,
+            appliedDiscountCodeGiftProductId: null,
+            appliedDiscountCodeGiftProductName: null,
+            appliedDiscountCodeDiscountPercentage: percentage,
+            appliedBenefitType: 'DiscountCode',
+            appliedBenefitSourceId: code.id,
+            appliedBenefitCode: code.code,
+            appliedBenefitLabel: code.label || `Codigo ${code.code}: ${percentage}% de descuento`,
+            appliedBenefitRewardType: code.type,
+            appliedBenefitAmount: percentage,
+            appliedBenefitSnapshot: JSON.stringify(code),
+            updatedAt: new Date(),
+        }
+    }
+
+    const applyDiscountCodeBenefitToCurrentOrder = (
+        code: DiscountCode,
+        selectedBenefitType: DraftOrder['selectedBenefitType'] = 'DiscountCode',
+    ) => {
+        if (!currentTabId.value) return false
+        const order = draftOrders.value.get(currentTabId.value)
+        if (!order || order.orderItems.filter((item) =>
+            item.isDailyPromotionGift !== true &&
+            item.isLoyaltyGift !== true &&
+            item.isDiscountCodeGift !== true).length === 0) return false
+        if (!discountCodeIsCurrentlyValid(order, code)) {
+            setCurrentOrderActiveDiscountCode(null, 'El codigo ya no cumple las condiciones del pedido.')
+            return false
+        }
+
+        const orderWithoutBenefit = clearBenefitEffectsFromOrder({
+            ...order,
+            activeDiscountCode: code,
+            selectedBenefitType,
+        })
+        let updated: DraftOrder | null = null
+
+        if (code.type === 'GiftProduct') {
+            if (!code.giftProductId) return false
+            const giftItem = {
+                tempId: `discount-code-${code.id}-${code.giftProductId}`,
+                productId: code.giftProductId,
+                productName: code.giftProductName ?? code.label ?? 'Codigo promocional',
+                productPrice: 0,
+                quantity: 1,
+                unitPrice: 0,
+                discount: 0,
+                dailyPromotionDiscount: 0,
+                dailyPromotionDiscountPercentage: null,
+                loyaltyDiscount: 0,
+                loyaltyDiscountPercentage: null,
+                discountCodeDiscount: 0,
+                discountCodeDiscountPercentage: null,
+                freeDeliveryDiscount: 0,
+                subtotal: 0,
+                notes: `Codigo ${code.code}`,
+                isDailyPromotionGift: false,
+                isLoyaltyGift: false,
+                isDiscountCodeGift: true,
+            }
+            updated = {
+                ...orderWithoutBenefit,
+                orderItems: [...orderWithoutBenefit.orderItems, giftItem],
+                appliedDiscountCodeId: code.id,
+                appliedDiscountCodeCode: code.code,
+                appliedDiscountCodeType: code.type,
+                appliedDiscountCodeGiftProductId: code.giftProductId,
+                appliedDiscountCodeGiftProductName: code.giftProductName ?? null,
+                appliedDiscountCodeDiscountPercentage: null,
+                appliedBenefitType: 'DiscountCode',
+                appliedBenefitSourceId: code.id,
+                appliedBenefitCode: code.code,
+                appliedBenefitLabel: code.label || `Codigo ${code.code}: producto gratis`,
+                appliedBenefitRewardType: code.type,
+                appliedBenefitAmount: null,
+                appliedBenefitSnapshot: JSON.stringify(code),
+                updatedAt: new Date(),
+            }
+        } else if (code.type === 'FreeDelivery') {
+            updated = {
+                ...orderWithoutBenefit,
+                freeDeliveryRequested: true,
+                appliedDiscountCodeId: code.id,
+                appliedDiscountCodeCode: code.code,
+                appliedDiscountCodeType: code.type,
+                appliedDiscountCodeGiftProductId: null,
+                appliedDiscountCodeGiftProductName: null,
+                appliedDiscountCodeDiscountPercentage: null,
+                appliedBenefitType: 'DiscountCode',
+                appliedBenefitSourceId: code.id,
+                appliedBenefitCode: code.code,
+                appliedBenefitLabel: code.label || `Codigo ${code.code}: Domicilio gratis`,
+                appliedBenefitRewardType: code.type,
+                appliedBenefitAmount: null,
+                appliedBenefitSnapshot: JSON.stringify(code),
+                updatedAt: new Date(),
+            }
+        } else if (code.type === 'PercentageDiscount') {
+            updated = applyDiscountCodePercentageBenefit(orderWithoutBenefit, code)
+        }
+
+        if (!updated) return false
+        recalculateTotals({ ...updated, activeDiscountCode: code, selectedBenefitType })
         saveToLocalStorage()
         return true
     }
@@ -982,7 +1253,14 @@ export const useOrdersDraftsStore = defineStore('ordersDrafts', () => {
                     typeof order.ignoredDailyPromotionId === 'number' ? order.ignoredDailyPromotionId : null,
                 selectedBenefitType: order.selectedBenefitType ?? null,
                 appliedBenefitType: order.appliedBenefitType ?? null,
+                appliedBenefitSourceId:
+                    typeof order.appliedBenefitSourceId === 'number' ? order.appliedBenefitSourceId : null,
+                appliedBenefitCode: order.appliedBenefitCode ?? null,
                 appliedBenefitLabel: order.appliedBenefitLabel ?? null,
+                appliedBenefitRewardType: order.appliedBenefitRewardType ?? null,
+                appliedBenefitAmount:
+                    typeof order.appliedBenefitAmount === 'number' ? order.appliedBenefitAmount : null,
+                appliedBenefitSnapshot: order.appliedBenefitSnapshot ?? null,
                 appliedLoyaltyStepId:
                     typeof order.appliedLoyaltyStepId === 'number' ? order.appliedLoyaltyStepId : null,
                 appliedLoyaltyStepIndex:
@@ -999,12 +1277,29 @@ export const useOrdersDraftsStore = defineStore('ordersDrafts', () => {
                         : null,
                 ignoredLoyaltyStepId:
                     typeof order.ignoredLoyaltyStepId === 'number' ? order.ignoredLoyaltyStepId : null,
+                discountCodeInput: order.discountCodeInput ?? '',
+                activeDiscountCode: order.activeDiscountCode ?? null,
+                discountCodeError: order.discountCodeError ?? null,
+                appliedDiscountCodeId:
+                    typeof order.appliedDiscountCodeId === 'number' ? order.appliedDiscountCodeId : null,
+                appliedDiscountCodeCode: order.appliedDiscountCodeCode ?? null,
+                appliedDiscountCodeType: order.appliedDiscountCodeType ?? null,
+                appliedDiscountCodeGiftProductId:
+                    typeof order.appliedDiscountCodeGiftProductId === 'number'
+                        ? order.appliedDiscountCodeGiftProductId
+                        : null,
+                appliedDiscountCodeGiftProductName: order.appliedDiscountCodeGiftProductName ?? null,
+                appliedDiscountCodeDiscountPercentage:
+                    typeof order.appliedDiscountCodeDiscountPercentage === 'number'
+                        ? order.appliedDiscountCodeDiscountPercentage
+                        : null,
                 freeDeliveryRequested: order.freeDeliveryRequested ?? false,
                 orderItems: (order.orderItems ?? []).map((it: any) => {
                     const fd = typeof it.freeDeliveryDiscount === 'number' ? it.freeDeliveryDiscount : 0
                     const disc = typeof it.discount === 'number' ? it.discount : 0
                     const dp = typeof it.dailyPromotionDiscount === 'number' ? it.dailyPromotionDiscount : 0
                     const loyalty = typeof it.loyaltyDiscount === 'number' ? it.loyaltyDiscount : 0
+                    const codeDiscount = typeof it.discountCodeDiscount === 'number' ? it.discountCodeDiscount : 0
                     const q = typeof it.quantity === 'number' ? it.quantity : 0
                     const up = typeof it.unitPrice === 'number' ? it.unitPrice : 0
                     return {
@@ -1022,8 +1317,14 @@ export const useOrdersDraftsStore = defineStore('ordersDrafts', () => {
                                 ? it.loyaltyDiscountPercentage
                                 : null,
                         isLoyaltyGift: it.isLoyaltyGift === true,
+                        discountCodeDiscount: codeDiscount,
+                        discountCodeDiscountPercentage:
+                            typeof it.discountCodeDiscountPercentage === 'number'
+                                ? it.discountCodeDiscountPercentage
+                                : null,
+                        isDiscountCodeGift: it.isDiscountCodeGift === true,
                         freeDeliveryDiscount: fd,
-                        subtotal: Math.max(0, q * up - disc - dp - loyalty - fd),
+                        subtotal: Math.max(0, q * up - disc - dp - loyalty - codeDiscount - fd),
                     }
                 }),
             }))
@@ -1184,7 +1485,12 @@ export const useOrdersDraftsStore = defineStore('ordersDrafts', () => {
             paidInStoreCashAmount: null,
             selectedBenefitType: null,
             appliedBenefitType: null,
+            appliedBenefitSourceId: null,
+            appliedBenefitCode: null,
             appliedBenefitLabel: null,
+            appliedBenefitRewardType: null,
+            appliedBenefitAmount: null,
+            appliedBenefitSnapshot: null,
             appliedDailyPromotionId: null,
             appliedDailyPromotionType: null,
             appliedDailyPromotionGiftProductId: null,
@@ -1199,6 +1505,15 @@ export const useOrdersDraftsStore = defineStore('ordersDrafts', () => {
             appliedLoyaltyGiftProductName: null,
             appliedLoyaltyDiscountPercentage: null,
             ignoredLoyaltyStepId: null,
+            discountCodeInput: '',
+            activeDiscountCode: null,
+            discountCodeError: null,
+            appliedDiscountCodeId: null,
+            appliedDiscountCodeCode: null,
+            appliedDiscountCodeType: null,
+            appliedDiscountCodeGiftProductId: null,
+            appliedDiscountCodeGiftProductName: null,
+            appliedDiscountCodeDiscountPercentage: null,
         }
 
         const customerWithAddress = {
@@ -1275,9 +1590,13 @@ export const useOrdersDraftsStore = defineStore('ordersDrafts', () => {
         updateFreeDeliveryRequested,
         setCurrentOrderSelectedBenefit,
         clearAppliedBenefitForCurrentOrder,
+        setCurrentOrderDiscountCodeInput,
+        setCurrentOrderActiveDiscountCode,
+        clearCurrentOrderDiscountCode,
         applyDailyPromotionBenefitToCurrentOrder,
         applyDailyPromotionToCurrentOrder,
         applyLoyaltyBenefitToCurrentOrder,
+        applyDiscountCodeBenefitToCurrentOrder,
         resolveDeliveryFeeFromSelectedAddress,
         createOrReuseWhatsAppDraft,
         recalculateTotals,

@@ -10,7 +10,7 @@ import type { Product, ProductCategory } from './product'
 // ===== TIPOS BÁSICOS =====
 export type OrderType = 'onsite' | 'delivery' | 'reservation'
 export type OrderStatus = 'taken' | 'in_preparation' | 'ready' | 'on_the_way' | 'delivered' | 'cancelled'
-export type AppliedBenefitType = 'DailyPromotion' | 'Loyalty' | 'None'
+export type AppliedBenefitType = 'DailyPromotion' | 'Loyalty' | 'DiscountCode' | 'None'
 
 export interface OrderItem {
     tempId: string
@@ -33,6 +33,12 @@ export interface OrderItem {
     loyaltyDiscountPercentage?: number | null
     /** Linea agregada automaticamente por fidelizacion. */
     isLoyaltyGift?: boolean
+    /** Descuento automatico de codigo promocional. */
+    discountCodeDiscount?: number
+    /** Porcentaje usado para recalcular codigo promocional al cambiar cantidad/precio. */
+    discountCodeDiscountPercentage?: number | null
+    /** Linea agregada automaticamente por codigo promocional. */
+    isDiscountCodeGift?: boolean
     /** Descuento automático por “domicilio gratis” (reparto en líneas). */
     freeDeliveryDiscount: number
     subtotal: number
@@ -48,6 +54,8 @@ export interface ActiveOrder {
     addressId?: number
     /** Texto de premio fidelidad si aplica (p. ej. pedido persistido reabierto). */
     loyaltyRuleName?: string
+    appliedBenefitLabel?: string | null
+    appliedBenefitType?: AppliedBenefitType | null
     type: OrderType
     deliveryFee?: number
     reservedFor?: Date
@@ -135,7 +143,12 @@ export interface DraftOrder {
     ignoredDailyPromotionId?: number | null
     selectedBenefitType?: AppliedBenefitType | null
     appliedBenefitType?: AppliedBenefitType | null
+    appliedBenefitSourceId?: number | null
+    appliedBenefitCode?: string | null
     appliedBenefitLabel?: string | null
+    appliedBenefitRewardType?: string | null
+    appliedBenefitAmount?: number | null
+    appliedBenefitSnapshot?: string | null
     appliedLoyaltyStepId?: number | null
     appliedLoyaltyStepIndex?: number | null
     appliedLoyaltyRewardType?: string | null
@@ -143,6 +156,15 @@ export interface DraftOrder {
     appliedLoyaltyGiftProductName?: string | null
     appliedLoyaltyDiscountPercentage?: number | null
     ignoredLoyaltyStepId?: number | null
+    discountCodeInput?: string | null
+    activeDiscountCode?: import('./discountCode').DiscountCode | null
+    discountCodeError?: string | null
+    appliedDiscountCodeId?: number | null
+    appliedDiscountCodeCode?: string | null
+    appliedDiscountCodeType?: string | null
+    appliedDiscountCodeGiftProductId?: number | null
+    appliedDiscountCodeGiftProductName?: string | null
+    appliedDiscountCodeDiscountPercentage?: number | null
 }
 
 // ===== TIPOS DE PEDIDOS COMPLETADOS =====
@@ -162,6 +184,13 @@ export interface Order {
     loyaltyRuleName?: string
     loyaltyCycleStepId?: number | null
     loyaltyRewardSnapshot?: string | null
+    appliedBenefitType?: AppliedBenefitType | null
+    appliedBenefitSourceId?: number | null
+    appliedBenefitCode?: string | null
+    appliedBenefitLabel?: string | null
+    appliedBenefitRewardType?: string | null
+    appliedBenefitAmount?: number | null
+    appliedBenefitSnapshot?: string | null
     type: OrderType
     status: OrderStatus
     deliveryFee?: number
@@ -296,6 +325,7 @@ export interface OrderListItem {
     subtotal: number
     total: number
     discountTotal: number
+    loyaltyRuleName?: string | null
     notes: string | null
     cancelledReason: string | null
     createdAt: string
@@ -311,6 +341,13 @@ export interface OrderListItem {
     paidInStoreCashAt?: string | null
     paidInStoreCashAmount?: number | null
     /** Resumen de líneas desde el API (search/list con detalles cargados). */
+    appliedBenefitType?: AppliedBenefitType | null
+    appliedBenefitSourceId?: number | null
+    appliedBenefitCode?: string | null
+    appliedBenefitLabel?: string | null
+    appliedBenefitRewardType?: string | null
+    appliedBenefitAmount?: number | null
+    appliedBenefitSnapshot?: string | null
     summaryLines?: OrderLineSummary[]
 }
 
@@ -391,6 +428,13 @@ export interface CreateOrderDto {
     appPayments?: CreateAppPaymentDto[]
     paidInStoreCash?: boolean
     paidInStoreCashAmount?: number | null
+    appliedBenefitType?: AppliedBenefitType | null
+    appliedBenefitSourceId?: number | null
+    appliedBenefitCode?: string | null
+    appliedBenefitLabel?: string | null
+    appliedBenefitRewardType?: string | null
+    appliedBenefitAmount?: number | null
+    appliedBenefitSnapshot?: string | null
 }
 
 export interface CreateOrderDetailDto {
@@ -426,6 +470,13 @@ export interface UpdateOrderDto {
     discountTotal?: number
     orderDetails?: UpdateOrderDetailDto[]
     freeDeliveryRequested?: boolean
+    appliedBenefitType?: AppliedBenefitType | null
+    appliedBenefitSourceId?: number | null
+    appliedBenefitCode?: string | null
+    appliedBenefitLabel?: string | null
+    appliedBenefitRewardType?: string | null
+    appliedBenefitAmount?: number | null
+    appliedBenefitSnapshot?: string | null
     deleteReservationAssociatedPayments?: boolean
 }
 

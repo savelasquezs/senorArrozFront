@@ -432,6 +432,11 @@
 						</div>
 					</div>
 
+					<div v-if="appliedBenefitLabel" class="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3">
+						<p class="text-xs font-medium uppercase tracking-wide text-emerald-700">Beneficio aplicado</p>
+						<p class="mt-1 text-sm font-semibold text-emerald-900">{{ appliedBenefitLabel }}</p>
+					</div>
+
 					<!-- Notas -->
 					<div class="space-y-2">
 						<label class="text-xs sm:text-sm font-medium text-gray-700"
@@ -869,6 +874,9 @@ const emit = defineEmits<{
 }>();
 
 const order = ref<OrderDetailView | null>(null);
+const appliedBenefitLabel = computed(() =>
+	order.value?.appliedBenefitLabel || order.value?.loyaltyRuleName || '',
+);
 
 const showScheduleEditor = computed(() => {
 	const o = order.value;
