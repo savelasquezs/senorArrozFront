@@ -7,6 +7,18 @@ export function useOrderItems() {
     const store = useOrdersDraftsStore()
     const { createNewTab } = useOrderTabs()
 
+    const lineSubtotal = (item: {
+        quantity: number
+        unitPrice: number
+        discount: number
+        dailyPromotionDiscount?: number | null
+        freeDeliveryDiscount?: number | null
+    }) => {
+        const daily = Math.max(0, Number(item.dailyPromotionDiscount ?? 0) || 0)
+        const fd = Math.max(0, Number(item.freeDeliveryDiscount ?? 0) || 0)
+        return Math.max(0, item.quantity * item.unitPrice - item.discount - daily - fd)
+    }
+
     const addProduct = (product: Product, quantity: number = 1) => {
         // Auto-crear tab si no existe
         if (!store.currentTabId) {
@@ -26,9 +38,7 @@ export function useOrderItems() {
             updatedItems = order.orderItems.map((item, index) => {
                 if (index === existingIndex) {
                     const newQuantity = item.quantity + quantity
-                    const fd = item.freeDeliveryDiscount ?? 0
-                    const newSubtotal = (newQuantity * item.unitPrice) - item.discount - fd
-                    return { ...item, quantity: newQuantity, subtotal: newSubtotal }
+                    return { ...item, quantity: newQuantity, subtotal: lineSubtotal({ ...item, quantity: newQuantity }) }
                 }
                 return item
             })
@@ -41,6 +51,8 @@ export function useOrderItems() {
                 quantity,
                 unitPrice: product.price,
                 discount: 0,
+                dailyPromotionDiscount: 0,
+                dailyPromotionDiscountPercentage: null,
                 freeDeliveryDiscount: 0,
                 subtotal: product.price * quantity,
                 notes: ''
@@ -51,6 +63,7 @@ export function useOrderItems() {
         const updated = { ...order, orderItems: updatedItems }
         store.recalculateTotals(updated)
         store.saveToLocalStorage()
+        void store.applyDailyPromotionToCurrentOrder()
     }
 
     const removeItem = (itemTempId: string) => {
@@ -58,9 +71,16 @@ export function useOrderItems() {
         const order = store.draftOrders.get(store.currentTabId)
         if (!order) return
 
+        const removedItem = order.orderItems.find(item => item.tempId === itemTempId)
         const updated = {
             ...order,
-            orderItems: order.orderItems.filter(item => item.tempId !== itemTempId)
+            orderItems: order.orderItems.filter(item => item.tempId !== itemTempId),
+            ignoredDailyPromotionId:
+                removedItem?.isDailyPromotionGift === true && order.appliedDailyPromotionId
+                    ? order.appliedDailyPromotionId
+                    : order.ignoredDailyPromotionId,
+            appliedDailyPromotionId:
+                removedItem?.isDailyPromotionGift === true ? null : order.appliedDailyPromotionId,
         }
         store.recalculateTotals(updated)
         store.saveToLocalStorage()
@@ -73,9 +93,7 @@ export function useOrderItems() {
 
         const updatedItems = order.orderItems.map(item => {
             if (item.tempId === itemTempId) {
-                const fd = item.freeDeliveryDiscount ?? 0
-                const newSubtotal = (quantity * item.unitPrice) - item.discount - fd
-                return { ...item, quantity, subtotal: newSubtotal }
+                return { ...item, quantity, subtotal: lineSubtotal({ ...item, quantity }) }
             }
             return item
         })
@@ -83,6 +101,7 @@ export function useOrderItems() {
         const updated = { ...order, orderItems: updatedItems }
         store.recalculateTotals(updated)
         store.saveToLocalStorage()
+        void store.applyDailyPromotionToCurrentOrder()
     }
 
     const updatePrice = (itemTempId: string, price: number) => {
@@ -92,9 +111,7 @@ export function useOrderItems() {
 
         const updatedItems = order.orderItems.map(item => {
             if (item.tempId === itemTempId) {
-                const fd = item.freeDeliveryDiscount ?? 0
-                const newSubtotal = (item.quantity * price) - item.discount - fd
-                return { ...item, unitPrice: price, subtotal: newSubtotal }
+                return { ...item, unitPrice: price, subtotal: lineSubtotal({ ...item, unitPrice: price }) }
             }
             return item
         })
@@ -102,6 +119,7 @@ export function useOrderItems() {
         const updated = { ...order, orderItems: updatedItems }
         store.recalculateTotals(updated)
         store.saveToLocalStorage()
+        void store.applyDailyPromotionToCurrentOrder()
     }
 
     const updateDiscount = (itemTempId: string, discount: number) => {
@@ -111,9 +129,7 @@ export function useOrderItems() {
 
         const updatedItems = order.orderItems.map(item => {
             if (item.tempId === itemTempId) {
-                const fd = item.freeDeliveryDiscount ?? 0
-                const newSubtotal = (item.quantity * item.unitPrice) - discount - fd
-                return { ...item, discount, subtotal: newSubtotal }
+                return { ...item, discount, subtotal: lineSubtotal({ ...item, discount }) }
             }
             return item
         })

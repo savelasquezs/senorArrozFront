@@ -20,6 +20,12 @@ export interface OrderItem {
     unitPrice: number
     /** Descuento manual (UI porcentaje). */
     discount: number
+    /** Descuento automatico de promo del dia. */
+    dailyPromotionDiscount?: number
+    /** Porcentaje usado para recalcular la promo al cambiar cantidad/precio. */
+    dailyPromotionDiscountPercentage?: number | null
+    /** Linea agregada automaticamente por promo del dia. */
+    isDailyPromotionGift?: boolean
     /** Descuento automático por “domicilio gratis” (reparto en líneas). */
     freeDeliveryDiscount: number
     subtotal: number
@@ -113,6 +119,13 @@ export interface DraftOrder {
     paidInStoreCash?: boolean
     /** Monto COP en tienda (borrador avanzado; opcional). */
     paidInStoreCashAmount?: number | null
+    appliedDailyPromotionId?: number | null
+    appliedDailyPromotionType?: string | null
+    appliedDailyPromotionGiftProductId?: number | null
+    appliedDailyPromotionGiftProductName?: string | null
+    appliedDailyPromotionDiscountPercentage?: number | null
+    appliedDailyPromotionDiscountScope?: string | null
+    ignoredDailyPromotionId?: number | null
 }
 
 // ===== TIPOS DE PEDIDOS COMPLETADOS =====

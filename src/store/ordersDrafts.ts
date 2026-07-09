@@ -28,11 +28,13 @@ import {
 } from '@/config/orderPosCategories'
 import { useBranchPosSettingsStore } from '@/store/branchPosSettings'
 import { useAuthStore } from '@/store/auth'
+import { useDailyPromotionStore } from '@/store/dailyPromotion'
 import {
     deliveryDiscountBudget,
     distributeEqualWithCaps,
     lineCapacityCop,
 } from '@/composables/useFreeDeliveryDiscount'
+import type { DailyPromotion } from '@/types/dailyPromotion'
 
 /** Si falla la API al rehidratar, reconstruye un cliente mínimo desde el borrador persistido. */
 function buildFallbackCustomerForDraft(customerId: number, drafts: DraftOrder[]): Customer | null {
@@ -434,6 +436,29 @@ export const useOrdersDraftsStore = defineStore('ordersDrafts', () => {
         return order
     }
 
+    const linePromotionDiscount = (item: { dailyPromotionDiscount?: number | null }) =>
+        Math.max(0, Math.round(Number(item.dailyPromotionDiscount ?? 0) || 0))
+
+    const lineBaseDiscount = (item: { discount: number; dailyPromotionDiscount?: number | null }) =>
+        Math.max(0, Math.round(Number(item.discount ?? 0) || 0)) + linePromotionDiscount(item)
+
+    const lineSubtotal = (item: {
+        quantity: number
+        unitPrice: number
+        discount: number
+        dailyPromotionDiscount?: number | null
+        freeDeliveryDiscount?: number | null
+    }) => {
+        const gross = Math.max(0, item.quantity) * Math.max(0, item.unitPrice)
+        const discounts = lineBaseDiscount(item) + Math.max(0, Math.round(Number(item.freeDeliveryDiscount ?? 0) || 0))
+        return Math.max(0, gross - discounts)
+    }
+
+    const purchasedProductsGrossSubtotal = (order: DraftOrder) =>
+        order.orderItems
+            .filter((item) => item.isDailyPromotionGift !== true)
+            .reduce((sum, item) => sum + Math.max(0, item.quantity) * Math.max(0, item.unitPrice), 0)
+
     const applyFreeDeliveryToOrder = (order: DraftOrder): DraftOrder => {
         const pos = useBranchPosSettingsStore()
         const maxCap = pos.maxFreeDeliveryDiscount
@@ -447,7 +472,7 @@ export const useOrdersDraftsStore = defineStore('ordersDrafts', () => {
         if (!eligible) {
             const cleared = items.map((i) => {
                 const fd = 0
-                const sub = Math.max(0, i.quantity * i.unitPrice - i.discount - fd)
+                const sub = lineSubtotal({ ...i, freeDeliveryDiscount: fd })
                 return { ...i, freeDeliveryDiscount: fd, subtotal: sub }
             })
             return { ...order, orderItems: cleared }
@@ -458,13 +483,13 @@ export const useOrdersDraftsStore = defineStore('ordersDrafts', () => {
             lineCapacityCop({
                 quantity: i.quantity,
                 unitPrice: i.unitPrice,
-                manualDiscount: i.discount,
+                manualDiscount: lineBaseDiscount(i),
             }),
         )
         const shares = distributeEqualWithCaps(budget, caps)
         const next = items.map((i, idx) => {
             const fd = shares[idx] ?? 0
-            const sub = Math.max(0, i.quantity * i.unitPrice - i.discount - fd)
+            const sub = lineSubtotal({ ...i, freeDeliveryDiscount: fd })
             return { ...i, freeDeliveryDiscount: fd, subtotal: sub }
         })
         return { ...order, orderItems: next }
@@ -475,7 +500,7 @@ export const useOrdersDraftsStore = defineStore('ordersDrafts', () => {
         const withFd = applyFreeDeliveryToOrder(order)
         const subtotal = withFd.orderItems.reduce((sum, item) => sum + item.subtotal, 0)
         const discountTotal = withFd.orderItems.reduce(
-            (sum, item) => sum + item.discount + (item.freeDeliveryDiscount ?? 0),
+            (sum, item) => sum + item.discount + linePromotionDiscount(item) + (item.freeDeliveryDiscount ?? 0),
             0,
         )
         const total = subtotal + withFd.deliveryFee
@@ -502,6 +527,153 @@ export const useOrdersDraftsStore = defineStore('ordersDrafts', () => {
         const order = draftOrders.value.get(currentTabId.value)
         if (!order) return
         const updated = { ...order, freeDeliveryRequested: value, updatedAt: new Date() }
+        recalculateTotals(updated)
+        saveToLocalStorage()
+    }
+
+    const promotionMinimumReached = (order: DraftOrder, promo: DailyPromotion) => {
+        const minimum = Math.max(0, Number(promo.minimumOrderValue ?? 0) || 0)
+        if (minimum <= 0) return true
+        return purchasedProductsGrossSubtotal(order) >= minimum
+    }
+
+    const applyPercentagePromotion = (order: DraftOrder, promo: DailyPromotion): DraftOrder => {
+        const eligibleIds =
+            promo.discountScope === 'SpecificProducts'
+                ? new Set((promo.discountProducts ?? []).map((p) => p.productId))
+                : null
+        const percentage = Math.max(0, Number(promo.discountPercentage ?? 0) || 0)
+
+        const orderItems = order.orderItems.map((item) => {
+            const eligible =
+                item.isDailyPromotionGift !== true &&
+                (eligibleIds == null || eligibleIds.has(item.productId))
+
+            if (!eligible) {
+                return item.dailyPromotionDiscount
+                    ? {
+                        ...item,
+                        dailyPromotionDiscount: 0,
+                        dailyPromotionDiscountPercentage: null,
+                        subtotal: lineSubtotal({ ...item, dailyPromotionDiscount: 0 }),
+                    }
+                    : item
+            }
+
+            const gross = Math.max(0, item.quantity) * Math.max(0, item.unitPrice)
+            const dailyPromotionDiscount = Math.round((gross * percentage) / 100)
+            const next = {
+                ...item,
+                dailyPromotionDiscount,
+                dailyPromotionDiscountPercentage: percentage,
+            }
+            return { ...next, subtotal: lineSubtotal(next) }
+        })
+
+        return {
+            ...order,
+            orderItems,
+            appliedDailyPromotionId: promo.id,
+            appliedDailyPromotionType: promo.type,
+            appliedDailyPromotionGiftProductId: null,
+            appliedDailyPromotionGiftProductName: null,
+            appliedDailyPromotionDiscountPercentage: percentage,
+            appliedDailyPromotionDiscountScope: promo.discountScope ?? null,
+            updatedAt: new Date(),
+        }
+    }
+
+    const applyPromotionToOrder = (order: DraftOrder, promo: DailyPromotion): DraftOrder | null => {
+        if (order.ignoredDailyPromotionId === promo.id) return null
+
+        const alreadyApplied = order.appliedDailyPromotionId === promo.id
+        if (!alreadyApplied && !promotionMinimumReached(order, promo)) return null
+
+        if (promo.type === 'GiftProduct') {
+            if (!promo.giftProductId || alreadyApplied) return null
+            const alreadyHasGift = order.orderItems.some(
+                (item) => item.isDailyPromotionGift === true && item.productId === promo.giftProductId,
+            )
+            if (alreadyHasGift) {
+                return {
+                    ...order,
+                    appliedDailyPromotionId: promo.id,
+                    appliedDailyPromotionType: promo.type,
+                    appliedDailyPromotionGiftProductId: promo.giftProductId,
+                    appliedDailyPromotionGiftProductName: promo.giftProductName ?? null,
+                    updatedAt: new Date(),
+                }
+            }
+
+            const giftItem = {
+                tempId: `daily-promo-${promo.id}-${promo.giftProductId}`,
+                productId: promo.giftProductId,
+                productName: promo.giftProductName ?? 'Promocion del dia',
+                productPrice: 0,
+                quantity: 1,
+                unitPrice: 0,
+                discount: 0,
+                dailyPromotionDiscount: 0,
+                dailyPromotionDiscountPercentage: null,
+                freeDeliveryDiscount: 0,
+                subtotal: 0,
+                notes: 'Promocion del dia',
+                isDailyPromotionGift: true,
+            }
+
+            return {
+                ...order,
+                orderItems: [...order.orderItems, giftItem],
+                appliedDailyPromotionId: promo.id,
+                appliedDailyPromotionType: promo.type,
+                appliedDailyPromotionGiftProductId: promo.giftProductId,
+                appliedDailyPromotionGiftProductName: promo.giftProductName ?? null,
+                appliedDailyPromotionDiscountPercentage: null,
+                appliedDailyPromotionDiscountScope: null,
+                updatedAt: new Date(),
+            }
+        }
+
+        if (promo.type === 'FreeDelivery') {
+            if (alreadyApplied && order.freeDeliveryRequested === true) return null
+            return {
+                ...order,
+                freeDeliveryRequested: true,
+                appliedDailyPromotionId: promo.id,
+                appliedDailyPromotionType: promo.type,
+                appliedDailyPromotionGiftProductId: null,
+                appliedDailyPromotionGiftProductName: null,
+                appliedDailyPromotionDiscountPercentage: null,
+                appliedDailyPromotionDiscountScope: null,
+                updatedAt: new Date(),
+            }
+        }
+
+        if (promo.type === 'PercentageDiscount') {
+            return applyPercentagePromotion(order, promo)
+        }
+
+        return null
+    }
+
+    const applyDailyPromotionToCurrentOrder = async () => {
+        if (!currentTabId.value) return
+        const order = draftOrders.value.get(currentTabId.value)
+        if (!order || order.orderItems.filter((item) => item.isDailyPromotionGift !== true).length === 0) return
+
+        const authStore = useAuthStore()
+        const branchId = order.branchId || authStore.branchId
+        if (!branchId) return
+
+        const promoStore = useDailyPromotionStore()
+        const promo = await promoStore.loadActive(branchId)
+        if (!promo) return
+
+        const current = draftOrders.value.get(order.tabId)
+        if (!current) return
+        const updated = applyPromotionToOrder(current, promo)
+        if (!updated) return
+
         recalculateTotals(updated)
         saveToLocalStorage()
     }
@@ -582,16 +754,39 @@ export const useOrdersDraftsStore = defineStore('ordersDrafts', () => {
                 paidInStoreCash: order.paidInStoreCash ?? false,
                 paidInStoreCashAmount:
                     typeof order.paidInStoreCashAmount === 'number' ? order.paidInStoreCashAmount : null,
+                appliedDailyPromotionId:
+                    typeof order.appliedDailyPromotionId === 'number' ? order.appliedDailyPromotionId : null,
+                appliedDailyPromotionType: order.appliedDailyPromotionType ?? null,
+                appliedDailyPromotionGiftProductId:
+                    typeof order.appliedDailyPromotionGiftProductId === 'number'
+                        ? order.appliedDailyPromotionGiftProductId
+                        : null,
+                appliedDailyPromotionGiftProductName: order.appliedDailyPromotionGiftProductName ?? null,
+                appliedDailyPromotionDiscountPercentage:
+                    typeof order.appliedDailyPromotionDiscountPercentage === 'number'
+                        ? order.appliedDailyPromotionDiscountPercentage
+                        : null,
+                appliedDailyPromotionDiscountScope: order.appliedDailyPromotionDiscountScope ?? null,
+                ignoredDailyPromotionId:
+                    typeof order.ignoredDailyPromotionId === 'number' ? order.ignoredDailyPromotionId : null,
                 freeDeliveryRequested: order.freeDeliveryRequested ?? false,
                 orderItems: (order.orderItems ?? []).map((it: any) => {
                     const fd = typeof it.freeDeliveryDiscount === 'number' ? it.freeDeliveryDiscount : 0
                     const disc = typeof it.discount === 'number' ? it.discount : 0
+                    const dp = typeof it.dailyPromotionDiscount === 'number' ? it.dailyPromotionDiscount : 0
                     const q = typeof it.quantity === 'number' ? it.quantity : 0
                     const up = typeof it.unitPrice === 'number' ? it.unitPrice : 0
                     return {
                         ...it,
+                        discount: disc,
+                        dailyPromotionDiscount: dp,
+                        dailyPromotionDiscountPercentage:
+                            typeof it.dailyPromotionDiscountPercentage === 'number'
+                                ? it.dailyPromotionDiscountPercentage
+                                : null,
+                        isDailyPromotionGift: it.isDailyPromotionGift === true,
                         freeDeliveryDiscount: fd,
-                        subtotal: Math.max(0, q * up - disc - fd),
+                        subtotal: Math.max(0, q * up - disc - dp - fd),
                     }
                 }),
             }))
@@ -824,6 +1019,7 @@ export const useOrdersDraftsStore = defineStore('ordersDrafts', () => {
         updatePaidInStoreCash,
         updateDeliveryFee,
         updateFreeDeliveryRequested,
+        applyDailyPromotionToCurrentOrder,
         resolveDeliveryFeeFromSelectedAddress,
         createOrReuseWhatsAppDraft,
         recalculateTotals,

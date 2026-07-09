@@ -4,6 +4,12 @@
         <div class="flex items-center justify-between mb-2">
             <div class="flex items-center gap-2 flex-1 min-w-0">
                 <h4 class="product-name text-sm font-medium text-gray-900">{{ item.productName }}</h4>
+                <span
+                    v-if="item.isDailyPromotionGift"
+                    class="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-800"
+                >
+                    Promo
+                </span>
                 <span class="text-xs text-gray-500 whitespace-nowrap">Precio base: {{ formatCurrency(item.productPrice)
                 }}</span>
             </div>
@@ -25,7 +31,8 @@
                 <span class="quantity-display font-medium text-gray-900 min-w-[2rem] text-center">
                     {{ localQuantity }}
                 </span>
-                <BaseButton @click="increaseQuantity" variant="outline" size="sm" class="h-6 w-6 p-0">
+                <BaseButton @click="increaseQuantity" variant="outline" size="sm" class="h-6 w-6 p-0"
+                    :disabled="item.isDailyPromotionGift">
                     <PlusIcon class="w-3 h-3" />
                 </BaseButton>
             </div>
@@ -36,6 +43,7 @@
             <!-- Precio unitario (editable) -->
             <div class="flex items-center gap-1">
                 <input v-model.number="localUnitPrice" type="number" min="0" step="100" @input="handlePriceChange"
+                    :disabled="item.isDailyPromotionGift"
                     class="w-20 px-1 py-0.5 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500" />
             </div>
 
@@ -47,6 +55,7 @@
                 <span class="text-gray-500 text-xs">Desc:</span>
                 <input v-model.number="discountPercentage" type="number" min="0" max="100" step="0.1"
                     @input="updateDiscountFromPercentage"
+                    :disabled="item.isDailyPromotionGift"
                     class="w-12 px-1 py-0.5 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500" />
                 <span class="text-xs">%</span>
             </div>
@@ -62,9 +71,12 @@
         </div>
 
         <!-- Mostrar ahorro si hay descuento (opcional, tercera línea pequeña) -->
-        <div v-if="discountAmount > 0 || freeDeliveryCop > 0" class="mt-1 text-xs text-right space-y-0.5">
+        <div v-if="discountAmount > 0 || dailyPromotionCop > 0 || freeDeliveryCop > 0" class="mt-1 text-xs text-right space-y-0.5">
             <div v-if="discountAmount > 0" class="text-green-600">
                 Ahorro: {{ formatCurrency(discountAmount) }}
+            </div>
+            <div v-if="dailyPromotionCop > 0" class="text-amber-700">
+                Promo del dia: -{{ formatCurrency(dailyPromotionCop) }}
             </div>
             <div v-if="freeDeliveryCop > 0" class="text-emerald-700">
                 Domicilio gratis: −{{ formatCurrency(freeDeliveryCop) }}
@@ -137,10 +149,11 @@ const discountAmount = computed(() => {
 })
 
 const freeDeliveryCop = computed(() => Math.max(0, props.item.freeDeliveryDiscount ?? 0))
+const dailyPromotionCop = computed(() => Math.max(0, props.item.dailyPromotionDiscount ?? 0))
 
 // Subtotal final calculado
 const calculatedSubtotal = computed(() => {
-    return subtotalSinDescuento.value - discountAmount.value - freeDeliveryCop.value
+    return subtotalSinDescuento.value - discountAmount.value - dailyPromotionCop.value - freeDeliveryCop.value
 })
 
 // Métodos

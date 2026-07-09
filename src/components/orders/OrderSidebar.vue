@@ -88,6 +88,12 @@
                     </div>
 
                     <OrderItemList :tab-id="currentTabId || ''" @add-products="handleAddProducts" />
+                    <div
+                        v-if="dailyPromotionAppliedText"
+                        class="mx-4 mb-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-800"
+                    >
+                        {{ dailyPromotionAppliedText }}
+                    </div>
                     <PaidInStoreCashPanel
                         v-if="showPaidInStoreInDraft && currentOrder"
                         :input-id="'draft-paid-store-' + currentOrder.tabId"
@@ -289,6 +295,21 @@ const isSendingWhatsAppConfirmation = ref(false)
 const currentOrder = computed(() => ordersStore.currentOrder)
 const currentTabId = computed(() => ordersStore.currentTabId)
 const { canSubmitOrder, orderErrors } = useOrderValidation()
+
+const dailyPromotionAppliedText = computed(() => {
+    const promoType = currentOrder.value?.appliedDailyPromotionType
+    if (!promoType) return ''
+    if (promoType === 'GiftProduct') {
+        return `Promocion del dia aplicada: ${currentOrder.value?.appliedDailyPromotionGiftProductName ?? 'producto gratis'} gratis`
+    }
+    if (promoType === 'FreeDelivery') {
+        return 'Promocion del dia aplicada: Domicilio gratis'
+    }
+    if (promoType === 'PercentageDiscount') {
+        return `Promocion del dia aplicada: ${currentOrder.value?.appliedDailyPromotionDiscountPercentage ?? 0}% de descuento`
+    }
+    return ''
+})
 
 const showCopyAddressesButton = computed(() => {
     const o = currentOrder.value
