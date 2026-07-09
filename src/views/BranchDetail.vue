@@ -148,38 +148,14 @@
                     </BaseCard>
                 </div>
 
-                <!-- Impresión térmica (agente local) -->
-                <BaseCard v-if="canEditBranchProfile && activeBranchSection === 'printing'">
-                    <div class="space-y-4">
-                        <h3 class="text-lg font-semibold text-gray-900 flex items-center gap-2">
-                            <PrinterIcon class="w-6 h-6 text-gray-600" />
-                            Impresión térmica
-                        </h3>
-                        <p class="text-sm text-gray-600">
-                            Nombres de cola Windows, reglas de encolado y token del agente que consulta la API en cada
-                            sucursal.
-                        </p>
-                        <BranchPrintSettingsForm :branch-id="branchId" :initial="branch.printSettings"
-                            @saved="handlePrintSettingsSaved" />
-                        <div
-                            v-if="branch.printSettings && (branch.printSettings.enableKitchenJobs || branch.printSettings.enableDeliveryJobs)"
-                            class="pt-4 mt-4 border-t border-gray-100 space-y-3">
-                            <p class="text-sm text-gray-600">
-                                Encola un ticket de prueba (datos ficticios) para verificar la impresora y el agente, sin pedido real.
-                            </p>
-                            <div class="flex flex-wrap gap-2">
-                                <BaseButton v-if="branch.printSettings.enableKitchenJobs" variant="outline" size="sm"
-                                    :loading="testPrintLoading === 'kitchen'" @click="enqueueTestPrint('kitchen')">
-                                    Impresión prueba (cocina)
-                                </BaseButton>
-                                <BaseButton v-if="branch.printSettings.enableDeliveryJobs" variant="outline" size="sm"
-                                    :loading="testPrintLoading === 'delivery'" @click="enqueueTestPrint('delivery')">
-                                    Impresión prueba (domicilio)
-                                </BaseButton>
-                            </div>
-                        </div>
-                    </div>
-                </BaseCard>
+                <BranchPrintingSection
+                    v-if="canEditBranchProfile && activeBranchSection === 'printing'"
+                    :branch-id="branchId"
+                    :print-settings="branch.printSettings"
+                    :test-print-loading="testPrintLoading"
+                    @saved="handlePrintSettingsSaved"
+                    @test-print="enqueueTestPrint"
+                />
 
                 <BranchWhatsAppAiSettingsSection
                     v-if="canEditBranchProfile && activeBranchSection === 'whatsapp-ai'"
@@ -429,7 +405,7 @@ import BaseAlert from '@/components/ui/BaseAlert.vue'
 import BaseLoading from '@/components/ui/BaseLoading.vue'
 import PhoneNumberItem from '@/components/customers/PhoneNumberItem.vue'
 import BranchUsersTable from '@/components/branches/BranchUsersTable.vue'
-import BranchPrintSettingsForm from '@/components/branches/BranchPrintSettingsForm.vue'
+import BranchPrintingSection from '@/components/branches/BranchPrintingSection.vue'
 import BranchWhatsAppAiSettingsSection from '@/components/branches/BranchWhatsAppAiSettingsSection.vue'
 import BranchBanksAppsSection from '@/components/branches/BranchBanksAppsSection.vue'
 import BranchExpensesSection from '@/components/branches/BranchExpensesSection.vue'
@@ -464,7 +440,6 @@ import {
     BuildingLibraryIcon,
     DevicePhoneMobileIcon,
     CurrencyDollarIcon,
-    PrinterIcon,
     InformationCircleIcon
 } from '@heroicons/vue/24/outline'
 import type { User } from '@/types/user'
