@@ -2,6 +2,7 @@ export * from './authApi';
 export * from './branchApi';
 export * from './branchAiSettingsApi';
 export * from './dailyPromotionApi';
+export * from './loyaltyCycleApi';
 export * from './userApi';
 export * from './customerApi';
 export * from './bankTransferApi';
