@@ -300,57 +300,34 @@
                 />
 
                 <!-- Expenses Section -->
-                <BaseCard v-if="activeBranchSection === 'expenses'">
-                    <div class="space-y-4">
-                        <!-- Tabs -->
-                        <div class="border-b border-gray-200">
-                            <nav class="-mb-px flex space-x-8">
-                                <button @click="expensesActiveTab = 'categories'" :class="[
-                                    expensesActiveTab === 'categories'
-                                        ? 'border-green-500 text-green-600'
-                                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300',
-                                    'whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm'
-                                ]">
-                                    Categorías
-                                </button>
-                                <button @click="expensesActiveTab = 'expenses'" :class="[
-                                    expensesActiveTab === 'expenses'
-                                        ? 'border-green-500 text-green-600'
-                                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300',
-                                    'whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm'
-                                ]">
-                                    Gastos
-                                </button>
-                                <button @click="expensesActiveTab = 'suppliers'" :class="[
-                                    expensesActiveTab === 'suppliers'
-                                        ? 'border-green-500 text-green-600'
-                                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300',
-                                    'whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm'
-                                ]">
-                                    Proveedores
-                                </button>
-                            </nav>
-                        </div>
-
-                        <!-- Categories Tab -->
-                        <ExpenseCategoriesTable v-if="expensesActiveTab === 'categories'" :list="expenseCategoriesList"
-                            :loading="expenseCategoriesLoading" @create="openCreateExpenseCategory"
-                            @edit="openEditExpenseCategory" @delete="deleteExpenseCategory"
-                            @previous-page="previousExpenseCategoryPage" @next-page="nextExpenseCategoryPage" />
-
-                        <!-- Expenses Tab -->
-                        <ExpensesTable v-if="expensesActiveTab === 'expenses'" :list="expensesList"
-                            :categories="expenseCategoriesList?.items || []" :loading="expensesLoading"
-                            @create="openCreateExpense" @edit="openEditExpense" @delete="deleteExpense"
-                            @filter-change="onExpenseFilterChange" @search-change="onExpenseSearchChange"
-                            @previous-page="previousExpensePage" @next-page="nextExpensePage" />
-
-                        <SuppliersTable v-if="expensesActiveTab === 'suppliers'" :list="suppliersList"
-                            :loading="suppliersLoading" :can-manage="canManageSuppliers" @create="openCreateSupplier"
-                            @edit="openEditSupplier" @delete="deleteSupplier" @previous-page="previousSupplierPage"
-                            @next-page="nextSupplierPage" />
-                    </div>
-                </BaseCard>
+                <BranchExpensesSection
+                    v-if="activeBranchSection === 'expenses'"
+                    v-model="expensesActiveTab"
+                    :expense-categories="expenseCategoriesList"
+                    :expense-categories-loading="expenseCategoriesLoading"
+                    :expenses="expensesList"
+                    :expenses-loading="expensesLoading"
+                    :suppliers="suppliersList"
+                    :suppliers-loading="suppliersLoading"
+                    :can-manage-suppliers="canManageSuppliers"
+                    @create-expense-category="openCreateExpenseCategory"
+                    @edit-expense-category="openEditExpenseCategory"
+                    @delete-expense-category="deleteExpenseCategory"
+                    @previous-expense-category-page="previousExpenseCategoryPage"
+                    @next-expense-category-page="nextExpenseCategoryPage"
+                    @create-expense="openCreateExpense"
+                    @edit-expense="openEditExpense"
+                    @delete-expense="deleteExpense"
+                    @expense-filter-change="onExpenseFilterChange"
+                    @expense-search-change="onExpenseSearchChange"
+                    @previous-expense-page="previousExpensePage"
+                    @next-expense-page="nextExpensePage"
+                    @create-supplier="openCreateSupplier"
+                    @edit-supplier="openEditSupplier"
+                    @delete-supplier="deleteSupplier"
+                    @previous-supplier-page="previousSupplierPage"
+                    @next-supplier-page="nextSupplierPage"
+                />
             </div>
 
             <!-- Edit Branch Dialog -->
@@ -452,16 +429,14 @@ import BranchUsersTable from '@/components/branches/BranchUsersTable.vue'
 import BranchPrintSettingsForm from '@/components/branches/BranchPrintSettingsForm.vue'
 import BranchWhatsAppAiSettingsSection from '@/components/branches/BranchWhatsAppAiSettingsSection.vue'
 import BranchBanksAppsSection from '@/components/branches/BranchBanksAppsSection.vue'
+import BranchExpensesSection from '@/components/branches/BranchExpensesSection.vue'
 import BranchLoyaltyCycleForm from '@/components/branches/BranchLoyaltyCycleForm.vue'
 import BranchForm from '@/components/branches/BranchForm.vue'
 import NeighborhoodForm from '@/components/neighborhoods/NeighborhoodForm.vue'
 import BankForm from '@/components/payments/banks/BankForm.vue'
 import AppForm from '@/components/payments/apps/AppForm.vue'
-import ExpenseCategoriesTable from '@/components/expenses/ExpenseCategoriesTable.vue'
-import ExpensesTable from '@/components/expenses/ExpensesTable.vue'
 import ExpenseCategoryFormModal from '@/components/expenses/ExpenseCategoryFormModal.vue'
 import ExpenseForm from '@/components/expenses/ExpenseForm.vue'
-import SuppliersTable from '@/components/suppliers/SuppliersTable.vue'
 import SupplierFormModal from '@/components/suppliers/SupplierFormModal.vue'
 import { expenseCategoryApi } from '@/services/MainAPI/expenseCategoryApi'
 import { expenseApi } from '@/services/MainAPI/expenseApi'
@@ -518,7 +493,8 @@ const editingNeighborhood = ref<NeighborhoodSummary | null>(null)
 const neighborhoodFormLoading = ref(false)
 
 // Expenses state
-const expensesActiveTab = ref<'categories' | 'expenses' | 'suppliers'>('categories')
+type BranchExpensesTab = 'categories' | 'expenses' | 'suppliers'
+const expensesActiveTab = ref<BranchExpensesTab>('categories')
 const expenseCategoriesList = ref<PagedResult<ExpenseCategory> | null>(null)
 const expenseCategoriesLoading = ref(false)
 const expenseCategoriesPage = ref(1)
