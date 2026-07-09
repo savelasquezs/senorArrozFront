@@ -108,7 +108,7 @@
                 <span class="text-gray-600">Domicilio:</span>
                 <span class="font-medium text-gray-900">{{ formatCurrency(deliveryFee) }}</span>
             </div>
-            <div v-if="showFreeDeliveryCheckbox" class="flex items-start justify-between gap-3 text-sm">
+            <div v-if="false" class="flex items-start justify-between gap-3 text-sm">
                 <label class="flex items-center gap-2 cursor-pointer text-xs text-gray-700">
                     <input
                         type="checkbox"

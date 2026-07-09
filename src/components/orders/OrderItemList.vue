@@ -55,7 +55,7 @@
                             class="w-16 px-1 py-0.5 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500" />
                     </div>
                 </div>
-                <div v-if="showFreeDeliveryCheckbox" class="summary-line items-start">
+                <div v-if="false" class="summary-line items-start">
                     <label class="flex items-center gap-2 cursor-pointer text-xs text-gray-700">
                         <input type="checkbox" class="rounded border-gray-300 text-emerald-600 focus:ring-emerald-500"
                             :checked="currentOrder?.freeDeliveryRequested === true"

@@ -432,9 +432,51 @@
 						</div>
 					</div>
 
-					<div v-if="appliedBenefitLabel" class="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3">
-						<p class="text-xs font-medium uppercase tracking-wide text-emerald-700">Beneficio aplicado</p>
-						<p class="mt-1 text-sm font-semibold text-emerald-900">{{ appliedBenefitLabel }}</p>
+					<div v-if="order" class="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3">
+						<div class="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+							<div>
+								<p class="text-xs font-medium uppercase tracking-wide text-emerald-700">Beneficio aplicado</p>
+								<p class="mt-1 text-sm font-semibold" :class="appliedBenefitLabel ? 'text-emerald-900' : 'text-gray-500'">
+									{{ appliedBenefitLabel || 'Sin beneficio aplicado' }}
+								</p>
+								<p v-if="order.appliedBenefitCode" class="mt-0.5 text-xs text-emerald-700">
+									Codigo: {{ order.appliedBenefitCode }}
+								</p>
+							</div>
+							<div v-if="permissions.canEditOrder(order)" class="w-full space-y-2 lg:max-w-md">
+								<div class="flex gap-2">
+									<BaseInput
+										:model-value="detailDiscountCodeInput"
+										placeholder="Codigo promocional"
+										class="flex-1"
+										@update:model-value="updateDetailDiscountCodeInput"
+										@keyup.enter="applyDiscountCodeToDetail"
+									/>
+									<BaseButton
+										variant="primary"
+										size="sm"
+										:loading="savingBenefit"
+										:disabled="!detailDiscountCodeInput.trim() || savingBenefit"
+										@click="applyDiscountCodeToDetail"
+									>
+										Aplicar
+									</BaseButton>
+								</div>
+								<div class="flex items-center justify-between gap-3">
+									<p v-if="detailBenefitError" class="text-xs text-red-600">{{ detailBenefitError }}</p>
+									<p v-else class="text-xs text-emerald-700">Solo puede quedar un beneficio por pedido.</p>
+									<BaseButton
+										v-if="order.appliedBenefitType && order.appliedBenefitType !== 'None'"
+										variant="outline"
+										size="sm"
+										:disabled="savingBenefit"
+										@click="clearDetailBenefit"
+									>
+										Quitar beneficio
+									</BaseButton>
+								</div>
+							</div>
+						</div>
 					</div>
 
 					<!-- Notas -->
@@ -784,7 +826,9 @@ import type {
 	OrderDetailView,
 	OrderStatus,
 	UpdateOrderDetailDto,
+	UpdateOrderDto,
 } from '@/types/order';
+import type { DiscountCode } from '@/types/discountCode';
 import type { Customer } from '@/types/customer';
 import { useOrdersDraftsStore } from '@/store/ordersDrafts';
 import { useOrdersDataStore } from '@/store/ordersData';
@@ -792,6 +836,7 @@ import { useBranchPosSettingsStore } from '@/store/branchPosSettings';
 import { useAuthStore } from '@/store/auth';
 import { customerApi } from '@/services/MainAPI/customerApi';
 import { orderApi } from '@/services/MainAPI/orderApi';
+import { discountCodeApi } from '@/services/MainAPI/discountCodeApi';
 import { bankPaymentApi } from '@/services/MainAPI/bankPaymentApi';
 import { printJobsApi } from '@/services/MainAPI/printJobsApi';
 import {
@@ -804,6 +849,11 @@ import {
 	orderCashToCollect,
 	sumPaymentsAmounts,
 } from '@/utils/orderCashToCollect';
+import {
+	deliveryDiscountBudget,
+	distributeEqualWithCaps,
+	lineCapacityCop,
+} from '@/composables/useFreeDeliveryDiscount';
 
 import type { OrderListItem } from '@/types/order';
 
@@ -842,6 +892,9 @@ const editablePrepareAtDate = ref<Date | null>(null);
 const savingSchedule = ref(false);
 const savingPrepareNow = ref(false);
 const savingPaidInStore = ref(false);
+const savingBenefit = ref(false);
+const detailDiscountCodeInput = ref('');
+const detailBenefitError = ref('');
 const showRemovePaidInStoreDetailDialog = ref(false);
 const removePaidInStoreDetailLoading = ref(false);
 const showEditPaidInStoreDetailDialog = ref(false);
@@ -877,6 +930,231 @@ const order = ref<OrderDetailView | null>(null);
 const appliedBenefitLabel = computed(() =>
 	order.value?.appliedBenefitLabel || order.value?.loyaltyRuleName || '',
 );
+
+type DetailLineDraft = UpdateOrderDetailDto & {
+	productName?: string
+	subtotal?: number
+}
+
+function updateDetailDiscountCodeInput(value: string | number | null) {
+	detailDiscountCodeInput.value = String(value || '').toUpperCase();
+	detailBenefitError.value = '';
+}
+
+function parseAppliedBenefitSnapshot(): any | null {
+	if (!order.value?.appliedBenefitSnapshot) return null;
+	try {
+		return JSON.parse(order.value.appliedBenefitSnapshot);
+	} catch {
+		return null;
+	}
+}
+
+function toDetailLineDrafts(source: OrderDetailView): DetailLineDraft[] {
+	return source.orderDetails.map((item) => ({
+		id: item.id,
+		productId: item.productId,
+		quantity: item.quantity,
+		unitPrice: item.unitPrice,
+		discount: Math.max(0, Math.round(Number(item.discount ?? 0))),
+		notes: item.notes || undefined,
+		productName: item.productName,
+		subtotal: item.subtotal,
+	}));
+}
+
+function orderDetailsGrossSubtotal(lines: DetailLineDraft[]) {
+	return lines
+		.filter((item) => !(item.unitPrice === 0 && item.discount === 0))
+		.reduce((sum, item) => sum + Math.max(0, item.quantity) * Math.max(0, item.unitPrice), 0);
+}
+
+function normalizeDetailLines(lines: DetailLineDraft[]): UpdateOrderDetailDto[] {
+	return lines.map((item) => ({
+		id: item.id,
+		productId: item.productId,
+		quantity: Math.max(1, Math.round(Number(item.quantity) || 1)),
+		unitPrice: Math.max(0, Math.round(Number(item.unitPrice) || 0)),
+		discount: Math.max(0, Math.round(Number(item.discount) || 0)),
+		notes: item.notes || undefined,
+	}));
+}
+
+function removePercentageBenefit(lines: DetailLineDraft[], percentage: number) {
+	if (!Number.isFinite(percentage) || percentage <= 0) return lines;
+	return lines.map((item) => {
+		if (item.unitPrice <= 0) return item;
+		const gross = Math.max(0, item.quantity) * Math.max(0, item.unitPrice);
+		const benefitDiscount = Math.round((gross * percentage) / 100);
+		return {
+			...item,
+			discount: Math.max(0, Math.round(Number(item.discount ?? 0)) - benefitDiscount),
+		};
+	});
+}
+
+function removeFreeDeliveryBenefit(lines: DetailLineDraft[], sourceOrder: OrderDetailView) {
+	const budget = deliveryDiscountBudget(sourceOrder.deliveryFee ?? 0, branchPosSettings.maxFreeDeliveryDiscount);
+	if (budget <= 0 || lines.length === 0) return lines;
+	const caps = lines.map((item) => Math.min(
+		Math.max(0, Math.round(Number(item.discount ?? 0))),
+		Math.max(0, item.quantity) * Math.max(0, item.unitPrice),
+	));
+	const shares = distributeEqualWithCaps(budget, caps);
+	return lines.map((item, index) => ({
+		...item,
+		discount: Math.max(0, Math.round(Number(item.discount ?? 0)) - Math.max(0, shares[index] ?? 0)),
+	}));
+}
+
+function stripAppliedBenefit(sourceOrder: OrderDetailView) {
+	const snapshot = parseAppliedBenefitSnapshot() ?? {};
+	const rewardType = sourceOrder.appliedBenefitRewardType;
+	const giftProductId = Number(snapshot.giftProductId ?? 0) || null;
+	let lines = toDetailLineDrafts(sourceOrder);
+
+	if (rewardType === 'GiftProduct' && giftProductId) {
+		lines = lines.filter((item) => !(item.productId === giftProductId && item.unitPrice === 0));
+	} else if (rewardType === 'PercentageDiscount') {
+		const percentage = Number(sourceOrder.appliedBenefitAmount ?? snapshot.discountPercentage ?? 0);
+		lines = removePercentageBenefit(lines, percentage);
+	} else if (rewardType === 'FreeDelivery') {
+		lines = removeFreeDeliveryBenefit(lines, sourceOrder);
+	}
+
+	return lines;
+}
+
+function applyPercentageCode(lines: DetailLineDraft[], code: DiscountCode) {
+	const percentage = Number(code.discountPercentage ?? 0);
+	return lines.map((item) => {
+		if (item.unitPrice <= 0) return item;
+		const gross = Math.max(0, item.quantity) * Math.max(0, item.unitPrice);
+		const add = Math.round((gross * percentage) / 100);
+		return { ...item, discount: Math.max(0, Math.round(Number(item.discount ?? 0)) + add) };
+	});
+}
+
+function applyFreeDeliveryCode(lines: DetailLineDraft[], sourceOrder: OrderDetailView) {
+	const budget = deliveryDiscountBudget(sourceOrder.deliveryFee ?? 0, branchPosSettings.maxFreeDeliveryDiscount);
+	const caps = lines.map((item) =>
+		lineCapacityCop({
+			quantity: item.quantity,
+			unitPrice: item.unitPrice,
+			manualDiscount: item.discount ?? 0,
+		}),
+	);
+	const shares = distributeEqualWithCaps(budget, caps);
+	return lines.map((item, index) => ({
+		...item,
+		discount: Math.max(0, Math.round(Number(item.discount ?? 0)) + Math.max(0, shares[index] ?? 0)),
+	}));
+}
+
+function buildClearBenefitPayload(sourceOrder: OrderDetailView): UpdateOrderDto {
+	return {
+		orderDetails: normalizeDetailLines(stripAppliedBenefit(sourceOrder)),
+		freeDeliveryRequested: false,
+		appliedBenefitType: 'None',
+		appliedBenefitSourceId: null,
+		appliedBenefitCode: null,
+		appliedBenefitLabel: null,
+		appliedBenefitRewardType: null,
+		appliedBenefitAmount: null,
+		appliedBenefitSnapshot: null,
+	};
+}
+
+function buildApplyDiscountCodePayload(sourceOrder: OrderDetailView, code: DiscountCode): UpdateOrderDto {
+	let lines = stripAppliedBenefit(sourceOrder);
+	if (code.type === 'GiftProduct') {
+		if (!code.giftProductId) throw new Error('El codigo no tiene producto regalo configurado.');
+		lines = [
+			...lines,
+			{
+				id: 0,
+				productId: code.giftProductId,
+				quantity: 1,
+				unitPrice: 0,
+				discount: 0,
+				notes: `Codigo ${code.code}`,
+				productName: code.giftProductName ?? code.label,
+			},
+		];
+	} else if (code.type === 'PercentageDiscount') {
+		lines = applyPercentageCode(lines, code);
+	} else if (code.type === 'FreeDelivery') {
+		lines = applyFreeDeliveryCode(lines, sourceOrder);
+	}
+
+	return {
+		orderDetails: normalizeDetailLines(lines),
+		freeDeliveryRequested: code.type === 'FreeDelivery',
+		appliedBenefitType: 'DiscountCode',
+		appliedBenefitSourceId: code.id,
+		appliedBenefitCode: code.code,
+		appliedBenefitLabel: code.label || `Codigo ${code.code}`,
+		appliedBenefitRewardType: code.type,
+		appliedBenefitAmount: code.type === 'PercentageDiscount' ? Number(code.discountPercentage ?? 0) : null,
+		appliedBenefitSnapshot: JSON.stringify(code),
+	};
+}
+
+async function updateDetailBenefit(payload: UpdateOrderDto, successMessage: string) {
+	if (!order.value) return;
+	savingBenefit.value = true;
+	detailBenefitError.value = '';
+	const paymentSnapshotBefore = captureOrderPaymentSnapshot();
+	try {
+		await ordersDataStore.update(order.value.id, payload);
+		success('Beneficio actualizado', 4000, successMessage);
+		await promptBankSyncIfNeeded(paymentSnapshotBefore);
+	} catch (err: any) {
+		detailBenefitError.value = err?.message || 'No se pudo actualizar el beneficio.';
+		error('Beneficio', detailBenefitError.value);
+	} finally {
+		savingBenefit.value = false;
+	}
+}
+
+async function clearDetailBenefit() {
+	if (!order.value) return;
+	await updateDetailBenefit(buildClearBenefitPayload(order.value), 'El pedido quedo sin beneficio aplicado.');
+}
+
+async function applyDiscountCodeToDetail() {
+	if (!order.value) return;
+	const codeText = detailDiscountCodeInput.value.trim();
+	if (!codeText) {
+		detailBenefitError.value = 'Ingresa un codigo promocional.';
+		return;
+	}
+
+	savingBenefit.value = true;
+	detailBenefitError.value = '';
+	try {
+		const baseLines = stripAppliedBenefit(order.value);
+		const response = await discountCodeApi.validate(
+			order.value.branchId,
+			codeText,
+			orderDetailsGrossSubtotal(baseLines),
+		);
+		if (!response.isSuccess || !response.data) {
+			throw new Error(response.message || 'Codigo promocional invalido.');
+		}
+		savingBenefit.value = false;
+		await updateDetailBenefit(
+			buildApplyDiscountCodePayload(order.value, response.data),
+			`Se aplico el codigo ${response.data.code}.`,
+		);
+		detailDiscountCodeInput.value = '';
+	} catch (err: any) {
+		detailBenefitError.value = err?.message || 'Codigo promocional invalido.';
+		error('Codigo promocional', detailBenefitError.value);
+	} finally {
+		savingBenefit.value = false;
+	}
+}
 
 const showScheduleEditor = computed(() => {
 	const o = order.value;
