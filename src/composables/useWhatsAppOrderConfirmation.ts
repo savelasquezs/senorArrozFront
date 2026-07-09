@@ -11,7 +11,11 @@ export function buildWhatsAppOrderConfirmationMessage(order: DraftOrder, etaPhra
   const greeting = customerName ? `${customerName} 😊` : 'Hola 😊'
   const productLines = order.orderItems.length
     ? order.orderItems.map(item => {
-        const lineTotal = Math.max(0, item.quantity * item.unitPrice - (item.discount || 0) - (item.freeDeliveryDiscount || 0))
+        const automaticDiscount =
+          (item.dailyPromotionDiscount || 0) +
+          (item.loyaltyDiscount || 0) +
+          (item.freeDeliveryDiscount || 0)
+        const lineTotal = Math.max(0, item.quantity * item.unitPrice - (item.discount || 0) - automaticDiscount)
         return `• ${item.productName} x ${item.quantity} - ${currency.format(lineTotal)}`
       })
     : ['• Pedido en preparación']

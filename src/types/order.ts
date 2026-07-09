@@ -10,6 +10,7 @@ import type { Product, ProductCategory } from './product'
 // ===== TIPOS BÁSICOS =====
 export type OrderType = 'onsite' | 'delivery' | 'reservation'
 export type OrderStatus = 'taken' | 'in_preparation' | 'ready' | 'on_the_way' | 'delivered' | 'cancelled'
+export type AppliedBenefitType = 'DailyPromotion' | 'Loyalty' | 'None'
 
 export interface OrderItem {
     tempId: string
@@ -26,6 +27,12 @@ export interface OrderItem {
     dailyPromotionDiscountPercentage?: number | null
     /** Linea agregada automaticamente por promo del dia. */
     isDailyPromotionGift?: boolean
+    /** Descuento automatico de fidelizacion. */
+    loyaltyDiscount?: number
+    /** Porcentaje usado para recalcular fidelizacion al cambiar cantidad/precio. */
+    loyaltyDiscountPercentage?: number | null
+    /** Linea agregada automaticamente por fidelizacion. */
+    isLoyaltyGift?: boolean
     /** Descuento automático por “domicilio gratis” (reparto en líneas). */
     freeDeliveryDiscount: number
     subtotal: number
@@ -126,6 +133,16 @@ export interface DraftOrder {
     appliedDailyPromotionDiscountPercentage?: number | null
     appliedDailyPromotionDiscountScope?: string | null
     ignoredDailyPromotionId?: number | null
+    selectedBenefitType?: AppliedBenefitType | null
+    appliedBenefitType?: AppliedBenefitType | null
+    appliedBenefitLabel?: string | null
+    appliedLoyaltyStepId?: number | null
+    appliedLoyaltyStepIndex?: number | null
+    appliedLoyaltyRewardType?: string | null
+    appliedLoyaltyGiftProductId?: number | null
+    appliedLoyaltyGiftProductName?: string | null
+    appliedLoyaltyDiscountPercentage?: number | null
+    ignoredLoyaltyStepId?: number | null
 }
 
 // ===== TIPOS DE PEDIDOS COMPLETADOS =====

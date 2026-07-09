@@ -1,22 +1,26 @@
 // src/composables/useOrderItems.ts
 import { useOrdersDraftsStore } from '@/store/ordersDrafts'
 import { useOrderTabs } from '@/composables/useOrderTabs'
+import { useOrderBenefitResolver } from '@/composables/useOrderBenefitResolver'
 import type { Product, OrderItem } from '@/types/order'
 
 export function useOrderItems() {
     const store = useOrdersDraftsStore()
     const { createNewTab } = useOrderTabs()
+    const { resolveBenefits } = useOrderBenefitResolver()
 
     const lineSubtotal = (item: {
         quantity: number
         unitPrice: number
         discount: number
         dailyPromotionDiscount?: number | null
+        loyaltyDiscount?: number | null
         freeDeliveryDiscount?: number | null
     }) => {
         const daily = Math.max(0, Number(item.dailyPromotionDiscount ?? 0) || 0)
+        const loyalty = Math.max(0, Number(item.loyaltyDiscount ?? 0) || 0)
         const fd = Math.max(0, Number(item.freeDeliveryDiscount ?? 0) || 0)
-        return Math.max(0, item.quantity * item.unitPrice - item.discount - daily - fd)
+        return Math.max(0, item.quantity * item.unitPrice - item.discount - daily - loyalty - fd)
     }
 
     const addProduct = (product: Product, quantity: number = 1) => {
@@ -30,7 +34,11 @@ export function useOrderItems() {
         const order = store.draftOrders.get(store.currentTabId)
         if (!order) return
 
-        const existingIndex = order.orderItems.findIndex(item => item.productId === product.id)
+        const existingIndex = order.orderItems.findIndex(item =>
+            item.productId === product.id &&
+            item.isDailyPromotionGift !== true &&
+            item.isLoyaltyGift !== true,
+        )
 
         let updatedItems: OrderItem[]
 
@@ -53,6 +61,8 @@ export function useOrderItems() {
                 discount: 0,
                 dailyPromotionDiscount: 0,
                 dailyPromotionDiscountPercentage: null,
+                loyaltyDiscount: 0,
+                loyaltyDiscountPercentage: null,
                 freeDeliveryDiscount: 0,
                 subtotal: product.price * quantity,
                 notes: ''
@@ -63,7 +73,7 @@ export function useOrderItems() {
         const updated = { ...order, orderItems: updatedItems }
         store.recalculateTotals(updated)
         store.saveToLocalStorage()
-        void store.applyDailyPromotionToCurrentOrder()
+        void resolveBenefits()
     }
 
     const removeItem = (itemTempId: string) => {
@@ -72,6 +82,7 @@ export function useOrderItems() {
         if (!order) return
 
         const removedItem = order.orderItems.find(item => item.tempId === itemTempId)
+        const removedBenefitGift = removedItem?.isDailyPromotionGift === true || removedItem?.isLoyaltyGift === true
         const updated = {
             ...order,
             orderItems: order.orderItems.filter(item => item.tempId !== itemTempId),
@@ -79,11 +90,23 @@ export function useOrderItems() {
                 removedItem?.isDailyPromotionGift === true && order.appliedDailyPromotionId
                     ? order.appliedDailyPromotionId
                     : order.ignoredDailyPromotionId,
+            ignoredLoyaltyStepId:
+                removedItem?.isLoyaltyGift === true && order.appliedLoyaltyStepId
+                    ? order.appliedLoyaltyStepId
+                    : order.ignoredLoyaltyStepId,
             appliedDailyPromotionId:
                 removedItem?.isDailyPromotionGift === true ? null : order.appliedDailyPromotionId,
+            appliedLoyaltyStepId:
+                removedItem?.isLoyaltyGift === true ? null : order.appliedLoyaltyStepId,
+            appliedBenefitType:
+                removedBenefitGift ? null : order.appliedBenefitType,
+            appliedBenefitLabel:
+                removedBenefitGift ? null : order.appliedBenefitLabel,
+            selectedBenefitType: removedBenefitGift ? 'None' : order.selectedBenefitType,
         }
         store.recalculateTotals(updated)
         store.saveToLocalStorage()
+        void resolveBenefits()
     }
 
     const updateQuantity = (itemTempId: string, quantity: number) => {
@@ -101,7 +124,7 @@ export function useOrderItems() {
         const updated = { ...order, orderItems: updatedItems }
         store.recalculateTotals(updated)
         store.saveToLocalStorage()
-        void store.applyDailyPromotionToCurrentOrder()
+        void resolveBenefits()
     }
 
     const updatePrice = (itemTempId: string, price: number) => {
@@ -119,7 +142,7 @@ export function useOrderItems() {
         const updated = { ...order, orderItems: updatedItems }
         store.recalculateTotals(updated)
         store.saveToLocalStorage()
-        void store.applyDailyPromotionToCurrentOrder()
+        void resolveBenefits()
     }
 
     const updateDiscount = (itemTempId: string, discount: number) => {
@@ -137,6 +160,7 @@ export function useOrderItems() {
         const updated = { ...order, orderItems: updatedItems }
         store.recalculateTotals(updated)
         store.saveToLocalStorage()
+        void resolveBenefits()
     }
 
     const updateNotes = (itemTempId: string, notes: string) => {

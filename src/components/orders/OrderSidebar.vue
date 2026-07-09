@@ -89,10 +89,21 @@
 
                     <OrderItemList :tab-id="currentTabId || ''" @add-products="handleAddProducts" />
                     <div
-                        v-if="dailyPromotionAppliedText"
-                        class="mx-4 mb-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-800"
+                        v-if="appliedBenefitText"
+                        class="mx-4 mb-3 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-medium text-emerald-800"
                     >
-                        {{ dailyPromotionAppliedText }}
+                        {{ appliedBenefitText }}
+                    </div>
+                    <div
+                        v-else-if="benefitConflictExists"
+                        class="mx-4 mb-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900"
+                    >
+                        <div class="flex items-center justify-between gap-3">
+                            <span class="font-medium">Beneficio pendiente por resolver</span>
+                            <BaseButton variant="outline" size="sm" @click="openBenefitConflictDialog">
+                                Resolver
+                            </BaseButton>
+                        </div>
                     </div>
                     <PaidInStoreCashPanel
                         v-if="showPaidInStoreInDraft && currentOrder"
@@ -210,6 +221,43 @@
             </template>
         </BaseDialog>
 
+        <BaseDialog
+            v-model="showBenefitConflictDialog"
+            title="Elegir beneficio"
+            size="md"
+            :close-on-backdrop="true"
+            :show-close-button="true"
+        >
+            <div class="space-y-4">
+                <p class="text-sm text-gray-700">
+                    Este pedido tiene Promo del dia y Fidelizacion disponibles. Solo se puede aplicar un beneficio.
+                </p>
+                <p class="text-xs text-gray-500">
+                    Puedes cerrar este modal y resolverlo despues, pero no se podra enviar el pedido hasta elegir una opcion.
+                </p>
+                <div class="rounded-md border border-gray-200 bg-gray-50 p-3 text-sm text-gray-800 whitespace-pre-line">
+                    {{ benefitCopyMessage }}
+                </div>
+                <BaseButton variant="outline" size="sm" class="w-full" @click="copyBenefitConflictMessage">
+                    <span class="flex items-center justify-center gap-1.5">
+                        <ClipboardDocumentIcon class="w-4 h-4" />
+                        Copiar mensaje
+                    </span>
+                </BaseButton>
+            </div>
+            <template #footer>
+                <BaseButton variant="outline" size="sm" @click="chooseNoBenefit">
+                    No aplicar beneficio
+                </BaseButton>
+                <BaseButton variant="secondary" size="sm" @click="chooseLoyaltyBenefit">
+                    Aplicar fidelizacion
+                </BaseButton>
+                <BaseButton variant="primary" size="sm" @click="chooseDailyPromotionBenefit">
+                    Aplicar promo del dia
+                </BaseButton>
+            </template>
+        </BaseDialog>
+
         <!-- Customer Detail Modal -->
         <CustomerDetailModal v-if="selectedCustomer" :show="showCustomerDetail" :customer="selectedCustomer"
             @close="closeCustomerDetail" @customer-updated="handleCustomerUpdated" />
@@ -222,6 +270,7 @@ import { useOrderPersistence } from '@/composables/useOrderPersistence'
 import { useOrderValidation } from '@/composables/useOrderValidation'
 import { useOrderTabs } from '@/composables/useOrderTabs'
 import { useOrderSubmission } from '@/composables/useOrderSubmission'
+import { useOrderBenefitResolver } from '@/composables/useOrderBenefitResolver'
 import { findCustomerOrdersOnSameBusinessDate, type CustomerOrderDateConflictItem } from '@/composables/useCustomerOrderDateConflict'
 import { VueDatePicker } from '@vuepic/vue-datepicker';
 import '@vuepic/vue-datepicker/dist/main.css'
@@ -267,6 +316,14 @@ const { createNewTab, closeTab } = useOrderTabs()
 const { submitOrder } = useOrderSubmission()
 const { success, error: showError } = useToast()
 const { formatCurrency, formatDateTime } = useFormatting()
+const {
+    conflictExists: benefitConflictExists,
+    copyMessage: benefitCopyMessage,
+    resolveBenefits,
+    applyDailyPromotion,
+    applyLoyaltyBenefit,
+    clearAppliedBenefit,
+} = useOrderBenefitResolver()
 const router = useRouter()
 const branchPosSettings = useBranchPosSettingsStore()
 
@@ -290,25 +347,23 @@ const duplicateConflictOrders = ref<CustomerOrderDateConflictItem[]>([])
 const isSubmittingOrder = ref(false)
 const isCheckingDuplicateOrderDate = ref(false)
 const isSendingWhatsAppConfirmation = ref(false)
+const showBenefitConflictDialog = ref(false)
 
 // Computed
 const currentOrder = computed(() => ordersStore.currentOrder)
 const currentTabId = computed(() => ordersStore.currentTabId)
 const { canSubmitOrder, orderErrors } = useOrderValidation()
 
-const dailyPromotionAppliedText = computed(() => {
-    const promoType = currentOrder.value?.appliedDailyPromotionType
-    if (!promoType) return ''
-    if (promoType === 'GiftProduct') {
-        return `Promocion del dia aplicada: ${currentOrder.value?.appliedDailyPromotionGiftProductName ?? 'producto gratis'} gratis`
+const appliedBenefitText = computed(() => {
+    const order = currentOrder.value
+    if (!order?.appliedBenefitType || order.appliedBenefitType === 'None') return ''
+    if (order.appliedBenefitLabel) {
+        return `Beneficio aplicado: ${order.appliedBenefitLabel}`
     }
-    if (promoType === 'FreeDelivery') {
-        return 'Promocion del dia aplicada: Domicilio gratis'
+    if (order.appliedBenefitType === 'Loyalty') {
+        return 'Beneficio aplicado: Fidelizacion'
     }
-    if (promoType === 'PercentageDiscount') {
-        return `Promocion del dia aplicada: ${currentOrder.value?.appliedDailyPromotionDiscountPercentage ?? 0}% de descuento`
-    }
-    return ''
+    return 'Beneficio aplicado: Promo del dia'
 })
 
 const showCopyAddressesButton = computed(() => {
@@ -437,6 +492,34 @@ async function copyDeliveryAddressesText() {
     } catch {
         showError('No se pudo copiar', 'Permite el portapapeles en el navegador o copia manualmente.')
     }
+}
+
+async function copyBenefitConflictMessage() {
+    try {
+        await navigator.clipboard.writeText(benefitCopyMessage.value)
+        success('Copiado', 2500, 'Mensaje de beneficios listo para pegar.')
+    } catch {
+        showError('No se pudo copiar', 'Permite el portapapeles en el navegador o copia manualmente.')
+    }
+}
+
+function openBenefitConflictDialog() {
+    showBenefitConflictDialog.value = true
+}
+
+async function chooseDailyPromotionBenefit() {
+    await applyDailyPromotion()
+    showBenefitConflictDialog.value = false
+}
+
+async function chooseLoyaltyBenefit() {
+    await applyLoyaltyBenefit()
+    showBenefitConflictDialog.value = false
+}
+
+function chooseNoBenefit() {
+    clearAppliedBenefit()
+    showBenefitConflictDialog.value = false
 }
 
 const guestNameError = computed(() => {
@@ -665,6 +748,16 @@ function goToOrderDetail(orderId: number) {
 }
 
 const handleSubmitOrder = async () => {
+    await resolveBenefits()
+    if (benefitConflictExists.value) {
+        showBenefitConflictDialog.value = true
+        showError(
+            'Beneficio pendiente',
+            'Este pedido tiene Promo del dia y Fidelizacion disponibles. Elige una opcion antes de enviarlo.',
+        )
+        return
+    }
+
     // Show errors if not valid
     if (!canSubmitOrder.value) {
         if (orderErrors.value.length > 0) {
@@ -720,6 +813,42 @@ const handleSubmitOrder = async () => {
 
 
 // Watchers
+watch(
+    () => benefitConflictExists.value,
+    (exists) => {
+        if (exists) {
+            showBenefitConflictDialog.value = true
+        } else {
+            showBenefitConflictDialog.value = false
+        }
+    },
+)
+
+watch(
+    () => {
+        const order = currentOrder.value
+        if (!order) return ''
+        const items = order.orderItems
+            .filter((item) => item.isDailyPromotionGift !== true && item.isLoyaltyGift !== true)
+            .map((item) => `${item.productId}:${item.quantity}:${item.unitPrice}:${item.discount}`)
+            .join('|')
+        return [
+            order.tabId,
+            order.branchId ?? '',
+            order.customerId ?? '',
+            order.type,
+            order.addressId ?? '',
+            order.deliveryFee,
+            order.selectedBenefitType ?? '',
+            items,
+        ].join(';')
+    },
+    () => {
+        void resolveBenefits()
+    },
+    { immediate: true },
+)
+
 watch(currentOrder, () => {
     // Ya no necesitamos actualizar refs locales, las props se actualizan automáticamente desde el store
     showCustomerDetail.value = false

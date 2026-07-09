@@ -24,7 +24,11 @@ export function useOrderSubmission() {
             productId: item.productId,
             quantity: item.quantity,
             unitPrice: item.unitPrice,
-            discount: (item.discount || 0) + (item.dailyPromotionDiscount || 0) + (item.freeDeliveryDiscount || 0),
+            discount:
+                (item.discount || 0) +
+                (item.dailyPromotionDiscount || 0) +
+                (item.loyaltyDiscount || 0) +
+                (item.freeDeliveryDiscount || 0),
             notes: item.notes || undefined
         }))
 

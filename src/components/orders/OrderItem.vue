@@ -10,6 +10,12 @@
                 >
                     Promo
                 </span>
+                <span
+                    v-if="item.isLoyaltyGift"
+                    class="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-medium text-emerald-800"
+                >
+                    Fidelizacion
+                </span>
                 <span class="text-xs text-gray-500 whitespace-nowrap">Precio base: {{ formatCurrency(item.productPrice)
                 }}</span>
             </div>
@@ -32,7 +38,7 @@
                     {{ localQuantity }}
                 </span>
                 <BaseButton @click="increaseQuantity" variant="outline" size="sm" class="h-6 w-6 p-0"
-                    :disabled="item.isDailyPromotionGift">
+                    :disabled="item.isDailyPromotionGift || item.isLoyaltyGift">
                     <PlusIcon class="w-3 h-3" />
                 </BaseButton>
             </div>
@@ -43,7 +49,7 @@
             <!-- Precio unitario (editable) -->
             <div class="flex items-center gap-1">
                 <input v-model.number="localUnitPrice" type="number" min="0" step="100" @input="handlePriceChange"
-                    :disabled="item.isDailyPromotionGift"
+                    :disabled="item.isDailyPromotionGift || item.isLoyaltyGift"
                     class="w-20 px-1 py-0.5 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500" />
             </div>
 
@@ -55,7 +61,7 @@
                 <span class="text-gray-500 text-xs">Desc:</span>
                 <input v-model.number="discountPercentage" type="number" min="0" max="100" step="0.1"
                     @input="updateDiscountFromPercentage"
-                    :disabled="item.isDailyPromotionGift"
+                    :disabled="item.isDailyPromotionGift || item.isLoyaltyGift"
                     class="w-12 px-1 py-0.5 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500" />
                 <span class="text-xs">%</span>
             </div>
@@ -71,12 +77,15 @@
         </div>
 
         <!-- Mostrar ahorro si hay descuento (opcional, tercera línea pequeña) -->
-        <div v-if="discountAmount > 0 || dailyPromotionCop > 0 || freeDeliveryCop > 0" class="mt-1 text-xs text-right space-y-0.5">
+        <div v-if="discountAmount > 0 || dailyPromotionCop > 0 || loyaltyCop > 0 || freeDeliveryCop > 0" class="mt-1 text-xs text-right space-y-0.5">
             <div v-if="discountAmount > 0" class="text-green-600">
                 Ahorro: {{ formatCurrency(discountAmount) }}
             </div>
             <div v-if="dailyPromotionCop > 0" class="text-amber-700">
                 Promo del dia: -{{ formatCurrency(dailyPromotionCop) }}
+            </div>
+            <div v-if="loyaltyCop > 0" class="text-emerald-700">
+                Fidelizacion: -{{ formatCurrency(loyaltyCop) }}
             </div>
             <div v-if="freeDeliveryCop > 0" class="text-emerald-700">
                 Domicilio gratis: −{{ formatCurrency(freeDeliveryCop) }}
@@ -150,10 +159,11 @@ const discountAmount = computed(() => {
 
 const freeDeliveryCop = computed(() => Math.max(0, props.item.freeDeliveryDiscount ?? 0))
 const dailyPromotionCop = computed(() => Math.max(0, props.item.dailyPromotionDiscount ?? 0))
+const loyaltyCop = computed(() => Math.max(0, props.item.loyaltyDiscount ?? 0))
 
 // Subtotal final calculado
 const calculatedSubtotal = computed(() => {
-    return subtotalSinDescuento.value - discountAmount.value - dailyPromotionCop.value - freeDeliveryCop.value
+    return subtotalSinDescuento.value - discountAmount.value - dailyPromotionCop.value - loyaltyCop.value - freeDeliveryCop.value
 })
 
 // Métodos

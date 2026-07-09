@@ -40,6 +40,23 @@ export function useOrderTabs() {
             createdAt: new Date(),
             updatedAt: new Date(),
             paidInStoreCash: false,
+            selectedBenefitType: null,
+            appliedBenefitType: null,
+            appliedBenefitLabel: null,
+            appliedDailyPromotionId: null,
+            appliedDailyPromotionType: null,
+            appliedDailyPromotionGiftProductId: null,
+            appliedDailyPromotionGiftProductName: null,
+            appliedDailyPromotionDiscountPercentage: null,
+            appliedDailyPromotionDiscountScope: null,
+            ignoredDailyPromotionId: null,
+            appliedLoyaltyStepId: null,
+            appliedLoyaltyStepIndex: null,
+            appliedLoyaltyRewardType: null,
+            appliedLoyaltyGiftProductId: null,
+            appliedLoyaltyGiftProductName: null,
+            appliedLoyaltyDiscountPercentage: null,
+            ignoredLoyaltyStepId: null,
         }
 
         store.draftOrders.set(tabId, newOrder)
