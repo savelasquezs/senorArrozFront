@@ -97,11 +97,9 @@
         </table>
       </div>
 
-      <div class="flex justify-end border-t border-gray-100 pt-3">
-        <BaseButton type="button" variant="primary" :loading="saving" :disabled="formSteps.length === 0" @click="save">
-          Guardar fidelizacion
-        </BaseButton>
-      </div>
+      <p class="text-xs text-gray-500">
+        Los cambios de cada registro se guardan desde su modal de edicion.
+      </p>
     </div>
 
     <BaseDialog v-model="showStepDialog" :title="editingIndex == null ? 'Agregar paso' : 'Editar paso'" size="lg">
@@ -182,8 +180,8 @@
         <BaseButton variant="secondary" size="sm" @click="showStepDialog = false">
           Cancelar
         </BaseButton>
-        <BaseButton variant="primary" size="sm" @click="confirmStepDialog">
-          Guardar en tabla
+        <BaseButton variant="primary" size="sm" :loading="saving" @click="confirmStepDialog">
+          Guardar
         </BaseButton>
       </template>
     </BaseDialog>
@@ -266,10 +264,13 @@ async function load() {
   try {
     await productsStore.ensureCatalogLoaded()
     const res = await loyaltyCycleApi.getCycle(props.branchId)
-    formSteps.value = (res.data ?? []).map(fromDto)
+    const steps = res.data ?? []
+    formSteps.value = steps.map(fromDto)
+    return steps
   } catch (error: any) {
     message.type = 'error'
     message.text = error?.message || 'No se pudo cargar fidelizacion.'
+    return []
   } finally {
     loading.value = false
   }
@@ -329,13 +330,33 @@ function openEditStep(sortedIndex: number) {
   showStepDialog.value = true
 }
 
-function removeStep(sortedIndex: number) {
+async function removeStep(sortedIndex: number) {
   const step = sortedSteps.value[sortedIndex]
   const realIndex = formSteps.value.findIndex((item) => item.localId === step.localId)
-  if (realIndex >= 0) formSteps.value.splice(realIndex, 1)
+  if (realIndex < 0) return
+
+  if (!step.id) {
+    formSteps.value.splice(realIndex, 1)
+    return
+  }
+
+  saving.value = true
+  message.text = ''
+  try {
+    await loyaltyCycleApi.disableStep(props.branchId, step.id)
+    const steps = await load()
+    message.type = 'success'
+    message.text = 'Paso de fidelizacion desactivado.'
+    emit('saved', steps)
+  } catch (error: any) {
+    message.type = 'error'
+    message.text = error?.message || 'No se pudo desactivar el paso.'
+  } finally {
+    saving.value = false
+  }
 }
 
-function confirmStepDialog() {
+async function confirmStepDialog() {
   const validation = validateStep(draftStep, editingIndex.value)
   if (validation) {
     modalError.value = validation
@@ -343,13 +364,21 @@ function confirmStepDialog() {
   }
 
   const normalized = normalizeStep(draftStep)
-  if (editingIndex.value == null) {
-    formSteps.value.push(normalized)
-  } else {
-    formSteps.value.splice(editingIndex.value, 1, normalized)
-  }
+  saving.value = true
+  modalError.value = ''
   message.text = ''
-  showStepDialog.value = false
+  try {
+    await loyaltyCycleApi.saveStep(props.branchId, normalized.id ?? 0, toPayload(normalized))
+    const steps = await load()
+    message.type = 'success'
+    message.text = 'Paso de fidelizacion guardado.'
+    emit('saved', steps)
+    showStepDialog.value = false
+  } catch (error: any) {
+    modalError.value = error?.message || 'No se pudo guardar el paso.'
+  } finally {
+    saving.value = false
+  }
 }
 
 function validateStep(step: EditableStep, currentIndex: number | null): string | null {
@@ -376,14 +405,6 @@ function validateStep(step: EditableStep, currentIndex: number | null): string |
   return null
 }
 
-function validate(): string | null {
-  for (let index = 0; index < formSteps.value.length; index++) {
-    const validation = validateStep(formSteps.value[index], index)
-    if (validation) return validation
-  }
-  return null
-}
-
 function normalizeStep(step: EditableStep): EditableStep {
   return {
     ...step,
@@ -395,40 +416,15 @@ function normalizeStep(step: EditableStep): EditableStep {
   }
 }
 
-async function save() {
-  const validation = validate()
-  if (validation) {
-    message.type = 'error'
-    message.text = validation
-    return
-  }
-
-  const payload: UpsertLoyaltyCycleStep[] = formSteps.value
-    .map((step) => normalizeStep(step))
-    .map((step) => ({
-      stepIndex: Number(step.stepIndex),
-      stepName: step.stepName,
-      rewardLabel: step.rewardLabel,
-      rewardType: step.rewardType,
-      giftProductId: step.rewardType === 'GiftProduct' ? step.giftProductId : null,
-      discountPercentage: step.rewardType === 'PercentageDiscount' ? Number(step.discountPercentage) : null,
-      isActive: step.isActive,
-    }))
-    .sort((a, b) => a.stepIndex - b.stepIndex)
-
-  saving.value = true
-  message.text = ''
-  try {
-    const res = await loyaltyCycleApi.saveCycle(props.branchId, payload)
-    formSteps.value = (res.data ?? []).map(fromDto)
-    message.type = 'success'
-    message.text = 'Fidelizacion guardada.'
-    emit('saved', res.data ?? [])
-  } catch (error: any) {
-    message.type = 'error'
-    message.text = error?.message || 'No se pudo guardar fidelizacion.'
-  } finally {
-    saving.value = false
+function toPayload(step: EditableStep): UpsertLoyaltyCycleStep {
+  return {
+    stepIndex: Number(step.stepIndex),
+    stepName: step.stepName,
+    rewardLabel: step.rewardLabel,
+    rewardType: step.rewardType,
+    giftProductId: step.rewardType === 'GiftProduct' ? step.giftProductId : null,
+    discountPercentage: step.rewardType === 'PercentageDiscount' ? Number(step.discountPercentage) : null,
+    isActive: step.isActive,
   }
 }
 
