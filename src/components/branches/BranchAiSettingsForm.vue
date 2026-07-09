@@ -157,6 +157,10 @@ import type { AiProviderModel, BranchAiSetting, UpsertBranchAiSetting } from '@/
 const props = defineProps<{ branchId: number }>()
 const emit = defineEmits<{ saved: [setting: BranchAiSetting] }>()
 
+type BranchAiSettingsFormState = Omit<UpsertBranchAiSetting, 'apiKey'> & {
+  apiKey: string
+}
+
 const providerOptions = [
   { value: 'openai', label: 'OpenAI' },
   { value: 'gemini', label: 'Google Gemini' },
@@ -174,7 +178,7 @@ const modelOptions = ref<AiProviderModel[]>([])
 const message = reactive<{ text: string; type: 'success' | 'warning' | 'error' | 'info' }>({ text: '', type: 'info' })
 let suppressModelReset = false
 
-const form = reactive<UpsertBranchAiSetting>({
+const form = reactive<BranchAiSettingsFormState>({
   provider: 'openai',
   model: '',
   apiKey: '',
@@ -245,6 +249,11 @@ function clearLoadedModels(messageText = '') {
   modelMessage.value = messageText
 }
 
+function normalizeApiKeyInput(): string | null {
+  const value = form.apiKey.trim()
+  return value.length > 0 ? value : null
+}
+
 async function load() {
   try {
     loading.value = true
@@ -277,9 +286,10 @@ async function loadModels() {
     modelsLoading.value = true
     modelMessage.value = ''
     modelMessageType.value = 'info'
+    const apiKey = normalizeApiKeyInput()
     const res = await branchAiSettingsApi.getProviderModels(props.branchId, {
       provider,
-      apiKey: form.apiKey.trim() || null,
+      ...(apiKey ? { apiKey } : {}),
     })
     modelOptions.value = res.data?.models ?? []
 
@@ -313,7 +323,7 @@ async function save(options: { quiet?: boolean } = {}): Promise<BranchAiSetting 
     const payload: UpsertBranchAiSetting = {
       provider: String(form.provider).trim(),
       model: form.model.trim(),
-      apiKey: form.apiKey.trim(),
+      apiKey: normalizeApiKeyInput(),
       isActive: form.isActive,
       temperature: form.temperature,
       maxContextMessages: Number(form.maxContextMessages || 20),

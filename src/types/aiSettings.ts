@@ -26,7 +26,7 @@ export interface BranchAiSetting {
 export interface UpsertBranchAiSetting {
   provider: AiProvider | string
   model: string
-  apiKey: string
+  apiKey?: string | null
   isActive: boolean
   temperature: number | null
   maxContextMessages: number
