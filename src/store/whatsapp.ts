@@ -83,7 +83,7 @@ export const useWhatsAppStore = defineStore('whatsapp', () => {
       isLoadingMessages.value = true
       error.value = null
       const res = await whatsappApi.getMessages(conversationId)
-      messages.value[conversationId] = res.data ?? []
+      messages.value[conversationId] = sortMessages(res.data ?? [])
       const conversation = conversations.value.find(c => c.id === conversationId)
       if (conversation && conversation.unreadCount > 0) {
         const previousUnread = conversation.unreadCount
@@ -213,9 +213,21 @@ export const useWhatsAppStore = defineStore('whatsapp', () => {
   function upsertMessage(conversationId: number, message: WhatsAppMessage) {
     const existing = messages.value[conversationId] ?? []
     const index = existing.findIndex(x => x.id === message.id)
-    messages.value[conversationId] = index >= 0
+    const updated = index >= 0
       ? existing.map(x => x.id === message.id ? message : x)
-      : [...existing, message].sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime() || a.id - b.id)
+      : [...existing, message]
+    messages.value[conversationId] = sortMessages(updated)
+  }
+
+  function utcTimestamp(value: string) {
+    // Compatibility with API responses produced before UTC values included `Z`.
+    const normalized = /(?:Z|[+-]\d{2}:?\d{2})$/i.test(value) ? value : `${value}Z`
+    const timestamp = new Date(normalized).getTime()
+    return Number.isFinite(timestamp) ? timestamp : 0
+  }
+
+  function sortMessages(items: WhatsAppMessage[]) {
+    return [...items].sort((a, b) => utcTimestamp(a.timestamp) - utcTimestamp(b.timestamp) || a.id - b.id)
   }
 
   function applyRealtimeMessage(payload: WhatsAppRealtimeMessagePayload, activeConversationId?: number | null) {

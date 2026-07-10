@@ -1034,7 +1034,7 @@ function shortConversationPreview(value?: string | null) {
 
 function formatRelativeConversationTime(value?: string | null) {
   if (!value) return ''
-  const date = new Date(value)
+  const date = parseUtcDate(value)
   const timestamp = date.getTime()
   if (!Number.isFinite(timestamp)) return ''
 
@@ -1070,7 +1070,12 @@ function formatRelativeConversationTime(value?: string | null) {
 }
 
 function formatTime(value: string) {
-  return new Intl.DateTimeFormat('es-CO', { hour: '2-digit', minute: '2-digit' }).format(new Date(value))
+  return new Intl.DateTimeFormat('es-CO', { hour: '2-digit', minute: '2-digit' }).format(parseUtcDate(value))
+}
+
+function parseUtcDate(value: string) {
+  // Older API versions omitted the UTC designator for PostgreSQL timestamps.
+  return new Date(/(?:Z|[+-]\d{2}:?\d{2})$/i.test(value) ? value : `${value}Z`)
 }
 
 function statusLabel(status: WhatsAppMessage['status']) {
