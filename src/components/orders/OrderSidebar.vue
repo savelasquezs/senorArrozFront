@@ -88,39 +88,16 @@
                     </div>
 
                     <OrderItemList :tab-id="currentTabId || ''" @add-products="handleAddProducts" />
-                    <div class="mx-4 mb-3 rounded-md border border-gray-200 bg-white p-3 space-y-2">
-                        <label class="block text-xs font-medium text-gray-700">Codigo promocional</label>
-                        <div class="flex gap-2">
-                            <BaseInput
-                                :model-value="discountCodeInput"
-                                placeholder="Ej: ARROZ10"
-                                class="flex-1"
-                                @update:model-value="updateDiscountCodeInput"
-                                @keyup.enter="validateDiscountCode"
-                            />
-                            <BaseButton
-                                variant="outline"
-                                size="sm"
-                                :loading="isValidatingDiscountCode"
-                                :disabled="!discountCodeInput.trim() || isValidatingDiscountCode"
-                                @click="validateDiscountCode"
-                            >
-                                Aplicar
-                            </BaseButton>
-                        </div>
-                        <div v-if="currentOrder.activeDiscountCode" class="flex items-center justify-between gap-2 text-xs text-indigo-700">
-                            <span class="font-medium">Codigo valido: {{ currentOrder.activeDiscountCode.label || currentOrder.activeDiscountCode.code }}</span>
-                            <button type="button" class="text-red-600 hover:text-red-700" @click="removeDiscountCode">
+                    <div
+                        v-if="hasAppliedBenefit"
+                        class="mx-4 mb-3 rounded-md border border-emerald-200 bg-emerald-50 p-3 text-xs text-emerald-800"
+                    >
+                        <div class="flex items-center justify-between gap-3">
+                            <span class="font-medium">{{ appliedBenefitText }}</span>
+                            <button type="button" class="text-red-600 hover:text-red-700" @click="clearDraftBenefit">
                                 Quitar
                             </button>
                         </div>
-                        <p v-if="discountCodeError" class="text-xs text-red-600">{{ discountCodeError }}</p>
-                    </div>
-                    <div
-                        v-if="appliedBenefitText"
-                        class="mx-4 mb-3 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-medium text-emerald-800"
-                    >
-                        {{ appliedBenefitText }}
                     </div>
                     <div
                         v-else-if="benefitConflictExists"
@@ -131,6 +108,81 @@
                             <BaseButton variant="outline" size="sm" @click="openBenefitConflictDialog">
                                 Resolver
                             </BaseButton>
+                        </div>
+                    </div>
+                    <div
+                        v-else
+                        class="mx-4 mb-3 rounded-md border border-gray-200 bg-white p-3 text-xs text-gray-700"
+                    >
+                        <div class="flex items-center justify-between gap-3">
+                            <div>
+                                <p class="font-medium text-gray-800">Sin beneficio aplicado</p>
+                                <p class="mt-0.5 text-gray-500">Puedes agregar promo, fidelizacion o codigo.</p>
+                            </div>
+                            <BaseButton variant="outline" size="sm" @click="toggleDraftBenefitForm">
+                                {{ showDraftBenefitForm ? 'Cerrar' : 'Agregar beneficio' }}
+                            </BaseButton>
+                        </div>
+
+                        <div v-if="showDraftBenefitForm" class="mt-3 space-y-3 border-t border-gray-100 pt-3">
+                            <div v-if="activeDailyPromotion || activeLoyaltyStep || activeDiscountCode" class="space-y-2">
+                                <BaseButton
+                                    v-if="activeDailyPromotion"
+                                    variant="outline"
+                                    size="sm"
+                                    class="w-full justify-start"
+                                    @click="chooseDailyPromotionBenefit"
+                                >
+                                    Aplicar promo del dia
+                                </BaseButton>
+                                <BaseButton
+                                    v-if="activeLoyaltyStep"
+                                    variant="outline"
+                                    size="sm"
+                                    class="w-full justify-start"
+                                    @click="chooseLoyaltyBenefit"
+                                >
+                                    Aplicar fidelizacion
+                                </BaseButton>
+                                <BaseButton
+                                    v-if="activeDiscountCode"
+                                    variant="outline"
+                                    size="sm"
+                                    class="w-full justify-start"
+                                    @click="chooseDiscountCodeBenefit"
+                                >
+                                    Aplicar codigo validado
+                                </BaseButton>
+                            </div>
+
+                            <div class="space-y-2">
+                                <label class="block text-xs font-medium text-gray-700">Codigo promocional</label>
+                                <div class="flex gap-2">
+                                    <BaseInput
+                                        :model-value="discountCodeInput"
+                                        placeholder="Ej: ARROZ10"
+                                        class="flex-1"
+                                        @update:model-value="updateDiscountCodeInput"
+                                        @keyup.enter="validateDiscountCode"
+                                    />
+                                    <BaseButton
+                                        variant="outline"
+                                        size="sm"
+                                        :loading="isValidatingDiscountCode"
+                                        :disabled="!discountCodeInput.trim() || isValidatingDiscountCode"
+                                        @click="validateDiscountCode"
+                                    >
+                                        Aplicar
+                                    </BaseButton>
+                                </div>
+                                <div v-if="currentOrder.activeDiscountCode" class="flex items-center justify-between gap-2 text-xs text-indigo-700">
+                                    <span class="font-medium">Codigo valido: {{ currentOrder.activeDiscountCode.label || currentOrder.activeDiscountCode.code }}</span>
+                                    <button type="button" class="text-red-600 hover:text-red-700" @click="removeDiscountCode">
+                                        Quitar
+                                    </button>
+                                </div>
+                                <p v-if="discountCodeError" class="text-xs text-red-600">{{ discountCodeError }}</p>
+                            </div>
                         </div>
                     </div>
                     <PaidInStoreCashPanel
@@ -386,6 +438,7 @@ const isSubmittingOrder = ref(false)
 const isCheckingDuplicateOrderDate = ref(false)
 const isSendingWhatsAppConfirmation = ref(false)
 const showBenefitConflictDialog = ref(false)
+const showDraftBenefitForm = ref(false)
 const isValidatingDiscountCode = ref(false)
 
 // Computed
@@ -394,6 +447,10 @@ const currentTabId = computed(() => ordersStore.currentTabId)
 const { canSubmitOrder, orderErrors } = useOrderValidation()
 const discountCodeInput = computed(() => currentOrder.value?.discountCodeInput ?? '')
 const discountCodeError = computed(() => currentOrder.value?.discountCodeError ?? '')
+const hasAppliedBenefit = computed(() => {
+    const type = currentOrder.value?.appliedBenefitType
+    return !!type && type !== 'None'
+})
 
 const appliedBenefitText = computed(() => {
     const order = currentOrder.value
@@ -583,6 +640,9 @@ async function validateDiscountCode() {
         }
         ordersStore.setCurrentOrderActiveDiscountCode(response.data, null)
         await resolveBenefits()
+        if (!benefitConflictExists.value && hasAppliedBenefit.value) {
+            showDraftBenefitForm.value = false
+        }
     } catch (err: any) {
         ordersStore.setCurrentOrderActiveDiscountCode(null, err?.message || 'Codigo promocional invalido.')
     } finally {
@@ -595,27 +655,46 @@ async function removeDiscountCode() {
     await resolveBenefits()
 }
 
+function toggleDraftBenefitForm() {
+    showDraftBenefitForm.value = !showDraftBenefitForm.value
+}
+
+async function clearDraftBenefit() {
+    if (currentOrder.value?.appliedBenefitType === 'DiscountCode') {
+        ordersStore.clearCurrentOrderDiscountCode()
+        ordersStore.setCurrentOrderSelectedBenefit('None')
+    } else {
+        clearAppliedBenefit()
+    }
+    showDraftBenefitForm.value = false
+    await resolveBenefits()
+}
+
 function openBenefitConflictDialog() {
     showBenefitConflictDialog.value = true
 }
 
 async function chooseDailyPromotionBenefit() {
     await applyDailyPromotion()
+    showDraftBenefitForm.value = false
     showBenefitConflictDialog.value = false
 }
 
 async function chooseLoyaltyBenefit() {
     await applyLoyaltyBenefit()
+    showDraftBenefitForm.value = false
     showBenefitConflictDialog.value = false
 }
 
 async function chooseDiscountCodeBenefit() {
     await applyDiscountCode()
+    showDraftBenefitForm.value = false
     showBenefitConflictDialog.value = false
 }
 
 function chooseNoBenefit() {
     clearAppliedBenefit()
+    showDraftBenefitForm.value = false
     showBenefitConflictDialog.value = false
 }
 
