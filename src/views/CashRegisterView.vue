@@ -294,9 +294,29 @@
                       <h2 class="text-base font-semibold text-gray-800">{{ cashVaultBank.bankName }}</h2>
                       <p class="text-[11px] sm:text-xs text-gray-500 leading-snug">
                         Esperado período:
-                        <span class="font-semibold text-gray-700 tabular-nums">{{
-                          formatCurrency(cashVaultBank.expectedBalance)
-                        }}</span>
+                        <span class="font-semibold text-gray-700 tabular-nums">
+                          {{ maskedCashVaultAmount(cashVaultBank.expectedBalance) }}
+                        </span>
+                        <button
+                          v-if="shouldMaskCashVaultBalance"
+                          type="button"
+                          class="inline-flex align-middle ml-1 rounded text-slate-500 hover:text-slate-700 focus:outline-none focus:ring-2 focus:ring-slate-300"
+                          title="Mantener presionado para ver saldo"
+                          aria-label="Mantener presionado para ver saldo de caja mayor"
+                          @pointerdown.prevent="showCashVaultBalance = true"
+                          @pointerup="showCashVaultBalance = false"
+                          @pointercancel="showCashVaultBalance = false"
+                          @pointerleave="showCashVaultBalance = false"
+                          @mousedown.prevent="showCashVaultBalance = true"
+                          @mouseup="showCashVaultBalance = false"
+                          @mouseleave="showCashVaultBalance = false"
+                          @touchstart.prevent="showCashVaultBalance = true"
+                          @touchend="showCashVaultBalance = false"
+                          @touchcancel="showCashVaultBalance = false"
+                        >
+                          <EyeIcon v-if="showCashVaultBalance" class="h-3.5 w-3.5" />
+                          <EyeSlashIcon v-else class="h-3.5 w-3.5" />
+                        </button>
                         <span class="hidden sm:inline"> · Efectivo en caja mayor (no es transferencia entre
                           bancos).</span>
                       </p>
@@ -339,12 +359,38 @@
                       <div class="col-span-1 min-w-0">
                         <p class="text-xs sm:text-sm font-medium text-gray-800 truncate">{{ recon.bankName }}</p>
                         <p class="text-[10px] sm:text-xs text-gray-400 tabular-nums">
-                          Sis.: {{ formatCurrency(recon.expectedBalance) }}
+                          Sis.: {{ isCashVaultRecon(recon) ? maskedCashVaultAmount(recon.expectedBalance) : formatCurrency(recon.expectedBalance) }}
                         </p>
                       </div>
                       <div class="col-span-1">
                         <label class="text-[10px] text-gray-500 block mb-0.5">Saldo real</label>
-                        <input v-model.number="recon.actualBalance" type="number" min="0" step="100"
+                        <div v-if="isCashVaultRecon(recon) && shouldMaskCashVaultBalance" class="relative">
+                          <input v-if="showCashVaultBalance" v-model.number="recon.actualBalance" type="number" min="0" step="100"
+                            @input="onBankActualInput" @blur="onBankActualBlur(recon)"
+                            class="w-full border border-gray-300 rounded-md px-2 py-1 pr-8 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-blue-300" />
+                          <input v-else :value="maskedCashVaultAmount(recon.actualBalance)" type="text" readonly
+                            class="w-full border border-gray-300 rounded-md px-2 py-1 pr-8 text-xs sm:text-sm tabular-nums bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-300" />
+                          <button
+                            type="button"
+                            class="absolute inset-y-0 right-1.5 flex items-center rounded px-1 text-gray-500 hover:text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-300"
+                            title="Mantener presionado para ver y editar"
+                            aria-label="Mantener presionado para ver y editar saldo real de caja mayor"
+                            @pointerdown.prevent="showCashVaultBalance = true"
+                            @pointerup="showCashVaultBalance = false"
+                            @pointercancel="showCashVaultBalance = false"
+                            @pointerleave="showCashVaultBalance = false"
+                            @mousedown.prevent="showCashVaultBalance = true"
+                            @mouseup="showCashVaultBalance = false"
+                            @mouseleave="showCashVaultBalance = false"
+                            @touchstart.prevent="showCashVaultBalance = true"
+                            @touchend="showCashVaultBalance = false"
+                            @touchcancel="showCashVaultBalance = false"
+                          >
+                            <EyeIcon v-if="showCashVaultBalance" class="h-4 w-4" />
+                            <EyeSlashIcon v-else class="h-4 w-4" />
+                          </button>
+                        </div>
+                        <input v-else v-model.number="recon.actualBalance" type="number" min="0" step="100"
                           @input="onBankActualInput" @blur="onBankActualBlur(recon)"
                           class="w-full border border-gray-300 rounded-md px-2 py-1 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-blue-300" />
                       </div>
@@ -569,6 +615,8 @@ import {
   CheckCircleIcon,
   ExclamationCircleIcon,
   InformationCircleIcon,
+  EyeIcon,
+  EyeSlashIcon,
 } from '@heroicons/vue/24/outline'
 import { cashRegisterApi } from '@/services/MainAPI/cashRegisterApi'
 import { useToast } from '@/composables/useToast'
@@ -583,6 +631,8 @@ const showHistoryModal = ref(false)
 const showVaultHistoryModal = ref(false)
 const showExpenseFormModal = ref(false)
 const canViewClosureHistory = computed(() => authStore.isAdmin || authStore.isSuperadmin)
+const showCashVaultBalance = ref(false)
+const shouldMaskCashVaultBalance = computed(() => authStore.isAdmin && !authStore.isSuperadmin)
 
 function emptyDenominationCounts(): Record<number, number> {
   return Object.fromEntries(DENOMINATIONS.map((d) => [d, 0]))
@@ -626,7 +676,7 @@ const vaultDescargaNote = ref('')
 const savingVaultMovement = ref(false)
 
 const bankReconciliations = ref<
-  Array<CloseBankReconciliationDto & { bankName: string }>
+  Array<CloseBankReconciliationDto & { bankName: string; bankType?: string }>
 >([])
 
 const movementsBankId = ref<number | null>(null)
@@ -928,6 +978,17 @@ function formatCurrency(value: number): string {
   )
 }
 
+function maskedCashVaultAmount(value: number): string {
+  if (!shouldMaskCashVaultBalance.value || showCashVaultBalance.value) {
+    return formatCurrency(value)
+  }
+  return '$ ******'
+}
+
+function isCashVaultRecon(recon: CloseBankReconciliationDto & { bankType?: string }): boolean {
+  return recon.bankType === 'cash_vault' || recon.bankId === cashVaultBank.value?.bankId
+}
+
 function formatDate(iso: string): string {
   return defaultBusinessCalendar.formatDateMediumTime(iso)
 }
@@ -962,6 +1023,7 @@ async function refreshExpectedPreservingBankActuals() {
     return {
       bankId: b.bankId,
       bankName: b.bankName,
+      bankType: b.bankType,
       expectedBalance: b.expectedBalance,
       actualBalance: row?.actualBalance ?? b.expectedBalance,
       adjustments: row?.adjustments ?? '[]',
@@ -1231,6 +1293,7 @@ async function loadData() {
     bankReconciliations.value = expected.value.banks.map((b) => ({
       bankId: b.bankId,
       bankName: b.bankName,
+      bankType: b.bankType,
       expectedBalance: b.expectedBalance,
       actualBalance: b.expectedBalance, // Por defecto asumimos que cuadra
       adjustments: '[]',
