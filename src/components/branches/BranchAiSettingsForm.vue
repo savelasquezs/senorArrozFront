@@ -118,6 +118,15 @@
           </p>
         </div>
 
+        <div class="space-y-4 border-t border-gray-200 pt-5">
+          <div><h4 class="font-semibold text-gray-900">Personalidad y prompt</h4><p v-pre class="text-sm text-gray-500">Variables disponibles: {{BranchName}}, {{BranchAddress}}, {{BranchPhone}}, {{BusinessHours}}, {{Today}} y {{CurrentTime}}.</p></div>
+          <BaseInput v-model="form.assistantName" label="Nombre del asistente" />
+          <div v-for="field in promptFields" :key="field.key"><label class="mb-1 block text-sm font-medium text-gray-700">{{ field.label }}</label><textarea v-model="form[field.key]" rows="3" class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:ring-indigo-500" /></div>
+          <BaseInput v-model="form.transferMessage" label="Mensaje de transferencia a un asesor" />
+          <BaseButton type="button" variant="outline" @click="previewPrompt">Previsualizar prompt</BaseButton>
+          <pre v-if="promptPreview" class="max-h-96 overflow-auto whitespace-pre-wrap rounded-lg bg-gray-900 p-4 text-xs text-gray-100">{{ promptPreview }}</pre>
+        </div>
+
         <BaseAlert v-if="message.text" :type="message.type">
           <InformationCircleIcon v-if="message.type !== 'error'" class="w-5 h-5" />
           <ExclamationTriangleIcon v-else class="w-5 h-5" />
@@ -176,6 +185,12 @@ const modelMessage = ref('')
 const modelMessageType = ref<'info' | 'error'>('info')
 const modelOptions = ref<AiProviderModel[]>([])
 const message = reactive<{ text: string; type: 'success' | 'warning' | 'error' | 'info' }>({ text: '', type: 'info' })
+const promptPreview = ref('')
+const promptFields = [
+  { key: 'promptObjective', label: 'Objetivo' }, { key: 'promptPersonality', label: 'Personalidad' },
+  { key: 'promptRequiredRules', label: 'Reglas obligatorias' }, { key: 'promptFixedBranchInfo', label: 'Información fija de la sucursal' },
+  { key: 'promptAdditionalInstructions', label: 'Instrucciones adicionales' },
+] as const
 let suppressModelReset = false
 
 const form = reactive<BranchAiSettingsFormState>({
@@ -185,6 +200,8 @@ const form = reactive<BranchAiSettingsFormState>({
   isActive: false,
   temperature: null,
   maxContextMessages: 20,
+  assistantName: '', promptObjective: '', promptPersonality: '', promptRequiredRules: '',
+  promptFixedBranchInfo: '', promptAdditionalInstructions: '', transferMessage: '',
 })
 
 const providerHasConfiguredKey = computed(() =>
@@ -237,6 +254,10 @@ function applySetting(next: BranchAiSetting) {
   form.isActive = next.isActive ?? false
   form.temperature = next.temperature ?? null
   form.maxContextMessages = next.maxContextMessages || 20
+  form.assistantName = next.assistantName || ''; form.promptObjective = next.promptObjective || ''
+  form.promptPersonality = next.promptPersonality || ''; form.promptRequiredRules = next.promptRequiredRules || ''
+  form.promptFixedBranchInfo = next.promptFixedBranchInfo || ''; form.promptAdditionalInstructions = next.promptAdditionalInstructions || ''
+  form.transferMessage = next.transferMessage || ''
   window.setTimeout(() => {
     suppressModelReset = false
   }, 0)
@@ -327,6 +348,9 @@ async function save(options: { quiet?: boolean } = {}): Promise<BranchAiSetting 
       isActive: form.isActive,
       temperature: form.temperature,
       maxContextMessages: Number(form.maxContextMessages || 20),
+      assistantName: form.assistantName, promptObjective: form.promptObjective, promptPersonality: form.promptPersonality,
+      promptRequiredRules: form.promptRequiredRules, promptFixedBranchInfo: form.promptFixedBranchInfo,
+      promptAdditionalInstructions: form.promptAdditionalInstructions, transferMessage: form.transferMessage,
     }
     const res = await branchAiSettingsApi.saveBranchSetting(props.branchId, payload)
     applySetting(res.data)
@@ -343,6 +367,12 @@ async function save(options: { quiet?: boolean } = {}): Promise<BranchAiSetting 
   } finally {
     saving.value = false
   }
+}
+
+async function previewPrompt() {
+  const saved = await save({ quiet: true }); if (!saved) return
+  try { promptPreview.value = (await branchAiSettingsApi.getPromptPreview(props.branchId)).data.prompt }
+  catch (error: any) { message.type = 'error'; message.text = error.message || 'No se pudo generar la previsualización.' }
 }
 
 async function testConnection() {

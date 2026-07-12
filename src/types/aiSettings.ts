@@ -21,6 +21,13 @@ export interface BranchAiSetting {
   createdAt?: string | null
   updatedAt?: string | null
   status: AiSettingStatus
+  assistantName: string
+  promptObjective: string
+  promptPersonality: string
+  promptRequiredRules: string
+  promptFixedBranchInfo: string
+  promptAdditionalInstructions: string
+  transferMessage: string
 }
 
 export interface UpsertBranchAiSetting {
@@ -30,6 +37,13 @@ export interface UpsertBranchAiSetting {
   isActive: boolean
   temperature: number | null
   maxContextMessages: number
+  assistantName: string
+  promptObjective: string
+  promptPersonality: string
+  promptRequiredRules: string
+  promptFixedBranchInfo: string
+  promptAdditionalInstructions: string
+  transferMessage: string
 }
 
 export interface AiTestConnectionResult {
