@@ -120,9 +120,9 @@
 
         <div class="space-y-4 border-t border-gray-200 pt-5">
           <div><h4 class="font-semibold text-gray-900">Personalidad y prompt</h4><p v-pre class="text-sm text-gray-500">Variables disponibles: {{BranchName}}, {{BranchAddress}}, {{BranchPhone}}, {{BusinessHours}}, {{Today}} y {{CurrentTime}}.</p></div>
-          <BaseInput v-model="form.assistantName" label="Nombre del asistente" />
-          <div v-for="field in promptFields" :key="field.key"><label class="mb-1 block text-sm font-medium text-gray-700">{{ field.label }}</label><textarea v-model="form[field.key]" rows="3" class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:ring-indigo-500" /></div>
-          <BaseInput v-model="form.transferMessage" label="Mensaje de transferencia a un asesor" />
+          <BaseInput v-model="form.assistantName" label="Nombre del asistente" :maxlength="150" />
+          <div v-for="field in promptFields" :key="field.key"><label class="mb-1 block text-sm font-medium text-gray-700">{{ field.label }}</label><textarea v-model="form[field.key]" rows="3" :maxlength="field.maxlength" class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:ring-indigo-500" /></div>
+          <BaseInput v-model="form.transferMessage" label="Mensaje de transferencia a un asesor" :maxlength="1000" />
           <BaseButton type="button" variant="outline" @click="previewPrompt">Previsualizar prompt</BaseButton>
           <pre v-if="promptPreview" class="max-h-96 overflow-auto whitespace-pre-wrap rounded-lg bg-gray-900 p-4 text-xs text-gray-100">{{ promptPreview }}</pre>
         </div>
@@ -187,9 +187,9 @@ const modelOptions = ref<AiProviderModel[]>([])
 const message = reactive<{ text: string; type: 'success' | 'warning' | 'error' | 'info' }>({ text: '', type: 'info' })
 const promptPreview = ref('')
 const promptFields = [
-  { key: 'promptObjective', label: 'Objetivo' }, { key: 'promptPersonality', label: 'Personalidad' },
-  { key: 'promptRequiredRules', label: 'Reglas obligatorias' }, { key: 'promptFixedBranchInfo', label: 'Información fija de la sucursal' },
-  { key: 'promptAdditionalInstructions', label: 'Instrucciones adicionales' },
+  { key: 'promptObjective', label: 'Objetivo', maxlength: 2000 }, { key: 'promptPersonality', label: 'Personalidad', maxlength: 2000 },
+  { key: 'promptRequiredRules', label: 'Reglas obligatorias', maxlength: 8000 }, { key: 'promptFixedBranchInfo', label: 'Información fija de la sucursal', maxlength: 8000 },
+  { key: 'promptAdditionalInstructions', label: 'Instrucciones adicionales', maxlength: 8000 },
 ] as const
 let suppressModelReset = false
 
@@ -370,8 +370,8 @@ async function save(options: { quiet?: boolean } = {}): Promise<BranchAiSetting 
 }
 
 async function previewPrompt() {
-  const saved = await save({ quiet: true }); if (!saved) return
-  try { promptPreview.value = (await branchAiSettingsApi.getPromptPreview(props.branchId)).data.prompt }
+  const payload: UpsertBranchAiSetting = { provider:String(form.provider),model:form.model,apiKey:normalizeApiKeyInput(),isActive:form.isActive,temperature:form.temperature,maxContextMessages:Number(form.maxContextMessages),assistantName:form.assistantName,promptObjective:form.promptObjective,promptPersonality:form.promptPersonality,promptRequiredRules:form.promptRequiredRules,promptFixedBranchInfo:form.promptFixedBranchInfo,promptAdditionalInstructions:form.promptAdditionalInstructions,transferMessage:form.transferMessage }
+  try { promptPreview.value = (await branchAiSettingsApi.getPromptPreview(props.branchId,payload)).data.prompt }
   catch (error: any) { message.type = 'error'; message.text = error.message || 'No se pudo generar la previsualización.' }
 }
 

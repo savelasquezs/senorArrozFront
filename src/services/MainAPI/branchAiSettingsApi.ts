@@ -24,8 +24,8 @@ class BranchAiSettingsApi extends BaseApi {
   getProviderModels(branchId: number, payload: AiModelLookup): Promise<ApiResponse<AiProviderModelsResult>> {
     return this.post<ApiResponse<AiProviderModelsResult>>(`/branches/${branchId}/ai-settings/models`, payload)
   }
-  getPromptPreview(branchId: number): Promise<ApiResponse<{ prompt: string }>> {
-    return this.get<ApiResponse<{ prompt: string }>>(`/branches/${branchId}/ai-settings/prompt-preview`)
+  getPromptPreview(branchId: number, payload: UpsertBranchAiSetting): Promise<ApiResponse<{ prompt: string }>> {
+    return this.post<ApiResponse<{ prompt: string }>>(`/branches/${branchId}/ai-settings/prompt-preview`, payload)
   }
 }
 
