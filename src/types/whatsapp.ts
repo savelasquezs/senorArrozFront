@@ -145,7 +145,7 @@ export interface WhatsAppConversation {
 }
 
 export type WhatsAppAttentionMode = 'ai' | 'human' | 'waitingForHuman' | 'paused' | 'closed'
-export interface WhatsAppAttention { conversationId: number; attentionMode: WhatsAppAttentionMode; assignedUserId?: number | null; assignedUserName?: string | null; aiPausedAt?: string | null; humanAssignedAt?: string | null; closedAt?: string | null; attentionModeUpdatedAt: string; updatedByUserId?: number | null }
+export interface WhatsAppAttention { conversationId: number; attentionMode: WhatsAppAttentionMode; assignedUserId?: number | null; assignedUserName?: string | null; aiPausedAt?: string | null; humanAssignedAt?: string | null; closedAt?: string | null; attentionModeUpdatedAt: string; attentionModeUpdatedByUserId?: number | null }
 export interface WhatsAppAttentionChangedPayload { branchId: number; conversation: WhatsAppConversation }
 
 export interface WhatsAppMessage {
