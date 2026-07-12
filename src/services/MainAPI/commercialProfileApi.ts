@@ -11,5 +11,8 @@ class CommercialProfileApi extends BaseApi {
     return this.post<ApiResponse<CommercialProfile>>(`/commercial-profiles/${id}/photo`, form, { headers: { 'Content-Type': 'multipart/form-data' } })
   }
   deletePhoto(id: number) { return this.delete<void>(`/commercial-profiles/${id}/photo`) }
+  getProducts(id: number) { return this.get<ApiResponse<CommercialProfileProduct[]>>(`/commercial-profiles/${id}/products`) }
+  setProducts(id: number, productIds: number[]) { return this.put<ApiResponse<number[]>>(`/commercial-profiles/${id}/products`, { productIds }) }
 }
+export interface CommercialProfileProduct { id:number; name:string; active:boolean; commercialProfileId:number|null; commercialProfileName:string|null }
 export const commercialProfileApi = new CommercialProfileApi()
