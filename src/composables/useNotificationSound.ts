@@ -1,6 +1,6 @@
 import { ref } from 'vue'
 
-export type WhatsAppNotificationSound = 'classic' | 'soft' | 'bell' | 'digital' | 'none'
+export type WhatsAppNotificationSound = 'classic' | 'soft' | 'bell' | 'digital' | 'loud' | 'urgent' | 'none'
 
 export const WHATSAPP_NOTIFICATION_SOUNDS: Array<{
   value: WhatsAppNotificationSound
@@ -11,6 +11,8 @@ export const WHATSAPP_NOTIFICATION_SOUNDS: Array<{
   { value: 'soft', label: 'Suave', description: 'Discreto para espacios tranquilos' },
   { value: 'bell', label: 'Campana', description: 'Un aviso cálido de tres notas' },
   { value: 'digital', label: 'Digital', description: 'Rápido y fácil de reconocer' },
+  { value: 'loud', label: 'Fuerte', description: 'Tres tonos intensos y definidos' },
+  { value: 'urgent', label: 'Urgente', description: 'Alerta repetida de máxima intensidad' },
   { value: 'none', label: 'Sin sonido', description: 'Mantiene solo el aviso visual' },
 ]
 
@@ -72,6 +74,15 @@ export function useNotificationSound() {
       scheduleTone(ctx, 1047, now, 0.08, 0.06, 'square')
       scheduleTone(ctx, 1568, now + 0.1, 0.08, 0.05, 'square')
       scheduleTone(ctx, 1319, now + 0.2, 0.11, 0.045, 'square')
+    } else if (sound === 'loud') {
+      scheduleTone(ctx, 740, now, 0.16, 0.16, 'square')
+      scheduleTone(ctx, 988, now + 0.18, 0.16, 0.16, 'square')
+      scheduleTone(ctx, 1319, now + 0.36, 0.24, 0.15, 'square')
+    } else if (sound === 'urgent') {
+      scheduleTone(ctx, 880, now, 0.18, 0.2, 'sawtooth')
+      scheduleTone(ctx, 1320, now + 0.2, 0.18, 0.2, 'sawtooth')
+      scheduleTone(ctx, 880, now + 0.42, 0.18, 0.2, 'sawtooth')
+      scheduleTone(ctx, 1320, now + 0.62, 0.28, 0.2, 'sawtooth')
     } else {
       scheduleTone(ctx, 880, now, 0.12, 0.08)
       scheduleTone(ctx, 1175, now + 0.16, 0.16, 0.07)
