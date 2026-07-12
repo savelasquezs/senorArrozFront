@@ -117,6 +117,19 @@ export const useWhatsAppStore = defineStore('whatsapp', () => {
     return message
   }
 
+  async function changeAttention(conversationId: number, action: 'take' | 'return-to-ai' | 'pause-ai' | 'request-human' | 'close' | 'reopen') {
+    const res = await whatsappApi.changeAttention(conversationId, action)
+    const conversation = conversations.value.find(x => x.id === conversationId)
+    if (conversation && res.data) Object.assign(conversation, res.data)
+    return res.data
+  }
+
+  function applyAttentionChanged(conversation: WhatsAppConversation) {
+    const current = conversations.value.find(x => x.id === conversation.id)
+    if (current) Object.assign(current, conversation)
+    else conversations.value.unshift(conversation)
+  }
+
   async function sendMenu(conversationId: number) {
     const res = await whatsappApi.sendMenu(conversationId)
     if (res.data) upsertMessage(conversationId, res.data)
@@ -315,6 +328,8 @@ export const useWhatsAppStore = defineStore('whatsapp', () => {
     fetchConversations,
     fetchMessages,
     sendMessage,
+    changeAttention,
+    applyAttentionChanged,
     sendMenu,
     sendQuickReply,
     sendMediaMessage,

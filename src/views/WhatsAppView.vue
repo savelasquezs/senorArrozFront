@@ -68,7 +68,7 @@
               :key="conversation.id"
               type="button"
               class="w-full border-b border-gray-100 px-3 py-2 text-left hover:bg-gray-50"
-              :class="selectedConversation?.id === conversation.id ? 'bg-emerald-50' : 'bg-white'"
+              :class="selectedConversation?.id === conversation.id ? 'bg-emerald-50' : conversation.attentionMode === 'waitingForHuman' ? 'bg-amber-50 ring-1 ring-inset ring-amber-300' : 'bg-white'"
               @click="selectConversation(conversation)"
             >
               <div class="flex items-center justify-between gap-2">
@@ -95,6 +95,7 @@
                   {{ formatRelativeConversationTime(conversation.lastMessageAt || conversation.createdAt) }}
                 </span>
               </div>
+              <div class="mt-1"><span class="rounded-full px-2 py-0.5 text-[10px] font-semibold" :class="attentionBadgeClass(conversation.attentionMode)">{{ attentionLabel(conversation) }}</span></div>
             </button>
 
             <div v-if="!whatsappStore.isLoadingConversations && whatsappStore.conversations.length === 0" class="p-6 text-center text-sm text-gray-500">
@@ -112,9 +113,14 @@
               <span v-if="selectedConversation.branchName"> · {{ selectedConversation.branchName }}</span>
             </p>
             </div>
-            <BaseButton variant="ghost" size="sm" @click="contextPanelCollapsed = !contextPanelCollapsed">
-              {{ contextPanelCollapsed ? 'Abrir pedido' : 'Contraer' }}
-            </BaseButton>
+            <div class="flex flex-wrap justify-end gap-2">
+              <BaseButton v-if="canTakeAttention" size="sm" :loading="changingAttention" @click="changeAttention('take')">Tomar conversación</BaseButton>
+              <BaseButton v-if="canReturnToAi" variant="secondary" size="sm" :loading="changingAttention" @click="changeAttention('return-to-ai')">Devolver a la IA</BaseButton>
+              <BaseButton v-if="canPauseAi" variant="secondary" size="sm" :loading="changingAttention" @click="changeAttention('pause-ai')">Pausar IA</BaseButton>
+              <BaseButton v-if="selectedConversation.attentionMode !== 'closed'" variant="danger" size="sm" :loading="changingAttention" @click="changeAttention('close')">Cerrar conversación</BaseButton>
+              <BaseButton v-else size="sm" :loading="changingAttention" @click="changeAttention('reopen')">Reabrir conversación</BaseButton>
+              <BaseButton variant="ghost" size="sm" @click="contextPanelCollapsed = !contextPanelCollapsed">{{ contextPanelCollapsed ? 'Abrir pedido' : 'Contraer' }}</BaseButton>
+            </div>
           </div>
 
           <div v-if="!selectedConversation" class="flex-1 grid place-items-center p-6 text-center text-gray-500">
@@ -189,6 +195,7 @@
             </div>
 
             <form class="border-t border-gray-200 bg-white p-3" @submit.prevent="sendMessage">
+              <p v-if="selectedConversation.attentionMode === 'closed'" class="mb-2 rounded-lg bg-gray-100 p-2 text-sm text-gray-600">La conversación está cerrada. Reábrela para enviar mensajes.</p>
               <div v-if="topQuickReplies.length" class="mb-2 flex flex-wrap items-center gap-2">
                 <span class="text-xs font-medium text-gray-500">Rápidas</span>
                 <button
@@ -213,7 +220,7 @@
                 </button>
               </div>
               <div class="flex items-end gap-2">
-                <BaseButton type="button" variant="secondary" :loading="sendingMenu" :disabled="sending" @click="sendMenu">
+                <BaseButton type="button" variant="secondary" :loading="sendingMenu" :disabled="sending || selectedConversation.attentionMode === 'closed'" @click="sendMenu">
                   Enviar carta
                 </BaseButton>
                 <input ref="fileInput" type="file" class="hidden" @change="onFileSelected" />
@@ -227,8 +234,9 @@
                   class="min-h-[44px] flex-1 resize-none rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-emerald-500 focus:ring-emerald-500"
                   placeholder="Escribe un mensaje"
                   @keydown.enter.exact.prevent="sendMessage"
+                  :disabled="selectedConversation.attentionMode === 'closed'"
                 />
-                <BaseButton type="submit" :loading="sending" :disabled="!draft.trim() && !selectedFile" :icon="PaperAirplaneIcon">
+                <BaseButton type="submit" :loading="sending" :disabled="selectedConversation.attentionMode === 'closed' || (!draft.trim() && !selectedFile)" :icon="PaperAirplaneIcon">
                   Enviar
                 </BaseButton>
               </div>
@@ -479,7 +487,7 @@ import { whatsappApi } from '@/services/MainAPI/whatsappApi'
 import { useToast } from '@/composables/useToast'
 import { useSignalR } from '@/composables/useSignalR'
 import { WHATSAPP_SIGNALR_HUB_URL } from '@/config/signalr'
-import type { WhatsAppConversation, WhatsAppMessage, WhatsAppQuickReply, WhatsAppRealtimeMessagePayload } from '@/types/whatsapp'
+import type { WhatsAppAttentionChangedPayload, WhatsAppAttentionMode, WhatsAppConversation, WhatsAppMessage, WhatsAppQuickReply, WhatsAppRealtimeMessagePayload } from '@/types/whatsapp'
 import type { Customer, CustomerAddress, CustomerFormData } from '@/types/customer'
 
 const whatsappStore = useWhatsAppStore()
@@ -500,6 +508,7 @@ const selectedFile = ref<File | null>(null)
 const fileInput = ref<HTMLInputElement | null>(null)
 const sending = ref(false)
 const sendingMenu = ref(false)
+const changingAttention = ref(false)
 const contextLoading = ref(false)
 const creatingCustomer = ref(false)
 const takingOrder = ref(false)
@@ -526,6 +535,14 @@ let searchTimeout: number | undefined
 const currentMessages = computed<WhatsAppMessage[]>(() =>
   selectedConversation.value ? (whatsappStore.messages[selectedConversation.value.id] ?? []) : []
 )
+
+const canTakeAttention = computed(() => !!selectedConversation.value && ['ai', 'waitingForHuman', 'paused'].includes(selectedConversation.value.attentionMode))
+const canReturnToAi = computed(() => !!selectedConversation.value && ['human', 'waitingForHuman', 'paused'].includes(selectedConversation.value.attentionMode))
+const canPauseAi = computed(() => selectedConversation.value?.attentionMode === 'ai')
+function attentionLabel(conversation: WhatsAppConversation) { const labels: Record<WhatsAppAttentionMode, string> = { ai: 'Atendida por IA', human: 'Atendida por una persona', waitingForHuman: 'Esperando asesor', paused: 'IA pausada', closed: 'Conversación cerrada' }; const label = labels[conversation.attentionMode] || labels.human; return conversation.attentionMode === 'human' && conversation.assignedUserName ? `${label}: ${conversation.assignedUserName}` : label }
+function attentionBadgeClass(mode: WhatsAppAttentionMode) { return { ai: 'bg-violet-100 text-violet-700', human: 'bg-blue-100 text-blue-700', waitingForHuman: 'bg-amber-200 text-amber-900', paused: 'bg-gray-200 text-gray-700', closed: 'bg-red-100 text-red-700' }[mode] }
+async function changeAttention(action: 'take' | 'return-to-ai' | 'pause-ai' | 'close' | 'reopen') { if (!selectedConversation.value) return; try { changingAttention.value = true; await whatsappStore.changeAttention(selectedConversation.value.id, action) } catch (error: any) { showError('Atención', error.message || 'No se pudo cambiar el estado.') } finally { changingAttention.value = false } }
+function handleAttentionChanged(payload: WhatsAppAttentionChangedPayload) { if (!payload?.conversation?.id) return; whatsappStore.applyAttentionChanged(payload.conversation); if (selectedConversation.value?.id === payload.conversation.id) selectedConversation.value = whatsappStore.conversations.find(x => x.id === payload.conversation.id) ?? payload.conversation }
 
 const showBranchFilter = computed(() => whatsappStore.enabledBranchIds.length > 1)
 
@@ -1135,6 +1152,7 @@ function mediaFallbackLabel(message: WhatsAppMessage) {
 
 onMounted(async () => {
   onSignalR('WhatsAppMessageCreated', handleRealtimeMessage)
+  onSignalR('WhatsAppAttentionChanged', handleAttentionChanged)
   try {
     await whatsappStore.ensureStatus(0)
     if (whatsappStore.enabled) {
@@ -1148,6 +1166,7 @@ onMounted(async () => {
 
 onBeforeUnmount(() => {
   offSignalR('WhatsAppMessageCreated', handleRealtimeMessage)
+  offSignalR('WhatsAppAttentionChanged', handleAttentionChanged)
   if (searchTimeout) window.clearTimeout(searchTimeout)
 })
 
