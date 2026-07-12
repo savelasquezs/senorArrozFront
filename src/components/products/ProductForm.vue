@@ -22,7 +22,8 @@
         <div class="rounded-lg border border-gray-200 bg-gray-50 p-4 space-y-4">
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <BaseSelect v-model="form.commercialProfileId" :options="commercialProfileOptions"
-                    label="Ficha comercial" placeholder="Sin ficha comercial" @update:model-value="validateForm" />
+                    label="Ficha comercial" placeholder="Sin ficha comercial" value-key="value" display-key="label"
+                    @update:model-value="validateForm" />
                 <div v-if="selectedCommercialProfile" class="flex items-center gap-3 rounded-lg bg-white p-2 border border-gray-200">
                     <img v-if="selectedCommercialProfile.photoUrl" :src="selectedCommercialProfile.photoUrl"
                         class="h-16 w-16 rounded-md object-cover" alt="Foto actual" />
