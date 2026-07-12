@@ -12,6 +12,13 @@ export interface Product {
     /** Peso unitario en gramos (opcional); usado en dashboard ventas por categoría. */
     weightGrams?: number | null;
     active: boolean;
+    commercialProfileId?: number | null;
+    commercialProfileName?: string | null;
+    description?: string | null;
+    ingredients?: string | null;
+    photoUrl?: string | null;
+    servesPeopleMin?: number | null;
+    servesPeopleMax?: number | null;
     createdAt: string;
     updatedAt: string;
 }
@@ -51,6 +58,9 @@ export interface CreateProductDto {
     stock?: number | null;
     weightGrams?: number | null;
     active?: boolean;
+    commercialProfileId?: number | null;
+    servesPeopleMin?: number | null;
+    servesPeopleMax?: number | null;
 }
 
 export interface UpdateProductDto {
@@ -60,6 +70,9 @@ export interface UpdateProductDto {
     stock?: number | null;
     weightGrams?: number | null;
     active?: boolean;
+    commercialProfileId?: number | null;
+    servesPeopleMin?: number | null;
+    servesPeopleMax?: number | null;
 }
 
 export interface CreateProductCategoryDto {
@@ -102,6 +115,25 @@ export interface ProductFormData {
     stock?: number | null; // null = stock infinito; undefined = no enviar (edición)
     weightGrams?: number | null;
     active: boolean;
+    commercialProfileId?: number | null;
+    servesPeopleMin?: number | null;
+    servesPeopleMax?: number | null;
+}
+
+export interface CommercialProfile {
+    id: number;
+    branchId: number;
+    name: string;
+    description?: string | null;
+    ingredients?: string | null;
+    photoUrl?: string | null;
+}
+
+export interface SaveCommercialProfileDto {
+    branchId: number;
+    name: string;
+    description?: string | null;
+    ingredients?: string | null;
 }
 
 export interface ProductCategoryFormData {

@@ -213,6 +213,9 @@
                 </button>
               </div>
               <div class="flex items-end gap-2">
+                <BaseButton type="button" variant="secondary" :loading="sendingMenu" :disabled="sending" @click="sendMenu">
+                  Enviar carta
+                </BaseButton>
                 <input ref="fileInput" type="file" class="hidden" @change="onFileSelected" />
                 <BaseButton type="button" variant="secondary" :icon="PaperClipIcon" title="Adjuntar archivo" @click="openFilePicker">
                   Archivo
@@ -496,6 +499,7 @@ const draft = ref('')
 const selectedFile = ref<File | null>(null)
 const fileInput = ref<HTMLInputElement | null>(null)
 const sending = ref(false)
+const sendingMenu = ref(false)
 const contextLoading = ref(false)
 const creatingCustomer = ref(false)
 const takingOrder = ref(false)
@@ -973,6 +977,22 @@ async function sendMessage() {
     sendError.value = error.message || 'No se pudo enviar el mensaje.'
   } finally {
     sending.value = false
+  }
+}
+
+async function sendMenu() {
+  if (!selectedConversation.value) return
+  try {
+    sendingMenu.value = true
+    sendError.value = ''
+    await whatsappStore.sendMenu(selectedConversation.value.id)
+    success('Carta enviada', 3000, 'El cliente recibió el acceso a la carta.')
+    await scrollToBottom()
+  } catch (error: any) {
+    sendError.value = error.message || 'No se pudo enviar la carta.'
+    showError('Carta', sendError.value)
+  } finally {
+    sendingMenu.value = false
   }
 }
 

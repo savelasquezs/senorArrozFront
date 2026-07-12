@@ -19,6 +19,30 @@
             </BaseSelect>
         </div>
 
+        <div class="rounded-lg border border-gray-200 bg-gray-50 p-4 space-y-4">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <BaseSelect v-model="form.commercialProfileId" :options="commercialProfileOptions"
+                    label="Ficha comercial" placeholder="Sin ficha comercial" @update:model-value="validateForm" />
+                <div v-if="selectedCommercialProfile" class="flex items-center gap-3 rounded-lg bg-white p-2 border border-gray-200">
+                    <img v-if="selectedCommercialProfile.photoUrl" :src="selectedCommercialProfile.photoUrl"
+                        class="h-16 w-16 rounded-md object-cover" alt="Foto actual" />
+                    <div class="min-w-0 text-sm">
+                        <p class="font-medium text-gray-900">{{ selectedCommercialProfile.name }}</p>
+                        <p class="truncate text-gray-500">{{ selectedCommercialProfile.description || 'Sin descripción' }}</p>
+                    </div>
+                </div>
+            </div>
+            <button v-if="form.commercialProfileId" type="button" class="text-sm font-medium text-red-600 hover:text-red-700"
+                @click="form.commercialProfileId = null">Desvincular ficha</button>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <BaseInput v-model.number="form.servesPeopleMin" label="Personas (mínimo)" type="number" :min="1" :step="1"
+                    placeholder="Opcional" :error="errors.servesPeopleMin" @input="validateForm" />
+                <BaseInput v-model.number="form.servesPeopleMax" label="Personas (máximo)" type="number" :min="1" :step="1"
+                    placeholder="Opcional" :error="errors.servesPeopleMax" @input="validateForm" />
+            </div>
+            <p class="text-xs text-gray-500">Ejemplo: 7 y 9 se mostrará como “7-9 personas”.</p>
+        </div>
+
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
             <BaseInput v-model.number="form.price" label="Precio" type="number" :min="0" :step="100" required
                 placeholder="2500" :error="errors.price" @input="validateForm">
@@ -143,6 +167,8 @@ import { useProductCategoriesStore } from '@/store/productCategories'
 import { useAuthStore } from '@/store/auth'
 import { useToast } from '@/composables/useToast'
 import type { Product, ProductFormData } from '@/types/product'
+import type { CommercialProfile } from '@/types/product'
+import { commercialProfileApi } from '@/services/MainAPI/commercialProfileApi'
 import BaseInput from '@/components/ui/BaseInput.vue'
 import BaseSelect from '@/components/ui/BaseSelect.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
@@ -183,6 +209,9 @@ const form = reactive({
     weightGrams: null as number | null,
     infiniteStock: false,
     active: true
+    ,commercialProfileId: null as number | null,
+    servesPeopleMin: null as number | null,
+    servesPeopleMax: null as number | null,
 })
 
 const errors = reactive({
@@ -191,7 +220,13 @@ const errors = reactive({
     price: '',
     stock: '',
     weightGrams: '',
+    servesPeopleMin: '',
+    servesPeopleMax: '',
 })
+
+const commercialProfiles = ref<CommercialProfile[]>([])
+const commercialProfileOptions = computed(() => commercialProfiles.value.map(x => ({ value: x.id, label: x.name })))
+const selectedCommercialProfile = computed(() => commercialProfiles.value.find(x => x.id === form.commercialProfileId))
 
 /** BaseInput no acepta bien `null` en v-model.number; usamos '' como vacío. */
 const formWeightGramsModel = computed({
@@ -223,6 +258,7 @@ const isFormValid = computed(() => {
         !errors.name &&
         !errors.price &&
         !errors.weightGrams
+        && !errors.servesPeopleMin && !errors.servesPeopleMax
 
     // Only validate stock for new products
     if (!props.product) {
@@ -265,6 +301,11 @@ const validateForm = () => {
         errors.weightGrams = ''
     }
 
+    const hasMin = form.servesPeopleMin != null && String(form.servesPeopleMin) !== ''
+    const hasMax = form.servesPeopleMax != null && String(form.servesPeopleMax) !== ''
+    errors.servesPeopleMin = hasMin && Number(form.servesPeopleMin) <= 0 ? 'Debe ser mayor que cero' : (hasMin !== hasMax ? 'Completa ambos valores' : '')
+    errors.servesPeopleMax = hasMax && Number(form.servesPeopleMax) < Number(form.servesPeopleMin) ? 'Debe ser igual o mayor que el mínimo' : (hasMin !== hasMax ? 'Completa ambos valores' : '')
+
     // Validate stock (only for new products)
     if (!props.product) {
         if (form.stock != null && form.stock < 0) {
@@ -283,7 +324,10 @@ const buildFormData = (): ProductFormData => ({
     price: form.price,
     stock: props.product ? undefined : (form.infiniteStock ? null : form.stock),
     weightGrams: form.weightGrams,
-    active: form.active
+    active: form.active,
+    commercialProfileId: form.commercialProfileId,
+    servesPeopleMin: form.servesPeopleMin === null || String(form.servesPeopleMin) === '' ? null : Number(form.servesPeopleMin),
+    servesPeopleMax: form.servesPeopleMax === null || String(form.servesPeopleMax) === '' ? null : Number(form.servesPeopleMax),
 })
 
 const handleSubmit = () => {
@@ -332,6 +376,9 @@ watch(() => props.product, (newProduct) => {
         form.weightGrams = newProduct.weightGrams ?? null
         form.infiniteStock = newProduct.stock === null
         form.active = newProduct.active
+        form.commercialProfileId = newProduct.commercialProfileId ?? null
+        form.servesPeopleMin = newProduct.servesPeopleMin ?? null
+        form.servesPeopleMax = newProduct.servesPeopleMax ?? null
     } else {
         form.categoryId = 0
         form.name = ''
@@ -340,6 +387,9 @@ watch(() => props.product, (newProduct) => {
         form.weightGrams = null
         form.infiniteStock = false
         form.active = true
+        form.commercialProfileId = null
+        form.servesPeopleMin = null
+        form.servesPeopleMax = null
     }
 
     errors.categoryId = ''
@@ -347,6 +397,8 @@ watch(() => props.product, (newProduct) => {
     errors.price = ''
     errors.stock = ''
     errors.weightGrams = ''
+    errors.servesPeopleMin = ''
+    errors.servesPeopleMax = ''
 }, { immediate: true })
 
 // Load categories on mount
@@ -357,6 +409,8 @@ onMounted(async () => {
             pageSize: 100, // Load all categories for the dropdown
             branchId: authStore.isSuperadmin ? undefined : (authStore.branchId || undefined)
         })
+        const branchId = props.product?.branchId || authStore.branchId
+        if (branchId) commercialProfiles.value = (await commercialProfileApi.getAll(branchId)).data
     } catch (error) {
         console.error('Error loading categories:', error)
     }

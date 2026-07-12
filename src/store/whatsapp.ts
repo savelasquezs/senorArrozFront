@@ -117,6 +117,12 @@ export const useWhatsAppStore = defineStore('whatsapp', () => {
     return message
   }
 
+  async function sendMenu(conversationId: number) {
+    const res = await whatsappApi.sendMenu(conversationId)
+    if (res.data) upsertMessage(conversationId, res.data)
+    return res.data
+  }
+
   async function sendQuickReply(conversationId: number, quickReplyId: number) {
     const res = await whatsappApi.sendQuickReply(conversationId, quickReplyId)
     const message = res.data
@@ -309,6 +315,7 @@ export const useWhatsAppStore = defineStore('whatsapp', () => {
     fetchConversations,
     fetchMessages,
     sendMessage,
+    sendMenu,
     sendQuickReply,
     sendMediaMessage,
     fetchQuickReplies,

@@ -30,6 +30,7 @@
                 <BaseButton @click="goToCategories" variant="outline" size="sm" :icon="TagIcon">
                     Categorías
                 </BaseButton>
+                <BaseButton v-if="auth.branchId" @click="showProfiles = true" variant="outline" size="sm" :icon="PhotoIcon">Fichas</BaseButton>
                 <BaseButton @click="openCreate" variant="primary" size="sm" :icon="PlusIcon">
                     Nuevo
                 </BaseButton>
@@ -92,6 +93,8 @@
                                             <div class="font-medium text-gray-900 truncate max-w-[14rem]">{{
                                                 product.name }}</div>
                                             <div class="text-[11px] text-gray-500">#{{ product.id }}</div>
+                                            <div v-if="product.commercialProfileName" class="text-[11px] text-emerald-700">{{ product.commercialProfileName }}</div>
+                                            <div v-if="product.servesPeopleMin" class="text-[11px] text-gray-500">{{ servesPeopleLabel(product) }}</div>
                                         </div>
                                     </div>
                                 </td>
@@ -144,6 +147,9 @@
             <ProductForm :product="editingProduct" :loading="formLoading" @submit="handleFormSubmit"
                 @cancel="showForm = false" />
         </BaseDialog>
+        <BaseDialog v-model="showProfiles" title="Fichas comerciales" size="lg">
+            <CommercialProfilesManager v-if="auth.branchId" :branch-id="auth.branchId" />
+        </BaseDialog>
 
         <ProductDetailModal
             :open="detailOpen"
@@ -171,6 +177,7 @@ import BaseDialog from '@/components/ui/BaseDialog.vue'
 import BaseBadge from '@/components/ui/BaseBadge.vue'
 import ProductForm from '@/components/products/ProductForm.vue'
 import ProductDetailModal from '@/components/products/ProductDetailModal.vue'
+import CommercialProfilesManager from '@/components/products/CommercialProfilesManager.vue'
 
 import {
     CubeIcon,
@@ -181,7 +188,8 @@ import {
     EyeIcon,
     PencilIcon,
     TrashIcon,
-    XMarkIcon
+    XMarkIcon,
+    PhotoIcon
 } from '@heroicons/vue/24/outline'
 
 import type { Product, ProductFormData } from '@/types/product'
@@ -199,6 +207,13 @@ const { success, error: showError } = useToast()
 const listLoading = ref(true)
 const detailOpen = ref(false)
 const detailProductId = ref<number | null>(null)
+const showProfiles = ref(false)
+
+function servesPeopleLabel(product: Product) {
+    if (!product.servesPeopleMin || !product.servesPeopleMax) return ''
+    if (product.servesPeopleMin === product.servesPeopleMax) return `${product.servesPeopleMin} ${product.servesPeopleMin === 1 ? 'persona' : 'personas'}`
+    return `${product.servesPeopleMin}-${product.servesPeopleMax} personas`
+}
 
 const filters = ref({
     name: '',

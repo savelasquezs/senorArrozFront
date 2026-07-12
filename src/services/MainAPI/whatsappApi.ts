@@ -60,6 +60,9 @@ class WhatsAppApi extends BaseApi {
   sendMessage(conversationId: number, text: string): Promise<ApiResponse<WhatsAppMessage>> {
     return this.post<ApiResponse<WhatsAppMessage>>(`/whatsapp/conversations/${conversationId}/messages`, { text })
   }
+  sendMenu(conversationId: number): Promise<ApiResponse<WhatsAppMessage>> {
+    return this.post<ApiResponse<WhatsAppMessage>>(`/whatsapp/conversations/${conversationId}/messages/menu`, {})
+  }
 
   sendQuickReply(conversationId: number, quickReplyId: number): Promise<ApiResponse<WhatsAppMessage>> {
     return this.post<ApiResponse<WhatsAppMessage>>(`/whatsapp/conversations/${conversationId}/messages/quick-reply`, { quickReplyId })
