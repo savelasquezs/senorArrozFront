@@ -45,8 +45,8 @@
           <button type="button" class="relative inline-flex w-28 items-center rounded-full px-2 py-1 text-xs font-medium transition-colors" :class="hour.isClosed ? 'bg-gray-200 text-gray-700' : 'bg-emerald-100 text-emerald-700'" @click="toggleClosed(hour)">
             <span class="mr-2 h-3 w-3 rounded-full" :class="hour.isClosed ? 'bg-gray-500' : 'bg-emerald-500'" />{{ hour.isClosed ? 'Cerrado' : 'Abierto' }}
           </button>
-          <label class="text-xs font-medium text-gray-500 md:text-transparent">Apertura<input v-model="hour.openTime" type="time" :disabled="hour.isClosed" class="mt-1 block w-full rounded-lg border-gray-300 text-sm disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-400 md:mt-0" /></label>
-          <label class="text-xs font-medium text-gray-500 md:text-transparent">Cierre<input v-model="hour.closeTime" type="time" :disabled="hour.isClosed" class="mt-1 block w-full rounded-lg border-gray-300 text-sm disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-400 md:mt-0" /></label>
+          <label class="text-xs font-medium text-gray-500"><span class="md:hidden">Apertura</span><input v-model="hour.openTime" type="time" :disabled="hour.isClosed" class="mt-1 block w-full rounded-lg border-gray-300 bg-white text-sm text-gray-900 disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-400 md:mt-0" /></label>
+          <label class="text-xs font-medium text-gray-500"><span class="md:hidden">Cierre</span><input v-model="hour.closeTime" type="time" :disabled="hour.isClosed" class="mt-1 block w-full rounded-lg border-gray-300 bg-white text-sm text-gray-900 disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-400 md:mt-0" /></label>
         </div>
       </div>
 
