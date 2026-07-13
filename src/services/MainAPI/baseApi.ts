@@ -70,11 +70,14 @@ export class BaseApi {
 
 		if (error.response) {
 			const data = error.response.data;
-			if (data?.errors) {
+			if (Array.isArray(data?.errors) && data.errors.length > 0) {
 				const validationMessages = Object.values(data.errors)
 					.flat()
+					.filter((value) => String(value).trim().length > 0)
 					.join(' | ');
-				return new Error(validationMessages);
+				if (validationMessages) {
+					return new Error(validationMessages);
+				}
 			}
 			if (data?.message || data?.error) {
 				const base = (data.message || data.error) as string;

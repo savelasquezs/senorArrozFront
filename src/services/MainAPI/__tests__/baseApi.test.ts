@@ -102,4 +102,41 @@ describe('BaseApi interceptors', () => {
         expect(refreshAccessTokenMock).not.toHaveBeenCalled()
         expect(axiosInstanceMock).not.toHaveBeenCalled()
     })
+
+    it('preserves the API message when the errors array is empty', async () => {
+        const api = new TestApi()
+        axiosInstanceMock.get.mockRejectedValue({
+            response: {
+                status: 400,
+                statusText: 'Bad Request',
+                data: {
+                    isSuccess: false,
+                    message: 'La cuota de OpenAI fue agotada.',
+                    errors: [],
+                },
+            },
+        })
+
+        await expect(api.get('/connection-test')).rejects.toThrow(
+            'La cuota de OpenAI fue agotada.',
+        )
+    })
+
+    it('shows populated validation errors before the generic API message', async () => {
+        const api = new TestApi()
+        axiosInstanceMock.get.mockRejectedValue({
+            response: {
+                status: 400,
+                statusText: 'Bad Request',
+                data: {
+                    message: 'Solicitud invalida.',
+                    errors: ['El modelo no soporta herramientas.'],
+                },
+            },
+        })
+
+        await expect(api.get('/connection-test')).rejects.toThrow(
+            'El modelo no soporta herramientas.',
+        )
+    })
 })
