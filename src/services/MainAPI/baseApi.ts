@@ -64,7 +64,7 @@ export class BaseApi {
 	protected handleError(error: any): Error {
 		if (error.code === 'ECONNABORTED' || /timeout/i.test(String(error.message ?? ''))) {
 			return new Error(
-				'El servidor tardó demasiado en responder. Revisa la configuración del correo o intenta de nuevo.'
+				'El servidor o proveedor externo tardó demasiado en responder. Intenta de nuevo y revisa el estado del servicio.'
 			);
 		}
 

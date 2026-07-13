@@ -376,12 +376,15 @@ async function previewPrompt() {
 }
 
 async function testConnection() {
+  message.type = 'info'
+  message.text = 'Guardando la configuracion antes de probar la conexion...'
   const saved = await save({ quiet: true })
   if (!saved) return
 
   try {
     testing.value = true
-    message.text = ''
+    message.type = 'info'
+    message.text = 'Probando credenciales, modelo y compatibilidad con herramientas...'
     const res = await branchAiSettingsApi.testBranchConnection(props.branchId)
     if (res.data?.setting) {
       applySetting(res.data.setting)
@@ -392,7 +395,6 @@ async function testConnection() {
   } catch (error: any) {
     message.type = 'error'
     message.text = error.message || 'No se pudo validar la conexion.'
-    await load()
   } finally {
     testing.value = false
   }

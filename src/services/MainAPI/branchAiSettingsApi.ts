@@ -18,7 +18,13 @@ class BranchAiSettingsApi extends BaseApi {
   }
 
   testBranchConnection(branchId: number): Promise<ApiResponse<AiTestConnectionResult>> {
-    return this.post<ApiResponse<AiTestConnectionResult>>(`/branches/${branchId}/ai-settings/test-connection`, {})
+    // A real provider probe can legitimately take longer than the 10-second
+    // default used by the rest of the application.
+    return this.post<ApiResponse<AiTestConnectionResult>>(
+      `/branches/${branchId}/ai-settings/test-connection`,
+      {},
+      { timeout: 60_000 },
+    )
   }
 
   getProviderModels(branchId: number, payload: AiModelLookup): Promise<ApiResponse<AiProviderModelsResult>> {
