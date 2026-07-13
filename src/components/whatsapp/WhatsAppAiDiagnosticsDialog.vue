@@ -120,18 +120,41 @@
             Aún no hay actividad de IA registrada para este alcance.
           </div>
         </section>
+
+        <section class="rounded-xl border border-gray-200 p-4">
+          <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
+            <h3 class="text-sm font-semibold text-gray-900">Uso y costo de IA</h3>
+            <BaseButton size="sm" variant="secondary" :loading="usageLoading" @click="loadUsage">Aplicar filtros</BaseButton>
+          </div>
+          <div class="mb-3 grid gap-2 sm:grid-cols-4">
+            <input v-model="usageFilters.from" type="date" aria-label="Fecha desde" class="rounded-md border border-gray-300 px-2 py-1.5 text-sm" />
+            <input v-model="usageFilters.to" type="date" aria-label="Fecha hasta" class="rounded-md border border-gray-300 px-2 py-1.5 text-sm" />
+            <input v-model.trim="usageFilters.provider" placeholder="Proveedor" aria-label="Proveedor" class="rounded-md border border-gray-300 px-2 py-1.5 text-sm" />
+            <input v-model.trim="usageFilters.model" placeholder="Modelo" aria-label="Modelo" class="rounded-md border border-gray-300 px-2 py-1.5 text-sm" />
+          </div>
+          <div v-if="usageError" role="alert" class="rounded-md bg-red-50 p-2 text-sm text-red-700">{{ usageError }}</div>
+          <BaseLoading v-else-if="usageLoading && !usage" text="Consultando uso de IA..." />
+          <template v-else-if="usage">
+            <div v-if="usage.unpricedInvocations" class="mb-3 rounded-md border border-amber-200 bg-amber-50 p-2 text-sm text-amber-900">Costo no disponible para {{ usage.unpricedInvocations }} invocación(es) sin precio configurado.</div>
+            <dl class="grid grid-cols-2 gap-2 text-sm sm:grid-cols-4">
+              <div v-for="item in usageCards" :key="item.label" class="rounded-lg bg-gray-50 p-3"><dt class="text-xs text-gray-500">{{ item.label }}</dt><dd class="mt-1 font-semibold text-gray-900">{{ item.value }}</dd></div>
+            </dl>
+            <div class="mt-3 overflow-x-auto"><table class="min-w-full text-left text-xs"><thead><tr class="border-b"><th class="p-2">Proveedor / modelo</th><th class="p-2">Invocaciones</th><th class="p-2">Mensajes</th><th class="p-2">Tokens entrada</th><th class="p-2">Tokens salida</th><th class="p-2">Costo USD</th></tr></thead><tbody><tr v-for="row in usage.breakdown" :key="`${row.provider}-${row.model}`" class="border-b"><td class="p-2">{{ row.provider }} · {{ row.model }}</td><td class="p-2">{{ number(row.invocations) }}</td><td class="p-2">{{ number(row.messagesProcessed) }}</td><td class="p-2">{{ number(row.inputTokens) }}</td><td class="p-2">{{ number(row.outputTokens) }}</td><td class="p-2">{{ money(row.estimatedCostUsd) }}<span v-if="row.unpricedInvocations" class="ml-1 text-amber-700">*</span></td></tr></tbody></table></div>
+          </template>
+        </section>
       </template>
     </div>
   </BaseDialog>
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, reactive, ref, watch } from 'vue'
 import { CpuChipIcon } from '@heroicons/vue/24/outline'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseDialog from '@/components/ui/BaseDialog.vue'
 import BaseLoading from '@/components/ui/BaseLoading.vue'
-import type { WhatsAppAiDiagnostics, WhatsAppAiProcessing } from '@/types/whatsapp'
+import type { WhatsAppAiDiagnostics, WhatsAppAiProcessing, WhatsAppAiUsage } from '@/types/whatsapp'
+import { whatsappApi } from '@/services/MainAPI/whatsappApi'
 import {
   aiDiagnosticsTone,
   aiProcessingTone,
@@ -155,6 +178,22 @@ defineEmits<{
 }>()
 
 const recentMessages = computed(() => sortAiProcessing(props.diagnostics?.recentMessages ?? []))
+const usage = ref<WhatsAppAiUsage | null>(null)
+const usageLoading = ref(false)
+const usageError = ref<string | null>(null)
+const today = new Date().toISOString().slice(0, 10)
+const monthAgo = new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10)
+const usageFilters = reactive({ from: monthAgo, to: today, provider: '', model: '' })
+const usageCards = computed(() => usage.value ? [
+  { label: 'Invocaciones', value: number(usage.value.totalInvocations) }, { label: 'Mensajes procesados', value: number(usage.value.incomingMessagesProcessed) },
+  { label: 'Tokens de entrada', value: number(usage.value.inputTokens) }, { label: 'Tokens de salida', value: number(usage.value.outputTokens) },
+  { label: 'Costo estimado', value: money(usage.value.estimatedCostUsd) }, { label: 'Llamadas / mensaje', value: usage.value.averageInvocationsPerMessage.toFixed(2) },
+  { label: 'Latencia promedio', value: `${Math.round(usage.value.averageDurationMs)} ms` }, { label: 'Tasa de errores', value: `${(usage.value.errorRate * 100).toFixed(1)}%` },
+] : [])
+async function loadUsage() { if (!props.diagnostics?.branchId) return; try { usageLoading.value = true; usageError.value = null; const response = await whatsappApi.getAiUsage({ branchId: props.diagnostics.branchId, from: `${usageFilters.from}T00:00:00Z`, to: `${usageFilters.to}T23:59:59Z`, provider: usageFilters.provider || undefined, model: usageFilters.model || undefined }); usage.value = response.data ?? null } catch (error: any) { usageError.value = error?.message || 'No se pudo consultar el uso de IA.' } finally { usageLoading.value = false } }
+const number = (value: number) => new Intl.NumberFormat('es-CO').format(value)
+const money = (value: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 4 }).format(value)
+watch(() => [props.modelValue, props.diagnostics?.branchId], ([open]) => { if (open) void loadUsage() }, { immediate: true })
 const diagnosticsToneClasses = computed(() => aiToneClasses[aiDiagnosticsTone(props.diagnostics)])
 const providerModel = computed(() => {
   const provider = props.diagnostics?.provider?.trim()

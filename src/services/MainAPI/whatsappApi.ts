@@ -5,6 +5,8 @@ import type {
   UpsertWhatsAppQuickReply,
   WhatsAppBranchSetting,
   WhatsAppAiDiagnostics,
+  WhatsAppAiUsage,
+  WhatsAppAiUsageFilters,
   WhatsAppConversation,
   WhatsAppConversationFilters,
   WhatsAppMessage,
@@ -42,6 +44,10 @@ class WhatsAppApi extends BaseApi {
         take,
       },
     })
+  }
+
+  getAiUsage(filters: WhatsAppAiUsageFilters): Promise<ApiResponse<WhatsAppAiUsage>> {
+    return this.get<ApiResponse<WhatsAppAiUsage>>('/whatsapp/ai-usage', { params: filters })
   }
 
   getBranchSetting(branchId: number): Promise<ApiResponse<WhatsAppBranchSetting>> {
