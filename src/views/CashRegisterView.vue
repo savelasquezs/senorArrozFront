@@ -301,18 +301,10 @@
                           v-if="shouldMaskCashVaultBalance"
                           type="button"
                           class="inline-flex align-middle ml-1 rounded text-slate-500 hover:text-slate-700 focus:outline-none focus:ring-2 focus:ring-slate-300"
-                          title="Mantener presionado para ver saldo"
-                          aria-label="Mantener presionado para ver saldo de caja mayor"
-                          @pointerdown.prevent="showCashVaultBalance = true"
-                          @pointerup="showCashVaultBalance = false"
-                          @pointercancel="showCashVaultBalance = false"
-                          @pointerleave="showCashVaultBalance = false"
-                          @mousedown.prevent="showCashVaultBalance = true"
-                          @mouseup="showCashVaultBalance = false"
-                          @mouseleave="showCashVaultBalance = false"
-                          @touchstart.prevent="showCashVaultBalance = true"
-                          @touchend="showCashVaultBalance = false"
-                          @touchcancel="showCashVaultBalance = false"
+                          :title="showCashVaultBalance ? 'Ocultar saldo' : 'Mostrar saldo'"
+                          :aria-label="showCashVaultBalance ? 'Ocultar saldo de caja mayor' : 'Mostrar saldo de caja mayor'"
+                          :aria-pressed="showCashVaultBalance"
+                          @click="toggleCashVaultBalance"
                         >
                           <EyeIcon v-if="showCashVaultBalance" class="h-3.5 w-3.5" />
                           <EyeSlashIcon v-else class="h-3.5 w-3.5" />
@@ -365,26 +357,21 @@
                       <div class="col-span-1">
                         <label class="text-[10px] text-gray-500 block mb-0.5">Saldo real</label>
                         <div v-if="isCashVaultRecon(recon) && shouldMaskCashVaultBalance" class="relative">
-                          <input v-if="showCashVaultBalance" v-model.number="recon.actualBalance" type="number" min="0" step="100"
+                          <input v-if="showCashVaultBalance" ref="cashVaultActualInput" v-model.number="recon.actualBalance" type="number" min="0" step="100"
                             @input="onBankActualInput" @blur="onBankActualBlur(recon)"
                             class="w-full border border-gray-300 rounded-md px-2 py-1 pr-8 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-blue-300" />
                           <input v-else :value="maskedCashVaultAmount(recon.actualBalance)" type="text" readonly
-                            class="w-full border border-gray-300 rounded-md px-2 py-1 pr-8 text-xs sm:text-sm tabular-nums bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-300" />
+                            title="Haz clic para editar el saldo real"
+                            aria-label="Saldo real de caja mayor oculto. Haz clic para editar"
+                            @click="revealCashVaultForEditing"
+                            class="w-full cursor-text border border-gray-300 rounded-md px-2 py-1 pr-8 text-xs sm:text-sm tabular-nums bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-300" />
                           <button
                             type="button"
                             class="absolute inset-y-0 right-1.5 flex items-center rounded px-1 text-gray-500 hover:text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-300"
-                            title="Mantener presionado para ver y editar"
-                            aria-label="Mantener presionado para ver y editar saldo real de caja mayor"
-                            @pointerdown.prevent="showCashVaultBalance = true"
-                            @pointerup="showCashVaultBalance = false"
-                            @pointercancel="showCashVaultBalance = false"
-                            @pointerleave="showCashVaultBalance = false"
-                            @mousedown.prevent="showCashVaultBalance = true"
-                            @mouseup="showCashVaultBalance = false"
-                            @mouseleave="showCashVaultBalance = false"
-                            @touchstart.prevent="showCashVaultBalance = true"
-                            @touchend="showCashVaultBalance = false"
-                            @touchcancel="showCashVaultBalance = false"
+                            :title="showCashVaultBalance ? 'Ocultar saldo' : 'Mostrar y editar saldo'"
+                            :aria-label="showCashVaultBalance ? 'Ocultar saldo real de caja mayor' : 'Mostrar y editar saldo real de caja mayor'"
+                            :aria-pressed="showCashVaultBalance"
+                            @click="toggleCashVaultBalance"
                           >
                             <EyeIcon v-if="showCashVaultBalance" class="h-4 w-4" />
                             <EyeSlashIcon v-else class="h-4 w-4" />
@@ -592,7 +579,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
+import { ref, computed, watch, onMounted, onBeforeUnmount, nextTick } from 'vue'
 import MainLayout from '@/components/layout/MainLayout.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseDialog from '@/components/ui/BaseDialog.vue'
@@ -632,7 +619,19 @@ const showVaultHistoryModal = ref(false)
 const showExpenseFormModal = ref(false)
 const canViewClosureHistory = computed(() => authStore.isAdmin || authStore.isSuperadmin)
 const showCashVaultBalance = ref(false)
+const cashVaultActualInput = ref<HTMLInputElement | null>(null)
 const shouldMaskCashVaultBalance = computed(() => authStore.isAdmin && !authStore.isSuperadmin)
+
+function toggleCashVaultBalance() {
+  showCashVaultBalance.value = !showCashVaultBalance.value
+}
+
+async function revealCashVaultForEditing() {
+  showCashVaultBalance.value = true
+  await nextTick()
+  cashVaultActualInput.value?.focus()
+  cashVaultActualInput.value?.select()
+}
 
 function emptyDenominationCounts(): Record<number, number> {
   return Object.fromEntries(DENOMINATIONS.map((d) => [d, 0]))
