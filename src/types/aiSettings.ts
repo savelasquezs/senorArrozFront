@@ -16,6 +16,7 @@ export interface BranchAiSetting {
   isActive: boolean
   temperature?: number | null
   maxContextMessages: number
+  contextStrategy: 'legacy' | 'optimized_v1'
   lastTestedAt?: string | null
   isVerified: boolean
   createdAt?: string | null
@@ -37,6 +38,7 @@ export interface UpsertBranchAiSetting {
   isActive: boolean
   temperature: number | null
   maxContextMessages: number
+  contextStrategy: 'legacy' | 'optimized_v1'
   assistantName: string
   promptObjective: string
   promptPersonality: string
