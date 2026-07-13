@@ -4,6 +4,7 @@ import type {
   UpsertWhatsAppBranchSetting,
   UpsertWhatsAppQuickReply,
   WhatsAppBranchSetting,
+  WhatsAppAiDiagnostics,
   WhatsAppConversation,
   WhatsAppConversationFilters,
   WhatsAppMessage,
@@ -31,6 +32,16 @@ class WhatsAppApi extends BaseApi {
 
   getUnreadSummary(): Promise<ApiResponse<WhatsAppUnreadSummary>> {
     return this.get<ApiResponse<WhatsAppUnreadSummary>>('/whatsapp/unread-summary')
+  }
+
+  getAiDiagnostics(branchId: number, conversationId?: number | null, take = 20): Promise<ApiResponse<WhatsAppAiDiagnostics>> {
+    return this.get<ApiResponse<WhatsAppAiDiagnostics>>('/whatsapp/ai-diagnostics', {
+      params: {
+        branchId,
+        ...(conversationId ? { conversationId } : {}),
+        take,
+      },
+    })
   }
 
   getBranchSetting(branchId: number): Promise<ApiResponse<WhatsAppBranchSetting>> {

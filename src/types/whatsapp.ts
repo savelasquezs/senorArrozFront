@@ -49,6 +49,49 @@ export interface WhatsAppUnreadSummary {
   latestMessageAt?: string | null
 }
 
+export interface WhatsAppAiProcessing {
+  messageId: number
+  conversationId: number
+  status: string
+  severity: string
+  title: string
+  detail: string
+  technicalDetail?: string | null
+  errorCategory?: string | null
+  httpStatusCode?: number | null
+  attempts: number
+  maxAttempts: number
+  willRetry: boolean
+  timestamp: string
+  statusChangedAt: string
+  startedAt?: string | null
+  nextRetryAt?: string | null
+  processedAt?: string | null
+}
+
+export interface WhatsAppAiDiagnostics {
+  branchId: number
+  conversationId?: number | null
+  agentStatus: string
+  overallStatus: string
+  title: string
+  summary: string
+  provider?: string | null
+  model?: string | null
+  isActive: boolean
+  isVerified: boolean
+  attentionMode?: WhatsAppAttentionMode | string | null
+  pendingCount: number
+  failedCountLast24Hours: number
+  lastActivityAt?: string | null
+  recentMessages: WhatsAppAiProcessing[]
+}
+
+export interface WhatsAppAiProcessingChangedPayload {
+  branchId: number
+  processing: WhatsAppAiProcessing
+}
+
 export interface WhatsAppQuickReply {
   id: number
   branchId: number
@@ -165,6 +208,7 @@ export interface WhatsAppMessage {
   sentByUserId?: number | null
   timestamp: string
   createdAt: string
+  aiProcessing?: WhatsAppAiProcessing | null
 }
 
 export interface WhatsAppConversationFilters {

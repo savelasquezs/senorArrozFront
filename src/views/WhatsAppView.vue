@@ -9,7 +9,29 @@
           </h1>
           <p class="text-sm text-gray-500">Conversaciones de WhatsApp Cloud API</p>
         </div>
-        <div v-if="whatsappStore.enabled" class="flex flex-col gap-2 sm:flex-row">
+        <div v-if="whatsappStore.enabled" class="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end">
+          <button
+            v-if="diagnosticsBranchId"
+            type="button"
+            class="inline-flex items-center justify-center gap-2 rounded-lg border px-3 py-2 text-sm font-semibold transition-colors"
+            :class="aiStatusChipClasses"
+            :title="currentAiDiagnostics?.summary || whatsappStore.aiDiagnosticsError || 'Abrir actividad de la IA'"
+            @click="openAiDiagnostics"
+          >
+            <CpuChipIcon class="h-4 w-4" />
+            <span class="max-w-52 truncate">{{ aiStatusChipLabel }}</span>
+            <span v-if="currentAiDiagnostics?.pendingCount" class="rounded-full bg-white/70 px-1.5 py-0.5 text-[10px]">
+              {{ currentAiDiagnostics.pendingCount }}
+            </span>
+          </button>
+          <span
+            class="inline-flex items-center justify-center gap-1.5 rounded-lg px-2.5 py-2 text-xs font-semibold"
+            :class="signalRStatusClasses"
+            :title="signalRError || signalRStatusLabel"
+          >
+            <span class="h-2 w-2 rounded-full" :class="signalRDotClass" />
+            {{ signalRStatusLabel }}
+          </span>
           <BaseButton variant="secondary" size="sm" @click="openQuickRepliesModal">
             Respuestas rápidas
           </BaseButton>
@@ -36,8 +58,26 @@
         </div>
       </div>
 
+      <div
+        v-if="statusLoadError && whatsappStore.status"
+        class="flex items-center justify-between gap-3 border-b border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-900"
+        role="alert"
+      >
+        <span>{{ statusLoadError }} Se conserva el último estado conocido.</span>
+        <button type="button" class="shrink-0 font-semibold underline" @click="retryWhatsAppStatus">Reintentar</button>
+      </div>
+
       <div v-if="loadingStatus" class="flex-1 grid place-items-center">
         <BaseLoading text="Consultando estado de WhatsApp..." />
+      </div>
+
+      <div v-else-if="statusLoadError && !whatsappStore.status" class="flex-1 grid place-items-center p-6">
+        <div class="max-w-lg rounded-lg border border-red-200 bg-white p-6 text-center shadow-sm">
+          <ExclamationTriangleIcon class="mx-auto h-12 w-12 text-red-500" />
+          <h2 class="mt-3 text-lg font-semibold text-gray-900">No pudimos consultar el estado de WhatsApp</h2>
+          <p class="mt-2 text-sm text-gray-600">{{ statusLoadError }}</p>
+          <BaseButton class="mt-4" :loading="loadingStatus" @click="retryWhatsAppStatus">Reintentar</BaseButton>
+        </div>
       </div>
 
       <div v-else-if="!whatsappStore.enabled" class="flex-1 grid place-items-center p-6">
@@ -123,6 +163,14 @@
             </div>
           </div>
 
+          <WhatsAppAiStatusStrip
+            v-if="selectedConversation"
+            :diagnostics="currentAiDiagnostics"
+            :processing="latestAiProcessing"
+            :error="currentAiDiagnostics ? null : whatsappStore.aiDiagnosticsError"
+            @open="openAiDiagnostics"
+          />
+
           <div v-if="!selectedConversation" class="flex-1 grid place-items-center p-6 text-center text-gray-500">
             <div>
               <ChatBubbleOvalLeftEllipsisIcon class="mx-auto h-12 w-12 text-gray-400" />
@@ -188,6 +236,18 @@
                   <div class="mt-1 flex items-center justify-end gap-2 text-[11px]" :class="message.direction === 'outbound' ? 'text-emerald-50' : 'text-gray-400'">
                     <span>{{ formatTime(message.timestamp) }}</span>
                     <span v-if="message.direction === 'outbound'">{{ statusLabel(message.status) }}</span>
+                  </div>
+                  <div
+                    v-if="message.direction === 'inbound' && message.aiProcessing"
+                    class="mt-2 flex flex-wrap items-center gap-1.5 rounded-md px-2 py-1.5 text-[11px] font-medium"
+                    :class="aiMessageStatusClasses(message.aiProcessing)"
+                    role="status"
+                  >
+                    <CpuChipIcon class="h-3.5 w-3.5 shrink-0" />
+                    <span>{{ message.aiProcessing.title || aiValueLabel(message.aiProcessing.status) }}</span>
+                    <span v-if="message.aiProcessing.willRetry" class="opacity-80">
+                      · intento {{ message.aiProcessing.attempts }}/{{ message.aiProcessing.maxAttempts }}
+                    </span>
                   </div>
                 </div>
               </div>
@@ -428,6 +488,16 @@
         </div>
       </BaseDialog>
 
+      <WhatsAppAiDiagnosticsDialog
+        v-model="showAiDiagnosticsDialog"
+        :diagnostics="currentAiDiagnostics"
+        :loading="whatsappStore.aiDiagnosticsLoadingCount > 0"
+        :error="whatsappStore.aiDiagnosticsError"
+        :connection-state="connectionState"
+        :connection-error="signalRError"
+        @refresh="refreshAiDiagnostics(true)"
+      />
+
       <Teleport to="body">
         <div
           v-if="imagePreview"
@@ -468,7 +538,9 @@ import { useRoute, useRouter } from 'vue-router'
 import {
   ChatBubbleLeftRightIcon,
   ChatBubbleOvalLeftEllipsisIcon,
+  CpuChipIcon,
   DocumentIcon,
+  ExclamationTriangleIcon,
   PaperClipIcon,
   PaperAirplaneIcon,
   XMarkIcon,
@@ -480,6 +552,8 @@ import BaseInput from '@/components/ui/BaseInput.vue'
 import BaseLoading from '@/components/ui/BaseLoading.vue'
 import CustomerForm from '@/components/customers/CustomerForm.vue'
 import AddressSelector from '@/components/customers/address/AddressSelector.vue'
+import WhatsAppAiDiagnosticsDialog from '@/components/whatsapp/WhatsAppAiDiagnosticsDialog.vue'
+import WhatsAppAiStatusStrip from '@/components/whatsapp/WhatsAppAiStatusStrip.vue'
 import { useWhatsAppStore } from '@/store/whatsapp'
 import { useOrdersDraftsStore } from '@/store/ordersDrafts'
 import { customerApi } from '@/services/MainAPI/customerApi'
@@ -487,16 +561,39 @@ import { whatsappApi } from '@/services/MainAPI/whatsappApi'
 import { useToast } from '@/composables/useToast'
 import { useSignalR } from '@/composables/useSignalR'
 import { WHATSAPP_SIGNALR_HUB_URL } from '@/config/signalr'
-import type { WhatsAppAttentionChangedPayload, WhatsAppAttentionMode, WhatsAppConversation, WhatsAppMessage, WhatsAppQuickReply, WhatsAppRealtimeMessagePayload } from '@/types/whatsapp'
+import type {
+  WhatsAppAiDiagnostics,
+  WhatsAppAiProcessing,
+  WhatsAppAiProcessingChangedPayload,
+  WhatsAppAttentionChangedPayload,
+  WhatsAppAttentionMode,
+  WhatsAppConversation,
+  WhatsAppMessage,
+  WhatsAppQuickReply,
+  WhatsAppRealtimeMessagePayload,
+} from '@/types/whatsapp'
 import type { Customer, CustomerAddress, CustomerFormData } from '@/types/customer'
+import {
+  aiDiagnosticsTone,
+  aiProcessingTone,
+  aiToneClasses,
+  aiValueLabel,
+  sortAiProcessing,
+} from '@/utils/whatsappAiDiagnostics'
 
 const whatsappStore = useWhatsAppStore()
 const ordersStore = useOrdersDraftsStore()
 const router = useRouter()
 const route = useRoute()
 const { success, error: showError } = useToast()
-const { on: onSignalR, off: offSignalR } = useSignalR(WHATSAPP_SIGNALR_HUB_URL)
+const {
+  connectionState,
+  error: signalRError,
+  on: onSignalR,
+  off: offSignalR,
+} = useSignalR(WHATSAPP_SIGNALR_HUB_URL)
 const loadingStatus = ref(true)
+const statusLoadError = ref('')
 const selectedConversation = ref<WhatsAppConversation | null>(null)
 const selectedCustomer = ref<Customer | null>(null)
 const selectedAddress = ref<CustomerAddress | null>(null)
@@ -530,19 +627,158 @@ const contextError = ref('')
 const addressSelectionNote = ref('')
 const messagesEnd = ref<HTMLElement | null>(null)
 const imagePreview = ref<WhatsAppMessage | null>(null)
+const showAiDiagnosticsDialog = ref(false)
 let searchTimeout: number | undefined
+let aiDiagnosticsPollingId: number | undefined
 
 const currentMessages = computed<WhatsAppMessage[]>(() =>
   selectedConversation.value ? (whatsappStore.messages[selectedConversation.value.id] ?? []) : []
 )
+
+const diagnosticsBranchId = computed(() =>
+  selectedConversation.value?.branchId
+  || selectedBranchId.value
+  || whatsappStore.enabledBranchIds[0]
+  || 0,
+)
+
+const currentAiDiagnostics = computed<WhatsAppAiDiagnostics | null>(() => {
+  const conversationId = selectedConversation.value?.id
+  if (conversationId && whatsappStore.aiDiagnosticsByConversation[conversationId]) {
+    return whatsappStore.aiDiagnosticsByConversation[conversationId]
+  }
+
+  const branchId = diagnosticsBranchId.value
+  if (branchId && whatsappStore.aiDiagnosticsByBranch[branchId]) {
+    return whatsappStore.aiDiagnosticsByBranch[branchId]
+  }
+
+  const diagnostics = Object.values(whatsappStore.aiDiagnosticsByBranch)
+  const rank = { danger: 5, warning: 4, info: 3, neutral: 2, success: 1 }
+  return [...diagnostics].sort((left, right) =>
+    rank[aiDiagnosticsTone(right)] - rank[aiDiagnosticsTone(left)],
+  )[0] ?? null
+})
+
+const latestAiProcessing = computed(() =>
+  sortAiProcessing(currentAiDiagnostics.value?.recentMessages ?? [])[0] ?? null,
+)
+
+const aiStatusChipClasses = computed(() => {
+  const classes = aiToneClasses[aiDiagnosticsTone(currentAiDiagnostics.value)]
+  return `${classes.surface} ${classes.text}`
+})
+
+const aiStatusChipLabel = computed(() => {
+  const diagnostics = currentAiDiagnostics.value
+  if (!diagnostics && whatsappStore.aiDiagnosticsLoadingCount > 0) return 'Consultando IA...'
+  if (!diagnostics && whatsappStore.aiDiagnosticsError) return 'Estado IA no disponible'
+  if (!diagnostics) return 'Estado de la IA'
+  if (!diagnostics.isActive) return 'IA inactiva'
+  if (diagnostics.pendingCount > 0) return `IA procesando (${diagnostics.pendingCount})`
+  return diagnostics.title || 'IA operativa'
+})
+
+const signalRStatusLabel = computed(() => ({
+  connected: 'En vivo',
+  connecting: 'Conectando',
+  reconnecting: 'Reconectando',
+  error: 'Sin conexión en vivo',
+  disconnected: 'Sin conexión en vivo',
+}[connectionState.value]))
+
+const signalRStatusClasses = computed(() => connectionState.value === 'connected'
+  ? 'bg-emerald-100 text-emerald-800'
+  : connectionState.value === 'connecting' || connectionState.value === 'reconnecting'
+    ? 'bg-amber-100 text-amber-900'
+    : 'bg-red-100 text-red-800')
+
+const signalRDotClass = computed(() => connectionState.value === 'connected'
+  ? 'bg-emerald-500'
+  : connectionState.value === 'connecting' || connectionState.value === 'reconnecting'
+    ? 'animate-pulse bg-amber-500'
+    : 'bg-red-500')
 
 const canTakeAttention = computed(() => !!selectedConversation.value && ['ai', 'waitingForHuman', 'paused'].includes(selectedConversation.value.attentionMode))
 const canReturnToAi = computed(() => !!selectedConversation.value && ['human', 'waitingForHuman', 'paused'].includes(selectedConversation.value.attentionMode))
 const canPauseAi = computed(() => selectedConversation.value?.attentionMode === 'ai')
 function attentionLabel(conversation: WhatsAppConversation) { const labels: Record<WhatsAppAttentionMode, string> = { ai: 'Atendida por IA', human: 'Atendida por una persona', waitingForHuman: 'Esperando asesor', paused: 'IA pausada', closed: 'Conversación cerrada' }; const label = labels[conversation.attentionMode] || labels.human; return conversation.attentionMode === 'human' && conversation.assignedUserName ? `${label}: ${conversation.assignedUserName}` : label }
 function attentionBadgeClass(mode: WhatsAppAttentionMode) { return { ai: 'bg-violet-100 text-violet-700', human: 'bg-blue-100 text-blue-700', waitingForHuman: 'bg-amber-200 text-amber-900', paused: 'bg-gray-200 text-gray-700', closed: 'bg-red-100 text-red-700' }[mode] }
-async function changeAttention(action: 'take' | 'return-to-ai' | 'pause-ai' | 'close' | 'reopen') { if (!selectedConversation.value) return; try { changingAttention.value = true; await whatsappStore.changeAttention(selectedConversation.value.id, action) } catch (error: any) { showError('Atención', error.message || 'No se pudo cambiar el estado.') } finally { changingAttention.value = false } }
+async function changeAttention(action: 'take' | 'return-to-ai' | 'pause-ai' | 'close' | 'reopen') { if (!selectedConversation.value) return; try { changingAttention.value = true; await whatsappStore.changeAttention(selectedConversation.value.id, action); await refreshAiDiagnostics() } catch (error: any) { showError('Atención', error.message || 'No se pudo cambiar el estado.') } finally { changingAttention.value = false } }
 function handleAttentionChanged(payload: WhatsAppAttentionChangedPayload) { if (!payload?.conversation?.id) return; whatsappStore.applyAttentionChanged(payload.conversation); if (selectedConversation.value?.id === payload.conversation.id) selectedConversation.value = whatsappStore.conversations.find(x => x.id === payload.conversation.id) ?? payload.conversation }
+
+function handleAiProcessingChanged(payload: WhatsAppAiProcessingChangedPayload) {
+  whatsappStore.applyAiProcessingChanged(payload)
+}
+
+async function refreshAiDiagnostics(showErrors = false) {
+  if (!whatsappStore.enabled) return
+  const selected = selectedConversation.value
+
+  try {
+    if (selected) {
+      await whatsappStore.fetchAiDiagnostics(selected.branchId, selected.id, 20)
+      return
+    }
+
+    const branchIds = selectedBranchId.value
+      ? [selectedBranchId.value]
+      : [...new Set(whatsappStore.enabledBranchIds)]
+    if (!branchIds.length) return
+
+    const results = await Promise.allSettled(
+      branchIds.map(branchId => whatsappStore.fetchAiDiagnostics(branchId, null, 20)),
+    )
+    const firstFailure = results.find(result => result.status === 'rejected') as PromiseRejectedResult | undefined
+    if (firstFailure && results.every(result => result.status === 'rejected')) throw firstFailure.reason
+  } catch (error: any) {
+    if (showErrors) showError('Estado de la IA', error.message || 'No se pudo actualizar el diagnóstico.')
+  }
+}
+
+function openAiDiagnostics() {
+  showAiDiagnosticsDialog.value = true
+  void refreshAiDiagnostics()
+}
+
+function startAiDiagnosticsPolling() {
+  if (aiDiagnosticsPollingId) window.clearInterval(aiDiagnosticsPollingId)
+  void refreshAiDiagnostics()
+  aiDiagnosticsPollingId = window.setInterval(() => {
+    void refreshAiDiagnostics()
+  }, 15000)
+}
+
+function stopAiDiagnosticsPolling() {
+  if (!aiDiagnosticsPollingId) return
+  window.clearInterval(aiDiagnosticsPollingId)
+  aiDiagnosticsPollingId = undefined
+}
+
+async function retryWhatsAppStatus() {
+  loadingStatus.value = true
+  statusLoadError.value = ''
+  try {
+    await whatsappStore.refreshStatus()
+    if (whatsappStore.enabled) {
+      await Promise.allSettled([
+        whatsappStore.fetchQuickReplies(),
+        reloadConversations(),
+      ])
+      startAiDiagnosticsPolling()
+    } else {
+      stopAiDiagnosticsPolling()
+    }
+  } catch (error: any) {
+    statusLoadError.value = error.message || 'No se pudo consultar el estado de WhatsApp.'
+  } finally {
+    loadingStatus.value = false
+  }
+}
+
+function aiMessageStatusClasses(processing: WhatsAppAiProcessing) {
+  return aiToneClasses[aiProcessingTone(processing)].badge
+}
 
 const showBranchFilter = computed(() => whatsappStore.enabledBranchIds.length > 1)
 
@@ -1153,20 +1389,15 @@ function mediaFallbackLabel(message: WhatsAppMessage) {
 onMounted(async () => {
   onSignalR('WhatsAppMessageCreated', handleRealtimeMessage)
   onSignalR('WhatsAppAttentionChanged', handleAttentionChanged)
-  try {
-    await whatsappStore.ensureStatus(0)
-    if (whatsappStore.enabled) {
-      await whatsappStore.fetchQuickReplies()
-      await reloadConversations()
-    }
-  } finally {
-    loadingStatus.value = false
-  }
+  onSignalR('WhatsAppAiProcessingChanged', handleAiProcessingChanged)
+  await retryWhatsAppStatus()
 })
 
 onBeforeUnmount(() => {
   offSignalR('WhatsAppMessageCreated', handleRealtimeMessage)
   offSignalR('WhatsAppAttentionChanged', handleAttentionChanged)
+  offSignalR('WhatsAppAiProcessingChanged', handleAiProcessingChanged)
+  stopAiDiagnosticsPolling()
   if (searchTimeout) window.clearTimeout(searchTimeout)
 })
 
@@ -1176,4 +1407,17 @@ watch(
     void selectConversationFromRoute()
   }
 )
+
+watch(
+  () => [selectedConversation.value?.id ?? 0, selectedBranchId.value],
+  () => {
+    if (whatsappStore.enabled) void refreshAiDiagnostics()
+  },
+)
+
+watch(connectionState, (current, previous) => {
+  if (current === 'connected' && previous !== 'connected' && whatsappStore.enabled) {
+    void refreshAiDiagnostics()
+  }
+})
 </script>

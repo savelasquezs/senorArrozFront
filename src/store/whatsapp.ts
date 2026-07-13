@@ -4,6 +4,8 @@ import { whatsappApi } from '@/services/MainAPI/whatsappApi'
 import type {
   WhatsAppConversation,
   WhatsAppConversationFilters,
+  WhatsAppAiDiagnostics,
+  WhatsAppAiProcessingChangedPayload,
   WhatsAppMessage,
   WhatsAppQuickReply,
   WhatsAppQuickReplyFilters,
@@ -11,6 +13,14 @@ import type {
   WhatsAppStatus,
   WhatsAppUnreadSummary,
 } from '@/types/whatsapp'
+import {
+  aiOverallStatusFromActivity,
+  aiProcessingActivityAt,
+  isAiProcessingFailed,
+  isAiProcessingPending,
+  shouldApplyAiProcessingUpdate,
+  upsertAiProcessing,
+} from '@/utils/whatsappAiDiagnostics'
 
 export const useWhatsAppStore = defineStore('whatsapp', () => {
   const status = ref<WhatsAppStatus | null>(null)
@@ -18,10 +28,14 @@ export const useWhatsAppStore = defineStore('whatsapp', () => {
   const conversations = ref<WhatsAppConversation[]>([])
   const messages = ref<Record<number, WhatsAppMessage[]>>({})
   const quickReplies = ref<WhatsAppQuickReply[]>([])
+  const aiDiagnosticsByBranch = ref<Record<number, WhatsAppAiDiagnostics>>({})
+  const aiDiagnosticsByConversation = ref<Record<number, WhatsAppAiDiagnostics>>({})
   const isLoadingStatus = ref(false)
   const isLoadingConversations = ref(false)
   const isLoadingMessages = ref(false)
   const isLoadingQuickReplies = ref(false)
+  const aiDiagnosticsLoadingCount = ref(0)
+  const aiDiagnosticsError = ref<string | null>(null)
   const error = ref<string | null>(null)
   let statusLoadedAt = 0
 
@@ -40,10 +54,37 @@ export const useWhatsAppStore = defineStore('whatsapp', () => {
       return res.data
     } catch (err: any) {
       error.value = err.message || 'No se pudo consultar el estado de WhatsApp'
-      status.value = { enabled: false, branchIds: [] }
       throw err
     } finally {
       isLoadingStatus.value = false
+    }
+  }
+
+  async function fetchAiDiagnostics(branchId: number, conversationId?: number | null, take = 20) {
+    try {
+      aiDiagnosticsLoadingCount.value += 1
+      aiDiagnosticsError.value = null
+      const res = await whatsappApi.getAiDiagnostics(branchId, conversationId, take)
+      const diagnostics = res.data
+      if (!diagnostics) return null
+
+      diagnostics.recentMessages = diagnostics.recentMessages ?? []
+      const diagnosticsConversationId = conversationId || diagnostics.conversationId || null
+      if (diagnosticsConversationId) {
+        aiDiagnosticsByConversation.value[diagnosticsConversationId] = diagnostics
+      } else {
+        aiDiagnosticsByBranch.value[branchId] = diagnostics
+      }
+
+      for (const processing of diagnostics.recentMessages) {
+        attachAiProcessingToMessage(processing.conversationId, processing.messageId, processing)
+      }
+      return diagnostics
+    } catch (err: any) {
+      aiDiagnosticsError.value = err.message || 'No se pudo consultar el estado de la IA'
+      throw err
+    } finally {
+      aiDiagnosticsLoadingCount.value = Math.max(0, aiDiagnosticsLoadingCount.value - 1)
     }
   }
 
@@ -84,6 +125,10 @@ export const useWhatsAppStore = defineStore('whatsapp', () => {
       error.value = null
       const res = await whatsappApi.getMessages(conversationId)
       messages.value[conversationId] = sortMessages(res.data ?? [])
+      const diagnostics = aiDiagnosticsByConversation.value[conversationId]
+      for (const processing of diagnostics?.recentMessages ?? []) {
+        attachAiProcessingToMessage(conversationId, processing.messageId, processing)
+      }
       const conversation = conversations.value.find(c => c.id === conversationId)
       if (conversation && conversation.unreadCount > 0) {
         const previousUnread = conversation.unreadCount
@@ -230,12 +275,116 @@ export const useWhatsAppStore = defineStore('whatsapp', () => {
   }
 
   function upsertMessage(conversationId: number, message: WhatsAppMessage) {
+    const knownProcessing = aiDiagnosticsByConversation.value[conversationId]?.recentMessages.find(
+      processing => processing.messageId === message.id,
+    )
+    const enrichedMessage = message.aiProcessing || !knownProcessing
+      ? message
+      : { ...message, aiProcessing: knownProcessing }
     const existing = messages.value[conversationId] ?? []
-    const index = existing.findIndex(x => x.id === message.id)
+    const index = existing.findIndex(x => x.id === enrichedMessage.id)
     const updated = index >= 0
-      ? existing.map(x => x.id === message.id ? message : x)
-      : [...existing, message]
+      ? existing.map(x => x.id === enrichedMessage.id ? enrichedMessage : x)
+      : [...existing, enrichedMessage]
     messages.value[conversationId] = sortMessages(updated)
+  }
+
+  function attachAiProcessingToMessage(
+    conversationId: number,
+    messageId: number,
+    processing: WhatsAppMessage['aiProcessing'],
+  ) {
+    const conversationMessages = messages.value[conversationId]
+    if (!conversationMessages?.length) return
+    const index = conversationMessages.findIndex(message => message.id === messageId)
+    if (index < 0) return
+    if (processing
+      && !shouldApplyAiProcessingUpdate(conversationMessages[index].aiProcessing, processing)) return
+    conversationMessages[index] = { ...conversationMessages[index], aiProcessing: processing }
+    messages.value[conversationId] = [...conversationMessages]
+  }
+
+  function applyAiProcessingChanged(payload: WhatsAppAiProcessingChangedPayload) {
+    if (!payload?.branchId || !payload.processing?.messageId || !payload.processing.conversationId) return
+    const processing = payload.processing
+    const conversationId = processing.conversationId
+    const branchDiagnostics = aiDiagnosticsByBranch.value[payload.branchId]
+    const existingDiagnostics = aiDiagnosticsByConversation.value[conversationId] ?? branchDiagnostics
+    const knownProcessing = existingDiagnostics?.recentMessages.find(item =>
+      item.messageId === processing.messageId && item.conversationId === conversationId,
+    )
+    if (!shouldApplyAiProcessingUpdate(knownProcessing, processing)) return
+
+    function updatedDiagnostics(current: WhatsAppAiDiagnostics): WhatsAppAiDiagnostics {
+      const previous = current.recentMessages.find(item =>
+        item.messageId === processing.messageId && item.conversationId === conversationId,
+      )
+      const pendingDelta = Number(isAiProcessingPending(processing)) - Number(isAiProcessingPending(previous))
+      const failedDelta = Number(isAiProcessingFailed(processing)) - Number(isAiProcessingFailed(previous))
+      const pendingCount = Math.max(0, current.pendingCount + pendingDelta)
+      const failedCountLast24Hours = Math.max(0, current.failedCountLast24Hours + failedDelta)
+      const recentMessages = upsertAiProcessing(current.recentMessages, processing)
+      const retrying = recentMessages.find(item =>
+        isAiProcessingPending(item)
+        && item.willRetry
+        && Boolean(item.errorCategory || item.nextRetryAt),
+      )
+      const representative = failedCountLast24Hours > 0
+        ? recentMessages.find(isAiProcessingFailed)
+        : pendingCount > 0
+          ? retrying ?? recentMessages.find(isAiProcessingPending)
+          : recentMessages[0]
+      const activityAt = aiProcessingActivityAt(processing)
+      const previousActivity = current.lastActivityAt ? new Date(current.lastActivityAt).getTime() : 0
+      const incomingActivity = activityAt ? new Date(activityAt).getTime() : 0
+      return {
+        ...current,
+        title: representative?.title || current.title,
+        summary: representative?.detail || current.summary,
+        overallStatus: aiOverallStatusFromActivity(recentMessages, pendingCount, failedCountLast24Hours),
+        pendingCount,
+        failedCountLast24Hours,
+        lastActivityAt: incomingActivity >= previousActivity ? activityAt : current.lastActivityAt,
+        recentMessages,
+      }
+    }
+
+    const conversationDiagnostics = aiDiagnosticsByConversation.value[conversationId]
+    const conversationBase: WhatsAppAiDiagnostics = conversationDiagnostics
+      ? conversationDiagnostics
+      : branchDiagnostics
+        ? {
+            ...branchDiagnostics,
+            conversationId,
+            pendingCount: 0,
+            failedCountLast24Hours: 0,
+            lastActivityAt: null,
+            recentMessages: [],
+          }
+      : {
+          branchId: payload.branchId,
+          conversationId,
+          agentStatus: '',
+          overallStatus: processing.severity || processing.status,
+          title: processing.title || 'Actividad de IA',
+          summary: processing.detail || '',
+          provider: null,
+          model: null,
+          isActive: true,
+          isVerified: false,
+          attentionMode: null,
+          pendingCount: 0,
+          failedCountLast24Hours: 0,
+          lastActivityAt: aiProcessingActivityAt(processing),
+          recentMessages: [],
+        }
+    aiDiagnosticsByConversation.value[conversationId] = updatedDiagnostics(conversationBase)
+
+    if (branchDiagnostics) {
+      aiDiagnosticsByBranch.value[payload.branchId] = updatedDiagnostics(branchDiagnostics)
+    }
+
+    attachAiProcessingToMessage(conversationId, processing.messageId, processing)
   }
 
   function utcTimestamp(value: string) {
@@ -303,8 +452,11 @@ export const useWhatsAppStore = defineStore('whatsapp', () => {
     conversations.value = []
     messages.value = {}
     quickReplies.value = []
+    aiDiagnosticsByBranch.value = {}
+    aiDiagnosticsByConversation.value = {}
     unreadSummary.value = { totalUnread: 0, unreadConversations: 0, latestMessageAt: null }
     error.value = null
+    aiDiagnosticsError.value = null
   }
 
   return {
@@ -313,10 +465,14 @@ export const useWhatsAppStore = defineStore('whatsapp', () => {
     conversations,
     messages,
     quickReplies,
+    aiDiagnosticsByBranch,
+    aiDiagnosticsByConversation,
     isLoadingStatus,
     isLoadingConversations,
     isLoadingMessages,
     isLoadingQuickReplies,
+    aiDiagnosticsLoadingCount,
+    aiDiagnosticsError,
     error,
     enabled,
     enabledBranchIds,
@@ -325,6 +481,7 @@ export const useWhatsAppStore = defineStore('whatsapp', () => {
     refreshStatus,
     ensureStatus,
     fetchUnreadSummary,
+    fetchAiDiagnostics,
     fetchConversations,
     fetchMessages,
     sendMessage,
@@ -337,6 +494,7 @@ export const useWhatsAppStore = defineStore('whatsapp', () => {
     saveQuickReply,
     deleteQuickReply,
     applyRealtimeMessage,
+    applyAiProcessingChanged,
     clear,
   }
 })
