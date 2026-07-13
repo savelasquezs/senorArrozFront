@@ -1,0 +1,18 @@
+import { flushPromises, mount } from '@vue/test-utils'
+import { describe, expect, it, vi } from 'vitest'
+import WhatsAppAiDiagnosticsDialog from '@/components/whatsapp/WhatsAppAiDiagnosticsDialog.vue'
+
+const { getAiUsage } = vi.hoisted(() => ({ getAiUsage: vi.fn() }))
+vi.mock('@/services/MainAPI/whatsappApi', () => ({ whatsappApi: { getAiUsage } }))
+
+const diagnostics = (branchId = 1) => ({ branchId, agentStatus:'operational',overallStatus:'healthy',title:'IA operativa',summary:'OK',isActive:true,isVerified:true,pendingCount:0,failedCountLast24Hours:0,recentMessages:[] })
+const usage = (overrides:any={}) => ({ totalInvocations:1,incomingMessagesProcessed:1,conversationsServed:1,inputTokens:100,cachedInputTokens:20,outputTokens:30,thinkingTokens:10,billableOutputTokens:40,estimatedCostUsd:.001,unpricedInvocations:0,averageDurationMs:100,p95DurationMs:150,errorRate:0,averageInvocationsPerMessage:1,averageToolCallsPerMessage:2,breakdown:[],daily:[{date:'2026-07-13T00:00:00',invocations:1,inputTokens:100,cachedInputTokens:20,outputTokens:30,thinkingTokens:10,billableOutputTokens:40,estimatedCostUsd:.001,unpricedInvocations:0}],...overrides })
+const mountDialog = (branchId=1) => mount(WhatsAppAiDiagnosticsDialog,{props:{modelValue:true,diagnostics:diagnostics(branchId)},global:{stubs:{BaseDialog:{template:'<div><slot /></div>'},BaseButton:{template:'<button @click="$emit(\'click\')"><slot /></button>'},BaseLoading:{template:'<div>loading</div>'}}}})
+
+describe('WhatsAppAiDiagnosticsDialog usage',()=>{
+  it('loads initially with local date-only filters and renders daily data',async()=>{ getAiUsage.mockResolvedValueOnce({data:usage()}); const w=mountDialog(); await flushPromises(); expect(getAiUsage).toHaveBeenCalled(); const filters=getAiUsage.mock.calls.at(-1)?.[0]; expect(filters.fromDate).toMatch(/^\d{4}-\d{2}-\d{2}$/); expect(filters.toDate).toMatch(/^\d{4}-\d{2}-\d{2}$/); expect(w.text()).toContain('Uso diario'); expect(w.text()).toContain('20'); })
+  it('shows missing-price warning and empty state',async()=>{ getAiUsage.mockResolvedValueOnce({data:usage({totalInvocations:0,unpricedInvocations:2,daily:[]})}); const w=mountDialog(); await flushPromises(); expect(w.text()).toContain('Costo no disponible'); expect(w.text()).toContain('No hay registros'); })
+  it('keeps operational diagnostics when usage fails',async()=>{ getAiUsage.mockRejectedValueOnce(new Error('costos caídos')); const w=mountDialog(); await flushPromises(); expect(w.text()).toContain('IA operativa'); expect(w.text()).toContain('costos caídos'); })
+  it('clears old branch usage and ignores stale response',async()=>{ let resolveOld:any; getAiUsage.mockImplementationOnce(()=>new Promise(r=>resolveOld=r)).mockResolvedValueOnce({data:usage({inputTokens:222})}); const w=mountDialog(1); await w.setProps({diagnostics:diagnostics(2)}); await flushPromises(); resolveOld({data:usage({inputTokens:111})}); await flushPromises(); expect(w.text()).toContain('222'); expect(w.text()).not.toContain('111'); })
+  it('rejects an invalid date range without calling API again',async()=>{ getAiUsage.mockResolvedValueOnce({data:usage()}); const w=mountDialog(); await flushPromises(); const inputs=w.findAll('input[type="date"]'); await inputs[0].setValue('2026-08-02'); await inputs[1].setValue('2026-08-01'); const before=getAiUsage.mock.calls.length; await w.findAll('button').at(-1)!.trigger('click'); expect(getAiUsage).toHaveBeenCalledTimes(before); expect(w.text()).toContain('rango de fechas válido'); })
+})

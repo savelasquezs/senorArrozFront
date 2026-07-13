@@ -87,10 +87,10 @@ export interface WhatsAppAiDiagnostics {
   recentMessages: WhatsAppAiProcessing[]
 }
 
-export interface WhatsAppAiUsageBreakdown { provider: string; model: string; invocations: number; messagesProcessed: number; inputTokens: number; cachedInputTokens: number; outputTokens: number; estimatedCostUsd: number; unpricedInvocations: number; averageDurationMs: number; errorRate: number }
-export interface WhatsAppAiUsageDaily { date: string; invocations: number; inputTokens: number; cachedInputTokens: number; outputTokens: number; estimatedCostUsd: number; unpricedInvocations: number }
-export interface WhatsAppAiUsage { totalInvocations: number; incomingMessagesProcessed: number; conversationsServed: number; inputTokens: number; cachedInputTokens: number; outputTokens: number; estimatedCostUsd: number; unpricedInvocations: number; averageDurationMs: number; p95DurationMs: number; errorRate: number; averageInvocationsPerMessage: number; averageToolCallsPerMessage: number; breakdown: WhatsAppAiUsageBreakdown[]; daily: WhatsAppAiUsageDaily[] }
-export interface WhatsAppAiUsageFilters { branchId?: number; from?: string; to?: string; provider?: string; model?: string }
+export interface WhatsAppAiUsageBreakdown { provider: string; model: string; invocations: number; messagesProcessed: number; inputTokens: number; cachedInputTokens: number; outputTokens: number; thinkingTokens: number; billableOutputTokens: number; estimatedCostUsd: number; unpricedInvocations: number; averageDurationMs: number; errorRate: number }
+export interface WhatsAppAiUsageDaily { date: string; invocations: number; inputTokens: number; cachedInputTokens: number; outputTokens: number; thinkingTokens: number; billableOutputTokens: number; estimatedCostUsd: number; unpricedInvocations: number }
+export interface WhatsAppAiUsage { totalInvocations: number; incomingMessagesProcessed: number; conversationsServed: number; inputTokens: number; cachedInputTokens: number; outputTokens: number; thinkingTokens: number; billableOutputTokens: number; estimatedCostUsd: number; unpricedInvocations: number; averageDurationMs: number; p95DurationMs: number; errorRate: number; averageInvocationsPerMessage: number; averageToolCallsPerMessage: number; breakdown: WhatsAppAiUsageBreakdown[]; daily: WhatsAppAiUsageDaily[] }
+export interface WhatsAppAiUsageFilters { branchId?: number; fromDate?: string; toDate?: string; provider?: string; model?: string }
 
 export interface WhatsAppAiProcessingChangedPayload {
   branchId: number

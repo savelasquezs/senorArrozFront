@@ -140,6 +140,8 @@
               <div v-for="item in usageCards" :key="item.label" class="rounded-lg bg-gray-50 p-3"><dt class="text-xs text-gray-500">{{ item.label }}</dt><dd class="mt-1 font-semibold text-gray-900">{{ item.value }}</dd></div>
             </dl>
             <div class="mt-3 overflow-x-auto"><table class="min-w-full text-left text-xs"><thead><tr class="border-b"><th class="p-2">Proveedor / modelo</th><th class="p-2">Invocaciones</th><th class="p-2">Mensajes</th><th class="p-2">Tokens entrada</th><th class="p-2">Tokens salida</th><th class="p-2">Costo USD</th></tr></thead><tbody><tr v-for="row in usage.breakdown" :key="`${row.provider}-${row.model}`" class="border-b"><td class="p-2">{{ row.provider }} · {{ row.model }}</td><td class="p-2">{{ number(row.invocations) }}</td><td class="p-2">{{ number(row.messagesProcessed) }}</td><td class="p-2">{{ number(row.inputTokens) }}</td><td class="p-2">{{ number(row.outputTokens) }}</td><td class="p-2">{{ money(row.estimatedCostUsd) }}<span v-if="row.unpricedInvocations" class="ml-1 text-amber-700">*</span></td></tr></tbody></table></div>
+            <div v-if="!usage.totalInvocations" class="mt-3 rounded-lg border border-dashed p-5 text-center text-sm text-gray-500">No hay registros de uso para este rango.</div>
+            <div v-else class="mt-3 overflow-x-auto"><h4 class="mb-2 text-xs font-semibold text-gray-700">Uso diario (hora Colombia)</h4><table class="min-w-full text-left text-xs"><thead><tr class="border-b"><th class="p-2">Fecha</th><th class="p-2">Invocaciones</th><th class="p-2">Entrada</th><th class="p-2">Caché</th><th class="p-2">Salida</th><th class="p-2">Pensamiento</th><th class="p-2">Costo</th></tr></thead><tbody><tr v-for="day in usage.daily" :key="day.date" class="border-b"><td class="p-2">{{ day.date.slice(0,10) }}</td><td class="p-2">{{ number(day.invocations) }}</td><td class="p-2">{{ number(day.inputTokens) }}</td><td class="p-2">{{ number(day.cachedInputTokens) }}</td><td class="p-2">{{ number(day.outputTokens) }}</td><td class="p-2">{{ number(day.thinkingTokens) }}</td><td class="p-2">{{ money(day.estimatedCostUsd) }}</td></tr></tbody></table></div>
           </template>
         </section>
       </template>
@@ -181,19 +183,23 @@ const recentMessages = computed(() => sortAiProcessing(props.diagnostics?.recent
 const usage = ref<WhatsAppAiUsage | null>(null)
 const usageLoading = ref(false)
 const usageError = ref<string | null>(null)
-const today = new Date().toISOString().slice(0, 10)
-const monthAgo = new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10)
+function localDate(value: Date) { const y=value.getFullYear(); const m=String(value.getMonth()+1).padStart(2,'0'); const d=String(value.getDate()).padStart(2,'0'); return `${y}-${m}-${d}` }
+const today = localDate(new Date())
+const prior = new Date(); prior.setDate(prior.getDate()-29)
+const monthAgo = localDate(prior)
 const usageFilters = reactive({ from: monthAgo, to: today, provider: '', model: '' })
 const usageCards = computed(() => usage.value ? [
   { label: 'Invocaciones', value: number(usage.value.totalInvocations) }, { label: 'Mensajes procesados', value: number(usage.value.incomingMessagesProcessed) },
   { label: 'Tokens de entrada', value: number(usage.value.inputTokens) }, { label: 'Tokens de salida', value: number(usage.value.outputTokens) },
+  { label: 'Tokens en caché', value: number(usage.value.cachedInputTokens) }, { label: 'Tokens de pensamiento', value: number(usage.value.thinkingTokens) },
   { label: 'Costo estimado', value: money(usage.value.estimatedCostUsd) }, { label: 'Llamadas / mensaje', value: usage.value.averageInvocationsPerMessage.toFixed(2) },
-  { label: 'Latencia promedio', value: `${Math.round(usage.value.averageDurationMs)} ms` }, { label: 'Tasa de errores', value: `${(usage.value.errorRate * 100).toFixed(1)}%` },
+  { label: 'Latencia promedio', value: `${Math.round(usage.value.averageDurationMs)} ms` }, { label: 'Latencia p95', value: `${Math.round(usage.value.p95DurationMs)} ms` }, { label: 'Herramientas / mensaje', value: usage.value.averageToolCallsPerMessage.toFixed(2) }, { label: 'Tasa de errores', value: `${(usage.value.errorRate * 100).toFixed(1)}%` },
 ] : [])
-async function loadUsage() { if (!props.diagnostics?.branchId) return; try { usageLoading.value = true; usageError.value = null; const response = await whatsappApi.getAiUsage({ branchId: props.diagnostics.branchId, from: `${usageFilters.from}T00:00:00Z`, to: `${usageFilters.to}T23:59:59Z`, provider: usageFilters.provider || undefined, model: usageFilters.model || undefined }); usage.value = response.data ?? null } catch (error: any) { usageError.value = error?.message || 'No se pudo consultar el uso de IA.' } finally { usageLoading.value = false } }
+let usageRequest = 0
+async function loadUsage() { const branchId=props.diagnostics?.branchId; if (!branchId) return; if (!usageFilters.from || !usageFilters.to || usageFilters.from>usageFilters.to) { usageError.value='Selecciona un rango de fechas válido.'; return } const request=++usageRequest; try { usageLoading.value=true; usageError.value=null; const response=await whatsappApi.getAiUsage({branchId,fromDate:usageFilters.from,toDate:usageFilters.to,provider:usageFilters.provider||undefined,model:usageFilters.model||undefined}); if(request===usageRequest && props.diagnostics?.branchId===branchId) usage.value=response.data??null } catch(error:any) { if(request===usageRequest) usageError.value=error?.message||'No se pudo consultar el uso de IA.' } finally { if(request===usageRequest) usageLoading.value=false } }
 const number = (value: number) => new Intl.NumberFormat('es-CO').format(value)
 const money = (value: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 4 }).format(value)
-watch(() => [props.modelValue, props.diagnostics?.branchId], ([open]) => { if (open) void loadUsage() }, { immediate: true })
+watch(() => [props.modelValue, props.diagnostics?.branchId], ([open], old) => { if (old?.[1]!==props.diagnostics?.branchId) { usageRequest++; usage.value=null; usageError.value=null } if (open) void loadUsage() }, { immediate: true })
 const diagnosticsToneClasses = computed(() => aiToneClasses[aiDiagnosticsTone(props.diagnostics)])
 const providerModel = computed(() => {
   const provider = props.diagnostics?.provider?.trim()
