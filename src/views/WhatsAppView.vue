@@ -157,6 +157,18 @@
               <BaseButton v-if="canTakeAttention" size="sm" :loading="changingAttention" @click="changeAttention('take')">Tomar conversación</BaseButton>
               <BaseButton v-if="canReturnToAi" variant="secondary" size="sm" :loading="changingAttention" @click="changeAttention('return-to-ai')">Devolver a la IA</BaseButton>
               <BaseButton v-if="canPauseAi" variant="secondary" size="sm" :loading="changingAttention" @click="changeAttention('pause-ai')">Pausar IA</BaseButton>
+              <BaseButton
+                v-if="canResetTestContext"
+                variant="secondary"
+                size="sm"
+                :loading="resettingConversation"
+                :disabled="changingAttention"
+                :icon="ArrowPathIcon"
+                title="Borra mensajes y carrito de IA, pero conserva el cliente y sus direcciones"
+                @click="resetConversationForTesting"
+              >
+                Reiniciar prueba
+              </BaseButton>
               <BaseButton v-if="selectedConversation.attentionMode !== 'closed'" variant="danger" size="sm" :loading="changingAttention" @click="changeAttention('close')">Cerrar conversación</BaseButton>
               <BaseButton v-else size="sm" :loading="changingAttention" @click="changeAttention('reopen')">Reabrir conversación</BaseButton>
               <BaseButton variant="ghost" size="sm" @click="contextPanelCollapsed = !contextPanelCollapsed">{{ contextPanelCollapsed ? 'Abrir pedido' : 'Contraer' }}</BaseButton>
@@ -538,6 +550,7 @@ import { useRoute, useRouter } from 'vue-router'
 import {
   ChatBubbleLeftRightIcon,
   ChatBubbleOvalLeftEllipsisIcon,
+  ArrowPathIcon,
   CpuChipIcon,
   DocumentIcon,
   ExclamationTriangleIcon,
@@ -555,6 +568,7 @@ import AddressSelector from '@/components/customers/address/AddressSelector.vue'
 import WhatsAppAiDiagnosticsDialog from '@/components/whatsapp/WhatsAppAiDiagnosticsDialog.vue'
 import WhatsAppAiStatusStrip from '@/components/whatsapp/WhatsAppAiStatusStrip.vue'
 import { useWhatsAppStore } from '@/store/whatsapp'
+import { useAuthStore } from '@/store/auth'
 import { useOrdersDraftsStore } from '@/store/ordersDrafts'
 import { customerApi } from '@/services/MainAPI/customerApi'
 import { whatsappApi } from '@/services/MainAPI/whatsappApi'
@@ -582,6 +596,7 @@ import {
 } from '@/utils/whatsappAiDiagnostics'
 
 const whatsappStore = useWhatsAppStore()
+const authStore = useAuthStore()
 const ordersStore = useOrdersDraftsStore()
 const router = useRouter()
 const route = useRoute()
@@ -606,6 +621,7 @@ const fileInput = ref<HTMLInputElement | null>(null)
 const sending = ref(false)
 const sendingMenu = ref(false)
 const changingAttention = ref(false)
+const resettingConversation = ref(false)
 const contextLoading = ref(false)
 const creatingCustomer = ref(false)
 const takingOrder = ref(false)
@@ -702,9 +718,35 @@ const signalRDotClass = computed(() => connectionState.value === 'connected'
 const canTakeAttention = computed(() => !!selectedConversation.value && ['ai', 'waitingForHuman', 'paused'].includes(selectedConversation.value.attentionMode))
 const canReturnToAi = computed(() => !!selectedConversation.value && ['human', 'waitingForHuman', 'paused'].includes(selectedConversation.value.attentionMode))
 const canPauseAi = computed(() => selectedConversation.value?.attentionMode === 'ai')
+const canResetTestContext = computed(() => authStore.isSuperadmin || authStore.isAdmin)
 function attentionLabel(conversation: WhatsAppConversation) { const labels: Record<WhatsAppAttentionMode, string> = { ai: 'Atendida por IA', human: 'Atendida por una persona', waitingForHuman: 'Esperando asesor', paused: 'IA pausada', closed: 'Conversación cerrada' }; const label = labels[conversation.attentionMode] || labels.human; return conversation.attentionMode === 'human' && conversation.assignedUserName ? `${label}: ${conversation.assignedUserName}` : label }
 function attentionBadgeClass(mode: WhatsAppAttentionMode) { return { ai: 'bg-violet-100 text-violet-700', human: 'bg-blue-100 text-blue-700', waitingForHuman: 'bg-amber-200 text-amber-900', paused: 'bg-gray-200 text-gray-700', closed: 'bg-red-100 text-red-700' }[mode] }
 async function changeAttention(action: 'take' | 'return-to-ai' | 'pause-ai' | 'close' | 'reopen') { if (!selectedConversation.value) return; try { changingAttention.value = true; await whatsappStore.changeAttention(selectedConversation.value.id, action); await refreshAiDiagnostics() } catch (error: any) { showError('Atención', error.message || 'No se pudo cambiar el estado.') } finally { changingAttention.value = false } }
+async function resetConversationForTesting() {
+  const conversation = selectedConversation.value
+  if (!conversation) return
+  const confirmed = window.confirm(
+    'Se borrarán todos los mensajes y el carrito/contexto de IA de esta conversación. El cliente y sus direcciones se conservarán. ¿Reiniciar la prueba?',
+  )
+  if (!confirmed) return
+
+  try {
+    resettingConversation.value = true
+    const reset = await whatsappStore.resetConversationForTesting(conversation.id)
+    selectedConversation.value = reset
+      ?? whatsappStore.conversations.find(x => x.id === conversation.id)
+      ?? conversation
+    draft.value = ''
+    sendError.value = ''
+    contextError.value = ''
+    addressSelectionNote.value = ''
+    success('Prueba reiniciada', 3000, 'El próximo mensaje del cliente iniciará una conversación nueva para la IA.')
+  } catch (error: any) {
+    showError('Reiniciar prueba', error.message || 'No se pudo reiniciar la conversación.')
+  } finally {
+    resettingConversation.value = false
+  }
+}
 function handleAttentionChanged(payload: WhatsAppAttentionChangedPayload) { if (!payload?.conversation?.id) return; whatsappStore.applyAttentionChanged(payload.conversation); if (selectedConversation.value?.id === payload.conversation.id) selectedConversation.value = whatsappStore.conversations.find(x => x.id === payload.conversation.id) ?? payload.conversation }
 
 function handleAiProcessingChanged(payload: WhatsAppAiProcessingChangedPayload) {

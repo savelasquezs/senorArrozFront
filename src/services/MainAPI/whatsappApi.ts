@@ -72,6 +72,10 @@ class WhatsAppApi extends BaseApi {
   getAttention(conversationId: number) { return this.get<ApiResponse<import('@/types/whatsapp').WhatsAppAttention>>(`/whatsapp/conversations/${conversationId}/attention`) }
   changeAttention(conversationId: number, action: 'take' | 'return-to-ai' | 'pause-ai' | 'request-human' | 'close' | 'reopen') { return this.post<ApiResponse<import('@/types/whatsapp').WhatsAppAttention>>(`/whatsapp/conversations/${conversationId}/${action}`, {}) }
 
+  resetConversationForTesting(conversationId: number): Promise<ApiResponse<WhatsAppConversation>> {
+    return this.delete<ApiResponse<WhatsAppConversation>>(`/whatsapp/conversations/${conversationId}/test-context`)
+  }
+
   linkConversationCustomer(conversationId: number, customerId: number): Promise<ApiResponse<WhatsAppConversation>> {
     return this.post<ApiResponse<WhatsAppConversation>>(`/whatsapp/conversations/${conversationId}/customer`, { customerId })
   }

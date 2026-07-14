@@ -169,6 +169,15 @@ export const useWhatsAppStore = defineStore('whatsapp', () => {
     return res.data
   }
 
+  async function resetConversationForTesting(conversationId: number) {
+    const res = await whatsappApi.resetConversationForTesting(conversationId)
+    const conversation = conversations.value.find(x => x.id === conversationId)
+    if (conversation && res.data) Object.assign(conversation, res.data)
+    messages.value[conversationId] = []
+    delete aiDiagnosticsByConversation.value[conversationId]
+    return res.data
+  }
+
   function applyAttentionChanged(conversation: WhatsAppConversation) {
     const current = conversations.value.find(x => x.id === conversation.id)
     if (current) Object.assign(current, conversation)
@@ -486,6 +495,7 @@ export const useWhatsAppStore = defineStore('whatsapp', () => {
     fetchMessages,
     sendMessage,
     changeAttention,
+    resetConversationForTesting,
     applyAttentionChanged,
     sendMenu,
     sendQuickReply,

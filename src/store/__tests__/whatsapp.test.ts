@@ -7,6 +7,7 @@ const { whatsappApiMock } = vi.hoisted(() => ({
   whatsappApiMock: {
     getStatus: vi.fn(),
     getAiDiagnostics: vi.fn(),
+    resetConversationForTesting: vi.fn(),
   },
 }))
 
@@ -169,5 +170,33 @@ describe('WhatsApp store AI diagnostics', () => {
     expect(store.status).toEqual({ enabled: true, branchIds: [1] })
     expect(store.enabled).toBe(true)
     expect(store.error).toBe('Servicio no disponible')
+  })
+
+  it('clears local messages and diagnostics after resetting a conversation for testing', async () => {
+    const store = useWhatsAppStore()
+    const conversation = {
+      id: 20,
+      branchId: 1,
+      phoneNumber: '573001234567',
+      status: 'closed',
+      unreadCount: 2,
+      createdAt: '2026-07-13T15:00:00Z',
+      updatedAt: '2026-07-13T15:00:00Z',
+      attentionMode: 'closed',
+      attentionModeUpdatedAt: '2026-07-13T15:00:00Z',
+    } as const
+    store.conversations = [conversation]
+    store.messages = { 20: [makeMessage()] }
+    store.aiDiagnosticsByConversation = { 20: makeDiagnostics() }
+    whatsappApiMock.resetConversationForTesting.mockResolvedValue({
+      data: { ...conversation, status: 'open', unreadCount: 0, attentionMode: 'ai' },
+    })
+
+    await store.resetConversationForTesting(20)
+
+    expect(store.messages[20]).toEqual([])
+    expect(store.aiDiagnosticsByConversation[20]).toBeUndefined()
+    expect(store.conversations[0].status).toBe('open')
+    expect(store.conversations[0].attentionMode).toBe('ai')
   })
 })
