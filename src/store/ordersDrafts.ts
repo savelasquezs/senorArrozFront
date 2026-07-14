@@ -28,6 +28,7 @@ import {
 } from '@/config/orderPosCategories'
 import { useBranchPosSettingsStore } from '@/store/branchPosSettings'
 import { useAuthStore } from '@/store/auth'
+import type { WhatsAppOrderDraft } from '@/types/whatsapp'
 import { useDailyPromotionStore } from '@/store/dailyPromotion'
 import {
     deliveryDiscountBudget,
@@ -1434,7 +1435,8 @@ export const useOrdersDraftsStore = defineStore('ordersDrafts', () => {
         conversationId: number
         branchId: number
         customer: Customer
-        address: CustomerAddress
+        address?: CustomerAddress | null
+        draft: WhatsAppOrderDraft
     }): DraftOrder | null => {
         const existing = Array.from(draftOrders.value.values())
             .find((order) => order.whatsappConversationId === payload.conversationId)
@@ -1452,32 +1454,44 @@ export const useOrdersDraftsStore = defineStore('ordersDrafts', () => {
         const authStore = useAuthStore()
         const tabId = `tab-${Date.now()}-${nextTabNumber.value}`
         const tabName = `WhatsApp ${nextTabNumber.value}`
-        const deliveryFee = payload.address.deliveryFee || 0
+        const deliveryFee = payload.draft.orderType === 'delivery' ? payload.draft.deliveryFee : 0
+        const orderItems = payload.draft.items.map((item) => ({
+            tempId: `whatsapp-${payload.conversationId}-${item.productId}`,
+            productId: item.productId,
+            productName: item.name,
+            productPrice: item.unitPrice,
+            quantity: item.quantity,
+            unitPrice: item.unitPrice,
+            discount: 0,
+            freeDeliveryDiscount: 0,
+            subtotal: item.subtotal,
+            notes: item.notes ?? '',
+        }))
         const newOrder: DraftOrder = {
             tabId,
             tabName,
             branchId: payload.branchId || authStore.branchId || null,
             source: 'WhatsApp',
             whatsappConversationId: payload.conversationId,
-            type: 'delivery',
+            type: payload.draft.orderType ?? 'onsite',
             customerId: payload.customer.id,
             customerName: payload.customer.name,
             customerPhone: payload.customer.phone1,
             guestName: payload.customer.name,
-            addressId: payload.address.id,
-            addressDescription: payload.address.address,
-            addressAdditionalInfo: payload.address.additionalInfo ?? null,
+            addressId: payload.address?.id ?? null,
+            addressDescription: payload.address?.address ?? null,
+            addressAdditionalInfo: payload.address?.additionalInfo ?? null,
             deliveryFee,
             freeDeliveryRequested: false,
             reservedFor: null,
             prepareAt: null,
             isLater: false,
             notes: '',
-            orderItems: [],
+            orderItems,
             bankPayments: [],
             appPayment: null,
-            subtotal: 0,
-            total: deliveryFee,
+            subtotal: payload.draft.subtotal,
+            total: payload.draft.total,
             discountTotal: 0,
             createdAt: new Date(),
             updatedAt: new Date(),
@@ -1518,12 +1532,12 @@ export const useOrdersDraftsStore = defineStore('ordersDrafts', () => {
 
         const customerWithAddress = {
             ...payload.customer,
-            addresses: payload.customer.addresses?.length
+            addresses: payload.customer.addresses?.length || !payload.address
                 ? payload.customer.addresses
                 : [payload.address],
         }
         ensureCustomerInList(customerWithAddress)
-        addAddressToCustomer(payload.customer.id, payload.address, customerWithAddress)
+        if (payload.address) addAddressToCustomer(payload.customer.id, payload.address, customerWithAddress)
         draftOrders.value.set(tabId, newOrder)
         currentTabId.value = tabId
         nextTabNumber.value++

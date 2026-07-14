@@ -97,6 +97,48 @@ export interface WhatsAppAiProcessingChangedPayload {
   processing: WhatsAppAiProcessing
 }
 
+export interface WhatsAppOrderDraftItem {
+  productId: number
+  name: string
+  quantity: number
+  unitPrice: number
+  subtotal: number
+  notes?: string | null
+  available: boolean
+}
+
+export interface WhatsAppOrderDraftAddress {
+  id: number
+  address: string
+  additionalInfo?: string | null
+  neighborhood: string
+  deliveryFee: number
+}
+
+export interface WhatsAppOrderDraftActivity {
+  type: string
+  message: string
+  timestamp: string
+}
+
+export interface WhatsAppOrderDraft {
+  conversationId: number
+  branchId: number
+  customerId?: number | null
+  customerName?: string | null
+  phoneNumber: string
+  orderType?: 'onsite' | 'delivery' | null
+  selectedAddressId?: number | null
+  selectedAddress?: WhatsAppOrderDraftAddress | null
+  items: WhatsAppOrderDraftItem[]
+  activities: WhatsAppOrderDraftActivity[]
+  subtotal: number
+  deliveryFee: number
+  total: number
+  totalItems: number
+  updatedAt?: string | null
+}
+
 export interface WhatsAppQuickReply {
   id: number
   branchId: number

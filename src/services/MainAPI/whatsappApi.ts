@@ -10,6 +10,7 @@ import type {
   WhatsAppConversation,
   WhatsAppConversationFilters,
   WhatsAppMessage,
+  WhatsAppOrderDraft,
   WhatsAppQuickReply,
   WhatsAppQuickReplyFilters,
   WhatsAppTemplate,
@@ -68,6 +69,12 @@ class WhatsAppApi extends BaseApi {
 
   getMessages(conversationId: number): Promise<ApiResponse<WhatsAppMessage[]>> {
     return this.get<ApiResponse<WhatsAppMessage[]>>(`/whatsapp/conversations/${conversationId}/messages`)
+  }
+  getOrderDraft(conversationId: number): Promise<ApiResponse<WhatsAppOrderDraft>> {
+    return this.get<ApiResponse<WhatsAppOrderDraft>>(`/whatsapp/conversations/${conversationId}/order-draft`)
+  }
+  updateOrderDraftFulfillment(conversationId: number, orderType: 'onsite' | 'delivery', addressId?: number | null): Promise<ApiResponse<string>> {
+    return this.put<ApiResponse<string>>(`/whatsapp/conversations/${conversationId}/order-draft/fulfillment`, { orderType, addressId: addressId ?? null })
   }
   getAttention(conversationId: number) { return this.get<ApiResponse<import('@/types/whatsapp').WhatsAppAttention>>(`/whatsapp/conversations/${conversationId}/attention`) }
   changeAttention(conversationId: number, action: 'take' | 'return-to-ai' | 'pause-ai' | 'request-human' | 'close' | 'reopen') { return this.post<ApiResponse<import('@/types/whatsapp').WhatsAppAttention>>(`/whatsapp/conversations/${conversationId}/${action}`, {}) }

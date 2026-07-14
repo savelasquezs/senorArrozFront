@@ -369,6 +369,54 @@
                   <p v-if="selectedCustomer.phone2" class="text-sm text-emerald-800">{{ selectedCustomer.phone2 }}</p>
                 </div>
 
+                <section class="space-y-3 rounded-xl border border-gray-200 bg-gray-50 p-3">
+                  <div class="flex items-center justify-between gap-2">
+                    <div>
+                      <p class="text-sm font-semibold text-gray-900">Draft construido por la IA</p>
+                      <p class="text-xs text-gray-500">Se actualiza con cada herramienta ejecutada.</p>
+                    </div>
+                    <span class="rounded-full px-2 py-1 text-[11px] font-semibold" :class="aiDraftOrderTypeClass">
+                      {{ aiDraftOrderTypeLabel }}
+                    </span>
+                  </div>
+
+                  <div v-if="aiOrderDraft?.items.length" class="space-y-2">
+                    <div
+                      v-for="item in aiOrderDraft.items"
+                      :key="item.productId"
+                      class="rounded-lg border border-gray-200 bg-white px-3 py-2"
+                    >
+                      <div class="flex items-start justify-between gap-3">
+                        <div class="min-w-0">
+                          <p class="truncate text-sm font-semibold text-gray-900">{{ item.quantity }} × {{ item.name }}</p>
+                          <p v-if="item.notes" class="mt-0.5 text-xs text-gray-500">{{ item.notes }}</p>
+                          <p v-if="!item.available" class="mt-0.5 text-xs font-semibold text-red-700">No disponible actualmente</p>
+                        </div>
+                        <span class="shrink-0 text-sm font-semibold text-gray-800">{{ formatMoney(item.subtotal) }}</span>
+                      </div>
+                    </div>
+                  </div>
+                  <p v-else class="rounded-lg border border-dashed border-gray-300 bg-white p-3 text-center text-xs text-gray-500">
+                    La IA todavía no ha agregado productos.
+                  </p>
+
+                  <dl class="space-y-1 border-t border-gray-200 pt-2 text-sm">
+                    <div class="flex justify-between"><dt class="text-gray-600">Subtotal</dt><dd class="font-medium">{{ formatMoney(aiOrderDraft?.subtotal || 0) }}</dd></div>
+                    <div v-if="aiOrderDraft?.orderType === 'delivery'" class="flex justify-between"><dt class="text-gray-600">Domicilio</dt><dd class="font-medium">{{ formatMoney(aiOrderDraft.deliveryFee) }}</dd></div>
+                    <div class="flex justify-between text-base"><dt class="font-semibold text-gray-900">Total</dt><dd class="font-bold text-emerald-700">{{ formatMoney(aiOrderDraft?.total || 0) }}</dd></div>
+                  </dl>
+
+                  <div v-if="aiOrderDraft?.activities.length" class="border-t border-gray-200 pt-2">
+                    <p class="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">Decisiones y cambios</p>
+                    <ol class="space-y-2">
+                      <li v-for="activity in aiOrderDraft.activities.slice(0, 8)" :key="`${activity.timestamp}-${activity.message}`" class="flex gap-2 text-xs text-gray-700">
+                        <span class="mt-1 h-2 w-2 shrink-0 rounded-full bg-emerald-500" />
+                        <span>{{ activity.message }}</span>
+                      </li>
+                    </ol>
+                  </div>
+                </section>
+
                 <AddressSelector
                   :customer-id="selectedCustomer.id"
                   :selected-address="selectedAddress?.id || undefined"
@@ -393,7 +441,7 @@
                 <BaseButton
                   class="w-full"
                   variant="primary"
-                  :disabled="!selectedAddress || takingOrder"
+                  :disabled="!canTakeAiDraftOrder || takingOrder"
                   :loading="takingOrder"
                   @click="takeOrderFromWhatsApp"
                 >
@@ -592,6 +640,7 @@ import type {
   WhatsAppAttentionMode,
   WhatsAppConversation,
   WhatsAppMessage,
+  WhatsAppOrderDraft,
   WhatsAppQuickReply,
   WhatsAppRealtimeMessagePayload,
 } from '@/types/whatsapp'
@@ -621,6 +670,7 @@ const statusLoadError = ref('')
 const selectedConversation = ref<WhatsAppConversation | null>(null)
 const selectedCustomer = ref<Customer | null>(null)
 const selectedAddress = ref<CustomerAddress | null>(null)
+const aiOrderDraft = ref<WhatsAppOrderDraft | null>(null)
 const selectedBranchId = ref(0)
 const search = ref('')
 const unreadOnly = ref(false)
@@ -789,6 +839,10 @@ function handleAttentionChanged(payload: WhatsAppAttentionChangedPayload) { if (
 
 function handleAiProcessingChanged(payload: WhatsAppAiProcessingChangedPayload) {
   whatsappStore.applyAiProcessingChanged(payload)
+  if (selectedConversation.value?.id === payload.processing.conversationId
+    && ['completed', 'transferredtohuman', 'failed'].includes(normalizedAiValue(payload.processing.status))) {
+    void loadConversationContext(selectedConversation.value)
+  }
 }
 
 async function refreshAiDiagnostics(showErrors = false) {
@@ -868,6 +922,21 @@ const initialCustomerPhone = computed(() => {
 })
 
 const selectedCustomerAddresses = computed(() => selectedCustomer.value?.addresses ?? [])
+const canTakeAiDraftOrder = computed(() => {
+  if (!selectedCustomer.value || !aiOrderDraft.value?.items.length) return false
+  return aiOrderDraft.value.orderType === 'onsite'
+    || (aiOrderDraft.value.orderType === 'delivery' && !!aiOrderDraft.value.selectedAddressId)
+})
+const aiDraftOrderTypeLabel = computed(() => aiOrderDraft.value?.orderType === 'delivery'
+  ? (aiOrderDraft.value.selectedAddressId ? 'Domicilio' : 'Domicilio · falta dirección')
+  : aiOrderDraft.value?.orderType === 'onsite' ? 'Recoger en local' : 'Tipo pendiente')
+const aiDraftOrderTypeClass = computed(() => aiOrderDraft.value?.orderType === 'delivery'
+  ? 'bg-blue-100 text-blue-800'
+  : aiOrderDraft.value?.orderType === 'onsite' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-900')
+
+function formatMoney(value: number) {
+  return new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(value || 0)
+}
 
 const branchOptions = computed(() => {
   const labels = new Map<number, string>()
@@ -948,6 +1017,7 @@ async function handleRealtimeMessage(payload: WhatsAppRealtimeMessagePayload) {
 
   const activeConversationId = selectedConversation.value?.id ?? null
   const isActiveConversation = activeConversationId === payload.conversation.id
+  const previousCustomerId = isActiveConversation ? selectedConversation.value?.customerId : null
   if (!isActiveConversation && !conversationMatchesCurrentFilters(payload.conversation)) return
 
   whatsappStore.applyRealtimeMessage(payload, activeConversationId)
@@ -957,10 +1027,7 @@ async function handleRealtimeMessage(payload: WhatsAppRealtimeMessagePayload) {
   const refreshed = whatsappStore.conversations.find(c => c.id === payload.conversation.id)
   if (refreshed) {
     selectedConversation.value = refreshed
-  }
-
-  if (payload.message.direction === 'inbound') {
-    applyAddressSelectionFromLatestInboundMessage()
+    if (refreshed.customerId !== previousCustomerId) void loadConversationContext(refreshed)
   }
 
   await scrollToBottom()
@@ -969,12 +1036,14 @@ async function handleRealtimeMessage(payload: WhatsAppRealtimeMessagePayload) {
 async function loadConversationContext(conversation: WhatsAppConversation) {
   selectedCustomer.value = null
   selectedAddress.value = null
+  aiOrderDraft.value = null
   contextError.value = ''
-  if (!conversation.customerId) return
 
   try {
     contextLoading.value = true
     addressSelectionNote.value = ''
+    const loadedDraft = await loadAiOrderDraft(conversation.id)
+    if (!conversation.customerId) return
     const customerRes = await customerApi.getCustomerById(conversation.customerId)
     const customer = customerRes.data
     if (!customer) return
@@ -986,8 +1055,9 @@ async function loadConversationContext(conversation: WhatsAppConversation) {
     }
 
     selectedCustomer.value = { ...customer, addresses }
-    selectedAddress.value = addresses.find(a => a.isPrimary) ?? addresses[0] ?? null
-    applyAddressSelectionFromLatestInboundMessage()
+    selectedAddress.value = loadedDraft?.selectedAddressId
+      ? addresses.find(a => a.id === loadedDraft.selectedAddressId) ?? null
+      : null
   } catch (error: any) {
     contextError.value = error.message || 'No se pudo cargar el cliente.'
   } finally {
@@ -995,7 +1065,14 @@ async function loadConversationContext(conversation: WhatsAppConversation) {
   }
 }
 
-function onContextAddressSelected(address?: CustomerAddress) {
+async function loadAiOrderDraft(conversationId: number) {
+  const response = await whatsappApi.getOrderDraft(conversationId)
+  const loaded = response.data ?? null
+  if (selectedConversation.value?.id === conversationId) aiOrderDraft.value = loaded
+  return loaded
+}
+
+async function onContextAddressSelected(address?: CustomerAddress) {
   selectedAddress.value = address ?? null
   addressSelectionNote.value = address ? 'Dirección seleccionada para el pedido.' : ''
   if (address && selectedCustomer.value) {
@@ -1006,6 +1083,14 @@ function onContextAddressSelected(address?: CustomerAddress) {
       addresses: exists
         ? addresses.map(a => a.id === address.id ? address : a)
         : [...addresses, address],
+    }
+  }
+  if (selectedConversation.value) {
+    try {
+      await whatsappApi.updateOrderDraftFulfillment(selectedConversation.value.id, 'delivery', address?.id)
+      await loadAiOrderDraft(selectedConversation.value.id)
+    } catch (error: any) {
+      contextError.value = error.message || 'No se pudo actualizar la dirección del draft.'
     }
   }
 }
@@ -1255,7 +1340,10 @@ async function createCustomerFromConversation(data: CustomerFormData) {
     selectedConversation.value = linked.data ?? { ...selectedConversation.value, customerId: customer.id, customerName: customer.name }
     selectedCustomer.value = { ...customer, addresses }
     selectedAddress.value = addresses.find(a => a.isPrimary) ?? addresses[0] ?? null
-    applyAddressSelectionFromLatestInboundMessage()
+    if (selectedAddress.value) {
+      await whatsappApi.updateOrderDraftFulfillment(selectedConversation.value.id, 'delivery', selectedAddress.value.id)
+      await loadAiOrderDraft(selectedConversation.value.id)
+    }
     success('Cliente creado', 2500, 'La conversación quedó vinculada al cliente.')
   } catch (error: any) {
     contextError.value = error.message || 'No se pudo crear el cliente.'
@@ -1266,7 +1354,7 @@ async function createCustomerFromConversation(data: CustomerFormData) {
 }
 
 async function takeOrderFromWhatsApp() {
-  if (!selectedConversation.value || !selectedCustomer.value || !selectedAddress.value) return
+  if (!selectedConversation.value || !selectedCustomer.value || !aiOrderDraft.value || !canTakeAiDraftOrder.value) return
   try {
     takingOrder.value = true
     const draftOrder = ordersStore.createOrReuseWhatsAppDraft({
@@ -1274,6 +1362,7 @@ async function takeOrderFromWhatsApp() {
       branchId: selectedConversation.value.branchId,
       customer: selectedCustomer.value,
       address: selectedAddress.value,
+      draft: aiOrderDraft.value,
     })
     if (!draftOrder) {
       showError('Pedido', ordersStore.error || 'No se pudo crear el borrador.')
