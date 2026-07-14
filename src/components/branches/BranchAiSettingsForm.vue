@@ -59,18 +59,9 @@
             :disabled="modelsLoading || modelSelectOptions.length === 0"
             required
           />
-          <BaseInput
-            v-model="form.apiKey"
-            class="lg:col-span-2"
-            type="password"
-            label="Api Key"
-            :placeholder="providerHasConfiguredKey ? 'Api Key configurada. Dejela vacia para conservarla.' : 'Api key del proveedor'"
-            :required="!providerHasConfiguredKey"
-            :maxlength="4096"
-          />
           <div class="lg:col-span-2 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <p class="text-sm text-gray-600">
-              Carga los modelos despues de seleccionar proveedor e ingresar la Api Key.
+              La credencial se obtiene de la variable de entorno configurada en el servidor.
             </p>
             <BaseButton
               type="button"
@@ -109,7 +100,7 @@
           <p class="text-sm font-medium text-gray-900">Estado</p>
           <p class="mt-1 text-sm text-gray-600">{{ statusDescription }}</p>
           <p v-if="setting?.apiKeyConfigured" class="mt-2 text-xs text-gray-500">
-            Api Key guardada: {{ setting.apiKeyMasked || '********' }}
+            Credencial disponible desde: {{ setting.apiKeyMasked || 'variable de entorno' }}
           </p>
           <p
             v-if="modelMessage"
@@ -168,9 +159,7 @@ import type { AiProviderModel, BranchAiSetting, UpsertBranchAiSetting } from '@/
 const props = defineProps<{ branchId: number }>()
 const emit = defineEmits<{ saved: [setting: BranchAiSetting] }>()
 
-type BranchAiSettingsFormState = Omit<UpsertBranchAiSetting, 'apiKey'> & {
-  apiKey: string
-}
+type BranchAiSettingsFormState = UpsertBranchAiSetting
 
 const providerOptions = [
   { value: 'openai', label: 'OpenAI' },
@@ -198,7 +187,6 @@ let suppressModelReset = false
 const form = reactive<BranchAiSettingsFormState>({
   provider: 'openai',
   model: '',
-  apiKey: '',
   isActive: false,
   temperature: null,
   maxContextMessages: 20,
@@ -222,12 +210,10 @@ const modelSelectOptions = computed(() =>
 const canLoadModels = computed(() =>
   !modelsLoading.value
   && !!String(form.provider).trim()
-  && (!!form.apiKey.trim() || providerHasConfiguredKey.value),
 )
 
 const canSave = computed(() => {
   if (!String(form.provider).trim() || !form.model.trim() || form.maxContextMessages <= 0) return false
-  if (!providerHasConfiguredKey.value && !form.apiKey.trim()) return false
   return true
 })
 
@@ -241,7 +227,7 @@ const statusBadge = computed(() => {
 })
 
 const statusDescription = computed(() => {
-  if (!setting.value?.id) return 'No configurado. Guarda proveedor, modelo y credenciales para comenzar.'
+  if (!setting.value?.id) return 'No configurado. Define la credencial en el servidor y guarda proveedor y modelo para comenzar.'
   if (!setting.value.isActive) return 'Inactivo. La configuracion existe, pero no se usara hasta activarla.'
   if (setting.value.isVerified) return 'Conectado. La ultima prueba de configuracion fue correcta.'
   return 'Configurado sin verificar. Usa Probar conexion para validar los datos guardados.'
@@ -252,7 +238,6 @@ function applySetting(next: BranchAiSetting) {
   setting.value = next
   form.provider = next.provider || 'openai'
   form.model = next.model || ''
-  form.apiKey = ''
   form.isActive = next.isActive ?? false
   form.temperature = next.temperature ?? null
   form.maxContextMessages = next.maxContextMessages || 20
@@ -270,11 +255,6 @@ function clearLoadedModels(messageText = '') {
   form.model = ''
   modelMessageType.value = messageText ? 'info' : modelMessageType.value
   modelMessage.value = messageText
-}
-
-function normalizeApiKeyInput(): string | null {
-  const value = form.apiKey.trim()
-  return value.length > 0 ? value : null
 }
 
 async function load() {
@@ -298,21 +278,12 @@ async function loadModels() {
   const provider = String(form.provider).trim()
   if (!provider) return
 
-  if (!form.apiKey.trim() && !providerHasConfiguredKey.value) {
-    modelOptions.value = []
-    modelMessageType.value = 'info'
-    modelMessage.value = 'Ingresa una Api Key para consultar los modelos disponibles del proveedor seleccionado.'
-    return
-  }
-
   try {
     modelsLoading.value = true
     modelMessage.value = ''
     modelMessageType.value = 'info'
-    const apiKey = normalizeApiKeyInput()
     const res = await branchAiSettingsApi.getProviderModels(props.branchId, {
       provider,
-      ...(apiKey ? { apiKey } : {}),
     })
     modelOptions.value = res.data?.models ?? []
 
@@ -346,7 +317,6 @@ async function save(options: { quiet?: boolean } = {}): Promise<BranchAiSetting 
     const payload: UpsertBranchAiSetting = {
       provider: String(form.provider).trim(),
       model: form.model.trim(),
-      apiKey: normalizeApiKeyInput(),
       isActive: form.isActive,
       temperature: form.temperature,
       maxContextMessages: Number(form.maxContextMessages || 20),
@@ -372,7 +342,7 @@ async function save(options: { quiet?: boolean } = {}): Promise<BranchAiSetting 
 }
 
 async function previewPrompt() {
-  const payload: UpsertBranchAiSetting = { provider:String(form.provider),model:form.model,apiKey:normalizeApiKeyInput(),isActive:form.isActive,temperature:form.temperature,maxContextMessages:Number(form.maxContextMessages),assistantName:form.assistantName,promptObjective:form.promptObjective,promptPersonality:form.promptPersonality,promptRequiredRules:form.promptRequiredRules,promptFixedBranchInfo:form.promptFixedBranchInfo,promptAdditionalInstructions:form.promptAdditionalInstructions,transferMessage:form.transferMessage }
+  const payload: UpsertBranchAiSetting = { provider:String(form.provider),model:form.model,isActive:form.isActive,temperature:form.temperature,maxContextMessages:Number(form.maxContextMessages),assistantName:form.assistantName,promptObjective:form.promptObjective,promptPersonality:form.promptPersonality,promptRequiredRules:form.promptRequiredRules,promptFixedBranchInfo:form.promptFixedBranchInfo,promptAdditionalInstructions:form.promptAdditionalInstructions,transferMessage:form.transferMessage }
   try { promptPreview.value = (await branchAiSettingsApi.getPromptPreview(props.branchId,payload)).data.prompt }
   catch (error: any) { message.type = 'error'; message.text = error.message || 'No se pudo generar la previsualización.' }
 }
@@ -415,8 +385,4 @@ watch(() => form.provider, () => {
   clearLoadedModels('Proveedor cambiado. Carga los modelos disponibles para continuar.')
 })
 
-watch(() => form.apiKey, () => {
-  if (suppressModelReset) return
-  clearLoadedModels('Api Key modificada. Vuelve a cargar modelos para usar la nueva credencial.')
-})
 </script>

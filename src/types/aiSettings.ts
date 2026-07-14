@@ -33,7 +33,6 @@ export interface BranchAiSetting {
 export interface UpsertBranchAiSetting {
   provider: AiProvider | string
   model: string
-  apiKey?: string | null
   isActive: boolean
   temperature: number | null
   maxContextMessages: number
@@ -54,7 +53,6 @@ export interface AiTestConnectionResult {
 
 export interface AiModelLookup {
   provider: AiProvider | string
-  apiKey?: string | null
 }
 
 export interface AiProviderModel {
