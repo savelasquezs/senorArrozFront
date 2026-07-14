@@ -238,6 +238,12 @@ async function copyOrderSummaryToClipboard() {
         formatTime,
         formatDateShort,
         guestName: o.guestName,
+        freeGiftProductNames: o.orderItems
+            .filter(item =>
+                item.isDailyPromotionGift === true ||
+                item.isLoyaltyGift === true ||
+                item.isDiscountCodeGift === true)
+            .map(item => item.productName),
         etaPhrase: branchPosSettings.posCopyMessageEtaPhrase,
     })
     try {

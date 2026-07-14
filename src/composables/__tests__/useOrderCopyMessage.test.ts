@@ -92,4 +92,34 @@ describe('buildPosOrderCopyMessage', () => {
         expect(s).toContain('15:30')
         expect(s).toContain('María')
     })
+
+    it('agrega el producto gratis del beneficio y la pregunta por bebida', () => {
+        const s = buildPosOrderCopyMessage({
+            ...base,
+            orderType: 'delivery',
+            isLater: false,
+            addressId: 1,
+            reservedFor: null,
+            freeGiftProductNames: ['Yucas'],
+        })
+        expect(s).toContain('30-45 min.\n\nHoy te llegan unas yuquitas gratis')
+        expect(s).toContain('¿Deseas algo de tomar?')
+    })
+
+    it.each([
+        ['Papas a la francesa', 'unas papitas'],
+        ['Costilla BBQ', 'una costillita'],
+        ['Gaseosa 400 ml', 'una gaseosita'],
+        ['Chicharrón', 'un chicharroncito'],
+    ])('usa el nombre amigable de %s', (productName, expected) => {
+        const s = buildPosOrderCopyMessage({
+            ...base,
+            orderType: 'onsite',
+            isLater: false,
+            addressId: null,
+            reservedFor: null,
+            freeGiftProductNames: [productName],
+        })
+        expect(s).toContain(`Hoy te llegan ${expected} gratis`)
+    })
 })

@@ -18,6 +18,8 @@ export interface BuildPosOrderCopyMessageParams {
     formatTime: (date: string | Date) => string
     formatDateShort: (date: string | Date) => string
     guestName: string | null | undefined
+    /** Nombres de las líneas gratis agregadas por un beneficio. */
+    freeGiftProductNames?: string[]
     /** Texto de ventana aproximada, p. ej. "30-40 min". */
     etaPhrase: string
 }
@@ -42,6 +44,26 @@ function isDeliveryStyle(orderType: OrderType, addressId: number | null): boolea
     return false
 }
 
+function friendlyGiftName(productName: string): string {
+    const normalized = productName.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
+    if (normalized.includes('yuca')) return 'unas yuquitas'
+    if (normalized.includes('papa')) return 'unas papitas'
+    if (normalized.includes('costilla')) return 'una costillita'
+    if (normalized.includes('gaseosa')) return 'una gaseosita'
+    if (normalized.includes('chicharron')) return 'un chicharroncito'
+    return productName.trim()
+}
+
+function appendGiftBenefit(message: string, productNames: string[] | undefined): string {
+    const gifts = [...new Set((productNames ?? []).map(friendlyGiftName).filter(Boolean))]
+    if (gifts.length === 0) return message
+
+    const description = gifts.length === 1
+        ? gifts[0]
+        : `${gifts.slice(0, -1).join(', ')} y ${gifts[gifts.length - 1]}`
+    return `${message}\n\nHoy te llegan ${description} gratis\n¿Deseas algo de tomar?`
+}
+
 /**
  * Construye el texto copiable unificado: onsite (recogida), delivery, reserva con o sin entrega a domicilio.
  */
@@ -56,7 +78,10 @@ export function buildPosOrderCopyMessage(p: BuildPosOrderCopyMessageParams): str
             p.isLater && reserved
                 ? `y lo puedes recoger a las ${p.formatTime(reserved)}.`
                 : `y lo puedes recoger en ${eta}.`
-        return `El total serían ${fc(total)} ${recoger}${guestClaimLine(p.guestName)}`
+        return appendGiftBenefit(
+            `El total serían ${fc(total)} ${recoger}${guestClaimLine(p.guestName)}`,
+            p.freeGiftProductNames,
+        )
     }
 
     if (isDeliveryStyle(p.orderType, p.addressId)) {
@@ -73,7 +98,7 @@ export function buildPosOrderCopyMessage(p: BuildPosOrderCopyMessageParams): str
             arrivalClosings = { plain, pesitos: `, y allá estaremos entonces a las ${t}.` }
         }
 
-        return buildDeliveryCopyMessage({
+        return appendGiftBenefit(buildDeliveryCopyMessage({
             deliveryFee: p.deliveryFee,
             orderTotal: p.orderTotal,
             freeDeliveryRequested: p.freeDeliveryRequested,
@@ -81,15 +106,21 @@ export function buildPosOrderCopyMessage(p: BuildPosOrderCopyMessageParams): str
             formatCurrency: p.formatCurrency,
             etaPhrase: p.etaPhrase,
             arrivalClosings,
-        })
+        }), p.freeGiftProductNames)
     }
 
     if (p.orderType === 'reservation') {
         if (reserved) {
-            return `El total serían ${fc(total)} y allá estaremos entonces el ${p.formatDateShort(reserved)} a las ${p.formatTime(reserved)}.${guestClaimLine(p.guestName)}`
+            return appendGiftBenefit(
+                `El total serían ${fc(total)} y allá estaremos entonces el ${p.formatDateShort(reserved)} a las ${p.formatTime(reserved)}.${guestClaimLine(p.guestName)}`,
+                p.freeGiftProductNames,
+            )
         }
-        return `El total serían ${fc(total)}.${guestClaimLine(p.guestName)}`
+        return appendGiftBenefit(
+            `El total serían ${fc(total)}.${guestClaimLine(p.guestName)}`,
+            p.freeGiftProductNames,
+        )
     }
 
-    return `El total serían ${fc(total)}.`
+    return appendGiftBenefit(`El total serían ${fc(total)}.`, p.freeGiftProductNames)
 }
