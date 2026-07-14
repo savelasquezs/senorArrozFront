@@ -95,7 +95,7 @@ import { useOrderItems } from '@/composables/useOrderItems'
 import { useFormatting } from '@/composables/useFormatting'
 import { useToast } from '@/composables/useToast'
 import { deliveryDiscountBudget } from '@/composables/useFreeDeliveryDiscount'
-import { buildPosOrderCopyMessage } from '@/composables/useOrderCopyMessage'
+import { buildPosOrderCopyMessage, resolveFreeGiftProductNames } from '@/composables/useOrderCopyMessage'
 
 // Components
 import BaseButton from '@/components/ui/BaseButton.vue'
@@ -238,12 +238,7 @@ async function copyOrderSummaryToClipboard() {
         formatTime,
         formatDateShort,
         guestName: o.guestName,
-        freeGiftProductNames: o.orderItems
-            .filter(item =>
-                item.isDailyPromotionGift === true ||
-                item.isLoyaltyGift === true ||
-                item.isDiscountCodeGift === true)
-            .map(item => item.productName),
+        freeGiftProductNames: resolveFreeGiftProductNames(o),
         etaPhrase: branchPosSettings.posCopyMessageEtaPhrase,
     })
     try {

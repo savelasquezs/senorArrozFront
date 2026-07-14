@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
-import { buildPosOrderCopyMessage } from '@/composables/useOrderCopyMessage'
+import { buildPosOrderCopyMessage, resolveFreeGiftProductNames } from '@/composables/useOrderCopyMessage'
+import type { DraftOrder } from '@/types/order'
 
 const fc = (n: number) => `$${n.toLocaleString('es-CO')}`
 const ft = () => '15:30'
@@ -121,5 +122,16 @@ describe('buildPosOrderCopyMessage', () => {
             freeGiftProductNames: [productName],
         })
         expect(s).toContain(`Hoy te llegan ${expected} gratis`)
+    })
+
+    it('recupera el regalo desde los metadatos del beneficio si la línea perdió su marca', () => {
+        const order = {
+            appliedBenefitType: 'DailyPromotion',
+            appliedBenefitRewardType: 'GiftProduct',
+            appliedDailyPromotionGiftProductName: 'Yucas',
+            orderItems: [{ productName: 'Yucas', isDailyPromotionGift: false }],
+        } as DraftOrder
+
+        expect(resolveFreeGiftProductNames(order)).toEqual(['Yucas'])
     })
 })

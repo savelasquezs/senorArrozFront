@@ -2,7 +2,7 @@
  * Mensaje copiable para cliente (WhatsApp, etc.) según tipo de pedido y programación.
  */
 
-import type { OrderType } from '@/types/order'
+import type { DraftOrder, OrderType } from '@/types/order'
 import { buildDeliveryCopyMessage } from '@/composables/useFreeDeliveryDiscount'
 
 export interface BuildPosOrderCopyMessageParams {
@@ -62,6 +62,37 @@ function appendGiftBenefit(message: string, productNames: string[] | undefined):
         ? gifts[0]
         : `${gifts.slice(0, -1).join(', ')} y ${gifts[gifts.length - 1]}`
     return `${message}\n\nHoy te llegan ${description} gratis\n¿Deseas algo de tomar?`
+}
+
+/**
+ * Obtiene el regalo desde las líneas marcadas y, como respaldo, desde los metadatos
+ * persistidos del beneficio. Esto cubre borradores antiguos cuyas líneas no guardaron el flag.
+ */
+export function resolveFreeGiftProductNames(order: DraftOrder): string[] {
+    const marked = order.orderItems
+        .filter(item =>
+            item.isDailyPromotionGift === true ||
+            item.isLoyaltyGift === true ||
+            item.isDiscountCodeGift === true)
+        .map(item => item.productName)
+        .filter(Boolean)
+
+    if (marked.length > 0) return marked
+    const rewardType = order.appliedBenefitRewardType
+        ?? (order.appliedBenefitType === 'DailyPromotion' ? order.appliedDailyPromotionType : null)
+        ?? (order.appliedBenefitType === 'Loyalty' ? order.appliedLoyaltyRewardType : null)
+        ?? (order.appliedBenefitType === 'DiscountCode' ? order.appliedDiscountCodeType : null)
+    if (rewardType?.toLowerCase() !== 'giftproduct') return []
+
+    const benefitName = order.appliedBenefitType === 'DailyPromotion'
+        ? order.appliedDailyPromotionGiftProductName
+        : order.appliedBenefitType === 'Loyalty'
+            ? order.appliedLoyaltyGiftProductName
+            : order.appliedBenefitType === 'DiscountCode'
+                ? order.appliedDiscountCodeGiftProductName
+                : null
+
+    return benefitName?.trim() ? [benefitName] : []
 }
 
 /**
