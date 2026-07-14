@@ -135,7 +135,7 @@
                   {{ formatRelativeConversationTime(conversation.lastMessageAt || conversation.createdAt) }}
                 </span>
               </div>
-              <div class="mt-1"><span class="rounded-full px-2 py-0.5 text-[10px] font-semibold" :class="attentionBadgeClass(conversation.attentionMode)">{{ attentionLabel(conversation) }}</span></div>
+              <div class="mt-1"><span class="rounded-full px-2 py-0.5 text-[10px] font-semibold" :class="attentionBadgeClass(conversation.attentionMode)" :title="attentionTooltip(conversation)">{{ attentionLabel(conversation) }}</span></div>
             </button>
 
             <div v-if="!whatsappStore.isLoadingConversations && whatsappStore.conversations.length === 0" class="p-6 text-center text-sm text-gray-500">
@@ -168,6 +168,14 @@
                 @click="resetConversationForTesting"
               >
                 Reiniciar prueba
+              </BaseButton>
+              <BaseButton
+                variant="secondary"
+                size="sm"
+                :title="latestFailureReason || 'Ver fallos, transferencias y reintentos de la IA'"
+                @click="openAiDiagnostics"
+              >
+                Fallos IA<span v-if="failureActivityCount"> ({{ failureActivityCount }})</span>
               </BaseButton>
               <BaseButton v-if="selectedConversation.attentionMode !== 'closed'" variant="danger" size="sm" :loading="changingAttention" @click="changeAttention('close')">Cerrar conversación</BaseButton>
               <BaseButton v-else size="sm" :loading="changingAttention" @click="changeAttention('reopen')">Reabrir conversación</BaseButton>
@@ -254,6 +262,7 @@
                     class="mt-2 flex flex-wrap items-center gap-1.5 rounded-md px-2 py-1.5 text-[11px] font-medium"
                     :class="aiMessageStatusClasses(message.aiProcessing)"
                     role="status"
+                    :title="aiProcessingReason(message.aiProcessing)"
                   >
                     <CpuChipIcon class="h-3.5 w-3.5 shrink-0" />
                     <span>{{ message.aiProcessing.title || aiValueLabel(message.aiProcessing.status) }}</span>
@@ -680,6 +689,17 @@ const latestAiProcessing = computed(() =>
   sortAiProcessing(currentAiDiagnostics.value?.recentMessages ?? [])[0] ?? null,
 )
 
+const failureActivities = computed(() => sortAiProcessing(
+  currentAiDiagnostics.value?.recentMessages.filter(isFailureActivity) ?? [],
+))
+const failureActivityCount = computed(() => failureActivities.value.length)
+const latestFailureReason = computed(() =>
+  selectedConversation.value?.attentionReason
+  || failureActivities.value[0]?.technicalDetail
+  || failureActivities.value[0]?.detail
+  || '',
+)
+
 const aiStatusChipClasses = computed(() => {
   const classes = aiToneClasses[aiDiagnosticsTone(currentAiDiagnostics.value)]
   return `${classes.surface} ${classes.text}`
@@ -721,6 +741,24 @@ const canPauseAi = computed(() => selectedConversation.value?.attentionMode === 
 const canResetTestContext = computed(() => authStore.isSuperadmin || authStore.isAdmin)
 function attentionLabel(conversation: WhatsAppConversation) { const labels: Record<WhatsAppAttentionMode, string> = { ai: 'Atendida por IA', human: 'Atendida por una persona', waitingForHuman: 'Esperando asesor', paused: 'IA pausada', closed: 'Conversación cerrada' }; const label = labels[conversation.attentionMode] || labels.human; return conversation.attentionMode === 'human' && conversation.assignedUserName ? `${label}: ${conversation.assignedUserName}` : label }
 function attentionBadgeClass(mode: WhatsAppAttentionMode) { return { ai: 'bg-violet-100 text-violet-700', human: 'bg-blue-100 text-blue-700', waitingForHuman: 'bg-amber-200 text-amber-900', paused: 'bg-gray-200 text-gray-700', closed: 'bg-red-100 text-red-700' }[mode] }
+function attentionTooltip(conversation: WhatsAppConversation) {
+  if (conversation.attentionMode !== 'waitingForHuman') return attentionLabel(conversation)
+  return conversation.attentionReason
+    ? `Esperando asesor porque la IA no pudo completar esta acción: ${conversation.attentionReason}`
+    : 'Esperando asesor. Abre “Fallos IA” para consultar qué no pudo completar el agente.'
+}
+function normalizedAiValue(value?: string | null) { return String(value ?? '').replace(/[\s_-]+/g, '').toLowerCase() }
+function isFailureActivity(processing: WhatsAppAiProcessing) {
+  const status = normalizedAiValue(processing.status)
+  return status === 'failed'
+    || status === 'transferredtohuman'
+    || (status === 'ignored' && normalizedAiValue(processing.severity) !== 'neutral')
+    || processing.willRetry
+}
+function aiProcessingReason(processing: WhatsAppAiProcessing) {
+  const reason = processing.technicalDetail || processing.detail
+  return reason ? `${processing.title}: ${reason}` : processing.title
+}
 async function changeAttention(action: 'take' | 'return-to-ai' | 'pause-ai' | 'close' | 'reopen') { if (!selectedConversation.value) return; try { changingAttention.value = true; await whatsappStore.changeAttention(selectedConversation.value.id, action); await refreshAiDiagnostics() } catch (error: any) { showError('Atención', error.message || 'No se pudo cambiar el estado.') } finally { changingAttention.value = false } }
 async function resetConversationForTesting() {
   const conversation = selectedConversation.value
@@ -759,7 +797,7 @@ async function refreshAiDiagnostics(showErrors = false) {
 
   try {
     if (selected) {
-      await whatsappStore.fetchAiDiagnostics(selected.branchId, selected.id, 20)
+      await whatsappStore.fetchAiDiagnostics(selected.branchId, selected.id, 50)
       return
     }
 
@@ -769,7 +807,7 @@ async function refreshAiDiagnostics(showErrors = false) {
     if (!branchIds.length) return
 
     const results = await Promise.allSettled(
-      branchIds.map(branchId => whatsappStore.fetchAiDiagnostics(branchId, null, 20)),
+      branchIds.map(branchId => whatsappStore.fetchAiDiagnostics(branchId, null, 50)),
     )
     const firstFailure = results.find(result => result.status === 'rejected') as PromiseRejectedResult | undefined
     if (firstFailure && results.every(result => result.status === 'rejected')) throw firstFailure.reason

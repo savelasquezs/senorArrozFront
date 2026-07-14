@@ -1,7 +1,7 @@
 <template>
   <BaseDialog
     :model-value="modelValue"
-    title="Actividad de la IA"
+    title="Fallos y actividad de la IA"
     size="2xl"
     @update:model-value="$emit('update:modelValue', $event)"
   >
@@ -73,9 +73,14 @@
 
         <section>
           <div class="mb-2 flex items-center justify-between gap-3">
-            <h3 class="text-sm font-semibold text-gray-900">Mensajes recientes</h3>
-            <span class="text-xs text-gray-500">{{ recentMessages.length }} registros</span>
+            <h3 class="text-sm font-semibold text-gray-900">{{ onlyFailures ? 'Fallos, transferencias y reintentos' : 'Todos los mensajes recientes' }}</h3>
+            <label class="inline-flex items-center gap-2 text-xs font-medium text-gray-700">
+              <input v-model="onlyFailures" type="checkbox" class="h-4 w-4 rounded border-gray-300 text-amber-600" />
+              Solo fallos
+            </label>
           </div>
+
+          <p class="mb-2 text-xs text-gray-500">{{ recentMessages.length }} registros mostrados de {{ allRecentMessages.length }} actividades.</p>
 
           <div v-if="recentMessages.length" class="max-h-[42vh] space-y-2 overflow-y-auto pr-1">
             <article
@@ -117,7 +122,7 @@
             </article>
           </div>
           <div v-else class="rounded-lg border border-dashed border-gray-300 p-6 text-center text-sm text-gray-500">
-            Aún no hay actividad de IA registrada para este alcance.
+            {{ onlyFailures ? 'No hay fallos, transferencias ni reintentos registrados en este alcance.' : 'Aún no hay actividad de IA registrada para este alcance.' }}
           </div>
         </section>
 
@@ -180,7 +185,20 @@ defineEmits<{
   refresh: []
 }>()
 
-const recentMessages = computed(() => sortAiProcessing(props.diagnostics?.recentMessages ?? []))
+const onlyFailures = ref(true)
+const allRecentMessages = computed(() => sortAiProcessing(props.diagnostics?.recentMessages ?? []))
+const recentMessages = computed(() => onlyFailures.value
+  ? allRecentMessages.value.filter(isFailureActivity)
+  : allRecentMessages.value)
+
+function normalized(value?: string | null) { return String(value ?? '').replace(/[\s_-]+/g, '').toLowerCase() }
+function isFailureActivity(processing: WhatsAppAiProcessing) {
+  const status = normalized(processing.status)
+  return status === 'failed'
+    || status === 'transferredtohuman'
+    || (status === 'ignored' && normalized(processing.severity) !== 'neutral')
+    || processing.willRetry
+}
 const usage = ref<WhatsAppAiUsage | null>(null)
 const usageLoading = ref(false)
 const usageError = ref<string | null>(null)
