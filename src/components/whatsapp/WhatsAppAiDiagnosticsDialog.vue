@@ -109,7 +109,12 @@
 
               <div class="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-gray-600">
                 <span>Mensaje #{{ processing.messageId }}</span>
-                <span v-if="processing.maxAttempts > 0">Intento {{ processing.attempts }}/{{ processing.maxAttempts }}</span>
+                <span v-if="processing.willRetry && processing.maxAttempts > 0">
+                  Intento {{ processing.attempts }}/{{ processing.maxAttempts }}
+                </span>
+                <span v-else-if="processing.attempts > 0">
+                  {{ processing.attempts === 1 ? '1 intento realizado' : `${processing.attempts} intentos realizados` }}
+                </span>
                 <span v-if="processing.httpStatusCode">HTTP {{ processing.httpStatusCode }}</span>
                 <span v-if="processing.errorCategory">{{ aiValueLabel(processing.errorCategory) }}</span>
                 <span v-if="processing.nextRetryAt">Próximo intento: {{ formatDate(processing.nextRetryAt) }}</span>
