@@ -131,7 +131,6 @@
             <input v-model="usageFilters.to" type="date" aria-label="Fecha hasta" class="rounded-md border border-gray-300 px-2 py-1.5 text-sm" />
             <input v-model.trim="usageFilters.provider" placeholder="Proveedor" aria-label="Proveedor" class="rounded-md border border-gray-300 px-2 py-1.5 text-sm" />
             <input v-model.trim="usageFilters.model" placeholder="Modelo" aria-label="Modelo" class="rounded-md border border-gray-300 px-2 py-1.5 text-sm" />
-            <select v-model="usageFilters.contextStrategy" aria-label="Estrategia de contexto" class="rounded-md border border-gray-300 px-2 py-1.5 text-sm"><option value="">Todas las estrategias</option><option value="legacy">Actual</option><option value="optimized_v1">Optimizada v1</option></select>
           </div>
           <div v-if="usageError" role="alert" class="rounded-md bg-red-50 p-2 text-sm text-red-700">{{ usageError }}</div>
           <BaseLoading v-else-if="usageLoading && !usage" text="Consultando uso de IA..." />
@@ -189,7 +188,7 @@ function localDate(value: Date) { const y=value.getFullYear(); const m=String(va
 const today = localDate(new Date())
 const prior = new Date(); prior.setDate(prior.getDate()-29)
 const monthAgo = localDate(prior)
-const usageFilters = reactive({ from: monthAgo, to: today, provider: '', model: '', contextStrategy: '' })
+const usageFilters = reactive({ from: monthAgo, to: today, provider: '', model: '' })
 const usageCards = computed(() => usage.value ? [
   { label: 'Invocaciones', value: number(usage.value.totalInvocations) }, { label: 'Mensajes procesados', value: number(usage.value.incomingMessagesProcessed) },
   { label: 'Tokens de entrada', value: number(usage.value.inputTokens) }, { label: 'Tokens de salida', value: number(usage.value.outputTokens) },
@@ -200,7 +199,7 @@ const usageCards = computed(() => usage.value ? [
   { label: 'Latencia promedio', value: `${Math.round(usage.value.averageDurationMs)} ms` }, { label: 'Latencia p95', value: `${Math.round(usage.value.p95DurationMs)} ms` }, { label: 'Herramientas / mensaje', value: usage.value.averageToolCallsPerMessage.toFixed(2) }, { label: 'Tasa de errores', value: `${(usage.value.errorRate * 100).toFixed(1)}%` },
 ] : [])
 let usageRequest = 0
-async function loadUsage() { const branchId=props.diagnostics?.branchId; if (!branchId) return; if (!usageFilters.from || !usageFilters.to || usageFilters.from>usageFilters.to) { usageError.value='Selecciona un rango de fechas válido.'; return } const request=++usageRequest; try { usageLoading.value=true; usageError.value=null; const response=await whatsappApi.getAiUsage({branchId,fromDate:usageFilters.from,toDate:usageFilters.to,provider:usageFilters.provider||undefined,model:usageFilters.model||undefined,contextStrategy:usageFilters.contextStrategy||undefined}); if(request===usageRequest && props.diagnostics?.branchId===branchId) usage.value=response.data??null } catch(error:any) { if(request===usageRequest) usageError.value=error?.message||'No se pudo consultar el uso de IA.' } finally { if(request===usageRequest) usageLoading.value=false } }
+async function loadUsage() { const branchId=props.diagnostics?.branchId; if (!branchId) return; if (!usageFilters.from || !usageFilters.to || usageFilters.from>usageFilters.to) { usageError.value='Selecciona un rango de fechas válido.'; return } const request=++usageRequest; try { usageLoading.value=true; usageError.value=null; const response=await whatsappApi.getAiUsage({branchId,fromDate:usageFilters.from,toDate:usageFilters.to,provider:usageFilters.provider||undefined,model:usageFilters.model||undefined}); if(request===usageRequest && props.diagnostics?.branchId===branchId) usage.value=response.data??null } catch(error:any) { if(request===usageRequest) usageError.value=error?.message||'No se pudo consultar el uso de IA.' } finally { if(request===usageRequest) usageLoading.value=false } }
 const number = (value: number) => new Intl.NumberFormat('es-CO').format(value)
 const money = (value: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 4 }).format(value)
 watch(() => [props.modelValue, props.diagnostics?.branchId], ([open], old) => { if (old?.[1]!==props.diagnostics?.branchId) { usageRequest++; usage.value=null; usageError.value=null } if (open) void loadUsage() }, { immediate: true })

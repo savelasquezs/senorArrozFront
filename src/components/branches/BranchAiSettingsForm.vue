@@ -101,15 +101,9 @@
             :min="1"
             :max="200"
           />
-          <div>
-            <label class="mb-1 block text-sm font-medium text-gray-700" for="context-strategy">Estrategia de contexto</label>
-            <select id="context-strategy" v-model="form.contextStrategy" class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm">
-              <option value="legacy">Actual: historial y herramientas completas</option>
-              <option value="optimized_v1">Optimizada v1: contexto compacto y herramientas dinámicas</option>
-            </select>
-            <p class="mt-1 text-xs text-gray-500">La versión optimizada busca reducir consumo sin modificar precios, productos ni reglas del pedido. Puedes volver a la estrategia actual en cualquier momento.</p>
-          </div>
         </div>
+
+        <p class="text-sm text-gray-500">Arquitectura del agente: Simple v1</p>
 
         <div class="rounded-lg border border-gray-200 bg-gray-50 p-4">
           <p class="text-sm font-medium text-gray-900">Estado</p>
@@ -208,7 +202,6 @@ const form = reactive<BranchAiSettingsFormState>({
   isActive: false,
   temperature: null,
   maxContextMessages: 20,
-  contextStrategy: 'legacy' as 'legacy' | 'optimized_v1',
   assistantName: '', promptObjective: '', promptPersonality: '', promptRequiredRules: '',
   promptFixedBranchInfo: '', promptAdditionalInstructions: '', transferMessage: '',
 })
@@ -263,7 +256,6 @@ function applySetting(next: BranchAiSetting) {
   form.isActive = next.isActive ?? false
   form.temperature = next.temperature ?? null
   form.maxContextMessages = next.maxContextMessages || 20
-  form.contextStrategy = next.contextStrategy || 'legacy'
   form.assistantName = next.assistantName || ''; form.promptObjective = next.promptObjective || ''
   form.promptPersonality = next.promptPersonality || ''; form.promptRequiredRules = next.promptRequiredRules || ''
   form.promptFixedBranchInfo = next.promptFixedBranchInfo || ''; form.promptAdditionalInstructions = next.promptAdditionalInstructions || ''
@@ -358,7 +350,6 @@ async function save(options: { quiet?: boolean } = {}): Promise<BranchAiSetting 
       isActive: form.isActive,
       temperature: form.temperature,
       maxContextMessages: Number(form.maxContextMessages || 20),
-      contextStrategy: form.contextStrategy,
       assistantName: form.assistantName, promptObjective: form.promptObjective, promptPersonality: form.promptPersonality,
       promptRequiredRules: form.promptRequiredRules, promptFixedBranchInfo: form.promptFixedBranchInfo,
       promptAdditionalInstructions: form.promptAdditionalInstructions, transferMessage: form.transferMessage,
@@ -381,7 +372,7 @@ async function save(options: { quiet?: boolean } = {}): Promise<BranchAiSetting 
 }
 
 async function previewPrompt() {
-  const payload: UpsertBranchAiSetting = { provider:String(form.provider),model:form.model,apiKey:normalizeApiKeyInput(),isActive:form.isActive,temperature:form.temperature,maxContextMessages:Number(form.maxContextMessages),contextStrategy:form.contextStrategy,assistantName:form.assistantName,promptObjective:form.promptObjective,promptPersonality:form.promptPersonality,promptRequiredRules:form.promptRequiredRules,promptFixedBranchInfo:form.promptFixedBranchInfo,promptAdditionalInstructions:form.promptAdditionalInstructions,transferMessage:form.transferMessage }
+  const payload: UpsertBranchAiSetting = { provider:String(form.provider),model:form.model,apiKey:normalizeApiKeyInput(),isActive:form.isActive,temperature:form.temperature,maxContextMessages:Number(form.maxContextMessages),assistantName:form.assistantName,promptObjective:form.promptObjective,promptPersonality:form.promptPersonality,promptRequiredRules:form.promptRequiredRules,promptFixedBranchInfo:form.promptFixedBranchInfo,promptAdditionalInstructions:form.promptAdditionalInstructions,transferMessage:form.transferMessage }
   try { promptPreview.value = (await branchAiSettingsApi.getPromptPreview(props.branchId,payload)).data.prompt }
   catch (error: any) { message.type = 'error'; message.text = error.message || 'No se pudo generar la previsualización.' }
 }
