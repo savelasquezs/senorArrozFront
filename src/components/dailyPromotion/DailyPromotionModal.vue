@@ -146,6 +146,7 @@ import BaseSelect from '@/components/ui/BaseSelect.vue'
 import { useDailyPromotionStore } from '@/store/dailyPromotion'
 import { useProductsStore } from '@/store/products'
 import type { DailyPromotion, DailyPromotionDiscountScope, DailyPromotionType, UpsertDailyPromotion } from '@/types/dailyPromotion'
+import { defaultBusinessCalendar } from '@/utils/datetime'
 
 const props = defineProps<{
   modelValue: boolean
@@ -256,8 +257,16 @@ function hydrateForm(promo: DailyPromotion | null) {
   form.discountScope = promo?.discountScope ?? 'AllProducts'
   form.discountProductIds = promo?.discountProducts?.map((p) => p.productId) ?? []
   form.minimumOrderValue = promo?.minimumOrderValue ?? null
-  startsAtLocal.value = toDatetimeLocal(promo?.startsAt ?? new Date().toISOString())
-  endsAtLocal.value = promo?.endsAt ? toDatetimeLocal(promo.endsAt) : ''
+  const promoEnd = promo?.endsAt ? new Date(promo.endsAt).getTime() : null
+  const hasReusableSchedule = promo && (promoEnd == null || promoEnd >= Date.now())
+  if (hasReusableSchedule) {
+    startsAtLocal.value = toDatetimeLocal(promo.startsAt)
+    endsAtLocal.value = promo.endsAt ? toDatetimeLocal(promo.endsAt) : ''
+  } else {
+    const today = defaultBusinessCalendar.todayYmd()
+    startsAtLocal.value = `${today}T10:00`
+    endsAtLocal.value = `${today}T23:59`
+  }
 }
 
 async function handleSave() {
