@@ -93,7 +93,8 @@ export function useOrderItems() {
         const removedBenefitGift =
             removedItem?.isDailyPromotionGift === true ||
             removedItem?.isLoyaltyGift === true ||
-            removedItem?.isDiscountCodeGift === true
+            removedItem?.isDiscountCodeGift === true ||
+            removedItem?.isManualBenefitGift === true
         const updated = {
             ...order,
             orderItems: order.orderItems.filter(item => item.tempId !== itemTempId),
@@ -125,6 +126,10 @@ export function useOrderItems() {
                 removedBenefitGift ? null : order.appliedBenefitAmount,
             appliedBenefitSnapshot:
                 removedBenefitGift ? null : order.appliedBenefitSnapshot,
+            manualBenefitReason:
+                removedBenefitGift ? null : order.manualBenefitReason,
+            manualBenefitGiftProductId:
+                removedBenefitGift ? null : order.manualBenefitGiftProductId,
             selectedBenefitType: removedBenefitGift ? 'None' : order.selectedBenefitType,
         }
         store.recalculateTotals(updated)

@@ -10,7 +10,7 @@ import type { Product, ProductCategory } from './product'
 // ===== TIPOS BÁSICOS =====
 export type OrderType = 'onsite' | 'delivery' | 'reservation'
 export type OrderStatus = 'taken' | 'in_preparation' | 'ready' | 'on_the_way' | 'delivered' | 'cancelled'
-export type AppliedBenefitType = 'DailyPromotion' | 'Loyalty' | 'DiscountCode' | 'None'
+export type AppliedBenefitType = 'DailyPromotion' | 'Loyalty' | 'DiscountCode' | 'Manual' | 'None'
 
 export interface OrderItem {
     tempId: string
@@ -39,6 +39,8 @@ export interface OrderItem {
     discountCodeDiscountPercentage?: number | null
     /** Linea agregada automaticamente por codigo promocional. */
     isDiscountCodeGift?: boolean
+    /** Linea agregada por un regalo discrecional de administrador. */
+    isManualBenefitGift?: boolean
     /** Descuento automático por “domicilio gratis” (reparto en líneas). */
     freeDeliveryDiscount: number
     subtotal: number
@@ -149,6 +151,11 @@ export interface DraftOrder {
     appliedBenefitRewardType?: string | null
     appliedBenefitAmount?: number | null
     appliedBenefitSnapshot?: string | null
+    manualBenefitReason?: string | null
+    manualBenefitGiftProductId?: number | null
+    manualBenefitGrantedByUserId?: number | null
+    manualBenefitGrantedByUserName?: string | null
+    manualBenefitGrantedAt?: string | null
     appliedLoyaltyStepId?: number | null
     appliedLoyaltyStepIndex?: number | null
     appliedLoyaltyRewardType?: string | null
@@ -348,6 +355,11 @@ export interface OrderListItem {
     appliedBenefitRewardType?: string | null
     appliedBenefitAmount?: number | null
     appliedBenefitSnapshot?: string | null
+    manualBenefitReason?: string | null
+    manualBenefitGiftProductId?: number | null
+    manualBenefitGrantedByUserId?: number | null
+    manualBenefitGrantedByUserName?: string | null
+    manualBenefitGrantedAt?: string | null
     summaryLines?: OrderLineSummary[]
 }
 
@@ -435,6 +447,8 @@ export interface CreateOrderDto {
     appliedBenefitRewardType?: string | null
     appliedBenefitAmount?: number | null
     appliedBenefitSnapshot?: string | null
+    manualBenefitReason?: string | null
+    manualBenefitGiftProductId?: number | null
 }
 
 export interface CreateOrderDetailDto {
@@ -477,6 +491,8 @@ export interface UpdateOrderDto {
     appliedBenefitRewardType?: string | null
     appliedBenefitAmount?: number | null
     appliedBenefitSnapshot?: string | null
+    manualBenefitReason?: string | null
+    manualBenefitGiftProductId?: number | null
     deleteReservationAssociatedPayments?: boolean
 }
 

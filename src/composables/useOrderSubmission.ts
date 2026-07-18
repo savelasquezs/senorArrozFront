@@ -69,6 +69,8 @@ export function useOrderSubmission() {
             appliedBenefitRewardType: draft.appliedBenefitRewardType ?? undefined,
             appliedBenefitAmount: draft.appliedBenefitAmount ?? undefined,
             appliedBenefitSnapshot: draft.appliedBenefitSnapshot ?? undefined,
+            manualBenefitReason: draft.manualBenefitReason ?? undefined,
+            manualBenefitGiftProductId: draft.manualBenefitGiftProductId ?? undefined,
             orderDetails,
             bankPayments,
             appPayments,

@@ -475,6 +475,21 @@
 										Quitar beneficio
 									</BaseButton>
 								</div>
+								<div v-if="canGrantManualBenefit" class="space-y-2 border-t border-emerald-200 pt-2">
+									<BaseInput v-model="detailManualBenefitReason" placeholder="Motivo obligatorio del regalo" />
+									<select v-model.number="detailManualGiftProductId" class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm">
+										<option :value="null">Producto de la categoría Regalos</option>
+										<option v-for="product in detailGiftProducts" :key="product.id" :value="product.id">{{ product.name }}</option>
+									</select>
+									<div class="flex gap-2">
+										<BaseButton size="sm" variant="outline" :disabled="savingBenefit || !detailManualBenefitReason.trim() || !detailManualGiftProductId" @click="applyManualGiftToDetail">Regalar producto</BaseButton>
+										<BaseButton v-if="canGiftDetailDelivery" size="sm" variant="outline" :disabled="savingBenefit || !detailManualBenefitReason.trim()" @click="applyManualDeliveryToDetail">Regalar domicilio</BaseButton>
+									</div>
+								</div>
+								<div v-if="order.appliedBenefitType === 'Manual'" class="text-xs text-emerald-800">
+									<p>Motivo: {{ order.manualBenefitReason }}</p>
+									<p v-if="order.manualBenefitGrantedByUserName">Otorgado por {{ order.manualBenefitGrantedByUserName }}<span v-if="order.manualBenefitGrantedAt"> · {{ formatDateTime(order.manualBenefitGrantedAt) }}</span></p>
+								</div>
 							</div>
 						</div>
 					</div>
@@ -834,6 +849,8 @@ import { useOrdersDraftsStore } from '@/store/ordersDrafts';
 import { useOrdersDataStore } from '@/store/ordersData';
 import { useBranchPosSettingsStore } from '@/store/branchPosSettings';
 import { useAuthStore } from '@/store/auth';
+import { useProductsStore } from '@/store/products';
+import type { Product } from '@/types/product';
 import { customerApi } from '@/services/MainAPI/customerApi';
 import { orderApi } from '@/services/MainAPI/orderApi';
 import { discountCodeApi } from '@/services/MainAPI/discountCodeApi';
@@ -873,6 +890,7 @@ import {
 import { ref, computed, watch, onMounted, nextTick } from 'vue';
 const permissions = useOrderPermissions();
 const authStore = useAuthStore();
+const productsStore = useProductsStore();
 const branchPosSettings = useBranchPosSettingsStore();
 const isDeliveryman = computed(() => authStore.userRole === 'Deliveryman');
 const pendingOrderType = ref<'onsite' | 'delivery' | 'reservation' | null>(
@@ -895,6 +913,11 @@ const savingPaidInStore = ref(false);
 const savingBenefit = ref(false);
 const detailDiscountCodeInput = ref('');
 const detailBenefitError = ref('');
+const detailManualBenefitReason = ref('');
+const detailManualGiftProductId = ref<number | null>(null);
+const canGrantManualBenefit = computed(() => authStore.isAdmin || authStore.isSuperadmin);
+const detailGiftProducts = computed(() => productsStore.currentProducts.filter((p) => p.active && p.categoryName.trim().toLocaleLowerCase() === 'regalos'));
+const canGiftDetailDelivery = computed(() => order.value?.type === 'delivery' || (order.value?.type === 'reservation' && order.value?.addressId != null));
 const showRemovePaidInStoreDetailDialog = ref(false);
 const removePaidInStoreDetailLoading = ref(false);
 const showEditPaidInStoreDetailDialog = ref(false);
@@ -1062,6 +1085,8 @@ function buildClearBenefitPayload(sourceOrder: OrderDetailView): UpdateOrderDto 
 		appliedBenefitRewardType: null,
 		appliedBenefitAmount: null,
 		appliedBenefitSnapshot: null,
+		manualBenefitReason: null,
+		manualBenefitGiftProductId: null,
 	};
 }
 
@@ -1098,6 +1123,40 @@ function buildApplyDiscountCodePayload(sourceOrder: OrderDetailView, code: Disco
 		appliedBenefitAmount: code.type === 'PercentageDiscount' ? Number(code.discountPercentage ?? 0) : null,
 		appliedBenefitSnapshot: JSON.stringify(code),
 	};
+}
+
+function buildManualBenefitPayload(sourceOrder: OrderDetailView, rewardType: 'GiftProduct' | 'FreeDelivery', reason: string, product?: Product): UpdateOrderDto {
+	let lines = stripAppliedBenefit(sourceOrder);
+	if (rewardType === 'GiftProduct') {
+		if (!product) throw new Error('Selecciona un producto regalo.');
+		lines.push({ id: 0, productId: product.id, quantity: 1, unitPrice: 0, discount: 0, notes: `Regalo manual: ${reason}`, productName: product.name });
+	} else {
+		lines = applyFreeDeliveryCode(lines, sourceOrder);
+	}
+	return {
+		orderDetails: normalizeDetailLines(lines),
+		freeDeliveryRequested: rewardType === 'FreeDelivery',
+		appliedBenefitType: 'Manual',
+		appliedBenefitLabel: rewardType === 'GiftProduct' ? `Regalo manual: ${product!.name}` : 'Regalo manual: Domicilio gratis',
+		appliedBenefitRewardType: rewardType,
+		appliedBenefitSnapshot: JSON.stringify(product ? { giftProductId: product.id, giftProductName: product.name } : {}),
+		manualBenefitReason: reason,
+		manualBenefitGiftProductId: product?.id ?? null,
+	};
+}
+
+async function applyManualGiftToDetail() {
+	if (!order.value) return;
+	const product = detailGiftProducts.value.find((p) => p.id === detailManualGiftProductId.value);
+	if (!product) return;
+	await updateDetailBenefit(buildManualBenefitPayload(order.value, 'GiftProduct', detailManualBenefitReason.value.trim(), product), `Se regalo ${product.name}.`);
+	detailManualBenefitReason.value = ''; detailManualGiftProductId.value = null;
+}
+
+async function applyManualDeliveryToDetail() {
+	if (!order.value) return;
+	await updateDetailBenefit(buildManualBenefitPayload(order.value, 'FreeDelivery', detailManualBenefitReason.value.trim()), 'Se regalo el domicilio.');
+	detailManualBenefitReason.value = ''; detailManualGiftProductId.value = null;
 }
 
 async function updateDetailBenefit(payload: UpdateOrderDto, successMessage: string) {
@@ -1540,6 +1599,7 @@ onMounted(() => {
 	ordersStore.loadBanks();
 	ordersStore.loadApps();
 	void branchPosSettings.ensureForBranch(authStore.branchId ?? undefined);
+	if (canGrantManualBenefit.value) void productsStore.ensureCatalogLoaded();
 });
 
 const handleStatusChange = async (newStatus: OrderStatus) => {

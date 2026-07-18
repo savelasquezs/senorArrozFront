@@ -183,6 +183,18 @@
                                 </div>
                                 <p v-if="discountCodeError" class="text-xs text-red-600">{{ discountCodeError }}</p>
                             </div>
+                            <div v-if="canGrantManualBenefit" class="space-y-2 border-t border-gray-100 pt-3">
+                                <label class="block text-xs font-medium text-gray-700">Regalo administrativo</label>
+                                <BaseInput v-model="manualBenefitReason" placeholder="Motivo obligatorio" />
+                                <select v-model.number="manualGiftProductId" class="w-full rounded-md border border-gray-300 px-3 py-2 text-xs">
+                                    <option :value="null">Selecciona un producto de Regalos</option>
+                                    <option v-for="product in giftProducts" :key="product.id" :value="product.id">{{ product.name }}</option>
+                                </select>
+                                <div class="flex gap-2">
+                                    <BaseButton variant="outline" size="sm" :disabled="!manualBenefitReason.trim() || !manualGiftProductId" @click="applyManualGift">Regalar producto</BaseButton>
+                                    <BaseButton v-if="canGiftDelivery" variant="outline" size="sm" :disabled="!manualBenefitReason.trim()" @click="applyManualDelivery">Regalar domicilio</BaseButton>
+                                </div>
+                            </div>
                         </div>
                     </div>
                     <PaidInStoreCashPanel
@@ -368,6 +380,7 @@ import { discountCodeApi } from '@/services/MainAPI/discountCodeApi'
 import { buildWhatsAppOrderConfirmationMessage } from '@/composables/useWhatsAppOrderConfirmation'
 import { useBranchPosSettingsStore } from '@/store/branchPosSettings'
 import { useAuthStore } from '@/store/auth'
+import { useProductsStore } from '@/store/products'
 import type { Customer, CustomerAddress } from '@/types/customer'
 import type { DraftOrder } from '@/types/order'
 
@@ -416,6 +429,7 @@ const {
 const router = useRouter()
 const branchPosSettings = useBranchPosSettingsStore()
 const authStore = useAuthStore()
+const productsStore = useProductsStore()
 
 // State
 const showCustomerDetail = ref(false)
@@ -440,6 +454,8 @@ const isSendingWhatsAppConfirmation = ref(false)
 const showBenefitConflictDialog = ref(false)
 const showDraftBenefitForm = ref(false)
 const isValidatingDiscountCode = ref(false)
+const manualBenefitReason = ref('')
+const manualGiftProductId = ref<number | null>(null)
 
 // Computed
 const currentOrder = computed(() => ordersStore.currentOrder)
@@ -451,6 +467,9 @@ const hasAppliedBenefit = computed(() => {
     const type = currentOrder.value?.appliedBenefitType
     return !!type && type !== 'None'
 })
+const canGrantManualBenefit = computed(() => authStore.isAdmin || authStore.isSuperadmin)
+const giftProducts = computed(() => productsStore.currentProducts.filter((p) => p.active && p.categoryName.trim().toLocaleLowerCase() === 'regalos'))
+const canGiftDelivery = computed(() => currentOrder.value?.type === 'delivery' || (currentOrder.value?.type === 'reservation' && currentOrder.value?.addressId != null))
 
 const appliedBenefitText = computed(() => {
     const order = currentOrder.value
@@ -657,6 +676,18 @@ async function removeDiscountCode() {
 
 function toggleDraftBenefitForm() {
     showDraftBenefitForm.value = !showDraftBenefitForm.value
+    if (showDraftBenefitForm.value && canGrantManualBenefit.value) void productsStore.ensureCatalogLoaded()
+}
+
+function applyManualGift() {
+    const product = giftProducts.value.find((p) => p.id === manualGiftProductId.value)
+    if (!product || !ordersStore.applyManualGiftBenefitToCurrentOrder(product, manualBenefitReason.value)) return
+    manualBenefitReason.value = ''; manualGiftProductId.value = null; showDraftBenefitForm.value = false
+}
+
+function applyManualDelivery() {
+    if (!ordersStore.applyManualFreeDeliveryBenefitToCurrentOrder(manualBenefitReason.value)) return
+    manualBenefitReason.value = ''; manualGiftProductId.value = null; showDraftBenefitForm.value = false
 }
 
 async function clearDraftBenefit() {

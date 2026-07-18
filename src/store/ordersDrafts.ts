@@ -21,6 +21,7 @@ import type {
     Bank,
     App,
 } from '@/types/bank'
+import type { Product } from '@/types/product'
 import { useProductCategoriesStore } from './productCategories'
 import {
     getRiceCategoryIdSet,
@@ -475,7 +476,8 @@ export const useOrdersDraftsStore = defineStore('ordersDrafts', () => {
             .filter((item) =>
                 item.isDailyPromotionGift !== true &&
                 item.isLoyaltyGift !== true &&
-                item.isDiscountCodeGift !== true)
+                item.isDiscountCodeGift !== true &&
+                item.isManualBenefitGift !== true)
             .reduce((sum, item) => sum + Math.max(0, item.quantity) * Math.max(0, item.unitPrice), 0)
 
     const applyFreeDeliveryToOrder = (order: DraftOrder): DraftOrder => {
@@ -563,12 +565,14 @@ export const useOrdersDraftsStore = defineStore('ordersDrafts', () => {
         const shouldClearFreeDelivery =
             order.appliedDailyPromotionType === 'FreeDelivery' ||
             order.appliedLoyaltyRewardType === 'FreeDelivery' ||
-            order.appliedDiscountCodeType === 'FreeDelivery'
+            order.appliedDiscountCodeType === 'FreeDelivery' ||
+            (order.appliedBenefitType === 'Manual' && order.appliedBenefitRewardType === 'FreeDelivery')
         const orderItems = order.orderItems
             .filter((item) =>
                 item.isDailyPromotionGift !== true &&
                 item.isLoyaltyGift !== true &&
-                item.isDiscountCodeGift !== true)
+                item.isDiscountCodeGift !== true &&
+                item.isManualBenefitGift !== true)
             .map((item) => {
                 const next = {
                     ...item,
@@ -620,6 +624,8 @@ export const useOrdersDraftsStore = defineStore('ordersDrafts', () => {
             appliedBenefitRewardType: null,
             appliedBenefitAmount: null,
             appliedBenefitSnapshot: null,
+            manualBenefitReason: null,
+            manualBenefitGiftProductId: null,
             selectedBenefitType: options.clearSelection ? null : order.selectedBenefitType ?? null,
             updatedAt: new Date(),
         }
@@ -1161,6 +1167,63 @@ export const useOrdersDraftsStore = defineStore('ordersDrafts', () => {
         return true
     }
 
+    const applyManualGiftBenefitToCurrentOrder = (product: Product, reason: string) => {
+        const order = currentOrder.value
+        if (!order || !reason.trim()) return false
+        const base = clearBenefitEffectsFromOrder(order)
+        const giftItem = {
+            tempId: `manual-benefit-${Date.now()}-${product.id}`,
+            productId: product.id,
+            productName: product.name,
+            productPrice: product.price,
+            quantity: 1,
+            unitPrice: 0,
+            discount: 0,
+            dailyPromotionDiscount: 0,
+            loyaltyDiscount: 0,
+            discountCodeDiscount: 0,
+            freeDeliveryDiscount: 0,
+            subtotal: 0,
+            notes: `Regalo manual: ${reason.trim()}`,
+            isManualBenefitGift: true,
+        }
+        recalculateTotals({
+            ...base,
+            orderItems: [...base.orderItems, giftItem],
+            selectedBenefitType: 'Manual',
+            appliedBenefitType: 'Manual',
+            appliedBenefitLabel: `Regalo manual: ${product.name}`,
+            appliedBenefitRewardType: 'GiftProduct',
+            appliedBenefitSnapshot: JSON.stringify({ giftProductId: product.id, giftProductName: product.name }),
+            manualBenefitReason: reason.trim(),
+            manualBenefitGiftProductId: product.id,
+            updatedAt: new Date(),
+        })
+        saveToLocalStorage()
+        return true
+    }
+
+    const applyManualFreeDeliveryBenefitToCurrentOrder = (reason: string) => {
+        const order = currentOrder.value
+        if (!order || !reason.trim()) return false
+        const eligible = order.type === 'delivery' || (order.type === 'reservation' && order.addressId != null)
+        if (!eligible) return false
+        const base = clearBenefitEffectsFromOrder(order)
+        recalculateTotals({
+            ...base,
+            freeDeliveryRequested: true,
+            selectedBenefitType: 'Manual',
+            appliedBenefitType: 'Manual',
+            appliedBenefitLabel: 'Regalo manual: Domicilio gratis',
+            appliedBenefitRewardType: 'FreeDelivery',
+            manualBenefitReason: reason.trim(),
+            manualBenefitGiftProductId: null,
+            updatedAt: new Date(),
+        })
+        saveToLocalStorage()
+        return true
+    }
+
     // Auto-ajustar pago único al total del pedido
     const autoAdjustSinglePayment = (order: DraftOrder): DraftOrder => {
         // Contar pagos totales
@@ -1611,6 +1674,8 @@ export const useOrdersDraftsStore = defineStore('ordersDrafts', () => {
         applyDailyPromotionToCurrentOrder,
         applyLoyaltyBenefitToCurrentOrder,
         applyDiscountCodeBenefitToCurrentOrder,
+        applyManualGiftBenefitToCurrentOrder,
+        applyManualFreeDeliveryBenefitToCurrentOrder,
         resolveDeliveryFeeFromSelectedAddress,
         createOrReuseWhatsAppDraft,
         recalculateTotals,

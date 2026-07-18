@@ -27,7 +27,8 @@ const realItems = (order: DraftOrder) =>
     order.orderItems.filter((item) =>
         item.isDailyPromotionGift !== true &&
         item.isLoyaltyGift !== true &&
-        item.isDiscountCodeGift !== true)
+        item.isDiscountCodeGift !== true &&
+        item.isManualBenefitGift !== true)
 
 const realItemsCount = (order: DraftOrder) => realItems(order).length
 
@@ -222,6 +223,11 @@ export function useOrderBenefitResolver() {
                 } else if (order.appliedBenefitType === 'DiscountCode') {
                     ordersStore.clearAppliedBenefitForCurrentOrder({ clearSelection: true })
                 }
+                return
+            }
+
+            if (selected === 'Manual' && order.appliedBenefitType === 'Manual') {
+                conflictExists.value = false
                 return
             }
 
