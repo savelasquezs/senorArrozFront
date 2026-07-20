@@ -70,6 +70,14 @@ export const useBranchesStore = defineStore('branches', () => {
 			| 'maxFreeDeliveryDiscount'
 			| 'posCopyEtaMinMinutes'
 			| 'posCopyEtaRangeMinutes'
+			| 'deliveryTrackingAutoCloseTime'
+			| 'deliveryTrackingLightIntervalSeconds'
+			| 'deliveryTrackingActiveIntervalSeconds'
+			| 'deliveryTrackingStayThresholdMinutes'
+			| 'deliveryTrackingStayRadiusMeters'
+			| 'deliveryTrackingAllowedDistanceMeters'
+			| 'deliveryTrackingLocationRetentionDays'
+			| 'deliveryTrackingIncidentRetentionDays'
 		>
 	) => {
 		try {
@@ -101,6 +109,14 @@ export const useBranchesStore = defineStore('branches', () => {
 			| 'maxFreeDeliveryDiscount'
 			| 'posCopyEtaMinMinutes'
 			| 'posCopyEtaRangeMinutes'
+			| 'deliveryTrackingAutoCloseTime'
+			| 'deliveryTrackingLightIntervalSeconds'
+			| 'deliveryTrackingActiveIntervalSeconds'
+			| 'deliveryTrackingStayThresholdMinutes'
+			| 'deliveryTrackingStayRadiusMeters'
+			| 'deliveryTrackingAllowedDistanceMeters'
+			| 'deliveryTrackingLocationRetentionDays'
+			| 'deliveryTrackingIncidentRetentionDays'
 		>
 	) => {
 		try {

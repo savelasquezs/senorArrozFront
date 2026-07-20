@@ -172,6 +172,15 @@ export interface Branch {
     posCopyEtaMinMinutes?: number;
     /** Minutos adicionales al mínimo para el tope (mín + rango → p. ej. 30-45 min). */
     posCopyEtaRangeMinutes?: number;
+    /** Hora local de Colombia para cerrar jornadas de domiciliarios. */
+    deliveryTrackingAutoCloseTime?: string;
+    deliveryTrackingLightIntervalSeconds?: number;
+    deliveryTrackingActiveIntervalSeconds?: number;
+    deliveryTrackingStayThresholdMinutes?: number;
+    deliveryTrackingStayRadiusMeters?: number;
+    deliveryTrackingAllowedDistanceMeters?: number;
+    deliveryTrackingLocationRetentionDays?: number;
+    deliveryTrackingIncidentRetentionDays?: number;
     createdAt: string;
   updatedAt: string;
   totalUsers: number;

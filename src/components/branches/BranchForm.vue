@@ -76,6 +76,47 @@
         </div>
         <p class="text-xs text-gray-500 -mt-2">En «Copiar mensaje» del POS se mostrará por ejemplo «30-45 min» si el mínimo es 30 y el margen 15. Si el margen es 0, solo se indica el mínimo (p. ej. «30 min»).</p>
 
+        <section class="space-y-4 rounded-lg border border-gray-200 bg-gray-50 p-4">
+            <div>
+                <h3 class="font-semibold text-gray-900">Seguimiento de domiciliarios</h3>
+                <p class="mt-1 text-xs text-gray-500">
+                    Reglas aplicadas durante la jornada laboral. La hora de cierre corresponde a Colombia.
+                </p>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <BaseInput v-model="form.deliveryTrackingAutoCloseTime" type="time"
+                    label="Cierre automático" required />
+                <BaseInput :model-value="form.deliveryTrackingLightIntervalSeconds"
+                    @update:model-value="(v) => { form.deliveryTrackingLightIntervalSeconds = positiveInteger(v, 300) }"
+                    type="number" :min="1" :step="1" label="Frecuencia liviana (seg)" />
+                <BaseInput :model-value="form.deliveryTrackingActiveIntervalSeconds"
+                    @update:model-value="(v) => { form.deliveryTrackingActiveIntervalSeconds = positiveInteger(v, 30) }"
+                    type="number" :min="1" :step="1" label="Frecuencia con pedido (seg)" />
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <BaseInput :model-value="form.deliveryTrackingStayThresholdMinutes"
+                    @update:model-value="(v) => { form.deliveryTrackingStayThresholdMinutes = positiveInteger(v, 10) }"
+                    type="number" :min="1" :step="1" label="Permanencia mínima (min)" />
+                <BaseInput :model-value="form.deliveryTrackingStayRadiusMeters"
+                    @update:model-value="(v) => { form.deliveryTrackingStayRadiusMeters = positiveInteger(v, 50) }"
+                    type="number" :min="1" :step="1" label="Radio de permanencia (m)" />
+                <BaseInput :model-value="form.deliveryTrackingAllowedDistanceMeters"
+                    @update:model-value="(v) => { form.deliveryTrackingAllowedDistanceMeters = positiveInteger(v, 50) }"
+                    type="number" :min="1" :step="1" label="Distancia permitida (m)" />
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <BaseInput :model-value="form.deliveryTrackingLocationRetentionDays"
+                    @update:model-value="(v) => { form.deliveryTrackingLocationRetentionDays = positiveInteger(v, 3) }"
+                    type="number" :min="1" :step="1" label="Retención de ubicaciones (días)" />
+                <BaseInput :model-value="form.deliveryTrackingIncidentRetentionDays"
+                    @update:model-value="(v) => { form.deliveryTrackingIncidentRetentionDays = positiveInteger(v, 15) }"
+                    type="number" :min="1" :step="1" label="Retención de incidentes (días)" />
+            </div>
+        </section>
+
         <!-- Validation Info -->
         <BaseAlert v-if="showValidationInfo" variant="info">
             <InformationCircleIcon class="w-5 h-5" />
@@ -141,6 +182,14 @@ interface BranchFormData {
     maxFreeDeliveryDiscount: number
     posCopyEtaMinMinutes: number
     posCopyEtaRangeMinutes: number
+    deliveryTrackingAutoCloseTime: string
+    deliveryTrackingLightIntervalSeconds: number
+    deliveryTrackingActiveIntervalSeconds: number
+    deliveryTrackingStayThresholdMinutes: number
+    deliveryTrackingStayRadiusMeters: number
+    deliveryTrackingAllowedDistanceMeters: number
+    deliveryTrackingLocationRetentionDays: number
+    deliveryTrackingIncidentRetentionDays: number
 }
 
 const emit = defineEmits<{
@@ -160,7 +209,20 @@ const form = reactive({
     maxFreeDeliveryDiscount: 3000,
     posCopyEtaMinMinutes: 30,
     posCopyEtaRangeMinutes: 15,
+    deliveryTrackingAutoCloseTime: '21:00',
+    deliveryTrackingLightIntervalSeconds: 300,
+    deliveryTrackingActiveIntervalSeconds: 30,
+    deliveryTrackingStayThresholdMinutes: 10,
+    deliveryTrackingStayRadiusMeters: 50,
+    deliveryTrackingAllowedDistanceMeters: 50,
+    deliveryTrackingLocationRetentionDays: 3,
+    deliveryTrackingIncidentRetentionDays: 15,
 })
+
+const positiveInteger = (value: unknown, fallback: number) => {
+    const parsed = Math.round(Number(value))
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback
+}
 
 const errors = reactive({
     name: '',
@@ -184,6 +246,14 @@ const isFormValid = computed(() => {
         form.phone1.trim() &&
         form.latitude !== 0 &&
         form.longitude !== 0 &&
+        form.deliveryTrackingAutoCloseTime.length >= 5 &&
+        form.deliveryTrackingLightIntervalSeconds > 0 &&
+        form.deliveryTrackingActiveIntervalSeconds > 0 &&
+        form.deliveryTrackingStayThresholdMinutes > 0 &&
+        form.deliveryTrackingStayRadiusMeters > 0 &&
+        form.deliveryTrackingAllowedDistanceMeters > 0 &&
+        form.deliveryTrackingLocationRetentionDays > 0 &&
+        form.deliveryTrackingIncidentRetentionDays > 0 &&
         isLocationConfirmed.value &&
         !errors.name &&
         !errors.nit &&
@@ -289,6 +359,14 @@ const handleSubmit = () => {
         maxFreeDeliveryDiscount: Math.max(0, Math.round(Number(form.maxFreeDeliveryDiscount) || 0)),
         posCopyEtaMinMinutes: Math.max(0, Math.min(10080, Math.round(Number(form.posCopyEtaMinMinutes) || 0))),
         posCopyEtaRangeMinutes: Math.max(0, Math.min(10080, Math.round(Number(form.posCopyEtaRangeMinutes) || 0))),
+        deliveryTrackingAutoCloseTime: `${form.deliveryTrackingAutoCloseTime.slice(0, 5)}:00`,
+        deliveryTrackingLightIntervalSeconds: form.deliveryTrackingLightIntervalSeconds,
+        deliveryTrackingActiveIntervalSeconds: form.deliveryTrackingActiveIntervalSeconds,
+        deliveryTrackingStayThresholdMinutes: form.deliveryTrackingStayThresholdMinutes,
+        deliveryTrackingStayRadiusMeters: form.deliveryTrackingStayRadiusMeters,
+        deliveryTrackingAllowedDistanceMeters: form.deliveryTrackingAllowedDistanceMeters,
+        deliveryTrackingLocationRetentionDays: form.deliveryTrackingLocationRetentionDays,
+        deliveryTrackingIncidentRetentionDays: form.deliveryTrackingIncidentRetentionDays,
     }
 
     emit('submit', formData)
@@ -347,6 +425,17 @@ watch(
                 typeof newBranch.posCopyEtaRangeMinutes === 'number' && newBranch.posCopyEtaRangeMinutes >= 0
                     ? Math.min(10080, Math.round(newBranch.posCopyEtaRangeMinutes))
                     : 15
+            form.deliveryTrackingAutoCloseTime =
+                typeof newBranch.deliveryTrackingAutoCloseTime === 'string'
+                    ? newBranch.deliveryTrackingAutoCloseTime.slice(0, 5)
+                    : '21:00'
+            form.deliveryTrackingLightIntervalSeconds = positiveInteger(newBranch.deliveryTrackingLightIntervalSeconds, 300)
+            form.deliveryTrackingActiveIntervalSeconds = positiveInteger(newBranch.deliveryTrackingActiveIntervalSeconds, 30)
+            form.deliveryTrackingStayThresholdMinutes = positiveInteger(newBranch.deliveryTrackingStayThresholdMinutes, 10)
+            form.deliveryTrackingStayRadiusMeters = positiveInteger(newBranch.deliveryTrackingStayRadiusMeters, 50)
+            form.deliveryTrackingAllowedDistanceMeters = positiveInteger(newBranch.deliveryTrackingAllowedDistanceMeters, 50)
+            form.deliveryTrackingLocationRetentionDays = positiveInteger(newBranch.deliveryTrackingLocationRetentionDays, 3)
+            form.deliveryTrackingIncidentRetentionDays = positiveInteger(newBranch.deliveryTrackingIncidentRetentionDays, 15)
             if (lat != null && lng != null && lat !== 0 && lng !== 0) {
                 form.latitude = Number(lat)
                 form.longitude = Number(lng)
@@ -369,6 +458,14 @@ watch(
             form.maxFreeDeliveryDiscount = 3000
             form.posCopyEtaMinMinutes = 30
             form.posCopyEtaRangeMinutes = 15
+            form.deliveryTrackingAutoCloseTime = '21:00'
+            form.deliveryTrackingLightIntervalSeconds = 300
+            form.deliveryTrackingActiveIntervalSeconds = 30
+            form.deliveryTrackingStayThresholdMinutes = 10
+            form.deliveryTrackingStayRadiusMeters = 50
+            form.deliveryTrackingAllowedDistanceMeters = 50
+            form.deliveryTrackingLocationRetentionDays = 3
+            form.deliveryTrackingIncidentRetentionDays = 15
             showValidationInfo.value = true
             resetMapState()
             setTimeout(() => {
