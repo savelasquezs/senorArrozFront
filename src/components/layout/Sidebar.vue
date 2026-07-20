@@ -286,6 +286,12 @@ const navigationItems = computed((): NavItem[] => [
 		roles: ['Admin', 'Cashier'],
 	},
 	{
+		name: 'Revisión seguimiento',
+		to: '/delivery-incidents',
+		icon: ClipboardDocumentListIcon,
+		roles: ['Superadmin', 'Admin'],
+	},
+	{
 		name: 'Clientes',
 		to: '/customers',
 		icon: UsersIcon,
