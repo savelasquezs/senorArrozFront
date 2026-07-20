@@ -188,6 +188,7 @@
                 <!-- Users Section -->
                 <BranchMenuSettings v-if="activeBranchSection === 'general'" :branch-id="branchId" />
                 <BranchBusinessHoursForm v-if="canEditBranchProfile && activeBranchSection === 'general'" :branch-id="branchId" />
+                <BranchAuthorizedPlacesSection v-if="canEditBranchProfile && activeBranchSection === 'general'" :branch-id="branchId" />
 
                 <BaseCard v-if="activeBranchSection === 'general'">
                     <BranchUsersTable :users="branch.users" :branch-id="branch.id" @user-created="handleUserCreated"
@@ -422,6 +423,7 @@ import MainLayout from '@/components/layout/MainLayout.vue'
 import BaseCard from '@/components/ui/BaseCard.vue'
 import BranchMenuSettings from '@/components/branches/BranchMenuSettings.vue'
 import BranchBusinessHoursForm from '@/components/branches/BranchBusinessHoursForm.vue'
+import BranchAuthorizedPlacesSection from '@/components/branches/BranchAuthorizedPlacesSection.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseDialog from '@/components/ui/BaseDialog.vue'
 import BaseAlert from '@/components/ui/BaseAlert.vue'
