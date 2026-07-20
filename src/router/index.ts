@@ -286,6 +286,16 @@ const routes: RouteRecordRaw[] = [
         }
     },
     {
+        path: '/delivery-alerts',
+        name: 'DeliveryTrackingAlerts',
+        component: () => import('@/views/DeliveryTrackingAlertsView.vue'),
+        meta: {
+            requiresAuth: true,
+            requiresRole: [UserRole.SUPERADMIN, UserRole.ADMIN],
+            title: 'Alertas de seguimiento'
+        }
+    },
+    {
         path: '/integrations/apps/rappi',
         name: 'RappiOrders',
         component: () => import('@/views/RappiOrdersView.vue'),

@@ -127,6 +127,7 @@ import {
 	ChatBubbleLeftRightIcon,
 	ChevronDownIcon,
 	ChevronRightIcon,
+	ExclamationTriangleIcon,
 } from '@heroicons/vue/24/outline';
 import { UserRole } from '@/types/auth';
 
@@ -289,6 +290,12 @@ const navigationItems = computed((): NavItem[] => [
 		name: 'Revisión seguimiento',
 		to: '/delivery-incidents',
 		icon: ClipboardDocumentListIcon,
+		roles: ['Superadmin', 'Admin'],
+	},
+	{
+		name: 'Alertas seguimiento',
+		to: '/delivery-alerts',
+		icon: ExclamationTriangleIcon,
 		roles: ['Superadmin', 'Admin'],
 	},
 	{
