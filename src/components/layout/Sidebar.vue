@@ -107,6 +107,8 @@ import { useRouter, useRoute } from 'vue-router';
 import { useAuthStore } from '@/store/auth';
 import { useDeliveryStore } from '@/store/delivery';
 import { useWhatsAppStore } from '@/store/whatsapp';
+import { integrationApi } from '@/services/MainAPI/integrationApi';
+import type { RappiConnection } from '@/types/integrations';
 import DeliverymanBranchSidebarBlock from '@/components/delivery/DeliverymanBranchSidebarBlock.vue';
 import {
 	HomeIcon,
@@ -171,6 +173,8 @@ function navChildActive(child: NavChild): boolean {
 const deliveryStore = useDeliveryStore();
 const router = useRouter();
 const expandedGroups = ref<Record<string, boolean>>({});
+const rappiConnection = ref<RappiConnection | null>(null);
+const rappiPending = ref(0);
 
 async function onDeliverymanMiHistorial() {
 	emit('close');
@@ -206,6 +210,9 @@ const branchSectionChildren = computed<NavChild[]>(() => {
 		{ name: 'Info general', to: `${base}?section=general`, section: 'general' },
 		{ name: 'WhatsApp e IA', to: `${base}?section=whatsapp-ai`, section: 'whatsapp-ai' },
 		{ name: 'Bancos y apps', to: `${base}?section=banks-apps`, section: 'banks-apps' },
+		{ name: 'Apps', to: `${base}?section=integration-apps`, section: 'integration-apps' },
+		{ name: 'Factura electrónica', to: `${base}?section=electronic-invoicing`, section: 'electronic-invoicing' },
+		{ name: 'Integraciones de pago', to: `${base}?section=payment-integrations`, section: 'payment-integrations' },
 		{ name: 'Gastos', to: `${base}?section=expenses`, section: 'expenses' },
 		{ name: 'Fidelizacion', to: `${base}?section=loyalty`, section: 'loyalty' },
 		{ name: 'Codigos promo', to: `${base}?section=discount-codes`, section: 'discount-codes' },
@@ -297,6 +304,13 @@ const navigationItems = computed((): NavItem[] => [
 		roles: ['Superadmin', 'Admin', 'Cashier'],
 		exactPath: true,
 	},
+	...(rappiConnection.value?.ready ? [{
+		name: 'Apps',
+		to: '/integrations/apps',
+		icon: ShoppingBagIcon,
+		roles: ['Superadmin', 'Admin', 'Cashier'],
+		children: [{ name: rappiPending.value > 0 ? `Rappi (${rappiPending.value})` : 'Rappi', to: `/integrations/apps/rappi${rappiConnection.value.branchId ? `?branchId=${rappiConnection.value.branchId}` : ''}` }],
+	}] : []),
 	{
 		name: 'Imputación menú',
 		to: '/expenses/menu-attribution',
@@ -342,9 +356,19 @@ function loadWhatsAppStatus() {
 	void whatsappStore.ensureStatus();
 }
 
-onMounted(loadWhatsAppStatus);
+async function loadIntegrationStatus() {
+	if (!authStore.isAuthenticated || !['Superadmin', 'Admin', 'Cashier'].includes(authStore.userRole || '')) return;
+	const routeBranch = currentBranchDetailId.value ? Number(currentBranchDetailId.value) : null;
+	const branchId = authStore.isSuperadmin ? routeBranch : authStore.user?.branchId;
+	if (!branchId) { rappiConnection.value = null; return; }
+	try { const result = await integrationApi.getOperationalStatus(branchId); rappiConnection.value = result.data.rappi ?? null; rappiPending.value = result.data.pending; }
+	catch { rappiConnection.value = null; rappiPending.value = 0; }
+}
+
+onMounted(() => { loadWhatsAppStatus(); void loadIntegrationStatus(); });
 
 watch(() => authStore.isAuthenticated, loadWhatsAppStatus);
+watch(() => [authStore.isAuthenticated, route.path, route.query.section], () => void loadIntegrationStatus());
 
 watch(
 	() => route.path,

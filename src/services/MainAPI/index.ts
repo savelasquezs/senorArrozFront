@@ -9,3 +9,4 @@ export * from './customerApi';
 export * from './bankTransferApi';
 export * from './cashRegisterApi';
 export * from './reservationDepositApi';
+export * from './integrationApi';

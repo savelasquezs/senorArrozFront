@@ -276,6 +276,16 @@ const routes: RouteRecordRaw[] = [
         }
     },
     {
+        path: '/integrations/apps/rappi',
+        name: 'RappiOrders',
+        component: () => import('@/views/RappiOrdersView.vue'),
+        meta: {
+            requiresAuth: true,
+            requiresRole: [UserRole.SUPERADMIN, UserRole.ADMIN, UserRole.CASHIER],
+            title: 'Pedidos Rappi'
+        }
+    },
+    {
         path: '/whatsapp',
         name: 'WhatsApp',
         component: () => import('@/views/WhatsAppView.vue'),

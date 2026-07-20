@@ -167,6 +167,19 @@
                     :branch-id="branchId"
                 />
 
+                <BranchDeliveryAppsSection
+                    v-if="canEditBranchProfile && activeBranchSection === 'integration-apps'"
+                    :branch-id="branchId"
+                />
+
+                <BaseCard v-if="canEditBranchProfile && activeBranchSection === 'electronic-invoicing'">
+                    <div class="py-10 text-center"><h3 class="text-lg font-semibold">Factura electrónica</h3><p class="mt-2 text-sm text-gray-500">Aquí podrás crear y configurar proveedores como Siigo.</p><BaseButton class="mt-4" disabled>Crear proveedor</BaseButton></div>
+                </BaseCard>
+
+                <BaseCard v-if="canEditBranchProfile && activeBranchSection === 'payment-integrations'">
+                    <div class="py-10 text-center"><h3 class="text-lg font-semibold">Integraciones de pago</h3><p class="mt-2 text-sm text-gray-500">Aquí podrás crear y configurar proveedores como Stripe.</p><BaseButton class="mt-4" disabled>Crear proveedor</BaseButton></div>
+                </BaseCard>
+
                 <BranchDiscountCodesSection
                     v-if="canEditBranchProfile && activeBranchSection === 'discount-codes'"
                     :branch-id="branchId"
@@ -417,6 +430,7 @@ import PhoneNumberItem from '@/components/customers/PhoneNumberItem.vue'
 import BranchUsersTable from '@/components/branches/BranchUsersTable.vue'
 import BranchPrintingSection from '@/components/branches/BranchPrintingSection.vue'
 import BranchWhatsAppAiSettingsSection from '@/components/branches/BranchWhatsAppAiSettingsSection.vue'
+import BranchDeliveryAppsSection from '@/components/branches/BranchDeliveryAppsSection.vue'
 import BranchBanksAppsSection from '@/components/branches/BranchBanksAppsSection.vue'
 import BranchExpensesSection from '@/components/branches/BranchExpensesSection.vue'
 import BranchLoyaltySection from '@/components/branches/BranchLoyaltySection.vue'
@@ -515,12 +529,15 @@ const supplierFormLoading = ref(false)
 
 const branchId = computed(() => Number(route.params.id))
 
-type BranchSectionId = 'general' | 'whatsapp-ai' | 'banks-apps' | 'expenses' | 'loyalty' | 'discount-codes' | 'printing'
+type BranchSectionId = 'general' | 'whatsapp-ai' | 'banks-apps' | 'integration-apps' | 'electronic-invoicing' | 'payment-integrations' | 'expenses' | 'loyalty' | 'discount-codes' | 'printing'
 
 const branchSections: Array<{ id: BranchSectionId; label: string }> = [
     { id: 'general', label: 'Info general' },
     { id: 'whatsapp-ai', label: 'WhatsApp e IA' },
     { id: 'banks-apps', label: 'Bancos y apps' },
+    { id: 'integration-apps', label: 'Apps' },
+    { id: 'electronic-invoicing', label: 'Factura electrónica' },
+    { id: 'payment-integrations', label: 'Integraciones de pago' },
     { id: 'expenses', label: 'Gastos' },
     { id: 'loyalty', label: 'Fidelizacion' },
     { id: 'discount-codes', label: 'Codigos promo' },
