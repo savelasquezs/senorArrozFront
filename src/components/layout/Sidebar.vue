@@ -64,7 +64,7 @@
 						</button>
 						<div v-if="expandedGroups[item.name]" class="ml-6 space-y-1">
 							<router-link
-								v-for="child in item.children"
+								v-for="child in visibleChildren(item)"
 								:key="child.name"
 								:to="child.to"
 								:class="[
@@ -127,7 +127,6 @@ import {
 	ChatBubbleLeftRightIcon,
 	ChevronDownIcon,
 	ChevronRightIcon,
-	ExclamationTriangleIcon,
 } from '@heroicons/vue/24/outline';
 import { UserRole } from '@/types/auth';
 
@@ -155,7 +154,12 @@ type NavChild = {
 	name: string;
 	to: string;
 	section?: string;
+	roles?: string[];
 };
+
+function visibleChildren(item: NavItem): NavChild[] {
+	return (item.children ?? []).filter(child => !child.roles || child.roles.includes(authStore.userRole || ''));
+}
 
 function navItemActive(item: NavItem): boolean {
 	const p = route.path;
@@ -284,19 +288,12 @@ const navigationItems = computed((): NavItem[] => [
 		name: 'Gestión Domiciliarios',
 		to: '/deliverymen',
 		icon: TruckIcon,
-		roles: ['Admin', 'Cashier'],
-	},
-	{
-		name: 'Revisión seguimiento',
-		to: '/delivery-incidents',
-		icon: ClipboardDocumentListIcon,
-		roles: ['Superadmin', 'Admin'],
-	},
-	{
-		name: 'Alertas seguimiento',
-		to: '/delivery-alerts',
-		icon: ExclamationTriangleIcon,
-		roles: ['Superadmin', 'Admin'],
+		roles: ['Superadmin', 'Admin', 'Cashier'],
+		children: [
+			{ name: 'Operación diaria', to: '/deliverymen', roles: ['Admin', 'Cashier'] },
+			{ name: 'Revisión seguimiento', to: '/delivery-incidents', roles: ['Superadmin', 'Admin'] },
+			{ name: 'Alertas seguimiento', to: '/delivery-alerts', roles: ['Superadmin', 'Admin'] },
+		],
 	},
 	{
 		name: 'Clientes',
@@ -391,6 +388,12 @@ watch(
 				...expandedGroups.value,
 				Sucursales: true,
 				'Mi sucursal': true,
+			};
+		}
+		if (path === '/deliverymen' || path.startsWith('/delivery-incidents') || path.startsWith('/delivery-alerts')) {
+			expandedGroups.value = {
+				...expandedGroups.value,
+				'Gestión Domiciliarios': true,
 			};
 		}
 	},

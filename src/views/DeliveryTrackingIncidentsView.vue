@@ -1,51 +1,59 @@
 <template>
-  <div class="space-y-5">
-    <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-      <div>
-        <h1 class="text-2xl font-bold text-gray-900">Revisión de seguimiento</h1>
-        <p class="mt-1 text-sm text-gray-500">Permanencias que requieren contexto antes de tomar una decisión.</p>
+  <MainLayout>
+  <div class="space-y-6 p-4 sm:p-6">
+    <header class="overflow-hidden rounded-2xl border border-emerald-100 bg-gradient-to-r from-emerald-50 via-white to-blue-50 p-5 sm:p-6">
+      <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div class="flex items-start gap-4">
+          <div class="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-emerald-100 text-emerald-700 shadow-sm"><MapIcon class="h-6 w-6" /></div>
+          <div>
+            <div class="flex flex-wrap items-center gap-2"><h1 class="text-2xl font-bold tracking-tight text-gray-900">Revisión de seguimiento</h1><span class="rounded-full bg-white/90 px-2.5 py-1 text-xs font-semibold text-gray-600 shadow-sm">{{ totalCount }} casos</span></div>
+            <p class="mt-1 max-w-2xl text-sm leading-6 text-gray-600">Analiza permanencias, recorrido y estado del dispositivo antes de registrar una decisión administrativa.</p>
+          </div>
+        </div>
+        <BaseButton variant="outline" :loading="loading" @click="loadIncidents"><ArrowPathIcon class="h-4 w-4" /> Actualizar</BaseButton>
       </div>
-      <BaseButton variant="outline" :loading="loading" @click="loadIncidents">Actualizar</BaseButton>
-    </div>
+    </header>
 
-    <BaseCard padding="md">
+    <BaseCard padding="lg">
+      <div class="mb-5 flex items-center gap-2"><FunnelIcon class="h-5 w-5 text-emerald-600" /><div><h2 class="font-semibold text-gray-900">Filtrar casos</h2><p class="text-xs text-gray-500">Consulta por estado de revisión y periodo de captura.</p></div></div>
       <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <label v-if="authStore.isSuperadmin" class="text-sm font-medium text-gray-700">
           Sucursal
-          <select v-model="branchId" class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm">
+          <select v-model="branchId" class="mt-1.5 w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100">
             <option value="">Todas</option>
             <option v-for="branch in branches" :key="branch.id" :value="String(branch.id)">{{ branch.name }}</option>
           </select>
         </label>
         <label class="text-sm font-medium text-gray-700">
           Estado
-          <select v-model="reviewStatus" class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm">
+          <select v-model="reviewStatus" class="mt-1.5 w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100">
             <option value="">Todos</option>
             <option v-for="option in reviewStatusOptions" :key="option.value" :value="option.value">{{ option.label }}</option>
           </select>
         </label>
         <label class="text-sm font-medium text-gray-700">
           Desde
-          <input v-model="fromDate" type="date" class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm" />
+          <input v-model="fromDate" type="date" class="mt-1.5 w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100" />
         </label>
         <label class="text-sm font-medium text-gray-700">
           Hasta
-          <input v-model="toDate" type="date" class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm" />
+          <input v-model="toDate" type="date" class="mt-1.5 w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100" />
         </label>
       </div>
       <div class="mt-4 flex justify-end">
-        <BaseButton @click="applyFilters">Aplicar filtros</BaseButton>
+        <BaseButton @click="applyFilters"><MagnifyingGlassIcon class="h-4 w-4" /> Aplicar filtros</BaseButton>
       </div>
     </BaseCard>
 
-    <BaseCard padding="none">
+    <BaseCard padding="none" class="overflow-hidden">
+      <div class="flex items-center justify-between border-b border-gray-100 px-5 py-4"><div><h2 class="font-semibold text-gray-900">Casos encontrados</h2><p class="text-xs text-gray-500">La clasificación automática se presenta como contexto, no como decisión final.</p></div><span class="text-xs font-medium text-gray-500">Página {{ page }}</span></div>
       <BaseLoading v-if="loading" text="Cargando incidentes..." class="py-16" />
       <div v-else-if="loadError" class="p-8 text-center">
         <p class="text-sm text-red-700">{{ loadError }}</p>
         <BaseButton class="mt-4" variant="outline" @click="loadIncidents">Reintentar</BaseButton>
       </div>
-      <div v-else-if="items.length === 0" class="p-12 text-center text-sm text-gray-500">
-        No hay incidentes con los filtros seleccionados.
+      <div v-else-if="items.length === 0" class="p-14 text-center">
+        <ClipboardDocumentCheckIcon class="mx-auto h-12 w-12 text-gray-300" /><p class="mt-3 font-medium text-gray-700">No hay casos pendientes</p><p class="mt-1 text-sm text-gray-500">No se encontraron incidentes con los filtros seleccionados.</p>
       </div>
       <template v-else>
         <div class="hidden overflow-x-auto md:block">
@@ -61,10 +69,11 @@
               </tr>
             </thead>
             <tbody class="divide-y divide-gray-100 bg-white">
-              <tr v-for="incident in items" :key="incident.id" class="hover:bg-gray-50">
+              <tr v-for="incident in items" :key="incident.id" class="transition-colors hover:bg-emerald-50/40">
                 <td class="px-4 py-3">
-                  <p class="font-semibold text-gray-900">{{ incident.deliverymanName }}</p>
+                  <div class="flex items-center gap-3"><div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-100 font-semibold text-emerald-700">{{ incident.deliverymanName.charAt(0).toUpperCase() }}</div><div><p class="font-semibold text-gray-900">{{ incident.deliverymanName }}</p>
                   <p class="text-xs text-gray-500">{{ incident.branchName }} · Jornada #{{ incident.workSessionId }}</p>
+                  </div></div>
                 </td>
                 <td class="px-4 py-3">
                   <p>{{ formatDateTime(incident.startedAt) }}</p>
@@ -206,10 +215,12 @@
       </div>
     </BaseDialog>
   </div>
+  </MainLayout>
 </template>
 
 <script setup lang="ts">
 import { defineComponent, h, onMounted, reactive, ref } from 'vue'
+import MainLayout from '@/components/layout/MainLayout.vue'
 import BaseBadge from '@/components/ui/BaseBadge.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseCard from '@/components/ui/BaseCard.vue'
@@ -217,6 +228,7 @@ import BaseDialog from '@/components/ui/BaseDialog.vue'
 import BaseLoading from '@/components/ui/BaseLoading.vue'
 import BasePagination from '@/components/ui/BasePaginatiopn.vue'
 import DeliveryIncidentEvidenceMap from '@/components/delivery/DeliveryIncidentEvidenceMap.vue'
+import { ArrowPathIcon, ClipboardDocumentCheckIcon, FunnelIcon, MagnifyingGlassIcon, MapIcon } from '@heroicons/vue/24/outline'
 import { useAuthStore } from '@/store/auth'
 import { branchApi } from '@/services/MainAPI/branchApi'
 import { useToast } from '@/composables/useToast'
