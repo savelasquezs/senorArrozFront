@@ -1,8 +1,8 @@
 {
-  "versionName": "1.2.1",
-  "buildNumber": 5,
+  "versionName": "1.2.2",
+  "buildNumber": 6,
   "apkFileName": "senor-arroz-domiciliarios.apk",
   "apkUrl": "/senor-arroz-domiciliarios.apk",
   "minimumBuild": 1,
-  "message": "1.2.1: manifiesto de actualización con URL por defecto (sin configurar). En preparación: domicilios Tomado y En preparación, más urgentes arriba, por barrio. Descarga e instala encima (no hace falta desinstalar)."
+  "message": "1.2.2: seguimiento activo hasta regresar a la sucursal, rutas actualizadas al recibir asignaciones y notificaciones para domiciliarios disponibles dentro de la sucursal. Descarga e instala encima; no hace falta desinstalar."
 }
