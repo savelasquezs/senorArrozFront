@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { buildPosOrderCopyMessage, resolveFreeGiftProductNames } from '@/composables/useOrderCopyMessage'
+import { buildPosOrderCopyMessage, resolveBenefitDiscountPercentage, resolveFreeGiftProductNames } from '@/composables/useOrderCopyMessage'
 import type { DraftOrder } from '@/types/order'
 
 const fc = (n: number) => `$${n.toLocaleString('es-CO')}`
@@ -133,5 +133,29 @@ describe('buildPosOrderCopyMessage', () => {
         } as DraftOrder
 
         expect(resolveFreeGiftProductNames(order)).toEqual(['Yucas'])
+    })
+
+    it('incluye el porcentaje, el total final y el tiempo en delivery', () => {
+        const s = buildPosOrderCopyMessage({
+            ...base,
+            orderType: 'delivery',
+            isLater: false,
+            addressId: 1,
+            reservedFor: null,
+            benefitDiscountPercentage: 5,
+        })
+
+        expect(s).toBe('Hoy tienes 5% de descuento, el domicilio tiene un costo de $3.000, en total pagas $64.000 y llega en 30-45 min.')
+    })
+
+    it('resuelve el porcentaje desde los metadatos del beneficio aplicado', () => {
+        const order = {
+            appliedBenefitType: 'DailyPromotion',
+            appliedBenefitRewardType: 'PercentageDiscount',
+            appliedBenefitAmount: 5,
+            orderItems: [],
+        } as unknown as DraftOrder
+
+        expect(resolveBenefitDiscountPercentage(order)).toBe(5)
     })
 })

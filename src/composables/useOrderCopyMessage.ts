@@ -20,6 +20,8 @@ export interface BuildPosOrderCopyMessageParams {
     guestName: string | null | undefined
     /** Nombres de las líneas gratis agregadas por un beneficio. */
     freeGiftProductNames?: string[]
+    /** Porcentaje de descuento aplicado por promo, fidelización o código. */
+    benefitDiscountPercentage?: number | null
     /** Texto de ventana aproximada, p. ej. "30-40 min". */
     etaPhrase: string
 }
@@ -64,6 +66,36 @@ function appendGiftBenefit(message: string, productNames: string[] | undefined):
     return `${message}\n\nHoy te llegan ${description} gratis\n¿Deseas algo de tomar?`
 }
 
+function applyPercentageBenefit(
+    message: string,
+    percentage: number | null | undefined,
+    total: number,
+    formatCurrency: (amount: number) => string,
+): string {
+    const value = Number(percentage)
+    if (!Number.isFinite(value) || value <= 0) return message
+
+    const formattedPercentage = Number.isInteger(value)
+        ? String(value)
+        : value.toLocaleString('es-CO', { maximumFractionDigits: 2 })
+    const formattedTotal = formatCurrency(total)
+    const withFinalTotal = message
+        .replace(`El total serían ${formattedTotal}`, `En total pagas ${formattedTotal}`)
+        .replace(`serían ${formattedTotal}`, `en total pagas ${formattedTotal}`)
+    const continuation = withFinalTotal.charAt(0).toLowerCase() + withFinalTotal.slice(1)
+    return `Hoy tienes ${formattedPercentage}% de descuento, ${continuation}`
+}
+
+function finalizeBenefitMessage(message: string, p: BuildPosOrderCopyMessageParams, total: number): string {
+    const withDiscount = applyPercentageBenefit(
+        message,
+        p.benefitDiscountPercentage,
+        total,
+        p.formatCurrency,
+    )
+    return appendGiftBenefit(withDiscount, p.freeGiftProductNames)
+}
+
 /**
  * Obtiene el regalo desde las líneas marcadas y, como respaldo, desde los metadatos
  * persistidos del beneficio. Esto cubre borradores antiguos cuyas líneas no guardaron el flag.
@@ -95,6 +127,21 @@ export function resolveFreeGiftProductNames(order: DraftOrder): string[] {
     return benefitName?.trim() ? [benefitName] : []
 }
 
+export function resolveBenefitDiscountPercentage(order: DraftOrder): number | null {
+    const rewardType = order.appliedBenefitRewardType
+        ?? (order.appliedBenefitType === 'DailyPromotion' ? order.appliedDailyPromotionType : null)
+        ?? (order.appliedBenefitType === 'Loyalty' ? order.appliedLoyaltyRewardType : null)
+        ?? (order.appliedBenefitType === 'DiscountCode' ? order.appliedDiscountCodeType : null)
+    if (rewardType?.toLowerCase() !== 'percentagediscount') return null
+
+    const value = order.appliedBenefitAmount
+        ?? (order.appliedBenefitType === 'DailyPromotion' ? order.appliedDailyPromotionDiscountPercentage : null)
+        ?? (order.appliedBenefitType === 'Loyalty' ? order.appliedLoyaltyDiscountPercentage : null)
+        ?? (order.appliedBenefitType === 'DiscountCode' ? order.appliedDiscountCodeDiscountPercentage : null)
+    const percentage = Number(value)
+    return Number.isFinite(percentage) && percentage > 0 ? percentage : null
+}
+
 /**
  * Construye el texto copiable unificado: onsite (recogida), delivery, reserva con o sin entrega a domicilio.
  */
@@ -109,9 +156,10 @@ export function buildPosOrderCopyMessage(p: BuildPosOrderCopyMessageParams): str
             p.isLater && reserved
                 ? `y lo puedes recoger a las ${p.formatTime(reserved)}.`
                 : `y lo puedes recoger en ${eta}.`
-        return appendGiftBenefit(
+        return finalizeBenefitMessage(
             `El total serían ${fc(total)} ${recoger}${guestClaimLine(p.guestName)}`,
-            p.freeGiftProductNames,
+            p,
+            total,
         )
     }
 
@@ -129,7 +177,7 @@ export function buildPosOrderCopyMessage(p: BuildPosOrderCopyMessageParams): str
             arrivalClosings = { plain, pesitos: `, y allá estaremos entonces a las ${t}.` }
         }
 
-        return appendGiftBenefit(buildDeliveryCopyMessage({
+        return finalizeBenefitMessage(buildDeliveryCopyMessage({
             deliveryFee: p.deliveryFee,
             orderTotal: p.orderTotal,
             freeDeliveryRequested: p.freeDeliveryRequested,
@@ -137,21 +185,23 @@ export function buildPosOrderCopyMessage(p: BuildPosOrderCopyMessageParams): str
             formatCurrency: p.formatCurrency,
             etaPhrase: p.etaPhrase,
             arrivalClosings,
-        }), p.freeGiftProductNames)
+        }), p, total)
     }
 
     if (p.orderType === 'reservation') {
         if (reserved) {
-            return appendGiftBenefit(
+            return finalizeBenefitMessage(
                 `El total serían ${fc(total)} y allá estaremos entonces el ${p.formatDateShort(reserved)} a las ${p.formatTime(reserved)}.${guestClaimLine(p.guestName)}`,
-                p.freeGiftProductNames,
+                p,
+                total,
             )
         }
-        return appendGiftBenefit(
+        return finalizeBenefitMessage(
             `El total serían ${fc(total)}.${guestClaimLine(p.guestName)}`,
-            p.freeGiftProductNames,
+            p,
+            total,
         )
     }
 
-    return appendGiftBenefit(`El total serían ${fc(total)}.`, p.freeGiftProductNames)
+    return finalizeBenefitMessage(`El total serían ${fc(total)}.`, p, total)
 }
