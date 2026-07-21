@@ -767,6 +767,12 @@ const routeTimeFormatter = new Intl.DateTimeFormat('es-CO', {
     minute: '2-digit',
     hour12: true,
 })
+const routeDayFormatter = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Bogota',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+})
 const routeClock = ref(Date.now())
 let routeClockTimer: ReturnType<typeof setInterval> | null = null
 onMounted(() => {
@@ -789,9 +795,20 @@ const routeTimingText = (orders: OrderListItem[]) => {
     const route = orders.find((o) => o.deliveryRouteStartedAtUtc) ?? orders[0]
     if (!route?.deliveryRouteStartedAtUtc) return ''
 
-    const startedAt = new Date(route.deliveryRouteStartedAtUtc)
+    let startedAt = new Date(route.deliveryRouteStartedAtUtc)
     const metaSeconds = route.deliveryRouteMetaDurationSeconds
     const completedAtValue = route.deliveryRouteCompletedAtUtc
+    const isStaleActiveRoute = !completedAtValue
+        && routeDayFormatter.format(startedAt) !== routeDayFormatter.format(routeClock.value)
+    if (isStaleActiveRoute) {
+        const currentOrderStarts = orders
+            .map((o) => o.statusTimes?.ontheway ?? o.statusTimes?.delivery_man_assigned)
+            .filter((value): value is string => Boolean(value))
+            .map((value) => new Date(value))
+            .filter((value) => routeDayFormatter.format(value) === routeDayFormatter.format(routeClock.value))
+            .sort((a, b) => a.getTime() - b.getTime())
+        if (currentOrderStarts.length > 0) startedAt = currentOrderStarts[0]!
+    }
     const parts = [`salió a las ${formatRouteTime(startedAt)}`]
 
     if (completedAtValue) {
