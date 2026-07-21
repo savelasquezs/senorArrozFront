@@ -317,6 +317,10 @@ export interface OrderListItem {
     deliveryRouteId?: number | null
     /** Avisos al consolidar la ruta (saltos de línea), desde delivery_route.planning_warnings. */
     deliveryRoutePlanningWarnings?: string | null
+    deliveryRouteStartedAtUtc?: string | null
+    deliveryRouteCompletedAtUtc?: string | null
+    deliveryRouteMetaDurationSeconds?: number | null
+    deliveryRouteActualDurationSeconds?: number | null
     deliveryManName: string | null
     guestName: string | null
     type: OrderType

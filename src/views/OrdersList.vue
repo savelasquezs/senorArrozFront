@@ -538,7 +538,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import type { OrderListItem, Order, OrderStatus, OrderBankPaymentDetail, OrderAppPaymentDetail } from '@/types/order'
 import type { ReservationDeposit } from '@/types/reservationDeposit'
 import { orderApi } from '@/services/MainAPI/orderApi'
@@ -761,6 +761,64 @@ const appFilterOptions = computed(() => {
     ]
 })
 
+const routeTimeFormatter = new Intl.DateTimeFormat('es-CO', {
+    timeZone: 'America/Bogota',
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+})
+const routeClock = ref(Date.now())
+let routeClockTimer: ReturnType<typeof setInterval> | null = null
+onMounted(() => {
+    routeClockTimer = setInterval(() => { routeClock.value = Date.now() }, 30_000)
+})
+onUnmounted(() => {
+    if (routeClockTimer != null) clearInterval(routeClockTimer)
+})
+
+const formatRouteTime = (value: string | Date) => routeTimeFormatter.format(
+    value instanceof Date ? value : new Date(value),
+)
+
+const humanizeRouteMinutes = (seconds: number) => {
+    const minutes = Math.max(0, Math.round(Math.abs(seconds) / 60))
+    return `${minutes} ${minutes === 1 ? 'minuto' : 'minutos'}`
+}
+
+const routeTimingText = (orders: OrderListItem[]) => {
+    const route = orders.find((o) => o.deliveryRouteStartedAtUtc) ?? orders[0]
+    if (!route?.deliveryRouteStartedAtUtc) return ''
+
+    const startedAt = new Date(route.deliveryRouteStartedAtUtc)
+    const metaSeconds = route.deliveryRouteMetaDurationSeconds
+    const completedAtValue = route.deliveryRouteCompletedAtUtc
+    const parts = [`salió a las ${formatRouteTime(startedAt)}`]
+
+    if (completedAtValue) {
+        const completedAt = new Date(completedAtValue)
+        const actualSeconds = route.deliveryRouteActualDurationSeconds
+            ?? Math.max(0, Math.round((completedAt.getTime() - startedAt.getTime()) / 1000))
+        parts.push(`ruta completada a las ${formatRouteTime(completedAt)}`)
+        if (metaSeconds != null) {
+            const difference = actualSeconds - metaSeconds
+            if (Math.abs(difference) < 30) parts.push('a tiempo')
+            else if (difference > 0) parts.push(`${humanizeRouteMinutes(difference)} de demora`)
+            else parts.push(`${humanizeRouteMinutes(difference)} antes`)
+        }
+        return parts.join(' · ')
+    }
+
+    if (metaSeconds != null) {
+        const expectedAt = new Date(startedAt.getTime() + metaSeconds * 1000)
+        const remainingSeconds = Math.round((expectedAt.getTime() - routeClock.value) / 1000)
+        parts.push(`regreso estimado ${formatRouteTime(expectedAt)}`)
+        parts.push(remainingSeconds >= 0
+            ? `debe llegar en ${humanizeRouteMinutes(remainingSeconds)}`
+            : `debió llegar hace ${humanizeRouteMinutes(remainingSeconds)}`)
+    }
+    return parts.join(' · ')
+}
+
 /** Bloques por deliveryRouteId para vista agrupada (mismo criterio que en detalle domiciliario). */
 const orderRouteBlocks = computed(() => {
     const list = orders.value
@@ -792,10 +850,13 @@ const orderRouteBlocks = computed(() => {
         }
         const id = Number(k.slice(2))
         const dmName = ords.find((o) => o.deliveryManName)?.deliveryManName ?? null
+        const timing = routeTimingText(ords)
         return {
             key: k,
             title: `Ruta #${id}`,
-            subtitle: dmName ? `Domiciliario: ${dmName}` : 'Sin domiciliario',
+            subtitle: [dmName ? `Domiciliario: ${dmName}` : 'Sin domiciliario', timing]
+                .filter(Boolean)
+                .join(' · '),
             orders: ords,
         }
     })
