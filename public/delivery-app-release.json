@@ -1,8 +1,8 @@
 {
-  "versionName": "1.2.2",
-  "buildNumber": 6,
+  "versionName": "1.2.3",
+  "buildNumber": 7,
   "apkFileName": "senor-arroz-domiciliarios.apk",
   "apkUrl": "/senor-arroz-domiciliarios.apk",
   "minimumBuild": 1,
-  "message": "1.2.2: seguimiento activo hasta regresar a la sucursal, rutas actualizadas al recibir asignaciones y notificaciones para domiciliarios disponibles dentro de la sucursal. Descarga e instala encima; no hace falta desinstalar."
+  "message": "1.2.3: la ubicación continúa cada 30 segundos durante el regreso a la sucursal, incluso si un punto es rechazado o la jornada se refresca. Descarga e instala encima; no hace falta desinstalar."
 }
