@@ -69,6 +69,21 @@
                 <p class="flex items-center gap-2"><BuildingStorefrontIcon class="h-4 w-4 text-gray-400" />{{ alert.branchName }}</p>
                 <p class="flex items-center gap-2 sm:col-span-2"><ClockIcon class="h-4 w-4 text-gray-400" />{{ formatDateTime(alert.occurredAt) }}<span v-if="alert.workSessionId">· Jornada #{{ alert.workSessionId }}</span><span v-if="alert.incidentId">· Incidente #{{ alert.incidentId }}</span></p>
               </div>
+              <div v-if="hasTrackingEvidence(alert)" class="mt-3 rounded-xl border border-sky-100 bg-sky-50 p-3 text-xs text-sky-900">
+                <div class="grid gap-2 sm:grid-cols-2">
+                  <p><span class="font-semibold">Inicio:</span> {{ formatDateTime(alert.occurredAt) }}</p>
+                  <p><span class="font-semibold">Fin:</span> {{ evidenceEnd(alert) ? formatDateTime(evidenceEnd(alert)!) : 'Sin recuperación registrada' }}</p>
+                  <p class="sm:col-span-2"><span class="font-semibold">Duración:</span> {{ formatDuration(alert.durationSeconds) }}</p>
+                </div>
+                <div class="mt-3 flex flex-wrap gap-2">
+                  <a v-if="mapUrl(alert.startLatitude, alert.startLongitude)" :href="mapUrl(alert.startLatitude, alert.startLongitude)!" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1.5 rounded-lg bg-white px-3 py-2 font-semibold text-sky-700 shadow-sm ring-1 ring-sky-200 hover:bg-sky-100">
+                    <MapPinIcon class="h-4 w-4" />{{ alert.alertType === 'unexpected_stay' ? 'Ver lugar de permanencia' : 'Ver última ubicación antes del corte' }}
+                  </a>
+                  <a v-if="mapUrl(alert.endLatitude, alert.endLongitude)" :href="mapUrl(alert.endLatitude, alert.endLongitude)!" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1.5 rounded-lg bg-white px-3 py-2 font-semibold text-sky-700 shadow-sm ring-1 ring-sky-200 hover:bg-sky-100">
+                    <MapPinIcon class="h-4 w-4" />Ver ubicación al recuperarse
+                  </a>
+                </div>
+              </div>
               <div v-if="alert.status === 'resolved'" class="mt-3 rounded-xl border border-emerald-100 bg-emerald-50 px-3 py-2.5 text-xs text-emerald-800"><p class="font-medium">{{ alert.resolutionReason || 'Resuelta.' }}</p><p v-if="alert.resolvedAt" class="mt-1 text-emerald-700">{{ formatDateTime(alert.resolvedAt) }}<span v-if="alert.resolvedByUserName"> · {{ alert.resolvedByUserName }}</span></p></div>
               <div v-else class="mt-4 flex justify-end"><BaseButton size="sm" variant="outline" @click="openResolve(alert)">Marcar resuelta</BaseButton></div>
             </article>
@@ -95,7 +110,7 @@ import BaseCard from '@/components/ui/BaseCard.vue'
 import BaseDialog from '@/components/ui/BaseDialog.vue'
 import BaseLoading from '@/components/ui/BaseLoading.vue'
 import BasePagination from '@/components/ui/BasePaginatiopn.vue'
-import { ArrowPathIcon, BellSlashIcon, BuildingStorefrontIcon, ClockIcon, ExclamationCircleIcon, ExclamationTriangleIcon, FunnelIcon, InformationCircleIcon, MagnifyingGlassIcon, ShieldExclamationIcon, UserCircleIcon } from '@heroicons/vue/24/outline'
+import { ArrowPathIcon, BellSlashIcon, BuildingStorefrontIcon, ClockIcon, ExclamationCircleIcon, ExclamationTriangleIcon, FunnelIcon, InformationCircleIcon, MagnifyingGlassIcon, MapPinIcon, ShieldExclamationIcon, UserCircleIcon } from '@heroicons/vue/24/outline'
 import { branchApi } from '@/services/MainAPI/branchApi'
 import { useAuthStore } from '@/store/auth'
 import { useToast } from '@/composables/useToast'
@@ -182,6 +197,19 @@ function alertIcon(value: DeliveryTrackingAlertSeverity) { return value === 'inf
 function alertIconClass(value: DeliveryTrackingAlertSeverity) { return value === 'critical' ? 'bg-red-100 text-red-700' : value === 'informational' ? 'bg-blue-100 text-blue-700' : value === 'requires_review' ? 'bg-orange-100 text-orange-700' : 'bg-amber-100 text-amber-700' }
 function alertBorderClass(value: DeliveryTrackingAlertSeverity) { return value === 'critical' ? 'border-red-200' : value === 'informational' ? 'border-blue-200' : value === 'requires_review' ? 'border-orange-200' : 'border-amber-200' }
 function formatDateTime(value: string) { return new Intl.DateTimeFormat('es-CO', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'America/Bogota' }).format(new Date(value)) }
+function hasTrackingEvidence(alert: DeliveryTrackingAlert) { return alert.alertType === 'gps_disabled' || alert.alertType === 'location_permission_revoked' || alert.alertType === 'unexpected_stay' }
+function evidenceEnd(alert: DeliveryTrackingAlert) { return alert.recoveredAt || (alert.durationSeconds !== null ? alert.lastOccurredAt : null) }
+function formatDuration(totalSeconds: number | null) {
+  if (totalSeconds === null) return 'Pendiente'
+  const seconds = Math.max(0, totalSeconds)
+  const hours = Math.floor(seconds / 3600)
+  const minutes = Math.floor((seconds % 3600) / 60)
+  const remainingSeconds = seconds % 60
+  return hours > 0 ? `${hours} h ${minutes} min ${remainingSeconds} s` : minutes > 0 ? `${minutes} min ${remainingSeconds} s` : `${remainingSeconds} s`
+}
+function mapUrl(latitude: number | null, longitude: number | null) {
+  return latitude === null || longitude === null ? null : `https://www.google.com/maps?q=${latitude},${longitude}`
+}
 
 onMounted(async () => {
   if (authStore.isSuperadmin) {

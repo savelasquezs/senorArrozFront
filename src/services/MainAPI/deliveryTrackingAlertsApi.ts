@@ -27,6 +27,14 @@ export interface DeliveryTrackingAlert {
   message: string
   occurredAt: string
   lastOccurredAt: string
+  recoveredAt: string | null
+  durationSeconds: number | null
+  startLatitude: number | null
+  startLongitude: number | null
+  startLocationRecordedAt: string | null
+  endLatitude: number | null
+  endLongitude: number | null
+  endLocationRecordedAt: string | null
   occurrenceCount: number
   resolvedAt: string | null
   resolvedByUserId: number | null
