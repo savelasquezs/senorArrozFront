@@ -5,7 +5,7 @@
     </div>
     <div v-else ref="mapContainer" class="h-[420px] w-full rounded-xl border border-gray-200" />
     <div class="mt-2 flex flex-wrap gap-3 text-xs text-gray-600">
-      <span class="flex items-center gap-1"><i class="h-2.5 w-2.5 rounded-full bg-blue-600" /> Punto de permanencia</span>
+      <span class="flex items-center gap-1"><i class="h-2.5 w-2.5 rounded-full bg-blue-600" /> Punto de evidencia</span>
       <span class="flex items-center gap-1"><i class="h-2.5 w-2.5 rounded-full bg-gray-400" /> Margen</span>
       <span v-if="hasOrder()" class="flex items-center gap-1"><i class="h-2.5 w-2.5 rounded-full bg-emerald-600" /> Destino del pedido</span>
     </div>
@@ -19,9 +19,10 @@ import type { DeliveryIncidentLocationEvidence } from '@/services/MainAPI/delive
 
 const props = defineProps<{
   locations: DeliveryIncidentLocationEvidence[]
-  centerLatitude: number
-  centerLongitude: number
+  centerLatitude: number | null
+  centerLongitude: number | null
   radiusMeters: number
+  showStayRadius?: boolean
   orderLatitude?: number | null
   orderLongitude?: number | null
 }>()
@@ -64,7 +65,7 @@ function renderEvidence() {
       markers.push(new google.maps.Marker({
         map,
         position,
-        title: `${point.isCorePoint ? 'Punto de permanencia' : 'Margen'} · ${new Date(point.recordedAt).toLocaleString('es-CO')}`,
+        title: `${point.isCorePoint ? 'Punto de evidencia' : 'Margen'} · ${new Date(point.recordedAt).toLocaleString('es-CO')}`,
         icon: {
           path: google.maps.SymbolPath.CIRCLE,
           fillColor: point.isCorePoint ? '#2563eb' : '#9ca3af',
@@ -77,18 +78,22 @@ function renderEvidence() {
     })
   }
 
-  const center = { lat: props.centerLatitude, lng: props.centerLongitude }
-  bounds.extend(center)
-  stayCircle = new google.maps.Circle({
-    map,
-    center,
-    radius: Math.max(props.radiusMeters, 5),
-    fillColor: '#f59e0b',
-    fillOpacity: 0.12,
-    strokeColor: '#d97706',
-    strokeOpacity: 0.8,
-    strokeWeight: 2,
-  })
+  const center = resolveCenter()
+  if (center) {
+    bounds.extend(center)
+    if (props.showStayRadius !== false) {
+      stayCircle = new google.maps.Circle({
+        map,
+        center,
+        radius: Math.max(props.radiusMeters, 5),
+        fillColor: '#f59e0b',
+        fillOpacity: 0.12,
+        strokeColor: '#d97706',
+        strokeOpacity: 0.8,
+        strokeWeight: 2,
+      })
+    }
+  }
 
   if (hasOrder()) {
     const orderPosition = { lat: props.orderLatitude!, lng: props.orderLongitude! }
@@ -109,12 +114,21 @@ function renderEvidence() {
     }))
   }
 
-  if (props.locations.length === 0 && !hasOrder()) {
+  if (props.locations.length === 0 && !hasOrder() && center) {
     map.setCenter(center)
     map.setZoom(16)
-  } else {
+  } else if (props.locations.length > 0 || hasOrder() || center) {
     map.fitBounds(bounds, 48)
   }
+}
+
+function resolveCenter() {
+  if (props.centerLatitude != null && props.centerLongitude != null)
+    return { lat: props.centerLatitude, lng: props.centerLongitude }
+  const first = props.locations[0]
+  if (first) return { lat: first.latitude, lng: first.longitude }
+  if (hasOrder()) return { lat: props.orderLatitude!, lng: props.orderLongitude! }
+  return null
 }
 
 async function initialize() {
@@ -129,7 +143,7 @@ async function initialize() {
     const { Map: GoogleMap } = await importLibrary('maps') as google.maps.MapsLibrary
     if (!mapContainer.value) return
     map = new GoogleMap(mapContainer.value, {
-      center: { lat: props.centerLatitude, lng: props.centerLongitude },
+      center: resolveCenter() || { lat: 4.711, lng: -74.0721 },
       zoom: 16,
       mapId: mapId || undefined,
       streetViewControl: false,

@@ -7,7 +7,7 @@
           <div class="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-emerald-100 text-emerald-700 shadow-sm"><MapIcon class="h-6 w-6" /></div>
           <div>
             <div class="flex flex-wrap items-center gap-2"><h1 class="text-2xl font-bold tracking-tight text-gray-900">Revisión de seguimiento</h1><span class="rounded-full bg-white/90 px-2.5 py-1 text-xs font-semibold text-gray-600 shadow-sm">{{ totalCount }} casos</span></div>
-            <p class="mt-1 max-w-2xl text-sm leading-6 text-gray-600">Analiza permanencias, recorrido y estado del dispositivo antes de registrar una decisión administrativa.</p>
+            <p class="mt-1 max-w-2xl text-sm leading-6 text-gray-600">Analiza apagados de ubicación, permanencias, recorrido y estado del dispositivo antes de registrar una decisión administrativa.</p>
           </div>
         </div>
         <BaseButton variant="outline" :loading="loading" @click="loadIncidents"><ArrowPathIcon class="h-4 w-4" /> Actualizar</BaseButton>
@@ -61,7 +61,7 @@
             <thead class="bg-gray-50 text-left text-xs uppercase tracking-wide text-gray-500">
               <tr>
                 <th class="px-4 py-3">Domiciliario / jornada</th>
-                <th class="px-4 py-3">Permanencia</th>
+                <th class="px-4 py-3">Caso</th>
                 <th class="px-4 py-3">Pedido</th>
                 <th class="px-4 py-3">GPS / internet</th>
                 <th class="px-4 py-3">Revisión</th>
@@ -76,8 +76,9 @@
                   </div></div>
                 </td>
                 <td class="px-4 py-3">
-                  <p>{{ formatDateTime(incident.startedAt) }}</p>
-                  <p class="text-xs text-gray-500">{{ formatDuration(incident.durationSeconds) }} · {{ classificationLabel(incident.automaticClassification) }}</p>
+                  <p class="font-medium">{{ incidentTypeLabel(incident.incidentType) }}</p>
+                  <p class="text-xs text-gray-500">{{ formatDateTime(incident.startedAt) }} · {{ formatDuration(incident.durationSeconds) }}</p>
+                  <p v-if="incident.incidentType === 'stay'" class="text-xs text-gray-500">{{ classificationLabel(incident.automaticClassification) }}</p>
                 </td>
                 <td class="max-w-xs px-4 py-3">
                   <p v-if="incident.orderId" class="font-medium">#{{ incident.orderId }}</p>
@@ -87,7 +88,7 @@
                 <td class="px-4 py-3 text-xs">
                   <p>{{ stateLabel('GPS', incident.gpsEnabled) }}</p>
                   <p>{{ stateLabel('Internet', incident.internetAvailable) }}</p>
-                  <p>Precisión {{ formatMeters(incident.averageAccuracyMeters) }}</p>
+                  <p v-if="incident.incidentType === 'stay'">Precisión {{ formatMeters(incident.averageAccuracyMeters) }}</p>
                 </td>
                 <td class="px-4 py-3"><BaseBadge :variant="reviewVariant(incident.reviewStatus)" size="sm">{{ reviewStatusLabel(incident.reviewStatus) }}</BaseBadge></td>
                 <td class="px-4 py-3 text-right"><BaseButton size="sm" variant="outline" @click="openDetail(incident.id)">Revisar</BaseButton></td>
@@ -102,7 +103,7 @@
               <div><p class="font-semibold text-gray-900">{{ incident.deliverymanName }}</p><p class="text-xs text-gray-500">{{ formatDateTime(incident.startedAt) }} · {{ formatDuration(incident.durationSeconds) }}</p></div>
               <BaseBadge :variant="reviewVariant(incident.reviewStatus)" size="sm">{{ reviewStatusLabel(incident.reviewStatus) }}</BaseBadge>
             </div>
-            <p class="mt-2 text-sm text-gray-700">{{ classificationLabel(incident.automaticClassification) }}</p>
+            <p class="mt-2 text-sm text-gray-700">{{ incidentTypeLabel(incident.incidentType) }}<span v-if="incident.incidentType === 'stay'"> · {{ classificationLabel(incident.automaticClassification) }}</span></p>
             <p class="mt-1 truncate text-xs text-gray-500">{{ incident.orderAddress || 'Sin pedido relacionado' }}</p>
           </button>
         </div>
@@ -120,20 +121,21 @@
             <p class="text-sm text-gray-500">{{ detail.branchName }} · Jornada #{{ detail.workSessionId }} · Incidente #{{ detail.id }}</p>
           </div>
           <div class="flex flex-wrap gap-2">
-            <BaseBadge variant="warning">{{ classificationLabel(detail.automaticClassification) }}</BaseBadge>
+            <BaseBadge variant="warning">{{ incidentTypeLabel(detail.incidentType) }}</BaseBadge>
+            <BaseBadge v-if="detail.incidentType === 'stay'" variant="info">{{ classificationLabel(detail.automaticClassification) }}</BaseBadge>
             <BaseBadge :variant="reviewVariant(reviewForm.reviewStatus)">{{ reviewStatusLabel(reviewForm.reviewStatus) }}</BaseBadge>
           </div>
         </div>
 
         <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <Fact label="Inicio" :value="formatDateTime(detail.startedAt)" />
-          <Fact label="Finalización" :value="formatDateTime(detail.endedAt)" />
+          <Fact :label="detail.incidentType === 'location_disabled' ? 'Recuperación' : 'Finalización'" :value="detail.incidentType !== 'location_disabled' || detail.evidenceComplete ? formatDateTime(detail.endedAt) : 'Aún no registrada'" />
           <Fact label="Duración" :value="formatDuration(detail.durationSeconds)" />
           <Fact label="Puntos de evidencia" :value="String(detail.locations.length)" />
-          <Fact label="Precisión promedio" :value="formatMeters(detail.averageAccuracyMeters)" />
-          <Fact label="Radio observado" :value="formatMeters(detail.radiusMeters)" />
-          <Fact label="Distancia a sucursal" :value="formatNullableMeters(detail.distanceToBranchMeters)" />
-          <Fact label="Distancia al destino" :value="formatNullableMeters(detail.distanceToOrderMeters)" />
+          <Fact v-if="detail.incidentType === 'stay'" label="Precisión promedio" :value="formatMeters(detail.averageAccuracyMeters)" />
+          <Fact v-if="detail.incidentType === 'stay'" label="Radio observado" :value="formatMeters(detail.radiusMeters)" />
+          <Fact v-if="detail.incidentType === 'stay'" label="Distancia a sucursal" :value="formatNullableMeters(detail.distanceToBranchMeters)" />
+          <Fact v-if="detail.incidentType === 'stay'" label="Distancia al destino" :value="formatNullableMeters(detail.distanceToOrderMeters)" />
         </div>
 
         <div v-if="detail.orderId" class="rounded-xl border border-blue-100 bg-blue-50 p-4 text-sm">
@@ -143,12 +145,13 @@
         </div>
 
         <section>
-          <h3 class="mb-3 text-base font-semibold text-gray-900">Recorrido y puntos conservados</h3>
+          <h3 class="mb-3 text-base font-semibold text-gray-900">{{ detail.incidentType === 'location_disabled' ? 'Ubicaciones antes y después del apagado' : 'Recorrido y puntos conservados' }}</h3>
           <DeliveryIncidentEvidenceMap
             :locations="detail.locations"
             :center-latitude="detail.centerLatitude"
             :center-longitude="detail.centerLongitude"
             :radius-meters="detail.radiusMeters"
+            :show-stay-radius="detail.incidentType === 'stay'"
             :order-latitude="detail.orderLatitude"
             :order-longitude="detail.orderLongitude"
           />
@@ -160,9 +163,12 @@
             <table class="min-w-full divide-y divide-gray-200 text-xs">
               <thead class="sticky top-0 bg-gray-50 text-left text-gray-500"><tr><th class="px-3 py-2">Hora real</th><th class="px-3 py-2">Punto</th><th class="px-3 py-2">Precisión</th><th class="px-3 py-2">GPS</th><th class="px-3 py-2">Internet</th><th class="px-3 py-2">Batería</th><th class="px-3 py-2">Modo</th></tr></thead>
               <tbody class="divide-y divide-gray-100">
-                <tr v-for="point in detail.locations" :key="point.sourceLocationId">
+                <tr v-for="(point, index) in detail.locations" :key="point.sourceLocationId">
                   <td class="whitespace-nowrap px-3 py-2">{{ formatDateTime(point.recordedAt) }}</td>
-                  <td class="px-3 py-2"><BaseBadge :variant="point.isCorePoint ? 'info' : 'secondary'" size="sm">{{ point.isCorePoint ? 'Permanencia' : 'Margen' }}</BaseBadge></td>
+                  <td class="px-3 py-2">
+                    <BaseBadge :variant="point.isCorePoint ? 'info' : 'secondary'" size="sm">{{ evidencePointLabel(detail, index) }}</BaseBadge>
+                    <a :href="mapUrl(point.latitude, point.longitude)" target="_blank" rel="noopener noreferrer" class="ml-2 font-semibold text-emerald-700 hover:underline">Ver mapa</a>
+                  </td>
                   <td class="px-3 py-2">{{ formatNullableMeters(point.accuracyMeters) }}</td>
                   <td class="px-3 py-2">{{ booleanLabel(point.gpsEnabled) }}</td>
                   <td class="px-3 py-2">{{ booleanLabel(point.internetAvailable) }}</td>
@@ -194,7 +200,7 @@
                 <option v-for="option in reviewStatusOptions" :key="option.value" :value="option.value">{{ option.label }}</option>
               </select>
             </label>
-            <label class="text-sm font-medium text-gray-700">Clasificación final
+            <label v-if="detail.incidentType === 'stay'" class="text-sm font-medium text-gray-700">Clasificación final
               <select v-model="reviewForm.finalClassification" class="mt-1 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm">
                 <option :value="null">Sin definir</option>
                 <option v-for="option in classificationOptions" :key="option.value" :value="option.value">{{ option.label }}</option>
@@ -397,6 +403,12 @@ function formatNullableMeters(value: number | null) { return value == null ? 'No
 function booleanLabel(value: boolean | null) { return value == null ? 'Sin dato' : value ? 'Sí' : 'No' }
 function stateLabel(name: string, value: boolean | null) { return `${name}: ${value == null ? 'sin dato' : value ? 'activo' : 'inactivo'}` }
 function classificationLabel(value: DeliveryStayClassification | null) { return classificationOptions.find(option => option.value === value)?.label || 'Sin clasificación' }
+function incidentTypeLabel(value: DeliveryTrackingIncidentListItem['incidentType']) { return ({ stay: 'Permanencia', route_deviation: 'Desviación de ruta', location_disabled: 'Ubicación apagada' } as const)[value] }
+function evidencePointLabel(incident: DeliveryTrackingIncidentDetail, index: number) {
+  if (incident.incidentType !== 'location_disabled') return incident.locations[index]?.isCorePoint ? 'Permanencia' : 'Margen'
+  return index === 0 ? 'Antes del apagado' : 'Después de encender'
+}
+function mapUrl(latitude: number, longitude: number) { return `https://www.google.com/maps?q=${latitude},${longitude}` }
 function reviewStatusLabel(value: DeliveryIncidentReviewStatus) { return reviewStatusOptions.find(option => option.value === value)?.label || value }
 function reviewVariant(value: DeliveryIncidentReviewStatus): 'warning' | 'success' | 'danger' | 'info' | 'secondary' { if (value === 'pending') return 'warning'; if (value === 'justified' || value === 'closed_without_action') return 'success'; if (value === 'not_justified' || value === 'referred_to_disciplinary_process') return 'danger'; if (value === 'gps_error' || value === 'technical_failure') return 'info'; return 'secondary' }
 function trackingModeLabel(value: string | null) { return ({ light: 'Liviano', active_delivery: 'Pedido activo', offline: 'Sin conexión', stopped: 'Detenido' } as Record<string, string>)[value || ''] || 'Sin dato' }
