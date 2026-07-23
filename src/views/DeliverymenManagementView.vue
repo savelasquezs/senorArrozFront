@@ -70,7 +70,7 @@
                 <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-3">
                     <h2 class="text-lg font-semibold text-gray-900 flex items-center gap-2">
                         <span class="w-2.5 h-2.5 rounded-full"
-                            :class="liveMapActivated && Object.keys(driverLocations).length > 0 ? 'bg-emerald-500 animate-pulse' : 'bg-gray-300'">
+                            :class="liveMapActivated && hasFreshDriverLocation ? 'bg-emerald-500 animate-pulse' : 'bg-gray-300'">
                         </span>
                         Ubicación en tiempo real
                     </h2>
@@ -80,8 +80,8 @@
                             Ver ubicaciones
                         </BaseButton>
                     </template>
-                    <span v-else-if="Object.keys(driverLocations).length === 0" class="text-xs text-gray-400">
-                        Sin señal GPS activa
+                    <span v-else-if="!hasFreshDriverLocation" class="text-xs text-amber-600">
+                        {{ Object.keys(driverLocations).length === 0 ? 'Sin señal GPS activa' : 'Sin señal GPS reciente' }}
                     </span>
                 </div>
 
@@ -160,6 +160,7 @@ import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/store/auth'
 import { useToast } from '@/composables/useToast'
 import { useSignalR } from '@/composables/useSignalR'
+import { ORDERS_SIGNALR_HUB_URL } from '@/config/signalr'
 import { deliverymanApi, type DeliverymanLastLocationDto } from '@/services/MainAPI/deliverymanApi'
 import { orderApi } from '@/services/MainAPI/orderApi'
 import type { OrderListItem } from '@/types/order'
@@ -178,14 +179,14 @@ import DeliverymanOrdersModal from '@/components/deliverymen/DeliverymanOrdersMo
 import type { DriverLocation } from '@/components/delivery/DeliveryMap.vue'
 import { ArrowPathIcon, TruckIcon } from '@heroicons/vue/24/outline'
 import { todayYmd } from '@/utils/datetime'
+import { ordersForCurrentDeliveryRoutes } from '@/utils/deliveryMapRoutes'
 
 const DeliveryMapAsync = defineAsyncComponent(() => import('@/components/delivery/DeliveryMap.vue'))
 
 const router = useRouter()
 const authStore = useAuthStore()
 const { success, error } = useToast()
-const SIGNALR_HUB_URL = import.meta.env.VITE_SIGNALR_HUB_URL || 'http://localhost:5000/hubs/orders'
-const { on } = useSignalR(SIGNALR_HUB_URL)
+const { on } = useSignalR(ORDERS_SIGNALR_HUB_URL)
 
 // Estado
 const selectedDate = ref(todayYmd())
@@ -243,6 +244,10 @@ const deliverymenStats = computed((): DeliverymanStats[] => {
  * Se actualiza vía SignalR o polling como fallback.
  */
 const driverLocations = ref<Record<number, DriverLocation>>({})
+const hasFreshDriverLocation = computed(() =>
+    Object.values(driverLocations.value)
+        .some((location) => Date.now() - location.updatedAt.getTime() < 90_000)
+)
 
 /**
  * Pedidos del día cargados por domiciliario (OnTheWay + Delivered), antes de filtrar por ruta activa.
@@ -250,28 +255,12 @@ const driverLocations = ref<Record<number, DriverLocation>>({})
  */
 const mapOrdersFetched = ref<OrderListItem[]>([])
 
-/** Incluye en el mapa solo pedidos de la ruta vigente del domiciliario (GPS/API/SignalR). */
-function orderMatchesDriverCurrentRoute(o: OrderListItem, loc: DriverLocation | undefined): boolean {
-    if (o.type !== 'delivery' || o.deliveryManId == null || !loc) return false
-    const routeId = loc.deliveryRouteId
-    if (routeId != null && routeId !== undefined) {
-        return o.deliveryRouteId === routeId
-    }
-    return o.status === 'on_the_way'
-}
-
 const mapOrders = computed((): OrderListItem[] => {
-    const locs = driverLocations.value
-    const rows = mapOrdersFetched.value
-    const out: OrderListItem[] = []
-    for (const o of rows) {
-        const loc = o.deliveryManId != null ? locs[o.deliveryManId] : undefined
-        if (orderMatchesDriverCurrentRoute(o, loc)) out.push(o)
-    }
-    return out.sort((a, b) => b.id - a.id)
+    return ordersForCurrentDeliveryRoutes(mapOrdersFetched.value, driverLocations.value)
 })
 
 let _pollInterval: ReturnType<typeof setInterval> | null = null
+let _pollInFlight = false
 
 /** Incorpora última ubicación del API sin pisar una marca temporal más reciente (p. ej. SignalR). */
 function mergeLastLocationFromApi(
@@ -372,8 +361,17 @@ async function refreshDriverLocationsFromApi(stats: DeliverymanStats[]) {
 const startPolling = () => {
     if (_pollInterval) return
     _pollInterval = setInterval(async () => {
-        if (deliverymenStats.value.length === 0) return
-        await refreshDriverLocationsFromApi(deliverymenStats.value)
+        if (_pollInFlight || deliverymenStats.value.length === 0) return
+        _pollInFlight = true
+        try {
+            const list = deliverymenStats.value
+            await Promise.all([
+                refreshDriverLocationsFromApi(list),
+                loadMapOrdersForDeliverymen(list),
+            ])
+        } finally {
+            _pollInFlight = false
+        }
     }, 30_000)
 }
 
@@ -590,6 +588,9 @@ onMounted(() => {
         const t = new Date(data.recordedAt).getTime()
         const cur = driverLocations.value[data.deliverymanId]
         if (cur && cur.updatedAt.getTime() > t) return
+        const previousRouteId = cur?.deliveryRouteId ?? null
+        const nextRouteId =
+            typeof data.deliveryRouteId === 'number' ? data.deliveryRouteId : null
         driverLocations.value = {
             ...driverLocations.value,
             [data.deliverymanId]: {
@@ -597,9 +598,11 @@ onMounted(() => {
                 lng: data.longitude,
                 updatedAt: new Date(data.recordedAt),
                 name: stat?.deliverymanName,
-                deliveryRouteId:
-                    typeof data.deliveryRouteId === 'number' ? data.deliveryRouteId : null,
+                deliveryRouteId: nextRouteId,
             },
+        }
+        if (previousRouteId !== nextRouteId) {
+            void loadMapOrdersForDeliverymen(deliverymenStats.value)
         }
     })
 })

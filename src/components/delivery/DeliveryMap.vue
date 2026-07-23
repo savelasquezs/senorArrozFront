@@ -78,6 +78,7 @@ import type { OrderDetailItem, OrderLineSummary, OrderListItem } from '@/types/o
 import { orderApi } from '@/services/MainAPI/orderApi'
 import { RouteOptimizationService } from '@/services/domain/RouteOptimizationService'
 import type { GeoLocation } from '@/composables/useGeolocation'
+import { currentRouteIdForDriver } from '@/utils/deliveryMapRoutes'
 
 // =========================
 // 🔹 Props y eventos
@@ -184,8 +185,8 @@ const panelOrders = computed((): OrderListItem[] => {
     const forDriver = props.orders.filter(
         (o) => o.type === 'delivery' && o.deliveryManId === id
     )
-    if (loc?.deliveryRouteId != null && loc.deliveryRouteId !== undefined) {
-        const rid = loc.deliveryRouteId
+    const rid = currentRouteIdForDriver(forDriver, id, loc)
+    if (rid != null) {
         return forDriver.filter((o) => o.deliveryRouteId === rid).sort((a, b) => b.id - a.id)
     }
     return forDriver.filter((o) => o.status === 'on_the_way').sort((a, b) => b.id - a.id)
