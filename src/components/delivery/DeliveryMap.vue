@@ -517,17 +517,6 @@ const clearMarkers = () => {
     markers = []
 }
 
-const fitToMarkers = () => {
-    if (!map) return
-    const bounds = new google.maps.LatLngBounds()
-    markers.forEach((m: any) => {
-        const pos = m.getPosition?.() || m.position
-        if (pos) bounds.extend(pos)
-    })
-    // No considerar marcador de usuario (geolocalización deshabilitada)
-    if (!bounds.isEmpty()) map.fitBounds(bounds)
-}
-
 const loadMarkers = () => {
     if (!map) return
     clearMarkers()
@@ -538,9 +527,6 @@ const loadMarkers = () => {
             const coords = getOrderCoords(order)
             if (coords) addOrderMarker(order, coords)
         })
-
-    // Ajustar vista si hay marcadores
-    if (markers.length > 0) fitToMarkers()
 }
 
 const addOrderMarker = (order: OrderListItem, coords: GeoLocation) => {
@@ -633,12 +619,6 @@ const recalculateRoute = async (orderedIds?: number[]) => {
         strokeWeight: 4,
     })
     routePolyline.setMap(map)
-    // Ajustar vista a la ruta
-    try {
-        const bounds = new google.maps.LatLngBounds()
-        result.route.overview_path.forEach((p: any) => bounds.extend(p))
-        if (!bounds.isEmpty()) map.fitBounds(bounds)
-    } catch { }
     emit('route-calculated', result.optimizedOrder)
 }
 
