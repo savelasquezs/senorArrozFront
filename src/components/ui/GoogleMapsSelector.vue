@@ -444,7 +444,7 @@ const syncOriginMarker = () => {
                 position: origin,
                 map,
                 title: `Sucursal ${origin.label}`,
-                ...(pin && { content: pin.element }),
+                ...(pin && { content: pin }),
             })
             return
         }

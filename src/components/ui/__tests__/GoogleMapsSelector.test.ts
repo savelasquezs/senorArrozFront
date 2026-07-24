@@ -49,9 +49,7 @@ const googleMocks = vi.hoisted(() => {
         }
     }
 
-    class PinElementMock {
-        element = document.createElement('div')
-    }
+    class PinElementMock extends HTMLElement {}
 
     return {
         camera,
