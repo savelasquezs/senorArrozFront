@@ -221,7 +221,7 @@ const routes: RouteRecordRaw[] = [
         component: () => import('@/views/DeliverymenManagementView.vue'),
         meta: {
             requiresAuth: true,
-            requiresRole: [UserRole.ADMIN, UserRole.CASHIER],
+            requiresRole: [UserRole.SUPERADMIN, UserRole.ADMIN, UserRole.CASHIER],
             title: 'Gestión de Domiciliarios'
         }
     },

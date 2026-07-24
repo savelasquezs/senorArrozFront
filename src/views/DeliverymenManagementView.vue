@@ -13,7 +13,7 @@
                     <BaseInput
                         v-model="selectedDate"
                         type="date"
-                        @change="loadData"
+                        @change="handleDateChange"
                         class="w-48"
                     />
                     <BaseButton @click="loadData" variant="outline" size="sm" :loading="loading">
@@ -66,7 +66,7 @@
                 </div>
             </div>
             <!-- Mapa GPS: chunk y APIs solo tras "Ver ubicaciones" -->
-            <div class="mt-6">
+            <div ref="liveMapSection" class="mt-6">
                 <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-3">
                     <h2 class="text-lg font-semibold text-gray-900 flex items-center gap-2">
                         <span class="w-2.5 h-2.5 rounded-full"
@@ -102,6 +102,7 @@
                         v-else
                         :orders="mapOrders"
                         :deliveryman-locations="driverLocations"
+                        :focus-order-id="focusOrderId"
                     />
                 </div>
             </div>
@@ -155,8 +156,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, computed, defineAsyncComponent } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, onMounted, onUnmounted, computed, defineAsyncComponent, nextTick } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/store/auth'
 import { useToast } from '@/composables/useToast'
 import { useSignalR } from '@/composables/useSignalR'
@@ -178,18 +179,44 @@ import LiquidationConfirmModal from '@/components/deliverymen/LiquidationConfirm
 import DeliverymanOrdersModal from '@/components/deliverymen/DeliverymanOrdersModal.vue'
 import type { DriverLocation } from '@/components/delivery/DeliveryMap.vue'
 import { ArrowPathIcon, TruckIcon } from '@heroicons/vue/24/outline'
-import { todayYmd } from '@/utils/datetime'
+import { defaultBusinessCalendar, todayYmd } from '@/utils/datetime'
 import { ordersForCurrentDeliveryRoutes } from '@/utils/deliveryMapRoutes'
 
 const DeliveryMapAsync = defineAsyncComponent(() => import('@/components/delivery/DeliveryMap.vue'))
 
+const route = useRoute()
 const router = useRouter()
 const authStore = useAuthStore()
 const { success, error } = useToast()
 const { on } = useSignalR(ORDERS_SIGNALR_HUB_URL)
 
 // Estado
-const selectedDate = ref(todayYmd())
+function queryValue(value: unknown): string | null {
+    return typeof value === 'string' ? value : Array.isArray(value) && typeof value[0] === 'string' ? value[0] : null
+}
+
+function positiveQueryInt(value: unknown): number | null {
+    const parsed = Number(queryValue(value))
+    return Number.isInteger(parsed) && parsed > 0 ? parsed : null
+}
+
+function validYmdQuery(value: unknown): string | null {
+    const candidate = queryValue(value)
+    if (!candidate || !/^\d{4}-\d{2}-\d{2}$/.test(candidate)) return null
+    const [year, month, day] = candidate.split('-').map(Number)
+    const parsed = new Date(Date.UTC(year, month - 1, day))
+    return parsed.getUTCFullYear() === year
+        && parsed.getUTCMonth() === month - 1
+        && parsed.getUTCDate() === day
+        ? candidate
+        : null
+}
+
+const requestedOrderId = positiveQueryInt(route.query.orderId)
+const requestedBranchId = positiveQueryInt(route.query.branchId)
+const requestedDate = validYmdQuery(route.query.date)
+
+const selectedDate = ref(requestedDate ?? todayYmd())
 const loading = ref(false)
 const submitting = ref(false)
 const loadingDetail = ref(false)
@@ -212,6 +239,9 @@ const liquidatedDeliveryman = ref<{ name: string; amount: number; baseAmount: nu
 /** Mapa: montaje del componente (chunk) y APIs GPS/pedidos solo tras el clic del usuario. */
 const liveMapActivated = ref(false)
 const liveMapBootstrapping = ref(false)
+const liveMapSection = ref<HTMLElement | null>(null)
+const focusOrderId = ref<number | null>(requestedOrderId)
+const focusedOrder = ref<OrderListItem | null>(null)
 
 const ordersDraftsStore = useOrdersDraftsStore()
 
@@ -256,7 +286,19 @@ const hasFreshDriverLocation = computed(() =>
 const mapOrdersFetched = ref<OrderListItem[]>([])
 
 const mapOrders = computed((): OrderListItem[] => {
-    return ordersForCurrentDeliveryRoutes(mapOrdersFetched.value, driverLocations.value)
+    const currentRouteOrders = ordersForCurrentDeliveryRoutes(mapOrdersFetched.value, driverLocations.value)
+    const focused = focusedOrder.value
+    if (!focused || focused.type !== 'delivery' || currentRouteOrders.some((order) => order.id === focused.id)) {
+        return currentRouteOrders
+    }
+    return [...currentRouteOrders, focused].sort((a, b) => b.id - a.id)
+})
+
+const resolvedBranchId = computed((): number | undefined => {
+    if (authStore.userRole === 'Superadmin') {
+        return focusedOrder.value?.branchId ?? requestedBranchId ?? authStore.user?.branchId ?? undefined
+    }
+    return authStore.user?.branchId ?? undefined
 })
 
 let _pollInterval: ReturnType<typeof setInterval> | null = null
@@ -283,7 +325,7 @@ function mergeLastLocationFromApi(
 }
 
 async function loadMapOrdersForDeliverymen(stats: DeliverymanStats[]) {
-    const branchId = authStore.user?.branchId
+    const branchId = resolvedBranchId.value
     if (!branchId || stats.length === 0) {
         mapOrdersFetched.value = []
         return
@@ -403,7 +445,7 @@ const loadData = async () => {
     try {
         const overview = await deliverymanApi.getDailyOverview({
             date: selectedDate.value,
-            branchId: authStore.user?.branchId
+            branchId: resolvedBranchId.value
         })
         deliverymenStatsRaw.value = overview.deliverymen
         advances.value = overview.advances
@@ -427,6 +469,49 @@ const loadData = async () => {
     } finally {
         loading.value = false
     }
+}
+
+async function loadFocusedOrder() {
+    const orderId = focusOrderId.value
+    if (orderId == null) return
+    try {
+        const order = await orderApi.fetchDetail(orderId)
+        focusedOrder.value = order
+        selectedDate.value = defaultBusinessCalendar.formatYmd(order.createdAt)
+    } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : 'No se pudo consultar el pedido seleccionado.'
+        error('No se pudo cargar la ubicación del pedido', message)
+    }
+}
+
+async function initializeView() {
+    if (focusOrderId.value != null) {
+        liveMapActivated.value = true
+        liveMapBootstrapping.value = true
+        await loadFocusedOrder()
+    }
+
+    try {
+        await loadData()
+        if (liveMapActivated.value && deliverymenStats.value.length > 0) startPolling()
+        if (focusOrderId.value != null) {
+            await nextTick()
+            liveMapSection.value?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+        }
+    } finally {
+        liveMapBootstrapping.value = false
+    }
+}
+
+async function handleDateChange() {
+    focusOrderId.value = null
+    focusedOrder.value = null
+    const query = { ...route.query }
+    delete query.orderId
+    delete query.branchId
+    delete query.date
+    await router.replace({ name: 'DeliverymenManagement', query })
+    await loadData()
 }
 
 // Handler: abrir modal de detalle con getDaySummary (datos frescos)
@@ -578,7 +663,7 @@ onMounted(() => {
     }
 
     ordersDraftsStore.loadBanks()
-    loadData()
+    void initializeView()
 
     // GPS en tiempo real solo con mapa activo y domiciliario presente en el resumen del día
     on('DeliverymanLocationUpdate', (data: any) => {

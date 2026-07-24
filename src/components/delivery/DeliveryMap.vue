@@ -46,21 +46,31 @@
                     </p>
                     <ul v-else class="space-y-2">
                         <li v-for="order in panelOrders" :key="order.id"
-                            class="rounded-md border border-gray-100 bg-gray-50/80 px-2 py-2">
-                            <button type="button"
-                                class="flex w-full items-center justify-between gap-2 text-left text-sm"
-                                @click="toggleOrderExpanded(order)">
-                                <span class="font-mono font-semibold text-emerald-800">#{{ order.id }}</span>
-                                <span class="shrink-0 text-xs text-gray-600">{{ order.statusDisplayName }}</span>
-                            </button>
-                            <div v-if="expandedOrderId === order.id" class="mt-2 border-t border-gray-200 pt-2">
-                                <p v-if="panelLoadingOrderId === order.id" class="text-xs text-gray-500">Cargando productos…</p>
-                                <ul v-else-if="linesForOrder(order).length" class="space-y-0.5 text-xs text-gray-700">
-                                    <li v-for="(line, idx) in linesForOrder(order)" :key="idx">
-                                        {{ line.quantity }}× {{ line.productName }}
-                                    </li>
-                                </ul>
-                                <p v-else class="text-xs text-gray-500">Sin líneas de detalle.</p>
+                            class="contextual-action-group rounded-md border border-gray-100 bg-gray-50/80 px-2.5 py-2.5">
+                            <div class="flex items-start justify-between gap-2">
+                                <div class="min-w-0 flex-1">
+                                    <div class="flex items-center justify-between gap-2">
+                                        <span class="font-mono text-sm font-semibold text-emerald-800">#{{ order.id }}</span>
+                                        <span class="shrink-0 text-xs text-gray-600">{{ order.statusDisplayName }}</span>
+                                    </div>
+                                    <p class="mt-1 truncate text-sm font-medium text-gray-900"
+                                        :title="orderCustomerName(order)">
+                                        {{ orderCustomerName(order) }}
+                                    </p>
+                                    <p class="mt-0.5 text-xs leading-snug text-gray-600"
+                                        :title="orderAddressText(order)">
+                                        {{ orderAddressText(order) }}
+                                    </p>
+                                </div>
+                                <button
+                                    v-if="selectedDriverName"
+                                    type="button"
+                                    class="contextual-hover-action shrink-0 rounded p-1 text-gray-400 transition hover:bg-emerald-50 hover:text-emerald-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
+                                    :aria-label="`Copiar mensaje sobre el pedido ${order.id}`"
+                                    title="Copiar mensaje"
+                                    @click.stop="copyDeliveryInquiry(order)">
+                                    <ClipboardDocumentIcon class="h-4 w-4" />
+                                </button>
                             </div>
                         </li>
                     </ul>
@@ -71,14 +81,16 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, watch, computed, shallowRef } from 'vue'
+import { ref, onMounted, onUnmounted, watch, computed } from 'vue'
 import { setOptions, importLibrary } from '@googlemaps/js-api-loader'
 import BaseButton from '@/components/ui/BaseButton.vue'
-import type { OrderDetailItem, OrderLineSummary, OrderListItem } from '@/types/order'
-import { orderApi } from '@/services/MainAPI/orderApi'
+import type { OrderListItem } from '@/types/order'
 import { RouteOptimizationService } from '@/services/domain/RouteOptimizationService'
 import type { GeoLocation } from '@/composables/useGeolocation'
 import { currentRouteIdForDriver } from '@/utils/deliveryMapRoutes'
+import { buildDeliveryInquiryMessage, deliveryAddressText } from '@/utils/deliveryInquiryMessage'
+import { useToast } from '@/composables/useToast'
+import { ClipboardDocumentIcon } from '@heroicons/vue/24/outline'
 
 // =========================
 // 🔹 Props y eventos
@@ -96,9 +108,15 @@ interface Props {
     orders: OrderListItem[]
     /** Mapa de ubicaciones GPS: clave = deliverymanId */
     deliverymanLocations?: Record<number, DriverLocation>
+    /** Pedido que debe quedar centrado al abrir el mapa desde el listado. */
+    focusOrderId?: number | null
 }
 const props = defineProps<Props>()
-const emit = defineEmits<{ 'route-calculated': [waypointOrder: number[]] }>()
+const emit = defineEmits<{
+    'route-calculated': [waypointOrder: number[]]
+    'focus-unavailable': [message: string]
+}>()
+const { success, error, warning } = useToast()
 
 // =========================
 // 🔹 Refs y variables
@@ -106,6 +124,8 @@ const emit = defineEmits<{ 'route-calculated': [waypointOrder: number[]] }>()
 const mapContainer = ref<HTMLDivElement | null>(null)
 let map: google.maps.Map | null = null
 let markers: (google.maps.marker.AdvancedMarkerElement | google.maps.Marker)[] = []
+const orderMarkers = new Map<number, google.maps.marker.AdvancedMarkerElement | google.maps.Marker>()
+const orderInfoWindows = new Map<number, google.maps.InfoWindow>()
 const driverMarkers = new Map<number, google.maps.marker.AdvancedMarkerElement | google.maps.Marker>()
 /** Raíz DOM del pin (Advanced Marker) para actualizar texto sin recrear el marcador. */
 const driverMarkerRoots = new Map<number, HTMLElement>()
@@ -167,9 +187,6 @@ function onTheWayCountForDriver(driverId: number): number {
 // ─── Panel lateral (clic en pin) ───────────────────────────────────────────
 
 const selectedDriverId = ref<number | null>(null)
-const expandedOrderId = ref<number | null>(null)
-const orderDetailLinesCache = shallowRef(new Map<number, OrderDetailItem[]>())
-const panelLoadingOrderId = ref<number | null>(null)
 
 const panelDriverTitle = computed(() => {
     const id = selectedDriverId.value
@@ -177,6 +194,8 @@ const panelDriverTitle = computed(() => {
     const loc = props.deliverymanLocations?.[id]
     return loc?.name ?? `Domiciliario #${id}`
 })
+
+const selectedDriverName = computed(() => panelDriverTitle.value.trim())
 
 const panelOrders = computed((): OrderListItem[] => {
     const id = selectedDriverId.value
@@ -194,37 +213,30 @@ const panelOrders = computed((): OrderListItem[] => {
 
 function closeDriverPanel() {
     selectedDriverId.value = null
-    expandedOrderId.value = null
 }
 
-function linesForOrder(order: OrderListItem): OrderLineSummary[] {
-    const sl = order.summaryLines
-    if (sl?.length) return sl
-    const details = orderDetailLinesCache.value.get(order.id)
-    if (!details?.length) return []
-    return details.map((d) => ({ productName: d.productName, quantity: d.quantity }))
+function orderCustomerName(order: OrderListItem): string {
+    return order.customerName?.trim() || order.guestName?.trim() || 'Cliente sin nombre'
 }
 
-async function toggleOrderExpanded(order: OrderListItem) {
-    if (expandedOrderId.value === order.id) {
-        expandedOrderId.value = null
-        return
-    }
-    expandedOrderId.value = order.id
-    if (order.summaryLines?.length) return
-    if (orderDetailLinesCache.value.has(order.id)) return
-    panelLoadingOrderId.value = order.id
+function orderAddressText(order: OrderListItem): string {
+    return deliveryAddressText(order) || 'Dirección registrada'
+}
+
+async function copyDeliveryInquiry(order: OrderListItem) {
+    const deliverymanName = selectedDriverName.value
+    if (!deliverymanName) return
+    const message = buildDeliveryInquiryMessage({
+        deliverymanName,
+        orderId: order.id,
+        addressDescription: order.addressDescription,
+        addressAdditionalInfo: order.addressAdditionalInfo,
+    })
     try {
-        const d = await orderApi.fetchDetail(order.id)
-        const next = new Map(orderDetailLinesCache.value)
-        next.set(order.id, d.orderDetails)
-        orderDetailLinesCache.value = next
+        await navigator.clipboard.writeText(message)
+        success('Mensaje copiado', 2500, `Pedido #${order.id}`)
     } catch {
-        const next = new Map(orderDetailLinesCache.value)
-        next.set(order.id, [])
-        orderDetailLinesCache.value = next
-    } finally {
-        panelLoadingOrderId.value = null
+        error('No se pudo copiar', 'Permite el acceso al portapapeles o copia el mensaje manualmente.')
     }
 }
 
@@ -382,7 +394,7 @@ function updateDriverMarkers(locs: Record<number, DriverLocation> | undefined) {
             const root = driverMarkerRoots.get(id)
             if (root) syncDriverPinDom(root, id, loc)
             else {
-                const el = m.content ?? m.element
+                const el = m.content
                 if (el instanceof HTMLElement) {
                     if (el.querySelector('.dm-marker-icon')) syncDriverPinDom(el, id, loc)
                     else {
@@ -467,7 +479,7 @@ onMounted(async () => {
         ...(mapId && { mapId }), // Only include mapId if it's defined
     })
 
-        ; (window as any)._AdvancedMarkerElement = AdvancedMarkerElement
+        ; (window as any)._AdvancedMarkerElement = mapId ? AdvancedMarkerElement : null
     geocoder.value = new Geocoder()
     RouteOptimizationService.initialize(map)
     loadMarkers()
@@ -485,6 +497,7 @@ onMounted(async () => {
 
 onUnmounted(() => {
     if (_clockInterval) clearInterval(_clockInterval)
+    clearMarkers()
     for (const marker of driverMarkers.values()) {
         google.maps.event.clearInstanceListeners(marker as any)
         if (typeof (marker as any).setMap === 'function') (marker as any).setMap(null)
@@ -498,23 +511,40 @@ onUnmounted(() => {
 // 🔹 Observadores
 // =========================
 watch(() => props.orders, () => loadMarkers(), { deep: true })
+watch(
+    () => props.focusOrderId,
+    () => {
+        focusRequestVersion += 1
+        focusedOrderId = null
+        focusWarningOrderId = null
+        if (props.focusOrderId == null) {
+            for (const infoWindow of orderInfoWindows.values()) infoWindow.close()
+            return
+        }
+        void tryFocusOrder()
+    },
+)
 
 // =========================
 // 🔹 Funciones de mapa
 // =========================
 const getOrderCoords = (order: OrderListItem): GeoLocation | null => {
-    if (typeof (order as any).latitude === 'number' && typeof (order as any).longitude === 'number') {
-        return { lat: (order as any).latitude, lng: (order as any).longitude }
+    if (typeof order.latitude === 'number' && typeof order.longitude === 'number') {
+        return { lat: order.latitude, lng: order.longitude }
     }
     return extraCoordsByOrderId.get(order.id) ?? null
 }
 
 const clearMarkers = () => {
+    for (const infoWindow of orderInfoWindows.values()) infoWindow.close()
+    orderInfoWindows.clear()
     markers.forEach((m: any) => {
+        google.maps.event.clearInstanceListeners(m)
         if (typeof m.setMap === 'function') m.setMap(null)
         else m.map = null
     })
     markers = []
+    orderMarkers.clear()
 }
 
 const loadMarkers = () => {
@@ -527,62 +557,173 @@ const loadMarkers = () => {
             const coords = getOrderCoords(order)
             if (coords) addOrderMarker(order, coords)
         })
+    void tryFocusOrder()
+}
+
+function createOrderMarkerContent(order: OrderListItem): HTMLElement {
+    const root = document.createElement('div')
+    root.className = 'order-marker-root'
+    root.style.cssText = 'display:flex;flex-direction:column;align-items:center;cursor:pointer;user-select:none;'
+
+    const pin = document.createElement('div')
+    pin.style.cssText = 'width:25px;height:25px;display:flex;align-items:center;justify-content:center;border-radius:9999px;border:2px solid white;background:#059669;color:white;font-size:10px;font-weight:700;box-shadow:0 2px 6px rgba(0,0,0,.35);'
+    pin.textContent = String(order.id)
+
+    const label = document.createElement('div')
+    label.className = 'order-marker-label'
+    label.style.cssText = 'margin-top:2px;max-width:180px;padding:2px 7px;border-radius:4px;background:rgba(255,255,255,.96);color:#111827;font-size:10px;font-weight:600;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;box-shadow:0 1px 4px rgba(0,0,0,.25);'
+    label.textContent = `#${order.id} · ${orderCustomerName(order)}`
+    label.title = label.textContent
+
+    root.append(pin, label)
+    return root
+}
+
+function createOrderInfoContent(order: OrderListItem, coords: GeoLocation): HTMLElement {
+    const root = document.createElement('div')
+    root.className = 'p-2'
+
+    const title = document.createElement('strong')
+    title.textContent = `Pedido #${order.id}`
+    root.appendChild(title)
+
+    const customer = document.createElement('p')
+    customer.className = 'mt-1 text-sm font-medium text-gray-900'
+    customer.textContent = `Cliente: ${orderCustomerName(order)}`
+    root.appendChild(customer)
+
+    const recipient = order.guestName?.trim()
+    if (recipient && recipient !== order.customerName?.trim()) {
+        const recipientLine = document.createElement('p')
+        recipientLine.className = 'text-xs text-gray-600'
+        recipientLine.textContent = `Recibe: ${recipient}`
+        root.appendChild(recipientLine)
+    }
+
+    const address = document.createElement('p')
+    address.className = 'mt-1 text-xs text-gray-600'
+    address.textContent = orderAddressText(order)
+    root.appendChild(address)
+
+    const navigate = document.createElement('a')
+    navigate.className = 'mt-2 inline-block text-emerald-600 underline'
+    navigate.href = `https://www.google.com/maps/dir/?api=1&destination=${coords.lat},${coords.lng}`
+    navigate.target = '_blank'
+    navigate.rel = 'noopener'
+    navigate.textContent = 'Navegar'
+    root.appendChild(navigate)
+
+    return root
 }
 
 const addOrderMarker = (order: OrderListItem, coords: GeoLocation) => {
-    if (!map) return
+    if (!map || orderMarkers.has(order.id)) return
 
     const AdvancedMarkerElement = (window as any)._AdvancedMarkerElement
-    const navigateUrl = `https://www.google.com/maps/dir/?api=1&destination=${coords.lat},${coords.lng}`
-
     const infoWindow = new google.maps.InfoWindow({
-        content: `
-        <div class="p-2">
-          <strong>Pedido #${order.id}</strong><br>
-          ${order.addressDescription || ''}
-          <div class="mt-2">
-            <a href="${navigateUrl}" target="_blank" rel="noopener" class="text-emerald-600 underline">
-              Navegar
-            </a>
-          </div>
-        </div>`,
+        content: createOrderInfoContent(order, coords),
     })
+    const title = `Pedido #${order.id} — ${orderCustomerName(order)}`
 
     let marker: google.maps.marker.AdvancedMarkerElement | google.maps.Marker
-    if (AdvancedMarkerElement && map.getMapTypeId()) {
+    if (AdvancedMarkerElement) {
         marker = new AdvancedMarkerElement({
             position: coords,
             map,
-            title: `Pedido #${order.id}`,
+            title,
+            content: createOrderMarkerContent(order),
         })
         marker.addListener('click', () => infoWindow.open({ map, anchor: marker }))
     } else {
         marker = new google.maps.Marker({
             position: coords,
             map,
-            title: `Pedido #${order.id}`,
+            title,
+            label: {
+                text: `#${order.id} · ${orderCustomerName(order)}`,
+                color: '#065f46',
+                fontSize: '10px',
+                fontWeight: '600',
+            },
         })
         marker.addListener('click', () => infoWindow.open(map, marker))
     }
 
     markers.push(marker)
+    orderMarkers.set(order.id, marker)
+    orderInfoWindows.set(order.id, infoWindow)
+}
+
+const orderGeocodePromises = new Map<number, Promise<GeoLocation | null>>()
+
+function resolveOrderCoords(order: OrderListItem): Promise<GeoLocation | null> {
+    const existing = getOrderCoords(order)
+    if (existing) return Promise.resolve(existing)
+    if (!order.addressDescription || !geocoder.value) return Promise.resolve(null)
+    const pending = orderGeocodePromises.get(order.id)
+    if (pending) return pending
+
+    const request = (async (): Promise<GeoLocation | null> => {
+        try {
+            const { results } = await geocoder.value!.geocode({ address: order.addressDescription! })
+            if (results.length > 0 && results[0].geometry?.location) {
+                const loc = results[0].geometry.location
+                const coords = { lat: loc.lat(), lng: loc.lng() }
+                extraCoordsByOrderId.set(order.id, coords)
+                return coords
+            }
+        } catch (geocodeError) {
+            console.warn('Error al geocodificar dirección:', geocodeError)
+        }
+        return null
+    })().finally(() => {
+        orderGeocodePromises.delete(order.id)
+    })
+    orderGeocodePromises.set(order.id, request)
+    return request
+}
+
+let focusedOrderId: number | null = null
+let focusWarningOrderId: number | null = null
+let focusRequestVersion = 0
+
+async function tryFocusOrder(): Promise<void> {
+    const orderId = props.focusOrderId
+    if (!map || orderId == null) return
+    const order = props.orders.find((item) => item.id === orderId)
+    if (!order) return
+
+    const requestVersion = focusRequestVersion
+    const coords = await resolveOrderCoords(order)
+    if (requestVersion !== focusRequestVersion || props.focusOrderId !== orderId) return
+    if (!coords) {
+        if (focusWarningOrderId !== orderId) {
+            const message = `El pedido #${orderId} no tiene una ubicación que pueda mostrarse.`
+            focusWarningOrderId = orderId
+            warning('Ubicación no disponible', message)
+            emit('focus-unavailable', message)
+        }
+        return
+    }
+
+    addOrderMarker(order, coords)
+    const marker = orderMarkers.get(orderId)
+    const infoWindow = orderInfoWindows.get(orderId)
+    if (!marker || !infoWindow) return
+
+    if (focusedOrderId !== orderId) {
+        map.setCenter(coords)
+        map.setZoom(17)
+    }
+    infoWindow.open({ map, anchor: marker })
+    focusedOrderId = orderId
 }
 
 const geocodeOrder = async (order: OrderListItem): Promise<void> => {
-    if (!order.addressDescription || !geocoder.value) return
-
-    try {
-        const { results } = await geocoder.value.geocode({ address: order.addressDescription })
-        if (results.length > 0 && results[0].geometry?.location) {
-            const loc = results[0].geometry.location
-            const coords = { lat: loc.lat(), lng: loc.lng() }
-            extraCoordsByOrderId.set(order.id, coords)
-            addOrderMarker(order, coords)
-            await recalculateRoute()
-        }
-    } catch (error) {
-        console.warn('Error al geocodificar dirección:', error)
-    }
+    const coords = await resolveOrderCoords(order)
+    if (!coords) return
+    addOrderMarker(order, coords)
+    await recalculateRoute()
 }
 
 // Geolocalización eliminada
@@ -665,3 +806,20 @@ const openInGoogleMaps = () => {
     window.open(url, '_blank')
 }
 </script>
+
+<style scoped>
+.contextual-hover-action {
+    opacity: 1;
+}
+
+@media (hover: hover) and (pointer: fine) {
+    .contextual-hover-action {
+        opacity: 0;
+    }
+
+    .contextual-action-group:hover .contextual-hover-action,
+    .contextual-action-group:focus-within .contextual-hover-action {
+        opacity: 1;
+    }
+}
+</style>

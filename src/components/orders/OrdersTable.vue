@@ -80,10 +80,19 @@
                 <tr v-else v-for="order in orders" :key="order.id" class="hover:bg-gray-50 transition-colors">
                     <!-- ID + productos (máx. 2 ítems + ....; hasta 2 líneas por nombre) -->
                     <td class="min-w-0 px-3 py-2 align-top">
-                        <div class="flex items-start gap-1.5 min-w-0 w-full">
+                        <div class="contextual-action-group flex items-start gap-1.5 min-w-0 w-full">
                             <router-link :to="{ name: 'OrderDetail', params: { id: order.id } }"
                                 class="shrink-0 text-sm font-medium text-emerald-600 hover:text-emerald-700 hover:underline whitespace-nowrap tabular-nums">
                                 #{{ order.id }}
+                            </router-link>
+                            <router-link
+                                v-if="canViewDeliveryLocation(order)"
+                                :to="deliveryLocationRoute(order)"
+                                class="contextual-hover-action flex shrink-0 items-center gap-0.5 rounded px-1 py-0.5 text-[10px] font-medium text-emerald-700 ring-1 ring-inset ring-emerald-200 transition hover:bg-emerald-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
+                                :aria-label="`Ver ubicación del pedido ${order.id}`"
+                                title="Ver ubicación">
+                                <MapPinIcon class="h-3 w-3" />
+                                <span>Ver ubicación</span>
                             </router-link>
                             <OrderSummaryLines :lines="order.summaryLines" />
                         </div>
@@ -266,23 +275,34 @@
                     </td>
 
                     <!-- Domiciliario (clickeable para asignar/cambiar) -->
-                    <td class="min-w-0 px-3 py-2">
-                        <button type="button" :disabled="!canAssignDeliveryman(order)" :class="[
-                            'text-left transition-colors w-full min-w-0',
-                            canAssignDeliveryman(order)
-                                ? 'hover:text-emerald-600 cursor-pointer'
-                                : 'cursor-not-allowed opacity-50'
-                        ]" @click.stop="canAssignDeliveryman(order) && $emit('assign-delivery', order)">
-                            <div v-if="order.deliveryManName" class="text-sm text-gray-900 truncate"
-                                :class="{ 'hover:underline': canAssignDeliveryman(order) }"
-                                :title="order.deliveryManName">
-                                {{ order.deliveryManName }}
-                            </div>
-                            <div v-else class="text-sm text-gray-400 italic"
-                                :class="{ 'hover:underline': canAssignDeliveryman(order) }">
-                                {{ canAssignDeliveryman(order) ? 'Asignar' : 'N/A' }}
-                            </div>
-                        </button>
+                    <td class="contextual-action-group min-w-0 px-3 py-2">
+                        <div class="flex min-w-0 items-start gap-1">
+                            <button type="button" :disabled="!canAssignDeliveryman(order)" :class="[
+                                'text-left transition-colors min-w-0 flex-1',
+                                canAssignDeliveryman(order)
+                                    ? 'hover:text-emerald-600 cursor-pointer'
+                                    : 'cursor-not-allowed opacity-50'
+                            ]" @click.stop="canAssignDeliveryman(order) && $emit('assign-delivery', order)">
+                                <div v-if="order.deliveryManName" class="text-sm text-gray-900 truncate"
+                                    :class="{ 'hover:underline': canAssignDeliveryman(order) }"
+                                    :title="order.deliveryManName">
+                                    {{ order.deliveryManName }}
+                                </div>
+                                <div v-else class="text-sm text-gray-400 italic"
+                                    :class="{ 'hover:underline': canAssignDeliveryman(order) }">
+                                    {{ canAssignDeliveryman(order) ? 'Asignar' : 'N/A' }}
+                                </div>
+                            </button>
+                            <button
+                                v-if="canCopyDeliveryInquiry(order)"
+                                type="button"
+                                class="contextual-hover-action shrink-0 rounded p-1 text-gray-400 transition hover:bg-emerald-50 hover:text-emerald-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
+                                :aria-label="`Copiar mensaje sobre el pedido ${order.id}`"
+                                title="Copiar mensaje"
+                                @click.stop="copyDeliveryInquiry(order)">
+                                <ClipboardDocumentIcon class="h-4 w-4" />
+                            </button>
+                        </div>
                     </td>
 
                     <!-- Fecha -->
@@ -320,11 +340,13 @@ import { useToast } from '@/composables/useToast'
 import { orderApi } from '@/services/MainAPI/orderApi'
 import { orderCashToCollect, sumPaymentsAmounts } from '@/utils/orderCashToCollect'
 import { orderHasElectronicPayments } from '@/utils/orderListPayments'
+import { buildDeliveryInquiryMessage } from '@/utils/deliveryInquiryMessage'
 import {
     ArrowsUpDownIcon,
     ChevronUpIcon,
     ChevronDownIcon,
     ClipboardDocumentIcon,
+    MapPinIcon,
 } from '@heroicons/vue/24/outline'
 
 interface Props {
@@ -423,6 +445,40 @@ async function copyCustomerPhone(order: OrderListItem) {
     }
 }
 
+const canViewDeliveryLocation = (order: OrderListItem): boolean =>
+    order.type === 'delivery' && order.status === 'on_the_way'
+
+const deliveryLocationRoute = (order: OrderListItem) => ({
+    name: 'DeliverymenManagement',
+    query: {
+        orderId: String(order.id),
+        branchId: String(order.branchId),
+        date: defaultBusinessCalendar.formatYmd(order.createdAt),
+    },
+})
+
+const canCopyDeliveryInquiry = (order: OrderListItem): boolean =>
+    order.type === 'delivery'
+    && order.status === 'on_the_way'
+    && Boolean(order.deliveryManName?.trim())
+
+async function copyDeliveryInquiry(order: OrderListItem) {
+    const deliverymanName = order.deliveryManName?.trim()
+    if (!deliverymanName) return
+    const message = buildDeliveryInquiryMessage({
+        deliverymanName,
+        orderId: order.id,
+        addressDescription: order.addressDescription,
+        addressAdditionalInfo: order.addressAdditionalInfo,
+    })
+    try {
+        await navigator.clipboard.writeText(message)
+        success('Mensaje copiado', 2500, `Pedido #${order.id}`)
+    } catch {
+        error('No se pudo copiar', 'Permite el acceso al portapapeles o copia el mensaje manualmente.')
+    }
+}
+
 const formatDate = (dateString: string): string => defaultBusinessCalendar.formatDateShort(dateString)
 
 const formatTime = (dateString: string): string => defaultBusinessCalendar.formatTime12h(dateString)
@@ -458,3 +514,20 @@ function paidInStoreCashCap(order: OrderListItem): number {
 }
 
 </script>
+
+<style scoped>
+.contextual-hover-action {
+    opacity: 1;
+}
+
+@media (hover: hover) and (pointer: fine) {
+    .contextual-hover-action {
+        opacity: 0;
+    }
+
+    .contextual-action-group:hover .contextual-hover-action,
+    .contextual-action-group:focus-within .contextual-hover-action {
+        opacity: 1;
+    }
+}
+</style>

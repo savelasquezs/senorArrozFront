@@ -312,6 +312,8 @@ export interface OrderListItem {
     addressAdditionalInfo?: string | null
     neighborhoodId: number | null
     neighborhoodName: string | null
+    latitude?: number | null
+    longitude?: number | null
     deliveryManId: number | null
     /** Ruta de domicilio (backend); null si no aplica o legado. */
     deliveryRouteId?: number | null
