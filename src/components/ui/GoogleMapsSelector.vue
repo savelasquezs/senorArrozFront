@@ -82,6 +82,36 @@
             </div>
         </div>
 
+        <!-- Driving route from the branch -->
+        <div
+            v-if="routeStatus !== 'idle' || (selectedLocation && routeOrigin === null)"
+            data-testid="route-summary"
+            class="rounded-lg border p-3"
+            :class="routeStatus === 'error' || routeOrigin === null
+                ? 'border-amber-200 bg-amber-50'
+                : 'border-emerald-200 bg-emerald-50'"
+        >
+            <div v-if="routeStatus === 'loading'" class="flex items-center gap-2 text-sm text-emerald-800">
+                <span class="h-4 w-4 animate-spin rounded-full border-2 border-emerald-600 border-t-transparent"></span>
+                Calculando recorrido…
+            </div>
+            <div v-else-if="routeStatus === 'success' && routeMetrics" class="space-y-1">
+                <p class="text-sm font-semibold text-emerald-900">
+                    Desde {{ routeOrigin?.label || 'la sucursal' }}:
+                    {{ formatDistance(routeMetrics.distanceMeters) }}
+                    · aprox. {{ formatDuration(routeMetrics.durationMillis) }} con tráfico actual
+                </p>
+                <p v-for="warning in routeMetrics.warnings" :key="warning" class="text-xs text-amber-800">
+                    {{ warning }}
+                </p>
+            </div>
+            <p v-else class="text-sm text-amber-800">
+                {{ routeOrigin === null
+                    ? 'La sucursal no tiene coordenadas válidas para calcular el recorrido.'
+                    : routeError }}
+            </p>
+        </div>
+
         <!-- Selected Coordinates Display -->
         <div v-if="selectedLocation || manualLocation" class="grid grid-cols-1 md:grid-cols-2 gap-4">
             <BaseInput :model-value="(selectedLocation?.lat || manualLocation?.lat)?.toFixed(6) ?? ''" label="Latitud"
@@ -151,6 +181,10 @@
 import { ref, watch, onMounted, onUnmounted } from 'vue'
 import { setOptions, importLibrary } from '@googlemaps/js-api-loader'
 import { parseGoogleMapsUrl } from '@/utils/parseGoogleMapsUrl'
+import {
+    RouteOptimizationService,
+    type SimpleRouteResult,
+} from '@/services/domain/RouteOptimizationService'
 import BaseInput from './BaseInput.vue'
 import BaseButton from './BaseButton.vue'
 import BaseDialog from './BaseDialog.vue'
@@ -168,6 +202,10 @@ interface Location {
     lng: number
 }
 
+export interface RouteOrigin extends Location {
+    label: string
+}
+
 interface SearchResult {
     formatted_address: string
     geometry: {
@@ -182,6 +220,8 @@ interface Props {
     modelValue?: Location | null
     error?: string
     initialAddress?: string
+    /** undefined: todavía resolviendo; null: sucursal sin coordenadas válidas. */
+    routeOrigin?: RouteOrigin | null
 }
 
 const props = withDefaults(defineProps<Props>(), {})
@@ -214,10 +254,21 @@ const mapsLinkError = ref('')
 // Google Maps instances
 let map: any = null
 let marker: any = null
+let originMarker: any = null
+let routePolyline: google.maps.Polyline | null = null
+let PolylineCtor: typeof google.maps.Polyline | null = null
+let AdvancedMarkerCtor: typeof google.maps.marker.AdvancedMarkerElement | null = null
+let PinElementCtor: typeof google.maps.marker.PinElement | null = null
 let geocoder: any = null
 let searchTimeout: any = null
 let sessionToken: any = null
 let placesLib: { AutocompleteSessionToken: any; AutocompleteSuggestion: any } | null = null
+
+type RouteStatus = 'idle' | 'loading' | 'success' | 'error'
+const routeStatus = ref<RouteStatus>('idle')
+const routeMetrics = ref<SimpleRouteResult | null>(null)
+const routeError = ref('')
+let routeRequestId = 0
 
 // Initialize map using @googlemaps/js-api-loader (mismo loader que DeliveryMap.vue)
 const initializeMap = async () => {
@@ -234,7 +285,12 @@ const initializeMap = async () => {
         })
 
         // Cargar todas las librerías necesarias en paralelo (incluyendo places)
-        const [{ Map }, { Geocoder }, { AdvancedMarkerElement }, { AutocompleteSessionToken, AutocompleteSuggestion }] =
+        const [
+            { Map, Polyline },
+            { Geocoder },
+            { AdvancedMarkerElement, PinElement },
+            { AutocompleteSessionToken, AutocompleteSuggestion },
+        ] =
             await Promise.all([
                 importLibrary('maps') as Promise<google.maps.MapsLibrary>,
                 importLibrary('geocoding') as Promise<google.maps.GeocodingLibrary>,
@@ -246,6 +302,9 @@ const initializeMap = async () => {
 
         // Guardar referencias de places para uso en searchAddress
         placesLib = { AutocompleteSessionToken, AutocompleteSuggestion }
+        PolylineCtor = Polyline
+        AdvancedMarkerCtor = AdvancedMarkerElement
+        PinElementCtor = PinElement
 
         const defaultLocation = { lat: 6.2442, lng: -75.5812 }
 
@@ -264,6 +323,10 @@ const initializeMap = async () => {
 
         map.addListener('click', (event: any) => {
             if (event.latLng && !isDestroyed.value && mapContainer.value?.parentNode) {
+                if (isManualMode.value) {
+                    map.setCenter(event.latLng)
+                    return
+                }
                 updateLocation({ lat: event.latLng.lat(), lng: event.latLng.lng() })
             }
         })
@@ -297,6 +360,7 @@ const initializeMap = async () => {
         }
 
         isMapLoaded.value = true
+        syncOriginMarker()
         syncFromModelValue()
 
     } catch (err) {
@@ -322,7 +386,162 @@ const updateLocation = (location: Location) => {
 
     if (!isDestroyed.value) {
         emit('update:modelValue', location)
+        void calculateRoute(location)
     }
+}
+
+const validRouteOrigin = (): RouteOrigin | null => {
+    const origin = props.routeOrigin
+    if (
+        !origin ||
+        !Number.isFinite(origin.lat) ||
+        !Number.isFinite(origin.lng) ||
+        origin.lat < -90 ||
+        origin.lat > 90 ||
+        origin.lng < -180 ||
+        origin.lng > 180
+    ) {
+        return null
+    }
+    return origin
+}
+
+const clearRoutePolyline = () => {
+    if (routePolyline) {
+        routePolyline.setMap(null)
+        routePolyline = null
+    }
+}
+
+const clearOriginMarker = () => {
+    if (!originMarker) return
+    try {
+        if (typeof originMarker.setMap === 'function') originMarker.setMap(null)
+        else originMarker.map = null
+    } catch {
+        // Ignore cleanup errors from a map that is being destroyed.
+    }
+    originMarker = null
+}
+
+const syncOriginMarker = () => {
+    if (!map || !isMapLoaded.value || isDestroyed.value) return
+    clearOriginMarker()
+    const origin = validRouteOrigin()
+    if (!origin) return
+
+    try {
+        if (AdvancedMarkerCtor) {
+            const pin = PinElementCtor
+                ? new PinElementCtor({
+                    background: '#059669',
+                    borderColor: '#047857',
+                    glyphColor: '#ffffff',
+                    glyphText: 'S',
+                })
+                : null
+            originMarker = new AdvancedMarkerCtor({
+                position: origin,
+                map,
+                title: `Sucursal ${origin.label}`,
+                ...(pin && { content: pin.element }),
+            })
+            return
+        }
+    } catch {
+        // Fall back to the classic marker when advanced markers are unavailable.
+    }
+
+    originMarker = new google.maps.Marker({
+        position: origin,
+        map,
+        title: `Sucursal ${origin.label}`,
+        label: { text: 'S', color: '#ffffff', fontWeight: '700' },
+        icon: {
+            path: google.maps.SymbolPath.CIRCLE,
+            fillColor: '#059669',
+            fillOpacity: 1,
+            strokeColor: '#ffffff',
+            strokeWeight: 2,
+            scale: 12,
+        },
+    })
+}
+
+const calculateRoute = async (destination: Location) => {
+    const requestId = ++routeRequestId
+    clearRoutePolyline()
+    routeMetrics.value = null
+    routeError.value = ''
+
+    const origin = validRouteOrigin()
+    if (!origin) {
+        routeStatus.value = props.routeOrigin === null ? 'error' : 'idle'
+        return
+    }
+
+    routeStatus.value = 'loading'
+    try {
+        const result = await RouteOptimizationService.getSimpleRoute(
+            { lat: origin.lat, lng: origin.lng },
+            destination
+        )
+        if (requestId !== routeRequestId || isDestroyed.value) return
+
+        if (!result) {
+            routeStatus.value = 'error'
+            routeError.value = 'No se pudo calcular un recorrido vial para esta ubicación.'
+            return
+        }
+
+        routeMetrics.value = result
+        routeStatus.value = 'success'
+
+        if (PolylineCtor && map && result.path.length > 0) {
+            routePolyline = new PolylineCtor({
+                path: result.path,
+                geodesic: false,
+                strokeColor: '#10b981',
+                strokeOpacity: 0.95,
+                strokeWeight: 5,
+                map,
+            })
+        }
+
+        if (map) {
+            const padding = { top: 48, right: 48, bottom: 48, left: 48 }
+            if (result.viewport) {
+                map.fitBounds(result.viewport, padding)
+            } else if (google.maps.LatLngBounds) {
+                const bounds = new google.maps.LatLngBounds()
+                bounds.extend(origin)
+                bounds.extend(destination)
+                result.path.forEach((point) => bounds.extend(point))
+                map.fitBounds(bounds, padding)
+            }
+        }
+    } catch (err) {
+        if (requestId !== routeRequestId || isDestroyed.value) return
+        console.warn('Error calculating branch route:', err)
+        routeStatus.value = 'error'
+        routeError.value = 'No fue posible consultar el recorrido en este momento.'
+    }
+}
+
+const formatDistance = (meters: number): string => {
+    if (meters < 1000) return `${Math.round(meters)} m`
+    return `${new Intl.NumberFormat('es-CO', {
+        minimumFractionDigits: 1,
+        maximumFractionDigits: 1,
+    }).format(meters / 1000)} km`
+}
+
+const formatDuration = (milliseconds: number): string => {
+    const minutes = Math.max(1, Math.round(milliseconds / 60_000))
+    if (minutes < 60) return `${minutes} min`
+    const hours = Math.floor(minutes / 60)
+    const remainingMinutes = minutes % 60
+    return remainingMinutes > 0 ? `${hours} h ${remainingMinutes} min` : `${hours} h`
 }
 
 function syncFromModelValue() {
@@ -451,6 +670,11 @@ const enableManualMode = () => {
     isManualMode.value = true
     searchResults.value = []
     searchQuery.value = ''
+    routeRequestId += 1
+    clearRoutePolyline()
+    routeMetrics.value = null
+    routeStatus.value = 'idle'
+    routeError.value = ''
 
     if (map) {
         const center = map.getCenter()
@@ -464,6 +688,9 @@ const enableManualMode = () => {
 const cancelManualMode = () => {
     isManualMode.value = false
     manualLocation.value = null
+    if (selectedLocation.value) {
+        void calculateRoute(selectedLocation.value)
+    }
 }
 
 const confirmManualLocation = async () => {
@@ -487,12 +714,12 @@ const confirmManualLocation = async () => {
 
 const confirmAddressAndLocation = () => {
     if (manualLocation.value) {
-        selectedLocation.value = manualLocation.value
+        const confirmedLocation = { ...manualLocation.value }
+        updateLocation(confirmedLocation)
         searchQuery.value = editableAddress.value
         isLocationConfirmed.value = true
 
-        emit('update:modelValue', manualLocation.value)
-        emit('location-confirmed', manualLocation.value)
+        emit('location-confirmed', confirmedLocation)
         emit('address-updated', editableAddress.value)
 
         // Reset manual mode
@@ -525,6 +752,23 @@ watch(
     }
 )
 
+watch(
+    () => props.routeOrigin,
+    () => {
+        if (!isMapLoaded.value || isDestroyed.value) return
+        syncOriginMarker()
+        if (selectedLocation.value) {
+            void calculateRoute(selectedLocation.value)
+        } else {
+            routeStatus.value = 'idle'
+            routeMetrics.value = null
+            routeError.value = ''
+            clearRoutePolyline()
+        }
+    },
+    { deep: true }
+)
+
 // Lifecycle
 onMounted(async () => {
     try {
@@ -538,6 +782,9 @@ onMounted(async () => {
 
 onUnmounted(() => {
     isDestroyed.value = true
+    routeRequestId += 1
+    clearRoutePolyline()
+    clearOriginMarker()
 
     // Clear timeout
     if (searchTimeout) {
@@ -573,6 +820,9 @@ onUnmounted(() => {
 
     geocoder = null
     placesLib = null
+    PolylineCtor = null
+    AdvancedMarkerCtor = null
+    PinElementCtor = null
 
     // Reset reactive state
     isMapLoaded.value = false
@@ -580,5 +830,8 @@ onUnmounted(() => {
     selectedLocation.value = null
     isLocationConfirmed.value = false
     error.value = ''
+    routeStatus.value = 'idle'
+    routeMetrics.value = null
+    routeError.value = ''
 })
 </script>

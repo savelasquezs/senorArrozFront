@@ -419,6 +419,7 @@
 
                 <AddressSelector
                   :customer-id="selectedCustomer.id"
+                  :branch-id="selectedCustomer.branchId"
                   :selected-address="selectedAddress?.id || undefined"
                   mode="persisted"
                   @address-selected="onContextAddressSelected"

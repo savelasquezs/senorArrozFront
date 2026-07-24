@@ -77,6 +77,7 @@
                     </span>
                 </div>
                 <AddressSelector :customer-id="props.selectedCustomer.id"
+                    :branch-id="props.selectedCustomer.branchId"
                     :selected-address="props.selectedAddress?.id || undefined" :mode="props.mode"
                     @address-selected="handleAddressSelected" />
             </div>

@@ -53,6 +53,7 @@
         <div v-if="localForm.address.trim() && showMapsSelector">
             <GoogleMapsSelector v-model="selectedLocation" :error="errors.latitude || errors.longitude"
                 :initial-address="localForm.address" @location-confirmed="handleLocationConfirmed"
+                :route-origin="routeOrigin"
                 :key="`maps-${props.addressId || 'new'}`" />
         </div>
 
@@ -82,11 +83,13 @@
 import { ref, reactive, computed, watch, onMounted } from "vue"
 import { useCustomersStore } from "@/store/customers"
 import { useBranchesStore } from "@/store/branches"
+import { useAuthStore } from "@/store/auth"
 import { useToast } from "@/composables/useToast"
+import { branchApi } from "@/services/MainAPI/branchApi"
 import type { CustomerAddressFormData } from "@/types/customer"
 import BaseInput from "@/components/ui/BaseInput.vue"
 import BaseButton from "@/components/ui/BaseButton.vue"
-import GoogleMapsSelector from "@/components/ui/GoogleMapsSelector.vue"
+import GoogleMapsSelector, { type RouteOrigin } from "@/components/ui/GoogleMapsSelector.vue"
 import NeighborhoodSearch from "@/components/neighborhoods/NeighborhoodSearch.vue"
 import {
     HomeIcon,
@@ -120,6 +123,7 @@ const emit = defineEmits<{
 const customersStore = useCustomersStore()
 const { error: showError } = useToast()
 const branchesStore = useBranchesStore()
+const authStore = useAuthStore()
 
 // Proxy local state with v-model
 const localForm = reactive({
@@ -156,8 +160,95 @@ const errors = reactive({
 })
 
 const selectedLocation = ref<{ lat: number; lng: number } | null>(null)
+const routeOrigin = ref<RouteOrigin | null | undefined>(undefined)
 const showMapsSelector = ref(false)
 const isLocationConfirmed = ref(false)
+let routeOriginRequestId = 0
+
+const validCoordinate = (value: unknown, min: number, max: number): value is number =>
+    typeof value === "number" &&
+    Number.isFinite(value) &&
+    value >= min &&
+    value <= max
+
+const buildRouteOrigin = (
+    label: string | null | undefined,
+    latitude: unknown,
+    longitude: unknown
+): RouteOrigin | null => {
+    if (
+        !validCoordinate(latitude, -90, 90) ||
+        !validCoordinate(longitude, -180, 180) ||
+        (latitude === 0 && longitude === 0)
+    ) {
+        return null
+    }
+    return {
+        label: label?.trim() || "la sucursal",
+        lat: latitude,
+        lng: longitude,
+    }
+}
+
+const resolveRouteOrigin = async () => {
+    const requestId = ++routeOriginRequestId
+    routeOrigin.value = undefined
+    const branchId = props.branchId || authStore.branchId
+    if (!branchId) {
+        routeOrigin.value = null
+        return
+    }
+
+    if (authStore.user?.branchId === branchId) {
+        const sessionOrigin = buildRouteOrigin(
+            authStore.user.branchName,
+            authStore.user.branchLatitude,
+            authStore.user.branchLongitude
+        )
+        if (sessionOrigin) {
+            routeOrigin.value = sessionOrigin
+            return
+        }
+    }
+
+    const loadedBranch =
+        (branchesStore.current?.id === branchId ? branchesStore.current : null) ??
+        branchesStore.list?.items?.find((branch) => branch.id === branchId)
+    const loadedOrigin = loadedBranch
+        ? buildRouteOrigin(loadedBranch.name, loadedBranch.latitude, loadedBranch.longitude)
+        : null
+    if (loadedOrigin) {
+        routeOrigin.value = loadedOrigin
+        return
+    }
+
+    try {
+        const response = await branchApi.getBranchById(branchId)
+        if (requestId !== routeOriginRequestId) return
+        routeOrigin.value = buildRouteOrigin(
+            response.data.name,
+            response.data.latitude,
+            response.data.longitude
+        )
+    } catch (error) {
+        if (requestId !== routeOriginRequestId) return
+        console.warn("Error loading branch coordinates for route preview:", error)
+        routeOrigin.value = null
+    }
+}
+
+watch(
+    () => [
+        props.branchId,
+        authStore.branchId,
+        authStore.user?.branchLatitude,
+        authStore.user?.branchLongitude,
+    ],
+    () => {
+        void resolveRouteOrigin()
+    },
+    { immediate: true }
+)
 
 /** Texto de dirección tal como vino del servidor (edición). */
 const baselineAddress = ref('')

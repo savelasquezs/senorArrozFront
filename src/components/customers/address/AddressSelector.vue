@@ -125,14 +125,14 @@
 
         <!-- Create Address Modal -->
         <BaseDialog v-model="showCreateModal" title="Agregar Nueva Dirección" size="lg">
-            <CustomerAddressForm v-model="addressFormData" :can-edit-delivery-fee="true" @submit="createAddress"
+            <CustomerAddressForm v-model="addressFormData" :branch-id="branchId" :can-edit-delivery-fee="true" @submit="createAddress"
                 @cancel="closeCreateModal" />
         </BaseDialog>
 
         <!-- Edit Address Modal -->
         <BaseDialog v-model="showEditModal" title="Editar Dirección" size="lg">
             <CustomerAddressForm v-if="editingAddress" v-model="editFormData" :addressId="editingAddress.id"
-                :can-edit-delivery-fee="true" @submit="updateAddress" @cancel="closeEditModal" />
+                :branch-id="branchId" :can-edit-delivery-fee="true" @submit="updateAddress" @cancel="closeEditModal" />
         </BaseDialog>
     </div>
 </template>
@@ -165,12 +165,14 @@ import {
 interface Props {
     customerId?: number
     selectedAddress?: number
+    branchId?: number
     mode?: 'draft' | 'persisted'
 }
 
 const props = withDefaults(defineProps<Props>(), {
     customerId: undefined,
     selectedAddress: undefined,
+    branchId: undefined,
     mode: 'draft'
 })
 

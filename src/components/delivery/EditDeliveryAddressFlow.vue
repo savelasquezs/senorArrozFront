@@ -10,6 +10,7 @@
                 :key="formKey"
                 v-model="addressForm"
                 :address-id="order.addressId || undefined"
+                :branch-id="order.branchId"
                 :can-edit-delivery-fee="false"
                 @submit="onFormSubmit"
                 @cancel="closeEntireFlow"

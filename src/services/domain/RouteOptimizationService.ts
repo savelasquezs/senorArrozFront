@@ -1,4 +1,13 @@
 import type { GeoLocation } from '@/composables/useGeolocation'
+import { importLibrary } from '@googlemaps/js-api-loader'
+
+export interface SimpleRouteResult {
+    distanceMeters: number
+    durationMillis: number
+    path: GeoLocation[]
+    viewport: google.maps.LatLngBounds | null
+    warnings: string[]
+}
 
 export class RouteOptimizationService {
     private static directionsService: any = null
@@ -61,21 +70,48 @@ export class RouteOptimizationService {
         })
     }
 
-    static async getSimpleRoute(origin: GeoLocation, destination: GeoLocation): Promise<any> {
-        if (!RouteOptimizationService.directionsService) return null
-        return new Promise((resolve) => {
-            RouteOptimizationService.directionsService.route(
-                {
-                    origin: { lat: origin.lat, lng: origin.lng },
-                    destination: { lat: destination.lat, lng: destination.lng },
-                    travelMode: (window as any).google.maps.TravelMode.DRIVING
-                },
-                (result: any, status: any) => {
-                    if (status === 'OK' && result) resolve(result.routes[0])
-                    else resolve(null)
-                }
-            )
+    static async getSimpleRoute(
+        origin: GeoLocation,
+        destination: GeoLocation
+    ): Promise<SimpleRouteResult | null> {
+        const { Route } = await importLibrary('routes') as google.maps.RoutesLibrary
+        const response = await Route.computeRoutes({
+            origin,
+            destination,
+            travelMode: 'DRIVING',
+            routingPreference: 'TRAFFIC_AWARE_OPTIMAL',
+            trafficModel: 'bestguess',
+            departureTime: new Date(),
+            language: 'es-CO',
+            region: 'co',
+            polylineQuality: 'OVERVIEW',
+            fields: [
+                'distanceMeters',
+                'durationMillis',
+                'path',
+                'viewport',
+                'warnings',
+            ],
         })
+
+        const route = response.routes?.[0]
+        if (
+            !route ||
+            typeof route.distanceMeters !== 'number' ||
+            typeof route.durationMillis !== 'number' ||
+            !Number.isFinite(route.distanceMeters) ||
+            !Number.isFinite(route.durationMillis)
+        ) {
+            return null
+        }
+
+        return {
+            distanceMeters: route.distanceMeters,
+            durationMillis: route.durationMillis,
+            path: (route.path ?? []).map((point) => ({ lat: point.lat, lng: point.lng })),
+            viewport: route.viewport ?? null,
+            warnings: route.warnings ?? [],
+        }
     }
 }
 
