@@ -81,7 +81,6 @@ export class RouteOptimizationService {
             travelMode: 'DRIVING',
             routingPreference: 'TRAFFIC_AWARE_OPTIMAL',
             trafficModel: 'bestguess',
-            departureTime: new Date(),
             language: 'es-CO',
             region: 'co',
             polylineQuality: 'OVERVIEW',

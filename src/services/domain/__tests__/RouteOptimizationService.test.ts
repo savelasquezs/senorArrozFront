@@ -60,8 +60,8 @@ describe('RouteOptimizationService.getSimpleRoute', () => {
                 'viewport',
                 'warnings',
             ],
-            departureTime: expect.any(Date),
         }))
+        expect(mapsMocks.computeRoutes.mock.calls[0][0]).not.toHaveProperty('departureTime')
         expect(result).toEqual({
             distanceMeters: 6425,
             durationMillis: 1_080_000,
