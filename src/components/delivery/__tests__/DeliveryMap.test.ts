@@ -217,9 +217,11 @@ describe('DeliveryMap', () => {
         expect(cameraSpies.setCenter).toHaveBeenCalledWith({ lat: 6.24, lng: -75.58 })
         expect(cameraSpies.setZoom).toHaveBeenCalledWith(17)
         expect(infoWindowSpies.open).toHaveBeenCalled()
+        expect(wrapper.emitted('focus-completed')).toEqual([[567]])
 
         cameraSpies.setCenter.mockClear()
         cameraSpies.setZoom.mockClear()
+        await wrapper.setProps({ focusOrderId: null })
         await wrapper.setProps({
             orders: [{ ...order(567, 6.24, -75.58), updatedAt: 'later' }] as any,
         })

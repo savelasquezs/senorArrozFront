@@ -115,6 +115,7 @@ const props = defineProps<Props>()
 const emit = defineEmits<{
     'route-calculated': [waypointOrder: number[]]
     'focus-unavailable': [message: string]
+    'focus-completed': [orderId: number]
 }>()
 const { success, error, warning } = useToast()
 
@@ -517,10 +518,7 @@ watch(
         focusRequestVersion += 1
         focusedOrderId = null
         focusWarningOrderId = null
-        if (props.focusOrderId == null) {
-            for (const infoWindow of orderInfoWindows.values()) infoWindow.close()
-            return
-        }
+        if (props.focusOrderId == null) return
         void tryFocusOrder()
     },
 )
@@ -711,12 +709,14 @@ async function tryFocusOrder(): Promise<void> {
     const infoWindow = orderInfoWindows.get(orderId)
     if (!marker || !infoWindow) return
 
-    if (focusedOrderId !== orderId) {
+    const shouldMoveCamera = focusedOrderId !== orderId
+    if (shouldMoveCamera) {
         map.setCenter(coords)
         map.setZoom(17)
     }
     infoWindow.open({ map, anchor: marker })
     focusedOrderId = orderId
+    if (shouldMoveCamera) emit('focus-completed', orderId)
 }
 
 const geocodeOrder = async (order: OrderListItem): Promise<void> => {

@@ -165,7 +165,8 @@ describe('DeliverymenManagementView focused order navigation', () => {
                     },
                     DeliveryMap: {
                         props: ['orders', 'deliverymanLocations', 'focusOrderId'],
-                        template: '<div data-test="delivery-map" :data-focus="focusOrderId" :data-orders="orders.length" />',
+                        emits: ['focus-completed'],
+                        template: '<button data-test="delivery-map" :data-focus="focusOrderId" :data-orders="orders.length" @click="$emit(\'focus-completed\', focusOrderId)" />',
                     },
                 },
             },
@@ -191,6 +192,9 @@ describe('DeliverymenManagementView focused order navigation', () => {
         expect(map.attributes('data-focus')).toBe('567')
         expect(map.attributes('data-orders')).toBe('1')
         expect(scrollIntoView).toHaveBeenCalledWith({ behavior: 'smooth', block: 'start' })
+
+        await map.trigger('click')
+        expect(wrapper.get('[data-test="delivery-map"]').attributes('data-focus')).toBeUndefined()
 
         wrapper.unmount()
     })

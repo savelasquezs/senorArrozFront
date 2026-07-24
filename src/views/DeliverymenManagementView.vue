@@ -103,6 +103,8 @@
                         :orders="mapOrders"
                         :deliveryman-locations="driverLocations"
                         :focus-order-id="focusOrderId"
+                        @focus-completed="handleInitialFocusCompleted"
+                        @focus-unavailable="handleInitialFocusUnavailable"
                     />
                 </div>
             </div>
@@ -512,6 +514,14 @@ async function handleDateChange() {
     delete query.date
     await router.replace({ name: 'DeliverymenManagement', query })
     await loadData()
+}
+
+function handleInitialFocusCompleted(orderId: number) {
+    if (focusOrderId.value === orderId) focusOrderId.value = null
+}
+
+function handleInitialFocusUnavailable() {
+    focusOrderId.value = null
 }
 
 // Handler: abrir modal de detalle con getDaySummary (datos frescos)
