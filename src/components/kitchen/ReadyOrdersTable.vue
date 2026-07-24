@@ -51,6 +51,15 @@
                                     <span class="sm:hidden">Impr.</span>
                                 </span>
                             </BaseButton>
+                            <BaseButton
+                                v-if="canReturnToPreparation"
+                                class="ml-2"
+                                @click="$emit('return-to-preparation', order.id)"
+                                variant="outline"
+                                size="sm"
+                            >
+                                Volver a preparación
+                            </BaseButton>
                         </td>
                     </tr>
                 </tbody>
@@ -74,10 +83,14 @@ import { PrinterIcon, ClockIcon } from '@heroicons/vue/24/outline'
 interface Props {
     orders: OrderListItem[]
     orderItemsMap: Map<number, OrderDetailItem[]>
+    canReturnToPreparation?: boolean
 }
 
 const props = defineProps<Props>()
-defineEmits<{ reprint: [orderId: number] }>()
+defineEmits<{
+    reprint: [orderId: number]
+    'return-to-preparation': [orderId: number]
+}>()
 
 const getOrderItems = (orderId: number): OrderDetailItem[] => {
     return props.orderItemsMap.get(orderId) || []

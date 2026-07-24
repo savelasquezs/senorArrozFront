@@ -174,6 +174,14 @@
                             :status-time="getStatusTime(order)" :clickable="order.status !== 'cancelled'"
                             @click="$emit('change-status', order)" />
                         <button
+                            v-if="order.status === 'ready' && permissions.canChangeStatus(order, 'in_preparation')"
+                            type="button"
+                            class="mt-1 block text-[11px] font-medium text-amber-700 hover:text-amber-900 underline decoration-dotted"
+                            @click.stop="$emit('return-to-preparation', order)"
+                        >
+                            Volver a preparación
+                        </button>
+                        <button
                             v-if="permissions.canUncancel(order)"
                             type="button"
                             class="mt-1 block text-[11px] font-medium text-emerald-700 hover:text-emerald-900 underline decoration-dotted"
@@ -372,6 +380,7 @@ const emit = defineEmits<{
     'edit-customer': [order: OrderListItem]
     'edit-address': [order: OrderListItem]
     'change-status': [order: OrderListItem]
+    'return-to-preparation': [order: OrderListItem]
     'uncancel-order': [order: OrderListItem]
     'assign-delivery': [order: OrderListItem]
     'edit-type': [order: OrderListItem]

@@ -128,6 +128,7 @@
                                     enable-paid-in-store-quick-action enable-app-settle-quick-action
                                     @edit-customer="handleEditCustomer" @edit-address="handleEditAddress"
                                     @change-status="handleChangeStatus" @assign-delivery="handleAssignDelivery"
+                                    @return-to-preparation="handleReturnToPreparation"
                                     @edit-type="handleEditType" @verify-bank-payment="handleVerifyBankPayment"
                                     @settle-app-payment="handleSettleAppPayment"
                                     @edit-bank-payment="handleEditBankPaymentFromList"
@@ -154,6 +155,7 @@
                                         enable-paid-in-store-quick-action enable-app-settle-quick-action
                                         @edit-customer="handleEditCustomer" @edit-address="handleEditAddress"
                                         @change-status="handleChangeStatus" @assign-delivery="handleAssignDelivery"
+                                        @return-to-preparation="handleReturnToPreparation"
                                         @edit-type="handleEditType" @verify-bank-payment="handleVerifyBankPayment"
                                         @settle-app-payment="handleSettleAppPayment"
                                         @edit-bank-payment="handleEditBankPaymentFromList"
@@ -1223,6 +1225,29 @@ const handleChangeStatus = async (order: OrderListItem) => {
         }
 
         success('Estado actualizado', 5000, `Pedido cambiado a ${getOrderStatusDisplayName(nextStatus)}`)
+    } catch (err: any) {
+        error('Error al cambiar estado', err.message)
+    }
+}
+
+const handleReturnToPreparation = async (order: OrderListItem) => {
+    if (!canChangeStatus(order, 'in_preparation')) {
+        error('Sin permisos', 'No tienes permiso para devolver este pedido a preparación')
+        return
+    }
+
+    try {
+        const updatedOrder = await orderApi.updateStatus(order.id, 'in_preparation')
+        const index = orders.value.findIndex(o => o.id === order.id)
+        if (index !== -1) {
+            orders.value[index] = {
+                ...orders.value[index],
+                status: updatedOrder.status,
+                statusDisplayName: getOrderStatusDisplayName(updatedOrder.status),
+                updatedAt: updatedOrder.updatedAt
+            }
+        }
+        success('Estado actualizado', 5000, 'Pedido devuelto a En preparación')
     } catch (err: any) {
         error('Error al cambiar estado', err.message)
     }

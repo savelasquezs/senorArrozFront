@@ -128,7 +128,9 @@
             </div>
 
             <div v-else-if="activeTab === 'ready'">
-                <ReadyOrdersTable :orders="readyOrders" :order-items-map="orderItemsMap" @reprint="handleReprint" />
+                <ReadyOrdersTable :orders="readyOrders" :order-items-map="orderItemsMap"
+                    :can-return-to-preparation="authStore.isAdmin || authStore.isSuperadmin"
+                    @reprint="handleReprint" @return-to-preparation="handleReturnToPreparation" />
             </div>
 
             <div v-else-if="activeTab === 'hourly_summary'" class="space-y-3 sm:space-y-4">
@@ -669,6 +671,14 @@ const handleReprint = async (orderId: number) => {
         const msg = err instanceof Error ? err.message : 'No se pudo encolar la reimpresiÃ³n.'
         error('ReimpresiÃ³n', msg)
     }
+}
+
+const handleReturnToPreparation = async (orderId: number) => {
+    if (!authStore.isAdmin && !authStore.isSuperadmin) {
+        error('Sin permisos', 'Solo un administrador puede devolver pedidos a preparación.')
+        return
+    }
+    await executeStatusChange([orderId], 'in_preparation')
 }
 
 onMounted(async () => {

@@ -151,6 +151,44 @@ describe('useOrderPermissions - canUncancel', () => {
     })
 })
 
+describe('useOrderPermissions - ready a in_preparation', () => {
+    beforeEach(() => {
+        setActivePinia(createPinia())
+        const auth = useAuthStore()
+        auth.user = {
+            id: 2,
+            name: 'A',
+            email: 'a@test.com',
+            phone: '',
+            active: true,
+            role: UserRole.ADMIN,
+            branchId: 1,
+            branchName: 'B',
+        }
+    })
+
+    it('permite a Admin devolver un pedido listo a preparación', () => {
+        const { canChangeStatus, getAllowedStatusTransitions } = useOrderPermissions()
+        const order = baseOrder({ status: 'ready' })
+
+        expect(canChangeStatus(order, 'in_preparation')).toBe(true)
+        expect(getAllowedStatusTransitions('ready')).toContain('in_preparation')
+    })
+
+    it.each([UserRole.CASHIER, UserRole.KITCHEN, UserRole.DELIVERYMAN])(
+        'no permite el retroceso al rol %s',
+        (role) => {
+            const auth = useAuthStore()
+            const u = auth.user
+            if (!u) throw new Error('expected user')
+            auth.user = { ...u, role }
+
+            const { canChangeStatus } = useOrderPermissions()
+            expect(canChangeStatus(baseOrder({ status: 'ready' }), 'in_preparation')).toBe(false)
+        }
+    )
+})
+
 describe('useOrderPermissions — canCancel', () => {
     afterEach(() => {
         vi.useRealTimers()
