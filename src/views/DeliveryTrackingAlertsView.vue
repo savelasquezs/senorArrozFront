@@ -93,7 +93,7 @@
       </BaseCard>
 
       <BaseDialog v-model="resolveOpen" title="Resolver alerta" size="lg" :close-on-backdrop="!saving">
-        <div class="rounded-xl border border-amber-100 bg-amber-50 p-4 text-sm text-amber-900">La alerta quedará en el historial y será incluida en el resumen de auditoría diaria.</div>
+        <div class="rounded-xl border border-amber-100 bg-amber-50 p-4 text-sm text-amber-900">La alerta quedará en el historial. Solo los cortes de GPS o permiso y las permanencias inesperadas se incluyen en la auditoría diaria.</div>
         <label class="mt-4 block text-sm font-medium text-gray-700">Motivo o acción tomada<textarea v-model="resolutionReason" maxlength="500" rows="4" class="mt-1.5 w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100" placeholder="Describe brevemente qué se verificó o corrigió" /></label>
         <template #footer><BaseButton variant="outline" :disabled="saving" @click="resolveOpen = false">Cancelar</BaseButton><BaseButton :loading="saving" @click="confirmResolve">Resolver alerta</BaseButton></template>
       </BaseDialog>
