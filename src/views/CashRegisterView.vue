@@ -415,7 +415,7 @@
 
                   <div v-if="movementsBankId != null && expected" class="mt-2">
                     <BankMovementsPanel :key="movementsBankId" :bank-id="movementsBankId"
-                      :branch-id="authStore.branchId ?? undefined" embedded lock-date-range
+                      :branch-id="activeBranchId ?? undefined" embedded lock-date-range
                       :initial-from-date="todayBankMovementsYmd" :initial-to-date="todayBankMovementsYmd" />
                   </div>
                 </div>
@@ -453,8 +453,8 @@
 
     </div>
 
-    <CashClosureHistoryModal v-model="showHistoryModal" :branch-id="authStore.branchId" />
-    <CashVaultMovementHistoryModal v-model="showVaultHistoryModal" :branch-id="authStore.branchId" />
+    <CashClosureHistoryModal v-model="showHistoryModal" :branch-id="activeBranchId" />
+    <CashVaultMovementHistoryModal v-model="showVaultHistoryModal" :branch-id="activeBranchId" />
     <ExpenseFormModal v-if="showExpenseFormModal" :is-open="showExpenseFormModal" @close="closeExpenseFormModal"
       @submit="onExpenseSaved" />
 
@@ -558,7 +558,7 @@
       </template>
     </BaseDialog>
 
-    <DeliveryAdvanceLoanModal v-model="deliveryAdvanceModalOpen" :branch-id="authStore.branchId"
+    <DeliveryAdvanceLoanModal v-model="deliveryAdvanceModalOpen" :branch-id="activeBranchId"
       @success="onDeliveryAdvanceSuccess" />
 
     <BaseDialog v-model="deactivateDialogOpen" title="Dar de baja préstamo informal" size="md"
@@ -600,6 +600,7 @@ import DeliveryAdvanceLoanModal from '@/components/cashRegister/DeliveryAdvanceL
 import ExpenseFormModal from '@/components/expenses/ExpenseFormModal.vue'
 import BankMovementsPanel from '@/components/payments/banks/BankMovementsPanel.vue'
 import { useAuthStore } from '@/store/auth'
+import { useBranchContextStore } from '@/store/branchContext'
 import { formatYmdBogota } from '@/utils/colombiaDate'
 import { defaultBusinessCalendar } from '@/utils/datetime'
 import {
@@ -623,6 +624,10 @@ import type { ExpenseHeader } from '@/types/expense'
 import { DENOMINATIONS } from '@/types/cashRegister'
 
 const authStore = useAuthStore()
+const branchContext = useBranchContextStore()
+const activeBranchId = computed(() =>
+  authStore.isSuperadmin ? branchContext.selectedBranchId : authStore.branchId,
+)
 const { success: toastSuccess, error: toastError } = useToast()
 
 const showHistoryModal = ref(false)
@@ -680,11 +685,11 @@ const bankReconciliations = ref<
 const movementsBankId = ref<number | null>(null)
 
 function denomsStorageKey(): string {
-  return `senor-arroz:cash-register-denoms:${authStore.branchId ?? 0}`
+  return `senor-arroz:cash-register-denoms:${activeBranchId.value ?? 0}`
 }
 
 function bankActualsStorageKey(): string {
-  return `senor-arroz:cash-register-bank-actuals:${authStore.branchId ?? 0}`
+  return `senor-arroz:cash-register-bank-actuals:${activeBranchId.value ?? 0}`
 }
 
 /** Identifica el periodo entre el último cuadre y el próximo; si cambia, el borrador guardado no aplica. */
@@ -1012,7 +1017,7 @@ function bankDifference(recon: CloseBankReconciliationDto): number {
 }
 
 async function refreshExpectedPreservingBankActuals() {
-  const branchId = authStore.branchId ?? undefined
+  const branchId = activeBranchId.value ?? undefined
   const exp = await cashRegisterApi.getExpected(branchId)
   expected.value = exp
   const existingRows = new Map(bankReconciliations.value.map((r) => [r.bankId, r]))
@@ -1052,7 +1057,7 @@ async function loadBranchInformalLoans() {
   informalLoansLoading.value = true
   try {
     const scope = loansTab.value === 'inactive' ? 'inactive' : 'active'
-    branchInformalLoans.value = await cashRegisterApi.getInformalLoans(authStore.branchId ?? undefined, scope)
+    branchInformalLoans.value = await cashRegisterApi.getInformalLoans(activeBranchId.value ?? undefined, scope)
   } catch (e) {
     console.error('Error cargando préstamos informales:', e)
     branchInformalLoans.value = []
@@ -1098,7 +1103,7 @@ async function submitNewLoan() {
   try {
     await cashRegisterApi.createInformalLoan(
       { concept: c, amount: Number(newLoanAmount.value) || 0 },
-      authStore.branchId ?? undefined
+      activeBranchId.value ?? undefined
     )
     newLoanConcept.value = ''
     newLoanAmount.value = 0
@@ -1155,7 +1160,7 @@ async function submitEditLoan() {
     await cashRegisterApi.updateInformalLoan(
       loan.id,
       { concept, amount },
-      authStore.branchId ?? undefined
+      activeBranchId.value ?? undefined
     )
     editLoanDialogOpen.value = false
     loanToEdit.value = null
@@ -1203,7 +1208,7 @@ async function submitVaultAbono() {
         amount: n,
         note: vaultAbonoNote.value.trim() || undefined,
       },
-      authStore.branchId ?? undefined
+      activeBranchId.value ?? undefined
     )
     vaultAbonoOpen.value = false
     toastSuccess('Abono registrado', 4000)
@@ -1246,7 +1251,7 @@ async function submitVaultDescarga() {
         withdrawAll: all,
         note: vaultDescargaNote.value.trim() || undefined,
       },
-      authStore.branchId ?? undefined
+      activeBranchId.value ?? undefined
     )
     vaultDescargaOpen.value = false
     toastSuccess('Descarga registrada', 4000)
@@ -1266,7 +1271,7 @@ async function confirmDeactivateLoan() {
     await cashRegisterApi.deactivateInformalLoan(
       loan.id,
       { notes: deactivateNotes.value.trim() || undefined },
-      authStore.branchId ?? undefined
+      activeBranchId.value ?? undefined
     )
     deactivateDialogOpen.value = false
     loanToDeactivate.value = null
@@ -1283,7 +1288,7 @@ async function confirmDeactivateLoan() {
 async function loadData() {
   loading.value = true
   try {
-    const branchId = authStore.branchId ?? undefined
+    const branchId = activeBranchId.value ?? undefined
     expected.value = await cashRegisterApi.getExpected(branchId)
     movementsBankId.value = null
 
@@ -1347,7 +1352,7 @@ async function saveClosure() {
       })),
     }
 
-    const closure = await cashRegisterApi.closeCashRegister(dto, authStore.branchId ?? undefined)
+    const closure = await cashRegisterApi.closeCashRegister(dto, activeBranchId.value ?? undefined)
     if (closure.auditDispatchStatus === 'sent') {
       toastSuccess('Cuadre guardado y auditoría enviada', 5000)
     } else if (closure.auditDispatchStatus === 'already_sent') {

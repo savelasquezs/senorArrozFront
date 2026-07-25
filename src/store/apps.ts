@@ -17,6 +17,7 @@ import {
 } from './helpers/resourceStore'
 
 let appsListEnsureInFlight: Promise<void> | null = null
+let appsLoadedBranchId: number | null = null
 
 type FetchOpts = ResourceActionOptions
 
@@ -33,14 +34,25 @@ export const useAppsStore = defineStore('apps', () => {
         }, { ...opts, errorMessage: 'Error al obtener apps' })
     }
 
-    const ensureListLoaded = async () => {
-        if (list.value?.items?.length) {
+    const ensureListLoaded = async (branchId?: number | null) => {
+        const normalizedBranchId = branchId && branchId > 0 ? branchId : null
+        if (list.value?.items?.length && appsLoadedBranchId === normalizedBranchId) {
             return
         }
         if (appsListEnsureInFlight) {
             return appsListEnsureInFlight
         }
-        appsListEnsureInFlight = fetch({ page: 1, pageSize: 100 }).finally(() => {
+        if (appsLoadedBranchId !== normalizedBranchId) {
+            list.value = null
+            byBank.value = null
+        }
+        appsListEnsureInFlight = fetch({
+            page: 1,
+            pageSize: 100,
+            branchId: normalizedBranchId ?? undefined,
+        }).then(() => {
+            appsLoadedBranchId = normalizedBranchId
+        }).finally(() => {
             appsListEnsureInFlight = null
         })
         return appsListEnsureInFlight
@@ -110,6 +122,7 @@ export const useAppsStore = defineStore('apps', () => {
     const clearList = () => {
         list.value = null
         byBank.value = null
+        appsLoadedBranchId = null
         clearError()
     }
 

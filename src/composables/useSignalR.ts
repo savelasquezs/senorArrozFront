@@ -1,6 +1,7 @@
 import { ref, onMounted, onUnmounted } from 'vue'
 import * as signalR from '@microsoft/signalr'
-import { getAccessToken } from '@/services/auth/authSession'
+import { getAccessToken, getStoredUser } from '@/services/auth/authSession'
+import { getSelectedBranchIdForRequest } from '@/services/branchContextSession'
 
 export type SignalRConnectionState = 'disconnected' | 'connecting' | 'connected' | 'reconnecting' | 'error'
 
@@ -13,6 +14,15 @@ export function useSignalR(hubUrl: string) {
     let isConnecting = false
     let reconnectTimer: number | undefined
     let shouldReconnect = true
+
+    const scopedHubUrl = () => {
+        const user = getStoredUser()
+        const branchId = getSelectedBranchIdForRequest()
+        if (user?.role?.toLowerCase() !== 'superadmin' || !branchId) return hubUrl
+
+        const separator = hubUrl.includes('?') ? '&' : '?'
+        return `${hubUrl}${separator}branchId=${encodeURIComponent(branchId)}`
+    }
 
     const registerHandlers = () => {
         if (!connection.value) return
@@ -33,7 +43,7 @@ export function useSignalR(hubUrl: string) {
         try {
             connection.value = null
             connection.value = new signalR.HubConnectionBuilder()
-                .withUrl(hubUrl, {
+                .withUrl(scopedHubUrl(), {
                     accessTokenFactory: () => {
                         return getAccessToken() || ''
                     }

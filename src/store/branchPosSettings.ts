@@ -62,6 +62,13 @@ export const useBranchPosSettingsStore = defineStore('branchPosSettings', () => 
         }
     }
 
+    function clear() {
+        maxFreeDeliveryDiscount.value = DEFAULT_MAX_FREE_DELIVERY
+        posCopyEtaMinMinutes.value = DEFAULT_POS_COPY_ETA_MIN_MINUTES
+        posCopyEtaRangeMinutes.value = DEFAULT_POS_COPY_ETA_RANGE_MINUTES
+        loadedBranchId.value = null
+    }
+
     return {
         maxFreeDeliveryDiscount,
         posCopyEtaMinMinutes,
@@ -70,5 +77,6 @@ export const useBranchPosSettingsStore = defineStore('branchPosSettings', () => 
         loadedBranchId,
         isLoading,
         ensureForBranch,
+        clear,
     }
 })

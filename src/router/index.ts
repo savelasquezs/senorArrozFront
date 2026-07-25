@@ -1,8 +1,10 @@
 // src/router/index.ts
 import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router'
 import { useAuthStore } from '@/store/auth'
+import { useBranchContextStore } from '@/store/branchContext'
 import { hasAccessToken } from '@/services/auth/authSession'
 import { UserRole } from '@/types/auth'
+import { bootstrapOrderCatalog } from '@/utils/orderCatalogBootstrap'
 
 // Import views
 import Login from '@/views/Login.vue'
@@ -385,6 +387,7 @@ const router = createRouter({
 // Navigation guards
 router.beforeEach(async (to, _from, next) => {
 	const authStore = useAuthStore()
+	const branchContext = useBranchContextStore()
 
 	// Initialize auth state if not already done
 	if (!authStore.isAuthenticated && hasAccessToken()) {
@@ -396,7 +399,26 @@ router.beforeEach(async (to, _from, next) => {
 
     // Check if route requires authentication
     if (to.meta.requiresAuth && !authStore.isAuthenticated) {
+        branchContext.reset()
         return next('/login')
+    }
+
+    if (authStore.isAuthenticated && authStore.user) {
+        try {
+            await branchContext.initializeForUser(authStore.user)
+            await bootstrapOrderCatalog(authStore.userRole, branchContext.selectedBranchId)
+        } catch (error) {
+            console.error('No se pudo inicializar el contexto de sucursal:', error)
+        }
+    }
+
+    if (
+        authStore.isSuperadmin
+        && branchContext.isInitialized
+        && !branchContext.hasBranches
+        && !to.path.startsWith('/branches')
+    ) {
+        return next('/branches')
     }
 
     // If authenticated user tries to access login, redirect to dashboard

@@ -133,6 +133,13 @@ export const useOrdersDataStore = defineStore('ordersData', () => {
         clearError()
     }
 
+    const clearAll = () => {
+        list.value = null
+        current.value = null
+        users.value = []
+        clearError()
+    }
+
     const loadUsers = async () => {
         try {
             // const response = await userApi.getUsers({ page: 1, pageSize: 1000 })
@@ -205,6 +212,7 @@ export const useOrdersDataStore = defineStore('ordersData', () => {
         updateStatus,
         remove,
         clear,
+        clearAll,
         loadUsers,
         fetchDeliveryReady,
         selfAssignOrders,

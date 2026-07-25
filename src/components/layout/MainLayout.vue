@@ -56,6 +56,7 @@ import { ref, computed, onBeforeUnmount, onMounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useAuthStore } from '@/store/auth';
 import { useWhatsAppStore } from '@/store/whatsapp';
+import { useBranchContextStore } from '@/store/branchContext';
 import { bootstrapOrderCatalog } from '@/utils/orderCatalogBootstrap';
 import { UserRole } from '@/types/auth';
 import Sidebar from '@/components/layout/Sidebar.vue';
@@ -79,6 +80,7 @@ const route = useRoute();
 const router = useRouter();
 const authStore = useAuthStore();
 const whatsappStore = useWhatsAppStore();
+const branchContext = useBranchContextStore();
 const { toasts, removeToast } = useToast();
 const { permission, requestPermission, notify } = useNotifications();
 const { playWhatsAppMessageSound } = useNotificationSound();
@@ -125,7 +127,10 @@ function isBranchDetailPath(path: string) {
 
 function prefetchOrderCatalog() {
 	if (!authStore.isAuthenticated || !canTakeOrders.value) return;
-	void bootstrapOrderCatalog(authStore.userRole);
+	void bootstrapOrderCatalog(
+		authStore.userRole,
+		authStore.isSuperadmin ? branchContext.selectedBranchId : authStore.branchId,
+	);
 }
 
 async function refreshWhatsAppUnreadSummary(options?: { notifyNewMessages?: boolean }) {

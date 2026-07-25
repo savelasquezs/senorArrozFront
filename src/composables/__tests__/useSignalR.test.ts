@@ -27,6 +27,8 @@ const mocks = vi.hoisted(() => {
   return {
     connection,
     builder,
+    user: null as { role: string } | null,
+    branchId: null as number | null,
     HubConnectionBuilder: vi.fn(function HubConnectionBuilder() {
       return builder
     }),
@@ -47,6 +49,11 @@ vi.mock('@microsoft/signalr', () => ({
 
 vi.mock('@/services/auth/authSession', () => ({
   getAccessToken: vi.fn(() => 'test-token'),
+  getStoredUser: vi.fn(() => mocks.user),
+}))
+
+vi.mock('@/services/branchContextSession', () => ({
+  getSelectedBranchIdForRequest: vi.fn(() => mocks.branchId),
 }))
 
 import { useSignalR } from '@/composables/useSignalR'
@@ -67,6 +74,8 @@ describe('useSignalR', () => {
     vi.useFakeTimers()
     vi.clearAllMocks()
     mocks.connection.state = 'Disconnected'
+    mocks.user = null
+    mocks.branchId = null
     mocks.connection.start.mockImplementation(async () => {
       mocks.connection.state = 'Connected'
     })
@@ -77,6 +86,20 @@ describe('useSignalR', () => {
     mocks.builder.withAutomaticReconnect.mockReturnValue(mocks.builder)
     mocks.builder.configureLogging.mockReturnValue(mocks.builder)
     mocks.builder.build.mockReturnValue(mocks.connection)
+  })
+
+  it('scopes a superadmin connection to the selected branch', async () => {
+    mocks.user = { role: 'Superadmin' }
+    mocks.branchId = 2
+
+    const mounted = mountSignalR()
+    await flushPromises()
+
+    expect(mocks.builder.withUrl).toHaveBeenCalledWith(
+      '/hubs/whatsapp?branchId=2',
+      expect.any(Object),
+    )
+    mounted.wrapper.unmount()
   })
 
   afterEach(() => {

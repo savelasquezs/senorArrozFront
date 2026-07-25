@@ -21,6 +21,7 @@ import {
 } from './helpers/resourceStore';
 
 let neighborhoodsLoadInFlight: Promise<void> | null = null;
+let neighborhoodsLoadedBranchId: number | null = null;
 
 type FetchOpts = ResourceActionOptions;
 
@@ -144,16 +145,19 @@ export const useCustomersStore = defineStore('customers', () => {
         }, { ...opts, errorMessage: 'Error al cargar barrios' });
     };
 
-    const ensureNeighborhoodsLoaded = async () => {
-        if (neighborhoods.value.length > 0) {
+    const ensureNeighborhoodsLoaded = async (branchId?: number | null) => {
+        const normalizedBranchId = branchId && branchId > 0 ? branchId : null;
+        if (neighborhoods.value.length > 0 && neighborhoodsLoadedBranchId === normalizedBranchId) {
             return;
         }
         if (neighborhoodsLoadInFlight) {
             return neighborhoodsLoadInFlight;
         }
+        if (neighborhoodsLoadedBranchId !== normalizedBranchId) neighborhoods.value = [];
         neighborhoodsLoadInFlight = (async () => {
             try {
                 await fetchNeighborhoods();
+                neighborhoodsLoadedBranchId = normalizedBranchId;
             } finally {
                 neighborhoodsLoadInFlight = null;
             }
@@ -191,6 +195,8 @@ export const useCustomersStore = defineStore('customers', () => {
 
     const clearList = () => {
         list.value = null;
+        neighborhoods.value = [];
+        neighborhoodsLoadedBranchId = null;
         clearError();
     };
 

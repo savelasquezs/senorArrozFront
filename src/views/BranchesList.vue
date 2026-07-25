@@ -194,6 +194,8 @@
 import { onMounted, ref, computed } from 'vue'
 import { useBranchesStore } from '@/store/branches'
 import { useAuthStore } from '@/store/auth'
+import { useBranchContextStore } from '@/store/branchContext'
+import { resetBranchScopedState } from '@/utils/branchScopedState'
 import { useToast } from '@/composables/useToast'
 import { useRouter } from 'vue-router'
 
@@ -224,6 +226,7 @@ import {
 
 const store = useBranchesStore()
 const auth = useAuthStore()
+const branchContext = useBranchContextStore()
 const router = useRouter()
 const { success, error: showError } = useToast()
 
@@ -276,7 +279,12 @@ const clearFilters = async () => {
     await load()
 }
 
-const goDetail = (id: number) => router.push({ name: 'BranchDetail', params: { id } })
+const goDetail = async (id: number) => {
+    if (auth.user && branchContext.selectBranch(auth.user, id)) {
+        resetBranchScopedState(id)
+        await router.push({ name: 'BranchDetail', params: { id } })
+    }
+}
 
 const openCreate = () => {
     showCreate.value = true
@@ -297,7 +305,7 @@ const submitCreate = async (data: {
 }) => {
     try {
         creating.value = true
-        await store.create({
+        const created = await store.create({
             name: data.name,
             address: data.address,
             phone1: data.phone1,
@@ -312,7 +320,13 @@ const submitCreate = async (data: {
         })
         showCreate.value = false
         success('Sucursal creada', 3000, `La sucursal "${data.name}" se ha creado correctamente`)
-        await load()
+        if (auth.user) {
+            await branchContext.refreshOptions(auth.user)
+            if (branchContext.selectBranch(auth.user, created.id, { force: true })) {
+                resetBranchScopedState(created.id)
+            }
+        }
+        await router.push({ name: 'BranchDetail', params: { id: created.id } })
     } catch (e) {
         showError('Error al crear', store.error || 'No se pudo crear la sucursal')
     } finally {

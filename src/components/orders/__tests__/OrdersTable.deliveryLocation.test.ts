@@ -14,6 +14,7 @@ vi.mock('@/composables/useToast', () => ({
 
 vi.mock('@/composables/useOrderPermissions', () => ({
     useOrderPermissions: () => ({
+        canChangeStatus: () => false,
         canUncancel: () => false,
         canEditPayments: () => false,
         canVerifyPayments: () => false,

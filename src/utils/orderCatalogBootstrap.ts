@@ -16,7 +16,10 @@ const ROLES_ORDER_CATALOG: string[] = [
  * Precarga idempotente: una sola tanda de red por sesión (store + promesa en vuelo).
  * Úsese tras login, restaurar sesión, o primera vista con layout (p. ej. F5).
  */
-export async function bootstrapOrderCatalog(userRole: string | null): Promise<void> {
+export async function bootstrapOrderCatalog(
+	userRole: string | null,
+	branchId?: number | null,
+): Promise<void> {
 	if (!userRole || !ROLES_ORDER_CATALOG.includes(userRole)) {
 		return
 	}
@@ -24,9 +27,9 @@ export async function bootstrapOrderCatalog(userRole: string | null): Promise<vo
 		await Promise.all([
 			useProductsStore().ensureCatalogLoaded(),
 			useProductCategoriesStore().ensureCatalogLoaded(),
-			useBanksStore().ensureListLoaded(),
-			useAppsStore().ensureListLoaded(),
-			useCustomersStore().ensureNeighborhoodsLoaded(),
+			useBanksStore().ensureListLoaded(branchId),
+			useAppsStore().ensureListLoaded(branchId),
+			useCustomersStore().ensureNeighborhoodsLoaded(branchId),
 		])
 	} catch (err) {
 		console.error('bootstrapOrderCatalog:', err)

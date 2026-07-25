@@ -14,6 +14,7 @@ class BusinessDocumentsApi extends BaseApi {
         sortBy: filters.sortBy ?? 'name',
         sortOrder: filters.sortOrder ?? 'asc',
       },
+      branchScope: 'none',
     })
   }
 
@@ -21,7 +22,7 @@ class BusinessDocumentsApi extends BaseApi {
     const formData = new FormData()
     formData.append('name', name.trim())
     formData.append('file', file)
-    return this.post<ApiResponse<BusinessDocument>>('/business-documents', formData)
+    return this.post<ApiResponse<BusinessDocument>>('/business-documents', formData, { branchScope: 'none' })
   }
 
   updateDocument(
@@ -32,11 +33,11 @@ class BusinessDocumentsApi extends BaseApi {
     const formData = new FormData()
     formData.append('name', name.trim())
     if (file) formData.append('file', file)
-    return this.put<ApiResponse<BusinessDocument>>(`/business-documents/${id}`, formData)
+    return this.put<ApiResponse<BusinessDocument>>(`/business-documents/${id}`, formData, { branchScope: 'none' })
   }
 
   deleteDocument(id: number): Promise<void> {
-    return this.delete<void>(`/business-documents/${id}`)
+    return this.delete<void>(`/business-documents/${id}`, { branchScope: 'none' })
   }
 }
 

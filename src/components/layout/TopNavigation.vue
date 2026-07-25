@@ -3,7 +3,7 @@
 		<MobileMenuButton @toggle="$emit('toggleSidebar')" />
 		<Breadcrumbs />
 		<div class="flex items-center gap-2 sm:gap-3 flex-wrap justify-end">
-			<BranchSelector v-if="authStore.isSuperadmin" :branch-name="authStore.branchName" />
+			<BranchSelector v-if="authStore.isSuperadmin" />
 			<template v-if="canAccessOrders">
 				<RouterLink
 					to="/orders"
@@ -73,11 +73,13 @@ import DailyPromotionModal from '@/components/dailyPromotion/DailyPromotionModal
 import { useAuthStore } from '@/store/auth';
 import { useWhatsAppStore } from '@/store/whatsapp';
 import { useDailyPromotionStore } from '@/store/dailyPromotion';
+import { useBranchContextStore } from '@/store/branchContext';
 
 defineEmits<{ toggleSidebar: [] }>();
 const authStore = useAuthStore();
 const whatsappStore = useWhatsAppStore();
 const dailyPromotionStore = useDailyPromotionStore();
+const branchContext = useBranchContextStore();
 const showDailyPromotionModal = ref(false);
 
 const canAccessOrders = computed(
@@ -88,7 +90,9 @@ const canAccessWhatsApp = computed(() => canAccessOrders.value && whatsappStore.
 
 const canEditDailyPromotion = computed(() => authStore.isSuperadmin || authStore.isAdmin);
 
-const activeBranchId = computed(() => authStore.branchId);
+const activeBranchId = computed(() =>
+	authStore.isSuperadmin ? branchContext.selectedBranchId : authStore.branchId,
+);
 
 const dailyPromotionActive = computed(() =>
 	dailyPromotionStore.hasActiveForBranch(activeBranchId.value),

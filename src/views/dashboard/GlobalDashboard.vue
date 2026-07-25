@@ -5,7 +5,7 @@
             v-model:date-range="globalDashboardDateRange"
             v-model:time-granularity="globalTimeGranularity"
             v-model:branch-id="globalDashboardBranchId"
-            :branch-options="deliveryBranchOptions"
+            :branch-options="dashboardBranchOptions"
             :show-branch-filter="authStore.isSuperadmin"
         />
         <div class="min-w-0 flex-1 pb-8 pr-0 lg:pr-6">
@@ -69,7 +69,7 @@
                     :error="domiciliosError"
                     :date-range="globalDashboardDateRange"
                     :show-branch-filter="false"
-                    :branch-options="deliveryBranchOptions"
+                    :branch-options="dashboardBranchOptions"
                     v-model:branch-id="globalDashboardBranchId"
                     v-model:delivery-evolution-driver-id="deliveryEvolutionDriverId"
                     :avg-prep-minutes="avgPrepMinutes"
@@ -97,6 +97,7 @@ import { ref, computed, watch } from 'vue'
 import { DashboardRightNav, defaultDateRangeToday } from '@/components/dashboard'
 import { BASE_BRANCH_COMPARISON_ROWS } from '@/views/dashboard/mock/dashboardMockCore'
 import { useAuthStore } from '@/store/auth'
+import { useBranchContextStore } from '@/store/branchContext'
 import type { DashboardSectionId } from '@/views/dashboard/dashboardSectionIds'
 import { useDashboardPrincipalSection } from '@/composables/dashboard/useDashboardPrincipalSection'
 import { useDashboardPrincipalSalesVsExpenses } from '@/composables/dashboard/useDashboardPrincipalSalesVsExpenses'
@@ -121,11 +122,20 @@ import DashboardMapaEntregasSection from '@/views/dashboard/sections/DashboardMa
 import DashboardRegalosSection from '@/views/dashboard/sections/DashboardRegalosSection.vue'
 
 const authStore = useAuthStore()
+const branchContext = useBranchContextStore()
 
 const activeSection = ref<DashboardSectionId>('principal')
 
 /** Filtro de sucursal global (superadmin). */
-const globalDashboardBranchId = ref<number | null>(null)
+const globalDashboardBranchId = ref<number | null>(branchContext.selectedBranchId)
+const dashboardBranchOptions = computed(() => branchContext.options)
+
+watch(
+    () => branchContext.revision,
+    () => {
+        globalDashboardBranchId.value = branchContext.selectedBranchId
+    },
+)
 
 /** Periodo global (sidebar): principal, ventas, domicilios, peso por categoría y gastos. Por defecto: hoy. */
 const globalDashboardDateRange = ref<[Date, Date]>(defaultDateRangeToday())
@@ -216,7 +226,6 @@ const ventasProducts = computed(() => ventasSection.data.value?.products ?? null
 const ventasHourly = computed(() => ventasSection.data.value?.hourly ?? null)
 
 const {
-    deliveryBranchOptions,
     deliveryEvolutionBundle,
     filteredDeliverymenEfficiency,
     deliveryEvolutionDeliveriesScaled,

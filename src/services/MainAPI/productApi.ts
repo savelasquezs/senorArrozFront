@@ -33,39 +33,40 @@ class ProductApi extends BaseApi {
 
         return this.get<ApiResponse<PagedResult<Product>>>('/products', {
             params,
+            branchScope: 'none',
         });
     }
 
     async getProductById(id: number): Promise<ApiResponse<Product>> {
-        return this.get<ApiResponse<Product>>(`/products/${id}`);
+        return this.get<ApiResponse<Product>>(`/products/${id}`, { branchScope: 'none' });
     }
 
     async getProductDetail(id: number): Promise<ApiResponse<ProductDetail>> {
-        return this.get<ApiResponse<ProductDetail>>(`/products/${id}/detail`);
+        return this.get<ApiResponse<ProductDetail>>(`/products/${id}/detail`, { branchScope: 'none' });
     }
 
     async createProduct(
         payload: CreateProductDto
     ): Promise<ApiResponse<Product>> {
-        return this.post<ApiResponse<Product>>('/products', payload);
+        return this.post<ApiResponse<Product>>('/products', payload, { branchScope: 'none' });
     }
 
     async updateProduct(
         id: number,
         payload: UpdateProductDto
     ): Promise<ApiResponse<Product>> {
-        return this.put<ApiResponse<Product>>(`/products/${id}`, payload);
+        return this.put<ApiResponse<Product>>(`/products/${id}`, payload, { branchScope: 'none' });
     }
 
     async deleteProduct(id: number): Promise<ApiResponse<string>> {
-        return this.delete<ApiResponse<string>>(`/products/${id}`);
+        return this.delete<ApiResponse<string>>(`/products/${id}`, { branchScope: 'none' });
     }
 
     async adjustStock(
         id: number,
         payload: StockAdjustmentDto
     ): Promise<ApiResponse<number>> {
-        return this.put<ApiResponse<number>>(`/products/${id}/stock`, payload);
+        return this.put<ApiResponse<number>>(`/products/${id}/stock`, payload, { branchScope: 'none' });
     }
 }
 

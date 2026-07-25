@@ -29,6 +29,7 @@ import {
 } from '@/config/orderPosCategories'
 import { useBranchPosSettingsStore } from '@/store/branchPosSettings'
 import { useAuthStore } from '@/store/auth'
+import { useBranchContextStore } from '@/store/branchContext'
 import type { WhatsAppOrderDraft } from '@/types/whatsapp'
 import { useDailyPromotionStore } from '@/store/dailyPromotion'
 import {
@@ -86,13 +87,26 @@ export const useOrdersDraftsStore = defineStore('ordersDrafts', () => {
     const apps = ref<App[]>([])
 
     // ===== Getters =====
+    const activeBranchId = computed(() => {
+        const authStore = useAuthStore()
+        const branchContext = useBranchContextStore()
+        return branchContext.selectedBranchId ?? authStore.branchId ?? null
+    })
+
+    const visibleDraftOrders = computed(() =>
+        Array.from(draftOrders.value.values()).filter(
+            order => order.branchId === activeBranchId.value,
+        ),
+    )
+
     const currentOrder = computed(() => {
         if (!currentTabId.value) return null
-        return draftOrders.value.get(currentTabId.value) || null
+        const order = draftOrders.value.get(currentTabId.value) || null
+        return order?.branchId === activeBranchId.value ? order : null
     })
 
     const orderTabs = computed((): OrderTab[] => {
-        return Array.from(draftOrders.value.values()).map(order => ({
+        return visibleDraftOrders.value.map(order => ({
             tabId: order.tabId,
             tabName: order.tabName,
             itemCount: order.orderItems.length,
@@ -103,9 +117,9 @@ export const useOrdersDraftsStore = defineStore('ordersDrafts', () => {
         }))
     })
 
-    const hasActiveOrders = computed(() => draftOrders.value.size > 0)
+    const hasActiveOrders = computed(() => visibleDraftOrders.value.length > 0)
 
-    const canAddNewTab = computed(() => draftOrders.value.size < maxTabs.value)
+    const canAddNewTab = computed(() => visibleDraftOrders.value.length < maxTabs.value)
 
     // Delegar a productsStore
     const products = computed(() => {
@@ -1290,9 +1304,11 @@ export const useOrdersDraftsStore = defineStore('ordersDrafts', () => {
             }
 
             // Cargar datos (migración: asegurar prepareAt e isLater en drafts antiguos)
+            const authStore = useAuthStore()
+            const legacyBranchId = authStore.branchId ?? null
             const migratedDrafts = data.draftOrders.map((order: any) => ({
                 ...order,
-                branchId: order.branchId ?? null,
+                branchId: order.branchId ?? legacyBranchId,
                 source: order.source ?? null,
                 whatsappConversationId: order.whatsappConversationId ?? null,
                 prepareAt: order.prepareAt ?? null,
@@ -1398,6 +1414,7 @@ export const useOrdersDraftsStore = defineStore('ordersDrafts', () => {
             }
             currentTabId.value = data.currentTabId
             nextTabNumber.value = data.nextTabNumber
+            activateBranch(activeBranchId.value)
         } catch (error) {
             console.warn('Error loading from localStorage:', error)
             localStorage.removeItem('senor-arroz-draft-orders')
@@ -1451,7 +1468,7 @@ export const useOrdersDraftsStore = defineStore('ordersDrafts', () => {
     const loadBanks = async () => {
         try {
             const banksStore = useBanksStore()
-            await banksStore.ensureListLoaded()
+            await banksStore.ensureListLoaded(activeBranchId.value)
             banks.value = banksStore.list?.items ?? []
         } catch (error) {
             console.error('Error loading banks:', error)
@@ -1461,7 +1478,7 @@ export const useOrdersDraftsStore = defineStore('ordersDrafts', () => {
     const loadApps = async () => {
         try {
             const appsStore = useAppsStore()
-            await appsStore.ensureListLoaded()
+            await appsStore.ensureListLoaded(activeBranchId.value)
             apps.value = appsStore.list?.items ?? []
         } catch (error) {
             console.error('Error loading apps:', error)
@@ -1502,14 +1519,17 @@ export const useOrdersDraftsStore = defineStore('ordersDrafts', () => {
         draft: WhatsAppOrderDraft
     }): DraftOrder | null => {
         const existing = Array.from(draftOrders.value.values())
-            .find((order) => order.whatsappConversationId === payload.conversationId)
+            .find((order) =>
+                order.whatsappConversationId === payload.conversationId
+                && order.branchId === payload.branchId,
+            )
         if (existing) {
             currentTabId.value = existing.tabId
             saveToLocalStorage()
             return existing
         }
 
-        if (draftOrders.value.size >= maxTabs.value) {
+        if (visibleDraftOrders.value.length >= maxTabs.value) {
             error.value = `Solo puedes tener ${maxTabs.value} pedidos abiertos.`
             return null
         }
@@ -1613,6 +1633,18 @@ export const useOrdersDraftsStore = defineStore('ordersDrafts', () => {
         error.value = null
     }
 
+    const activateBranch = (branchId: number | null) => {
+        const active = currentTabId.value
+            ? draftOrders.value.get(currentTabId.value)
+            : null
+        if (active?.branchId === branchId) return
+
+        currentTabId.value =
+            Array.from(draftOrders.value.values()).find(order => order.branchId === branchId)?.tabId
+            ?? null
+        saveToLocalStorage()
+    }
+
     // Create order - MOVIDO desde ordersData
     const create = async (payload: CreateOrderDto) => {
         isLoading.value = true
@@ -1642,6 +1674,7 @@ export const useOrdersDraftsStore = defineStore('ordersDrafts', () => {
         customers,
         banks,
         apps,
+        activeBranchId,
         // Getters
         currentOrder,
         orderTabs,
@@ -1689,6 +1722,7 @@ export const useOrdersDraftsStore = defineStore('ordersDrafts', () => {
         setSelectedCategoryIds,
         setSelectedCategory,
         clear,
+        activateBranch,
         create
     }
 })

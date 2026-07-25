@@ -115,7 +115,10 @@ class DashboardApi extends BaseApi {
 		if (params.branchId != null) q.branchId = params.branchId;
 		if (params.kpiFrom != null) q.kpiFrom = params.kpiFrom;
 		if (params.kpiTo != null) q.kpiTo = params.kpiTo;
-		return this.get<DashboardMainApiResponse>('/dashboard/main', { params: q });
+		return this.get<DashboardMainApiResponse>('/dashboard/main', {
+			params: q,
+			branchScope: 'all',
+		});
 	}
 
 	async getDelivery(
@@ -127,7 +130,10 @@ class DashboardApi extends BaseApi {
 		const params: Record<string, string | number> = { from: fromIso, to: toIso };
 		if (branchId != null) params.branchId = branchId;
 		if (opts?.deliveryManId != null) params.deliveryManId = opts.deliveryManId;
-		return this.get<DashboardDeliveryApiResponse>('/dashboard/delivery', { params });
+		return this.get<DashboardDeliveryApiResponse>('/dashboard/delivery', {
+			params,
+			branchScope: 'all',
+		});
 	}
 
 	/** Métricas del domiciliario autenticado (`GET /api/dashboard/delivery/me`). */
@@ -164,7 +170,10 @@ class DashboardApi extends BaseApi {
 		const params: Record<string, string | number> = { from: fromIso, to: toIso };
 		if (branchId != null) params.branchId = branchId;
 		if (dayOfWeek != null) params.dayOfWeek = dayOfWeek;
-		return this.get<DashboardSalesComparisonApiResponse>('/dashboard/sales/comparison', { params });
+		return this.get<DashboardSalesComparisonApiResponse>('/dashboard/sales/comparison', {
+			params,
+			branchScope: 'all',
+		});
 	}
 
 	/** Ventas — bloques día/hora/mes/año para TimeEvolutionPanel. */
@@ -177,7 +186,10 @@ class DashboardApi extends BaseApi {
 		const params: Record<string, string | number> = { from: fromIso, to: toIso };
 		if (branchId != null) params.branchId = branchId;
 		if (dayOfWeek != null) params.dayOfWeek = dayOfWeek;
-		return this.get<DashboardSalesEvolutionApiResponse>('/dashboard/sales/evolution', { params });
+		return this.get<DashboardSalesEvolutionApiResponse>('/dashboard/sales/evolution', {
+			params,
+			branchScope: 'all',
+		});
 	}
 
 	async getSalesHourly(
@@ -189,7 +201,10 @@ class DashboardApi extends BaseApi {
 		const params: Record<string, string | number> = { from: fromIso, to: toIso };
 		if (branchId != null) params.branchId = branchId;
 		if (dayOfWeek != null) params.dayOfWeek = dayOfWeek;
-		return this.get<DashboardSalesHourlyApiResponse>('/dashboard/sales/hourly', { params });
+		return this.get<DashboardSalesHourlyApiResponse>('/dashboard/sales/hourly', {
+			params,
+			branchScope: 'all',
+		});
 	}
 
 	/** Ventas — ranking productos o categorías + participación recaudo. */
@@ -204,7 +219,10 @@ class DashboardApi extends BaseApi {
 		const params: Record<string, string | number> = { from: fromIso, to: toIso, top, groupBy };
 		if (branchId != null) params.branchId = branchId;
 		if (dayOfWeek != null) params.dayOfWeek = dayOfWeek;
-		return this.get<DashboardSalesProductsApiResponse>('/dashboard/sales/products', { params });
+		return this.get<DashboardSalesProductsApiResponse>('/dashboard/sales/products', {
+			params,
+			branchScope: 'all',
+		});
 	}
 
 	/** Peso vendido (g) por categoría + evolución opcional por categoría (datos reales de líneas de pedido). */
@@ -224,7 +242,10 @@ class DashboardApi extends BaseApi {
 		if (opts.categoryId != null && opts.categoryId !== undefined)
 			params.categoryId = opts.categoryId;
 		if (dayOfWeek != null) params.dayOfWeek = dayOfWeek;
-		return this.get<DashboardCategoryWeightsApiResponse>('/dashboard/sales/category-weights', { params });
+		return this.get<DashboardCategoryWeightsApiResponse>('/dashboard/sales/category-weights', {
+			params,
+			branchScope: 'all',
+		});
 	}
 
 	async getExpenseSummary(
@@ -234,7 +255,10 @@ class DashboardApi extends BaseApi {
 	): Promise<DashboardExpenseSummaryApiResponse> {
 		const params: Record<string, string> = { from: fromIso, to: toIso };
 		if (branchId != null) params.branchId = String(branchId);
-		return this.get<DashboardExpenseSummaryApiResponse>('/dashboard/expenses/summary', { params });
+		return this.get<DashboardExpenseSummaryApiResponse>('/dashboard/expenses/summary', {
+			params,
+			branchScope: 'all',
+		});
 	}
 
 	async getExpenseByCategory(
@@ -244,7 +268,10 @@ class DashboardApi extends BaseApi {
 	): Promise<DashboardExpenseByCategoryApiResponse> {
 		const params: Record<string, string> = { from: fromIso, to: toIso };
 		if (branchId != null) params.branchId = String(branchId);
-		return this.get<DashboardExpenseByCategoryApiResponse>('/dashboard/expenses/by-category', { params });
+		return this.get<DashboardExpenseByCategoryApiResponse>('/dashboard/expenses/by-category', {
+			params,
+			branchScope: 'all',
+		});
 	}
 
 	async getExpenseTimeSeries(
@@ -262,7 +289,10 @@ class DashboardApi extends BaseApi {
 		if (opts?.categoryId != null) params.categoryId = String(opts.categoryId);
 		if (opts?.expenseId != null) params.expenseId = String(opts.expenseId);
 		if (opts?.granularity && opts.granularity !== 'auto') params.granularity = opts.granularity;
-		return this.get<DashboardExpenseTimeSeriesApiResponse>('/dashboard/expenses/timeseries', { params });
+		return this.get<DashboardExpenseTimeSeriesApiResponse>('/dashboard/expenses/timeseries', {
+			params,
+			branchScope: 'all',
+		});
 	}
 
 	/** Top ítems de catálogo por suma de importes de línea (agrupa varias compras del mismo ítem). `limit` 1–500, por defecto 15. */
@@ -281,7 +311,10 @@ class DashboardApi extends BaseApi {
 		if (opts.expenseId != null && opts.expenseId !== undefined)
 			params.expenseId = String(opts.expenseId);
 		if (opts.limit != null && opts.limit !== undefined) params.limit = String(opts.limit);
-		return this.get<DashboardExpenseTopLinesApiResponse>('/dashboard/expenses/top-lines', { params });
+		return this.get<DashboardExpenseTopLinesApiResponse>('/dashboard/expenses/top-lines', {
+			params,
+			branchScope: 'all',
+		});
 	}
 
 	/** Principal — ventas vs gastos (gastos apilados por categoría). */
@@ -295,7 +328,7 @@ class DashboardApi extends BaseApi {
 		if (branchId != null) params.branchId = String(branchId);
 		return this.get<DashboardPrincipalSalesVsExpensesApiResponse>(
 			'/dashboard/principal/sales-vs-expenses',
-			{ params },
+			{ params, branchScope: 'all' },
 		);
 	}
 }

@@ -1,6 +1,23 @@
 // src/services/baseApi.ts
-import axios, { type AxiosInstance, type AxiosRequestConfig } from 'axios';
+import axios, { CanceledError, type AxiosInstance, type AxiosRequestConfig } from 'axios';
 import { getAccessToken, refreshAccessToken } from '@/services/auth/authSession';
+import { getStoredUser } from '@/services/auth/authSession';
+import { getSelectedBranchIdForRequest } from '@/services/branchContextSession';
+import { UserRole } from '@/types/auth';
+
+export type BranchScope = 'selected' | 'all' | 'none';
+
+declare module 'axios' {
+	interface AxiosRequestConfig {
+		branchScope?: BranchScope;
+		_branchContextId?: number | null;
+	}
+
+	interface InternalAxiosRequestConfig {
+		branchScope?: BranchScope;
+		_branchContextId?: number | null;
+	}
+}
 
 export class BaseApi {
 	protected api: AxiosInstance;
@@ -23,6 +40,21 @@ export class BaseApi {
 					config.headers = config.headers ?? {};
 					config.headers.Authorization = `Bearer ${token}`;
 				}
+				const user = getStoredUser();
+				const branchScope = config.branchScope ?? 'selected';
+				const selectedBranchId = getSelectedBranchIdForRequest();
+				if (
+					user?.role === UserRole.SUPERADMIN
+					&& branchScope === 'selected'
+					&& selectedBranchId
+				) {
+					config.headers = config.headers ?? {};
+					config.headers['X-Branch-Id'] = String(selectedBranchId);
+					config._branchContextId = selectedBranchId;
+				} else if (config.headers) {
+					delete config.headers['X-Branch-Id'];
+					config._branchContextId = null;
+				}
 				// FormData: no forzar Content-Type para que el navegador envie multipart con boundary
 				if (config.data instanceof FormData && config.headers) {
 					delete config.headers['Content-Type'];
@@ -33,7 +65,16 @@ export class BaseApi {
 		);
 
 		this.api.interceptors.response.use(
-			(response) => response,
+			(response) => {
+				const requestBranchId = response.config._branchContextId;
+				if (
+					requestBranchId
+					&& requestBranchId !== getSelectedBranchIdForRequest()
+				) {
+					throw new CanceledError('La sucursal activa cambió durante la solicitud.');
+				}
+				return response;
+			},
 			async (error) => {
 				const originalRequest = error.config;
 				const url = String(originalRequest?.url ?? '');

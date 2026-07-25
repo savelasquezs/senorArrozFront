@@ -6,7 +6,7 @@ export function useOrderTabs() {
     const store = useOrdersDraftsStore()
 
     const createNewTab = () => {
-        if (store.draftOrders.size >= store.maxTabs) return
+        if (!store.canAddNewTab || !store.activeBranchId) return
 
         const tabId = `tab-${Date.now()}-${store.nextTabNumber}`
         const tabName = `Pedido ${store.nextTabNumber}`
@@ -14,7 +14,7 @@ export function useOrderTabs() {
         const newOrder: DraftOrder = {
             tabId,
             tabName,
-            branchId: null,
+            branchId: store.activeBranchId,
             source: null,
             whatsappConversationId: null,
             type: 'delivery',
@@ -80,7 +80,8 @@ export function useOrderTabs() {
     }
 
     const switchTab = (tabId: string) => {
-        if (store.draftOrders.has(tabId)) {
+        const order = store.draftOrders.get(tabId)
+        if (order?.branchId === store.activeBranchId) {
             store.currentTabId = tabId
             store.saveToLocalStorage()
         }
@@ -91,8 +92,9 @@ export function useOrderTabs() {
             store.draftOrders.delete(tabId)
 
             if (store.currentTabId === tabId) {
-                const remainingTabs = Array.from(store.draftOrders.keys())
-                store.currentTabId = remainingTabs.length > 0 ? remainingTabs[0] : null
+                const remainingTab = Array.from(store.draftOrders.values())
+                    .find(order => order.branchId === store.activeBranchId)
+                store.currentTabId = remainingTab?.tabId ?? null
             }
 
             store.saveToLocalStorage()

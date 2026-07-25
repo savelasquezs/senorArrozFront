@@ -35,8 +35,8 @@
 
 				<!-- Datos adicionales del usuario (no duplicar sucursal del domiciliario) -->
 				<div v-else class="text-sm mb-4">
-					<p v-if="authStore.branchName" class="text-xs text-gray-500">
-						{{ authStore.branchName }}
+					<p v-if="displayBranchName" class="text-xs text-gray-500">
+						{{ displayBranchName }}
 					</p>
 				</div>
 
@@ -107,6 +107,7 @@ import { useRouter, useRoute } from 'vue-router';
 import { useAuthStore } from '@/store/auth';
 import { useDeliveryStore } from '@/store/delivery';
 import { useWhatsAppStore } from '@/store/whatsapp';
+import { useBranchContextStore } from '@/store/branchContext';
 import { integrationApi } from '@/services/MainAPI/integrationApi';
 import type { RappiConnection } from '@/types/integrations';
 import DeliverymanBranchSidebarBlock from '@/components/delivery/DeliverymanBranchSidebarBlock.vue';
@@ -138,6 +139,7 @@ const emit = defineEmits<{ close: [] }>();
 const props = defineProps<Props>();
 const authStore = useAuthStore();
 const whatsappStore = useWhatsAppStore();
+const branchContext = useBranchContextStore();
 const route = useRoute();
 
 type NavItem = {
@@ -202,17 +204,22 @@ const currentBranchDetailId = computed(() => {
 	return match?.[1] ?? null;
 });
 
+const displayBranchName = computed(() =>
+	authStore.isSuperadmin
+		? branchContext.selectedBranch?.name ?? ''
+		: authStore.branchName,
+);
+
 const branchMenuBase = computed(() => {
-	const branchId = currentBranchDetailId.value ?? authStore.user?.branchId;
+	const branchId = authStore.isSuperadmin
+		? branchContext.selectedBranchId
+		: authStore.user?.branchId;
 	return branchId ? `/branches/${branchId}` : '/branches';
 });
 
 const branchSectionChildren = computed<NavChild[]>(() => {
 	const base = branchMenuBase.value;
-	if (base === '/branches') {
-		return [{ name: 'Listado', to: '/branches' }];
-	}
-	return [
+	const settings: NavChild[] = base === '/branches' ? [] : [
 		{ name: 'Info general', to: `${base}?section=general`, section: 'general' },
 		{ name: 'WhatsApp e IA', to: `${base}?section=whatsapp-ai`, section: 'whatsapp-ai' },
 		{ name: 'Bancos y apps', to: `${base}?section=banks-apps`, section: 'banks-apps' },
@@ -224,6 +231,9 @@ const branchSectionChildren = computed<NavChild[]>(() => {
 		{ name: 'Codigos promo', to: `${base}?section=discount-codes`, section: 'discount-codes' },
 		{ name: 'Impresion', to: `${base}?section=printing`, section: 'printing' },
 	];
+	return authStore.isSuperadmin
+		? [{ name: 'Administrar sucursales', to: '/branches' }, ...settings]
+		: settings;
 });
 
 function toggleNavGroup(name: string) {
@@ -375,8 +385,9 @@ function loadWhatsAppStatus() {
 
 async function loadIntegrationStatus() {
 	if (!authStore.isAuthenticated || !['Superadmin', 'Admin', 'Cashier'].includes(authStore.userRole || '')) return;
-	const routeBranch = currentBranchDetailId.value ? Number(currentBranchDetailId.value) : null;
-	const branchId = authStore.isSuperadmin ? routeBranch : authStore.user?.branchId;
+	const branchId = authStore.isSuperadmin
+		? branchContext.selectedBranchId
+		: authStore.user?.branchId;
 	if (!branchId) { rappiConnection.value = null; return; }
 	try { const result = await integrationApi.getOperationalStatus(branchId); rappiConnection.value = result.data.rappi ?? null; rappiPending.value = result.data.pending; }
 	catch { rappiConnection.value = null; rappiPending.value = 0; }
@@ -385,7 +396,10 @@ async function loadIntegrationStatus() {
 onMounted(() => { loadWhatsAppStatus(); void loadIntegrationStatus(); });
 
 watch(() => authStore.isAuthenticated, loadWhatsAppStatus);
-watch(() => [authStore.isAuthenticated, route.path, route.query.section], () => void loadIntegrationStatus());
+watch(
+	() => [authStore.isAuthenticated, route.path, route.query.section, branchContext.revision],
+	() => void loadIntegrationStatus(),
+);
 
 watch(
 	() => route.path,

@@ -17,7 +17,6 @@ import {
 	persistSession,
 	updateStoredUser,
 } from '@/services/auth/authSession';
-import { bootstrapOrderCatalog } from '@/utils/orderCatalogBootstrap';
 
 export const useAuthStore = defineStore('auth', () => {
 	// State
@@ -99,8 +98,6 @@ export const useAuthStore = defineStore('auth', () => {
 		refreshToken.value = data.refreshToken;
 
 		persistSession(data);
-
-		void bootstrapOrderCatalog(data.user.role);
 	};
 
 	const clearAuthData = (): void => {
@@ -168,9 +165,6 @@ export const useAuthStore = defineStore('auth', () => {
 			token.value = storedToken;
 			refreshToken.value = storedRefreshToken;
 			user.value = storedUser;
-			if (user.value) {
-				void bootstrapOrderCatalog(user.value.role);
-			}
 			return;
 		}
 

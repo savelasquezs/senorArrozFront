@@ -4,6 +4,7 @@ const {
     requestUseMock,
     responseUseMock,
     getAccessTokenMock,
+    getStoredUserMock,
     refreshAccessTokenMock,
 } = vi.hoisted(() => {
     const requestUseMock = vi.fn()
@@ -26,6 +27,7 @@ const {
         requestUseMock,
         responseUseMock,
         getAccessTokenMock: vi.fn(),
+        getStoredUserMock: vi.fn(),
         refreshAccessTokenMock: vi.fn(),
     }
 })
@@ -39,6 +41,7 @@ vi.mock('axios', () => ({
 
 vi.mock('@/services/auth/authSession', () => ({
     getAccessToken: getAccessTokenMock,
+    getStoredUser: getStoredUserMock,
     refreshAccessToken: refreshAccessTokenMock,
 }))
 
@@ -56,6 +59,7 @@ describe('BaseApi interceptors', () => {
         requestUseMock.mockClear()
         responseUseMock.mockClear()
         getAccessTokenMock.mockReset()
+        getStoredUserMock.mockReset()
         refreshAccessTokenMock.mockReset()
     })
 

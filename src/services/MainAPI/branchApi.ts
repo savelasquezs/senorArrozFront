@@ -15,14 +15,22 @@ import type {
 	UpdateBranchPrintSettingsPayload,
 	NeighborhoodSummary,
 } from '@/types/common';
+import type { BranchOption } from '@/store/branchContext';
 import type { NeighborhoodFormData } from '@/types/customer';
 
 class BranchApi extends BaseApi {
+	async getBranchOptions(): Promise<ApiResponse<BranchOption[]>> {
+		return this.get<ApiResponse<BranchOption[]>>('/Branches/options', {
+			branchScope: 'none',
+		});
+	}
+
 	async getAllBranches(
 		params?: Partial<BranchFilters>
 	): Promise<ApiResponse<PagedResult<Branch>>> {
 		return this.get<ApiResponse<PagedResult<Branch>>>('/Branches/all', {
 			params,
+			branchScope: 'none',
 		});
 	}
 
@@ -31,6 +39,7 @@ class BranchApi extends BaseApi {
 	): Promise<ApiResponse<PagedResult<Branch>>> {
 		return this.get<ApiResponse<PagedResult<Branch>>>('/Branches', {
 			params: filters,
+			branchScope: 'none',
 		});
 	}
 
@@ -54,7 +63,7 @@ class BranchApi extends BaseApi {
 			| 'posCopyEtaRangeMinutes'
 		>
 	): Promise<ApiResponse<Branch>> {
-		return this.post<ApiResponse<Branch>>('/Branches', payload);
+		return this.post<ApiResponse<Branch>>('/Branches', payload, { branchScope: 'none' });
 	}
 
 	async updateBranch(
@@ -78,7 +87,7 @@ class BranchApi extends BaseApi {
 	}
 
 	async deleteBranch(id: number): Promise<ApiResponse<string>> {
-		return this.delete<ApiResponse<string>>(`/Branches/${id}`);
+		return this.delete<ApiResponse<string>>(`/Branches/${id}`, { branchScope: 'none' });
 	}
 
 	// Neighborhood management

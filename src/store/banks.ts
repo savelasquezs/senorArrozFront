@@ -18,6 +18,7 @@ import {
 } from './helpers/resourceStore'
 
 let banksListEnsureInFlight: Promise<void> | null = null
+let banksLoadedBranchId: number | null = null
 
 type FetchOpts = ResourceActionOptions
 
@@ -34,14 +35,22 @@ export const useBanksStore = defineStore('banks', () => {
         }, { ...opts, errorMessage: 'Error al obtener bancos' })
     }
 
-    const ensureListLoaded = async () => {
-        if (list.value?.items?.length) {
+    const ensureListLoaded = async (branchId?: number | null) => {
+        const normalizedBranchId = branchId && branchId > 0 ? branchId : null
+        if (list.value?.items?.length && banksLoadedBranchId === normalizedBranchId) {
             return
         }
         if (banksListEnsureInFlight) {
             return banksListEnsureInFlight
         }
-        banksListEnsureInFlight = fetch({ page: 1, pageSize: 100 }).finally(() => {
+        if (banksLoadedBranchId !== normalizedBranchId) list.value = null
+        banksListEnsureInFlight = fetch({
+            page: 1,
+            pageSize: 100,
+            branchId: normalizedBranchId ?? undefined,
+        }).then(() => {
+            banksLoadedBranchId = normalizedBranchId
+        }).finally(() => {
             banksListEnsureInFlight = null
         })
         return banksListEnsureInFlight
@@ -105,6 +114,7 @@ export const useBanksStore = defineStore('banks', () => {
 
     const clearList = () => {
         list.value = null
+        banksLoadedBranchId = null
         clearError()
     }
 

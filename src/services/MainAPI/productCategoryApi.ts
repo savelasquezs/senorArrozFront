@@ -27,28 +27,29 @@ class ProductCategoryApi extends BaseApi {
 
         return this.get<ApiResponse<PagedResult<ProductCategory>>>('/productcategories', {
             params,
+            branchScope: 'none',
         });
     }
 
     async getProductCategoryById(id: number): Promise<ApiResponse<ProductCategory>> {
-        return this.get<ApiResponse<ProductCategory>>(`/productcategories/${id}`);
+        return this.get<ApiResponse<ProductCategory>>(`/productcategories/${id}`, { branchScope: 'none' });
     }
 
     async createProductCategory(
         payload: CreateProductCategoryDto
     ): Promise<ApiResponse<ProductCategory>> {
-        return this.post<ApiResponse<ProductCategory>>('/productcategories', payload);
+        return this.post<ApiResponse<ProductCategory>>('/productcategories', payload, { branchScope: 'none' });
     }
 
     async updateProductCategory(
         id: number,
         payload: UpdateProductCategoryDto
     ): Promise<ApiResponse<ProductCategory>> {
-        return this.put<ApiResponse<ProductCategory>>(`/productcategories/${id}`, payload);
+        return this.put<ApiResponse<ProductCategory>>(`/productcategories/${id}`, payload, { branchScope: 'none' });
     }
 
     async deleteProductCategory(id: number): Promise<ApiResponse<string>> {
-        return this.delete<ApiResponse<string>>(`/productcategories/${id}`);
+        return this.delete<ApiResponse<string>>(`/productcategories/${id}`, { branchScope: 'none' });
     }
 }
 

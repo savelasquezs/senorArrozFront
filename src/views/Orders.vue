@@ -95,7 +95,7 @@ const posTabs = computed(() => buildOrderPosTabs(categories.value))
 // Catálogo ya en bootstrap (login / layout); aquí solo sincronizamos draft con Pinia.
 const ensureOrderPageData = async () => {
     try {
-        await bootstrapOrderCatalog(authStore.userRole)
+        await bootstrapOrderCatalog(authStore.userRole, ordersStore.activeBranchId)
         await ordersStore.loadBanks()
         await ordersStore.loadApps()
     } catch (error) {
@@ -115,7 +115,7 @@ const refreshTotals = () => {
 
 const initializeData = async () => {
     await ensureOrderPageData()
-    await branchPosSettings.ensureForBranch(authStore.branchId ?? undefined)
+    await branchPosSettings.ensureForBranch(ordersStore.activeBranchId ?? undefined)
     const conversationId = Number(localStorage.getItem('senor-arroz-whatsapp-conversation-tab') || 0)
     whatsappReturnConversationId.value = conversationId > 0 ? conversationId : null
 }

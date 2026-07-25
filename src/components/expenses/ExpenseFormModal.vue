@@ -383,6 +383,7 @@ import { useExpensePermissions } from '@/composables/useExpensePermissions'
 import { useFormatting } from '@/composables/useFormatting'
 import { useToast } from '@/composables/useToast'
 import { useAuthStore } from '@/store/auth'
+import { useBranchContextStore } from '@/store/branchContext'
 import BaseDialog from '@/components/ui/BaseDialog.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseInput from '@/components/ui/BaseInput.vue'
@@ -422,6 +423,7 @@ const emit = defineEmits<{
 const { formatCurrency } = useFormatting()
 const { error, success } = useToast()
 const authStore = useAuthStore()
+const branchContext = useBranchContextStore()
 const expensePermissions = useExpensePermissions()
 
 const EXPENSE_VAT_RATE = 0.19
@@ -1050,7 +1052,12 @@ const handleSupplierCreate = async () => {
             payload.email = newSupplier.value.email.trim()
         }
 
-        const createdSupplier = await supplierApi.createSupplier(payload, authStore.isSuperadmin ? authStore.branchId ?? undefined : undefined)
+        const createdSupplier = await supplierApi.createSupplier(
+            payload,
+            authStore.isSuperadmin
+                ? branchContext.selectedBranchId ?? undefined
+                : undefined,
+        )
 
         supplierOptions.value.unshift({
             value: createdSupplier.id,

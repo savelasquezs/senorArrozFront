@@ -32,15 +32,12 @@ c<!-- src/components/CustomerForm.vue -->
             </BaseInput>
         </div>
 
-        <!-- Branch Selection (only for superadmin) -->
+        <!-- La sucursal se controla globalmente; no se puede sobrescribir desde el formulario. -->
         <div v-if="authStore.isSuperadmin">
-            <BaseSelect v-model="form.branchId" :options="branchOptions" label="Sucursal"
-                placeholder="Seleccionar sucursal..." required :error="errors.branchId"
-                @update:model-value="validateBranch(); validateForm()" value-key="value" display-key="label">
-                <template #icon>
-                    <BuildingOffice2Icon class="w-4 h-4" />
-                </template>
-            </BaseSelect>
+            <p class="text-sm font-medium text-gray-700">Sucursal</p>
+            <p class="mt-1 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700">
+                {{ branchContext.selectedBranch?.name ?? 'Sin sucursal activa' }}
+            </p>
         </div>
 
         <!-- Initial Address Section (only for new customers) -->
@@ -112,12 +109,11 @@ c<!-- src/components/CustomerForm.vue -->
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, watch, onMounted } from 'vue'
-import { useBranchesStore } from '@/store/branches'
+import { ref, reactive, computed, watch, onMounted, onBeforeUnmount, nextTick } from 'vue'
 import { useAuthStore } from '@/store/auth'
+import { useBranchContextStore } from '@/store/branchContext'
 import type { Customer, CustomerFormData } from '@/types/customer'
 import BaseInput from '@/components/ui/BaseInput.vue'
-import BaseSelect from '@/components/ui/BaseSelect.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseDialog from '@/components/ui/BaseDialog.vue'
 import CustomerAddressForm from '@/components/customers/address/CustomerAddressForm.vue'
@@ -125,7 +121,6 @@ import type { CustomerAddressFormData } from '@/types/customer'
 import {
     UserIcon,
     PhoneIcon,
-    BuildingOffice2Icon,
     MapPinIcon,
 } from '@heroicons/vue/24/outline'
 
@@ -150,14 +145,15 @@ const emit = defineEmits<{
     cancel: []
 }>()
 
-const branchesStore = useBranchesStore()
 const authStore = useAuthStore()
+const branchContext = useBranchContextStore()
+const dirtyTrackingReady = ref(false)
 
 const form = reactive({
     name: '',
     phone1: '',
     phone2: '',
-    branchId: authStore.branchId ?? 0,
+    branchId: branchContext.selectedBranchId ?? authStore.branchId ?? 0,
     active: true,
     initialAddress: {
         neighborhoodId: 0,
@@ -211,14 +207,6 @@ const errors = reactive({
 
 
 // Computed properties
-const branchOptions = computed(() => {
-    if (!branchesStore.list?.items) return []
-    return branchesStore.list.items.map(branch => ({
-        value: branch.id,
-        label: branch.name
-    }))
-})
-
 // Branch ID is handled by CustomerAddressForm
 
 
@@ -389,8 +377,17 @@ const handleSubmit = () => {
             : undefined
     }
 
+    branchContext.markDirty('customer-form', false)
     emit('submit', formData)
 }
+
+watch(
+    form,
+    () => {
+        if (dirtyTrackingReady.value) branchContext.markDirty('customer-form', true)
+    },
+    { deep: true },
+)
 
 // Watch for customer prop changes to populate form
 watch(() => props.customer, (newCustomer) => {
@@ -432,12 +429,8 @@ watch(() => props.customer, (newCustomer) => {
 onMounted(async () => {
     try {
         if (authStore.isSuperadmin) {
-            await branchesStore.fetchAll()
-            // Neighborhoods are loaded by CustomerAddressForm
-
-            // Initialize branch ID based on user role
-        }
-        else if (authStore.branchId) {
+            form.branchId = branchContext.selectedBranchId ?? 0
+        } else if (authStore.branchId) {
             form.branchId = authStore.branchId
         }
 
@@ -445,9 +438,15 @@ onMounted(async () => {
         if (!props.customer && props.initialPhone) {
             form.phone1 = props.initialPhone
         }
+        await nextTick()
+        dirtyTrackingReady.value = true
     } catch (error) {
         console.error('Error loading form data:', error)
     }
+})
+
+onBeforeUnmount(() => {
+    branchContext.markDirty('customer-form', false)
 })
 
 

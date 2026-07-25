@@ -417,6 +417,8 @@ import { useBranchPosSettingsStore } from '@/store/branchPosSettings'
 import { useBanksStore } from '@/store/banks'
 import { useAppsStore } from '@/store/apps'
 import { useAuthStore } from '@/store/auth'
+import { useBranchContextStore } from '@/store/branchContext'
+import { resetBranchScopedState } from '@/utils/branchScopedState'
 import { useToast } from '@/composables/useToast'
 import { defaultBusinessCalendar } from '@/utils/datetime'
 import MainLayout from '@/components/layout/MainLayout.vue'
@@ -482,6 +484,7 @@ const banksStore = useBanksStore()
 const appsStore = useAppsStore()
 const expenseCategoriesCatalogStore = useExpenseCategoriesCatalogStore()
 const authStore = useAuthStore()
+const branchContext = useBranchContextStore()
 const { success, error: showError } = useToast()
 
 // Reactive state
@@ -749,10 +752,17 @@ const handleEditSubmit = async (formData: any) => {
 
 const handleDelete = async () => {
     try {
+        const deletedActiveBranch = branchContext.selectedBranchId === branchId.value
         await branchesStore.remove(branchId.value)
         showDeleteDialog.value = false
         success('Sucursal eliminada', 5000, 'La sucursal se ha eliminado correctamente')
-        router.push('/branches')
+        if (authStore.user) {
+            await branchContext.refreshOptions(authStore.user)
+            if (deletedActiveBranch && branchContext.selectedBranchId) {
+                resetBranchScopedState(branchContext.selectedBranchId)
+            }
+        }
+        await router.push('/branches')
     } catch (error: any) {
         console.error('Error deleting branch:', error)
         showError('Error al eliminar', error.message || 'No se pudo eliminar la sucursal')
@@ -1202,6 +1212,18 @@ async function loadBranchPageData() {
     const hasAccess =
         userRole === 'Superadmin' || (userRole === 'Admin' && userBranchId === branchId.value)
     if (!hasAccess) return
+
+    if (
+        userRole === 'Superadmin'
+        && authStore.user
+        && branchContext.selectedBranchId !== branchId.value
+    ) {
+        if (!branchContext.selectBranch(authStore.user, branchId.value)) {
+            await router.replace('/branches')
+            return
+        }
+        resetBranchScopedState(branchId.value)
+    }
 
     try {
         await branchesStore.fetchById(branchId.value)

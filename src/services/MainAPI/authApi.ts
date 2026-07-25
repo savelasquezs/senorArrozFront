@@ -9,7 +9,7 @@ import type {
 class AuthApi extends BaseApi {
 	async login(credentials: LoginCredentials): Promise<LoginResponse> {
 		try {
-			const response = await this.api.post('/auth/login', credentials);
+			const response = await this.api.post('/auth/login', credentials, { branchScope: 'none' });
 			return response.data;
 		} catch (error: any) {
 			throw this.handleError(error);
@@ -18,7 +18,7 @@ class AuthApi extends BaseApi {
 
 	async logout(refreshToken: string): Promise<void> {
 		try {
-			await this.api.post('/auth/logout', { refreshToken });
+			await this.api.post('/auth/logout', { refreshToken }, { branchScope: 'none' });
 		} catch (error: any) {
 			throw this.handleError(error);
 		}
@@ -26,7 +26,7 @@ class AuthApi extends BaseApi {
 
 	async refreshToken(refreshToken: string): Promise<LoginResponse> {
 		try {
-			const response = await this.api.post('/auth/refresh', { refreshToken });
+			const response = await this.api.post('/auth/refresh', { refreshToken }, { branchScope: 'none' });
 			return response.data;
 		} catch (error: any) {
 			throw this.handleError(error);
@@ -35,7 +35,7 @@ class AuthApi extends BaseApi {
 
 	async changePassword(passwordData: ChangePasswordCredentials): Promise<void> {
 		try {
-			await this.api.post('/auth/change-password', passwordData);
+			await this.api.post('/auth/change-password', passwordData, { branchScope: 'none' });
 		} catch (error: any) {
 			throw this.handleError(error);
 		}
@@ -43,7 +43,10 @@ class AuthApi extends BaseApi {
 
 	async forgotPassword(email: string): Promise<{ message: string }> {
 		try {
-			const response = await this.api.post('/auth/forgot-password', { email }, { timeout: 30000 });
+			const response = await this.api.post('/auth/forgot-password', { email }, {
+				timeout: 30000,
+				branchScope: 'none',
+			});
 			return response.data;
 		} catch (error: any) {
 			throw this.handleError(error);
@@ -57,7 +60,10 @@ class AuthApi extends BaseApi {
 		confirmPassword: string;
 	}): Promise<void> {
 		try {
-			await this.api.post('/auth/reset-password', resetData, { timeout: 30000 });
+			await this.api.post('/auth/reset-password', resetData, {
+				timeout: 30000,
+				branchScope: 'none',
+			});
 		} catch (error: any) {
 			throw this.handleError(error);
 		}
