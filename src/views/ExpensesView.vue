@@ -113,12 +113,10 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, defineAsyncComponent, onMounted, ref, watch } from 'vue'
 import type { ColumnState } from 'ag-grid-community'
 import { ChevronLeftIcon, ChevronRightIcon, PlusIcon } from '@heroicons/vue/24/outline'
-import ExpenseDetailModal from '@/components/expenses/ExpenseDetailModal.vue'
 import ExpenseDetailsAgGrid from '@/components/expenses/ExpenseDetailsAgGrid.vue'
-import ExpenseFormModal from '@/components/expenses/ExpenseFormModal.vue'
 import ExpensesFilters from '@/components/expenses/ExpensesFilters.vue'
 import ExpensesSummary from '@/components/expenses/ExpensesSummary.vue'
 import MainLayout from '@/components/layout/MainLayout.vue'
@@ -141,6 +139,13 @@ import type { DashboardPeriodPresetId } from '@/utils/dashboardPeriodPresets'
 import { presetToExpenseApiDateRange } from '@/utils/expensesDateRange'
 import { toNumberFilterList, toStringFilterList } from '@/utils/filterNormalization'
 import { flattenExpenseHeadersToGridRows } from '@/utils/expenseGridFlatten'
+
+const ExpenseDetailModal = defineAsyncComponent(
+    () => import('@/components/expenses/ExpenseDetailModal.vue'),
+)
+const ExpenseFormModal = defineAsyncComponent(
+    () => import('@/components/expenses/ExpenseFormModal.vue'),
+)
 
 const { success, error } = useToast()
 const expensePermissions = useExpensePermissions()

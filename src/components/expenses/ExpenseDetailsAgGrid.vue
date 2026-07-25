@@ -15,8 +15,16 @@
 import { ref } from 'vue'
 import { AgGridVue } from 'ag-grid-vue3'
 import {
+    CellStyleModule,
+    ClientSideRowModelApiModule,
+    ClientSideRowModelModule,
+    ColumnApiModule,
+    EventApiModule,
     ModuleRegistry,
-    AllCommunityModule,
+    NumberFilterModule,
+    TextFilterModule,
+    TooltipModule,
+    ValidationModule,
     themeQuartz,
     type CellClickedEvent,
     type ColDef,
@@ -31,7 +39,20 @@ import { formatCurrency, formatDateShort, formatTime } from '@/composables/useFo
 
 // La grilla solo existe en la ruta lazy de Gastos. Registrar aquí evita incluir AG Grid
 // en el bundle inicial para usuarios que no visitan este módulo.
-ModuleRegistry.registerModules([AllCommunityModule])
+ModuleRegistry.registerModules([
+    CellStyleModule,
+    ClientSideRowModelApiModule,
+    ClientSideRowModelModule,
+    ColumnApiModule,
+    EventApiModule,
+    NumberFilterModule,
+    TextFilterModule,
+    TooltipModule,
+])
+
+if (import.meta.env.DEV) {
+    ModuleRegistry.registerModules([ValidationModule])
+}
 
 export interface ExpensesGridContext {
     onViewDetail: (headerId: number) => void
