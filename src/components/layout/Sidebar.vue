@@ -301,7 +301,7 @@ const navigationItems = computed((): NavItem[] => [
 		icon: TruckIcon,
 		roles: ['Superadmin', 'Admin', 'Cashier'],
 		children: [
-			{ name: 'Operación diaria', to: '/deliverymen', roles: ['Admin', 'Cashier'] },
+			{ name: 'Operación diaria', to: '/deliverymen', roles: ['Superadmin', 'Admin', 'Cashier'] },
 			{ name: 'Revisión seguimiento', to: '/delivery-incidents', roles: ['Superadmin', 'Admin'] },
 			{ name: 'Alertas seguimiento', to: '/delivery-alerts', roles: ['Superadmin', 'Admin'] },
 		],
