@@ -344,6 +344,22 @@ const routes: RouteRecordRaw[] = [
             title: 'Perfil'
         }
     },
+    {
+        path: '/documents',
+        name: 'BusinessDocuments',
+        component: () => import('@/views/BusinessDocumentsView.vue'),
+        meta: {
+            requiresAuth: true,
+            requiresRole: [
+                UserRole.SUPERADMIN,
+                UserRole.ADMIN,
+                UserRole.CASHIER,
+                UserRole.KITCHEN,
+                UserRole.DELIVERYMAN
+            ],
+            title: 'Documentos corporativos'
+        }
+    },
     //   // 404 page
     //   {
     //     path: '/:pathMatch(.*)*',
