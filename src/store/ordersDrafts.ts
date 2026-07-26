@@ -41,6 +41,25 @@ import type { DailyPromotion } from '@/types/dailyPromotion'
 import type { LoyaltyCycleStep } from '@/types/loyaltyCycle'
 import type { DiscountCode } from '@/types/discountCode'
 
+type WhatsAppDraftBase = {
+    conversationId: number
+    branchId: number
+    customer: Customer
+}
+
+type ManualWhatsAppDraftPayload = WhatsAppDraftBase & {
+    mode: 'manual'
+    address: CustomerAddress
+}
+
+type AiWhatsAppDraftPayload = WhatsAppDraftBase & {
+    mode: 'ai'
+    address?: CustomerAddress | null
+    draft: WhatsAppOrderDraft
+}
+
+type CreateWhatsAppDraftPayload = ManualWhatsAppDraftPayload | AiWhatsAppDraftPayload
+
 /** Si falla la API al rehidratar, reconstruye un cliente mínimo desde el borrador persistido. */
 function buildFallbackCustomerForDraft(customerId: number, drafts: DraftOrder[]): Customer | null {
     const order = drafts.find((d) => d.customerId === customerId)
@@ -1511,13 +1530,7 @@ export const useOrdersDraftsStore = defineStore('ordersDrafts', () => {
         return a ? (a.deliveryFee ?? 0) : 0
     }
 
-    const createOrReuseWhatsAppDraft = (payload: {
-        conversationId: number
-        branchId: number
-        customer: Customer
-        address?: CustomerAddress | null
-        draft: WhatsAppOrderDraft
-    }): DraftOrder | null => {
+    const createOrReuseWhatsAppDraft = (payload: CreateWhatsAppDraftPayload): DraftOrder | null => {
         const existing = Array.from(draftOrders.value.values())
             .find((order) =>
                 order.whatsappConversationId === payload.conversationId
@@ -1537,33 +1550,40 @@ export const useOrdersDraftsStore = defineStore('ordersDrafts', () => {
         const authStore = useAuthStore()
         const tabId = `tab-${Date.now()}-${nextTabNumber.value}`
         const tabName = `WhatsApp ${nextTabNumber.value}`
-        const deliveryFee = payload.draft.orderType === 'delivery' ? payload.draft.deliveryFee : 0
-        const orderItems = payload.draft.items.map((item) => ({
-            tempId: `whatsapp-${payload.conversationId}-${item.productId}`,
-            productId: item.productId,
-            productName: item.name,
-            productPrice: item.unitPrice,
-            quantity: item.quantity,
-            unitPrice: item.unitPrice,
-            discount: 0,
-            freeDeliveryDiscount: 0,
-            subtotal: item.subtotal,
-            notes: item.notes ?? '',
-        }))
+        const selectedAddress = payload.address
+        const deliveryFee = payload.mode === 'manual'
+            ? payload.address.deliveryFee ?? 0
+            : payload.draft.orderType === 'delivery'
+                ? payload.draft.deliveryFee
+                : 0
+        const orderItems = payload.mode === 'manual'
+            ? []
+            : payload.draft.items.map((item) => ({
+                tempId: `whatsapp-${payload.conversationId}-${item.productId}`,
+                productId: item.productId,
+                productName: item.name,
+                productPrice: item.unitPrice,
+                quantity: item.quantity,
+                unitPrice: item.unitPrice,
+                discount: 0,
+                freeDeliveryDiscount: 0,
+                subtotal: item.subtotal,
+                notes: item.notes ?? '',
+            }))
         const newOrder: DraftOrder = {
             tabId,
             tabName,
             branchId: payload.branchId || authStore.branchId || null,
             source: 'WhatsApp',
             whatsappConversationId: payload.conversationId,
-            type: payload.draft.orderType ?? 'onsite',
+            type: payload.mode === 'manual' ? 'delivery' : payload.draft.orderType ?? 'onsite',
             customerId: payload.customer.id,
             customerName: payload.customer.name,
             customerPhone: payload.customer.phone1,
             guestName: payload.customer.name,
-            addressId: payload.address?.id ?? null,
-            addressDescription: payload.address?.address ?? null,
-            addressAdditionalInfo: payload.address?.additionalInfo ?? null,
+            addressId: selectedAddress?.id ?? null,
+            addressDescription: selectedAddress?.address ?? null,
+            addressAdditionalInfo: selectedAddress?.additionalInfo ?? null,
             deliveryFee,
             freeDeliveryRequested: false,
             reservedFor: null,
@@ -1573,8 +1593,8 @@ export const useOrdersDraftsStore = defineStore('ordersDrafts', () => {
             orderItems,
             bankPayments: [],
             appPayment: null,
-            subtotal: payload.draft.subtotal,
-            total: payload.draft.total,
+            subtotal: payload.mode === 'manual' ? 0 : payload.draft.subtotal,
+            total: payload.mode === 'manual' ? deliveryFee : payload.draft.total,
             discountTotal: 0,
             createdAt: new Date(),
             updatedAt: new Date(),
@@ -1615,12 +1635,12 @@ export const useOrdersDraftsStore = defineStore('ordersDrafts', () => {
 
         const customerWithAddress = {
             ...payload.customer,
-            addresses: payload.customer.addresses?.length || !payload.address
+            addresses: payload.customer.addresses?.length || !selectedAddress
                 ? payload.customer.addresses
-                : [payload.address],
+                : [selectedAddress],
         }
         ensureCustomerInList(customerWithAddress)
-        if (payload.address) addAddressToCustomer(payload.customer.id, payload.address, customerWithAddress)
+        if (selectedAddress) addAddressToCustomer(payload.customer.id, selectedAddress, customerWithAddress)
         draftOrders.value.set(tabId, newOrder)
         currentTabId.value = tabId
         nextTabNumber.value++

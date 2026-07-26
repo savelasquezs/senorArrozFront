@@ -369,7 +369,7 @@
                   <p v-if="selectedCustomer.phone2" class="text-sm text-emerald-800">{{ selectedCustomer.phone2 }}</p>
                 </div>
 
-                <section class="space-y-3 rounded-xl border border-gray-200 bg-gray-50 p-3">
+                <section v-if="isAiOrderContext" class="space-y-3 rounded-xl border border-gray-200 bg-gray-50 p-3">
                   <div class="flex items-center justify-between gap-2">
                     <div>
                       <p class="text-sm font-semibold text-gray-900">Draft construido por la IA</p>
@@ -418,6 +418,7 @@
                 </section>
 
                 <AddressSelector
+                  v-if="canManageOrderContext"
                   :customer-id="selectedCustomer.id"
                   :branch-id="selectedCustomer.branchId"
                   :selected-address="selectedAddress?.id || undefined"
@@ -430,6 +431,7 @@
                 </p>
 
                 <BaseButton
+                  v-if="canManageOrderContext"
                   class="w-full"
                   variant="outline"
                   :disabled="!selectedCustomerAddresses.length || sendingAddressConfirmation"
@@ -442,15 +444,19 @@
                 <BaseButton
                   class="w-full"
                   variant="primary"
-                  :disabled="!canTakeAiDraftOrder || takingOrder"
+                  :disabled="!canTakeOrderFromWhatsApp || takingOrder"
                   :loading="takingOrder"
                   @click="takeOrderFromWhatsApp"
                 >
                   Tomar pedido
                 </BaseButton>
+
+                <p v-if="isBlockedOrderContext" class="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950">
+                  Toma la conversación para gestionar manualmente el cliente, sus direcciones y el pedido.
+                </p>
               </div>
 
-              <div v-else class="space-y-3">
+              <div v-else-if="isManualOrderContext" class="space-y-3">
                 <div class="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950">
                   No encontramos un cliente con este teléfono. Crea el cliente y su dirección para continuar.
                 </div>
@@ -460,6 +466,14 @@
                   :loading="creatingCustomer"
                   @submit="createCustomerFromConversation"
                 />
+              </div>
+
+              <div v-else-if="isAiOrderContext" class="rounded-lg border border-violet-200 bg-violet-50 p-3 text-sm text-violet-950">
+                La IA está construyendo el contexto del cliente y del pedido.
+              </div>
+
+              <div v-else class="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950">
+                Toma la conversación para crear o vincular el cliente y gestionar el pedido.
               </div>
 
               <p v-if="contextError" class="text-sm text-red-600">{{ contextError }}</p>
@@ -653,6 +667,7 @@ import {
   aiValueLabel,
   sortAiProcessing,
 } from '@/utils/whatsappAiDiagnostics'
+import { whatsappOrderContextMode } from '@/utils/whatsappOrderContextMode'
 
 const whatsappStore = useWhatsAppStore()
 const authStore = useAuthStore()
@@ -810,7 +825,24 @@ function aiProcessingReason(processing: WhatsAppAiProcessing) {
   const reason = processing.technicalDetail || processing.detail
   return reason ? `${processing.title}: ${reason}` : processing.title
 }
-async function changeAttention(action: 'take' | 'return-to-ai' | 'pause-ai' | 'close' | 'reopen') { if (!selectedConversation.value) return; try { changingAttention.value = true; await whatsappStore.changeAttention(selectedConversation.value.id, action); await refreshAiDiagnostics() } catch (error: any) { showError('Atención', error.message || 'No se pudo cambiar el estado.') } finally { changingAttention.value = false } }
+async function changeAttention(action: 'take' | 'return-to-ai' | 'pause-ai' | 'close' | 'reopen') {
+  if (!selectedConversation.value) return
+  try {
+    changingAttention.value = true
+    const conversationId = selectedConversation.value.id
+    await whatsappStore.changeAttention(conversationId, action)
+    const refreshed = whatsappStore.conversations.find(x => x.id === conversationId)
+    if (refreshed) {
+      selectedConversation.value = refreshed
+      await loadConversationContext(refreshed)
+    }
+    await refreshAiDiagnostics()
+  } catch (error: any) {
+    showError('Atención', error.message || 'No se pudo cambiar el estado.')
+  } finally {
+    changingAttention.value = false
+  }
+}
 async function resetConversationForTesting() {
   const conversation = selectedConversation.value
   if (!conversation) return
@@ -836,11 +868,19 @@ async function resetConversationForTesting() {
     resettingConversation.value = false
   }
 }
-function handleAttentionChanged(payload: WhatsAppAttentionChangedPayload) { if (!payload?.conversation?.id) return; whatsappStore.applyAttentionChanged(payload.conversation); if (selectedConversation.value?.id === payload.conversation.id) selectedConversation.value = whatsappStore.conversations.find(x => x.id === payload.conversation.id) ?? payload.conversation }
+function handleAttentionChanged(payload: WhatsAppAttentionChangedPayload) {
+  if (!payload?.conversation?.id) return
+  whatsappStore.applyAttentionChanged(payload.conversation)
+  if (selectedConversation.value?.id !== payload.conversation.id) return
+  selectedConversation.value = whatsappStore.conversations.find(x => x.id === payload.conversation.id)
+    ?? payload.conversation
+  void loadConversationContext(selectedConversation.value)
+}
 
 function handleAiProcessingChanged(payload: WhatsAppAiProcessingChangedPayload) {
   whatsappStore.applyAiProcessingChanged(payload)
-  if (selectedConversation.value?.id === payload.processing.conversationId
+  if (selectedConversation.value?.attentionMode === 'ai'
+    && selectedConversation.value.id === payload.processing.conversationId
     && ['completed', 'transferredtohuman', 'failed'].includes(normalizedAiValue(payload.processing.status))) {
     void loadConversationContext(selectedConversation.value)
   }
@@ -923,10 +963,25 @@ const initialCustomerPhone = computed(() => {
 })
 
 const selectedCustomerAddresses = computed(() => selectedCustomer.value?.addresses ?? [])
+const orderContextMode = computed(() =>
+  whatsappOrderContextMode(selectedConversation.value?.attentionMode),
+)
+const isAiOrderContext = computed(() => orderContextMode.value === 'ai')
+const isManualOrderContext = computed(() => orderContextMode.value === 'manual')
+const isBlockedOrderContext = computed(() => orderContextMode.value === 'blocked')
+const canManageOrderContext = computed(() =>
+  isAiOrderContext.value || isManualOrderContext.value,
+)
 const canTakeAiDraftOrder = computed(() => {
   if (!selectedCustomer.value || !aiOrderDraft.value?.items.length) return false
   return aiOrderDraft.value.orderType === 'onsite'
     || (aiOrderDraft.value.orderType === 'delivery' && !!aiOrderDraft.value.selectedAddressId)
+})
+const canTakeOrderFromWhatsApp = computed(() => {
+  if (!selectedCustomer.value) return false
+  if (isManualOrderContext.value) return !!selectedAddress.value
+  if (isAiOrderContext.value) return canTakeAiDraftOrder.value
+  return false
 })
 const aiDraftOrderTypeLabel = computed(() => aiOrderDraft.value?.orderType === 'delivery'
   ? (aiOrderDraft.value.selectedAddressId ? 'Domicilio' : 'Domicilio · falta dirección')
@@ -1043,7 +1098,10 @@ async function loadConversationContext(conversation: WhatsAppConversation) {
   try {
     contextLoading.value = true
     addressSelectionNote.value = ''
-    const loadedDraft = await loadAiOrderDraft(conversation.id)
+    const mode = whatsappOrderContextMode(conversation.attentionMode)
+    const loadedDraft = mode === 'ai'
+      ? await loadAiOrderDraft(conversation.id)
+      : null
     if (!conversation.customerId) return
     const customerRes = await customerApi.getCustomerById(conversation.customerId)
     const customer = customerRes.data
@@ -1056,9 +1114,13 @@ async function loadConversationContext(conversation: WhatsAppConversation) {
     }
 
     selectedCustomer.value = { ...customer, addresses }
-    selectedAddress.value = loadedDraft?.selectedAddressId
-      ? addresses.find(a => a.id === loadedDraft.selectedAddressId) ?? null
-      : null
+    selectedAddress.value = mode === 'ai'
+      ? loadedDraft?.selectedAddressId
+        ? addresses.find(a => a.id === loadedDraft.selectedAddressId) ?? null
+        : null
+      : mode === 'manual'
+        ? addresses.find(a => a.isPrimary) ?? addresses[0] ?? null
+        : null
   } catch (error: any) {
     contextError.value = error.message || 'No se pudo cargar el cliente.'
   } finally {
@@ -1086,7 +1148,7 @@ async function onContextAddressSelected(address?: CustomerAddress) {
         : [...addresses, address],
     }
   }
-  if (selectedConversation.value) {
+  if (selectedConversation.value?.attentionMode === 'ai') {
     try {
       await whatsappApi.updateOrderDraftFulfillment(selectedConversation.value.id, 'delivery', address?.id)
       await loadAiOrderDraft(selectedConversation.value.id)
@@ -1307,7 +1369,7 @@ async function removeQuickReply(reply: WhatsAppQuickReply) {
 }
 
 async function createCustomerFromConversation(data: CustomerFormData) {
-  if (!selectedConversation.value) return
+  if (!selectedConversation.value || selectedConversation.value.attentionMode !== 'human') return
   try {
     creatingCustomer.value = true
     contextError.value = ''
@@ -1341,10 +1403,6 @@ async function createCustomerFromConversation(data: CustomerFormData) {
     selectedConversation.value = linked.data ?? { ...selectedConversation.value, customerId: customer.id, customerName: customer.name }
     selectedCustomer.value = { ...customer, addresses }
     selectedAddress.value = addresses.find(a => a.isPrimary) ?? addresses[0] ?? null
-    if (selectedAddress.value) {
-      await whatsappApi.updateOrderDraftFulfillment(selectedConversation.value.id, 'delivery', selectedAddress.value.id)
-      await loadAiOrderDraft(selectedConversation.value.id)
-    }
     success('Cliente creado', 2500, 'La conversación quedó vinculada al cliente.')
   } catch (error: any) {
     contextError.value = error.message || 'No se pudo crear el cliente.'
@@ -1355,16 +1413,29 @@ async function createCustomerFromConversation(data: CustomerFormData) {
 }
 
 async function takeOrderFromWhatsApp() {
-  if (!selectedConversation.value || !selectedCustomer.value || !aiOrderDraft.value || !canTakeAiDraftOrder.value) return
+  if (!selectedConversation.value || !selectedCustomer.value || !canTakeOrderFromWhatsApp.value) return
   try {
     takingOrder.value = true
-    const draftOrder = ordersStore.createOrReuseWhatsAppDraft({
-      conversationId: selectedConversation.value.id,
-      branchId: selectedConversation.value.branchId,
-      customer: selectedCustomer.value,
-      address: selectedAddress.value,
-      draft: aiOrderDraft.value,
-    })
+    const draftOrder = isManualOrderContext.value
+      ? selectedAddress.value
+        ? ordersStore.createOrReuseWhatsAppDraft({
+            mode: 'manual',
+            conversationId: selectedConversation.value.id,
+            branchId: selectedConversation.value.branchId,
+            customer: selectedCustomer.value,
+            address: selectedAddress.value,
+          })
+        : null
+      : isAiOrderContext.value && aiOrderDraft.value
+        ? ordersStore.createOrReuseWhatsAppDraft({
+            mode: 'ai',
+            conversationId: selectedConversation.value.id,
+            branchId: selectedConversation.value.branchId,
+            customer: selectedCustomer.value,
+            address: selectedAddress.value,
+            draft: aiOrderDraft.value,
+          })
+        : null
     if (!draftOrder) {
       showError('Pedido', ordersStore.error || 'No se pudo crear el borrador.')
       return
