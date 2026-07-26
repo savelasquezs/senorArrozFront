@@ -135,7 +135,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
     success: [result: SettleDeliverymanDayResultDto]
-    /** Tras crear un gasto puede crearse abono automático; el padre debe volver a cargar getDaySummary. */
+    /** Tras crear un gasto puede crearse un abono automático; el padre debe refrescar detalle y listado. */
     'detail-refresh-requested': []
 }>()
 
@@ -222,12 +222,18 @@ function addBankRow() {
 function onExpenseCreated(expense: ExpenseHeader) {
     showExpenseModal.value = false
     const total = expense.total ?? 0
-    if (total <= 0) return
-    expenseRows.value.push({
-        expenseHeaderId: expense.id,
-        amount: total,
-        label: expense.supplierName || 'Gasto',
-    })
+
+    // ExpenseFormModal crea el abono automáticamente cuando logra vincularlo.
+    // En ese caso el saldo refrescado ya lo descuenta, por lo que no debe volver
+    // a sumarse ni enviarse como otro expenseOffset en esta liquidación.
+    if (total > 0 && !expense.linkedDeliverymanAdvanceId) {
+        expenseRows.value.push({
+            expenseHeaderId: expense.id,
+            amount: total,
+            label: expense.supplierName || 'Gasto',
+        })
+    }
+
     emit('detail-refresh-requested')
 }
 

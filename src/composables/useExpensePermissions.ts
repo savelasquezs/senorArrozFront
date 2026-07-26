@@ -25,8 +25,9 @@ export function useExpensePermissions() {
         return false
     }
 
-    const canDeleteExpense = (expense: Pick<ExpenseHeader, 'createdAt'>): boolean => {
-        return canEditExpense(expense)
+    const canDeleteExpense = (_expense: Pick<ExpenseHeader, 'createdAt'>): boolean => {
+        const role = authStore.userRole
+        return role === UserRole.SUPERADMIN || role === UserRole.ADMIN
     }
 
     return {

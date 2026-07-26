@@ -134,7 +134,7 @@
             :detail="selectedDeliverymanDetail"
             :selected-date="selectedDate"
             :bank-options="bankOptions"
-            @detail-refresh-requested="refreshSelectedDeliverymanDetail"
+            @detail-refresh-requested="refreshSelectedDeliverymanData"
             @success="handleSettleSuccess"
         />
 
@@ -543,20 +543,25 @@ const handleViewDetail = async (deliverymanId: number) => {
     }
 }
 
-/** Actualiza stats/pedidos tras abonos o gastos (p. ej. liquidación: crear gasto con abono automático). */
-const refreshSelectedDeliverymanDetail = async () => {
+/** Actualiza el saldo del modal y la tabla principal de abonos tras crear un gasto. */
+const refreshSelectedDeliverymanData = async () => {
     const d = selectedDeliverymanDetail.value
-    if (!d) return
-    try {
-        const overrideBase = baseAmounts.value.get(d.deliverymanId)
-        const detail = await deliverymanApi.getDaySummary(d.deliverymanId, {
-            date: selectedDate.value,
-            ...(overrideBase != null ? { baseAmount: overrideBase } : {}),
-        })
-        selectedDeliverymanDetail.value = detail
-    } catch (err: any) {
-        error('No se pudo actualizar el resumen del domiciliario', err.message)
-    }
+    const detailRefresh = d
+        ? (async () => {
+              try {
+                  const overrideBase = baseAmounts.value.get(d.deliverymanId)
+                  const detail = await deliverymanApi.getDaySummary(d.deliverymanId, {
+                      date: selectedDate.value,
+                      ...(overrideBase != null ? { baseAmount: overrideBase } : {}),
+                  })
+                  selectedDeliverymanDetail.value = detail
+              } catch (err: any) {
+                  error('No se pudo actualizar el resumen del domiciliario', err.message)
+              }
+          })()
+        : Promise.resolve()
+
+    await Promise.all([detailRefresh, loadData()])
 }
 
 const openLiquidationWizard = () => {

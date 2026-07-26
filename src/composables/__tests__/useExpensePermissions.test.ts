@@ -15,7 +15,7 @@ describe('useExpensePermissions', () => {
         setActivePinia(createPinia())
     })
 
-    it('permite al cajero editar y eliminar gastos de hoy en America/Bogota', () => {
+    it('permite al cajero editar gastos de hoy pero no eliminarlos', () => {
         const auth = useAuthStore()
         auth.user = {
             id: 1,
@@ -32,7 +32,7 @@ describe('useExpensePermissions', () => {
         const expense = { createdAt: '2026-06-16T13:00:00.000Z' }
 
         expect(canEditExpense(expense)).toBe(true)
-        expect(canDeleteExpense(expense)).toBe(true)
+        expect(canDeleteExpense(expense)).toBe(false)
     })
 
     it('bloquea al cajero fuera de la fecha actual', () => {
@@ -70,6 +70,7 @@ describe('useExpensePermissions', () => {
 
         const permissions = useExpensePermissions()
         expect(permissions.canEditExpense({ createdAt: '2026-06-01T13:00:00.000Z' })).toBe(true)
+        expect(permissions.canDeleteExpense({ createdAt: '2026-06-01T13:00:00.000Z' })).toBe(true)
 
         auth.user = {
             ...auth.user,

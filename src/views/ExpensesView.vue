@@ -491,7 +491,10 @@ function canDeleteExpenseHeader(expense: Pick<ExpenseHeader, 'createdAt'>): bool
 }
 
 function showCashierExpenseRestrictionMessage(action: 'modificar' | 'eliminar') {
-    error('Acción no permitida', `El cajero solo puede ${action} gastos de la fecha actual.`)
+    const message = action === 'eliminar'
+        ? 'Solo un administrador o superadministrador puede eliminar gastos.'
+        : 'El cajero solo puede modificar gastos de la fecha actual.'
+    error('Acción no permitida', message)
 }
 
 const handleViewDetailByHeaderId = async (headerId: number) => {

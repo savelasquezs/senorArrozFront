@@ -6,6 +6,7 @@ const apiMocks = vi.hoisted(() => ({
     fetchDetail: vi.fn(),
     fetchAssignedOrders: vi.fn(),
     getDailyOverview: vi.fn(),
+    getDaySummary: vi.fn(),
     getLastLocation: vi.fn(),
 }))
 const routerMocks = vi.hoisted(() => ({
@@ -60,6 +61,7 @@ vi.mock('@/services/MainAPI/orderApi', () => ({
 vi.mock('@/services/MainAPI/deliverymanApi', () => ({
     deliverymanApi: {
         getDailyOverview: apiMocks.getDailyOverview,
+        getDaySummary: apiMocks.getDaySummary,
         getLastLocation: apiMocks.getLastLocation,
     },
 }))
@@ -130,6 +132,18 @@ describe('DeliverymenManagementView focused order navigation', () => {
             }],
             advances: [],
         })
+        apiMocks.getDaySummary.mockReset().mockResolvedValue({
+            deliverymanId: 8,
+            deliverymanName: 'Abelardo',
+            ordersCount: 1,
+            averageDeliveryTime: 20,
+            totalCash: 337000,
+            totalDeliveryFee: 5000,
+            totalAdvances: 0,
+            baseAmount: 55000,
+            currentBalance: 392000,
+            orders: [],
+        })
         apiMocks.getLastLocation.mockReset().mockResolvedValue({
             latitude: 6.23,
             longitude: -75.59,
@@ -195,6 +209,84 @@ describe('DeliverymenManagementView focused order navigation', () => {
 
         await map.trigger('click')
         expect(wrapper.get('[data-test="delivery-map"]').attributes('data-focus')).toBeUndefined()
+
+        wrapper.unmount()
+    })
+
+    it('refresca el detalle y la tabla de abonos después de crear un gasto', async () => {
+        const wrapper = mount(DeliverymenManagementView, {
+            global: {
+                stubs: {
+                    MainLayout: { template: '<main><slot /></main>' },
+                    BaseInput: { template: '<input />' },
+                    BaseButton: { template: '<button><slot /></button>' },
+                    DeliverymanCard: true,
+                    AdvancesTable: true,
+                    AdvanceForm: true,
+                    DeliverymanDetailModal: true,
+                    LiquidationWizardModal: true,
+                    LiquidationConfirmModal: true,
+                    DeliverymanOrdersModal: true,
+                    AsyncComponentWrapper: true,
+                    DeliveryMap: true,
+                },
+            },
+        })
+        await flushPromises()
+        await vi.dynamicImportSettled()
+        await flushPromises()
+
+        wrapper.findComponent({ name: 'DeliverymanCard' }).vm.$emit('view-detail', 8)
+        await flushPromises()
+
+        const createdAdvance = {
+            id: 91,
+            deliverymanId: 8,
+            deliverymanName: 'Abelardo',
+            amount: 61800,
+            paymentMethod: 2,
+            expenseHeaderId: 730,
+            notes: 'gasto #730 - Proveedor General',
+            createdAt: '2026-07-24T16:00:00Z',
+            createdBy: 1,
+            createdByName: 'Caja',
+            branchId: 4,
+            branchName: 'Castilla',
+            updatedAt: '2026-07-24T16:00:00Z',
+        }
+        apiMocks.getDailyOverview.mockResolvedValueOnce({
+            deliverymen: [{
+                deliverymanId: 8,
+                deliverymanName: 'Abelardo',
+                ordersCount: 1,
+                averageDeliveryTime: 20,
+                totalCash: 337000,
+                totalDeliveryFee: 5000,
+                totalAdvances: 61800,
+                baseAmount: 55000,
+                currentBalance: 330200,
+            }],
+            advances: [createdAdvance],
+        })
+        apiMocks.getDaySummary.mockResolvedValueOnce({
+            deliverymanId: 8,
+            deliverymanName: 'Abelardo',
+            ordersCount: 1,
+            averageDeliveryTime: 20,
+            totalCash: 337000,
+            totalDeliveryFee: 5000,
+            totalAdvances: 61800,
+            baseAmount: 55000,
+            currentBalance: 330200,
+            orders: [],
+        })
+
+        wrapper.findComponent({ name: 'LiquidationWizardModal' }).vm.$emit('detail-refresh-requested')
+        await flushPromises()
+
+        expect(apiMocks.getDailyOverview).toHaveBeenCalledTimes(2)
+        expect(apiMocks.getDaySummary).toHaveBeenCalledTimes(2)
+        expect(wrapper.findComponent({ name: 'AdvancesTable' }).props('advances')).toEqual([createdAdvance])
 
         wrapper.unmount()
     })
