@@ -122,7 +122,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, defineAsyncComponent, onMounted, ref, watch } from 'vue'
+import { computed, defineAsyncComponent, nextTick, onMounted, ref, watch } from 'vue'
 import type { ColumnState } from 'ag-grid-community'
 import { ChevronLeftIcon, ChevronRightIcon, PlusIcon } from '@heroicons/vue/24/outline'
 import ExpenseDetailsAgGrid from '@/components/expenses/ExpenseDetailsAgGrid.vue'
@@ -602,11 +602,21 @@ const handleDeleteDetailLine = async (payload: { headerId: number; detailId: num
     }
 }
 
-const requestDeleteExpenseHeader = (header: ExpenseHeader) => {
+const requestDeleteExpenseHeader = async (header: ExpenseHeader) => {
     if (!canDeleteExpenseHeader(header)) {
         showCashierExpenseRestrictionMessage('eliminar')
         return
     }
+
+    // Never stack the confirmation behind the detail/edit dialog. Unmount the
+    // source dialog first, then open the single confirmation dialog.
+    if (selectedExpense.value?.id === header.id) {
+        closeDetailModal()
+    }
+    if (editingExpense.value?.id === header.id) {
+        closeFormModal()
+    }
+    await nextTick()
 
     deleteLinePending.value = {
         mode: 'full',
