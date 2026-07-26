@@ -26,6 +26,33 @@
         Activar WhatsApp para esta sucursal
       </label>
 
+      <section class="space-y-3 rounded-lg border border-amber-200 bg-amber-50/60 p-4">
+        <div>
+          <h4 class="font-semibold text-gray-900">Mensaje de ausencia</h4>
+          <p class="mt-1 text-sm text-gray-600">
+            Se envía una vez por conversación mientras la sucursal esté cerrada, según los horarios configurados en la sección General.
+          </p>
+        </div>
+        <label class="inline-flex items-center gap-2 text-sm font-medium text-gray-700">
+          <input v-model="form.awayMessageEnabled" type="checkbox" class="h-4 w-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500" />
+          Activar respuesta automática fuera del horario
+        </label>
+        <label class="block text-sm font-medium text-gray-700">
+          Texto del mensaje
+          <textarea
+            v-model="form.awayMessageText"
+            rows="4"
+            maxlength="3500"
+            :disabled="!form.awayMessageEnabled"
+            class="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-emerald-500 focus:ring-emerald-500 disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-500"
+          />
+        </label>
+        <div class="flex flex-col gap-1 text-xs text-gray-600 sm:flex-row sm:items-center sm:justify-between">
+          <span v-pre>Variables disponibles: {{BranchName}} y {{NextOpening}}.</span>
+          <span>{{ form.awayMessageText.length }}/3500</span>
+        </div>
+      </section>
+
       <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <BaseInput v-model="form.phoneNumberId" label="Phone Number ID" placeholder="123456789012345" required :maxlength="64" />
         <BaseInput v-model="form.businessAccountId" label="Business Account ID" placeholder="123456789012345" required :maxlength="64" />
@@ -95,6 +122,10 @@ import BaseAlert from '@/components/ui/BaseAlert.vue'
 import BaseLoading from '@/components/ui/BaseLoading.vue'
 import { whatsappApi, whatsappWebhookUrl } from '@/services/MainAPI/whatsappApi'
 import type { UpsertWhatsAppBranchSetting, WhatsAppBranchSetting } from '@/types/whatsapp'
+import {
+  DEFAULT_WHATSAPP_AWAY_MESSAGE,
+  validateWhatsAppAwayMessage,
+} from '@/utils/whatsappAwayMessage'
 
 const props = defineProps<{ branchId: number }>()
 const emit = defineEmits<{ saved: [setting: WhatsAppBranchSetting] }>()
@@ -105,7 +136,6 @@ const saving = ref(false)
 const testing = ref(false)
 const loadError = ref('')
 const message = reactive<{ text: string; variant: 'success' | 'warning' | 'danger' | 'info' }>({ text: '', variant: 'info' })
-
 const form = reactive<UpsertWhatsAppBranchSetting>({
   phoneNumberId: '',
   businessAccountId: '',
@@ -114,6 +144,8 @@ const form = reactive<UpsertWhatsAppBranchSetting>({
   webhookVerifyToken: '',
   appSecret: '',
   isActive: false,
+  awayMessageEnabled: false,
+  awayMessageText: DEFAULT_WHATSAPP_AWAY_MESSAGE,
 })
 
 const webhookUrl = whatsappWebhookUrl()
@@ -144,6 +176,8 @@ function applySetting(next: WhatsAppBranchSetting) {
   form.webhookVerifyToken = next.webhookVerifyToken ?? ''
   form.appSecret = ''
   form.isActive = next.isActive ?? false
+  form.awayMessageEnabled = next.awayMessageEnabled ?? false
+  form.awayMessageText = next.awayMessageText?.trim() || DEFAULT_WHATSAPP_AWAY_MESSAGE
 }
 
 async function load() {
@@ -161,12 +195,21 @@ async function load() {
 
 async function save() {
   try {
+    const awayMessageError = form.awayMessageEnabled
+      ? validateWhatsAppAwayMessage(form.awayMessageText)
+      : null
+    if (awayMessageError) {
+      message.variant = 'danger'
+      message.text = awayMessageError
+      return
+    }
     saving.value = true
     message.text = ''
     const payload: UpsertWhatsAppBranchSetting = {
       ...form,
       accessToken: form.accessToken.trim(),
       appSecret: form.appSecret.trim(),
+      awayMessageText: form.awayMessageText.trim(),
     }
     const res = await whatsappApi.saveBranchSetting(props.branchId, payload)
     applySetting(res.data)

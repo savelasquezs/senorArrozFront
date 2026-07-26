@@ -17,6 +17,8 @@ export interface WhatsAppBranchSetting {
   isActive: boolean
   isVerified: boolean
   lastVerifiedAt?: string | null
+  awayMessageEnabled: boolean
+  awayMessageText?: string | null
   createdAt?: string | null
   updatedAt?: string | null
   status: WhatsAppSettingStatus
@@ -30,6 +32,8 @@ export interface UpsertWhatsAppBranchSetting {
   webhookVerifyToken: string
   appSecret: string
   isActive: boolean
+  awayMessageEnabled: boolean
+  awayMessageText: string
 }
 
 export interface WhatsAppTestConnectionResult {
