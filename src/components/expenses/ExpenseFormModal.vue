@@ -289,6 +289,10 @@
         </form>
 
         <template #footer>
+            <BaseButton v-if="editingExpense && canDelete" type="button" variant="danger"
+                :disabled="loading || savingExpense" @click="$emit('delete')">
+                Eliminar factura
+            </BaseButton>
             <BaseButton @click="$emit('close')" variant="secondary">
                 Cancelar
             </BaseButton>
@@ -405,6 +409,8 @@ interface Props {
     presetDeliverymanId?: number | null
     /** No crear abono automático al guardar (el abono va en la liquidación). */
     skipAutoAdvance?: boolean
+    /** Permite eliminar el ExpenseHeader completo al editar. */
+    canDelete?: boolean
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -413,11 +419,13 @@ const props = withDefaults(defineProps<Props>(), {
     focusDetailId: null,
     presetDeliverymanId: null,
     skipAutoAdvance: false,
+    canDelete: false,
 })
 
 const emit = defineEmits<{
     'close': []
     'submit': [expense: ExpenseHeader]
+    'delete': []
 }>()
 
 const { formatCurrency } = useFormatting()

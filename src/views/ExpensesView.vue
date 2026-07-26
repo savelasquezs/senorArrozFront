@@ -82,19 +82,28 @@
 
         <ExpenseDetailModal v-if="showDetailModal && selectedExpense" :is-open="showDetailModal"
             :expense="selectedExpense" :loading="loadingDetail" :can-edit="canEditExpenseHeader(selectedExpense)"
-            @close="closeDetailModal" @edit="handleEditFromDetail" />
+            :can-delete="canDeleteExpenseHeader(selectedExpense)"
+            @close="closeDetailModal" @edit="handleEditFromDetail"
+            @delete="requestDeleteExpenseHeader(selectedExpense)" />
 
         <ExpenseFormModal v-if="showFormModal" :is-open="showFormModal" :editing-expense="editingExpense"
-            :focus-detail-id="formFocusDetailId" :loading="submitting" @close="closeFormModal"
-            @submit="handleSubmitExpense" />
+            :focus-detail-id="formFocusDetailId" :loading="submitting"
+            :can-delete="Boolean(editingExpense && canDeleteExpenseHeader(editingExpense))"
+            @close="closeFormModal" @submit="handleSubmitExpense"
+            @delete="editingExpense && requestDeleteExpenseHeader(editingExpense)" />
 
         <BaseDialog :model-value="showDeleteLineConfirm" title="Confirmar eliminación" size="md"
             @update:model-value="onDeleteLineDialogUpdate">
             <p v-if="deleteLinePending" class="text-sm text-gray-700">
                 <template v-if="deleteLinePending.mode === 'full'">
-                    Esta es la única línea de la factura
+                    Se eliminará la factura completa
                     <span class="font-semibold">#{{ deleteLinePending.headerId }}</span>.
-                    ¿Eliminar la factura completa?
+                    <span v-if="deleteLinePending.header.linkedDeliverymanAdvanceId">
+                        También se eliminará el abono vinculado
+                        <span class="font-semibold">#{{ deleteLinePending.header.linkedDeliverymanAdvanceId }}</span>.
+                    </span>
+                    El detalle permanecerá en el correo de auditoría del cierre.
+                    ¿Deseas continuar?
                 </template>
                 <template v-else>
                     ¿Eliminar esta línea del gasto?
@@ -546,7 +555,7 @@ const handleEditFromDetail = () => {
 type DeleteLinePending = {
     mode: 'full' | 'line'
     headerId: number
-    detailId: number
+    detailId?: number
     header: ExpenseHeader
 }
 
@@ -593,6 +602,20 @@ const handleDeleteDetailLine = async (payload: { headerId: number; detailId: num
     }
 }
 
+const requestDeleteExpenseHeader = (header: ExpenseHeader) => {
+    if (!canDeleteExpenseHeader(header)) {
+        showCashierExpenseRestrictionMessage('eliminar')
+        return
+    }
+
+    deleteLinePending.value = {
+        mode: 'full',
+        headerId: header.id,
+        header,
+    }
+    showDeleteLineConfirm.value = true
+}
+
 const confirmDeleteDetailLine = async () => {
     const pending = deleteLinePending.value
     if (!pending) return
@@ -609,7 +632,13 @@ const confirmDeleteDetailLine = async () => {
             if (selectedExpense.value?.id === headerId) {
                 closeDetailModal()
             }
+            if (editingExpense.value?.id === headerId) {
+                closeFormModal()
+            }
         } else {
+            if (detailId == null) {
+                throw new Error('No se encontró la línea que se desea eliminar.')
+            }
             const remaining = header.expenseDetails.filter(d => d.id !== detailId)
             const includeVat = Number(header.vatAmount ?? 0) > 0.01
             const updatePayload: UpdateExpenseHeaderDto = {

@@ -125,6 +125,9 @@
         </div>
 
         <template #footer>
+            <BaseButton v-if="expense && canDelete" @click="$emit('delete')" variant="danger">
+                Eliminar factura
+            </BaseButton>
             <BaseButton @click="$emit('close')" variant="secondary">
                 Cerrar
             </BaseButton>
@@ -149,15 +152,18 @@ interface Props {
     expense: ExpenseHeader | null
     loading?: boolean
     canEdit?: boolean
+    canDelete?: boolean
 }
 
 const props = withDefaults(defineProps<Props>(), {
     canEdit: true,
+    canDelete: false,
 })
 
 defineEmits<{
     'close': []
     'edit': []
+    'delete': []
 }>()
 
 const { formatCurrency, formatDateShort, formatTime12h } = useFormatting()
