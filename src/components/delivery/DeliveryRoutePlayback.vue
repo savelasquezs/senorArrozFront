@@ -72,6 +72,9 @@ let objects: Array<google.maps.Marker | google.maps.Polyline> = []
 let activePositions = new Map<number, google.maps.LatLngLiteral>()
 let lastPointIds = new Map<number, number>()
 let cameraMovingProgrammatically = false
+let renderTimer: number | null = null
+let lastRenderAt = 0
+const renderIntervalMs = 90
 
 const time = (value: string) => new Date(value).getTime()
 const percent = (value: number) => Math.max(0, Math.min(100, ((value - new Date(props.data.from).getTime()) / Math.max(1, new Date(props.data.to).getTime() - new Date(props.data.from).getTime())) * 100))
@@ -112,6 +115,7 @@ const popup = (deliveryman: any, point: any) => `<div style="max-width:260px;fon
 
 function render() {
   if (!map) return
+  lastRenderAt = performance.now()
   clearObjects()
   const now = engine.currentTimestamp.value
   const evidencePointIds = new Set(props.evidencePointIds || [])
@@ -198,6 +202,23 @@ function render() {
   }
 }
 
+function scheduleRender() {
+  const elapsed = performance.now() - lastRenderAt
+  if (elapsed >= renderIntervalMs) {
+    if (renderTimer != null) {
+      window.clearTimeout(renderTimer)
+      renderTimer = null
+    }
+    render()
+    return
+  }
+  if (renderTimer != null) return
+  renderTimer = window.setTimeout(() => {
+    renderTimer = null
+    render()
+  }, renderIntervalMs - elapsed)
+}
+
 function seekSlider(event: Event) {
   const value = Number((event.target as HTMLInputElement).value) / 1000
   engine.seekTo(new Date(props.data.from).getTime() + engine.duration.value * value)
@@ -233,7 +254,13 @@ async function initialize() {
   finally { initializing.value = false }
 }
 
-watch(() => engine.currentTimestamp.value, render)
+watch(() => engine.currentTimestamp.value, () => {
+  if (engine.isPlaying.value) scheduleRender()
+  else render()
+})
+watch(() => engine.isPlaying.value, isPlaying => {
+  if (!isPlaying) render()
+})
 watch(() => props.data, () => {
   engine.reset()
   hiddenIds.clear()
@@ -242,5 +269,12 @@ watch(() => props.data, () => {
   render()
 }, { deep: true })
 onMounted(initialize)
-onUnmounted(() => { engine.pause(); listeners.forEach(listener => listener.remove()); clearObjects(); infoWindow?.close(); map = null })
+onUnmounted(() => {
+  engine.pause()
+  if (renderTimer != null) window.clearTimeout(renderTimer)
+  listeners.forEach(listener => listener.remove())
+  clearObjects()
+  infoWindow?.close()
+  map = null
+})
 </script>
