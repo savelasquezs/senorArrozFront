@@ -1,6 +1,8 @@
 <template>
   <div class="space-y-3">
-    <div v-if="error" class="flex h-72 items-center justify-center rounded-xl border border-amber-200 bg-amber-50 px-6 text-center text-sm text-amber-800">{{ error }}</div>
+    <div v-if="error" class="flex h-72 items-center justify-center rounded-xl border border-amber-200 bg-amber-50 px-6 text-center text-sm text-amber-800">
+      {{ error }}
+    </div>
     <div v-else class="relative">
       <div ref="mapContainer" class="h-[460px] w-full rounded-xl border border-gray-200" />
       <BaseLoading v-if="initializing" text="Inicializando Google Maps..." class="absolute inset-0 rounded-xl bg-white/80" />
@@ -33,9 +35,14 @@
     </div>
 
     <div class="flex flex-wrap gap-2">
-      <button v-for="(deliveryman, index) in data.deliverymen" :key="deliveryman.deliverymanId" type="button"
+      <button
+        v-for="(deliveryman, index) in data.deliverymen"
+        :key="deliveryman.deliverymanId"
+        type="button"
         class="flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-semibold"
-        :class="hiddenIds.has(deliveryman.deliverymanId) ? 'opacity-40' : ''" @click="toggleVisibility(deliveryman.deliverymanId)">
+        :class="hiddenIds.has(deliveryman.deliverymanId) ? 'opacity-40' : ''"
+        @click="toggleVisibility(deliveryman.deliverymanId)"
+      >
         <i class="h-2.5 w-2.5 rounded-full" :style="{ backgroundColor: colors[index % colors.length] }" />
         {{ deliveryman.deliverymanName }}
       </button>
@@ -48,8 +55,18 @@ import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import { importLibrary, setOptions } from '@googlemaps/js-api-loader'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseLoading from '@/components/ui/BaseLoading.vue'
-import type { DeliveryPlaybackResponse } from '@/services/MainAPI/deliveryTrackingIncidentsApi'
-import { detectStays, gapThreshold, hasTechnicalGap, useDeliveryRoutePlayback } from '@/composables/useDeliveryRoutePlayback'
+import type {
+  DeliveryPlaybackDeliveryman,
+  DeliveryPlaybackPoint,
+  DeliveryPlaybackResponse,
+} from '@/services/MainAPI/deliveryTrackingIncidentsApi'
+import {
+  detectStays,
+  gapThreshold,
+  hasTechnicalGap,
+  type PlaybackStay,
+  useDeliveryRoutePlayback,
+} from '@/composables/useDeliveryRoutePlayback'
 
 const props = defineProps<{
   data: DeliveryPlaybackResponse
@@ -57,43 +74,134 @@ const props = defineProps<{
   incidentEnd?: number | null
   evidencePointIds?: number[]
 }>()
+
+interface StayOverlay {
+  marker: google.maps.Marker
+  stay: PlaybackStay
+}
+
+interface DeliverymanMapState {
+  renderedPointCount: number
+  pointMarkers: Map<number, google.maps.Marker>
+  evidenceHalos: Map<number, google.maps.Marker>
+  routeLines: google.maps.Polyline[]
+  stayMarkers: Map<string, StayOverlay>
+  activeMarker: google.maps.Marker | null
+  activePoint: DeliveryPlaybackPoint | null
+}
+
 const mapContainer = ref<HTMLDivElement | null>(null)
 const initializing = ref(true)
 const error = ref('')
 const hiddenIds = reactive(new Set<number>())
 const colors = ['#2563eb', '#dc2626', '#059669', '#7c3aed', '#d97706', '#0891b2']
 const rates = [0.5, 1, 2, 5, 10, 30, 60]
-const engine = useDeliveryRoutePlayback(() => new Date(props.data.from).getTime(), () => new Date(props.data.to).getTime())
+const engine = useDeliveryRoutePlayback(
+  () => new Date(props.data.from).getTime(),
+  () => new Date(props.data.to).getTime(),
+)
 const allEvents = computed(() => props.data.deliverymen.flatMap(item => item.events))
+const mapStates = new Map<number, DeliverymanMapState>()
+const activePositions = new Map<number, google.maps.LatLngLiteral>()
+const pulseMarkers = new Set<google.maps.Marker>()
+const gapThresholds = new Map<number, number>()
+
 let map: google.maps.Map | null = null
 let infoWindow: google.maps.InfoWindow | null = null
 let listeners: google.maps.MapsEventListener[] = []
-let objects: Array<google.maps.Marker | google.maps.Polyline> = []
-let activePositions = new Map<number, google.maps.LatLngLiteral>()
-let lastPointIds = new Map<number, number>()
 let cameraMovingProgrammatically = false
-let renderTimer: number | null = null
-let lastRenderAt = 0
-const renderIntervalMs = 90
+let cameraMoveToken = 0
+let lastCameraMoveAt = 0
 
 const time = (value: string) => new Date(value).getTime()
-const percent = (value: number) => Math.max(0, Math.min(100, ((value - new Date(props.data.from).getTime()) / Math.max(1, new Date(props.data.to).getTime() - new Date(props.data.from).getTime())) * 100))
-const incidentBandStyle = computed(() => ({ left: `${percent(props.incidentStart!)}%`, width: `${percent(props.incidentEnd!) - percent(props.incidentStart!)}%` }))
-const clearObjects = () => { objects.forEach(object => object.setMap(null)); objects = []; activePositions.clear() }
-const moveCamera = (action: () => void) => {
+const percent = (value: number) => Math.max(0, Math.min(100,
+  ((value - new Date(props.data.from).getTime())
+    / Math.max(1, new Date(props.data.to).getTime() - new Date(props.data.from).getTime())) * 100))
+const incidentBandStyle = computed(() => ({
+  left: `${percent(props.incidentStart!)}%`,
+  width: `${percent(props.incidentEnd!) - percent(props.incidentStart!)}%`,
+}))
+const popup = (deliveryman: DeliveryPlaybackDeliveryman, point: DeliveryPlaybackPoint) =>
+  `<div style="max-width:260px;font-size:12px"><b>${deliveryman.deliverymanName}</b><br>${new Date(point.recordedAt).toLocaleString('es-CO', { timeZone: 'America/Bogota' })}<br>${point.latitude.toFixed(6)}, ${point.longitude.toFixed(6)}<br>Precisión: ${point.accuracyMeters == null ? 'sin dato' : `${Math.round(point.accuracyMeters)} m`} · Batería: ${point.batteryLevelPercent == null ? 'sin dato' : `${point.batteryLevelPercent}%`}<br>GPS: ${point.gpsEnabled === false ? 'apagado' : 'activo'} · Internet: ${point.internetAvailable === false ? 'no' : 'sí'}<br>Modo: ${point.trackingMode || 'sin dato'}<br>Sincronización: ${point.syncedAt ? new Date(point.syncedAt).toLocaleString('es-CO', { timeZone: 'America/Bogota' }) : 'sin dato'}${point.syncedAt && time(point.syncedAt) - time(point.recordedAt) > 60000 ? '<br><b>Enviado offline</b>' : ''}<br>Ruta: ${point.deliveryRouteId ?? '—'} · Jornada: ${point.workSessionId ?? '—'}</div>`
+
+function formatDuration(milliseconds: number) {
+  const total = Math.floor(milliseconds / 1000)
+  return `${String(Math.floor(total / 60)).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`
+}
+
+function formatClock(timestamp: number) {
+  return new Intl.DateTimeFormat('es-CO', {
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    timeZone: 'America/Bogota',
+  }).format(new Date(timestamp))
+}
+
+function getMapState(deliverymanId: number) {
+  const existing = mapStates.get(deliverymanId)
+  if (existing) return existing
+  const state: DeliverymanMapState = {
+    renderedPointCount: 0,
+    pointMarkers: new Map(),
+    evidenceHalos: new Map(),
+    routeLines: [],
+    stayMarkers: new Map(),
+    activeMarker: null,
+    activePoint: null,
+  }
+  mapStates.set(deliverymanId, state)
+  return state
+}
+
+function clearMapState(state: DeliverymanMapState) {
+  state.pointMarkers.forEach(marker => marker.setMap(null))
+  state.evidenceHalos.forEach(marker => marker.setMap(null))
+  state.stayMarkers.forEach(({ marker }) => marker.setMap(null))
+  state.routeLines.forEach(line => line.setMap(null))
+  state.activeMarker?.setMap(null)
+  state.pointMarkers.clear()
+  state.evidenceHalos.clear()
+  state.stayMarkers.clear()
+  state.routeLines = []
+  state.activeMarker = null
+  state.activePoint = null
+  state.renderedPointCount = 0
+}
+
+function clearObjects() {
+  mapStates.forEach(clearMapState)
+  mapStates.clear()
+  pulseMarkers.forEach(marker => marker.setMap(null))
+  pulseMarkers.clear()
+  activePositions.clear()
+  gapThresholds.clear()
+}
+
+function getGapThreshold(deliveryman: DeliveryPlaybackDeliveryman) {
+  const existing = gapThresholds.get(deliveryman.deliverymanId)
+  if (existing != null) return existing
+  const value = gapThreshold(deliveryman.points)
+  gapThresholds.set(deliveryman.deliverymanId, value)
+  return value
+}
+
+function moveCamera(action: () => void) {
   if (!map) return
+  const token = ++cameraMoveToken
   cameraMovingProgrammatically = true
   action()
   google.maps.event.addListenerOnce(map, 'idle', () => {
-    cameraMovingProgrammatically = false
+    if (token === cameraMoveToken) cameraMovingProgrammatically = false
   })
 }
-const centerOnRouteStart = () => {
+
+function centerOnRouteStart() {
   if (!map) return
   const starts = props.data.deliverymen
     .filter(item => !hiddenIds.has(item.deliverymanId))
     .map(item => item.points[0])
-    .filter((point): point is NonNullable<typeof point> => Boolean(point))
+    .filter((point): point is DeliveryPlaybackPoint => Boolean(point))
   if (!starts.length) return
   if (starts.length === 1) {
     moveCamera(() => {
@@ -106,141 +214,348 @@ const centerOnRouteStart = () => {
   starts.forEach(point => bounds.extend({ lat: point.latitude, lng: point.longitude }))
   moveCamera(() => map!.fitBounds(bounds, 80))
 }
-const interpolate = (a: any, b: any, timestamp: number) => {
-  const start = time(a.recordedAt), end = time(b.recordedAt)
-  const ratio = end === start ? 0 : (timestamp - start) / (end - start)
-  return { lat: a.latitude + (b.latitude - a.latitude) * ratio, lng: a.longitude + (b.longitude - a.longitude) * ratio }
+
+function occurredPointCount(points: DeliveryPlaybackPoint[], timestamp: number) {
+  let low = 0
+  let high = points.length
+  while (low < high) {
+    const middle = Math.floor((low + high) / 2)
+    if (time(points[middle]!.recordedAt) <= timestamp) low = middle + 1
+    else high = middle
+  }
+  return low
 }
-const popup = (deliveryman: any, point: any) => `<div style="max-width:260px;font-size:12px"><b>${deliveryman.deliverymanName}</b><br>${new Date(point.recordedAt).toLocaleString('es-CO',{timeZone:'America/Bogota'})}<br>${point.latitude.toFixed(6)}, ${point.longitude.toFixed(6)}<br>Precisión: ${point.accuracyMeters == null ? 'sin dato' : `${Math.round(point.accuracyMeters)} m`} · Batería: ${point.batteryLevelPercent == null ? 'sin dato' : `${point.batteryLevelPercent}%`}<br>GPS: ${point.gpsEnabled === false ? 'apagado' : 'activo'} · Internet: ${point.internetAvailable === false ? 'no' : 'sí'}<br>Modo: ${point.trackingMode || 'sin dato'}<br>Sincronización: ${point.syncedAt ? new Date(point.syncedAt).toLocaleString('es-CO',{timeZone:'America/Bogota'}) : 'sin dato'}${point.syncedAt && time(point.syncedAt)-time(point.recordedAt)>60000?'<br><b>Enviado offline</b>':''}<br>Ruta: ${point.deliveryRouteId ?? '—'} · Jornada: ${point.workSessionId ?? '—'}</div>`
+
+function interpolate(a: DeliveryPlaybackPoint, b: DeliveryPlaybackPoint, timestamp: number) {
+  const start = time(a.recordedAt)
+  const end = time(b.recordedAt)
+  const ratio = end === start ? 0 : Math.max(0, Math.min(1, (timestamp - start) / (end - start)))
+  return {
+    lat: a.latitude + (b.latitude - a.latitude) * ratio,
+    lng: a.longitude + (b.longitude - a.longitude) * ratio,
+  }
+}
+
+function createPointMarker(
+  deliveryman: DeliveryPlaybackDeliveryman,
+  point: DeliveryPlaybackPoint,
+  color: string,
+  isEvidence: boolean,
+) {
+  const marker = new google.maps.Marker({
+    map,
+    position: { lat: point.latitude, lng: point.longitude },
+    title: isEvidence ? 'Punto del incidente' : `${deliveryman.deliverymanName} · punto GPS`,
+    zIndex: isEvidence ? 21 : 10,
+    icon: {
+      path: google.maps.SymbolPath.CIRCLE,
+      fillColor: isEvidence ? '#ffffff' : color,
+      fillOpacity: 1,
+      strokeColor: isEvidence ? '#d97706' : '#ffffff',
+      strokeWeight: isEvidence ? 3 : 2,
+      scale: isEvidence ? 7 : 6,
+    },
+  })
+  marker.addListener('click', () => {
+    infoWindow?.setContent(popup(deliveryman, point))
+    infoWindow?.open({ map, anchor: marker })
+  })
+  return marker
+}
+
+function createEvidenceHalo(point: DeliveryPlaybackPoint) {
+  return new google.maps.Marker({
+    map,
+    position: { lat: point.latitude, lng: point.longitude },
+    title: 'Punto del incidente',
+    zIndex: 20,
+    icon: {
+      path: google.maps.SymbolPath.CIRCLE,
+      fillColor: '#fef3c7',
+      fillOpacity: .7,
+      strokeColor: '#f59e0b',
+      strokeWeight: 4,
+      scale: 12,
+    },
+  })
+}
+
+function syncRouteLines(
+  state: DeliverymanMapState,
+  deliveryman: DeliveryPlaybackDeliveryman,
+  occurred: DeliveryPlaybackPoint[],
+  color: string,
+) {
+  const threshold = getGapThreshold(deliveryman)
+  const segments: Array<{ path: google.maps.LatLngLiteral[]; gap: boolean }> = []
+  let current: google.maps.LatLngLiteral[] = []
+
+  occurred.forEach((point, index) => {
+    const position = { lat: point.latitude, lng: point.longitude }
+    const previous = occurred[index - 1]
+    if (previous && hasTechnicalGap(previous, point, deliveryman.events, threshold)) {
+      if (current.length > 1) segments.push({ path: current, gap: false })
+      segments.push({
+        path: [{ lat: previous.latitude, lng: previous.longitude }, position],
+        gap: true,
+      })
+      current = [position]
+    } else {
+      current.push(position)
+    }
+  })
+  if (current.length > 1) segments.push({ path: current, gap: false })
+
+  segments.forEach((segment, index) => {
+    let line = state.routeLines[index]
+    if (!line) {
+      line = new google.maps.Polyline({ map })
+      state.routeLines.push(line)
+    }
+    line.setOptions({
+      map,
+      path: segment.path,
+      strokeColor: segment.gap ? '#6b7280' : color,
+      strokeOpacity: segment.gap ? .7 : 1,
+      strokeWeight: segment.gap ? 3 : 4,
+      icons: segment.gap
+        ? [{ icon: { path: 'M 0,-1 0,1', strokeOpacity: 1, scale: 3 }, offset: '0', repeat: '12px' }]
+        : [],
+    })
+  })
+  while (state.routeLines.length > segments.length)
+    state.routeLines.pop()!.setMap(null)
+}
+
+function showPointPulse(point: DeliveryPlaybackPoint, color: string) {
+  const pulse = new google.maps.Marker({
+    map,
+    position: { lat: point.latitude, lng: point.longitude },
+    zIndex: 25,
+    icon: {
+      path: google.maps.SymbolPath.CIRCLE,
+      fillColor: color,
+      fillOpacity: .2,
+      strokeColor: color,
+      strokeWeight: 2,
+      scale: 18,
+    },
+  })
+  pulseMarkers.add(pulse)
+  window.setTimeout(() => {
+    pulse.setMap(null)
+    pulseMarkers.delete(pulse)
+  }, 650)
+}
+
+function syncHistoricalOverlays(
+  state: DeliverymanMapState,
+  deliveryman: DeliveryPlaybackDeliveryman,
+  count: number,
+  color: string,
+  now: number,
+) {
+  const occurred = deliveryman.points.slice(0, count)
+  const desiredIds = new Set(occurred.map(point => point.id))
+  const evidenceIds = new Set(props.evidencePointIds || [])
+
+  state.pointMarkers.forEach((marker, id) => {
+    if (!desiredIds.has(id)) {
+      marker.setMap(null)
+      state.pointMarkers.delete(id)
+    }
+  })
+  state.evidenceHalos.forEach((marker, id) => {
+    if (!desiredIds.has(id) || !evidenceIds.has(id)) {
+      marker.setMap(null)
+      state.evidenceHalos.delete(id)
+    }
+  })
+  occurred.forEach(point => {
+    const isEvidence = evidenceIds.has(point.id)
+    if (!state.pointMarkers.has(point.id))
+      state.pointMarkers.set(point.id, createPointMarker(deliveryman, point, color, isEvidence))
+    if (isEvidence && !state.evidenceHalos.has(point.id))
+      state.evidenceHalos.set(point.id, createEvidenceHalo(point))
+  })
+
+  syncRouteLines(state, deliveryman, occurred, color)
+  const stays = detectStays(occurred)
+  const desiredStays = new Set(stays.map(stay => `${stay.start}:${stay.latitude}:${stay.longitude}`))
+  state.stayMarkers.forEach(({ marker }, key) => {
+    if (!desiredStays.has(key)) {
+      marker.setMap(null)
+      state.stayMarkers.delete(key)
+    }
+  })
+  stays.forEach(stay => {
+    const key = `${stay.start}:${stay.latitude}:${stay.longitude}`
+    if (state.stayMarkers.has(key)) return
+    state.stayMarkers.set(key, {
+      stay,
+      marker: new google.maps.Marker({
+        map,
+        position: { lat: stay.latitude, lng: stay.longitude },
+        zIndex: 24,
+        label: {
+          text: formatDuration(Math.max(0, Math.min(now, stay.end) - stay.start)),
+          color: '#111827',
+          fontSize: '11px',
+          fontWeight: '700',
+        },
+        icon: {
+          path: google.maps.SymbolPath.CIRCLE,
+          fillColor: '#fbbf24',
+          fillOpacity: .9,
+          strokeColor: '#fff',
+          strokeWeight: 2,
+          scale: 9,
+        },
+      }),
+    })
+  })
+
+  if (count > state.renderedPointCount && count > 0)
+    showPointPulse(deliveryman.points[count - 1]!, color)
+  state.renderedPointCount = count
+}
+
+function updateStayCounters(state: DeliverymanMapState, now: number) {
+  state.stayMarkers.forEach(({ marker, stay }) => {
+    marker.setLabel({
+      text: formatDuration(Math.max(0, Math.min(now, stay.end) - stay.start)),
+      color: '#111827',
+      fontSize: '11px',
+      fontWeight: '700',
+    })
+  })
+}
+
+function updateActiveMarker(
+  state: DeliverymanMapState,
+  deliveryman: DeliveryPlaybackDeliveryman,
+  count: number,
+  color: string,
+  now: number,
+) {
+  if (count === 0) {
+    state.activeMarker?.setMap(null)
+    state.activePoint = null
+    return
+  }
+  const last = deliveryman.points[count - 1]!
+  const next = deliveryman.points[count]
+  const threshold = getGapThreshold(deliveryman)
+  const position = next && !hasTechnicalGap(last, next, deliveryman.events, threshold)
+    ? interpolate(last, next, now)
+    : { lat: last.latitude, lng: last.longitude }
+  state.activePoint = last
+
+  if (!state.activeMarker) {
+    state.activeMarker = new google.maps.Marker({
+      map,
+      position,
+      zIndex: 30,
+      title: deliveryman.deliverymanName,
+      label: {
+        text: deliveryman.deliverymanName.charAt(0).toUpperCase(),
+        color: '#fff',
+        fontWeight: '700',
+      },
+      icon: {
+        path: google.maps.SymbolPath.CIRCLE,
+        fillColor: color,
+        fillOpacity: 1,
+        strokeColor: '#fff',
+        strokeWeight: 3,
+        scale: 14,
+      },
+    })
+    state.activeMarker.addListener('click', () => {
+      if (!state.activePoint) return
+      infoWindow?.setContent(popup(deliveryman, state.activePoint))
+      infoWindow?.open({ map, anchor: state.activeMarker! })
+    })
+  } else {
+    state.activeMarker.setMap(map)
+    state.activeMarker.setPosition(position)
+  }
+  activePositions.set(deliveryman.deliverymanId, position)
+}
+
+function followActivePositions() {
+  if (!map || !engine.followEnabled.value || !activePositions.size) return
+  const now = performance.now()
+  if (now - lastCameraMoveAt < 180) return
+  lastCameraMoveAt = now
+  if (activePositions.size === 1) {
+    moveCamera(() => map!.panTo([...activePositions.values()][0]!))
+    return
+  }
+  const bounds = new google.maps.LatLngBounds()
+  activePositions.forEach(position => bounds.extend(position))
+  const visibleBounds = map.getBounds()
+  const allVisible = visibleBounds
+    && [...activePositions.values()].every(position => visibleBounds.contains(position))
+  moveCamera(() => allVisible ? map!.panTo(bounds.getCenter()) : map!.fitBounds(bounds, 80))
+}
 
 function render() {
   if (!map) return
-  lastRenderAt = performance.now()
-  clearObjects()
   const now = engine.currentTimestamp.value
-  const evidencePointIds = new Set(props.evidencePointIds || [])
-  props.data.deliverymen.forEach((deliveryman, deliverymanIndex) => {
-    if (hiddenIds.has(deliveryman.deliverymanId)) return
-    const occurred = deliveryman.points.filter(point => time(point.recordedAt) <= now)
-    if (!occurred.length) return
-    const color = colors[deliverymanIndex % colors.length]!
-    const threshold = gapThreshold(deliveryman.points)
-    let segment: google.maps.LatLngLiteral[] = []
-    occurred.forEach((point, index) => {
-      const position = { lat: point.latitude, lng: point.longitude }
-      const previous = occurred[index - 1]
-      if (previous && hasTechnicalGap(previous, point, deliveryman.events, threshold)) {
-        if (segment.length > 1) objects.push(new google.maps.Polyline({ map, path: segment, strokeColor: color, strokeWeight: 4 }))
-        objects.push(new google.maps.Polyline({ map, path: [{ lat: previous.latitude, lng: previous.longitude }, position], strokeColor: '#6b7280', strokeOpacity: .7, strokeWeight: 3, icons: [{ icon: { path: 'M 0,-1 0,1', strokeOpacity: 1, scale: 3 }, offset: '0', repeat: '12px' }] }))
-        segment = [position]
-      } else segment.push(position)
-      const isEvidence = evidencePointIds.has(point.id)
-      if (isEvidence) {
-        const evidenceHalo = new google.maps.Marker({
-          map,
-          position,
-          title: 'Punto del incidente',
-          zIndex: 20,
-          icon: {
-            path: google.maps.SymbolPath.CIRCLE,
-            fillColor: '#fef3c7',
-            fillOpacity: .7,
-            strokeColor: '#f59e0b',
-            strokeWeight: 4,
-            scale: 12,
-          },
-        })
-        objects.push(evidenceHalo)
-      }
-      const pointMarker = new google.maps.Marker({
-        map,
-        position,
-        title: isEvidence ? 'Punto del incidente' : `${deliveryman.deliverymanName} · punto GPS`,
-        zIndex: isEvidence ? 21 : 10,
-        icon: {
-          path: google.maps.SymbolPath.CIRCLE,
-          fillColor: isEvidence ? '#ffffff' : color,
-          fillOpacity: 1,
-          strokeColor: isEvidence ? '#d97706' : '#ffffff',
-          strokeWeight: isEvidence ? 3 : 2,
-          scale: isEvidence ? 7 : 6,
-        },
-      })
-      pointMarker.addListener('click', () => {
-        infoWindow?.setContent(popup(deliveryman, point))
-        infoWindow?.open({ map, anchor: pointMarker })
-      })
-      objects.push(pointMarker)
-    })
-    if (segment.length > 1) objects.push(new google.maps.Polyline({ map, path: segment, strokeColor: color, strokeWeight: 4 }))
-    const last = occurred[occurred.length - 1]!
-    const next = deliveryman.points[occurred.length]
-    const active = next && time(next.recordedAt) > now && !hasTechnicalGap(last, next, deliveryman.events, threshold) ? interpolate(last, next, now) : { lat: last.latitude, lng: last.longitude }
-    activePositions.set(deliveryman.deliverymanId, active)
-    const marker = new google.maps.Marker({ map, position: active, zIndex: 30, title: deliveryman.deliverymanName, label: { text: deliveryman.deliverymanName.charAt(0).toUpperCase(), color: '#fff', fontWeight: '700' }, icon: { path: google.maps.SymbolPath.CIRCLE, fillColor: color, fillOpacity: 1, strokeColor: '#fff', strokeWeight: 3, scale: 14 } })
-    marker.addListener('click', () => { infoWindow?.setContent(popup(deliveryman, last)); infoWindow?.open({ map, anchor: marker }) })
-    objects.push(marker)
-    if (lastPointIds.get(deliveryman.deliverymanId) !== last.id) {
-      lastPointIds.set(deliveryman.deliverymanId, last.id)
-      const pulse = new google.maps.Marker({ map, position: { lat: last.latitude, lng: last.longitude }, icon: { path: google.maps.SymbolPath.CIRCLE, fillColor: color, fillOpacity: .2, strokeColor: color, strokeWeight: 2, scale: 18 } })
-      objects.push(pulse)
-      window.setTimeout(() => pulse.setMap(null), 650)
+  activePositions.clear()
+  props.data.deliverymen.forEach((deliveryman, index) => {
+    const state = getMapState(deliveryman.deliverymanId)
+    if (hiddenIds.has(deliveryman.deliverymanId)) {
+      clearMapState(state)
+      mapStates.delete(deliveryman.deliverymanId)
+      return
     }
-    detectStays(occurred).forEach(stay => {
-      const elapsed = Math.max(0, Math.min(now, stay.end) - stay.start)
-      const stayMarker = new google.maps.Marker({ map, position: { lat: stay.latitude, lng: stay.longitude }, label: { text: formatDuration(elapsed), color: '#111827', fontSize: '11px', fontWeight: '700' }, icon: { path: google.maps.SymbolPath.CIRCLE, fillColor: '#fbbf24', fillOpacity: .9, strokeColor: '#fff', strokeWeight: 2, scale: 9 } })
-      objects.push(stayMarker)
-    })
+    const count = occurredPointCount(deliveryman.points, now)
+    const color = colors[index % colors.length]!
+    if (count !== state.renderedPointCount)
+      syncHistoricalOverlays(state, deliveryman, count, color, now)
+    updateStayCounters(state, now)
+    updateActiveMarker(state, deliveryman, count, color, now)
   })
-  if (engine.followEnabled.value && activePositions.size) {
-    if (activePositions.size === 1) moveCamera(() => map!.panTo([...activePositions.values()][0]!))
-    else {
-      const bounds = new google.maps.LatLngBounds()
-      activePositions.forEach(position => bounds.extend(position))
-      moveCamera(() => map!.fitBounds(bounds, 80))
-    }
-  }
-}
-
-function scheduleRender() {
-  const elapsed = performance.now() - lastRenderAt
-  if (elapsed >= renderIntervalMs) {
-    if (renderTimer != null) {
-      window.clearTimeout(renderTimer)
-      renderTimer = null
-    }
-    render()
-    return
-  }
-  if (renderTimer != null) return
-  renderTimer = window.setTimeout(() => {
-    renderTimer = null
-    render()
-  }, renderIntervalMs - elapsed)
+  followActivePositions()
 }
 
 function seekSlider(event: Event) {
   const value = Number((event.target as HTMLInputElement).value) / 1000
   engine.seekTo(new Date(props.data.from).getTime() + engine.duration.value * value)
 }
-function toggleVisibility(id: number) { hiddenIds.has(id) ? hiddenIds.delete(id) : hiddenIds.add(id); render() }
+
+function toggleVisibility(id: number) {
+  hiddenIds.has(id) ? hiddenIds.delete(id) : hiddenIds.add(id)
+  render()
+}
+
 function enableFollow() {
   engine.followEnabled.value = true
   if (activePositions.size) render()
   else centerOnRouteStart()
 }
-function formatDuration(milliseconds: number) { const total = Math.floor(milliseconds / 1000); return `${String(Math.floor(total / 60)).padStart(2,'0')}:${String(total % 60).padStart(2,'0')}` }
-function formatClock(timestamp: number) { return new Intl.DateTimeFormat('es-CO',{hour:'2-digit',minute:'2-digit',second:'2-digit',timeZone:'America/Bogota'}).format(new Date(timestamp)) }
 
 async function initialize() {
   const key = import.meta.env.VITE_GOOGLE_MAPS_API_KEY
-  if (!key) { error.value = 'Google Maps no está configurado.'; initializing.value = false; return }
+  if (!key) {
+    error.value = 'Google Maps no está configurado.'
+    initializing.value = false
+    return
+  }
   try {
     const mapId = import.meta.env.VITE_GOOGLE_MAPS_MAP_ID
     setOptions({ key, v: 'weekly', ...(mapId ? { mapIds: [mapId] } : {}) })
     const { Map: GoogleMap } = await importLibrary('maps') as google.maps.MapsLibrary
     if (!mapContainer.value) return
-    map = new GoogleMap(mapContainer.value, { center: { lat: 6.2442, lng: -75.5812 }, zoom: 14, mapId: mapId || undefined, streetViewControl: false, mapTypeControl: false })
+    map = new GoogleMap(mapContainer.value, {
+      center: { lat: 6.2442, lng: -75.5812 },
+      zoom: 14,
+      mapId: mapId || undefined,
+      streetViewControl: false,
+      mapTypeControl: false,
+    })
     infoWindow = new google.maps.InfoWindow()
     listeners = [
       map.addListener('dragstart', () => { engine.followEnabled.value = false }),
@@ -250,28 +565,29 @@ async function initialize() {
     ]
     centerOnRouteStart()
     render()
-  } catch { error.value = 'No fue posible cargar Google Maps.' }
-  finally { initializing.value = false }
+  } catch {
+    error.value = 'No fue posible cargar Google Maps.'
+  } finally {
+    initializing.value = false
+  }
 }
 
-watch(() => engine.currentTimestamp.value, () => {
-  if (engine.isPlaying.value) scheduleRender()
-  else render()
-})
-watch(() => engine.isPlaying.value, isPlaying => {
-  if (!isPlaying) render()
-})
+watch(() => engine.currentTimestamp.value, render)
 watch(() => props.data, () => {
   engine.reset()
   hiddenIds.clear()
-  lastPointIds.clear()
+  clearObjects()
   centerOnRouteStart()
   render()
 }, { deep: true })
+watch(() => props.evidencePointIds, () => {
+  mapStates.forEach(state => { state.renderedPointCount = -1 })
+  render()
+}, { deep: true })
+
 onMounted(initialize)
 onUnmounted(() => {
   engine.pause()
-  if (renderTimer != null) window.clearTimeout(renderTimer)
   listeners.forEach(listener => listener.remove())
   clearObjects()
   infoWindow?.close()
