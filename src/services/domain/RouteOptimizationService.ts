@@ -74,7 +74,17 @@ export class RouteOptimizationService {
         origin: GeoLocation,
         destination: GeoLocation
     ): Promise<SimpleRouteResult | null> {
-        const { Route } = await importLibrary('routes') as google.maps.RoutesLibrary
+        type ComputedRoute = {
+            distanceMeters?: number
+            durationMillis?: number
+            path?: Array<{ lat: number; lng: number }>
+            viewport?: google.maps.LatLngBounds
+            warnings?: string[]
+        }
+        type RouteApi = {
+            computeRoutes(options: Record<string, unknown>): Promise<{ routes?: ComputedRoute[] }>
+        }
+        const { Route } = await importLibrary('routes') as google.maps.RoutesLibrary & { Route: RouteApi }
         const response = await Route.computeRoutes({
             origin,
             destination,
@@ -107,7 +117,7 @@ export class RouteOptimizationService {
         return {
             distanceMeters: route.distanceMeters,
             durationMillis: route.durationMillis,
-            path: (route.path ?? []).map((point) => ({ lat: point.lat, lng: point.lng })),
+            path: (route.path ?? []).map((point: { lat: number; lng: number }) => ({ lat: point.lat, lng: point.lng })),
             viewport: route.viewport ?? null,
             warnings: route.warnings ?? [],
         }

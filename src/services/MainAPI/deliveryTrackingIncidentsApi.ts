@@ -123,6 +123,60 @@ export interface ReviewDeliveryTrackingIncident {
   deliverymanExplanation: string | null
 }
 
+export interface DeliveryPlaybackPoint {
+  id: number
+  deliverymanId: number
+  latitude: number
+  longitude: number
+  recordedAt: string
+  syncedAt: string | null
+  accuracyMeters: number | null
+  headingDegrees: number | null
+  batteryLevelPercent: number | null
+  internetAvailable: boolean | null
+  gpsEnabled: boolean | null
+  trackingMode: 'light' | 'active_delivery' | 'offline' | 'stopped' | null
+  deliveryRouteId: number | null
+  workSessionId: number | null
+}
+
+export interface DeliveryPlaybackEvent {
+  id: number
+  deliverymanId: number
+  eventType: string
+  recordedAt: string
+  syncedAt: string
+  batteryLevelPercent: number | null
+  internetAvailable: boolean | null
+  gpsEnabled: boolean | null
+  locationPermissionGranted: boolean | null
+  details: string | null
+  workSessionId: number
+}
+
+export interface DeliveryPlaybackDeliveryman {
+  deliverymanId: number
+  deliverymanName: string
+  branchId: number
+  branchName: string
+  points: DeliveryPlaybackPoint[]
+  events: DeliveryPlaybackEvent[]
+}
+
+export interface DeliveryPlaybackResponse {
+  from: string
+  to: string
+  serverTimezone: string
+  deliverymen: DeliveryPlaybackDeliveryman[]
+}
+
+export interface DeliveryPlaybackFilters {
+  deliverymanIds: number[]
+  from: string
+  to: string
+  branchId?: number
+}
+
 class DeliveryTrackingIncidentsApi extends BaseApi {
   getAll(filters: DeliveryTrackingIncidentFilters): Promise<ApiResponse<PagedResult<DeliveryTrackingIncidentListItem>>> {
     return this.get('/delivery-tracking-incidents', { params: filters })
@@ -134,6 +188,15 @@ class DeliveryTrackingIncidentsApi extends BaseApi {
 
   review(id: number, payload: ReviewDeliveryTrackingIncident): Promise<ApiResponse<DeliveryTrackingIncidentDetail>> {
     return this.put(`/delivery-tracking-incidents/${id}/review`, payload)
+  }
+
+  getPlayback(filters: DeliveryPlaybackFilters): Promise<ApiResponse<DeliveryPlaybackResponse>> {
+    const params = new URLSearchParams()
+    filters.deliverymanIds.forEach(id => params.append('deliverymanIds', String(id)))
+    params.set('from', filters.from)
+    params.set('to', filters.to)
+    if (filters.branchId) params.set('branchId', String(filters.branchId))
+    return this.get(`/delivery-tracking/playback?${params.toString()}`)
   }
 }
 
