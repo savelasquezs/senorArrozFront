@@ -114,6 +114,7 @@ function render() {
   if (!map) return
   clearObjects()
   const now = engine.currentTimestamp.value
+  const evidencePointIds = new Set(props.evidencePointIds || [])
   props.data.deliverymen.forEach((deliveryman, deliverymanIndex) => {
     if (hiddenIds.has(deliveryman.deliverymanId)) return
     const occurred = deliveryman.points.filter(point => time(point.recordedAt) <= now)
@@ -129,28 +130,50 @@ function render() {
         objects.push(new google.maps.Polyline({ map, path: [{ lat: previous.latitude, lng: previous.longitude }, position], strokeColor: '#6b7280', strokeOpacity: .7, strokeWeight: 3, icons: [{ icon: { path: 'M 0,-1 0,1', strokeOpacity: 1, scale: 3 }, offset: '0', repeat: '12px' }] }))
         segment = [position]
       } else segment.push(position)
-      if (props.evidencePointIds?.includes(point.id)) {
-        objects.push(new google.maps.Marker({
+      const isEvidence = evidencePointIds.has(point.id)
+      if (isEvidence) {
+        const evidenceHalo = new google.maps.Marker({
           map,
           position,
-          title: 'Punto conservado como evidencia',
+          title: 'Punto del incidente',
+          zIndex: 20,
           icon: {
             path: google.maps.SymbolPath.CIRCLE,
-            fillColor: '#ffffff',
-            fillOpacity: 1,
-            strokeColor: color,
-            strokeWeight: 3,
-            scale: 5,
+            fillColor: '#fef3c7',
+            fillOpacity: .7,
+            strokeColor: '#f59e0b',
+            strokeWeight: 4,
+            scale: 12,
           },
-        }))
+        })
+        objects.push(evidenceHalo)
       }
+      const pointMarker = new google.maps.Marker({
+        map,
+        position,
+        title: isEvidence ? 'Punto del incidente' : `${deliveryman.deliverymanName} · punto GPS`,
+        zIndex: isEvidence ? 21 : 10,
+        icon: {
+          path: google.maps.SymbolPath.CIRCLE,
+          fillColor: isEvidence ? '#ffffff' : color,
+          fillOpacity: 1,
+          strokeColor: isEvidence ? '#d97706' : '#ffffff',
+          strokeWeight: isEvidence ? 3 : 2,
+          scale: isEvidence ? 7 : 6,
+        },
+      })
+      pointMarker.addListener('click', () => {
+        infoWindow?.setContent(popup(deliveryman, point))
+        infoWindow?.open({ map, anchor: pointMarker })
+      })
+      objects.push(pointMarker)
     })
     if (segment.length > 1) objects.push(new google.maps.Polyline({ map, path: segment, strokeColor: color, strokeWeight: 4 }))
     const last = occurred[occurred.length - 1]!
     const next = deliveryman.points[occurred.length]
     const active = next && time(next.recordedAt) > now && !hasTechnicalGap(last, next, deliveryman.events, threshold) ? interpolate(last, next, now) : { lat: last.latitude, lng: last.longitude }
     activePositions.set(deliveryman.deliverymanId, active)
-    const marker = new google.maps.Marker({ map, position: active, title: deliveryman.deliverymanName, label: { text: deliveryman.deliverymanName.charAt(0).toUpperCase(), color: '#fff', fontWeight: '700' }, icon: { path: google.maps.SymbolPath.CIRCLE, fillColor: color, fillOpacity: 1, strokeColor: '#fff', strokeWeight: 3, scale: 12 } })
+    const marker = new google.maps.Marker({ map, position: active, zIndex: 30, title: deliveryman.deliverymanName, label: { text: deliveryman.deliverymanName.charAt(0).toUpperCase(), color: '#fff', fontWeight: '700' }, icon: { path: google.maps.SymbolPath.CIRCLE, fillColor: color, fillOpacity: 1, strokeColor: '#fff', strokeWeight: 3, scale: 14 } })
     marker.addListener('click', () => { infoWindow?.setContent(popup(deliveryman, last)); infoWindow?.open({ map, anchor: marker }) })
     objects.push(marker)
     if (lastPointIds.get(deliveryman.deliverymanId) !== last.id) {
