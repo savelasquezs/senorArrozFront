@@ -4,7 +4,7 @@
     <div v-else class="relative">
       <div ref="mapContainer" class="h-[460px] w-full rounded-xl border border-gray-200" />
       <BaseLoading v-if="initializing" text="Inicializando Google Maps..." class="absolute inset-0 rounded-xl bg-white/80" />
-      <button type="button" class="absolute right-3 top-3 rounded-lg bg-white px-3 py-2 text-xs font-semibold shadow" @click="engine.followEnabled.value = true">
+      <button type="button" class="absolute right-3 top-3 rounded-lg bg-white px-3 py-2 text-xs font-semibold shadow" @click="enableFollow">
         {{ engine.followEnabled.value ? 'Siguiendo recorrido' : 'Seguir recorrido' }}
       </button>
     </div>
@@ -71,11 +71,38 @@ let listeners: google.maps.MapsEventListener[] = []
 let objects: Array<google.maps.Marker | google.maps.Polyline> = []
 let activePositions = new Map<number, google.maps.LatLngLiteral>()
 let lastPointIds = new Map<number, number>()
+let cameraMovingProgrammatically = false
 
 const time = (value: string) => new Date(value).getTime()
 const percent = (value: number) => Math.max(0, Math.min(100, ((value - new Date(props.data.from).getTime()) / Math.max(1, new Date(props.data.to).getTime() - new Date(props.data.from).getTime())) * 100))
 const incidentBandStyle = computed(() => ({ left: `${percent(props.incidentStart!)}%`, width: `${percent(props.incidentEnd!) - percent(props.incidentStart!)}%` }))
 const clearObjects = () => { objects.forEach(object => object.setMap(null)); objects = []; activePositions.clear() }
+const moveCamera = (action: () => void) => {
+  if (!map) return
+  cameraMovingProgrammatically = true
+  action()
+  google.maps.event.addListenerOnce(map, 'idle', () => {
+    cameraMovingProgrammatically = false
+  })
+}
+const centerOnRouteStart = () => {
+  if (!map) return
+  const starts = props.data.deliverymen
+    .filter(item => !hiddenIds.has(item.deliverymanId))
+    .map(item => item.points[0])
+    .filter((point): point is NonNullable<typeof point> => Boolean(point))
+  if (!starts.length) return
+  if (starts.length === 1) {
+    moveCamera(() => {
+      map!.setZoom(16)
+      map!.panTo({ lat: starts[0]!.latitude, lng: starts[0]!.longitude })
+    })
+    return
+  }
+  const bounds = new google.maps.LatLngBounds()
+  starts.forEach(point => bounds.extend({ lat: point.latitude, lng: point.longitude }))
+  moveCamera(() => map!.fitBounds(bounds, 80))
+}
 const interpolate = (a: any, b: any, timestamp: number) => {
   const start = time(a.recordedAt), end = time(b.recordedAt)
   const ratio = end === start ? 0 : (timestamp - start) / (end - start)
@@ -139,11 +166,11 @@ function render() {
     })
   })
   if (engine.followEnabled.value && activePositions.size) {
-    if (activePositions.size === 1) map.panTo([...activePositions.values()][0]!)
+    if (activePositions.size === 1) moveCamera(() => map!.panTo([...activePositions.values()][0]!))
     else {
       const bounds = new google.maps.LatLngBounds()
       activePositions.forEach(position => bounds.extend(position))
-      map.fitBounds(bounds, 80)
+      moveCamera(() => map!.fitBounds(bounds, 80))
     }
   }
 }
@@ -153,6 +180,11 @@ function seekSlider(event: Event) {
   engine.seekTo(new Date(props.data.from).getTime() + engine.duration.value * value)
 }
 function toggleVisibility(id: number) { hiddenIds.has(id) ? hiddenIds.delete(id) : hiddenIds.add(id); render() }
+function enableFollow() {
+  engine.followEnabled.value = true
+  if (activePositions.size) render()
+  else centerOnRouteStart()
+}
 function formatDuration(milliseconds: number) { const total = Math.floor(milliseconds / 1000); return `${String(Math.floor(total / 60)).padStart(2,'0')}:${String(total % 60).padStart(2,'0')}` }
 function formatClock(timestamp: number) { return new Intl.DateTimeFormat('es-CO',{hour:'2-digit',minute:'2-digit',second:'2-digit',timeZone:'America/Bogota'}).format(new Date(timestamp)) }
 
@@ -166,14 +198,26 @@ async function initialize() {
     if (!mapContainer.value) return
     map = new GoogleMap(mapContainer.value, { center: { lat: 6.2442, lng: -75.5812 }, zoom: 14, mapId: mapId || undefined, streetViewControl: false, mapTypeControl: false })
     infoWindow = new google.maps.InfoWindow()
-    listeners = ['dragstart', 'zoom_changed'].map(name => map!.addListener(name, () => { engine.followEnabled.value = false }))
+    listeners = [
+      map.addListener('dragstart', () => { engine.followEnabled.value = false }),
+      map.addListener('zoom_changed', () => {
+        if (!cameraMovingProgrammatically) engine.followEnabled.value = false
+      }),
+    ]
+    centerOnRouteStart()
     render()
   } catch { error.value = 'No fue posible cargar Google Maps.' }
   finally { initializing.value = false }
 }
 
 watch(() => engine.currentTimestamp.value, render)
-watch(() => props.data, () => { engine.reset(); hiddenIds.clear(); lastPointIds.clear(); render() }, { deep: true })
+watch(() => props.data, () => {
+  engine.reset()
+  hiddenIds.clear()
+  lastPointIds.clear()
+  centerOnRouteStart()
+  render()
+}, { deep: true })
 onMounted(initialize)
 onUnmounted(() => { engine.pause(); listeners.forEach(listener => listener.remove()); clearObjects(); infoWindow?.close(); map = null })
 </script>
