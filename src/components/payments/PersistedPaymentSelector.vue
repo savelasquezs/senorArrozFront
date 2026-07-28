@@ -25,16 +25,27 @@
                             <!-- Badge de estado de liquidación -->
                             <span v-if="canSettle" :class="[
                                 'inline-flex items-center px-2 py-1 rounded-full text-xs font-medium',
-                                appPayments[0].isSettled
+                                appPayments[0].isReversed
+                                    ? 'bg-red-100 text-red-800'
+                                    : appPayments[0].isSettled
                                     ? 'bg-green-100 text-green-800'
                                     : 'bg-yellow-100 text-yellow-800'
                             ]">
                                 <component :is="appPayments[0].isSettled ? CheckCircleIcon : ClockIcon"
                                     class="w-3 h-3 mr-1" />
-                                {{ appPayments[0].isSettled ? 'Liquidado' : 'Pendiente' }}
+                                {{ appPayments[0].isReversed ? 'Revertido' : appPayments[0].isSettled ? 'Liquidado' : 'Pendiente' }}
                             </span>
                         </div>
                         <div class="text-sm text-blue-600">{{ formatCurrency(appPayments[0].amount) }}</div>
+                        <div v-if="appPayments[0].expectedNetAmount != null" class="text-xs text-blue-600">
+                            Neto esperado: {{ formatCurrency(appPayments[0].expectedNetAmount) }}
+                        </div>
+                        <div v-if="appPayments[0].actualSettledAmount != null" class="text-xs text-emerald-700">
+                            Consignado: {{ formatCurrency(appPayments[0].actualSettledAmount) }}
+                        </div>
+                        <div v-if="appPayments[0].isReversed" class="text-xs text-red-700">
+                            {{ appPayments[0].reversalReason }}
+                        </div>
                         <div v-if="appPayments[0].isSettled && appPayments[0].settledAt"
                             class="text-xs text-blue-500 mt-1">
                             Liquidado: {{ formatDateTime(appPayments[0].settledAt) }}
@@ -43,7 +54,7 @@
                 </div>
                 <div class="flex gap-1">
                     <!-- Botones de liquidación (Admin/Superadmin) -->
-                    <BaseButton v-if="canSettle && !appPayments[0].isSettled"
+                    <BaseButton v-if="canSettle && !appPayments[0].isSettled && !appPayments[0].isReversed"
                         @click="handleSettlePayment(appPayments[0].id)" variant="ghost" size="sm" title="Liquidar pago">
                         <CheckIcon class="w-4 h-4 text-emerald-600" />
                     </BaseButton>
@@ -179,6 +190,7 @@ import { useFormatting } from '@/composables/useFormatting'
 import { usePersistedOrderPayments } from '@/composables/usePersistedOrderPayments'
 import { bankPaymentApi } from '@/services/MainAPI/bankPaymentApi'
 import { appPaymentApi } from '@/services/MainAPI/appPaymentApi'
+import { requestActualSettlementAmount } from '@/helpers/appPaymentSettlement'
 import { useToast } from '@/composables/useToast'
 import { useOrderPermissions } from '@/composables/useOrderPermissions'
 import type { OrderBankPaymentDetail, OrderAppPaymentDetail, OrderDetailView } from '@/types/order'
@@ -370,7 +382,14 @@ const handleUnverifyPayment = async (paymentId: number) => {
 
 const handleSettlePayment = async (paymentId: number) => {
     try {
-        await appPaymentApi.settleAppPayment(paymentId)
+        const payment = appPayments.value.find(item => item.id === paymentId)
+        if (payment?.expectedNetAmount != null) {
+            const actualAmount = requestActualSettlementAmount(payment.expectedNetAmount, formatCurrency)
+            if (actualAmount == null) return
+            await appPaymentApi.settleMultipleAppPayments({ paymentIds: [paymentId], actualAmount })
+        } else {
+            await appPaymentApi.settleAppPayment(paymentId)
+        }
         success('Pago liquidado', 5000, 'El pago por app ha sido liquidado')
 
         // Actualización optimista

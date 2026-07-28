@@ -160,6 +160,7 @@
                                 <tr v-for="payment in appPayments" :key="payment.id" class="hover:bg-gray-50">
                                     <td v-if="canManageAppPayments" class="px-6 py-4 whitespace-nowrap">
                                         <input type="checkbox" :checked="selectedPayments.includes(payment.id)"
+                                            :disabled="payment.isReversed"
                                             @change="togglePaymentSelection(payment.id)"
                                             class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500" />
                                     </td>
@@ -171,25 +172,28 @@
                                     </td>
                                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                                         {{ formatCurrency(payment.amount) }}
+                                        <p v-if="payment.expectedNetAmount != null" class="text-xs text-gray-500">
+                                            Neto: {{ formatCurrency(payment.expectedNetAmount) }}
+                                        </p>
                                     </td>
                                     <td class="px-6 py-4 whitespace-nowrap">
-                                        <BaseBadge :type="payment.isSetted ? 'success' : 'warning'"
-                                            :text="payment.isSetted ? 'Liquidado' : 'Pendiente'" />
+                                        <BaseBadge :type="payment.isReversed ? 'error' : payment.isSetted ? 'success' : 'warning'"
+                                            :text="payment.isReversed ? 'Revertido' : payment.isSetted ? 'Liquidado' : 'Pendiente'" />
                                     </td>
                                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                                         {{ formatDate(payment.createdAt) }}
                                     </td>
                                     <td v-if="canManageAppPayments"
                                         class="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-2">
-                                        <button v-if="!payment.isSetted" @click="settlePayment(payment.id)"
+                                        <button v-if="!payment.isSetted && !payment.isReversed" @click="settlePayment(payment.id)"
                                             class="text-green-600 hover:text-green-900">
                                             Liquidar
                                         </button>
-                                        <button v-else @click="unsettlePayment(payment.id)"
+                                        <button v-else-if="payment.isSetted" @click="unsettlePayment(payment.id)"
                                             class="text-yellow-600 hover:text-yellow-900">
                                             Desliquidar
                                         </button>
-                                        <button @click="deleteAppPayment(payment.id)"
+                                        <button v-if="!payment.isReversed" @click="deleteAppPayment(payment.id)"
                                             class="text-red-600 hover:text-red-900">
                                             Eliminar
                                         </button>
@@ -223,6 +227,7 @@ import { useAppsStore } from '@/store/apps'
 import { useAppPaymentsStore } from '@/store/appPayments'
 import { useAuthStore } from '@/store/auth'
 import { useToast } from '@/composables/useToast'
+import { requestActualSettlementAmount } from '@/helpers/appPaymentSettlement'
 import type { AppPayment } from '@/types/bank'
 import { defaultBusinessCalendar } from '@/utils/datetime'
 import type { UpdateAppDto } from '@/types/bank'
@@ -274,7 +279,7 @@ const settledPayments = computed(() =>
 )
 
 const unsettledPayments = computed(() =>
-    appPayments.value.filter(p => !p.isSetted)
+    appPayments.value.filter(p => !p.isSetted && !p.isReversed)
 )
 
 const allPaymentsSelected = computed(() =>
@@ -355,7 +360,14 @@ const toggleAllPayments = () => {
 
 const settlePayment = async (paymentId: number) => {
     try {
-        await appPaymentsStore.settle(paymentId)
+        const payment = appPayments.value.find(item => item.id === paymentId)
+        if (payment?.expectedNetAmount != null) {
+            const actualAmount = requestActualSettlementAmount(payment.expectedNetAmount, formatCurrency)
+            if (actualAmount == null) return
+            await appPaymentsStore.settleMultiple({ paymentIds: [paymentId], actualAmount })
+        } else {
+            await appPaymentsStore.settle(paymentId)
+        }
         success('Pago liquidado', 3000, 'El pago se ha liquidado correctamente')
         await fetchAppPayments()
         selectedPayments.value = selectedPayments.value.filter(id => id !== paymentId)
@@ -367,15 +379,18 @@ const settlePayment = async (paymentId: number) => {
 const settleSelectedPayments = async () => {
     if (selectedPayments.value.length === 0) return
 
-    const totalAmount = appPayments.value
-        .filter(p => selectedPayments.value.includes(p.id))
-        .reduce((sum, p) => sum + p.amount, 0)
+    const selected = appPayments.value.filter(p => selectedPayments.value.includes(p.id))
+    const totalAmount = selected.reduce((sum, p) => sum + (p.expectedNetAmount ?? p.amount), 0)
 
     const confirmMessage = `¿Estás seguro de liquidar ${selectedPayments.value.length} pagos por un total de ${formatCurrency(totalAmount)}?`
 
     if (confirm(confirmMessage)) {
         try {
-            if (selectedPayments.value.length === 1) {
+            if (selected.some(payment => payment.expectedNetAmount != null)) {
+                const actualAmount = requestActualSettlementAmount(totalAmount, formatCurrency)
+                if (actualAmount == null) return
+                await appPaymentsStore.settleMultiple({ paymentIds: selectedPayments.value, actualAmount })
+            } else if (selectedPayments.value.length === 1) {
                 await appPaymentsStore.settle(selectedPayments.value[0])
             } else {
                 await appPaymentsStore.settleMultiple({ paymentIds: selectedPayments.value })

@@ -132,6 +132,24 @@
 			<div class="p-4 sm:p-6">
 				<!-- Tab: Información General -->
 				<div v-if="activeTab === 'info'" class="space-y-6">
+					<div
+						v-if="order.externalFulfillmentProvider === 'rappi'"
+						class="rounded-lg border border-orange-200 bg-orange-50 p-4"
+					>
+						<div class="flex flex-wrap items-center justify-between gap-2">
+							<div>
+								<p class="font-semibold text-orange-900">Pedido Rappi #{{ order.externalOrderId }}</p>
+								<p class="text-sm text-orange-800">{{ order.externalStoreName || 'Tienda Rappi' }}</p>
+							</div>
+							<p class="text-xs text-orange-700">Productos, cliente y pagos se administran desde la integración.</p>
+						</div>
+						<div class="mt-3 grid gap-2 text-sm sm:grid-cols-4">
+							<p>Descuentos: <strong>{{ formatCurrency(order.externalTotalDiscounts || 0) }}</strong></p>
+							<p>Asume Rappi: <strong>{{ formatCurrency(order.externalDiscountByRappi || 0) }}</strong></p>
+							<p>Asume Señor Arroz: <strong>{{ formatCurrency(order.externalDiscountByPartner || 0) }}</strong></p>
+							<p>Cargos: <strong>{{ formatCurrency(order.externalCharges || 0) }}</strong></p>
+						</div>
+					</div>
 					<div class="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
 						<!-- Cliente -->
 						<div class="space-y-2">
@@ -158,7 +176,10 @@
 								</div>
 
 								<!-- Teléfonos del cliente -->
-								<div v-if="order.customerId && customer" class="space-y-1 mt-2">
+								<div v-if="order.externalCustomerPhone" class="mt-2">
+									<PhoneNumberItem :phone-number="order.externalCustomerPhone" />
+								</div>
+								<div v-else-if="order.customerId && customer" class="space-y-1 mt-2">
 									<PhoneNumberItem :phone-number="customer.phone1" />
 									<PhoneNumberItem
 										v-if="customer.phone2"
@@ -237,7 +258,7 @@
 							>
 								<div class="min-w-0 flex-1">
 									<p class="text-xs sm:text-sm text-gray-900">
-										{{ order.addressDescription || 'Sin dirección' }}
+										{{ order.externalDeliveryAddress || order.addressDescription || 'Sin dirección' }}
 									</p>
 									<p
 										v-if="order.addressAdditionalInfo"

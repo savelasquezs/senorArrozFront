@@ -150,11 +150,11 @@ const settledPayments = computed(() => {
 })
 
 const unsettledPayments = computed(() => {
-    return store.list?.items?.filter(p => !p.isSetted).length || 0
+    return store.list?.items?.filter(p => !p.isSetted && !p.isReversed).length || 0
 })
 
 const unsettledAmount = computed(() => {
-    return store.list?.items?.filter(p => !p.isSetted).reduce((total, p) => total + p.amount, 0) || 0
+    return store.list?.items?.filter(p => !p.isSetted && !p.isReversed).reduce((total, p) => total + (p.expectedNetAmount ?? p.amount), 0) || 0
 })
 
 // Methods
@@ -215,14 +215,14 @@ const nextPage = async () => {
     }
 }
 
-const handleSettle = async (paymentIds: number[]) => {
+const handleSettle = async (payload: { paymentIds: number[]; actualAmount?: number }) => {
     try {
-        if (paymentIds.length === 1) {
-            await store.settle(paymentIds[0])
+        if (payload.paymentIds.length === 1 && payload.actualAmount == null) {
+            await store.settle(payload.paymentIds[0])
             success('Pago liquidado', 3000, 'El pago se ha liquidado correctamente')
         } else {
-            await store.settleMultiple({ paymentIds })
-            success('Pagos liquidados', 3000, `${paymentIds.length} pagos se han liquidado correctamente`)
+            await store.settleMultiple(payload)
+            success('Pagos liquidados', 3000, `${payload.paymentIds.length} pagos se han liquidado correctamente`)
         }
         await load() // Refresh the list
     } catch (error: any) {

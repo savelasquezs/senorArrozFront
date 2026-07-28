@@ -197,6 +197,14 @@ export interface AppPayment {
     branchId: number
     branchName: string
     amount: number
+    estimatedCommissionRate?: number
+    estimatedCommissionAmount?: number
+    expectedNetAmount?: number
+    actualSettledAmount?: number
+    settlementVariance?: number
+    isReversed?: boolean
+    reversedAt?: string
+    reversalReason?: string
     isSetted: boolean
     createdAt: string
     updatedAt: string
@@ -236,4 +244,5 @@ export interface CreateAppPaymentDto {
 
 export interface SettleMultipleAppPaymentsDto {
     paymentIds: number[]
+    actualAmount?: number
 }

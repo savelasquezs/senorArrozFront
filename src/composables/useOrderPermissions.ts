@@ -31,6 +31,7 @@ export function useOrderPermissions() {
      * Verifica si el usuario puede editar datos básicos del pedido
      */
     const canEditOrder = (order: OrderListItem | OrderDetailView): boolean => {
+        if (order.externalFulfillmentProvider === 'rappi') return false
         const role = authStore.userRole
 
         // Superadmin puede todo
@@ -60,6 +61,7 @@ export function useOrderPermissions() {
      * Mismas reglas de “mismo día” que canEditOrder para pedidos entregados.
      */
     const canEditDeliveryFee = (order: OrderListItem | OrderDetailView): boolean => {
+        if (order.externalFulfillmentProvider === 'rappi') return false
         const role = authStore.userRole
         if (role !== 'Admin' && role !== 'Superadmin') return false
         if (order.type !== 'delivery') return false
@@ -73,6 +75,7 @@ export function useOrderPermissions() {
      * Verifica si el usuario puede editar productos del pedido
      */
     const canEditProducts = (order: OrderListItem | OrderDetailView): boolean => {
+        if (order.externalFulfillmentProvider === 'rappi') return false
         const role = authStore.userRole
 
         // Superadmin puede todo
@@ -101,6 +104,7 @@ export function useOrderPermissions() {
      * Verifica si el usuario puede editar pagos del pedido
      */
     const canEditPayments = (order: OrderListItem | OrderDetailView): boolean => {
+        if (order.externalFulfillmentProvider === 'rappi') return false
         const role = authStore.userRole
 
         // Superadmin puede modificar pagos sin restricciones
@@ -144,6 +148,7 @@ export function useOrderPermissions() {
      * Verifica si el usuario puede cancelar el pedido
      */
     const canCancel = (order: OrderListItem | OrderDetailView): boolean => {
+        if (order.externalFulfillmentProvider === 'rappi') return false
         const role = authStore.userRole
 
         if (role !== 'Admin' && role !== 'Superadmin') return false
@@ -153,6 +158,7 @@ export function useOrderPermissions() {
     }
 
     const canUncancel = (order: OrderListItem | OrderDetailView): boolean => {
+        if (order.externalFulfillmentProvider === 'rappi') return false
         const role = authStore.userRole
         return order.status === 'cancelled' && (role === 'Admin' || role === 'Superadmin')
     }
@@ -216,6 +222,14 @@ export function useOrderPermissions() {
     const canChangeStatus = (order: OrderListItem | OrderDetailView, newStatus: OrderStatus): boolean => {
         const role = authStore.userRole
         const currentStatus = order.status
+
+        if (order.externalFulfillmentProvider === 'rappi') {
+            const canPrepare = role !== null
+                && ['Superadmin', 'Admin', 'Cashier', 'Kitchen'].includes(role)
+            return canPrepare
+                && ((currentStatus === 'taken' && newStatus === 'in_preparation')
+                    || (currentStatus === 'in_preparation' && newStatus === 'ready'))
+        }
 
         if (currentStatus === 'cancelled') {
             return newStatus === 'ready' && (role === 'Admin' || role === 'Superadmin')
