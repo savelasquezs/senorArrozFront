@@ -75,15 +75,19 @@
               </option>
             </select>
           </label>
-          <label class="text-sm">
-            Cliente interno Rappi
-            <select v-model.number="form.customerId" class="mt-1 w-full rounded-lg border border-gray-300 p-2" required>
-              <option :value="0" disabled>Selecciona</option>
-              <option v-for="customer in customers" :key="customer.id" :value="customer.id">
-                {{ customer.name }} — {{ customer.phone1 }}
-              </option>
-            </select>
-          </label>
+          <div>
+            <CustomerSelector
+              label="Cliente interno Rappi"
+              :branch-id="branchId"
+              :allow-create="false"
+              required
+              @customer-selected="selectCustomer"
+            />
+            <p v-if="selectedCustomer" class="mt-2 rounded-lg bg-green-50 px-3 py-2 text-sm text-green-800">
+              Seleccionado: <strong>{{ selectedCustomer.name }}</strong>
+              <span v-if="selectedCustomer.phone1"> — {{ selectedCustomer.phone1 }}</span>
+            </p>
+          </div>
           <BaseInput v-model="form.defaultCookingTimeMinutes" type="number" label="Preparación (min)" :min="5" :max="180" required />
           <BaseInput v-model="commissionPercent" type="number" label="Comisión estimada (%)" :min="0" :max="100" :step="0.01" required />
           <label class="flex items-center gap-2 pt-7 text-sm">
@@ -223,9 +227,9 @@ import BaseCard from '@/components/ui/BaseCard.vue'
 import BaseDialog from '@/components/ui/BaseDialog.vue'
 import BaseInput from '@/components/ui/BaseInput.vue'
 import BaseLoading from '@/components/ui/BaseLoading.vue'
+import CustomerSelector from '@/components/customers/CustomerSelector.vue'
 import { integrationApi } from '@/services/MainAPI/integrationApi'
 import { appApi } from '@/services/MainAPI/appApi'
-import { customerApi } from '@/services/MainAPI/customerApi'
 import type { App } from '@/types/bank'
 import type { Customer } from '@/types/customer'
 import type {
@@ -241,7 +245,7 @@ const props = defineProps<{ branchId: number }>()
 const providers = ref<DeliveryProviderCard[]>([])
 const connection = ref<RappiConnection | null>(null)
 const financialApps = ref<App[]>([])
-const customers = ref<Customer[]>([])
+const selectedCustomer = ref<{ id: number; name: string; phone1?: string } | null>(null)
 const catalog = ref<RappiCatalog | null>(null)
 const menuPreview = ref<RappiMenuPreview | null>(null)
 const loading = ref(false)
@@ -297,7 +301,14 @@ function defaultStores() {
 
 function apply(value: RappiConnection | null) {
   connection.value = value
-  if (!value) return
+  if (!value) {
+    selectedCustomer.value = null
+    return
+  }
+  selectedCustomer.value = {
+    id: value.customerId,
+    name: value.customerName || `Cliente #${value.customerId}`,
+  }
   Object.assign(form, {
     displayName: value.displayName,
     financialAppId: value.financialAppId,
@@ -320,15 +331,13 @@ async function load() {
   loading.value = true
   errorText.value = ''
   try {
-    const [providersResponse, appsResponse, customersResponse] = await Promise.all([
+    const [providersResponse, appsResponse] = await Promise.all([
       integrationApi.getDeliveryApps(props.branchId),
       appApi.getApps({ branchId: props.branchId, active: true, page: 1, pageSize: 100 }),
-      customerApi.getCustomers({ branchId: props.branchId, active: true, page: 1, pageSize: 100 }),
     ])
     providers.value = providersResponse.data.providers
     apply(providers.value.find(item => item.key === 'rappi')?.connection || null)
     financialApps.value = appsResponse.items
-    customers.value = customersResponse.data.items
   } catch (error: any) {
     errorText.value = error.message
   } finally {
@@ -340,7 +349,21 @@ function openForm() {
   showForm.value = true
 }
 
+function selectCustomer(customer: Customer) {
+  form.customerId = customer.id
+  formError.value = ''
+  selectedCustomer.value = {
+    id: customer.id,
+    name: customer.name,
+    phone1: customer.phone1,
+  }
+}
+
 async function save() {
+  if (!form.customerId) {
+    formError.value = 'Selecciona el cliente interno Rappi.'
+    return
+  }
   if (form.stores.some(store => store.manualReadyForPickupEnabled)
     && !window.confirm('¿Rappi confirmó por escrito READY_FOR_PICKUP manual para las tiendas marcadas?')) {
     return
