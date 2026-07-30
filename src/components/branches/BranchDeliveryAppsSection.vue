@@ -38,6 +38,9 @@
             <p v-for="store in provider.connection.stores" :key="store.id" class="mb-1 last:mb-0">
               {{ store.isParent ? 'Padre' : 'Hija' }}:
               <strong>{{ store.name }} ({{ store.rappiStoreId }})</strong>
+              <span v-if="store.storeIntegrationId" class="text-gray-500">
+                · {{ store.storeIntegrationId }}
+              </span>
               <span v-if="store.lastPingAt" class="text-green-700"> · PING recibido</span>
             </p>
           </div>
@@ -98,6 +101,10 @@
 
         <div class="space-y-3">
           <h4 class="font-semibold">Tiendas sandbox</h4>
+          <BaseAlert type="info">
+            POS Tester: POS <strong>SeñorArrozDevV2</strong> · INTEGRACIÓN
+            <strong>SENORARROZDEVV2</strong>.
+          </BaseAlert>
           <div v-for="store in form.stores" :key="store.rappiStoreId" class="grid gap-3 rounded-lg border p-4 md:grid-cols-3">
             <div>
               <p class="font-medium">{{ store.name }}</p>
@@ -106,7 +113,7 @@
             <BaseInput
               v-model="store.storeIntegrationId"
               label="store_integration_id"
-              placeholder="Pendiente de confirmación Rappi"
+              :placeholder="store.rappiStoreId"
             />
             <label class="flex items-center gap-2 pt-7 text-sm">
               <input v-model="store.manualReadyForPickupEnabled" type="checkbox" class="h-4 w-4 rounded border-gray-300" />
@@ -114,7 +121,8 @@
             </label>
           </div>
           <p class="text-xs text-amber-700">
-            POS, INTEGRACIÓN y store_integration_id deben confirmarse con Rappi. No se asumen a partir del Store ID.
+            SENORARROZDEVV2 identifica la integración del POS. stores-pa confirmó un store_integration_id distinto para cada tienda.
+            READY_FOR_PICKUP continúa deshabilitado hasta autorización expresa.
           </p>
         </div>
 
@@ -286,14 +294,14 @@ function defaultStores() {
       rappiStoreId: '900173116',
       name: 'Señor Arroz Dev1',
       isParent: true,
-      storeIntegrationId: '',
+      storeIntegrationId: '900173116',
       manualReadyForPickupEnabled: false,
     },
     {
       rappiStoreId: '900173117',
       name: 'Señor Arroz Dev2',
       isParent: false,
-      storeIntegrationId: '',
+      storeIntegrationId: '900173117',
       manualReadyForPickupEnabled: false,
     },
   ]
