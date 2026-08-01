@@ -77,7 +77,7 @@
                         :class="{ 'bg-blue-50': isSelected(payment.id) }">
                         <!-- Checkbox -->
                         <td class="px-6 py-4 whitespace-nowrap">
-                            <input type="checkbox" :checked="isSelected(payment.id)"
+                            <input type="checkbox" :checked="isSelected(payment.id)" :disabled="payment.isReversed"
                                 @change="toggleSelection(payment.id)"
                                 class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
                         </td>
@@ -110,13 +110,20 @@
                             <div class="text-sm font-medium text-gray-900">
                                 {{ formatCurrency(payment.amount) }}
                             </div>
+                            <div v-if="payment.expectedNetAmount != null" class="text-xs text-gray-500">
+                                Neto esperado: {{ formatCurrency(payment.expectedNetAmount) }}
+                            </div>
+                            <div v-if="payment.actualSettledAmount != null" class="text-xs text-green-700">
+                                Consignado: {{ formatCurrency(payment.actualSettledAmount) }}
+                            </div>
                         </td>
 
                         <!-- Status -->
                         <td class="px-6 py-4 whitespace-nowrap">
-                            <BaseBadge :variant="payment.isSetted ? 'success' : 'warning'">
-                                {{ payment.isSetted ? 'Liquidado' : 'Pendiente' }}
+                            <BaseBadge :variant="payment.isReversed ? 'danger' : payment.isSetted ? 'success' : 'warning'">
+                                {{ payment.isReversed ? 'Revertido' : payment.isSetted ? 'Liquidado' : 'Pendiente' }}
                             </BaseBadge>
+                            <p v-if="payment.isReversed" class="mt-1 text-xs text-red-600">{{ payment.reversalReason }}</p>
                         </td>
 
                         <!-- Date -->
@@ -129,6 +136,29 @@
                 </tbody>
             </table>
         </div>
+
+        <BaseDialog v-model="showActualAmountDialog" title="Registrar consignación real" size="md">
+            <form class="space-y-4" @submit.prevent="confirmActualSettlement">
+                <div class="rounded-lg bg-blue-50 p-4 text-sm text-blue-800">
+                    Neto esperado: <strong>{{ formatCurrency(pendingExpectedTotal) }}</strong>
+                </div>
+                <BaseInput
+                    v-model="actualAmount"
+                    type="number"
+                    label="Valor real consignado"
+                    :min="0"
+                    :step="1"
+                    required
+                />
+                <p class="text-xs text-gray-500">
+                    La diferencia se distribuirá proporcionalmente y el residuo monetario se asignará a la última orden.
+                </p>
+                <div class="flex justify-end gap-2">
+                    <BaseButton type="button" variant="outline" @click="showActualAmountDialog = false">Cancelar</BaseButton>
+                    <BaseButton type="submit">Liquidar</BaseButton>
+                </div>
+            </form>
+        </BaseDialog>
     </div>
 </template>
 
@@ -139,6 +169,8 @@ import type { AppPayment } from '@/types/bank'
 import { defaultBusinessCalendar } from '@/utils/datetime'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseBadge from '@/components/ui/BaseBadge.vue'
+import BaseDialog from '@/components/ui/BaseDialog.vue'
+import BaseInput from '@/components/ui/BaseInput.vue'
 import {
     CheckIcon,
     XMarkIcon,
@@ -157,7 +189,7 @@ const props = withDefaults(defineProps<Props>(), {
 })
 
 const emit = defineEmits<{
-    settle: [paymentIds: number[]]
+    settle: [payload: { paymentIds: number[]; actualAmount?: number }]
     unsettle: [paymentIds: number[]]
 }>()
 
@@ -167,15 +199,18 @@ const { success, error: showError } = useToast()
 const selectedPaymentIds = ref<number[]>([])
 const isSettling = ref(false)
 const isUnsettling = ref(false)
+const showActualAmountDialog = ref(false)
+const actualAmount = ref<number | null>(null)
 
 // Computed
 const isAllSelected = computed(() => {
-    return props.payments.length > 0 && selectedPaymentIds.value.length === props.payments.length
+    const selectable = props.payments.filter(payment => !payment.isReversed)
+    return selectable.length > 0 && selectable.every(payment => selectedPaymentIds.value.includes(payment.id))
 })
 
 const selectedPayments = computed(() => {
     return props.payments.filter(payment =>
-        selectedPaymentIds.value.includes(payment.id) && !payment.isSetted
+        selectedPaymentIds.value.includes(payment.id) && !payment.isSetted && !payment.isReversed
     )
 })
 
@@ -186,8 +221,12 @@ const selectedSettledPayments = computed(() => {
 })
 
 const selectedTotal = computed(() => {
-    return selectedPayments.value.reduce((total, payment) => total + payment.amount, 0)
+    return selectedPayments.value.reduce((total, payment) => total + (payment.expectedNetAmount ?? payment.amount), 0)
 })
+
+const pendingExpectedTotal = computed(() =>
+    selectedPayments.value.reduce((total, payment) => total + (payment.expectedNetAmount ?? payment.amount), 0)
+)
 
 // Methods
 const isSelected = (paymentId: number) => {
@@ -207,7 +246,9 @@ const toggleSelectAll = () => {
     if (isAllSelected.value) {
         selectedPaymentIds.value = []
     } else {
-        selectedPaymentIds.value = props.payments.map(payment => payment.id)
+        selectedPaymentIds.value = props.payments
+            .filter(payment => !payment.isReversed)
+            .map(payment => payment.id)
     }
 }
 
@@ -221,19 +262,28 @@ const settleSelected = async () => {
     try {
         isSettling.value = true
         const paymentIds = selectedPayments.value.map(p => p.id)
-
-        if (paymentIds.length === 1) {
-            emit('settle', paymentIds)
-        } else {
-            emit('settle', paymentIds)
+        if (selectedPayments.value.some(payment => payment.expectedNetAmount != null)) {
+            actualAmount.value = pendingExpectedTotal.value
+            showActualAmountDialog.value = true
+            return
         }
-
+        emit('settle', { paymentIds })
         clearSelection()
     } catch (error) {
         showError('Error al liquidar pagos', 'No se pudieron liquidar los pagos seleccionados')
     } finally {
         isSettling.value = false
     }
+}
+
+const confirmActualSettlement = () => {
+    if (actualAmount.value == null || actualAmount.value < 0) return
+    emit('settle', {
+        paymentIds: selectedPayments.value.map(payment => payment.id),
+        actualAmount: actualAmount.value,
+    })
+    showActualAmountDialog.value = false
+    clearSelection()
 }
 
 const unsettleSelected = async () => {

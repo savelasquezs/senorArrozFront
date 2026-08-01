@@ -44,6 +44,8 @@ export interface UserFilters {
     role?: UserRole
     active?: boolean
     search?: string
+    page?: number
+    pageSize?: number
 }
 
 // Role labels for UI

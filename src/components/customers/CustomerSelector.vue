@@ -1,7 +1,7 @@
 <template>
     <div class="customer-selector">
         <label class="block text-sm font-medium text-gray-700 mb-2">
-            Cliente
+            {{ label }}
             <span v-if="required" class="text-red-500">*</span>
         </label>
 
@@ -18,9 +18,9 @@
             <!-- Customer Creation Options -->
             <div v-if="searchResults.length === 0 && searchQuery.trim()">
                 <div class="text-center py-4 border-2 border-dashed border-gray-300 rounded-lg">
-                    <UserPlusIcon class="mx-auto h-8 w-8 text-gray-400 mb-2" />
+                    <UserPlusIcon v-if="allowCreate" class="mx-auto h-8 w-8 text-gray-400 mb-2" />
                     <p class="text-sm text-gray-500 mb-3">No se encontró cliente</p>
-                    <BaseButton @click="showCreateCustomer" variant="primary" size="sm">
+                    <BaseButton v-if="allowCreate" @click="showCreateCustomer" variant="primary" size="sm">
                         
                         <span class="flex items-center"><PlusIcon class="w-4 h-4 mr-2" />Crear Cliente</span>
                     </BaseButton>
@@ -103,11 +103,15 @@ import {
 interface Props {
     required?: boolean
     branchId?: number
+    label?: string
+    allowCreate?: boolean
 }
 
 const props = withDefaults(defineProps<Props>(), {
     required: false,
     branchId: undefined,
+    label: 'Cliente',
+    allowCreate: true,
 })
 
 // Emits

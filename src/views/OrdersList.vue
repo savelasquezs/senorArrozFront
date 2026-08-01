@@ -556,6 +556,7 @@ import { defaultBusinessCalendar, todayYmd } from '@/utils/datetime'
 import { getDateRangeForPreset, type DashboardPeriodPresetId } from '@/utils/dashboardPeriodPresets'
 import { bankPaymentApi } from '@/services/MainAPI/bankPaymentApi'
 import { appPaymentApi } from '@/services/MainAPI/appPaymentApi'
+import { requestActualSettlementAmount } from '@/helpers/appPaymentSettlement'
 import { appPaymentIsSettled } from '@/utils/orderListPayments'
 import type { BankPayment } from '@/types/bank'
 import { useBanksStore } from '@/store/banks'
@@ -1348,6 +1349,11 @@ const handleSettleAppPayment = async (order: OrderListItem, payment: OrderAppPay
         if (settled) {
             await appPaymentApi.unsettleAppPayment(payment.id)
             success('Liquidación removida', 5000, 'El pago por app quedó pendiente de liquidar')
+        } else if (payment.expectedNetAmount != null) {
+            const actualAmount = requestActualSettlementAmount(payment.expectedNetAmount, formatCurrency)
+            if (actualAmount == null) return
+            await appPaymentApi.settleMultipleAppPayments({ paymentIds: [payment.id], actualAmount })
+            success('Pago liquidado', 5000, 'La consignación real fue registrada')
         } else {
             await appPaymentApi.settleAppPayment(payment.id)
             success('Pago liquidado', 5000, 'El pago por app fue liquidado')

@@ -10,7 +10,10 @@
             <p class="mt-1 max-w-2xl text-sm leading-6 text-gray-600">Analiza apagados de ubicación, permanencias, recorrido y estado del dispositivo antes de registrar una decisión administrativa.</p>
           </div>
         </div>
-        <BaseButton variant="outline" :loading="loading" @click="loadIncidents"><ArrowPathIcon class="h-4 w-4" /> Actualizar</BaseButton>
+        <div class="flex flex-wrap gap-2">
+          <BaseButton variant="outline" @click="openExplorer"><PlayIcon class="h-4 w-4" /> Explorar recorridos</BaseButton>
+          <BaseButton variant="outline" :loading="loading" @click="loadIncidents"><ArrowPathIcon class="h-4 w-4" /> Actualizar</BaseButton>
+        </div>
       </div>
     </header>
 
@@ -146,15 +149,27 @@
 
         <section>
           <h3 class="mb-3 text-base font-semibold text-gray-900">{{ detail.incidentType === 'location_disabled' ? 'Ubicaciones antes y después del apagado' : 'Recorrido y puntos conservados' }}</h3>
-          <DeliveryIncidentEvidenceMap
-            :locations="detail.locations"
-            :center-latitude="detail.centerLatitude"
-            :center-longitude="detail.centerLongitude"
-            :radius-meters="detail.radiusMeters"
-            :show-stay-radius="detail.incidentType === 'stay'"
-            :order-latitude="detail.orderLatitude"
-            :order-longitude="detail.orderLongitude"
-          />
+          <div class="mb-3 flex gap-2">
+            <BaseButton size="sm" :variant="mapMode === 'playback' ? 'primary' : 'outline'" @click="mapMode = 'playback'">Reproducción</BaseButton>
+            <BaseButton size="sm" :variant="mapMode === 'evidence' ? 'primary' : 'outline'" @click="mapMode = 'evidence'">Evidencia estática</BaseButton>
+          </div>
+          <div v-if="mapMode === 'playback'" class="space-y-3">
+            <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-[1fr_1fr_auto]">
+              <BaseInput v-model="contextFrom" label="Desde (hora Colombia)" type="datetime-local" />
+              <BaseInput v-model="contextTo" label="Hasta (hora Colombia)" type="datetime-local" />
+              <BaseButton class="self-end" :loading="playbackLoading" @click="loadContextPlayback">Cargar recorrido</BaseButton>
+            </div>
+            <p v-if="contextRecoveryMissing" class="rounded-lg bg-amber-50 p-3 text-sm text-amber-800">La recuperación aún no ha sido registrada.</p>
+            <BaseLoading v-if="playbackLoading" text="Cargando recorrido..." class="py-16" />
+            <p v-else-if="playbackError" class="rounded-lg bg-red-50 p-4 text-sm text-red-700">{{ playbackError }}</p>
+            <p v-else-if="contextPlayback && contextPlayback.deliverymen.every(item => item.points.length === 0)" class="rounded-lg bg-gray-50 p-5 text-sm text-gray-600">No hay puntos GPS en este rango.</p>
+            <DeliveryRoutePlayback v-else-if="contextPlayback" :data="contextPlayback" :incident-start="new Date(detail.startedAt).getTime()" :incident-end="contextIncidentEnd" :evidence-point-ids="detail.locations.map(point => point.sourceLocationId)" />
+          </div>
+          <DeliveryIncidentEvidenceMap v-else
+            :locations="detail.locations" :center-latitude="detail.centerLatitude"
+            :center-longitude="detail.centerLongitude" :radius-meters="detail.radiusMeters"
+            :show-stay-radius="detail.incidentType === 'stay'" :order-latitude="detail.orderLatitude"
+            :order-longitude="detail.orderLongitude" />
         </section>
 
         <section>
@@ -220,30 +235,69 @@
         </section>
       </div>
     </BaseDialog>
+
+    <BaseDialog v-model="explorerOpen" title="Explorar recorridos" size="6xl">
+      <div class="space-y-4">
+        <div class="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
+          <label v-if="authStore.isSuperadmin" class="text-sm font-medium text-gray-700">Sucursal
+            <select v-model="explorerBranchId" class="mt-1.5 w-full rounded-lg border border-gray-300 px-3 py-2.5">
+              <option value="">Selecciona una sucursal</option>
+              <option v-for="branch in branches" :key="branch.id" :value="String(branch.id)">{{ branch.name }}</option>
+            </select>
+          </label>
+          <BaseInput v-model="explorerFrom" label="Desde (hora Colombia)" type="datetime-local" />
+          <BaseInput v-model="explorerTo" label="Hasta (hora Colombia)" type="datetime-local" />
+          <div class="flex items-end gap-2">
+            <BaseButton :loading="explorerLoading" @click="loadExplorerPlayback">Cargar recorrido</BaseButton>
+            <BaseButton variant="outline" @click="clearExplorer">Limpiar</BaseButton>
+          </div>
+        </div>
+        <div>
+          <div class="mb-2 flex items-center justify-between"><p class="text-sm font-medium text-gray-700">Domiciliarios</p><span class="text-xs text-gray-500">{{ explorerSelectedIds.length }} seleccionados</span></div>
+          <BaseLoading v-if="deliverymenLoading" text="Cargando domiciliarios..." class="py-6" />
+          <div v-else class="flex max-h-36 flex-wrap gap-2 overflow-auto rounded-xl border border-gray-200 p-3">
+            <label v-for="deliveryman in explorerDeliverymen" :key="deliveryman.id" class="flex cursor-pointer items-center gap-2 rounded-full border px-3 py-1.5 text-sm">
+              <input v-model="explorerSelectedIds" type="checkbox" :value="deliveryman.id" class="accent-emerald-600" />
+              {{ deliveryman.name }}
+            </label>
+            <span v-if="!explorerDeliverymen.length" class="text-sm text-gray-500">No hay domiciliarios disponibles.</span>
+          </div>
+        </div>
+        <p v-if="explorerError" class="rounded-lg bg-red-50 p-4 text-sm text-red-700">{{ explorerError }}</p>
+        <p v-else-if="!explorerPlayback" class="rounded-xl bg-gray-50 p-10 text-center text-sm text-gray-600">Selecciona un rango y uno o varios domiciliarios para reproducir sus recorridos.</p>
+        <p v-else-if="explorerPlayback.deliverymen.every(item => item.points.length === 0)" class="rounded-xl bg-gray-50 p-10 text-center text-sm text-gray-600">No se encontraron puntos GPS en el rango seleccionado.</p>
+        <DeliveryRoutePlayback v-else :data="explorerPlayback" />
+      </div>
+    </BaseDialog>
   </div>
   </MainLayout>
 </template>
 
 <script setup lang="ts">
-import { defineComponent, h, onMounted, reactive, ref } from 'vue'
+import { computed, defineComponent, h, onMounted, reactive, ref, watch } from 'vue'
 import MainLayout from '@/components/layout/MainLayout.vue'
 import BaseBadge from '@/components/ui/BaseBadge.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseCard from '@/components/ui/BaseCard.vue'
 import BaseDialog from '@/components/ui/BaseDialog.vue'
 import BaseLoading from '@/components/ui/BaseLoading.vue'
+import BaseInput from '@/components/ui/BaseInput.vue'
 import BasePagination from '@/components/ui/BasePaginatiopn.vue'
 import DeliveryIncidentEvidenceMap from '@/components/delivery/DeliveryIncidentEvidenceMap.vue'
-import { ArrowPathIcon, ClipboardDocumentCheckIcon, FunnelIcon, MagnifyingGlassIcon, MapIcon } from '@heroicons/vue/24/outline'
+import DeliveryRoutePlayback from '@/components/delivery/DeliveryRoutePlayback.vue'
+import { ArrowPathIcon, ClipboardDocumentCheckIcon, FunnelIcon, MagnifyingGlassIcon, MapIcon, PlayIcon } from '@heroicons/vue/24/outline'
 import { useAuthStore } from '@/store/auth'
 import { branchApi } from '@/services/MainAPI/branchApi'
 import { useToast } from '@/composables/useToast'
+import { userApi } from '@/services/MainAPI/userApi'
+import { calculateIncidentPlaybackRange, colombiaDateTimeLocalToIso, isoToColombiaDateTimeLocal } from '@/composables/useDeliveryRoutePlayback'
 import {
   deliveryTrackingIncidentsApi,
   type DeliveryIncidentReviewStatus,
   type DeliveryStayClassification,
   type DeliveryTrackingIncidentDetail,
   type DeliveryTrackingIncidentListItem,
+  type DeliveryPlaybackResponse,
 } from '@/services/MainAPI/deliveryTrackingIncidentsApi'
 
 const Fact = defineComponent({
@@ -276,6 +330,24 @@ const detailOpen = ref(false)
 const detailLoading = ref(false)
 const detail = ref<DeliveryTrackingIncidentDetail | null>(null)
 const saving = ref(false)
+const mapMode = ref<'playback' | 'evidence'>('playback')
+const contextFrom = ref('')
+const contextTo = ref('')
+const contextPlayback = ref<DeliveryPlaybackResponse | null>(null)
+const playbackLoading = ref(false)
+const playbackError = ref('')
+const contextRecoveryMissing = ref(false)
+const contextIncidentEnd = computed(() => detail.value ? calculateIncidentPlaybackRange(detail.value).recoveryAt : null)
+const explorerOpen = ref(false)
+const explorerBranchId = ref('')
+const explorerFrom = ref('')
+const explorerTo = ref('')
+const explorerSelectedIds = ref<number[]>([])
+const explorerDeliverymen = ref<Array<{ id: number; name: string }>>([])
+const deliverymenLoading = ref(false)
+const explorerLoading = ref(false)
+const explorerError = ref('')
+const explorerPlayback = ref<DeliveryPlaybackResponse | null>(null)
 const reviewForm = reactive({
   reviewStatus: 'pending' as DeliveryIncidentReviewStatus,
   finalClassification: null as DeliveryStayClassification | null,
@@ -358,11 +430,114 @@ async function openDetail(id: number) {
     const response = await deliveryTrackingIncidentsApi.getById(id)
     detail.value = response.data
     hydrateReviewForm(response.data)
+    mapMode.value = 'playback'
+    contextPlayback.value = null
+    const range = calculateIncidentPlaybackRange(response.data)
+    contextFrom.value = isoToColombiaDateTimeLocal(range.from)
+    contextTo.value = isoToColombiaDateTimeLocal(range.to)
+    contextRecoveryMissing.value = range.recoveryMissing
+    await loadContextPlayback()
   } catch (error: any) {
     detailOpen.value = false
     toast.error('No se pudo cargar el incidente', error.message)
   } finally {
     detailLoading.value = false
+  }
+}
+
+async function loadContextPlayback() {
+  if (!detail.value) return
+  playbackLoading.value = true
+  playbackError.value = ''
+  contextPlayback.value = null
+  try {
+    const response = await deliveryTrackingIncidentsApi.getPlayback({
+      deliverymanIds: [detail.value.deliverymanId],
+      from: colombiaDateTimeLocalToIso(contextFrom.value),
+      to: colombiaDateTimeLocalToIso(contextTo.value),
+      branchId: detail.value.branchId,
+    })
+    contextPlayback.value = response.data
+    const range = calculateIncidentPlaybackRange(
+      detail.value,
+      response.data.deliverymen[0]?.events || [],
+      response.data.deliverymen[0]?.points || [],
+    )
+    contextRecoveryMissing.value = range.recoveryMissing
+  } catch (error: any) {
+    playbackError.value = error.message || 'No fue posible cargar el recorrido.'
+  } finally {
+    playbackLoading.value = false
+  }
+}
+
+function openExplorer() {
+  explorerOpen.value = true
+  clearExplorer()
+  if (!authStore.isSuperadmin) {
+    explorerBranchId.value = String(authStore.branchId || '')
+    void loadExplorerDeliverymen()
+  }
+}
+
+async function loadExplorerDeliverymen() {
+  const selectedBranch = Number(explorerBranchId.value || authStore.branchId)
+  explorerDeliverymen.value = []
+  explorerSelectedIds.value = []
+  explorerPlayback.value = null
+  if (!selectedBranch) return
+  deliverymenLoading.value = true
+  try {
+    const pageSize = 100
+    let page = 1
+    let totalPages = 1
+    const values: Array<{ id: number; name: string }> = []
+    do {
+      const response = await userApi.getUsers({ branchId: selectedBranch, role: 'Deliveryman', active: true, page, pageSize })
+      values.push(...response.items.map(user => ({ id: user.id, name: user.name })))
+      totalPages = response.totalPages
+      page++
+    } while (page <= totalPages)
+    explorerDeliverymen.value = values
+  } catch (error: any) {
+    explorerError.value = error.message || 'No fue posible cargar los domiciliarios.'
+  } finally {
+    deliverymenLoading.value = false
+  }
+}
+
+async function loadExplorerPlayback() {
+  explorerError.value = ''
+  if (!explorerFrom.value || !explorerTo.value || !explorerSelectedIds.value.length) {
+    explorerError.value = 'Selecciona el rango y al menos un domiciliario.'
+    return
+  }
+  explorerLoading.value = true
+  explorerPlayback.value = null
+  try {
+    const response = await deliveryTrackingIncidentsApi.getPlayback({
+      deliverymanIds: explorerSelectedIds.value,
+      from: colombiaDateTimeLocalToIso(explorerFrom.value),
+      to: colombiaDateTimeLocalToIso(explorerTo.value),
+      branchId: Number(explorerBranchId.value || authStore.branchId),
+    })
+    explorerPlayback.value = response.data
+  } catch (error: any) {
+    explorerError.value = error.message || 'No fue posible cargar el recorrido.'
+  } finally {
+    explorerLoading.value = false
+  }
+}
+
+function clearExplorer() {
+  explorerFrom.value = ''
+  explorerTo.value = ''
+  explorerSelectedIds.value = []
+  explorerPlayback.value = null
+  explorerError.value = ''
+  if (authStore.isSuperadmin) {
+    explorerBranchId.value = ''
+    explorerDeliverymen.value = []
   }
 }
 
@@ -418,5 +593,9 @@ function deviceEventLabel(value: string) { return ({ gps_disabled: 'GPS apagado'
 onMounted(async () => {
   try { await loadBranches() } catch (error: any) { toast.error('No se pudieron cargar las sucursales', error.message) }
   await loadIncidents()
+})
+
+watch(explorerBranchId, () => {
+  if (authStore.isSuperadmin && explorerOpen.value) void loadExplorerDeliverymen()
 })
 </script>

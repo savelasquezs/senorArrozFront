@@ -49,8 +49,18 @@ export const useCustomersStore = defineStore('customers', () => {
         }, { ...opts, errorMessage: 'Error al cargar el cliente' });
     };
 
-    const searchByPhone = async (phone: string, opts?: FetchOpts) => {
+    const searchByPhone = async (phone: string, branchId?: number, opts?: FetchOpts) => {
         return run(async () => {
+            if (branchId) {
+                const res = await customerApi.getCustomers({
+                    branchId,
+                    phone,
+                    page: 1,
+                    pageSize: 10,
+                    active: true,
+                });
+                return res.data?.items?.[0] ?? null;
+            }
             const res = await customerApi.getCustomerByPhone(phone);
             return res.data;
         }, { ...opts, errorMessage: 'Error al buscar cliente por telefono' });
@@ -165,12 +175,13 @@ export const useCustomersStore = defineStore('customers', () => {
         return neighborhoodsLoadInFlight;
     };
 
-    const searchCustomersByName = async (name: string): Promise<Customer[]> => {
+    const searchCustomersByName = async (name: string, branchId?: number): Promise<Customer[]> => {
         const trimmed = name.trim();
         if (trimmed.length < 2) {
             return [];
         }
         const res = await customerApi.getCustomers({
+            branchId,
             name: trimmed,
             page: 1,
             pageSize: 100,

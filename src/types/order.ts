@@ -325,6 +325,17 @@ export interface OrderListItem {
     deliveryRouteActualDurationSeconds?: number | null
     deliveryManName: string | null
     guestName: string | null
+    deliveryAppConnectionId?: number | null
+    externalOrderId?: string | null
+    orderSource?: string | null
+    externalFulfillmentProvider?: string | null
+    externalStoreName?: string | null
+    externalCustomerPhone?: string | null
+    externalDeliveryAddress?: string | null
+    externalTotalDiscounts?: number | null
+    externalDiscountByRappi?: number | null
+    externalDiscountByPartner?: number | null
+    externalCharges?: number | null
     type: OrderType
     typeDisplayName: string
     deliveryFee: number | null
@@ -421,6 +432,14 @@ export interface OrderAppPaymentDetail {
     branchId: number
     branchName: string
     amount: number
+    estimatedCommissionRate?: number
+    estimatedCommissionAmount?: number
+    expectedNetAmount?: number
+    actualSettledAmount?: number
+    settlementVariance?: number
+    isReversed?: boolean
+    reversedAt?: string
+    reversalReason?: string
     isSettled: boolean
     settledAt: string | null
     /** Alias del API (`IsSetted` → camelCase). Opcional si ya se normalizó a `isSettled`. */

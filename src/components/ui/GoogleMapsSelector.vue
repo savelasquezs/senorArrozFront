@@ -437,7 +437,7 @@ const syncOriginMarker = () => {
                     background: '#059669',
                     borderColor: '#047857',
                     glyphColor: '#ffffff',
-                    glyphText: 'S',
+                    glyph: 'S',
                 })
                 : null
             originMarker = new AdvancedMarkerCtor({
