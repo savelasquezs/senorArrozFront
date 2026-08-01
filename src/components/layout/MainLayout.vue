@@ -180,7 +180,7 @@ async function handleWhatsAppRealtimeMessage(payload: WhatsAppRealtimeMessagePay
 
 	await playWhatsAppMessageSound();
 	if (permission.value === 'granted') {
-		const name = payload.conversation?.contactName || payload.conversation?.customerName || payload.conversation?.phoneNumber || 'WhatsApp';
+		const name = payload.conversation?.contactName || payload.conversation?.customerName || payload.conversation?.whatsAppUsername || payload.conversation?.phoneNumber || 'WhatsApp';
 		notify('Nuevo mensaje de WhatsApp', {
 			body: String(name),
 			tag: `whatsapp-${payload.message.id}`,

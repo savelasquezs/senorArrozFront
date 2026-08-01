@@ -19,7 +19,8 @@
                                 </span>
                             </BaseButton>
                         </div>
-                        <PhoneNumberItem :phone-number="currentCustomer.phone1" />
+                        <p v-if="currentCustomer.whatsAppUsername" class="text-sm font-medium text-emerald-700">{{ currentCustomer.whatsAppUsername }}</p>
+                        <PhoneNumberItem v-if="currentCustomer.phone1" :phone-number="currentCustomer.phone1" />
                         <PhoneNumberItem :phone-number="currentCustomer.phone2" v-if="currentCustomer.phone2" />
                     </div>
                 </div>
@@ -203,6 +204,7 @@ const handleCustomerSubmit = async (formData: any) => {
             name: formData.name,
             phone1: formData.phone1,
             phone2: formData.phone2 || undefined,
+            whatsAppUsername: formData.whatsAppUsername || undefined,
             active: formData.active
         }
 

@@ -33,7 +33,8 @@
                             </div>
                         </div>
                         <div class="space-y-1">
-                            <PhoneNumberItem :phone-number="props.selectedCustomer.phone1" />
+                            <p v-if="props.selectedCustomer.whatsAppUsername" class="text-sm font-medium text-emerald-700">{{ props.selectedCustomer.whatsAppUsername }}</p>
+                            <PhoneNumberItem v-if="props.selectedCustomer.phone1" :phone-number="props.selectedCustomer.phone1" />
                             <PhoneNumberItem v-if="props.selectedCustomer.phone2"
                                 :phone-number="props.selectedCustomer.phone2" />
                         </div>

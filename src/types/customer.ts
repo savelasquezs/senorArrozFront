@@ -3,8 +3,10 @@
 export interface Customer {
     id: number;
     name: string;
-    phone1: string;
-    phone2?: string;
+    phone1?: string | null;
+    phone2?: string | null;
+    whatsAppUsername?: string | null;
+    hasWhatsAppIdentity?: boolean;
     branchId: number;
     branchName?: string;
     active: boolean;
@@ -55,8 +57,9 @@ export interface Neighborhood {
 // DTOs para crear/actualizar
 export interface CreateCustomerDto {
     name: string;
-    phone1: string;
+    phone1?: string | null;
     phone2?: string;
+    whatsAppUsername?: string | null;
     branchId: number;
     initialAddress?: {
         neighborhoodId: number;
@@ -73,6 +76,7 @@ export interface UpdateCustomerDto {
     name?: string;
     phone1?: string;
     phone2?: string;
+    whatsAppUsername?: string | null;
     active?: boolean;
 }
 
@@ -98,8 +102,10 @@ export interface UpdateCustomerAddressDto {
 
 // Filtros para búsqueda
 export interface CustomerFilters {
+    search?: string;
     name?: string;
     phone?: string;
+    whatsAppUsername?: string;
     branchId?: number;
     active?: boolean;
     page: number;
@@ -111,8 +117,9 @@ export interface CustomerFilters {
 // Formularios locales
 export interface CustomerFormData {
     name: string;
-    phone1: string;
+    phone1?: string;
     phone2?: string;
+    whatsAppUsername?: string;
     branchId: number;
     active: boolean;
     initialAddress?: {

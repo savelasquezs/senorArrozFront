@@ -8,7 +8,7 @@
         <!-- Customer Search -->
         <div class="space-y-3">
             <!-- Search Input -->
-            <BaseInput v-model="searchQuery" placeholder="Buscar por teléfono o nombre..." @paste="handlePaste"
+            <BaseInput v-model="searchQuery" placeholder="Buscar por nombre, teléfono o @usuario..."
                 @input="handleSearch" size="sm">
                 <template #icon>
                     <MagnifyingGlassIcon class="w-4 h-4 text-gray-400" />
@@ -38,7 +38,7 @@
                                 {{ customer.name }}
                             </div>
                             <div class="text-xs text-gray-500">
-                                {{ customer.phone1 }}
+                                {{ [customer.whatsAppUsername, customer.phone1, customer.phone2].filter(Boolean).join(' · ') }}
                             </div>
                         </div>
                         <ChevronRightIcon class="win-4 h-4 text-gray-400" />
@@ -51,7 +51,7 @@
         <BaseDialog v-model="showCreateModal" title="Crear Nuevo Cliente" size="lg">
             <div v-if="!createdCustomer">
                 <CustomerForm @submit="createCustomerWrapper" @cancel="closeCreateModal" :loading="isCreating"
-                    :initial-phone="searchQuery" submit-button-text="Crear Cliente" />
+                    :initial-phone="initialPhone" :initial-username="initialUsername" :initial-branch-id="branchId" submit-button-text="Crear Cliente" />
             </div>
 
             <div v-else class="text-center py-6">
@@ -102,10 +102,12 @@ import {
 // Props
 interface Props {
     required?: boolean
+    branchId?: number
 }
 
-withDefaults(defineProps<Props>(), {
-    required: false
+const props = withDefaults(defineProps<Props>(), {
+    required: false,
+    branchId: undefined,
 })
 
 // Emits
@@ -117,10 +119,7 @@ const emit = defineEmits<{
 const customersStore = useCustomersStore()
 const { success, error: showError } = useToast()
 
-/** Debounce para GET /customers/by-phone (coincidencia exacta en API). */
-const PHONE_SEARCH_DEBOUNCE_MS = 400
-/** Mínimo de dígitos para considerar búsqueda por teléfono y llamar a la API (ej. 10 en CO). */
-const MIN_PHONE_DIGITS_FOR_API = 10
+const SEARCH_DEBOUNCE_MS = 400
 
 // State
 const searchQuery = ref('')
@@ -130,159 +129,64 @@ const isCreating = ref(false)
 const createdCustomer = ref<Customer | null>(null)
 const error = ref('')
 
-let phoneDebounceTimer: ReturnType<typeof setTimeout> | null = null
-let phoneSearchGeneration = 0
-let nameDebounceTimer: ReturnType<typeof setTimeout> | null = null
-let nameSearchGeneration = 0
+let searchDebounceTimer: ReturnType<typeof setTimeout> | null = null
+let searchGeneration = 0
 
-const normalizePhone = (value: string) => {
-    return value.replace(/\D/g, '')
-}
-
-/** Quita prefijo país 57 si el número tiene longitud típica celular CO (12 dígitos). */
 const normalizePhoneForApi = (raw: string) => {
-    let digits = normalizePhone(raw)
+    let digits = raw.replace(/\D/g, '')
     if (digits.length >= 12 && digits.startsWith('57')) {
         digits = digits.slice(2)
     }
     return digits
 }
 
-const hasLetters = (s: string) => /[a-zA-ZáéíóúÁÉÍÓÚñÑüÜ]/.test(s)
-
-const isPhoneLikeQuery = (raw: string) => {
-    const trimmed = raw.trim()
-    if (!trimmed || hasLetters(trimmed)) {
-        return false
+const cancelPendingSearch = () => {
+    if (searchDebounceTimer !== null) {
+        clearTimeout(searchDebounceTimer)
+        searchDebounceTimer = null
     }
-    return normalizePhoneForApi(trimmed).length >= MIN_PHONE_DIGITS_FOR_API
+    searchGeneration++
 }
 
-const cancelPendingPhoneSearch = () => {
-    if (phoneDebounceTimer !== null) {
-        clearTimeout(phoneDebounceTimer)
-        phoneDebounceTimer = null
-    }
-    phoneSearchGeneration++
-}
-
-const cancelPendingNameSearch = () => {
-    if (nameDebounceTimer !== null) {
-        clearTimeout(nameDebounceTimer)
-        nameDebounceTimer = null
-    }
-    nameSearchGeneration++
-}
-
-const isPhoneNotFoundError = (message: string) =>
-    message.includes('Cliente no encontrado') ||
-    message.includes('no encontrado') ||
-    message.includes('404')
+const initialPhone = ref('')
+const initialUsername = ref('')
 
 // Methods
 const handleSearch = () => {
-    if (!searchQuery.value.trim()) {
-        cancelPendingPhoneSearch()
-        cancelPendingNameSearch()
+    const query = searchQuery.value.trim()
+    if (!query) {
+        cancelPendingSearch()
         searchResults.value = []
         return
     }
-
-    const raw = searchQuery.value
-
-    if (isPhoneLikeQuery(raw)) {
-        cancelPendingNameSearch()
-        searchResults.value = []
-
-        cancelPendingPhoneSearch()
-
-        const phoneForApi = normalizePhoneForApi(raw)
-        const generation = phoneSearchGeneration
-        phoneDebounceTimer = setTimeout(async () => {
-            phoneDebounceTimer = null
-            if (generation !== phoneSearchGeneration) {
-                return
-            }
-            try {
-                const remote = await customersStore.searchByPhone(phoneForApi)
-                if (generation !== phoneSearchGeneration) {
-                    return
-                }
-                searchResults.value = remote ? [remote] : []
-            } catch (e: unknown) {
-                if (generation !== phoneSearchGeneration) {
-                    return
-                }
-                const msg = e instanceof Error ? e.message : String(e)
-                if (!isPhoneNotFoundError(msg)) {
-                    showError('Búsqueda por teléfono', msg || 'No se pudo buscar el cliente')
-                }
-            }
-        }, PHONE_SEARCH_DEBOUNCE_MS)
-        return
-    }
-
-    cancelPendingPhoneSearch()
-
-    const trimmed = raw.trim()
-    if (hasLetters(trimmed) && trimmed.length >= 2) {
-        cancelPendingNameSearch()
-        searchResults.value = []
-        const generation = nameSearchGeneration
-        nameDebounceTimer = setTimeout(async () => {
-            nameDebounceTimer = null
-            if (generation !== nameSearchGeneration) {
-                return
-            }
-            const q = searchQuery.value.trim()
-            if (!hasLetters(q) || q.length < 2) {
-                return
-            }
-            try {
-                const apiRows = await customersStore.searchCustomersByName(q)
-                if (generation !== nameSearchGeneration) {
-                    return
-                }
-                searchResults.value = apiRows
-            } catch (e: unknown) {
-                if (generation !== nameSearchGeneration) {
-                    return
-                }
-                const msg = e instanceof Error ? e.message : String(e)
-                showError('Búsqueda por nombre', msg || 'No se pudo buscar clientes')
-            }
-        }, PHONE_SEARCH_DEBOUNCE_MS)
-        return
-    }
-
-    cancelPendingNameSearch()
+    if (query.length < 2) return
+    cancelPendingSearch()
     searchResults.value = []
-}
-
-const handlePaste = (event: ClipboardEvent) => {
-    const pasted = event.clipboardData?.getData('text') ?? ''
-    if (!pasted) {
-        return
-    }
-    event.preventDefault()
-    const cleaned = normalizePhone(pasted)
-    const input = event.target as HTMLInputElement
-    const start = input.selectionStart ?? searchQuery.value.length
-    const end = input.selectionEnd ?? searchQuery.value.length
-    const newValue = searchQuery.value.slice(0, start) + cleaned + searchQuery.value.slice(end)
-    searchQuery.value = newValue
-    handleSearch()
+    const generation = searchGeneration
+    searchDebounceTimer = setTimeout(async () => {
+        searchDebounceTimer = null
+        if (generation !== searchGeneration) return
+        try {
+            searchResults.value = await customersStore.searchCustomers(query, props.branchId)
+        } catch (e: unknown) {
+            if (generation !== searchGeneration) return
+            const msg = e instanceof Error ? e.message : String(e)
+            showError('Búsqueda de clientes', msg || 'No se pudo buscar clientes')
+        }
+    }, SEARCH_DEBOUNCE_MS)
 }
 
 const selectCustomer = (customer: Customer) => {
-    cancelPendingPhoneSearch()
-    cancelPendingNameSearch()
+    cancelPendingSearch()
     emit('customerSelected', customer)
     searchQuery.value = ''
     searchResults.value = []
 }
 
 const showCreateCustomer = () => {
+    const query = searchQuery.value.trim()
+    initialUsername.value = query.startsWith('@') ? query : ''
+    initialPhone.value = /^\+?\d[\d\s-]+$/.test(query) ? normalizePhoneForApi(query) : ''
     showCreateModal.value = true
 }
 
@@ -291,6 +195,7 @@ const createCustomerWrapper = async (customerData: any) => {
         name: customerData.name,
         phone1: customerData.phone1,
         phone2: customerData.phone2,
+        whatsAppUsername: customerData.whatsAppUsername,
         branchId: customerData.branchId,
         initialAddress: customerData.initialAddress?.address?.trim()
             ? customerData.initialAddress
@@ -326,14 +231,12 @@ const closeCreateModal = () => {
 }
 
 onUnmounted(() => {
-    cancelPendingPhoneSearch()
-    cancelPendingNameSearch()
+    cancelPendingSearch()
 })
 
 watch(searchQuery, () => {
     if (!searchQuery.value.trim()) {
-        cancelPendingPhoneSearch()
-        cancelPendingNameSearch()
+        cancelPendingSearch()
         searchResults.value = []
     }
 })

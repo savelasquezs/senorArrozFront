@@ -130,7 +130,8 @@ export interface WhatsAppOrderDraft {
   branchId: number
   customerId?: number | null
   customerName?: string | null
-  phoneNumber: string
+  phoneNumber?: string | null
+  whatsAppUsername?: string | null
   orderType?: 'onsite' | 'delivery' | null
   selectedAddressId?: number | null
   selectedAddress?: WhatsAppOrderDraftAddress | null
@@ -220,7 +221,9 @@ export interface WhatsAppConversation {
   branchName?: string | null
   customerId?: number | null
   customerName?: string | null
-  phoneNumber: string
+  phoneNumber?: string | null
+  whatsAppUsername?: string | null
+  hasWhatsAppIdentity: boolean
   contactName?: string | null
   status: 'open' | 'pending' | 'closed' | 'archived'
   lastMessageAt?: string | null

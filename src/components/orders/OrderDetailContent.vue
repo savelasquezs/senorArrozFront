@@ -159,7 +159,8 @@
 
 								<!-- Teléfonos del cliente -->
 								<div v-if="order.customerId && customer" class="space-y-1 mt-2">
-									<PhoneNumberItem :phone-number="customer.phone1" />
+									<p v-if="customer.whatsAppUsername" class="text-sm font-medium text-emerald-700">{{ customer.whatsAppUsername }}</p>
+									<PhoneNumberItem v-if="customer.phone1" :phone-number="customer.phone1" />
 									<PhoneNumberItem
 										v-if="customer.phone2"
 										:phone-number="customer.phone2"

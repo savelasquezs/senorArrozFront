@@ -115,7 +115,7 @@
                 <div class="flex min-w-0 flex-1 items-baseline gap-1.5">
                   <span class="min-w-0 truncate text-sm font-semibold text-gray-950">{{ conversationTitle(conversation) }}</span>
                   <span class="shrink-0 text-xs text-gray-300">-</span>
-                  <span class="truncate text-xs font-medium text-gray-500">{{ formatConversationPhone(conversation.phoneNumber) }}</span>
+                  <span class="truncate text-xs font-medium" :class="conversation.phoneNumber ? 'text-gray-500' : 'text-emerald-700'">{{ conversationIdentityLabel(conversation) }}</span>
                 </div>
                 <span v-if="conversation.unreadCount > 0" class="shrink-0 rounded-full bg-emerald-600 px-2 py-0.5 text-xs font-semibold text-white">
                   {{ conversation.unreadCount }}
@@ -149,7 +149,7 @@
             <div>
             <p class="font-semibold text-gray-900">{{ conversationTitle(selectedConversation) }}</p>
             <p class="text-sm text-gray-500">
-              {{ formatPhone(selectedConversation.phoneNumber) }}
+              {{ conversationIdentityLabel(selectedConversation) }}
               <span v-if="selectedConversation.branchName"> · {{ selectedConversation.branchName }}</span>
             </p>
             </div>
@@ -353,7 +353,7 @@
         <aside v-if="selectedConversation && !contextPanelCollapsed" class="min-h-0 border-l border-gray-200 bg-white flex flex-col">
           <div class="border-b border-gray-100 px-4 py-3">
             <p class="text-sm font-semibold text-gray-900">Contexto del pedido</p>
-            <p class="mt-0.5 text-xs text-gray-500">{{ formatPhone(selectedConversation.phoneNumber) }}</p>
+            <p class="mt-0.5 text-xs text-gray-500">{{ conversationIdentityLabel(selectedConversation) }}</p>
           </div>
 
           <div class="flex-1 min-h-0 overflow-y-auto p-4 space-y-4">
@@ -365,9 +365,15 @@
               <div v-if="selectedCustomer" class="space-y-3">
                 <div class="rounded-lg border border-emerald-200 bg-emerald-50 p-3">
                   <p class="text-sm font-semibold text-emerald-950">{{ selectedCustomer.name }}</p>
-                  <p class="mt-1 text-sm text-emerald-800">{{ selectedCustomer.phone1 }}</p>
+                  <p v-if="selectedCustomer.whatsAppUsername" class="mt-1 text-sm font-medium text-emerald-800">{{ selectedCustomer.whatsAppUsername }}</p>
+                  <p v-if="selectedCustomer.phone1" class="mt-1 text-sm text-emerald-800">{{ selectedCustomer.phone1 }}</p>
                   <p v-if="selectedCustomer.phone2" class="text-sm text-emerald-800">{{ selectedCustomer.phone2 }}</p>
+                  <BaseButton v-if="isManualOrderContext" class="mt-2" size="sm" variant="outline" @click="showCustomerSelector = !showCustomerSelector">
+                    Cambiar cliente asociado
+                  </BaseButton>
                 </div>
+
+                <CustomerSelector v-if="showCustomerSelector && isManualOrderContext" :branch-id="selectedConversation.branchId" @customer-selected="linkExistingCustomer" />
 
                 <section v-if="isAiOrderContext" class="space-y-3 rounded-xl border border-gray-200 bg-gray-50 p-3">
                   <div class="flex items-center justify-between gap-2">
@@ -458,10 +464,14 @@
 
               <div v-else-if="isManualOrderContext" class="space-y-3">
                 <div class="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950">
-                  No encontramos un cliente con este teléfono. Crea el cliente y su dirección para continuar.
+                  No encontramos un cliente con esta identidad. Busca uno existente o crea un cliente para continuar.
                 </div>
+                <CustomerSelector :branch-id="selectedConversation.branchId" @customer-selected="linkExistingCustomer" />
+                <div class="flex items-center gap-2 text-xs text-gray-400"><span class="h-px flex-1 bg-gray-200" />o crea uno nuevo<span class="h-px flex-1 bg-gray-200" /></div>
                 <CustomerForm
                   :initial-phone="initialCustomerPhone"
+                  :initial-username="selectedConversation.whatsAppUsername || ''"
+                  :initial-branch-id="selectedConversation.branchId"
                   submit-button-text="Crear cliente"
                   :loading="creatingCustomer"
                   @submit="createCustomerFromConversation"
@@ -636,6 +646,7 @@ import BaseDialog from '@/components/ui/BaseDialog.vue'
 import BaseInput from '@/components/ui/BaseInput.vue'
 import BaseLoading from '@/components/ui/BaseLoading.vue'
 import CustomerForm from '@/components/customers/CustomerForm.vue'
+import CustomerSelector from '@/components/customers/CustomerSelector.vue'
 import AddressSelector from '@/components/customers/address/AddressSelector.vue'
 import WhatsAppAiDiagnosticsDialog from '@/components/whatsapp/WhatsAppAiDiagnosticsDialog.vue'
 import WhatsAppAiStatusStrip from '@/components/whatsapp/WhatsAppAiStatusStrip.vue'
@@ -668,6 +679,7 @@ import {
   sortAiProcessing,
 } from '@/utils/whatsappAiDiagnostics'
 import { whatsappOrderContextMode } from '@/utils/whatsappOrderContextMode'
+import { matchesWhatsAppUsername } from '@/utils/whatsappIdentity'
 
 const whatsappStore = useWhatsAppStore()
 const authStore = useAuthStore()
@@ -699,6 +711,7 @@ const changingAttention = ref(false)
 const resettingConversation = ref(false)
 const contextLoading = ref(false)
 const creatingCustomer = ref(false)
+const showCustomerSelector = ref(false)
 const takingOrder = ref(false)
 const sendingAddressConfirmation = ref(false)
 const contextPanelCollapsed = ref(false)
@@ -1039,6 +1052,7 @@ async function reloadConversations() {
 
 async function selectConversation(conversation: WhatsAppConversation) {
   selectedConversation.value = conversation
+  showCustomerSelector.value = false
   await whatsappStore.fetchMessages(conversation.id)
   await loadConversationContext(conversation)
   await scrollToBottom()
@@ -1059,9 +1073,11 @@ function conversationMatchesCurrentFilters(conversation: WhatsAppConversation) {
 
   const term = search.value.trim().toLowerCase()
   if (!term) return true
+  if (matchesWhatsAppUsername(conversation.whatsAppUsername, term)) return true
 
   return [
     conversation.phoneNumber,
+    conversation.whatsAppUsername,
     conversation.contactName,
     conversation.customerName,
     conversation.branchName,
@@ -1377,6 +1393,7 @@ async function createCustomerFromConversation(data: CustomerFormData) {
       name: data.name,
       phone1: data.phone1,
       phone2: data.phone2,
+      whatsAppUsername: data.whatsAppUsername || selectedConversation.value.whatsAppUsername,
       branchId: selectedConversation.value.branchId,
       initialAddress: data.initialAddress
         ? {
@@ -1526,18 +1543,55 @@ async function scrollToBottom() {
 }
 
 function conversationTitle(conversation: WhatsAppConversation) {
-  return conversation.contactName || conversation.customerName || conversation.phoneNumber
+  return conversation.contactName || conversation.customerName || conversation.whatsAppUsername || conversation.phoneNumber || 'Usuario de WhatsApp'
 }
 
-function formatPhone(phone: string) {
+async function linkExistingCustomer(customer: Customer) {
+  if (!selectedConversation.value || selectedConversation.value.attentionMode !== 'human') return
+  try {
+    creatingCustomer.value = true
+    contextError.value = ''
+    const linked = await whatsappApi.linkConversationCustomer(selectedConversation.value.id, customer.id)
+    selectedConversation.value = linked.data ?? {
+      ...selectedConversation.value,
+      customerId: customer.id,
+      customerName: customer.name,
+    }
+    const refreshedCustomer = await customerApi.getCustomerById(customer.id)
+    const resolvedCustomer = refreshedCustomer.data ?? customer
+    let addresses = resolvedCustomer.addresses ?? []
+    if (addresses.length === 0) {
+      const addressRes = await customerApi.getCustomerAddresses(customer.id)
+      addresses = addressRes.data ?? []
+    }
+    selectedCustomer.value = { ...resolvedCustomer, addresses }
+    selectedAddress.value = addresses.find(address => address.isPrimary) ?? addresses[0] ?? null
+    showCustomerSelector.value = false
+    await reloadConversations()
+    success('Cliente asociado', 2500, 'La conversación quedó vinculada al cliente seleccionado.')
+  } catch (error: any) {
+    contextError.value = error.message || 'No se pudo asociar el cliente.'
+    showError('Cliente', contextError.value)
+  } finally {
+    creatingCustomer.value = false
+  }
+}
+
+function formatPhone(phone?: string | null) {
+  if (!phone) return ''
   if (phone.startsWith('57') && phone.length === 12) return `+57 ${phone.slice(2, 5)} ${phone.slice(5, 8)} ${phone.slice(8)}`
   return phone.startsWith('+') ? phone : `+${phone}`
 }
 
-function formatConversationPhone(phone: string) {
+function formatConversationPhone(phone?: string | null) {
+  if (!phone) return ''
   const digits = phone.replace(/\D/g, '')
   if (digits.startsWith('57') && digits.length === 12) return digits.slice(2)
   return digits || phone
+}
+
+function conversationIdentityLabel(conversation: WhatsAppConversation) {
+  return conversation.whatsAppUsername || formatPhone(conversation.phoneNumber) || 'Identidad de WhatsApp'
 }
 
 function shortConversationPreview(value?: string | null) {

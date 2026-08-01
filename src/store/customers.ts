@@ -179,6 +179,19 @@ export const useCustomersStore = defineStore('customers', () => {
         return res.data?.items ?? [];
     };
 
+    const searchCustomers = async (search: string, branchId?: number): Promise<Customer[]> => {
+        const trimmed = search.trim();
+        if (trimmed.length < 2) return [];
+        const res = await customerApi.getCustomers({
+            search: trimmed,
+            branchId,
+            page: 1,
+            pageSize: 100,
+            active: true,
+        });
+        return res.data?.items ?? [];
+    };
+
     const createNeighborhood = async (payload: { name: string; deliveryFee: number; branchId: number }, opts?: FetchOpts) => {
         return run(async () => {
             const res = await customerApi.createNeighborhood(payload);
@@ -224,6 +237,7 @@ export const useCustomersStore = defineStore('customers', () => {
         fetchNeighborhoods,
         ensureNeighborhoodsLoaded,
         searchCustomersByName,
+        searchCustomers,
         createNeighborhood,
         clear,
         clearList

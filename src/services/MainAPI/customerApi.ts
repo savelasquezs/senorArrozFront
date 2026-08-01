@@ -21,9 +21,11 @@ class CustomerApi extends BaseApi {
         filters?: CustomerFilters
     ): Promise<ApiResponse<PagedResult<Customer>>> {
         const params = buildQueryParams(filters, {
+            Search: 'search',
             BranchId: 'branchId',
             Name: 'name',
             Phone: 'phone',
+            WhatsAppUsername: 'whatsAppUsername',
             Active: 'active',
             Page: (value) => value.page ?? 1,
             PageSize: (value) => value.pageSize ?? 10,

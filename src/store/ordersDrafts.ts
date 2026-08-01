@@ -220,7 +220,7 @@ export const useOrdersDraftsStore = defineStore('ordersDrafts', () => {
             ...order,
             customerId: customer ? customer.id : null,
             customerName: customer ? customer.name : null,
-            customerPhone: customer ? customer.phone1 : null,
+            customerPhone: customer?.phone1 ?? null,
         }, { clearSelection: true, ignoredDailyPromotionId: null, ignoredLoyaltyStepId: null })
 
         // Reemplazar el objeto completo en el Map
@@ -1579,7 +1579,7 @@ export const useOrdersDraftsStore = defineStore('ordersDrafts', () => {
             type: payload.mode === 'manual' ? 'delivery' : payload.draft.orderType ?? 'onsite',
             customerId: payload.customer.id,
             customerName: payload.customer.name,
-            customerPhone: payload.customer.phone1,
+            customerPhone: payload.customer.phone1 ?? null,
             guestName: payload.customer.name,
             addressId: selectedAddress?.id ?? null,
             addressDescription: selectedAddress?.address ?? null,

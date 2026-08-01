@@ -118,7 +118,7 @@
                     <input v-model="selectedCustomerIds" type="checkbox" :value="customer.id" class="h-4 w-4 rounded border-gray-300 text-emerald-600" />
                     <span class="min-w-0 flex-1">
                       <span class="block truncate font-medium text-gray-800">{{ customer.name }}</span>
-                      <span class="block truncate text-xs text-gray-500">{{ customer.phone1 }}</span>
+                      <span class="block truncate text-xs text-gray-500">{{ customer.whatsAppUsername || customer.phone1 || 'Sin identificador visible' }}</span>
                     </span>
                   </label>
                   <div v-if="!loadingCustomers && customers.length === 0" class="px-3 py-3 text-sm text-gray-500">

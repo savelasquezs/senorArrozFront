@@ -12,14 +12,24 @@ c<!-- src/components/CustomerForm.vue -->
                 </template>
             </BaseInput>
 
-            <BaseInput v-model="form.phone1" label="Teléfono Principal" type="tel" placeholder="3001234567" required
+            <BaseInput v-model="form.phone1" label="Teléfono Principal" type="tel" placeholder="3001234567"
                 :error="errors.phone1" :maxlength="10" @paste="handlePhonePaste('phone1', $event)"
                 @input="normalizePhone('phone1'); validatePhone('phone1'); validateForm()">
                 <template #icon>
                     <PhoneIcon class="w-4 h-4" />
                 </template>
             </BaseInput>
+
+            <BaseInput v-model="form.whatsAppUsername" label="Usuario de WhatsApp" placeholder="@usuario"
+                :error="errors.whatsAppUsername" :maxlength="36"
+                @input="normalizeUsername(); validateUsername(); validateForm()">
+                <template #icon>
+                    <AtSymbolIcon class="w-4 h-4" />
+                </template>
+            </BaseInput>
         </div>
+
+        <p class="-mt-4 text-xs text-gray-500">Indica al menos un teléfono principal o un usuario de WhatsApp.</p>
 
         <!-- Secondary Phone -->
         <div>
@@ -113,6 +123,7 @@ import { ref, reactive, computed, watch, onMounted, onBeforeUnmount, nextTick } 
 import { useAuthStore } from '@/store/auth'
 import { useBranchContextStore } from '@/store/branchContext'
 import type { Customer, CustomerFormData } from '@/types/customer'
+import { normalizeWhatsAppUsername } from '@/utils/whatsappIdentity'
 import BaseInput from '@/components/ui/BaseInput.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseDialog from '@/components/ui/BaseDialog.vue'
@@ -121,6 +132,7 @@ import type { CustomerAddressFormData } from '@/types/customer'
 import {
     UserIcon,
     PhoneIcon,
+    AtSymbolIcon,
     MapPinIcon,
 } from '@heroicons/vue/24/outline'
 
@@ -129,6 +141,8 @@ interface Props {
     loading?: boolean
     canSelectBranch?: boolean
     initialPhone?: string
+    initialUsername?: string
+    initialBranchId?: number
     /** Texto del botón de envío (ej. "Crear Cliente"). Si no se pasa, se usa "Actualizar"/"Crear" según haya customer. */
     submitButtonText?: string
 }
@@ -137,6 +151,8 @@ const props = withDefaults(defineProps<Props>(), {
     loading: false,
     canSelectBranch: false,
     initialPhone: '',
+    initialUsername: '',
+    initialBranchId: 0,
     submitButtonText: ''
 })
 
@@ -153,6 +169,7 @@ const form = reactive({
     name: '',
     phone1: '',
     phone2: '',
+    whatsAppUsername: '',
     branchId: branchContext.selectedBranchId ?? authStore.branchId ?? 0,
     active: true,
     initialAddress: {
@@ -182,6 +199,7 @@ const errors = reactive({
     name: '',
     phone1: '',
     phone2: '',
+    whatsAppUsername: '',
     branchId: '',
     initialAddress: {
         neighborhoodId: '',
@@ -194,6 +212,7 @@ const errors = reactive({
     name: string;
     phone1: string;
     phone2: string;
+    whatsAppUsername: string;
     branchId: string;
     initialAddress: {
         neighborhoodId: string;
@@ -213,11 +232,12 @@ const errors = reactive({
 const isFormValid = computed(() => {
     const basicValidation =
         form.name.trim() &&
-        form.phone1.trim() &&
+        (form.phone1.trim() || form.whatsAppUsername.trim()) &&
         (authStore.isSuperadmin ? form.branchId > 0 : true) &&
         !errors.name &&
         !errors.phone1 &&
         !errors.phone2 &&
+        !errors.whatsAppUsername &&
         !errors.branchId
 
     if (!props.customer) {
@@ -243,12 +263,6 @@ const isFormValid = computed(() => {
 const validatePhone = (field: 'phone1' | 'phone2') => {
     const phone = form[field].trim()
 
-    // phone1 is required, phone2 is optional
-    if (field === 'phone1' && !phone) {
-        errors[field] = 'El teléfono principal es requerido'
-        return
-    }
-
     // If phone exists, validate format
     if (phone && !/^[36]\d{9}$/.test(phone)) {
         errors[field] = 'Debe ser un número válido (10 dígitos, celular con 3 o fijo con 6)'
@@ -256,6 +270,24 @@ const validatePhone = (field: 'phone1' | 'phone2') => {
     }
 
     errors[field] = ''
+}
+
+const normalizeUsername = () => {
+    form.whatsAppUsername = normalizeWhatsAppUsername(form.whatsAppUsername)
+}
+
+const validateUsername = () => {
+    const username = form.whatsAppUsername.trim()
+    const handle = username.replace(/^@/, '')
+    if (username && (handle.length < 3 || handle.length > 35 || !/[a-z]/.test(handle) || !/^[a-z0-9_][a-z0-9._]*[a-z0-9_]$/.test(handle))) {
+        errors.whatsAppUsername = 'Usa entre 3 y 35 caracteres: letras, números, punto o guion bajo'
+        return
+    }
+    if (username.includes('..')) {
+        errors.whatsAppUsername = 'El usuario no puede contener puntos consecutivos'
+        return
+    }
+    errors.whatsAppUsername = ''
 }
 
 const normalizePhone = (field: 'phone1' | 'phone2') => {
@@ -347,8 +379,13 @@ const validateForm = () => {
 
     // Validate phones
     validatePhone('phone1')
+    validateUsername()
+    if (!form.phone1.trim() && !form.whatsAppUsername.trim()) {
+        errors.phone1 = 'Indica un teléfono o un usuario de WhatsApp'
+    }
     if (form.phone2) {
-        validatePhone('phone2')
+        if (!form.phone1.trim()) errors.phone2 = 'El teléfono secundario requiere un teléfono principal'
+        else validatePhone('phone2')
     } else {
         errors.phone2 = ''
     }
@@ -368,8 +405,9 @@ const handleSubmit = () => {
 
     const formData: CustomerFormData = {
         name: form.name.trim(),
-        phone1: form.phone1.trim(),
+        phone1: form.phone1.trim() || undefined,
         phone2: form.phone2.trim() || undefined,
+        whatsAppUsername: form.whatsAppUsername.trim() || undefined,
         branchId: form.branchId,
         active: form.active,
         initialAddress: !props.customer && form.initialAddress.address.trim().length > 0
@@ -393,8 +431,9 @@ watch(
 watch(() => props.customer, (newCustomer) => {
     if (newCustomer) {
         form.name = newCustomer.name
-        form.phone1 = newCustomer.phone1
+        form.phone1 = newCustomer.phone1 || ''
         form.phone2 = newCustomer.phone2 || ''
+        form.whatsAppUsername = newCustomer.whatsAppUsername || ''
         form.branchId = newCustomer.branchId
         form.active = newCustomer.active
     } else {
@@ -402,6 +441,7 @@ watch(() => props.customer, (newCustomer) => {
         form.name = ''
         form.phone1 = ''
         form.phone2 = ''
+        form.whatsAppUsername = ''
         form.branchId = 0
         form.active = true
         form.initialAddress = {
@@ -419,16 +459,30 @@ watch(() => props.customer, (newCustomer) => {
     errors.name = ''
     errors.phone1 = ''
     errors.phone2 = ''
+    errors.whatsAppUsername = ''
     errors.branchId = ''
     // Address errors are handled by CustomerAddressForm
 }, { immediate: true })
+
+watch(
+    () => [props.initialPhone, props.initialUsername, props.initialBranchId] as const,
+    ([phone, username, branchId]) => {
+        if (props.customer) return
+        form.phone1 = phone || ''
+        form.whatsAppUsername = normalizeWhatsAppUsername(username)
+        if (branchId > 0) form.branchId = branchId
+        validateForm()
+    },
+)
 
 // Address form handles its own state management
 
 // Load data on mount
 onMounted(async () => {
     try {
-        if (authStore.isSuperadmin) {
+        if (props.initialBranchId > 0) {
+            form.branchId = props.initialBranchId
+        } else if (authStore.isSuperadmin) {
             form.branchId = branchContext.selectedBranchId ?? 0
         } else if (authStore.branchId) {
             form.branchId = authStore.branchId
@@ -437,6 +491,9 @@ onMounted(async () => {
         // Pre-poblar teléfono si se proporciona para nuevo cliente
         if (!props.customer && props.initialPhone) {
             form.phone1 = props.initialPhone
+        }
+        if (!props.customer && props.initialUsername) {
+            form.whatsAppUsername = props.initialUsername
         }
         await nextTick()
         dirtyTrackingReady.value = true

@@ -8,21 +8,12 @@
                 class="flex flex-wrap items-end gap-x-3 gap-y-2 px-3 py-2 bg-white border border-gray-200 rounded-lg shadow-sm text-xs"
                 @submit.prevent="runSearch">
                 <BaseInput
-                    v-model="filters.name"
-                    placeholder="Nombre…"
-                    class="min-w-[8rem] flex-1 sm:max-w-[11rem] [&_input]:py-1.5 [&_input]:text-xs"
+                    v-model="filters.search"
+                    placeholder="Nombre, teléfono o @usuario…"
+                    class="min-w-[14rem] flex-1 sm:max-w-[20rem] [&_input]:py-1.5 [&_input]:text-xs"
                     @enter="runSearch">
                     <template #icon>
                         <MagnifyingGlassIcon class="w-4 h-4" />
-                    </template>
-                </BaseInput>
-                <BaseInput
-                    v-model="filters.phone"
-                    placeholder="Teléfono…"
-                    class="min-w-[8rem] flex-1 sm:max-w-[11rem] [&_input]:py-1.5 [&_input]:text-xs"
-                    @enter="runSearch">
-                    <template #icon>
-                        <PhoneIcon class="w-4 h-4" />
                     </template>
                 </BaseInput>
                 <BaseSelect
@@ -120,7 +111,11 @@
                                     </div>
                                 </td>
                                 <td class="px-3 py-2 text-xs text-gray-800">
-                                    <div class="flex items-center gap-0.5">
+                                    <div v-if="customer.whatsAppUsername" class="flex items-center gap-0.5 font-medium text-emerald-700">
+                                        <AtSymbolIcon class="h-3.5 w-3.5 shrink-0" />
+                                        {{ customer.whatsAppUsername }}
+                                    </div>
+                                    <div v-if="customer.phone1" class="flex items-center gap-0.5" :class="customer.whatsAppUsername ? 'mt-0.5' : ''">
                                         <PhoneIcon class="h-3.5 w-3.5 text-gray-400 shrink-0" />
                                         {{ customer.phone1 }}
                                     </div>
@@ -234,6 +229,7 @@ import {
     UserGroupIcon,
     UserIcon,
     PhoneIcon,
+    AtSymbolIcon,
     BuildingOffice2Icon,
     MagnifyingGlassIcon,
     PlusIcon,
@@ -255,8 +251,7 @@ const router = useRouter()
 const { success, error: showError } = useToast()
 
 const filters = ref({
-    name: '',
-    phone: '',
+    search: '',
     active: undefined as boolean | undefined,
     branchId: undefined as number | undefined,
     page: 1,
@@ -384,8 +379,7 @@ watch(
 const load = async () => {
     try {
         const filtersToSend: CustomerFilters = {
-            name: filters.value.name || undefined,
-            phone: filters.value.phone || undefined,
+            search: filters.value.search || undefined,
             active: filters.value.active,
             branchId: auth.isSuperadmin ? filters.value.branchId : auth.branchId || undefined,
             page: filters.value.page || 1,
@@ -404,8 +398,7 @@ const runSearch = async () => {
 
 const clearFilters = async () => {
     filters.value = {
-        name: '',
-        phone: '',
+        search: '',
         active: undefined,
         branchId: auth.isSuperadmin ? undefined : auth.branchId || undefined,
         page: 1,
@@ -454,6 +447,7 @@ const handleFormSubmit = async (data: CustomerFormData) => {
                 name: data.name,
                 phone1: data.phone1,
                 phone2: data.phone2,
+                whatsAppUsername: data.whatsAppUsername,
                 active: data.active,
             })
             success('Cliente actualizado', 3000, `El cliente "${data.name}" se ha actualizado correctamente`)
@@ -462,6 +456,7 @@ const handleFormSubmit = async (data: CustomerFormData) => {
                 name: data.name,
                 phone1: data.phone1,
                 phone2: data.phone2,
+                whatsAppUsername: data.whatsAppUsername,
                 branchId: data.branchId,
                 initialAddress: data.initialAddress
                     ? {
