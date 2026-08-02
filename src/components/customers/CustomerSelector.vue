@@ -9,7 +9,7 @@
         <div class="space-y-3">
             <!-- Search Input -->
             <BaseInput v-model="searchQuery" placeholder="Buscar por nombre, teléfono o @usuario..."
-                @input="handleSearch" size="sm">
+                @paste="handlePaste" @input="handleSearch" size="sm">
                 <template #icon>
                     <MagnifyingGlassIcon class="w-4 h-4 text-gray-400" />
                 </template>
@@ -82,6 +82,7 @@ import { useCustomersStore } from '@/store/customers'
 import { useToast } from '@/composables/useToast'
 import type { Customer } from '@/types/customer'
 import type { CreateCustomerDto } from '@/types/customer'
+import { isLikelyPhoneNumber, normalizePhoneForSearch } from '@/utils/phoneInput'
 
 // Components
 import BaseInput from '@/components/ui/BaseInput.vue'
@@ -136,14 +137,6 @@ const error = ref('')
 let searchDebounceTimer: ReturnType<typeof setTimeout> | null = null
 let searchGeneration = 0
 
-const normalizePhoneForApi = (raw: string) => {
-    let digits = raw.replace(/\D/g, '')
-    if (digits.length >= 12 && digits.startsWith('57')) {
-        digits = digits.slice(2)
-    }
-    return digits
-}
-
 const cancelPendingSearch = () => {
     if (searchDebounceTimer !== null) {
         clearTimeout(searchDebounceTimer)
@@ -180,6 +173,20 @@ const handleSearch = () => {
     }, SEARCH_DEBOUNCE_MS)
 }
 
+const handlePaste = (event: ClipboardEvent) => {
+    const pasted = event.clipboardData?.getData('text') ?? ''
+    if (!isLikelyPhoneNumber(pasted)) return
+
+    event.preventDefault()
+    const normalizedPhone = normalizePhoneForSearch(pasted)
+    const input = event.target instanceof HTMLInputElement ? event.target : null
+    const start = input?.selectionStart ?? searchQuery.value.length
+    const end = input?.selectionEnd ?? searchQuery.value.length
+
+    searchQuery.value = `${searchQuery.value.slice(0, start)}${normalizedPhone}${searchQuery.value.slice(end)}`
+    handleSearch()
+}
+
 const selectCustomer = (customer: Customer) => {
     cancelPendingSearch()
     emit('customerSelected', customer)
@@ -190,7 +197,7 @@ const selectCustomer = (customer: Customer) => {
 const showCreateCustomer = () => {
     const query = searchQuery.value.trim()
     initialUsername.value = query.startsWith('@') ? query : ''
-    initialPhone.value = /^\+?\d[\d\s-]+$/.test(query) ? normalizePhoneForApi(query) : ''
+    initialPhone.value = isLikelyPhoneNumber(query) ? normalizePhoneForSearch(query) : ''
     showCreateModal.value = true
 }
 
