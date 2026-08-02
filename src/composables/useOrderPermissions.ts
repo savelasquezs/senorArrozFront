@@ -223,28 +223,26 @@ export function useOrderPermissions() {
         const role = authStore.userRole
         const currentStatus = order.status
 
+        // Admin y Superadmin pueden corregir libremente el estado, incluso si el
+        // pedido ya fue entregado, cancelado o proviene de una integración externa.
+        if (role === 'Superadmin' || role === 'Admin') return true
+
         if (order.externalFulfillmentProvider === 'rappi') {
             const canPrepare = role !== null
-                && ['Superadmin', 'Admin', 'Cashier', 'Kitchen'].includes(role)
+                && ['Cashier', 'Kitchen'].includes(role)
             return canPrepare
                 && ((currentStatus === 'taken' && newStatus === 'in_preparation')
                     || (currentStatus === 'in_preparation' && newStatus === 'ready'))
         }
 
         if (currentStatus === 'cancelled') {
-            return newStatus === 'ready' && (role === 'Admin' || role === 'Superadmin')
-        }
-
-        // Superadmin puede cambiar a cualquier estado (incluso retroceder)
-        if (role === 'Superadmin') return true
-
-        // No se puede cambiar desde delivered (excepto Superadmin)
-        if (currentStatus === 'delivered') {
             return false
         }
 
-        // Admin puede cambiar a cualquier estado (excepto desde cancelled/delivered)
-        if (role === 'Admin') return true
+        // No se puede cambiar desde delivered para los demás roles
+        if (currentStatus === 'delivered') {
+            return false
+        }
 
         // Kitchen solo puede cambiar entre taken, in_preparation y ready
         if (role === 'Kitchen') {
@@ -298,25 +296,19 @@ export function useOrderPermissions() {
             'ready',
             'on_the_way',
             'delivered',
+            'cancelled',
         ]
 
-        if (currentStatus === 'cancelled') {
-            return role === 'Admin' || role === 'Superadmin' ? ['ready'] : []
-        }
-
-        // Superadmin puede ir a cualquier estado
-        if (role === 'Superadmin') {
+        // Admin y Superadmin pueden ir a cualquier estado desde cualquier estado.
+        if (role === 'Superadmin' || role === 'Admin') {
             return allStatuses.filter((s) => s !== currentStatus)
         }
 
-        // Pedidos entregados no pueden cambiar (excepto Superadmin)
+        if (currentStatus === 'cancelled') return []
+
+        // Pedidos entregados no pueden cambiar para los demás roles
         if (currentStatus === 'delivered') {
             return []
-        }
-
-        // Admin puede ir a cualquier estado (excepto desde cancelled/delivered)
-        if (role === 'Admin') {
-            return allStatuses.filter((s) => s !== currentStatus)
         }
 
         // Kitchen solo puede ir a in_preparation y ready

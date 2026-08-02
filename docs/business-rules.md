@@ -198,6 +198,8 @@ CANCELLED  CANCELLED   CANCELLED  CANCELLED
 
 ### Reglas de Transición de Estados
 
+Admin y Superadmin pueden cambiar un pedido desde cualquier estado hacia cualquier otro estado. Para pasar a `CANCELLED` se conserva el flujo de cancelación con motivo y gestión de pagos asociados.
+
 1. **TAKEN → IN_PREPARATION**: Solo Admin, Kitchen
 2. **IN_PREPARATION → READY**: Solo Kitchen
 3. **READY → ON_THE_WAY**: Solo Deliveryman, Admin

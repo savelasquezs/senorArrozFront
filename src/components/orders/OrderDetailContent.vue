@@ -95,7 +95,7 @@
 				:current-status="order.status"
 				:status-times="order.statusTimes"
 				:order-type="order.type"
-				:clickable="order.status !== 'cancelled'"
+				:clickable="order.status !== 'cancelled' || canSelectAnyOrderStatus"
 				@status-click="handleStatusChange"
 			/>
 		</div>
@@ -938,6 +938,7 @@ const detailBenefitError = ref('');
 const detailManualBenefitReason = ref('');
 const detailManualGiftProductId = ref<number | null>(null);
 const canGrantManualBenefit = computed(() => authStore.isAdmin || authStore.isSuperadmin);
+const canSelectAnyOrderStatus = computed(() => authStore.isAdmin || authStore.isSuperadmin);
 const detailGiftProducts = computed(() => productsStore.currentProducts.filter((p) => p.active && p.categoryName.trim().toLocaleLowerCase() === 'regalos'));
 const canGiftDetailDelivery = computed(() => order.value?.type === 'delivery' || (order.value?.type === 'reservation' && order.value?.addressId != null));
 const showRemovePaidInStoreDetailDialog = ref(false);

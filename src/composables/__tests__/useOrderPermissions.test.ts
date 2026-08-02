@@ -141,15 +141,67 @@ describe('useOrderPermissions - canUncancel', () => {
         expect(canUncancel(baseOrder({ status: 'ready' }))).toBe(false)
     })
 
-    it('solo permite cambiar de cancelado a listo', () => {
+    it('permite cambiar de cancelado a cualquier otro estado', () => {
         const { canChangeStatus, getAllowedStatusTransitions } = useOrderPermissions()
         const order = baseOrder({ status: 'cancelled' })
 
         expect(canChangeStatus(order, 'ready')).toBe(true)
-        expect(canChangeStatus(order, 'taken')).toBe(false)
-        expect(getAllowedStatusTransitions('cancelled')).toEqual(['ready'])
+        expect(canChangeStatus(order, 'taken')).toBe(true)
+        expect(canChangeStatus(order, 'delivered')).toBe(true)
+        expect(getAllowedStatusTransitions('cancelled')).toEqual([
+            'taken',
+            'in_preparation',
+            'ready',
+            'on_the_way',
+            'delivered',
+        ])
     })
 })
+
+describe.each([UserRole.ADMIN, UserRole.SUPERADMIN])(
+    'useOrderPermissions - %s puede cambiar a cualquier estado',
+    (role) => {
+        beforeEach(() => {
+            setActivePinia(createPinia())
+            const auth = useAuthStore()
+            auth.user = {
+                id: 2,
+                name: 'A',
+                email: 'a@test.com',
+                phone: '',
+                active: true,
+                role,
+                branchId: 1,
+                branchName: 'B',
+            }
+        })
+
+        it('permite todas las combinaciones de estado, incluso pedidos externos', () => {
+            const { canChangeStatus, getAllowedStatusTransitions } = useOrderPermissions()
+            const statuses = [
+                'taken',
+                'in_preparation',
+                'ready',
+                'on_the_way',
+                'delivered',
+                'cancelled',
+            ] as const
+
+            for (const current of statuses) {
+                const order = baseOrder({
+                    status: current,
+                    externalFulfillmentProvider: 'rappi',
+                })
+                for (const target of statuses) {
+                    expect(canChangeStatus(order, target)).toBe(true)
+                }
+                expect(getAllowedStatusTransitions(current)).toEqual(
+                    statuses.filter((status) => status !== current)
+                )
+            }
+        })
+    }
+)
 
 describe('useOrderPermissions - ready a in_preparation', () => {
     beforeEach(() => {
