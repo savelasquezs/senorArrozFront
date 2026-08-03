@@ -856,10 +856,13 @@ import PhoneNumberItem from '@/components/customers/PhoneNumberItem.vue';
 import { useFormatting } from '@/composables/useFormatting';
 import { useOrderPermissions } from '@/composables/useOrderPermissions';
 import { useToast } from '@/composables/useToast';
-import { getOrderTypeDisplayName } from '@/composables/useFormatting';
+import {
+	getOrderStatusDisplayName,
+	getOrderTypeDisplayName,
+} from '@/composables/useFormatting';
 import { useOrderStatusChange } from '@/composables/useOrderStatusChange';
-import { useRouter } from 'vue-router';
 import type {
+	Order,
 	OrderDetailView,
 	OrderStatus,
 	UpdateOrderDetailDto,
@@ -1258,7 +1261,6 @@ const prepareNowTargetTypeLabel = computed(() =>
 
 const { formatDateTime, formatCurrency } = useFormatting();
 const activeTab = ref('info');
-const router = useRouter();
 
 const { success, error } = useToast();
 
@@ -1913,8 +1915,27 @@ const handleStatusChanged = async (newStatus: OrderStatus) => {
 	});
 };
 
-const handleOrderCancelled = () => {
-	router.push({ name: 'Orders' });
+const handleOrderCancelled = (updatedOrder: Order) => {
+	if (!order.value || updatedOrder.id !== order.value.id) return;
+	const updated = updatedOrder as Order & {
+		statusDisplayName?: string | null;
+		statusTimes?: Record<string, string>;
+		cancelledReason?: string | null;
+	};
+
+	ordersDataStore.updateCurrent({
+		status: 'cancelled',
+		statusDisplayName:
+			updated.statusDisplayName || getOrderStatusDisplayName('cancelled'),
+		statusTimes: updated.statusTimes || order.value.statusTimes,
+		cancelledReason: updated.cancelledReason ?? null,
+		bankPayments: [],
+		appPayments: [],
+		reservationDeposits: [],
+		totalDeposited: 0,
+		updatedAt: updated.updatedAt || order.value.updatedAt,
+	});
+	showCancelModal.value = false;
 };
 
 // Handlers optimistas para actualización sin recarga

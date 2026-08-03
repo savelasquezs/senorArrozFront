@@ -84,7 +84,7 @@
 
 <script setup lang="ts">
 import { ref, computed } from 'vue'
-import type { OrderListItem } from '@/types/order'
+import type { Order, OrderListItem } from '@/types/order'
 import { orderApi } from '@/services/MainAPI/orderApi'
 import { useFormatting } from '@/composables/useFormatting'
 import { useToast } from '@/composables/useToast'
@@ -101,7 +101,7 @@ const props = defineProps<Props>()
 
 const emit = defineEmits<{
     close: []
-    cancelled: []
+    cancelled: [order: Order]
 }>()
 
 const { formatCurrency } = useFormatting()
@@ -128,10 +128,10 @@ const handleCancel = async () => {
 
     cancelling.value = true
     try {
-        await orderApi.cancel(props.order.id, cancelReason.value.trim())
+        const cancelledOrder = await orderApi.cancel(props.order.id, cancelReason.value.trim())
 
         success('Pedido cancelado', 5000, 'El pedido ha sido cancelado correctamente')
-        emit('cancelled')
+        emit('cancelled', cancelledOrder)
         emit('close')
 
         // Resetear estado
