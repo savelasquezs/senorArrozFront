@@ -6,8 +6,11 @@
     @update:model-value="emit('update:modelValue', $event)"
   >
     <div class="space-y-4">
-      <div v-if="readonly && activePromotion" class="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
-        {{ activeSummary }}
+      <div v-if="readonly && displayedPromotion" class="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
+        {{ displayedSummary }}
+        <p v-if="displayedPromotion.isActive" class="mt-1 text-xs text-emerald-700">
+          Solo puede modificarla el cajero que la creó o un administrador.
+        </p>
       </div>
       <div v-else-if="readonly" class="rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-600">
         No hay promo activa para esta sucursal.
@@ -115,7 +118,7 @@
         Cerrar
       </BaseButton>
       <BaseButton
-        v-if="!readonly"
+        v-if="!readonly && currentPromotion?.isActive"
         variant="outline"
         size="sm"
         :disabled="!branchId || dailyPromotionStore.isSaving"
@@ -145,6 +148,7 @@ import BaseInput from '@/components/ui/BaseInput.vue'
 import BaseSelect from '@/components/ui/BaseSelect.vue'
 import { useDailyPromotionStore } from '@/store/dailyPromotion'
 import { useProductsStore } from '@/store/products'
+import { useAuthStore } from '@/store/auth'
 import type { DailyPromotion, DailyPromotionDiscountScope, DailyPromotionType, UpsertDailyPromotion } from '@/types/dailyPromotion'
 import { defaultBusinessCalendar } from '@/utils/datetime'
 
@@ -161,6 +165,7 @@ const emit = defineEmits<{
 
 const dailyPromotionStore = useDailyPromotionStore()
 const productsStore = useProductsStore()
+const authStore = useAuthStore()
 
 const startsAtLocal = ref('')
 const endsAtLocal = ref('')
@@ -214,7 +219,8 @@ const giftProductOptions = computed(() => {
   return gifts.length > 0 ? gifts : productOptions.value
 })
 
-const activeSummary = computed(() => summarize(activePromotion.value))
+const displayedPromotion = computed(() => activePromotion.value ?? currentPromotion.value)
+const displayedSummary = computed(() => summarize(displayedPromotion.value))
 
 watch(
   () => props.modelValue,
@@ -258,7 +264,8 @@ function hydrateForm(promo: DailyPromotion | null) {
   form.discountProductIds = promo?.discountProducts?.map((p) => p.productId) ?? []
   form.minimumOrderValue = promo?.minimumOrderValue ?? null
   const promoEnd = promo?.endsAt ? new Date(promo.endsAt).getTime() : null
-  const hasReusableSchedule = promo && (promoEnd == null || promoEnd >= Date.now())
+  const canReuseForCashier = !authStore.isCashier || isPromotionForToday(promo)
+  const hasReusableSchedule = promo && canReuseForCashier && (promoEnd == null || promoEnd >= Date.now())
   if (hasReusableSchedule) {
     startsAtLocal.value = toDatetimeLocal(promo.startsAt)
     endsAtLocal.value = promo.endsAt ? toDatetimeLocal(promo.endsAt) : ''
@@ -318,6 +325,14 @@ function summarize(promo: DailyPromotion | null) {
   if (promo.type === 'GiftProduct') return `Promo activa: ${promo.giftProductName ?? 'producto gratis'} gratis`
   if (promo.type === 'FreeDelivery') return 'Promo activa: Domicilio gratis'
   return `Promo activa: ${promo.discountPercentage ?? 0}% de descuento`
+}
+
+function isPromotionForToday(promo: DailyPromotion | null) {
+  if (!promo?.isActive) return false
+  const today = defaultBusinessCalendar.todayYmd()
+  const startsTodayOrEarlier = defaultBusinessCalendar.formatYmd(promo.startsAt) <= today
+  const endsTodayOrLater = !promo.endsAt || defaultBusinessCalendar.formatYmd(promo.endsAt) >= today
+  return startsTodayOrEarlier && endsTodayOrLater
 }
 
 function normalize(value?: string | null) {

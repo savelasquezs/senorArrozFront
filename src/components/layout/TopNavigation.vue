@@ -88,11 +88,16 @@ const canAccessOrders = computed(
 
 const canAccessWhatsApp = computed(() => canAccessOrders.value && whatsappStore.enabled);
 
-const canEditDailyPromotion = computed(() => authStore.isSuperadmin || authStore.isAdmin);
-
 const activeBranchId = computed(() =>
 	authStore.isSuperadmin ? branchContext.selectedBranchId : authStore.branchId,
 );
+
+const canEditDailyPromotion = computed(() => {
+	if (authStore.isSuperadmin || authStore.isAdmin) return true;
+	if (!authStore.isCashier || !activeBranchId.value) return false;
+	if (!dailyPromotionStore.currentLoadedByBranch[activeBranchId.value]) return false;
+	return dailyPromotionStore.currentByBranch[activeBranchId.value]?.canManage ?? true;
+});
 
 const dailyPromotionActive = computed(() =>
 	dailyPromotionStore.hasActiveForBranch(activeBranchId.value),

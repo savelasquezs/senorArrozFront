@@ -9,6 +9,7 @@ export interface DailyPromotionProduct {
 export interface DailyPromotion {
   id: number
   branchId: number
+  createdByUserId?: number | null
   type: DailyPromotionType
   giftProductId?: number | null
   giftProductName?: string | null
@@ -23,6 +24,7 @@ export interface DailyPromotion {
   createdAt: string
   updatedAt?: string | null
   status?: string
+  canManage: boolean
 }
 
 export interface UpsertDailyPromotion {

@@ -8,6 +8,7 @@ const ACTIVE_TTL_MS = 60 * 1000
 export const useDailyPromotionStore = defineStore('dailyPromotion', () => {
   const activeByBranch = ref<Record<number, DailyPromotion | null>>({})
   const currentByBranch = ref<Record<number, DailyPromotion | null>>({})
+  const currentLoadedByBranch = ref<Record<number, boolean>>({})
   const activeLoadedAt = ref<Record<number, number>>({})
   const activeInFlight = new Map<number, Promise<DailyPromotion | null>>()
   const isLoading = ref(false)
@@ -56,9 +57,11 @@ export const useDailyPromotionStore = defineStore('dailyPromotion', () => {
     if (!branchId) return null
     isLoading.value = true
     error.value = null
+    currentLoadedByBranch.value = { ...currentLoadedByBranch.value, [branchId]: false }
     try {
       const res = await dailyPromotionApi.getCurrent(branchId)
       currentByBranch.value = { ...currentByBranch.value, [branchId]: res.data ?? null }
+      currentLoadedByBranch.value = { ...currentLoadedByBranch.value, [branchId]: true }
       return res.data ?? null
     } catch (err: any) {
       error.value = err?.message || 'No se pudo cargar la configuracion de promo'
@@ -104,6 +107,7 @@ export const useDailyPromotionStore = defineStore('dailyPromotion', () => {
   return {
     activeByBranch,
     currentByBranch,
+    currentLoadedByBranch,
     isLoading,
     isSaving,
     error,
