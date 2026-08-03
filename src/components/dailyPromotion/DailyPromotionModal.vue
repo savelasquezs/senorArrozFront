@@ -95,18 +95,8 @@
           <p class="text-xs text-gray-500">El descuento se aplicara unicamente sobre productos, no sobre el domicilio.</p>
         </div>
 
-        <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
-          <BaseInput
-            v-model="startsAtLocal"
-            label="Fecha inicio"
-            type="datetime-local"
-          />
-          <BaseInput
-            v-model="endsAtLocal"
-            label="Fecha fin"
-            type="datetime-local"
-            placeholder="Opcional"
-          />
+        <div class="rounded-md border border-blue-100 bg-blue-50 px-3 py-2 text-sm text-blue-800">
+          Vigencia automática para hoy: de 5:00 a. m. a 11:59 p. m. (hora Colombia).
         </div>
       </fieldset>
 
@@ -141,16 +131,15 @@
 </template>
 
 <script setup lang="ts">
-import { computed, reactive, ref, watch } from 'vue'
+import { computed, reactive, watch } from 'vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseDialog from '@/components/ui/BaseDialog.vue'
 import BaseInput from '@/components/ui/BaseInput.vue'
 import BaseSelect from '@/components/ui/BaseSelect.vue'
 import { useDailyPromotionStore } from '@/store/dailyPromotion'
 import { useProductsStore } from '@/store/products'
-import { useAuthStore } from '@/store/auth'
 import type { DailyPromotion, DailyPromotionDiscountScope, DailyPromotionType, UpsertDailyPromotion } from '@/types/dailyPromotion'
-import { defaultBusinessCalendar } from '@/utils/datetime'
+import { getTodayDailyPromotionWindow } from '@/utils/dailyPromotionWindow'
 
 const props = defineProps<{
   modelValue: boolean
@@ -165,10 +154,6 @@ const emit = defineEmits<{
 
 const dailyPromotionStore = useDailyPromotionStore()
 const productsStore = useProductsStore()
-const authStore = useAuthStore()
-
-const startsAtLocal = ref('')
-const endsAtLocal = ref('')
 
 const form = reactive<{
   isActive: boolean
@@ -263,21 +248,11 @@ function hydrateForm(promo: DailyPromotion | null) {
   form.discountScope = promo?.discountScope ?? 'AllProducts'
   form.discountProductIds = promo?.discountProducts?.map((p) => p.productId) ?? []
   form.minimumOrderValue = promo?.minimumOrderValue ?? null
-  const promoEnd = promo?.endsAt ? new Date(promo.endsAt).getTime() : null
-  const canReuseForCashier = !authStore.isCashier || isPromotionForToday(promo)
-  const hasReusableSchedule = promo && canReuseForCashier && (promoEnd == null || promoEnd >= Date.now())
-  if (hasReusableSchedule) {
-    startsAtLocal.value = toDatetimeLocal(promo.startsAt)
-    endsAtLocal.value = promo.endsAt ? toDatetimeLocal(promo.endsAt) : ''
-  } else {
-    const today = defaultBusinessCalendar.todayYmd()
-    startsAtLocal.value = `${today}T10:00`
-    endsAtLocal.value = `${today}T23:59`
-  }
 }
 
 async function handleSave() {
   if (!props.branchId) return
+  const promotionWindow = getTodayDailyPromotionWindow()
   const payload: UpsertDailyPromotion = {
     type: form.type,
     giftProductId: form.type === 'GiftProduct' ? form.giftProductId : null,
@@ -292,8 +267,8 @@ async function handleSave() {
         ? form.minimumOrderValue
         : null,
     isActive: form.isActive,
-    startsAt: fromDatetimeLocal(startsAtLocal.value) ?? new Date().toISOString(),
-    endsAt: fromDatetimeLocal(endsAtLocal.value),
+    startsAt: promotionWindow.startsAt,
+    endsAt: promotionWindow.endsAt,
   }
 
   await dailyPromotionStore.save(props.branchId, payload)
@@ -307,32 +282,11 @@ async function handleDisable() {
   emit('saved')
 }
 
-function toDatetimeLocal(value: string) {
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return ''
-  const pad = (n: number) => String(n).padStart(2, '0')
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`
-}
-
-function fromDatetimeLocal(value: string) {
-  if (!value) return null
-  const date = new Date(value)
-  return Number.isNaN(date.getTime()) ? null : date.toISOString()
-}
-
 function summarize(promo: DailyPromotion | null) {
   if (!promo) return ''
   if (promo.type === 'GiftProduct') return `Promo activa: ${promo.giftProductName ?? 'producto gratis'} gratis`
   if (promo.type === 'FreeDelivery') return 'Promo activa: Domicilio gratis'
   return `Promo activa: ${promo.discountPercentage ?? 0}% de descuento`
-}
-
-function isPromotionForToday(promo: DailyPromotion | null) {
-  if (!promo?.isActive) return false
-  const today = defaultBusinessCalendar.todayYmd()
-  const startsTodayOrEarlier = defaultBusinessCalendar.formatYmd(promo.startsAt) <= today
-  const endsTodayOrLater = !promo.endsAt || defaultBusinessCalendar.formatYmd(promo.endsAt) >= today
-  return startsTodayOrEarlier && endsTodayOrLater
 }
 
 function normalize(value?: string | null) {
