@@ -38,6 +38,8 @@ export interface ExpenseDetail {
     quantity: number
     amount: number
     total?: number
+    /** La línea integra la base gravable del IVA 19 %. */
+    includeVat: boolean
     /** Notas de la línea */
     notes?: string | null
     createdAt: string
@@ -76,7 +78,7 @@ export interface CreateExpenseHeaderDto {
     notes?: string | null
     expenseDetails: CreateExpenseDetailDto[]
     expenseBankPayments?: CreateExpenseBankPaymentDto[]
-    /** IVA 19 % sobre subtotal de líneas */
+    /** Atajo para aplicar IVA 19 % a todas las líneas. */
     includeVat?: boolean
 }
 
@@ -85,6 +87,7 @@ export interface CreateExpenseDetailDto {
     quantity: number
     amount: number
     total?: number
+    includeVat?: boolean
     notes?: string | null
 }
 
@@ -108,6 +111,7 @@ export interface UpdateExpenseDetailDto {
     quantity: number
     amount: number
     total?: number
+    includeVat?: boolean
     notes?: string | null
 }
 

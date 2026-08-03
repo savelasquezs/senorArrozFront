@@ -650,7 +650,7 @@ const confirmDeleteDetailLine = async () => {
                 throw new Error('No se encontró la línea que se desea eliminar.')
             }
             const remaining = header.expenseDetails.filter(d => d.id !== detailId)
-            const includeVat = Number(header.vatAmount ?? 0) > 0.01
+            const includeVat = remaining.length > 0 && remaining.every(d => d.includeVat)
             const updatePayload: UpdateExpenseHeaderDto = {
                 includeVat,
                 notes: header.notes ?? null,
@@ -662,6 +662,7 @@ const confirmDeleteDetailLine = async () => {
                         quantity: d.quantity,
                         amount: Math.round(Number(d.amount)),
                         total: d.total != null ? Number(d.total) : undefined,
+                        includeVat: Boolean(d.includeVat),
                         ...(lineNotes ? { notes: lineNotes.slice(0, 1000) } : { notes: null }),
                     }
                 }),

@@ -77,6 +77,9 @@
                         <div class="w-28">
                             <span class="text-[11px] font-semibold text-gray-500 uppercase tracking-wide">Unit.</span>
                         </div>
+                        <div class="w-10 text-center">
+                            <span class="text-[11px] font-semibold text-gray-500 uppercase tracking-wide">IVA</span>
+                        </div>
                         <div class="w-[4.5rem] shrink-0" aria-hidden="true"></div>
                     </div>
 
@@ -113,6 +116,16 @@
                                     :title="'Referencia: total ÷ cantidad'">
                                     {{ formatUnitRef(calculateUnitPriceRef(detail)) }}
                                 </div>
+                            </div>
+
+                            <div class="w-10 flex justify-center">
+                                <input
+                                    v-model="detail.includeVat"
+                                    type="checkbox"
+                                    class="h-4 w-4 rounded border-gray-300 text-amber-600 focus:ring-amber-500"
+                                    :aria-label="`Aplicar IVA a la línea ${index + 1}`"
+                                    title="Aplicar IVA 19% a esta línea"
+                                />
                             </div>
 
                             <div class="flex items-center justify-end gap-0 shrink-0">
@@ -155,9 +168,9 @@
                 <label class="inline-flex items-start gap-2 text-sm text-gray-800 cursor-pointer">
                     <input v-model="applyVat" type="checkbox" class="rounded border-gray-300 mt-0.5 shrink-0" />
                     <span>
-                        <span class="font-medium">IVA 19%</span>
+                        <span class="font-medium">IVA 19% a todas las líneas</span>
                         <span class="block text-[11px] text-gray-600 mt-0.5 leading-snug">
-                            Sobre subtotal de líneas; total factura y pagos incluyen IVA si aplica.
+                            Atajo para marcar o desmarcar todas. También puedes elegir IVA individual en cada fila.
                         </span>
                     </span>
                 </label>
@@ -201,7 +214,7 @@
                         <span class="font-medium text-gray-700">Subtotal de líneas:</span>
                         <span class="font-semibold text-gray-900">{{ formatCurrency(totalExpenses) }}</span>
                     </div>
-                    <div v-if="applyVat" class="flex justify-between text-sm mt-1">
+                    <div v-if="invoiceVatAmount > 0" class="flex justify-between text-sm mt-1">
                         <span class="font-medium text-gray-700">IVA (19%):</span>
                         <span class="font-semibold text-gray-800">{{ formatCurrency(invoiceVatAmount) }}</span>
                     </div>
@@ -502,8 +515,17 @@ const selectedDeliverymanId = ref<number | null>(null)
 const deliverymenOptions = ref<Array<{ value: number; label: string; ordersCount: number }>>([])
 const loadingDeliverymen = ref(false)
 
-/** IVA sobre subtotal de líneas; total factura = subtotal + IVA. */
-const applyVat = ref(false)
+/** Atajo global: al cambiarlo marca o desmarca el IVA en todas las líneas. */
+const applyVat = computed({
+    get: () =>
+        formData.value.expenseDetails.length > 0 &&
+        formData.value.expenseDetails.every(detail => Boolean(detail.includeVat)),
+    set: (checked: boolean) => {
+        for (const detail of formData.value.expenseDetails) {
+            detail.includeVat = checked
+        }
+    },
+})
 
 /** Al abrir edición: el gasto cargaba 100 % por banco (suma bancos = total líneas) */
 const editExpensePaymentSnapshot = ref<{ wasFullyBank: boolean } | null>(null)
@@ -721,6 +743,11 @@ const initializeForm = async () => {
     }
 
     if (props.editingExpense) {
+        const hasPersistedIndividualVat = props.editingExpense.expenseDetails
+            .some(detail => detail.includeVat === true)
+        const legacyVatAppliesToAll =
+            Number(props.editingExpense.vatAmount ?? 0) > 0.01 &&
+            !hasPersistedIndividualVat
         const details = await Promise.all(
             props.editingExpense.expenseDetails.map(async (detail) => {
                 // Fuente de verdad: total persistido en API; solo si no viene, fallback a amount×qty (legado)
@@ -755,12 +782,11 @@ const initializeForm = async () => {
                     tempId: `detail-${detail.id}`,
                     expenseName,
                     expenseUnit,
+                    includeVat: Boolean(detail.includeVat || legacyVatAppliesToAll),
                     notes: detail.notes ?? '',
                 }
             })
         )
-
-        applyVat.value = Number(props.editingExpense.vatAmount ?? 0) > 0.01
 
         formData.value = {
             supplierId: props.editingExpense.supplierId,
@@ -805,7 +831,6 @@ const initializeForm = async () => {
         syncLineNotesVisibilityFromDetails()
         await scrollToFocusedExpenseLine()
     } else {
-        applyVat.value = false
         editExpensePaymentSnapshot.value = null
         formData.value = {
             supplierId: DEFAULT_GENERAL_SUPPLIER_ID,
@@ -857,8 +882,10 @@ const totalExpenses = computed(() => {
 })
 
 const invoiceVatAmount = computed(() => {
-    if (!applyVat.value) return 0
-    return Math.round(totalExpenses.value * EXPENSE_VAT_RATE)
+    const taxableSubtotal = formData.value.expenseDetails
+        .filter(detail => detail.includeVat)
+        .reduce((sum, detail) => sum + lineTotal(detail), 0)
+    return Math.round(taxableSubtotal * EXPENSE_VAT_RATE)
 })
 
 const invoiceGrossTotal = computed(() => totalExpenses.value + invoiceVatAmount.value)
@@ -1151,11 +1178,13 @@ function updateDerivedUnitAmount(index: number) {
 }
 
 const addDetail = () => {
+    const includeVat = applyVat.value
     formData.value.expenseDetails.unshift({
         expenseId: 0,
         quantity: 1,
         amount: 0,
         total: 0,
+        includeVat,
         notes: '',
         tempId: `temp-${Date.now()}-${Math.random()}`,
         expenseName: '',
@@ -1280,6 +1309,7 @@ async function executeExpenseSave() {
                     quantity: d.quantity,
                     amount: unitAmount,
                     total: userTotal,
+                    includeVat: Boolean(d.includeVat),
                     ...(lineNotes ? { notes: lineNotes.slice(0, 1000) } : { notes: null }),
                 }
                 if (props.editingExpense && d.detailId != null && d.detailId > 0) {
