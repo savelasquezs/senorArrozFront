@@ -108,7 +108,7 @@
         Cerrar
       </BaseButton>
       <BaseButton
-        v-if="!readonly && currentPromotion?.isActive"
+        v-if="!readonly"
         variant="outline"
         size="sm"
         :disabled="!branchId || dailyPromotionStore.isSaving"
