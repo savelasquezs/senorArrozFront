@@ -558,10 +558,25 @@ async function saveReview() {
       adminNotes: reviewForm.adminNotes.trim() || null,
       deliverymanExplanation: reviewForm.deliverymanExplanation.trim() || null,
     })
-    detail.value = response.data
-    hydrateReviewForm(response.data)
+    const saved = response.data
+    const itemIndex = items.value.findIndex(item => item.id === saved.id)
+    if (itemIndex >= 0) {
+      if (reviewStatus.value && saved.reviewStatus !== reviewStatus.value) {
+        items.value.splice(itemIndex, 1)
+        totalCount.value = Math.max(0, totalCount.value - 1)
+      } else {
+        items.value[itemIndex] = {
+          ...items.value[itemIndex],
+          reviewStatus: saved.reviewStatus,
+          finalClassification: saved.finalClassification,
+        }
+      }
+    }
+    detail.value = saved
+    hydrateReviewForm(saved)
+    detailOpen.value = false
     toast.success('Revisión guardada', 5000)
-    await loadIncidents()
+    void loadIncidents()
   } catch (error: any) {
     toast.error('No se pudo guardar la revisión', error.message)
   } finally {
