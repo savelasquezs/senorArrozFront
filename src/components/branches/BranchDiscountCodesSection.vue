@@ -142,8 +142,11 @@ import BaseDialog from '@/components/ui/BaseDialog.vue'
 import BaseInput from '@/components/ui/BaseInput.vue'
 import BaseLoading from '@/components/ui/BaseLoading.vue'
 import { discountCodeApi } from '@/services/MainAPI/discountCodeApi'
+import { useDialog } from '@/composables/useDialog'
 import { useProductsStore } from '@/store/products'
 import type { DiscountCode, DiscountCodeType, UpsertDiscountCode } from '@/types/discountCode'
+
+const { confirmDialog } = useDialog()
 
 const props = defineProps<{ branchId: number }>()
 
@@ -267,7 +270,12 @@ async function saveCode() {
 }
 
 async function removeCode(code: DiscountCode) {
-  if (!window.confirm(`Eliminar el codigo ${code.code}?`)) return
+  if (!(await confirmDialog({
+    title: 'Eliminar código de descuento',
+    message: `¿Eliminar el código ${code.code}?`,
+    confirmLabel: 'Eliminar',
+    tone: 'danger',
+  }))) return
   try {
     await discountCodeApi.remove(props.branchId, code.id)
     message.type = 'success'

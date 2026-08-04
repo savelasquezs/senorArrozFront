@@ -10,8 +10,13 @@
 				<div class="fixed inset-0 bg-black/50 transition-opacity" @click="closeDialog" />
 
 				<!-- Dialog -->
-				<div class="relative bg-white rounded-lg shadow-xl w-full max-h-[90vh] overflow-y-auto"
-					:class="sizeClasses" @click.stop>
+				<div
+					role="dialog"
+					aria-modal="true"
+					class="relative bg-white rounded-lg shadow-xl w-full max-h-[90vh] overflow-y-auto"
+					:class="[sizeClasses, panelClass]"
+					@click.stop
+				>
 					<!-- Header -->
 					<div v-if="$slots.header || title" class="flex items-center justify-between p-6 pb-0">
 						<div class="flex items-center">
@@ -57,6 +62,8 @@ interface Props {
 	closeOnBackdrop?: boolean;
 	/** Capa del overlay (p. ej. z-50 por defecto; z-[60] para diálogos anidados). */
 	zClass?: string;
+	/** Clase adicional para el panel del diálogo. */
+	panelClass?: string;
 }
 
 const props = withDefaults(defineProps<Props>(), {

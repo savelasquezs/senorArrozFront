@@ -355,6 +355,7 @@ import { useAppsStore } from '@/store/apps'
 import { useBankPaymentsStore } from '@/store/bankPayments'
 import { useAuthStore } from '@/store/auth'
 import { useToast } from '@/composables/useToast'
+import { useDialog } from '@/composables/useDialog'
 import type { App, BankDetail, BankPayment } from '@/types/bank'
 import { defaultBusinessCalendar } from '@/utils/datetime'
 import type { CreateAppDto, UpdateAppDto } from '@/types/bank'
@@ -389,6 +390,7 @@ const appsStore = useAppsStore()
 const bankPaymentsStore = useBankPaymentsStore()
 const authStore = useAuthStore()
 const { success, error: showError } = useToast()
+const { confirmDialog } = useDialog()
 
 // State
 const showAppForm = ref(false)
@@ -485,7 +487,12 @@ const handleAppSubmit = async (formData: CreateAppDto | UpdateAppDto) => {
 }
 
 const deleteApp = async (appId: number) => {
-    if (confirm('¿Estás seguro de que quieres eliminar esta app?')) {
+    if (await confirmDialog({
+        title: 'Eliminar app',
+        message: '¿Estás seguro de que quieres eliminar esta app?',
+        confirmLabel: 'Eliminar',
+        tone: 'danger',
+    })) {
         try {
             await appsStore.remove(appId)
             success('App eliminada', 3000, 'La app se ha eliminado correctamente')
@@ -546,7 +553,12 @@ const unverifyPayment = async (paymentId: number) => {
 }
 
 const deleteBankPayment = async (paymentId: number) => {
-    if (confirm('¿Estás seguro de que quieres eliminar este pago bancario?')) {
+    if (await confirmDialog({
+        title: 'Eliminar pago bancario',
+        message: '¿Estás seguro de que quieres eliminar este pago bancario?',
+        confirmLabel: 'Eliminar',
+        tone: 'danger',
+    })) {
         try {
             await bankPaymentsStore.remove(paymentId)
             success('Pago eliminado', 3000, 'El pago bancario se ha eliminado correctamente')

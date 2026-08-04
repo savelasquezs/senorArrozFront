@@ -1350,7 +1350,7 @@ const handleSettleAppPayment = async (order: OrderListItem, payment: OrderAppPay
             await appPaymentApi.unsettleAppPayment(payment.id)
             success('Liquidación removida', 5000, 'El pago por app quedó pendiente de liquidar')
         } else if (payment.expectedNetAmount != null) {
-            const actualAmount = requestActualSettlementAmount(payment.expectedNetAmount, formatCurrency)
+            const actualAmount = await requestActualSettlementAmount(payment.expectedNetAmount, formatCurrency)
             if (actualAmount == null) return
             await appPaymentApi.settleMultipleAppPayments({ paymentIds: [payment.id], actualAmount })
             success('Pago liquidado', 5000, 'La consignación real fue registrada')

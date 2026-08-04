@@ -160,6 +160,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { expenseCategoryApi } from '@/services/MainAPI/expenseCategoryApi'
 import { useToast } from '@/composables/useToast'
+import { useDialog } from '@/composables/useDialog'
 import type { ExpenseCategory, ExpenseCategoryFilters, CreateExpenseCategoryDto } from '@/types/expense'
 import type { PagedResult } from '@/types/common'
 import {
@@ -181,6 +182,7 @@ import ExpenseCategoryFormModal from '@/components/expenses/ExpenseCategoryFormM
 import { defaultBusinessCalendar } from '@/utils/datetime'
 
 const { success, error: showError } = useToast()
+const { confirmDialog } = useDialog()
 
 // State
 const loading = ref(false)
@@ -273,7 +275,12 @@ const handleFormSubmit = async (data: CreateExpenseCategoryDto) => {
 }
 
 const deleteCategory = async (category: ExpenseCategory) => {
-    if (!confirm(`¿Estás seguro de que quieres eliminar la categoría "${category.name}"?`)) {
+    if (!(await confirmDialog({
+        title: 'Eliminar categoría de gasto',
+        message: `¿Estás seguro de que quieres eliminar la categoría "${category.name}"?`,
+        confirmLabel: 'Eliminar',
+        tone: 'danger',
+    }))) {
         return
     }
 

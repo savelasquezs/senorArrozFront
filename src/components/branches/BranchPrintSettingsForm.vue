@@ -212,6 +212,7 @@ import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseAlert from '@/components/ui/BaseAlert.vue'
 import BaseDialog from '@/components/ui/BaseDialog.vue'
 import { useToast } from '@/composables/useToast'
+import { useDialog } from '@/composables/useDialog'
 
 const props = defineProps<{
     branchId: number
@@ -223,6 +224,7 @@ const emit = defineEmits<{
 }>()
 
 const { success, error: showError } = useToast()
+const { confirmDialog } = useDialog()
 const saving = ref(false)
 const rotating = ref(false)
 const showTokenModal = ref(false)
@@ -333,9 +335,12 @@ async function submit() {
 
 async function onRotateClick() {
     if (
-        !confirm(
-            '¿Generar un nuevo token? Los equipos que usen el token anterior dejarán de conectarse hasta actualizarlo.'
-        )
+        !(await confirmDialog({
+            title: 'Generar nuevo token',
+            message: '¿Generar un nuevo token? Los equipos que usen el token anterior dejarán de conectarse hasta actualizarlo.',
+            confirmLabel: 'Generar token',
+            tone: 'warning',
+        }))
     ) {
         return
     }
@@ -402,7 +407,12 @@ async function uploadLogo() {
 
 async function removeLogo() {
     if (!props.initial?.receiptLogoPath) return
-    if (!confirm('¿Quitar el logo del ticket?')) return
+    if (!(await confirmDialog({
+        title: 'Quitar logo del ticket',
+        message: '¿Quitar el logo del ticket?',
+        confirmLabel: 'Quitar',
+        tone: 'danger',
+    }))) return
     deletingLogo.value = true
     try {
         const res = await branchApi.deleteBranchReceiptLogo(props.branchId)

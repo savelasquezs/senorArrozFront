@@ -79,6 +79,7 @@ import BaseDialog from '@/components/ui/BaseDialog.vue'
 import BaseInput from '@/components/ui/BaseInput.vue'
 import GoogleMapsSelector from '@/components/ui/GoogleMapsSelector.vue'
 import { useToast } from '@/composables/useToast'
+import { useDialog } from '@/composables/useDialog'
 import {
   deliveryAuthorizedPlacesApi,
   type DeliveryAuthorizedPlace,
@@ -86,6 +87,7 @@ import {
 
 const props = defineProps<{ branchId: number }>()
 const { success, error: showError } = useToast()
+const { confirmDialog } = useDialog()
 const places = ref<DeliveryAuthorizedPlace[]>([])
 const loading = ref(false)
 const saving = ref(false)
@@ -167,7 +169,12 @@ async function save() {
 }
 
 async function disable(place: DeliveryAuthorizedPlace) {
-  if (!window.confirm(`¿Desactivar “${place.name}”?`)) return
+  if (!(await confirmDialog({
+    title: 'Desactivar lugar autorizado',
+    message: `¿Desactivar “${place.name}”?`,
+    confirmLabel: 'Desactivar',
+    tone: 'danger',
+  }))) return
   disablingId.value = place.id
   try {
     await deliveryAuthorizedPlacesApi.disable(props.branchId, place.id)

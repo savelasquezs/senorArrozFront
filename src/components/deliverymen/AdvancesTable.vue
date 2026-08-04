@@ -101,6 +101,7 @@
 import { computed } from 'vue'
 import type { DeliverymanAdvance } from '@/types/deliveryman.ts'
 import { useFormatting } from '@/composables/useFormatting'
+import { useDialog } from '@/composables/useDialog'
 import { defaultBusinessCalendar } from '@/utils/datetime'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import { PlusIcon, PencilIcon, TrashIcon, BanknotesIcon } from '@heroicons/vue/24/outline'
@@ -127,8 +128,15 @@ const formatDate = (dateString: string): string =>
 
 const formatTime = (dateString: string): string => formatTimeHm(dateString)
 
-const handleDelete = (advance: DeliverymanAdvance) => {
-    if (confirm(`¿Estás seguro de eliminar este abono de ${formatCurrency(advance.amount)} para ${advance.deliverymanName}?`)) {
+const { confirmDialog } = useDialog()
+
+const handleDelete = async (advance: DeliverymanAdvance) => {
+    if (await confirmDialog({
+        title: 'Eliminar abono',
+        message: `¿Estás seguro de eliminar este abono de ${formatCurrency(advance.amount)} para ${advance.deliverymanName}?`,
+        confirmLabel: 'Eliminar',
+        tone: 'danger',
+    })) {
         emit('delete-advance', advance)
     }
 }

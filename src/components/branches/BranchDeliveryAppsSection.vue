@@ -238,6 +238,7 @@ import BaseLoading from '@/components/ui/BaseLoading.vue'
 import CustomerSelector from '@/components/customers/CustomerSelector.vue'
 import { integrationApi } from '@/services/MainAPI/integrationApi'
 import { appApi } from '@/services/MainAPI/appApi'
+import { useDialog } from '@/composables/useDialog'
 import type { App } from '@/types/bank'
 import type { Customer } from '@/types/customer'
 import type {
@@ -248,6 +249,8 @@ import type {
   RappiMenuPreview,
   UpsertRappiConnection,
 } from '@/types/integrations'
+
+const { confirmDialog } = useDialog()
 
 const props = defineProps<{ branchId: number }>()
 const providers = ref<DeliveryProviderCard[]>([])
@@ -373,7 +376,12 @@ async function save() {
     return
   }
   if (form.stores.some(store => store.manualReadyForPickupEnabled)
-    && !window.confirm('¿Rappi confirmó por escrito READY_FOR_PICKUP manual para las tiendas marcadas?')) {
+    && !(await confirmDialog({
+      title: 'Confirmar READY_FOR_PICKUP manual',
+      message: '¿Rappi confirmó por escrito READY_FOR_PICKUP manual para las tiendas marcadas?',
+      confirmLabel: 'Confirmar',
+      tone: 'warning',
+    }))) {
     return
   }
   saving.value = true
@@ -466,7 +474,12 @@ async function openPreview() {
 }
 
 async function publishMenu() {
-  if (!window.confirm('¿Publicar este menú en la tienda padre 900173116?')) return
+  if (!(await confirmDialog({
+    title: 'Publicar menú en Rappi',
+    message: '¿Publicar este menú en la tienda padre 900173116?',
+    confirmLabel: 'Publicar',
+    tone: 'warning',
+  }))) return
   publishing.value = true
   try {
     await integrationApi.publishRappiMenu(props.branchId)

@@ -94,6 +94,7 @@ import { useBranchPosSettingsStore } from '@/store/branchPosSettings'
 import { useOrderItems } from '@/composables/useOrderItems'
 import { useFormatting } from '@/composables/useFormatting'
 import { useToast } from '@/composables/useToast'
+import { useDialog } from '@/composables/useDialog'
 import { deliveryDiscountBudget } from '@/composables/useFreeDeliveryDiscount'
 import { buildPosOrderCopyMessage, resolveBenefitDiscountPercentage, resolveFreeGiftProductNames } from '@/composables/useOrderCopyMessage'
 
@@ -126,6 +127,7 @@ const emit = defineEmits<{
 // Composables
 const { formatCurrency, formatTime, formatDateShort } = useFormatting()
 const { success, error: showError } = useToast()
+const { confirmDialog } = useDialog()
 const ordersStore = useOrdersDraftsStore()
 const authStore = useAuthStore()
 const branchPosSettings = useBranchPosSettingsStore()
@@ -250,10 +252,15 @@ async function copyOrderSummaryToClipboard() {
     }
 }
 
-const handleClearAll = () => {
+const handleClearAll = async () => {
     if (items.value.length === 0) return
 
-    const confirmed = confirm(`¿Estás seguro de que quieres eliminar todos los productos (${items.value.length}) de este pedido?`)
+    const confirmed = await confirmDialog({
+        title: 'Vaciar pedido',
+        message: `¿Estás seguro de que quieres eliminar todos los productos (${items.value.length}) de este pedido?`,
+        confirmLabel: 'Eliminar todos',
+        tone: 'danger',
+    })
 
     if (confirmed) {
         try {

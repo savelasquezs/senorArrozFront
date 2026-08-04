@@ -227,6 +227,7 @@ import { useAppsStore } from '@/store/apps'
 import { useAppPaymentsStore } from '@/store/appPayments'
 import { useAuthStore } from '@/store/auth'
 import { useToast } from '@/composables/useToast'
+import { useDialog } from '@/composables/useDialog'
 import { requestActualSettlementAmount } from '@/helpers/appPaymentSettlement'
 import type { AppPayment } from '@/types/bank'
 import { defaultBusinessCalendar } from '@/utils/datetime'
@@ -260,6 +261,7 @@ const appsStore = useAppsStore()
 const appPaymentsStore = useAppPaymentsStore()
 const authStore = useAuthStore()
 const { success, error: showError } = useToast()
+const { confirmDialog } = useDialog()
 
 // State
 const showAppForm = ref(false)
@@ -362,7 +364,7 @@ const settlePayment = async (paymentId: number) => {
     try {
         const payment = appPayments.value.find(item => item.id === paymentId)
         if (payment?.expectedNetAmount != null) {
-            const actualAmount = requestActualSettlementAmount(payment.expectedNetAmount, formatCurrency)
+            const actualAmount = await requestActualSettlementAmount(payment.expectedNetAmount, formatCurrency)
             if (actualAmount == null) return
             await appPaymentsStore.settleMultiple({ paymentIds: [paymentId], actualAmount })
         } else {
@@ -382,31 +384,43 @@ const settleSelectedPayments = async () => {
     const selected = appPayments.value.filter(p => selectedPayments.value.includes(p.id))
     const totalAmount = selected.reduce((sum, p) => sum + (p.expectedNetAmount ?? p.amount), 0)
 
-    const confirmMessage = `¿Estás seguro de liquidar ${selectedPayments.value.length} pagos por un total de ${formatCurrency(totalAmount)}?`
+    try {
+        if (selected.some(payment => payment.expectedNetAmount != null)) {
+            const actualAmount = await requestActualSettlementAmount(totalAmount, formatCurrency, {
+                description: `Vas a liquidar ${selectedPayments.value.length} pagos.`,
+            })
+            if (actualAmount == null) return
+            await appPaymentsStore.settleMultiple({ paymentIds: selectedPayments.value, actualAmount })
+        } else {
+            const confirmed = await confirmDialog({
+                title: 'Liquidar pagos seleccionados',
+                message: `¿Estás seguro de liquidar ${selectedPayments.value.length} pagos por un total de ${formatCurrency(totalAmount)}?`,
+                confirmLabel: 'Liquidar',
+            })
+            if (!confirmed) return
 
-    if (confirm(confirmMessage)) {
-        try {
-            if (selected.some(payment => payment.expectedNetAmount != null)) {
-                const actualAmount = requestActualSettlementAmount(totalAmount, formatCurrency)
-                if (actualAmount == null) return
-                await appPaymentsStore.settleMultiple({ paymentIds: selectedPayments.value, actualAmount })
-            } else if (selectedPayments.value.length === 1) {
+            if (selectedPayments.value.length === 1) {
                 await appPaymentsStore.settle(selectedPayments.value[0])
             } else {
                 await appPaymentsStore.settleMultiple({ paymentIds: selectedPayments.value })
             }
-
-            success('Pagos liquidados', 3000, `${selectedPayments.value.length} pagos se han liquidado correctamente`)
-            await fetchAppPayments()
-            selectedPayments.value = []
-        } catch (error: any) {
-            showError('Error', error.message || 'No se pudieron liquidar los pagos')
         }
+
+        success('Pagos liquidados', 3000, `${selectedPayments.value.length} pagos se han liquidado correctamente`)
+        await fetchAppPayments()
+        selectedPayments.value = []
+    } catch (error: any) {
+        showError('Error', error.message || 'No se pudieron liquidar los pagos')
     }
 }
 
 const unsettlePayment = async (paymentId: number) => {
-    if (confirm('¿Estás seguro de desliquidar este pago?')) {
+    if (await confirmDialog({
+        title: 'Desliquidar pago',
+        message: '¿Estás seguro de desliquidar este pago?',
+        confirmLabel: 'Desliquidar',
+        tone: 'warning',
+    })) {
         try {
             await appPaymentsStore.unsettle(paymentId)
             success('Pago desliquidado', 3000, 'El pago se ha desliquidado correctamente')
@@ -418,7 +432,12 @@ const unsettlePayment = async (paymentId: number) => {
 }
 
 const deleteAppPayment = async (paymentId: number) => {
-    if (confirm('¿Estás seguro de que quieres eliminar este pago?')) {
+    if (await confirmDialog({
+        title: 'Eliminar pago',
+        message: '¿Estás seguro de que quieres eliminar este pago?',
+        confirmLabel: 'Eliminar',
+        tone: 'danger',
+    })) {
         try {
             await appPaymentsStore.remove(paymentId)
             success('Pago eliminado', 3000, 'El pago se ha eliminado correctamente')

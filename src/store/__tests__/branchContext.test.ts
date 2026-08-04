@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { useBranchContextStore } from '../branchContext'
 import { getSelectedBranchIdForRequest } from '@/services/branchContextSession'
 import { UserRole, type User } from '@/types/auth'
+import { __resetDialogsForTests, useDialog } from '@/composables/useDialog'
 
 const { branchApiMock } = vi.hoisted(() => ({
     branchApiMock: {
@@ -27,6 +28,7 @@ const superadmin: User = {
 
 describe('branch context store', () => {
     beforeEach(() => {
+        __resetDialogsForTests()
         setActivePinia(createPinia())
         localStorage.clear()
         vi.clearAllMocks()
@@ -70,7 +72,7 @@ describe('branch context store', () => {
         const store = useBranchContextStore()
         await store.initializeForUser(superadmin)
 
-        expect(store.selectBranch(superadmin, 2)).toBe(true)
+        expect(await store.selectBranch(superadmin, 2)).toBe(true)
 
         expect(store.selectedBranchId).toBe(2)
         expect(store.revision).toBe(1)
@@ -87,5 +89,47 @@ describe('branch context store', () => {
         expect(branchApiMock.getBranchOptions).not.toHaveBeenCalled()
         expect(store.selectedBranchId).toBe(7)
         expect(getSelectedBranchIdForRequest()).toBeNull()
+    })
+
+    it('keeps the branch and dirty state when discarding changes is cancelled', async () => {
+        const store = useBranchContextStore()
+        const dialog = useDialog()
+        await store.initializeForUser(superadmin)
+        store.markDirty('branch-form', true)
+
+        const selection = store.selectBranch(superadmin, 2)
+
+        expect(dialog.activeDialog.value?.options.title).toBe('Descartar cambios sin guardar')
+        dialog.cancelDialog()
+        await expect(selection).resolves.toBe(false)
+        expect(store.selectedBranchId).toBe(1)
+        expect(store.hasDirtyForms).toBe(true)
+        expect(store.revision).toBe(0)
+    })
+
+    it('clears dirty state and changes branch after confirming discard', async () => {
+        const store = useBranchContextStore()
+        const dialog = useDialog()
+        await store.initializeForUser(superadmin)
+        store.markDirty('branch-form', true)
+
+        const selection = store.selectBranch(superadmin, 2)
+        dialog.resolveDialog(true)
+
+        await expect(selection).resolves.toBe(true)
+        expect(store.selectedBranchId).toBe(2)
+        expect(store.hasDirtyForms).toBe(false)
+        expect(store.revision).toBe(1)
+    })
+
+    it('bypasses the dialog when branch selection is forced', async () => {
+        const store = useBranchContextStore()
+        const dialog = useDialog()
+        await store.initializeForUser(superadmin)
+        store.markDirty('branch-form', true)
+
+        await expect(store.selectBranch(superadmin, 2, { force: true })).resolves.toBe(true)
+        expect(dialog.activeDialog.value).toBeNull()
+        expect(store.hasDirtyForms).toBe(false)
     })
 })

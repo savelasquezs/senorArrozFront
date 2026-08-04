@@ -6,6 +6,7 @@ import {
     setSelectedBranchIdForRequest,
 } from '@/services/branchContextSession'
 import { UserRole, type User } from '@/types/auth'
+import { useDialog } from '@/composables/useDialog'
 
 export interface BranchOption {
     id: number
@@ -15,6 +16,7 @@ export interface BranchOption {
 const storageKey = (userId: number) => `senor-arroz:selected-branch:${userId}`
 
 export const useBranchContextStore = defineStore('branchContext', () => {
+    const { confirmDialog } = useDialog()
     const options = ref<BranchOption[]>([])
     const selectedBranchId = ref<number | null>(null)
     const initializedUserId = ref<number | null>(null)
@@ -103,14 +105,19 @@ export const useBranchContextStore = defineStore('branchContext', () => {
         }
     }
 
-    function selectBranch(user: User, branchId: number, options?: { force?: boolean }): boolean {
+    async function selectBranch(user: User, branchId: number, options?: { force?: boolean }): Promise<boolean> {
         if (!Number.isInteger(branchId) || !hasBranch(branchId)) return false
         if (selectedBranchId.value === branchId) return true
 
         if (
             !options?.force
             && hasDirtyForms.value
-            && !window.confirm('Hay cambios sin guardar. ¿Deseas cambiar de sucursal y descartarlos?')
+            && !(await confirmDialog({
+                title: 'Descartar cambios sin guardar',
+                message: 'Hay cambios sin guardar. ¿Deseas cambiar de sucursal y descartarlos?',
+                confirmLabel: 'Descartar y cambiar',
+                tone: 'warning',
+            }))
         ) {
             return false
         }

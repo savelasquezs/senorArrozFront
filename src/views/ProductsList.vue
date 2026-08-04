@@ -165,6 +165,7 @@ import { useProductsStore } from '@/store/products'
 import { useProductCategoriesStore } from '@/store/productCategories'
 import { useAuthStore } from '@/store/auth'
 import { useToast } from '@/composables/useToast'
+import { useDialog } from '@/composables/useDialog'
 import { useRoute, useRouter } from 'vue-router'
 
 import MainLayout from '@/components/layout/MainLayout.vue'
@@ -203,6 +204,7 @@ const auth = useAuthStore()
 const route = useRoute()
 const router = useRouter()
 const { success, error: showError } = useToast()
+const { confirmDialog } = useDialog()
 
 const listLoading = ref(true)
 const detailOpen = ref(false)
@@ -368,7 +370,12 @@ const handleFormSubmit = async (data: ProductFormData) => {
 }
 
 const deleteProduct = async (product: Product) => {
-    if (!confirm(`¿Estás seguro de que quieres eliminar el producto "${product.name}"?`)) {
+    if (!(await confirmDialog({
+        title: 'Eliminar producto',
+        message: `¿Estás seguro de que quieres eliminar el producto "${product.name}"?`,
+        confirmLabel: 'Eliminar',
+        tone: 'danger',
+    }))) {
         return
     }
 

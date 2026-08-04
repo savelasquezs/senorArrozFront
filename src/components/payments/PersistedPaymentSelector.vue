@@ -384,7 +384,7 @@ const handleSettlePayment = async (paymentId: number) => {
     try {
         const payment = appPayments.value.find(item => item.id === paymentId)
         if (payment?.expectedNetAmount != null) {
-            const actualAmount = requestActualSettlementAmount(payment.expectedNetAmount, formatCurrency)
+            const actualAmount = await requestActualSettlementAmount(payment.expectedNetAmount, formatCurrency)
             if (actualAmount == null) return
             await appPaymentApi.settleMultipleAppPayments({ paymentIds: [paymentId], actualAmount })
         } else {

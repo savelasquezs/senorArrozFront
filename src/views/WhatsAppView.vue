@@ -656,6 +656,7 @@ import { useOrdersDraftsStore } from '@/store/ordersDrafts'
 import { customerApi } from '@/services/MainAPI/customerApi'
 import { whatsappApi } from '@/services/MainAPI/whatsappApi'
 import { useToast } from '@/composables/useToast'
+import { useDialog } from '@/composables/useDialog'
 import { useSignalR } from '@/composables/useSignalR'
 import { WHATSAPP_SIGNALR_HUB_URL } from '@/config/signalr'
 import type {
@@ -687,6 +688,7 @@ const ordersStore = useOrdersDraftsStore()
 const router = useRouter()
 const route = useRoute()
 const { success, error: showError } = useToast()
+const { confirmDialog } = useDialog()
 const {
   connectionState,
   error: signalRError,
@@ -859,9 +861,12 @@ async function changeAttention(action: 'take' | 'return-to-ai' | 'pause-ai' | 'c
 async function resetConversationForTesting() {
   const conversation = selectedConversation.value
   if (!conversation) return
-  const confirmed = window.confirm(
-    'Se borrarán todos los mensajes y el carrito/contexto de IA de esta conversación. El cliente y sus direcciones se conservarán. ¿Reiniciar la prueba?',
-  )
+  const confirmed = await confirmDialog({
+    title: 'Reiniciar conversación de prueba',
+    message: 'Se borrarán todos los mensajes y el carrito/contexto de IA de esta conversación. El cliente y sus direcciones se conservarán. ¿Reiniciar la prueba?',
+    confirmLabel: 'Reiniciar',
+    tone: 'danger',
+  })
   if (!confirmed) return
 
   try {
@@ -1375,7 +1380,12 @@ async function saveQuickReply() {
 }
 
 async function removeQuickReply(reply: WhatsAppQuickReply) {
-  if (!window.confirm(`¿Eliminar /${reply.shortcut}?`)) return
+  if (!(await confirmDialog({
+    title: 'Eliminar respuesta rápida',
+    message: `¿Eliminar /${reply.shortcut}?`,
+    confirmLabel: 'Eliminar',
+    tone: 'danger',
+  }))) return
   try {
     await whatsappStore.deleteQuickReply(reply.id)
     if (editingQuickReply.value?.id === reply.id) resetQuickReplyForm()

@@ -49,7 +49,7 @@ const changing = ref(false)
 async function changeBranch(event: Event) {
 	const user = authStore.user
 	const branchId = Number((event.target as HTMLSelectElement).value)
-	if (!user || !branchContext.selectBranch(user, branchId)) {
+	if (!user || !(await branchContext.selectBranch(user, branchId))) {
 		;(event.target as HTMLSelectElement).value = String(branchContext.selectedBranchId ?? '')
 		return
 	}

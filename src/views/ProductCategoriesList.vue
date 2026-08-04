@@ -132,6 +132,7 @@ import { useProductCategoriesStore } from '@/store/productCategories'
 import { useBranchesStore } from '@/store/branches'
 import { useAuthStore } from '@/store/auth'
 import { useToast } from '@/composables/useToast'
+import { useDialog } from '@/composables/useDialog'
 
 import MainLayout from '@/components/layout/MainLayout.vue'
 import BaseCard from '@/components/ui/BaseCard.vue'
@@ -163,6 +164,7 @@ const store = useProductCategoriesStore()
 const branchesStore = useBranchesStore()
 const auth = useAuthStore()
 const { success, error: showError } = useToast()
+const { confirmDialog } = useDialog()
 
 const filters = ref({
     name: '',
@@ -266,7 +268,12 @@ const handleFormSubmit = async (data: ProductCategoryFormData & { branchId?: num
 }
 
 const deleteCategory = async (category: ProductCategory) => {
-    if (!confirm(`¿Estás seguro de que quieres eliminar la categoría "${category.name}"?`)) {
+    if (!(await confirmDialog({
+        title: 'Eliminar categoría',
+        message: `¿Estás seguro de que quieres eliminar la categoría "${category.name}"?`,
+        confirmLabel: 'Eliminar',
+        tone: 'danger',
+    }))) {
         return
     }
 

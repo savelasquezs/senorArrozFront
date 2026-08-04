@@ -277,6 +277,7 @@ import BasePaginatiopn from '@/components/ui/BasePaginatiopn.vue'
 import { businessDocumentsApi } from '@/services/MainAPI/businessDocumentsApi'
 import { useAuthStore } from '@/store/auth'
 import { useToast } from '@/composables/useToast'
+import { useDialog } from '@/composables/useDialog'
 import { resolveBusinessDocumentPublicUrl } from '@/utils/businessDocumentUrl'
 import type { BusinessDocument, BusinessDocumentFilters } from '@/types/businessDocument'
 import type { PagedResult } from '@/types/common'
@@ -328,6 +329,7 @@ const DocumentActions = defineComponent({
 
 const authStore = useAuthStore()
 const toast = useToast()
+const { confirmDialog } = useDialog()
 const loading = ref(false)
 const loadError = ref('')
 const pageData = ref<PagedResult<BusinessDocument> | null>(null)
@@ -460,7 +462,12 @@ async function saveDocument() {
 }
 
 async function confirmDelete(document: BusinessDocument) {
-  if (!window.confirm(`¿Eliminar "${document.name}"? El QR dejará de funcionar.`)) return
+  if (!(await confirmDialog({
+    title: 'Eliminar documento',
+    message: `¿Eliminar "${document.name}"? El QR dejará de funcionar.`,
+    confirmLabel: 'Eliminar',
+    tone: 'danger',
+  }))) return
   try {
     await businessDocumentsApi.deleteDocument(document.id)
     toast.success('Documento eliminado', 3500)

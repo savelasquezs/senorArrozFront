@@ -420,6 +420,7 @@ import { useAuthStore } from '@/store/auth'
 import { useBranchContextStore } from '@/store/branchContext'
 import { resetBranchScopedState } from '@/utils/branchScopedState'
 import { useToast } from '@/composables/useToast'
+import { useDialog } from '@/composables/useDialog'
 import { defaultBusinessCalendar } from '@/utils/datetime'
 import MainLayout from '@/components/layout/MainLayout.vue'
 import BaseCard from '@/components/ui/BaseCard.vue'
@@ -486,6 +487,7 @@ const expenseCategoriesCatalogStore = useExpenseCategoriesCatalogStore()
 const authStore = useAuthStore()
 const branchContext = useBranchContextStore()
 const { success, error: showError } = useToast()
+const { confirmDialog } = useDialog()
 
 // Reactive state
 const showEditDialog = ref(false)
@@ -682,9 +684,12 @@ const handleNeighborhoodSubmit = async (data: NeighborhoodFormData) => {
 const confirmDeleteNeighborhood = async (neighborhood: NeighborhoodSummary) => {
     if (!canManageNeighborhoods.value) return
     if (
-        !confirm(
-            `¿Eliminar el barrio "${neighborhood.name}"? No podrás si tiene direcciones o pedidos asociados.`
-        )
+        !(await confirmDialog({
+            title: 'Eliminar barrio',
+            message: `¿Eliminar el barrio "${neighborhood.name}"? No podrás si tiene direcciones o pedidos asociados.`,
+            confirmLabel: 'Eliminar',
+            tone: 'danger',
+        }))
     ) {
         return
     }
@@ -825,7 +830,12 @@ const handleBankSubmit = async (formData: BankFormData) => {
 }
 
 const deleteBank = async (bank: Bank) => {
-    if (confirm(`¿Estás seguro de que deseas eliminar el banco "${bank.name}"?`)) {
+    if (await confirmDialog({
+        title: 'Eliminar banco',
+        message: `¿Estás seguro de que deseas eliminar el banco "${bank.name}"?`,
+        confirmLabel: 'Eliminar',
+        tone: 'danger',
+    })) {
         try {
             await banksStore.remove(bank.id)
             success('Banco eliminado', 3000, `El banco "${bank.name}" se ha eliminado correctamente`)
@@ -863,7 +873,12 @@ const handleAppSubmit = async (formData: AppFormData) => {
 }
 
 const deleteApp = async (app: App) => {
-    if (confirm(`¿Estás seguro de que deseas eliminar la app "${app.name}"?`)) {
+    if (await confirmDialog({
+        title: 'Eliminar app',
+        message: `¿Estás seguro de que deseas eliminar la app "${app.name}"?`,
+        confirmLabel: 'Eliminar',
+        tone: 'danger',
+    })) {
         try {
             await appsStore.remove(app.id)
             success('App eliminada', 3000, `La app "${app.name}" se ha eliminado correctamente`)
@@ -926,7 +941,12 @@ const handleSupplierSubmit = async (data: CreateSupplierDto) => {
 
 const deleteSupplier = async (supplier: Supplier) => {
     if (!canManageSuppliers.value) return
-    if (!confirm(`¿Estás seguro de que deseas eliminar el proveedor "${supplier.name}"?`)) return
+    if (!(await confirmDialog({
+        title: 'Eliminar proveedor',
+        message: `¿Estás seguro de que deseas eliminar el proveedor "${supplier.name}"?`,
+        confirmLabel: 'Eliminar',
+        tone: 'danger',
+    }))) return
 
     try {
         await supplierApi.deleteSupplier(supplier.id)
@@ -1033,7 +1053,12 @@ const handleExpenseCategorySubmit = async (data: CreateExpenseCategoryDto) => {
 }
 
 const deleteExpenseCategory = async (category: ExpenseCategory) => {
-    if (!confirm(`¿Estás seguro de que deseas eliminar la categoría "${category.name}"?`)) {
+    if (!(await confirmDialog({
+        title: 'Eliminar categoría de gasto',
+        message: `¿Estás seguro de que deseas eliminar la categoría "${category.name}"?`,
+        confirmLabel: 'Eliminar',
+        tone: 'danger',
+    }))) {
         return
     }
     try {
@@ -1126,7 +1151,12 @@ const handleExpenseSubmit = async (data: CreateExpenseDto | UpdateExpenseDto) =>
 }
 
 const deleteExpense = async (expense: Expense) => {
-    if (!confirm(`¿Estás seguro de que deseas eliminar el gasto "${expense.name}"?`)) {
+    if (!(await confirmDialog({
+        title: 'Eliminar gasto',
+        message: `¿Estás seguro de que deseas eliminar el gasto "${expense.name}"?`,
+        confirmLabel: 'Eliminar',
+        tone: 'danger',
+    }))) {
         return
     }
     try {
@@ -1218,7 +1248,7 @@ async function loadBranchPageData() {
         && authStore.user
         && branchContext.selectedBranchId !== branchId.value
     ) {
-        if (!branchContext.selectBranch(authStore.user, branchId.value)) {
+        if (!(await branchContext.selectBranch(authStore.user, branchId.value))) {
             await router.replace('/branches')
             return
         }

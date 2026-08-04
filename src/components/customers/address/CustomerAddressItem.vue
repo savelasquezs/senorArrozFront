@@ -51,6 +51,7 @@ import type { Customer, CustomerAddress } from '@/types/customer'
 import { useFormatting } from '@/composables/useFormatting'
 import { useCustomersStore } from '@/store/customers'
 import { useToast } from '@/composables/useToast'
+import { useDialog } from '@/composables/useDialog'
 
 // Components
 import BaseButton from '@/components/ui/BaseButton.vue'
@@ -81,6 +82,7 @@ const emit = defineEmits<{
 // Composables
 const { formatCurrency } = useFormatting()
 const { success, error: showError } = useToast()
+const { confirmDialog } = useDialog()
 const customersStore = useCustomersStore()
 
 // Methods
@@ -98,8 +100,12 @@ const handleSetPrimary = async () => {
 }
 
 const handleDeleteAddress = async () => {
-    // Show confirmation dialog
-    const confirmed = confirm(`¿Estás seguro de que quieres eliminar la dirección "${props.address.address}"?`)
+    const confirmed = await confirmDialog({
+        title: 'Eliminar dirección',
+        message: `¿Estás seguro de que quieres eliminar la dirección "${props.address.address}"?`,
+        confirmLabel: 'Eliminar',
+        tone: 'danger',
+    })
 
     if (!confirmed) return
 

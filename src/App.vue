@@ -8,6 +8,7 @@
           : `${route.fullPath}:${branchContext.revision}`"
       />
     </router-view>
+    <DialogHost />
   </div>
 </template>
 
@@ -15,6 +16,7 @@
 import { onMounted } from 'vue'
 import { useAuthStore } from '@/store/auth'
 import { useBranchContextStore } from '@/store/branchContext'
+import DialogHost from '@/components/ui/DialogHost.vue'
 
 const authStore = useAuthStore()
 const branchContext = useBranchContextStore()

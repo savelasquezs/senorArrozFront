@@ -280,7 +280,7 @@ const clearFilters = async () => {
 }
 
 const goDetail = async (id: number) => {
-    if (auth.user && branchContext.selectBranch(auth.user, id)) {
+    if (auth.user && await branchContext.selectBranch(auth.user, id)) {
         resetBranchScopedState(id)
         await router.push({ name: 'BranchDetail', params: { id } })
     }
@@ -322,7 +322,7 @@ const submitCreate = async (data: {
         success('Sucursal creada', 3000, `La sucursal "${data.name}" se ha creado correctamente`)
         if (auth.user) {
             await branchContext.refreshOptions(auth.user)
-            if (branchContext.selectBranch(auth.user, created.id, { force: true })) {
+            if (await branchContext.selectBranch(auth.user, created.id, { force: true })) {
                 resetBranchScopedState(created.id)
             }
         }
