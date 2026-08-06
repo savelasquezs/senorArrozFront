@@ -2,8 +2,8 @@ import type { PagedResult } from './common'
 
 export interface Supplier {
     id: number
-    branchId: number
-    branchName: string
+    branchId?: number | null
+    branchName?: string | null
     name: string
     phone: string
     address?: string | null
@@ -28,7 +28,6 @@ export interface UpdateSupplierDto {
 
 export interface SupplierFilters {
     search?: string
-    branchId?: number
     page?: number
     pageSize?: number
     sortBy?: string

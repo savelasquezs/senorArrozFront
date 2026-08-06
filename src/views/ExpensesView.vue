@@ -445,7 +445,7 @@ const loadFilterOptions = async () => {
             .sort((a, b) => a.label.localeCompare(b.label))
 
         availableSupplierOptions.value = suppliers
-            .map(supplier => ({ value: supplier.id, label: supplier.name }))
+            .map(supplier => ({ value: supplier.id, label: `${supplier.name} - ${supplier.phone}` }))
             .sort((a, b) => a.label.localeCompare(b.label))
 
         availableBankOptions.value = (banksResponse.items || [])
