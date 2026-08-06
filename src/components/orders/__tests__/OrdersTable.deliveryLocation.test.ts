@@ -18,6 +18,7 @@ vi.mock('@/composables/useOrderPermissions', () => ({
         canUncancel: () => false,
         canEditPayments: () => false,
         canVerifyPayments: () => false,
+        canUnverifyPayments: () => false,
         canSettleAppPayments: () => false,
     }),
 }))

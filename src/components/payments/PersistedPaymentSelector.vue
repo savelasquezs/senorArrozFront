@@ -94,7 +94,8 @@
 
             <!-- Existing Bank Payments -->
             <OrderBankPaymentRow v-for="payment in bankPayments" :key="payment.id" :payment="payment"
-                density="comfortable" variant="panel" :show-verify-actions="canVerify" :show-edit-remove="canEdit"
+                density="comfortable" variant="panel" :show-verify-action="canVerify"
+                :show-unverify-action="canUnverify" :show-edit-remove="canEdit"
                 :show-verification-badge="true" @verify="handleVerifyPayment" @unverify="handleUnverifyPayment"
                 @edit="handleEditBankPayment" @remove="onRemoveBankPaymentRow" />
         </div>
@@ -256,6 +257,7 @@ const {
 // Computed para permisos
 const canEdit = computed(() => permissions.canEditPayments(props.order))
 const canVerify = computed(() => permissions.canVerifyPayments())
+const canUnverify = computed(() => permissions.canUnverifyPayments())
 const canSettle = computed(() => permissions.canSettleAppPayments())
 
 // State

@@ -127,6 +127,14 @@ export function useOrderPermissions() {
      */
     const canVerifyPayments = (): boolean => {
         const role = authStore.userRole
+        return role === 'Superadmin' || role === 'Admin' || role === 'Cashier'
+    }
+
+    /**
+     * Revertir una verificación sigue siendo una corrección administrativa.
+     */
+    const canUnverifyPayments = (): boolean => {
+        const role = authStore.userRole
         return role === 'Superadmin' || role === 'Admin'
     }
 
@@ -341,6 +349,7 @@ export function useOrderPermissions() {
         canEditProducts,
         canEditPayments,
         canVerifyPayments,
+        canUnverifyPayments,
         canReprintThermalTickets,
         canSettleAppPayments,
         canUncancel,

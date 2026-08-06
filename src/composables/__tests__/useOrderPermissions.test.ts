@@ -95,6 +95,39 @@ describe('useOrderPermissions — canEditPayments', () => {
     })
 })
 
+describe('useOrderPermissions — verificación de pagos bancarios', () => {
+    beforeEach(() => {
+        setActivePinia(createPinia())
+        const auth = useAuthStore()
+        auth.user = {
+            id: 1,
+            name: 'Caja',
+            email: 'caja@test.com',
+            phone: '',
+            active: true,
+            role: UserRole.CASHIER,
+            branchId: 1,
+            branchName: 'B',
+        }
+    })
+
+    it('permite al cajero verificar, pero no desverificar', () => {
+        const { canVerifyPayments, canUnverifyPayments } = useOrderPermissions()
+        expect(canVerifyPayments()).toBe(true)
+        expect(canUnverifyPayments()).toBe(false)
+    })
+
+    it.each([UserRole.ADMIN, UserRole.SUPERADMIN])('%s puede verificar y desverificar', (role) => {
+        const auth = useAuthStore()
+        if (!auth.user) throw new Error('expected user')
+        auth.user = { ...auth.user, role }
+
+        const { canVerifyPayments, canUnverifyPayments } = useOrderPermissions()
+        expect(canVerifyPayments()).toBe(true)
+        expect(canUnverifyPayments()).toBe(true)
+    })
+})
+
 describe('useOrderPermissions - canUncancel', () => {
     beforeEach(() => {
         setActivePinia(createPinia())

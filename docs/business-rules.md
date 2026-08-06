@@ -42,7 +42,9 @@ enum UserRole {
 | Gestión de bancos | ✅ | ✅ | ❌ | ❌ | ❌ |
 | Gestión de apps | ✅ | ✅ | ❌ | ❌ | ❌ |
 | Liquidar apps | ✅ | ✅ | ❌ | ❌ | ❌ |
-| Confirmar transferencias | ✅ | ✅ | ❌ | ❌ | ❌ |
+| Confirmar transferencias | ✅ | ✅ | ✅ | ❌ | ❌ |
+| Desconfirmar transferencias | ✅ | ✅ | ❌ | ❌ | ❌ |
+| Movimientos banco↔banco / banco↔efectivo | ✅ | ✅ | ✅ | ❌ | ❌ |
 | **Módulo de Cocina** | | | | | |
 | Ver pedidos en preparación | ✅ | ✅ | ❌ | ✅ | ❌ |
 | Cambiar estado a "Ready" | ✅ | ✅ | ❌ | ✅ | ❌ |
@@ -72,6 +74,8 @@ enum UserRole {
 - **Asignación**: Puede asignar/desasignar domiciliarios solo para pedidos del mismo día
 - **Abonos**: Crear abonos parciales y liquidaciones de domiciliarios
 - **Caja**: Hacer cuadre de caja diario
+- **Pagos bancarios**: Puede verificar transferencias pendientes de su sucursal, pero no revertir una verificación
+- **Movimientos bancarios**: Desde el cuadre puede consultar y registrar movimientos banco↔banco o banco↔efectivo de su sucursal
 
 #### Kitchen
 - **Vista simplificada**: Solo ve pedidos en preparación

@@ -15,6 +15,14 @@
           </p>
         </div>
         <div class="flex items-center gap-2">
+          <BaseButton
+            variant="outline"
+            size="sm"
+            :disabled="activeBranchId == null"
+            @click="showBankTransfersModal = true"
+          >
+            <ArrowsRightLeftIcon class="w-4 h-4 mr-1" /> Movimientos Bancos
+          </BaseButton>
           <BaseButton variant="primary" size="sm" @click="openCreateExpenseModal">
             <PlusIcon class="w-4 h-4 mr-1" /> Nuevo gasto
           </BaseButton>
@@ -455,6 +463,12 @@
 
     <CashClosureHistoryModal v-model="showHistoryModal" :branch-id="activeBranchId" />
     <CashVaultMovementHistoryModal v-model="showVaultHistoryModal" :branch-id="activeBranchId" />
+    <BankTransfersModal
+      v-if="activeBranchId != null"
+      v-model="showBankTransfersModal"
+      :branch-id="activeBranchId"
+      @saved="onBankTransferSaved"
+    />
     <ExpenseFormModal v-if="showExpenseFormModal" :is-open="showExpenseFormModal" @close="closeExpenseFormModal"
       @submit="onExpenseSaved" />
 
@@ -597,6 +611,7 @@ import BaseDialog from '@/components/ui/BaseDialog.vue'
 import CashClosureHistoryModal from '@/components/cashRegister/CashClosureHistoryModal.vue'
 import CashVaultMovementHistoryModal from '@/components/cashRegister/CashVaultMovementHistoryModal.vue'
 import DeliveryAdvanceLoanModal from '@/components/cashRegister/DeliveryAdvanceLoanModal.vue'
+import BankTransfersModal from '@/components/cashRegister/BankTransfersModal.vue'
 import ExpenseFormModal from '@/components/expenses/ExpenseFormModal.vue'
 import BankMovementsPanel from '@/components/payments/banks/BankMovementsPanel.vue'
 import { useAuthStore } from '@/store/auth'
@@ -605,6 +620,7 @@ import { formatYmdBogota } from '@/utils/colombiaDate'
 import { defaultBusinessCalendar } from '@/utils/datetime'
 import {
   ArrowPathIcon,
+  ArrowsRightLeftIcon,
   BanknotesIcon,
   BuildingLibraryIcon,
   ChevronDownIcon,
@@ -632,6 +648,7 @@ const { success: toastSuccess, error: toastError } = useToast()
 
 const showHistoryModal = ref(false)
 const showVaultHistoryModal = ref(false)
+const showBankTransfersModal = ref(false)
 const showExpenseFormModal = ref(false)
 const canViewClosureHistory = computed(() => authStore.isAdmin || authStore.isSuperadmin)
 const showCashVaultBalance = ref(false)
@@ -1050,6 +1067,17 @@ async function onExpenseSaved(_expense: ExpenseHeader) {
   } catch (e: any) {
     console.error('Error actualizando cuadre tras guardar gasto:', e)
     toastError('No se pudo actualizar el cuadre', e.message || 'Actualiza manualmente para ver el nuevo gasto.')
+  }
+}
+
+async function onBankTransferSaved() {
+  showBankTransfersModal.value = false
+  toastSuccess('Movimiento bancario registrado', 5000, 'El cuadre se actualizó con los nuevos saldos esperados.')
+  try {
+    await refreshExpectedPreservingBankActuals()
+  } catch (e: any) {
+    console.error('Error actualizando cuadre tras guardar movimiento bancario:', e)
+    toastError('No se pudo actualizar el cuadre', e.message || 'Actualiza manualmente para ver el movimiento.')
   }
 }
 

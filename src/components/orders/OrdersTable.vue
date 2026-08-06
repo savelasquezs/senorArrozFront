@@ -223,7 +223,8 @@
                             <div v-if="order.bankPayments && order.bankPayments.length > 0" class="space-y-1">
                                 <OrderBankPaymentRow v-for="payment in order.bankPayments" :key="payment.id"
                                     :payment="payment" density="compact" variant="table"
-                                    :show-verify-actions="showVerifyBankActions(order)"
+                                    :show-verify-action="showVerifyBankAction(order)"
+                                    :show-unverify-action="showUnverifyBankAction(order)"
                                     :show-edit-remove="permissions.canEditPayments(order)"
                                     :show-verification-badge="false" @verify="emit('verify-bank-payment', order, payment)"
                                     @unverify="emit('verify-bank-payment', order, payment)"
@@ -492,8 +493,11 @@ const formatDate = (dateString: string): string => defaultBusinessCalendar.forma
 
 const formatTime = (dateString: string): string => defaultBusinessCalendar.formatTime12h(dateString)
 
-const showVerifyBankActions = (order: OrderListItem): boolean =>
+const showVerifyBankAction = (order: OrderListItem): boolean =>
     permissions.canVerifyPayments() && order.status !== 'cancelled'
+
+const showUnverifyBankAction = (order: OrderListItem): boolean =>
+    permissions.canUnverifyPayments() && order.status !== 'cancelled'
 
 const showSettleAppActions = (order: OrderListItem): boolean =>
     props.enableAppSettleQuickAction &&

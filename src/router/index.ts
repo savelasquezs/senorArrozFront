@@ -328,16 +328,6 @@ const routes: RouteRecordRaw[] = [
         }
     },
     {
-        path: '/bank-transfers',
-        name: 'BankTransfers',
-        component: () => import('@/views/BankTransfersView.vue'),
-        meta: {
-            requiresAuth: true,
-            requiresRole: [UserRole.SUPERADMIN, UserRole.ADMIN],
-            title: 'Movimientos entre Bancos'
-        }
-    },
-    {
         path: '/profile',
         name: 'Profile',
         component: () => import('@/views/Profile.vue'),

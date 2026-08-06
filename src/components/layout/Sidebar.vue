@@ -123,7 +123,6 @@ import {
 	BriefcaseIcon,
 	ShoppingBagIcon,
 	BanknotesIcon,
-	ArrowsRightLeftIcon,
 	ClipboardDocumentListIcon,
 	DocumentTextIcon,
 	ChatBubbleLeftRightIcon,
@@ -351,12 +350,6 @@ const navigationItems = computed((): NavItem[] => [
 		roles: ['Superadmin', 'Admin', 'Cashier'],
 		requiresWhatsApp: true,
 		exactPath: true,
-	},
-	{
-		name: 'Movimientos Bancos',
-		to: '/bank-transfers',
-		icon: ArrowsRightLeftIcon,
-		roles: ['Superadmin', 'Admin'],
 	},
 	{
 		name: 'Documentos',

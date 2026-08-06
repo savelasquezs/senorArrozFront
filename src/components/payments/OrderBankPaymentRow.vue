@@ -4,18 +4,18 @@
         <div class="flex items-center gap-1 min-w-0 flex-1">
             <component :is="leadIcon" :class="compactIconClass" />
             <span class="font-medium truncate min-w-0 flex-1 text-left" :title="bankDisplayName">{{ bankDisplayName }}</span>
-            <span v-if="showVerifyActions && payment.isVerified" class="shrink-0 text-green-600" title="Verificado">
+            <span v-if="(showVerifyAction || showUnverifyAction) && payment.isVerified" class="shrink-0 text-green-600" title="Verificado">
                 <CheckCircleIcon class="w-3 h-3" />
             </span>
             <span :class="compactAmountClass">{{ formatCurrency(payment.amount) }}</span>
         </div>
         <div class="flex items-center shrink-0 gap-0.5">
-            <button v-if="showVerifyActions && !payment.isVerified" type="button"
+            <button v-if="showVerifyAction && !payment.isVerified" type="button"
                 class="p-0.5 rounded text-gray-500 hover:bg-gray-100 transition-colors" title="Verificar pago"
                 @click.stop="emit('verify', payment.id)">
                 <CheckIcon class="w-3.5 h-3.5 text-emerald-600" />
             </button>
-            <button v-if="showVerifyActions && payment.isVerified" type="button"
+            <button v-if="showUnverifyAction && payment.isVerified" type="button"
                 class="p-0.5 rounded text-gray-500 hover:bg-gray-100 transition-colors" title="Desverificar pago"
                 @click.stop="emit('unverify', payment.id)">
                 <XMarkIcon class="w-3.5 h-3.5 text-gray-600" />
@@ -40,7 +40,7 @@
             <div class="flex-1 min-w-0">
                 <div class="flex items-center gap-2 flex-wrap">
                     <div :class="comfortableTitleClass">{{ bankDisplayName }}</div>
-                    <span v-if="showVerificationBadge && showVerifyActions" :class="badgeClass">
+                    <span v-if="showVerificationBadge" :class="badgeClass">
                         <component :is="payment.isVerified ? CheckCircleIcon : ClockIcon" class="w-3 h-3 mr-1" />
                         {{ payment.isVerified ? 'Verificado' : 'Pendiente' }}
                     </span>
@@ -52,11 +52,11 @@
             </div>
         </div>
         <div class="flex gap-1 shrink-0">
-            <BaseButton v-if="showVerifyActions && !payment.isVerified" variant="ghost" size="sm" title="Verificar pago"
+            <BaseButton v-if="showVerifyAction && !payment.isVerified" variant="ghost" size="sm" title="Verificar pago"
                 @click="emit('verify', payment.id)">
                 <CheckIcon class="w-4 h-4 text-emerald-600" />
             </BaseButton>
-            <BaseButton v-if="showVerifyActions && payment.isVerified" variant="ghost" size="sm"
+            <BaseButton v-if="showUnverifyAction && payment.isVerified" variant="ghost" size="sm"
                 title="Desverificar pago" @click="emit('unverify', payment.id)">
                 <XMarkIcon class="w-4 h-4 text-gray-600" />
             </BaseButton>
@@ -93,14 +93,16 @@ const props = withDefaults(
         payment: OrderBankPaymentDetail
         density?: 'compact' | 'comfortable'
         variant?: 'table' | 'panel'
-        showVerifyActions?: boolean
+        showVerifyAction?: boolean
+        showUnverifyAction?: boolean
         showEditRemove?: boolean
         showVerificationBadge?: boolean
     }>(),
     {
         density: 'comfortable',
         variant: 'panel',
-        showVerifyActions: false,
+        showVerifyAction: false,
+        showUnverifyAction: false,
         showEditRemove: false,
         showVerificationBadge: true,
     }
