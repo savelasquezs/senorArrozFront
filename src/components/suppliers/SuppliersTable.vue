@@ -3,7 +3,7 @@
         <div class="flex items-center justify-between">
             <div>
                 <h3 class="text-lg font-semibold text-gray-900">Proveedores</h3>
-                <p class="text-sm text-gray-500">Listado de proveedores disponibles para esta sucursal.</p>
+                <p class="text-sm text-gray-500">Listado de proveedores disponibles.</p>
             </div>
             <BaseButton v-if="canManage" variant="primary" size="sm" @click="$emit('create')">
                 <PlusIcon class="w-4 h-4 mr-1" />

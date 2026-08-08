@@ -893,7 +893,6 @@ const loadSuppliers = async () => {
     try {
         suppliersLoading.value = true
         const response = await supplierApi.getSuppliers({
-            branchId: branchId.value,
             page: suppliersPage.value,
             pageSize: suppliersPageSize.value
         })
@@ -927,7 +926,7 @@ const handleSupplierSubmit = async (data: CreateSupplierDto) => {
             await supplierApi.updateSupplier(editingSupplier.value.id, data as UpdateSupplierDto)
             success('Proveedor actualizado', 3000, `El proveedor "${data.name}" se ha actualizado correctamente`)
         } else {
-            await supplierApi.createSupplier(data, authStore.isSuperadmin ? branchId.value : undefined)
+            await supplierApi.createSupplier(data)
             success('Proveedor creado', 3000, `El proveedor "${data.name}" se ha creado correctamente`)
         }
         closeSupplierForm()

@@ -8,7 +8,6 @@ class SupplierApi extends BaseApi {
 
         if (filters) {
             if (filters.search) params.Search = filters.search
-            if (filters.branchId !== undefined) params.BranchId = filters.branchId
             params.Page = filters.page ?? 1
             params.PageSize = filters.pageSize ?? 10
             if (filters.sortBy) params.SortBy = filters.sortBy
@@ -18,20 +17,16 @@ class SupplierApi extends BaseApi {
         return this.get<SupplierListResult>('/suppliers', { params })
     }
 
-    async getSuppliersByBranch(branchId?: number): Promise<Supplier[]> {
-        const params: Record<string, unknown> = {}
-        if (branchId !== undefined) params.BranchId = branchId
-        return this.get<Supplier[]>('/suppliers/by-branch', { params })
+    async getSuppliersByBranch(): Promise<Supplier[]> {
+        return this.get<Supplier[]>('/suppliers/by-branch')
     }
 
     async getSupplierById(id: number): Promise<Supplier> {
         return this.get<Supplier>(`/suppliers/${id}`)
     }
 
-    async createSupplier(payload: CreateSupplierDto, branchId?: number): Promise<Supplier> {
-        const params: Record<string, unknown> = {}
-        if (branchId !== undefined) params.BranchId = branchId
-        return this.post<Supplier>('/suppliers', payload, { params })
+    async createSupplier(payload: CreateSupplierDto): Promise<Supplier> {
+        return this.post<Supplier>('/suppliers', payload)
     }
 
     async updateSupplier(id: number, payload: UpdateSupplierDto): Promise<Supplier> {

@@ -1,8 +1,8 @@
 {
   "versionName": "1.2.5",
-  "buildNumber": 9,
+  "buildNumber": 10,
   "apkFileName": "senor-arroz-domiciliarios.apk",
   "apkUrl": "/senor-arroz-domiciliarios.apk",
   "minimumBuild": 1,
-  "message": "1.2.5: incorpora la biblioteca de documentos corporativos desde el menú del perfil. Descarga e instala encima; no hace falta desinstalar."
+  "message": "1.2.5: incorpora avisos informativos de revisión de seguimiento. Descarga e instala encima; no hace falta desinstalar."
 }
