@@ -64,20 +64,24 @@
                     </th>
                 </tr>
             </thead>
-            <tbody class="bg-white divide-y divide-gray-200">
-                <tr v-if="loading">
+            <tbody v-if="loading" class="bg-white divide-y divide-gray-200">
+                <tr>
                     <td colspan="10" class="px-3 py-12 text-center text-gray-500">
                         <div class="flex justify-center">
                             <BaseLoading size="md" />
                         </div>
                     </td>
                 </tr>
-                <tr v-else-if="!orders || orders.length === 0">
+            </tbody>
+            <tbody v-else-if="!orders || orders.length === 0" class="bg-white divide-y divide-gray-200">
+                <tr>
                     <td colspan="10" class="px-3 py-12 text-center text-gray-500">
                         No se encontraron pedidos
                     </td>
                 </tr>
-                <tr v-else v-for="order in orders" :key="order.id" class="hover:bg-gray-50 transition-colors">
+            </tbody>
+            <TransitionGroup v-else name="order-row" tag="tbody" class="bg-white divide-y divide-gray-200">
+                <tr v-for="order in orders" :key="order.id" class="hover:bg-gray-50 transition-colors">
                     <!-- ID + productos (máx. 2 ítems + ....; hasta 2 líneas por nombre) -->
                     <td class="min-w-0 px-3 py-2 align-top">
                         <div class="contextual-action-group flex items-start gap-1.5 min-w-0 w-full">
@@ -320,7 +324,7 @@
                         <div class="text-xs text-gray-500">{{ formatTime(order.createdAt) }}</div>
                     </td>
                 </tr>
-            </tbody>
+            </TransitionGroup>
         </table>
     </div>
 </template>
@@ -531,6 +535,24 @@ function paidInStoreCashCap(order: OrderListItem): number {
 <style scoped>
 .contextual-hover-action {
     opacity: 1;
+}
+
+.order-row-move,
+.order-row-enter-active,
+.order-row-leave-active {
+    transition: transform 260ms ease, opacity 260ms ease;
+}
+
+.order-row-leave-active {
+    position: absolute;
+    display: table;
+    width: 100%;
+    z-index: 0;
+}
+
+.order-row-leave-to {
+    opacity: 0;
+    transform: translateX(2rem);
 }
 
 @media (hover: hover) and (pointer: fine) {

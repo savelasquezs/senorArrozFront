@@ -725,6 +725,7 @@ const showBulkUnverifyDialog = ref(false)
 const bulkUnverifyCount = ref<number | null>(null)
 const bulkUnverifyCountLoading = ref(false)
 const bulkUnverifyLoading = ref(false)
+const verifyingPaymentIds = new Set<number>()
 
 // Modales
 const showEditCustomerModal = ref(false)
@@ -858,10 +859,13 @@ const displayedOrders = computed<OrderListItem[]>(() => {
                     (payment) =>
                         payment.bankId === transferVerificationBankId.value && !payment.isVerified,
                 )
-                .sort((a, b) => b.amount - a.amount),
+                .sort((a, b) => a.amount - b.amount || a.id - b.id),
         }))
         .filter((order) => order.bankPayments.length > 0)
-        .sort((a, b) => (b.bankPayments[0]?.amount ?? 0) - (a.bankPayments[0]?.amount ?? 0))
+        .sort((a, b) =>
+            (a.bankPayments[0]?.amount ?? 0) - (b.bankPayments[0]?.amount ?? 0)
+            || (a.bankPayments[0]?.id ?? 0) - (b.bankPayments[0]?.id ?? 0),
+        )
 })
 
 const appFilterOptions = computed(() => {
@@ -1494,6 +1498,9 @@ const handleEditType = (order: OrderListItem) => {
 
 // ✅ NUEVO: Handler para verificar pago bancario
 const handleVerifyBankPayment = async (order: OrderListItem, payment: OrderBankPaymentDetail) => {
+    if (verifyingPaymentIds.has(payment.id)) return
+    verifyingPaymentIds.add(payment.id)
+
     try {
         if (payment.isVerified) {
             // Desverificar
@@ -1505,25 +1512,32 @@ const handleVerifyBankPayment = async (order: OrderListItem, payment: OrderBankP
             success('Pago verificado', 5000)
         }
 
-        if (isTransferVerificationMode.value) {
-            await fetchOrders()
-            return
-        }
-
-        // ✅ Actualización optimista
         const index = orders.value.findIndex(o => o.id === order.id)
         if (index !== -1) {
             const paymentIndex = orders.value[index].bankPayments.findIndex(p => p.id === payment.id)
             if (paymentIndex !== -1) {
+                const nextVerified = !payment.isVerified
                 orders.value[index].bankPayments[paymentIndex] = {
                     ...orders.value[index].bankPayments[paymentIndex],
-                    isVerified: !payment.isVerified,
-                    verifiedAt: !payment.isVerified ? new Date().toISOString() : null
+                    isVerified: nextVerified,
+                    verifiedAt: nextVerified ? new Date().toISOString() : null
+                }
+
+                if (
+                    isTransferVerificationMode.value
+                    && transferVerificationBankId.value != null
+                    && !orders.value[index].bankPayments.some((item) =>
+                        item.bankId === transferVerificationBankId.value && !item.isVerified,
+                    )
+                ) {
+                    totalCount.value = Math.max(0, totalCount.value - 1)
                 }
             }
         }
     } catch (err: any) {
         error('Error al verificar pago', err.message)
+    } finally {
+        verifyingPaymentIds.delete(payment.id)
     }
 }
 
