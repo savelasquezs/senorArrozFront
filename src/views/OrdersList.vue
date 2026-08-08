@@ -39,6 +39,11 @@
                                     </span>
                                 </BaseButton>
 
+                                <BaseButton v-if="canVerifyPayments()" type="button" variant="primary" size="sm"
+                                    class="shrink-0" @click="openTransferVerificationDialog">
+                                    Verificar transferencias
+                                </BaseButton>
+
                                 <div v-if="showAdvancedFilters" class="flex flex-wrap items-end gap-2">
                                     <div class="w-36 sm:w-40">
                                         <BaseSelect v-model="filters.type" :options="typeOptions" value-key="value"
@@ -77,6 +82,16 @@
                         </div>
 
                         <div class="px-4 py-3 bg-gray-50 flex flex-wrap items-center justify-between gap-3">
+                            <div v-if="isTransferVerificationMode"
+                                class="w-full flex flex-wrap items-center justify-between gap-2 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-900">
+                                <span>
+                                    Verificando transferencias de hoy —
+                                    <strong>{{ transferVerificationBankName }}</strong>
+                                </span>
+                                <BaseButton type="button" variant="ghost" size="sm" @click="exitTransferVerificationMode">
+                                    Salir de verificación
+                                </BaseButton>
+                            </div>
                             <div class="flex flex-wrap items-center gap-3 min-w-0">
                                 <div
                                     class="flex rounded-lg border border-gray-200 bg-white p-0.5 gap-0.5 shrink-0">
@@ -92,8 +107,8 @@
                                     </button>
                                 </div>
                                 <div class="text-sm text-gray-600 min-w-0">
-                                    <span v-if="!loading && orders.length > 0">
-                                        Mostrando <span class="font-medium">{{ orders.length }}</span>
+                                    <span v-if="!loading && displayedOrders.length > 0">
+                                        Mostrando <span class="font-medium">{{ displayedOrders.length }}</span>
                                         de <span class="font-medium">{{ totalCount }}</span> pedidos
                                     </span>
                                     <span v-else-if="!loading" class="text-gray-400">No hay pedidos</span>
@@ -123,7 +138,7 @@
                     <div class="bg-white rounded-lg shadow overflow-hidden min-w-0 flex flex-col max-h-[min(75vh,42rem)]">
                         <div class="overflow-y-auto overflow-x-auto min-h-0 min-w-0 flex-1">
                             <template v-if="!groupByRoute">
-                                <OrdersTable :orders="orders" :loading="loading" :sort-by="sortBy"
+                                <OrdersTable :orders="displayedOrders" :loading="loading" :sort-by="sortBy"
                                     :sort-order="sortOrder" :quick-banks="quickBanks"
                                     enable-paid-in-store-quick-action enable-app-settle-quick-action
                                     @edit-customer="handleEditCustomer" @edit-address="handleEditAddress"
@@ -368,6 +383,57 @@
             @deposited="handleDeposited"
         />
 
+        <BaseDialog v-model="showTransferVerificationDialog" title="Verificar transferencias" size="sm">
+            <div class="space-y-4">
+                <p class="text-sm text-gray-600">
+                    Selecciona el banco para revisar las transferencias creadas hoy.
+                </p>
+                <BaseSelect v-model="transferVerificationBankId" :options="transferBankOptions"
+                    value-key="value" display-key="label" placeholder="Selecciona un banco" />
+                <div class="rounded-md bg-gray-50 p-3 text-xs text-gray-600">
+                    Solo aparecerán pedidos que tengan transferencias no verificadas de este banco creadas hoy,
+                    sin importar si el pedido es una reserva.
+                </div>
+            </div>
+            <template #footer>
+                <BaseButton variant="secondary" size="sm" @click="closeTransferVerificationDialog">
+                    Cancelar
+                </BaseButton>
+                <BaseButton variant="outline" size="sm" :disabled="!transferVerificationBankId"
+                    @click="startTransferVerification">
+                    Verificar
+                </BaseButton>
+                <BaseButton variant="primary" size="sm" :disabled="!transferVerificationBankId"
+                    @click="requestBulkUnverify">
+                    Desverificar las verificadas
+                </BaseButton>
+            </template>
+        </BaseDialog>
+
+        <BaseDialog v-model="showBulkUnverifyDialog" title="Desverificar transferencias" size="sm">
+            <div class="space-y-3 text-sm text-gray-600">
+                <p>
+                    Se desverificarán las transferencias verificadas creadas hoy en
+                    <strong class="text-gray-900">{{ transferVerificationBankName }}</strong>.
+                </p>
+                <p v-if="bulkUnverifyCountLoading" class="text-gray-500">Consultando cantidad...</p>
+                <p v-else-if="bulkUnverifyCount !== null" class="font-medium text-amber-700">
+                    Transferencias que serán afectadas: {{ bulkUnverifyCount }}
+                </p>
+            </div>
+            <template #footer>
+                <BaseButton variant="secondary" size="sm" :disabled="bulkUnverifyLoading"
+                    @click="showBulkUnverifyDialog = false">
+                    Cancelar
+                </BaseButton>
+                <BaseButton variant="primary" size="sm"
+                    :disabled="bulkUnverifyCountLoading || bulkUnverifyCount === 0"
+                    :loading="bulkUnverifyLoading" @click="confirmBulkUnverify">
+                    Confirmar
+                </BaseButton>
+            </template>
+        </BaseDialog>
+
         <BaseDialog v-model="showRemoveBankPaymentDialog" title="Eliminar pago bancario" size="sm">
             <p class="text-sm text-gray-600">
                 ¿Eliminar la transferencia
@@ -590,7 +656,12 @@ const appsStore = useAppsStore()
 const debouncedRefetchOrders = useDebouncedCallback(() => {
     void fetchOrders()
 }, 300)
-const { getNextAllowedStatus, canChangeStatus } = useOrderPermissions()
+const {
+    getNextAllowedStatus,
+    canChangeStatus,
+    canVerifyPayments,
+    canUnverifyPayments,
+} = useOrderPermissions()
 
 // ===== TABS =====
 type TabValue = 'orders' | 'reservations'
@@ -646,6 +717,14 @@ const dateFilters = ref({
     fromDate: todayYmd(),
     toDate: todayYmd(),
 })
+
+const isTransferVerificationMode = ref(false)
+const transferVerificationBankId = ref<number | null>(null)
+const showTransferVerificationDialog = ref(false)
+const showBulkUnverifyDialog = ref(false)
+const bulkUnverifyCount = ref<number | null>(null)
+const bulkUnverifyCountLoading = ref(false)
+const bulkUnverifyLoading = ref(false)
 
 // Modales
 const showEditCustomerModal = ref(false)
@@ -755,6 +834,36 @@ const bankFilterOptions = computed(() => {
     ]
 })
 
+const transferBankOptions = computed(() =>
+    bankFilterOptions.value.filter((option) => option.value !== null),
+)
+
+const transferVerificationBankName = computed(() => {
+    const bank = transferBankOptions.value.find(
+        (option) => option.value === transferVerificationBankId.value,
+    )
+    return bank?.label || 'Banco seleccionado'
+})
+
+const displayedOrders = computed<OrderListItem[]>(() => {
+    if (!isTransferVerificationMode.value || transferVerificationBankId.value == null) {
+        return orders.value
+    }
+
+    return orders.value
+        .map((order) => ({
+            ...order,
+            bankPayments: order.bankPayments
+                .filter(
+                    (payment) =>
+                        payment.bankId === transferVerificationBankId.value && !payment.isVerified,
+                )
+                .sort((a, b) => b.amount - a.amount),
+        }))
+        .filter((order) => order.bankPayments.length > 0)
+        .sort((a, b) => (b.bankPayments[0]?.amount ?? 0) - (a.bankPayments[0]?.amount ?? 0))
+})
+
 const appFilterOptions = computed(() => {
     const items = appsStore.list?.items || []
     const active = items.filter((a) => a.active).sort((a, b) => a.name.localeCompare(b.name))
@@ -841,7 +950,7 @@ const routeTimingText = (orders: OrderListItem[]) => {
 
 /** Bloques por deliveryRouteId para vista agrupada (mismo criterio que en detalle domiciliario). */
 const orderRouteBlocks = computed(() => {
-    const list = orders.value
+    const list = displayedOrders.value
     const buckets = new Map<string, OrderListItem[]>()
     const keyFor = (o: OrderListItem) =>
         o.deliveryRouteId != null ? `r:${o.deliveryRouteId}` : 'none'
@@ -985,6 +1094,7 @@ const fetchOrders = async () => {
             fromDate: dateFilters.value.fromDate || undefined,
             toDate: dateFilters.value.toDate || undefined,
             bankId: bankFilterId.value,
+            transferVerificationMode: isTransferVerificationMode.value,
             appId: appFilterId.value,
             appPaymentsUnsettledOnly: appUnsettledOnly.value,
             search: combinedSearch,
@@ -1133,6 +1243,8 @@ const clearFilters = () => {
     deliveryManFilterId.value = null
     appFilterId.value = null
     appUnsettledOnly.value = false
+    isTransferVerificationMode.value = false
+    transferVerificationBankId.value = null
     datePresetId.value = 'today'
     customDateRange.value = null
     dateFilters.value = {
@@ -1142,6 +1254,91 @@ const clearFilters = () => {
     currentPage.value = 1
     debouncedRefetchOrders.cancel()
     void applyOrdersDateFilters('today')
+}
+
+const openTransferVerificationDialog = () => {
+    transferVerificationBankId.value = bankFilterId.value
+    showTransferVerificationDialog.value = true
+}
+
+const closeTransferVerificationDialog = () => {
+    showTransferVerificationDialog.value = false
+    transferVerificationBankId.value = null
+}
+
+const startTransferVerification = async () => {
+    const bankId = transferVerificationBankId.value
+    if (bankId == null) return
+
+    showTransferVerificationDialog.value = false
+    isTransferVerificationMode.value = true
+    bankFilterId.value = bankId
+    filters.value = {
+        totalQuery: '',
+        search: '',
+        type: null,
+        status: null,
+        customer: '',
+    }
+    deliveryManFilterId.value = null
+    appFilterId.value = null
+    appUnsettledOnly.value = false
+    datePresetId.value = 'today'
+    customDateRange.value = null
+    dateFilters.value = { fromDate: todayYmd(), toDate: todayYmd() }
+    currentPage.value = 1
+    debouncedRefetchOrders.cancel()
+    await fetchOrders()
+}
+
+const requestBulkUnverify = async () => {
+    const bankId = transferVerificationBankId.value
+    if (bankId == null || !canUnverifyPayments()) return
+
+    showTransferVerificationDialog.value = false
+    showBulkUnverifyDialog.value = true
+    bulkUnverifyCount.value = null
+    bulkUnverifyCountLoading.value = true
+
+    try {
+        const result = await bankPaymentApi.getBankPayments({
+            bankId,
+            verified: true,
+            fromDate: todayYmd(),
+            toDate: todayYmd(),
+            page: 1,
+            pageSize: 1,
+        })
+        bulkUnverifyCount.value = result.totalCount
+    } catch (err: any) {
+        showBulkUnverifyDialog.value = false
+        error('Error al consultar transferencias', err.message || 'No se pudo obtener la cantidad de transferencias')
+    } finally {
+        bulkUnverifyCountLoading.value = false
+    }
+}
+
+const confirmBulkUnverify = async () => {
+    const bankId = transferVerificationBankId.value
+    if (bankId == null || bulkUnverifyCount.value === 0) return
+
+    bulkUnverifyLoading.value = true
+    try {
+        const result = await bankPaymentApi.unverifyTodayBankPayments(bankId)
+        success('Transferencias desverificadas', 4000, `${result.count} transferencia(s) fueron desverificadas`)
+        showBulkUnverifyDialog.value = false
+        await startTransferVerification()
+    } catch (err: any) {
+        error('Error al desverificar transferencias', err.message || 'No se pudieron desverificar las transferencias')
+    } finally {
+        bulkUnverifyLoading.value = false
+    }
+}
+
+const exitTransferVerificationMode = () => {
+    showTransferVerificationDialog.value = false
+    showBulkUnverifyDialog.value = false
+    clearFilters()
 }
 
 const onBankFilterChange = () => {
@@ -1306,6 +1503,11 @@ const handleVerifyBankPayment = async (order: OrderListItem, payment: OrderBankP
             // Verificar
             await bankPaymentApi.verifyBankPayment(payment.id)
             success('Pago verificado', 5000)
+        }
+
+        if (isTransferVerificationMode.value) {
+            await fetchOrders()
+            return
         }
 
         // ✅ Actualización optimista

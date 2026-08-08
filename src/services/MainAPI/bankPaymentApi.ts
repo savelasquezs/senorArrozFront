@@ -65,6 +65,10 @@ class BankPaymentApi extends BaseApi {
         return this.post<string>(`/bankpayments/${id}/unverify`, {});
     }
 
+    async unverifyTodayBankPayments(bankId: number): Promise<{ count: number; message: string }> {
+        return this.post<{ count: number; message: string }>('/bankpayments/unverify-today', { bankId });
+    }
+
 
 
     // 8. Actualizar monto de pago bancario

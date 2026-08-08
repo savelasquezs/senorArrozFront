@@ -135,7 +135,7 @@ export function useOrderPermissions() {
      */
     const canUnverifyPayments = (): boolean => {
         const role = authStore.userRole
-        return role === 'Superadmin' || role === 'Admin'
+        return role === 'Superadmin' || role === 'Admin' || role === 'Cashier'
     }
 
     /** Reimprimir comanda / ticket térmico desde detalle de pedido (cola por sucursal del pedido). */

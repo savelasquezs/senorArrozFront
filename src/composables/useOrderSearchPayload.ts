@@ -10,6 +10,7 @@ export interface OrderSearchPayloadInput {
     fromDate?: string
     toDate?: string
     bankId?: number | null
+    transferVerificationMode?: boolean
     appId?: number | null
     /** Por defecto false si se omite. */
     appPaymentsUnsettledOnly?: boolean
@@ -46,6 +47,7 @@ export function buildOrderSearchBody(input: OrderSearchPayloadInput): Record<str
     if (input.fromDate) body.fromDate = input.fromDate
     if (input.toDate) body.toDate = input.toDate
     if (input.bankId != null) body.bankId = input.bankId
+    if (input.transferVerificationMode === true) body.transferVerificationMode = true
     if (input.appId != null) body.appId = input.appId
 
     const term = input.search.trim()

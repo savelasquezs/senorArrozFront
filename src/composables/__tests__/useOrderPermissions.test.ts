@@ -111,10 +111,10 @@ describe('useOrderPermissions — verificación de pagos bancarios', () => {
         }
     })
 
-    it('permite al cajero verificar, pero no desverificar', () => {
+    it('permite al cajero verificar y desverificar', () => {
         const { canVerifyPayments, canUnverifyPayments } = useOrderPermissions()
         expect(canVerifyPayments()).toBe(true)
-        expect(canUnverifyPayments()).toBe(false)
+        expect(canUnverifyPayments()).toBe(true)
     })
 
     it.each([UserRole.ADMIN, UserRole.SUPERADMIN])('%s puede verificar y desverificar', (role) => {
