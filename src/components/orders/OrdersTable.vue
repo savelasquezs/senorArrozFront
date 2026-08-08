@@ -540,7 +540,7 @@ function paidInStoreCashCap(order: OrderListItem): number {
 .order-row-move,
 .order-row-enter-active,
 .order-row-leave-active {
-    transition: transform 260ms ease, opacity 260ms ease;
+    transition: transform 460ms cubic-bezier(0.22, 1, 0.36, 1), opacity 460ms ease-out;
 }
 
 .order-row-leave-active {
