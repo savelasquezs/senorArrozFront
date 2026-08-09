@@ -334,3 +334,45 @@ describe('useOrderPermissions — canCancel', () => {
         expect(canCancel(order)).toBe(true)
     })
 })
+
+describe('useOrderPermissions — cajero con pedido entregado', () => {
+    beforeEach(() => {
+        vi.useFakeTimers()
+        vi.setSystemTime(new Date('2026-04-15T15:00:00.000Z'))
+        setActivePinia(createPinia())
+        const auth = useAuthStore()
+        auth.user = {
+            id: 2,
+            name: 'A',
+            email: 'a@test.com',
+            phone: '',
+            active: true,
+            role: UserRole.CASHIER,
+            branchId: 1,
+            branchName: 'B',
+        }
+    })
+
+    afterEach(() => {
+        vi.useRealTimers()
+    })
+
+    it('puede editar un pedido entregado creado hoy', () => {
+        const { canEditOrder, canEditProducts } = useOrderPermissions()
+        const order = baseOrder({
+            status: 'delivered',
+            createdAt: '2026-04-15T12:00:00.000Z',
+        })
+
+        expect(canEditOrder(order)).toBe(true)
+        expect(canEditProducts(order)).toBe(true)
+    })
+
+    it('puede reabrir un pedido entregado a En camino', () => {
+        const { canChangeStatus, getAllowedStatusTransitions } = useOrderPermissions()
+        const order = baseOrder({ status: 'delivered' })
+
+        expect(canChangeStatus(order, 'on_the_way')).toBe(true)
+        expect(getAllowedStatusTransitions('delivered')).toEqual(['on_the_way'])
+    })
+})

@@ -48,9 +48,9 @@ export function useOrderPermissions() {
             return true
         }
 
-        // Cashier: solo puede editar pedidos NO entregados
+        // Cashier: puede editar pedidos no entregados y pedidos entregados del día
         if (role === 'Cashier') {
-            return order.status !== 'delivered'
+            return order.status !== 'delivered' || isSameDay(order.createdAt)
         }
 
         return false
@@ -92,9 +92,9 @@ export function useOrderPermissions() {
             return true
         }
 
-        // Cashier: NO puede modificar productos si está entregado
+        // Cashier: puede modificar productos de pedidos entregados del día
         if (role === 'Cashier') {
-            return order.status !== 'delivered'
+            return order.status !== 'delivered' || isSameDay(order.createdAt)
         }
 
         return false
@@ -247,9 +247,14 @@ export function useOrderPermissions() {
             return false
         }
 
-        // No se puede cambiar desde delivered para los demás roles
-        if (currentStatus === 'delivered') {
+        // Solo Admin/Superadmin pueden corregir libremente un pedido entregado.
+        // Cajero puede reabrirlo a En camino para corregir una entrega registrada por error.
+        if (currentStatus === 'delivered' && role !== 'Cashier') {
             return false
+        }
+
+        if (role === 'Cashier' && currentStatus === 'delivered') {
+            return newStatus === 'on_the_way'
         }
 
         // Kitchen solo puede cambiar entre taken, in_preparation y ready
@@ -313,6 +318,11 @@ export function useOrderPermissions() {
         }
 
         if (currentStatus === 'cancelled') return []
+
+        // Cajero puede reabrir un pedido entregado a En camino.
+        if (currentStatus === 'delivered' && role === 'Cashier') {
+            return ['on_the_way']
+        }
 
         // Pedidos entregados no pueden cambiar para los demás roles
         if (currentStatus === 'delivered') {
