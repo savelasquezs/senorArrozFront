@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Política de privacidad de la aplicación Señor Arroz Domiciliarios.">
+  <title>Política de privacidad | Señor Arroz Domiciliarios</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #202124;
+      --muted: #5f6368;
+      --brand: #9b2c22;
+      --line: #e5e7eb;
+      --surface: #fff;
+      --background: #f8f7f4;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      color: var(--ink);
+      background: var(--background);
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      line-height: 1.65;
+    }
+
+    main {
+      width: min(900px, calc(100% - 32px));
+      margin: 40px auto;
+      padding: clamp(24px, 5vw, 56px);
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      box-shadow: 0 10px 30px rgba(32, 33, 36, .06);
+    }
+
+    h1, h2 { line-height: 1.25; }
+    h1 { margin-top: 0; color: var(--brand); font-size: clamp(1.8rem, 4vw, 2.6rem); }
+    h2 { margin-top: 2rem; font-size: 1.25rem; }
+    p, ul { max-width: 75ch; }
+    .updated { color: var(--muted); font-size: .95rem; }
+    .notice {
+      margin: 24px 0;
+      padding: 16px 18px;
+      border-left: 4px solid var(--brand);
+      background: #fff4f1;
+      border-radius: 8px;
+    }
+    a { color: var(--brand); }
+    footer { margin-top: 36px; padding-top: 20px; border-top: 1px solid var(--line); color: var(--muted); font-size: .9rem; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Política de privacidad</h1>
+    <p class="updated"><strong>Señor Arroz Domiciliarios</strong><br>Última actualización: 9 de agosto de 2026</p>
+
+    <div class="notice">
+      Esta aplicación es una herramienta interna para los domiciliarios de Señor Arroz. No permite crear cuentas desde la aplicación; el acceso es habilitado y administrado por la operación.
+    </div>
+
+    <h2>1. Responsable del tratamiento</h2>
+    <p>El responsable del tratamiento de la información es <strong>Señor Arroz</strong>. Para consultas o solicitudes relacionadas con tus datos personales, escríbenos a <a href="mailto:santyvano@outlook.com">santyvano@outlook.com</a>.</p>
+
+    <h2>2. Información que recopilamos</h2>
+    <p>Según las funciones que utilices y tu jornada de trabajo, podemos tratar las siguientes categorías de información:</p>
+    <ul>
+      <li><strong>Cuenta y perfil:</strong> correo electrónico, identificador de usuario, nombre, teléfono, rol y datos necesarios para autenticarte y gestionar tu perfil.</li>
+      <li><strong>Ubicación precisa:</strong> latitud, longitud, precisión, rumbo y hora de la medición durante una jornada activa.</li>
+      <li><strong>Dispositivo e instalación:</strong> identificador seguro de instalación, sistema operativo, versión del sistema, versión de la aplicación y datos necesarios para mantener una sesión de trabajo.</li>
+      <li><strong>Notificaciones:</strong> token de Firebase Cloud Messaging, plataforma y contenido de avisos operativos enviados a tu dispositivo.</li>
+      <li><strong>Estado operativo:</strong> batería, conectividad, estado del GPS, estado del permiso de ubicación y eventos relacionados con el seguimiento.</li>
+      <li><strong>Información de domicilios:</strong> pedidos, direcciones y datos operativos que necesitas para realizar una entrega.</li>
+      <li><strong>Información que eliges enviar:</strong> fotografías de perfil, mensajes o acciones realizadas desde la aplicación.</li>
+    </ul>
+
+    <h2>3. Uso de la ubicación en segundo plano</h2>
+    <p>La aplicación puede recopilar ubicación precisa incluso cuando no está visible o cuando la pantalla está apagada. Esta función se activa para una jornada laboral y se utiliza para:</p>
+    <ul>
+      <li>gestionar y verificar la entrega de domicilios;</li>
+      <li>mostrar el estado operativo de la ruta;</li>
+      <li>registrar el recorrido de la jornada;</li>
+      <li>detectar interrupciones del GPS, conectividad o permisos;</li>
+      <li>generar alertas y revisiones operativas.</li>
+    </ul>
+    <p>El seguimiento finaliza al cerrar la jornada, cuando llega la hora de cierre configurada o cuando la sesión es invalidada. La aplicación muestra una divulgación específica antes de solicitar el permiso de ubicación.</p>
+
+    <h2>4. Finalidades del tratamiento</h2>
+    <p>Usamos la información para autenticarte, asignar y gestionar domicilios, coordinar la operación de las sucursales, mantener la seguridad de las sesiones, enviar avisos importantes, prestar soporte, investigar incidentes y mejorar la confiabilidad del servicio interno.</p>
+
+    <h2>5. Almacenamiento temporal y conservación</h2>
+    <p>Si el dispositivo pierde conexión, la aplicación puede conservar temporalmente puntos de ubicación y eventos para sincronizarlos cuando vuelva Internet. Los datos locales de sesión se almacenan en el almacenamiento seguro del dispositivo y se eliminan al cerrar o reemplazar la sesión cuando corresponde.</p>
+    <p>La conservación de datos en el servidor depende de la configuración operativa de la sucursal. Como referencia, la configuración predeterminada conserva las ubicaciones durante <strong>3 días</strong> y los incidentes de seguimiento durante <strong>15 días</strong>. Pueden aplicarse periodos diferentes cuando exista una necesidad operativa, de soporte o una obligación legal.</p>
+
+    <h2>6. Acceso y proveedores de servicio</h2>
+    <p>El acceso está limitado a personal autorizado de Señor Arroz que necesita la información para administrar domicilios, sucursales, soporte o auditoría operativa. Podemos utilizar proveedores tecnológicos para alojar la API y la aplicación, enviar notificaciones push y entregar mapas o contenido de red. Estos proveedores procesan la información únicamente para prestar sus servicios.</p>
+    <p>La aplicación puede abrir WhatsApp, mapas u otros enlaces externos cuando tú eliges utilizarlos. En esos casos, el tratamiento de datos queda sujeto a la política de privacidad del proveedor externo.</p>
+    <p>No vendemos tu información personal ni usamos la ubicación para publicidad personalizada.</p>
+
+    <h2>7. Seguridad</h2>
+    <p>Usamos conexiones HTTPS para las comunicaciones con nuestros servicios, tokens protegidos y controles de acceso para reducir el riesgo de acceso no autorizado. Ningún sistema conectado a Internet puede garantizar seguridad absoluta; si detectamos un incidente relevante, actuaremos conforme a nuestras obligaciones y procedimientos aplicables.</p>
+
+    <h2>8. Tus solicitudes</h2>
+    <p>Puedes solicitar información sobre los datos asociados a tu cuenta, pedir correcciones o solicitar la eliminación de información que ya no sea necesaria, escribiendo a <a href="mailto:santyvano@outlook.com">santyvano@outlook.com</a>. Verificaremos tu identidad antes de atender la solicitud. Algunas eliminaciones pueden estar limitadas cuando debamos conservar información por razones operativas, de seguridad o legales.</p>
+    <p>Cerrar sesión en la aplicación elimina las credenciales y datos de sesión del dispositivo, pero no constituye por sí solo una solicitud de eliminación de los registros operativos del servidor.</p>
+
+    <h2>9. Menores de edad</h2>
+    <p>La aplicación está destinada a personal autorizado de Señor Arroz y no está dirigida a menores de edad.</p>
+
+    <h2>10. Cambios a esta política</h2>
+    <p>Podemos actualizar esta política cuando cambien la aplicación, los servicios o los requisitos legales. Publicaremos la versión vigente en esta misma página e indicaremos la fecha de actualización.</p>
+
+    <footer>
+      Contacto de privacidad: <a href="mailto:santyvano@outlook.com">santyvano@outlook.com</a>
+    </footer>
+  </main>
+</body>
+</html>
