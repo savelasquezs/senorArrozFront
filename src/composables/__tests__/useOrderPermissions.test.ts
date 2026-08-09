@@ -321,7 +321,7 @@ describe('useOrderPermissions — canCancel', () => {
         expect(canCancel(order)).toBe(true)
     })
 
-    it('Cajero no puede cancelar aunque sea el día programado', () => {
+    it('Cajero puede cancelar un pedido', () => {
         const auth = useAuthStore()
         const u = auth.user
         if (!u) throw new Error('expected user')
@@ -331,6 +331,6 @@ describe('useOrderPermissions — canCancel', () => {
             prepareAt: '2026-04-15T20:00:00.000Z',
             reservedFor: '2026-04-15T23:00:00.000Z',
         })
-        expect(canCancel(order)).toBe(false)
+        expect(canCancel(order)).toBe(true)
     })
 })

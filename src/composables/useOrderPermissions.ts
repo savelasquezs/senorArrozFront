@@ -159,7 +159,7 @@ export function useOrderPermissions() {
         if (order.externalFulfillmentProvider === 'rappi') return false
         const role = authStore.userRole
 
-        if (role !== 'Admin' && role !== 'Superadmin') return false
+        if (role !== 'Admin' && role !== 'Superadmin' && role !== 'Cashier') return false
         if (order.status === 'cancelled') return false
 
         return true

@@ -208,8 +208,8 @@ Admin y Superadmin pueden cambiar un pedido desde cualquier estado hacia cualqui
 2. **IN_PREPARATION → READY**: Solo Kitchen
 3. **READY → ON_THE_WAY**: Solo Deliveryman, Admin
 4. **ON_THE_WAY → DELIVERED**: Solo Deliveryman, Admin
-5. **Cualquier estado → CANCELLED**: Solo Admin, Superadmin (requiere motivo)
-- **Reserva con horario** (`prepare_at` y `reserved_for`): Admin/Superadmin pueden cancelar solo si el **día calendario en Colombia** coincide con el de **`createdAt`**, con el de **`prepareAt`** o con el de **`reservedFor`** (p. ej. reserva registrada con anticipación pero entrega hoy). Backend: `CancelOrderHandler`; POS: `useOrderPermissions.canCancel`.
+5. **Cualquier estado → CANCELLED**: Admin, Superadmin y Cajero (requiere motivo)
+- **Reserva con horario** (`prepare_at` y `reserved_for`): Admin/Superadmin/Cajero pueden cancelar según las reglas vigentes de `CancelOrderHandler`; POS: `useOrderPermissions.canCancel`.
 
 ## 💰 Sistema de Pagos
 
@@ -402,7 +402,7 @@ Validaciones implementadas antes de enviar un pedido al backend:
 ### Cancelaciones
 - **Motivo obligatorio**: Cancelaciones requieren motivo
 - **Auditoría**: Historial de cambios en pedidos
-- **Permisos**: Solo Admin y Superadmin pueden cancelar
+- **Permisos**: Admin, Superadmin y Cajero pueden cancelar
 
 ## 📍 Sistema de Geolocalización
 

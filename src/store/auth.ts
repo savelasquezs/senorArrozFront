@@ -43,7 +43,7 @@ export const useAuthStore = defineStore('auth', () => {
 	// Permission checks
 	const canManageUsers = computed(() => isSuperadmin.value || isAdmin.value);
 	const canManageProducts = computed(() => isSuperadmin.value || isAdmin.value);
-	const canCancelOrders = computed(() => isSuperadmin.value || isAdmin.value);
+	const canCancelOrders = computed(() => isSuperadmin.value || isAdmin.value || isCashier.value);
 	const canManageExpenses = computed(() => isSuperadmin.value || isAdmin.value || isCashier.value);
 	const canViewAllBranches = computed(() => isSuperadmin.value);
 
