@@ -1,8 +1,8 @@
 {
   "versionName": "1.2.5",
-  "buildNumber": 10,
+  "buildNumber": 11,
   "apkFileName": "senor-arroz-domiciliarios.apk",
   "apkUrl": "/senor-arroz-domiciliarios.apk",
   "minimumBuild": 1,
-  "message": "1.2.5: incorpora avisos informativos de revisión de seguimiento. Descarga e instala encima; no hace falta desinstalar."
+  "message": "1.2.5 build 11: corrige la continuidad del rastreo en segundo plano y la recuperacion automatica del servicio. Actualiza desde Google Play."
 }
