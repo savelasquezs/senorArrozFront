@@ -230,11 +230,15 @@ export const useDeliveryStore = defineStore('delivery', () => {
     }
 
     // Asignar pedidos (actualización optimista)
-    const assignOrders = async (orderIds: number[], password: string) => {
+    const assignOrders = async (
+        orderIds: number[],
+        password: string,
+        routing?: { proposalId: number; expectedPlanVersion: number },
+    ) => {
         isLoading.value = true
         error.value = null
         try {
-            const assigned = await orderApi.selfAssignOrders({ orderIds, password })
+            const assigned = await orderApi.selfAssignOrders({ orderIds, password, ...routing })
 
             // Remover pedidos asignados de lista disponible
             availableOrders.value = availableOrders.value.filter(o => !orderIds.includes(o.id))

@@ -181,7 +181,7 @@ class OrderApi extends BaseApi {
     }
 
     // 19. Autoasignar pedidos (usado por domiciliarios)
-    async selfAssignOrders(data: { orderIds: number[]; password: string }): Promise<OrderListItem[]> {
+    async selfAssignOrders(data: { orderIds: number[]; password: string; proposalId?: number; expectedPlanVersion?: number }): Promise<OrderListItem[]> {
         return this.post<OrderListItem[]>('/orders/delivery/self-assign', data);
     }
 

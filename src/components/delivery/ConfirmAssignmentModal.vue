@@ -86,6 +86,8 @@ interface Props {
     dayBlocked: boolean
     /** Si ya tiene pedidos en camino, no se muestra el aviso de vueltos. */
     hasOnTheWay: boolean
+    proposalId?: number
+    expectedPlanVersion?: number
 }
 
 const props = defineProps<Props>()
@@ -142,7 +144,10 @@ const handleConfirm = async () => {
         isLoading.value = true
 
         const orderIds = props.orders.map((o) => o.id)
-        const assigned = await deliveryStore.assignOrders(orderIds, password.value)
+        const routing = props.proposalId != null && props.expectedPlanVersion != null
+            ? { proposalId: props.proposalId, expectedPlanVersion: props.expectedPlanVersion }
+            : undefined
+        const assigned = await deliveryStore.assignOrders(orderIds, password.value, routing)
 
         console.log('TODO: Imprimir facturas para pedidos:', assigned.map((o) => o.id))
 

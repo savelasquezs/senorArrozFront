@@ -73,7 +73,7 @@
             <!-- Tabs: Disponibles y En preparación (ocultos en vista de ruta) -->
             <template v-if="activeTab !== 'route'">
                 <!-- Mobile -->
-                <div class="grid grid-cols-3 gap-2 md:hidden">
+                <div class="grid grid-cols-4 gap-2 md:hidden">
                     <button @click="activeTab = 'available'" :class="[
                         'py-3 px-4 rounded-lg font-medium text-sm transition-colors text-center',
                         activeTab === 'available' ? 'bg-emerald-500 text-white' : 'bg-gray-100 text-gray-600'
@@ -103,6 +103,10 @@
                     ]">
                         Métricas
                     </button>
+                    <button type="button" @click="activeTab = 'routing'" :class="[
+                        'py-3 px-2 rounded-lg font-medium text-sm transition-colors text-center',
+                        activeTab === 'routing' ? 'bg-emerald-500 text-white' : 'bg-gray-100 text-gray-600'
+                    ]">Rutas</button>
                 </div>
 
                 <!-- Desktop -->
@@ -141,6 +145,10 @@
                         ]">
                             Rendimiento
                         </button>
+                        <button type="button" @click="activeTab = 'routing'" :class="[
+                            'py-4 px-1 border-b-2 font-medium text-sm transition-colors',
+                            activeTab === 'routing' ? 'border-emerald-500 text-emerald-600' : 'border-transparent text-gray-500 hover:text-gray-700'
+                        ]">Rutas sugeridas</button>
                     </nav>
                 </div>
             </template>
@@ -216,6 +224,21 @@
                     :route-metrics="deliveryAnalyticsResolved.routeMetrics"
                 />
             </div>
+
+            <DeliveryRoutingPanel
+                v-else-if="activeTab === 'routing'"
+                :plan="routingPlan"
+                :loading="routingLoading"
+                :error="routingError"
+                :can-recalculate="authStore.isAdmin || authStore.isSuperadmin"
+                :can-claim="authStore.isDeliveryman"
+                :can-edit="authStore.isAdmin || authStore.isSuperadmin || authStore.isCashier"
+                :preview="routingPreview"
+                :preview-loading="routingPreviewLoading"
+                @recalculate="loadRoutingPlan(true)"
+                @claim="handleRoutingClaim"
+                @preview="previewRoutingOrder"
+            />
 
             <!-- Vista "En ruta" (scroll vertical si hay muchos pedidos) -->
             <div v-else-if="activeTab === 'route'" class="min-w-0">
@@ -294,6 +317,8 @@
             :orders="ordersToAssign"
             :day-blocked="authStore.isDeliveryman ? deliveryStore.myDayBlocked : false"
             :has-on-the-way="authStore.isDeliveryman && deliveryStore.ordersOnTheWay.length > 0"
+            :proposal-id="routingClaim?.proposalId"
+            :expected-plan-version="routingClaim?.expectedPlanVersion"
             @close="closeConfirmModal"
             @assigned="handleAssigned"
         />
@@ -320,6 +345,7 @@ import MainLayout from '@/components/layout/MainLayout.vue'
 import DeliveryCardGrid from '@/components/delivery/DeliveryCardGrid.vue'
 import DeliveryHistoryTable from '@/components/delivery/DeliveryHistoryTable.vue'
 import ConfirmAssignmentModal from '@/components/delivery/ConfirmAssignmentModal.vue'
+import DeliveryRoutingPanel from '@/components/delivery/DeliveryRoutingPanel.vue'
 import DeliveryAppUpdateDialog from '@/components/delivery/DeliveryAppUpdateDialog.vue'
 import RouteOrderManager from '@/components/delivery/RouteOrderManager.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
@@ -344,6 +370,8 @@ import { DELIVERY_ANDROID_APK_PATH } from '@/constants/downloads'
 import { branchApi } from '@/services/MainAPI/branchApi'
 import { fcmApi } from '@/services/MainAPI/fcmApi'
 import type { Branch } from '@/types/common'
+import type { DeliveryRouteProposal, DeliveryRoutingPlan } from '@/types/deliveryRouting'
+import { deliveryRoutingApi } from '@/services/MainAPI/deliveryRoutingApi'
 
 const deliveryApkPath = DELIVERY_ANDROID_APK_PATH
 
@@ -364,11 +392,17 @@ const { success, error, warning } = useToast()
 const SIGNALR_HUB_URL = import.meta.env.VITE_SIGNALR_HUB_URL || 'http://localhost:5000/hubs/orders'
 const { isConnected, on } = useSignalR(SIGNALR_HUB_URL)
 
-const activeTab = ref<'available' | 'preparation' | 'analytics' | 'route'>('available')
+const activeTab = ref<'available' | 'preparation' | 'analytics' | 'routing' | 'route'>('available')
 const isLoading = ref(false)
 const showConfirmModal = ref(false)
 const showHistoryModal = ref(false)
 const ordersToAssign = ref<OrderListItem[]>([])
+const routingPlan = ref<DeliveryRoutingPlan | null>(null)
+const routingLoading = ref(false)
+const routingError = ref<string | null>(null)
+const routingClaim = ref<{ proposalId: number; expectedPlanVersion: number } | null>(null)
+const routingPreview = ref<DeliveryRouteProposal | null>(null)
+const routingPreviewLoading = ref(false)
 const routeOrders = ref<OrderListItem[]>([])
 
 /** Misma ruta para todos los pedidos en ruta: un solo bloque de avisos del API. */
@@ -580,6 +614,7 @@ const handleOrderModifiedSignalR = async (payload: any) => {
 // ─── Asignación ───────────────────────────────────────────────
 
 const handleAssign = async (orderIds: number[]) => {
+    routingClaim.value = null
     ordersToAssign.value = deliveryStore.availableOrders.filter((o: OrderListItem) => orderIds.includes(o.id))
     if (authStore.isDeliveryman && authStore.user?.id) {
         await Promise.all([deliveryStore.loadMyDayState(), loadRouteAssigned()])
@@ -587,9 +622,50 @@ const handleAssign = async (orderIds: number[]) => {
     showConfirmModal.value = true
 }
 
+const loadRoutingPlan = async (force = false) => {
+    routingLoading.value = true
+    routingError.value = null
+    try {
+        routingPlan.value = force
+            ? await deliveryRoutingApi.recalculate()
+            : await deliveryRoutingApi.getPlan()
+    } catch (err: any) {
+        routingError.value = err.message || 'No fue posible cargar las rutas sugeridas.'
+    } finally {
+        routingLoading.value = false
+    }
+}
+
+const handleRoutingClaim = async (proposal: DeliveryRouteProposal) => {
+    await loadAvailableOrders()
+    const readyIds = new Set(proposal.claimableReadyOrderIds)
+    ordersToAssign.value = deliveryStore.availableOrders.filter((order) => readyIds.has(order.id))
+    if (ordersToAssign.value.length !== readyIds.size) {
+        warning('El plan cambió', 'Actualizando las rutas sugeridas.', 5000)
+        await loadRoutingPlan()
+        return
+    }
+    routingClaim.value = { proposalId: proposal.id, expectedPlanVersion: routingPlan.value!.version }
+    if (authStore.user?.id) await Promise.all([deliveryStore.loadMyDayState(), loadRouteAssigned()])
+    showConfirmModal.value = true
+}
+
+const previewRoutingOrder = async (orderIds: number[]) => {
+    routingPreviewLoading.value = true
+    try {
+        routingPreview.value = await deliveryRoutingApi.preview(orderIds)
+    } catch (err: any) {
+        error('No se pudo calcular la vista previa', err.message)
+    } finally {
+        routingPreviewLoading.value = false
+    }
+}
+
 const handleAssigned = async () => {
     await loadAvailableOrders()
     cardGridRef.value?.clearSelection()
+    routingClaim.value = null
+    await loadRoutingPlan()
     if (authStore.user?.id) {
         if (authStore.isDeliveryman) {
             await deliveryStore.loadMyDayState()
@@ -607,6 +683,7 @@ const handleAssigned = async () => {
 const closeConfirmModal = () => {
     showConfirmModal.value = false
     ordersToAssign.value = []
+    routingClaim.value = null
 }
 
 // ─── Refresco ─────────────────────────────────────────────────
@@ -618,6 +695,8 @@ const refreshData = async () => {
         await loadPreparationOrders()
     } else if (activeTab.value === 'analytics') {
         await deliveryAnalytics.refresh()
+    } else if (activeTab.value === 'routing') {
+        await loadRoutingPlan()
     } else if (activeTab.value === 'route') {
         await loadRouteAssigned()
         routeOrders.value = [...deliveryStore.ordersOnTheWay]
@@ -725,6 +804,8 @@ watch(activeTab, async (newTab) => {
         await loadPreparationOrders()
     } else if (newTab === 'analytics') {
         await deliveryAnalytics.refresh()
+    } else if (newTab === 'routing') {
+        await loadRoutingPlan()
     }
 })
 
@@ -743,6 +824,7 @@ onMounted(async () => {
     if (
         authStore.userRole !== 'Deliveryman' &&
         authStore.userRole !== 'Admin' &&
+        authStore.userRole !== 'Cashier' &&
         authStore.userRole !== 'Superadmin'
     ) {
         router.push('/')
@@ -771,5 +853,7 @@ onMounted(async () => {
     on('OrderReady', handleOrderReady)
     on('OrderAssigned', handleOrderAssigned)
     on('OrderModified', handleOrderModifiedSignalR)
+    on('DeliveryRoutingPlanChanged', () => loadRoutingPlan())
+    on('RouteProposalClaimed', () => loadRoutingPlan())
 })
 </script>
