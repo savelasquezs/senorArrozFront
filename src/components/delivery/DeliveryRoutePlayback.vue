@@ -46,6 +46,9 @@
         <i class="h-2.5 w-2.5 rounded-full" :style="{ backgroundColor: colors[index % colors.length] }" />
         {{ deliveryman.deliverymanName }}
       </button>
+      <span v-if="hasCurrentRouteOrders" class="flex items-center gap-1 px-2 py-1.5 text-xs text-gray-600"><i class="h-2.5 w-2.5 rounded-full bg-violet-600" /> Pedido de ruta en curso</span>
+      <span v-if="hasPreviousRouteOrders" class="flex items-center gap-1 px-2 py-1.5 text-xs text-gray-600"><i class="h-2.5 w-2.5 rounded-full bg-blue-600" /> Pedido de ruta anterior</span>
+      <span v-if="hasRelatedOrders" class="flex items-center gap-1 px-2 py-1.5 text-xs text-gray-600"><i class="h-2.5 w-2.5 rounded-full bg-emerald-600" /> Ubicación relacionada</span>
     </div>
   </div>
 </template>
@@ -106,6 +109,10 @@ const engine = useDeliveryRoutePlayback(
   () => new Date(props.data.to).getTime(),
 )
 const allEvents = computed(() => props.data.deliverymen.flatMap(item => item.events))
+const allStayOrders = computed(() => props.data.deliverymen.flatMap(item => item.stays.flatMap(stay => stay.orders)))
+const hasCurrentRouteOrders = computed(() => allStayOrders.value.some(order => order.roles.includes('current_route')))
+const hasPreviousRouteOrders = computed(() => allStayOrders.value.some(order => order.roles.includes('previous_route')))
+const hasRelatedOrders = computed(() => allStayOrders.value.some(order => order.roles.includes('related')))
 const mapStates = new Map<number, DeliverymanMapState>()
 const activePositions = new Map<number, google.maps.LatLngLiteral>()
 const pulseMarkers = new Set<google.maps.Marker>()
@@ -369,9 +376,9 @@ function stayDurationSeconds(stay: DeliveryPlaybackStay, playhead: number) {
 }
 
 const roleLabels: Record<string, string> = {
-  previous: 'Pedido anterior',
-  related: 'Pedido relacionado',
-  next: 'Pedido siguiente',
+  current_route: 'Pedido de la ruta en curso',
+  previous_route: 'Pedido de la ruta anterior',
+  related: 'Ubicación relacionada',
 }
 
 function orderDescription(order: DeliveryPlaybackOrder) {
@@ -470,12 +477,12 @@ function syncStayOverlays(
   })
   orders.forEach(order => {
     if (order.latitude == null || order.longitude == null || state.orderMarkers.has(order.orderId)) return
-    const role = order.roles.includes('related') ? 'related' : order.roles[0] || 'next'
+    const role = order.roles.includes('related') ? 'related' : order.roles[0] || 'current_route'
     const styles = role === 'related'
       ? { color: '#059669', label: 'R' }
-      : role === 'previous'
+      : role === 'previous_route'
         ? { color: '#2563eb', label: 'A' }
-        : { color: '#7c3aed', label: 'S' }
+        : { color: '#7c3aed', label: 'P' }
     const marker = new google.maps.Marker({
       map,
       position: { lat: order.latitude, lng: order.longitude },

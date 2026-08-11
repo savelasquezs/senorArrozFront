@@ -4,6 +4,7 @@
 
 - Los mapas consumen las estadías agrupadas entregadas por el API y ocultan por defecto sus puntos GPS centrales.
 - La representación usa círculo amarillo semitransparente, marcador central con duración `mm:ss`/`hh:mm:ss` y detalle interactivo con contexto de sucursal y pedidos.
+- Cada estadía muestra todos los destinos de su ruta aunque los pedidos no estén entregados; si no hay paradas en esa ruta, muestra los destinos de la ruta inmediatamente anterior del mismo domiciliario y sucursal.
 - Cuando una estadía activa está en el extremo vivo del rango, el contador avanza cada segundo y el API se refresca silenciosamente cada 30 segundos. Un rango histórico no se refresca automáticamente.
 
 ## 👥 Sistema de Roles y Permisos

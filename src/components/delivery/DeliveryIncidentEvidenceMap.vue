@@ -7,7 +7,9 @@
     <div class="mt-2 flex flex-wrap gap-3 text-xs text-gray-600">
       <span v-if="showStayRadius" class="flex items-center gap-1"><i class="h-2.5 w-2.5 rounded-full bg-amber-400" /> Estadía agrupada</span>
       <span class="flex items-center gap-1"><i class="h-2.5 w-2.5 rounded-full bg-gray-400" /> Margen</span>
-      <span v-if="hasOrder()" class="flex items-center gap-1"><i class="h-2.5 w-2.5 rounded-full bg-emerald-600" /> Destino del pedido</span>
+      <span v-if="hasCurrentRouteOrder()" class="flex items-center gap-1"><i class="h-2.5 w-2.5 rounded-full bg-violet-600" /> Pedido de ruta en curso</span>
+      <span v-if="hasPreviousRouteOrder()" class="flex items-center gap-1"><i class="h-2.5 w-2.5 rounded-full bg-blue-600" /> Pedido de ruta anterior</span>
+      <span v-if="hasRelatedOrder()" class="flex items-center gap-1"><i class="h-2.5 w-2.5 rounded-full bg-emerald-600" /> Ubicación relacionada</span>
     </div>
   </div>
 </template>
@@ -51,6 +53,9 @@ let counterTimer: number | null = null
 
 const hasOrder = () => (props.orderLatitude != null && props.orderLongitude != null)
   || Boolean(props.stay?.orders.some(order => order.latitude != null && order.longitude != null))
+const hasCurrentRouteOrder = () => Boolean(props.stay?.orders.some(order => order.roles.includes('current_route')))
+const hasPreviousRouteOrder = () => Boolean(props.stay?.orders.some(order => order.roles.includes('previous_route')))
+const hasRelatedOrder = () => Boolean(props.orderId || props.stay?.orders.some(order => order.roles.includes('related')))
 const formatDateTime = (value: string) => new Date(value).toLocaleString('es-CO', { timeZone: 'America/Bogota' })
 
 function currentDurationSeconds() {
@@ -67,7 +72,7 @@ function stayDetails() {
   const active = stay?.isActive ?? props.isActive
   const orders = stay?.orders || []
   const orderRows = orders.map(order => {
-    const roles = order.roles.map(role => ({ previous: 'Pedido anterior', related: 'Pedido relacionado', next: 'Pedido siguiente' })[role]).join(' · ')
+    const roles = order.roles.map(role => ({ current_route: 'Pedido de la ruta en curso', previous_route: 'Pedido de la ruta anterior', related: 'Ubicación relacionada' })[role]).join(' · ')
     return `<div style="margin-top:6px"><b>${escapeMapHtml(roles)} #${order.orderId}</b><br>${escapeMapHtml(order.address || 'Dirección no disponible')}${order.deliveredAt ? `<br>Entregado: ${formatDateTime(order.deliveredAt)}` : ''}</div>`
   }).join('')
   return `<div style="max-width:320px;font-size:12px;line-height:1.45"><b>Estadía agrupada</b><br>Inicio: ${startedAt ? formatDateTime(startedAt) : 'sin dato'}<br>Fin: ${active ? 'Activa' : endedAt ? formatDateTime(endedAt) : 'sin dato'}<br>Duración: <b>${formatStayDuration(currentDurationSeconds())}</b><br>Puntos agrupados: ${stay?.pointCount ?? props.pointCount ?? props.locations.filter(point => point.isCorePoint).length}<br>Ubicación aproximada: ${props.centerLatitude?.toFixed(6) ?? '—'}, ${props.centerLongitude?.toFixed(6) ?? '—'}<br>Radio observado: ${Math.round(props.radiusMeters)} m<br>Sucursal: ${escapeMapHtml(props.branchName || 'sin dato')} · ${props.distanceToBranchMeters == null ? 'sin distancia' : `${Math.round(props.distanceToBranchMeters)} m`}<br>Distancia al pedido: ${props.distanceToOrderMeters == null ? 'sin dato' : `${Math.round(props.distanceToOrderMeters)} m`}${orderRows || (props.orderId ? `<div style="margin-top:6px"><b>Pedido relacionado #${props.orderId}</b><br>${escapeMapHtml(props.orderAddress || 'Dirección no disponible')}</div>` : '<br>Sin pedidos relacionados')}</div>`
@@ -180,12 +185,12 @@ function renderEvidence() {
     if (order.latitude == null || order.longitude == null) return
     const orderPosition = { lat: order.latitude, lng: order.longitude }
     bounds.extend(orderPosition)
-    const role = order.roles.includes('related') ? 'related' : order.roles[0] || 'next'
+    const role = order.roles.includes('related') ? 'related' : order.roles[0] || 'current_route'
     const styles = role === 'related'
       ? { color: '#059669', label: 'R' }
-      : role === 'previous'
+      : role === 'previous_route'
         ? { color: '#2563eb', label: 'A' }
-        : { color: '#7c3aed', label: 'S' }
+        : { color: '#7c3aed', label: 'P' }
     const orderMarker = new google.maps.Marker({
       map,
       position: orderPosition,

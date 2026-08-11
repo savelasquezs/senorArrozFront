@@ -166,7 +166,7 @@ export interface DeliveryPlaybackDeliveryman {
   stays: DeliveryPlaybackStay[]
 }
 
-export type DeliveryPlaybackOrderRole = 'previous' | 'related' | 'next'
+export type DeliveryPlaybackOrderRole = 'current_route' | 'previous_route' | 'related'
 
 export interface DeliveryPlaybackOrder {
   orderId: number

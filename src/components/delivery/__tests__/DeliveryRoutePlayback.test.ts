@@ -154,7 +154,14 @@ describe('DeliveryRoutePlayback overlays', () => {
           distanceToBranchMeters: 100,
           distanceToOrderMeters: 30,
           classification: 'pending_review',
-          orders: [],
+          orders: [{
+            orderId: 701,
+            deliveredAt: null,
+            address: 'Destino en ruta',
+            latitude: 6.251,
+            longitude: -75.581,
+            roles: ['current_route'],
+          }],
         }],
       }],
     }
@@ -165,6 +172,7 @@ describe('DeliveryRoutePlayback overlays', () => {
 
     expect(markerInstances.some(marker => marker.title.includes('punto GPS'))).toBe(false)
     expect(markerInstances.some(marker => marker.title === 'Ver detalle de la estadía')).toBe(true)
+    expect(markerInstances.some(marker => marker.title.includes('Pedido de la ruta en curso #701'))).toBe(true)
     expect(CircleMock.instances).toHaveLength(1)
   })
 })
