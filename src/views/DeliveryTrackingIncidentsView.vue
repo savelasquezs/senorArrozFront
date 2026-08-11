@@ -132,9 +132,9 @@
 
         <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <Fact label="Inicio" :value="formatDateTime(detail.startedAt)" />
-          <Fact :label="detail.incidentType === 'location_disabled' ? 'Recuperación' : 'Finalización'" :value="detail.incidentType !== 'location_disabled' || detail.evidenceComplete ? formatDateTime(detail.endedAt) : 'Aún no registrada'" />
-          <Fact label="Duración" :value="formatDuration(detail.durationSeconds)" />
-          <Fact label="Puntos de evidencia" :value="String(detail.locations.length)" />
+          <Fact :label="detail.incidentType === 'location_disabled' ? 'Recuperación' : 'Finalización'" :value="detail.isActive ? 'Activa' : detail.endedAt ? formatDateTime(detail.endedAt) : 'Aún no registrada'" />
+          <Fact label="Duración" :value="formatDuration(detail.isActive ? Math.floor((liveNow - new Date(detail.startedAt).getTime()) / 1000) : detail.durationSeconds)" />
+          <Fact :label="detail.incidentType === 'stay' ? 'Puntos agrupados' : 'Puntos de evidencia'" :value="String(detail.incidentType === 'stay' ? detail.pointCount : detail.locations.length)" />
           <Fact v-if="detail.incidentType === 'stay'" label="Precisión promedio" :value="formatMeters(detail.averageAccuracyMeters)" />
           <Fact v-if="detail.incidentType === 'stay'" label="Radio observado" :value="formatMeters(detail.radiusMeters)" />
           <Fact v-if="detail.incidentType === 'stay'" label="Distancia a sucursal" :value="formatNullableMeters(detail.distanceToBranchMeters)" />
@@ -157,7 +157,7 @@
             <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-[1fr_1fr_auto]">
               <BaseInput v-model="contextFrom" label="Desde (hora Colombia)" type="datetime-local" />
               <BaseInput v-model="contextTo" label="Hasta (hora Colombia)" type="datetime-local" />
-              <BaseButton class="self-end" :loading="playbackLoading" @click="loadContextPlayback">Cargar recorrido</BaseButton>
+              <BaseButton class="self-end" :loading="playbackLoading" @click="loadContextPlayback()">Cargar recorrido</BaseButton>
             </div>
             <p v-if="contextRecoveryMissing" class="rounded-lg bg-amber-50 p-3 text-sm text-amber-800">La recuperación aún no ha sido registrada.</p>
             <BaseLoading v-if="playbackLoading" text="Cargando recorrido..." class="py-16" />
@@ -168,6 +168,11 @@
           <DeliveryIncidentEvidenceMap v-else
             :locations="detail.locations" :center-latitude="detail.centerLatitude"
             :center-longitude="detail.centerLongitude" :radius-meters="detail.radiusMeters"
+            :stay="contextIncidentStay" :started-at="detail.startedAt" :ended-at="detail.endedAt"
+            :is-active="detail.isActive" :duration-seconds="detail.durationSeconds" :point-count="detail.pointCount"
+            :branch-name="detail.branchName" :distance-to-branch-meters="detail.distanceToBranchMeters"
+            :distance-to-order-meters="detail.distanceToOrderMeters" :order-id="detail.orderId"
+            :order-address="detail.orderAddress"
             :show-stay-radius="detail.incidentType === 'stay'" :order-latitude="detail.orderLatitude"
             :order-longitude="detail.orderLongitude" />
         </section>
@@ -248,7 +253,7 @@
           <BaseInput v-model="explorerFrom" label="Desde (hora Colombia)" type="datetime-local" />
           <BaseInput v-model="explorerTo" label="Hasta (hora Colombia)" type="datetime-local" />
           <div class="flex items-end gap-2">
-            <BaseButton :loading="explorerLoading" @click="loadExplorerPlayback">Cargar recorrido</BaseButton>
+            <BaseButton :loading="explorerLoading" @click="loadExplorerPlayback()">Cargar recorrido</BaseButton>
             <BaseButton variant="outline" @click="clearExplorer">Limpiar</BaseButton>
           </div>
         </div>
@@ -274,7 +279,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, defineComponent, h, onMounted, reactive, ref, watch } from 'vue'
+import { computed, defineComponent, h, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import MainLayout from '@/components/layout/MainLayout.vue'
 import BaseBadge from '@/components/ui/BaseBadge.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
@@ -290,7 +295,7 @@ import { useAuthStore } from '@/store/auth'
 import { branchApi } from '@/services/MainAPI/branchApi'
 import { useToast } from '@/composables/useToast'
 import { userApi } from '@/services/MainAPI/userApi'
-import { calculateIncidentPlaybackRange, colombiaDateTimeLocalToIso, isoToColombiaDateTimeLocal } from '@/composables/useDeliveryRoutePlayback'
+import { calculateIncidentPlaybackRange, colombiaDateTimeLocalToIso, formatStayDuration, isoToColombiaDateTimeLocal } from '@/composables/useDeliveryRoutePlayback'
 import {
   deliveryTrackingIncidentsApi,
   type DeliveryIncidentReviewStatus,
@@ -338,6 +343,18 @@ const playbackLoading = ref(false)
 const playbackError = ref('')
 const contextRecoveryMissing = ref(false)
 const contextIncidentEnd = computed(() => detail.value ? calculateIncidentPlaybackRange(detail.value).recoveryAt : null)
+const contextIncidentStay = computed(() => {
+  if (!detail.value || detail.value.incidentType !== 'stay') return null
+  return contextPlayback.value?.deliverymen[0]?.stays.find(stay =>
+    stay.workSessionId === detail.value!.workSessionId
+    && Math.abs(new Date(stay.startedAt).getTime() - new Date(detail.value!.startedAt).getTime()) < 1_000) || null
+})
+const liveNow = ref(Date.now())
+const contextLiveFollow = ref(false)
+const explorerLiveFollow = ref(false)
+let liveRefreshTimer: number | null = null
+let liveClockTimer: number | null = null
+let liveRefreshRunning = false
 const explorerOpen = ref(false)
 const explorerBranchId = ref('')
 const explorerFrom = ref('')
@@ -445,16 +462,18 @@ async function openDetail(id: number) {
   }
 }
 
-async function loadContextPlayback() {
+async function loadContextPlayback(silent = false, toOverride?: string) {
   if (!detail.value) return
-  playbackLoading.value = true
-  playbackError.value = ''
-  contextPlayback.value = null
+  if (!silent) {
+    playbackLoading.value = true
+    playbackError.value = ''
+    contextPlayback.value = null
+  }
   try {
     const response = await deliveryTrackingIncidentsApi.getPlayback({
       deliverymanIds: [detail.value.deliverymanId],
       from: colombiaDateTimeLocalToIso(contextFrom.value),
-      to: colombiaDateTimeLocalToIso(contextTo.value),
+      to: toOverride || colombiaDateTimeLocalToIso(contextTo.value),
       branchId: detail.value.branchId,
     })
     contextPlayback.value = response.data
@@ -464,10 +483,13 @@ async function loadContextPlayback() {
       response.data.deliverymen[0]?.points || [],
     )
     contextRecoveryMissing.value = range.recoveryMissing
+    contextLiveFollow.value = detail.value.isActive
+      && Math.abs(new Date(toOverride || colombiaDateTimeLocalToIso(contextTo.value)).getTime() - Date.now()) < 90_000
+    updateLiveRefreshTimer()
   } catch (error: any) {
-    playbackError.value = error.message || 'No fue posible cargar el recorrido.'
+    if (!silent) playbackError.value = error.message || 'No fue posible cargar el recorrido.'
   } finally {
-    playbackLoading.value = false
+    if (!silent) playbackLoading.value = false
   }
 }
 
@@ -506,26 +528,75 @@ async function loadExplorerDeliverymen() {
   }
 }
 
-async function loadExplorerPlayback() {
-  explorerError.value = ''
+async function loadExplorerPlayback(silent = false, toOverride?: string) {
+  if (!silent) explorerError.value = ''
   if (!explorerFrom.value || !explorerTo.value || !explorerSelectedIds.value.length) {
     explorerError.value = 'Selecciona el rango y al menos un domiciliario.'
     return
   }
-  explorerLoading.value = true
-  explorerPlayback.value = null
+  if (!silent) {
+    explorerLoading.value = true
+    explorerPlayback.value = null
+  }
   try {
     const response = await deliveryTrackingIncidentsApi.getPlayback({
       deliverymanIds: explorerSelectedIds.value,
       from: colombiaDateTimeLocalToIso(explorerFrom.value),
-      to: colombiaDateTimeLocalToIso(explorerTo.value),
+      to: toOverride || colombiaDateTimeLocalToIso(explorerTo.value),
       branchId: Number(explorerBranchId.value || authStore.branchId),
     })
     explorerPlayback.value = response.data
+    explorerLiveFollow.value = response.data.deliverymen.some(item => item.stays.some(stay => stay.isActive))
+      && Math.abs(new Date(toOverride || colombiaDateTimeLocalToIso(explorerTo.value)).getTime() - Date.now()) < 90_000
+    updateLiveRefreshTimer()
   } catch (error: any) {
-    explorerError.value = error.message || 'No fue posible cargar el recorrido.'
+    if (!silent) explorerError.value = error.message || 'No fue posible cargar el recorrido.'
   } finally {
-    explorerLoading.value = false
+    if (!silent) explorerLoading.value = false
+  }
+}
+
+function canExtendLiveRange(from: string) {
+  return Date.now() - new Date(colombiaDateTimeLocalToIso(from)).getTime() < 24 * 60 * 60 * 1000 - 30_000
+}
+
+async function refreshLiveMaps() {
+  if (liveRefreshRunning) return
+  liveRefreshRunning = true
+  try {
+    if (detailOpen.value && detail.value?.isActive && contextLiveFollow.value) {
+      if (!canExtendLiveRange(contextFrom.value)) {
+        contextLiveFollow.value = false
+      } else {
+        const response = await deliveryTrackingIncidentsApi.getById(detail.value.id)
+        detail.value = response.data
+        contextTo.value = isoToColombiaDateTimeLocal(Date.now())
+        await loadContextPlayback(true, new Date().toISOString())
+      }
+    }
+    if (explorerOpen.value && explorerLiveFollow.value && explorerPlayback.value) {
+      if (!canExtendLiveRange(explorerFrom.value)) {
+        explorerLiveFollow.value = false
+      } else {
+        explorerTo.value = isoToColombiaDateTimeLocal(Date.now())
+        await loadExplorerPlayback(true, new Date().toISOString())
+      }
+    }
+  } catch {
+  } finally {
+    liveRefreshRunning = false
+    updateLiveRefreshTimer()
+  }
+}
+
+function updateLiveRefreshTimer() {
+  const shouldRefresh = (detailOpen.value && contextLiveFollow.value)
+    || (explorerOpen.value && explorerLiveFollow.value)
+  if (shouldRefresh && liveRefreshTimer == null)
+    liveRefreshTimer = window.setInterval(() => { void refreshLiveMaps() }, 30_000)
+  else if (!shouldRefresh && liveRefreshTimer != null) {
+    window.clearInterval(liveRefreshTimer)
+    liveRefreshTimer = null
   }
 }
 
@@ -535,6 +606,8 @@ function clearExplorer() {
   explorerSelectedIds.value = []
   explorerPlayback.value = null
   explorerError.value = ''
+  explorerLiveFollow.value = false
+  updateLiveRefreshTimer()
   if (authStore.isSuperadmin) {
     explorerBranchId.value = ''
     explorerDeliverymen.value = []
@@ -587,7 +660,7 @@ async function saveReview() {
 function formatDateTime(value: string) {
   return new Intl.DateTimeFormat('es-CO', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'America/Bogota' }).format(new Date(value))
 }
-function formatDuration(seconds: number) { const minutes = Math.round(seconds / 60); return minutes < 60 ? `${minutes} min` : `${Math.floor(minutes / 60)} h ${minutes % 60} min` }
+function formatDuration(seconds: number) { return formatStayDuration(seconds) }
 function formatMeters(value: number) { return value >= 1000 ? `${(value / 1000).toFixed(1)} km` : `${Math.round(value)} m` }
 function formatNullableMeters(value: number | null) { return value == null ? 'No disponible' : formatMeters(value) }
 function booleanLabel(value: boolean | null) { return value == null ? 'Sin dato' : value ? 'Sí' : 'No' }
@@ -606,8 +679,24 @@ function orderStatusLabel(value: string | null) { return ({ OnTheWay: 'En camino
 function deviceEventLabel(value: string) { return ({ gps_disabled: 'GPS apagado', gps_enabled: 'GPS recuperado', internet_lost: 'Internet perdido', internet_recovered: 'Internet recuperado', location_permission_revoked: 'Permiso retirado', location_permission_recovered: 'Permiso recuperado', battery_low: 'Batería baja', app_stopped: 'Aplicación detenida', location_service_restarted: 'Servicio reiniciado', automatic_closure: 'Cierre automático', total_settlement: 'Cierre por liquidación', tracking_started: 'Seguimiento iniciado', tracking_stopped: 'Seguimiento detenido' } as Record<string, string>)[value] || value.replace(/_/g, ' ') }
 
 onMounted(async () => {
+  liveClockTimer = window.setInterval(() => { liveNow.value = Date.now() }, 1_000)
   try { await loadBranches() } catch (error: any) { toast.error('No se pudieron cargar las sucursales', error.message) }
   await loadIncidents()
+})
+
+onUnmounted(() => {
+  if (liveClockTimer != null) window.clearInterval(liveClockTimer)
+  if (liveRefreshTimer != null) window.clearInterval(liveRefreshTimer)
+})
+
+watch(detailOpen, value => {
+  if (!value) contextLiveFollow.value = false
+  updateLiveRefreshTimer()
+})
+
+watch(explorerOpen, value => {
+  if (!value) explorerLiveFollow.value = false
+  updateLiveRefreshTimer()
 })
 
 watch(explorerBranchId, () => {

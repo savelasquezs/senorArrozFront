@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   calculateIncidentPlaybackRange,
   colombiaDateTimeLocalToIso,
-  detectStays,
+  formatStayDuration,
   gapThreshold,
   hasTechnicalGap,
 } from '@/composables/useDeliveryRoutePlayback'
@@ -23,7 +23,7 @@ const incident = (complete = true): DeliveryTrackingIncidentDetail => ({
   orderId: null, automaticClassification: null, classificationReason: null,
   finalClassification: null, reviewStatus: 'pending',
   startedAt: '2026-07-26T17:10:00Z', endedAt: '2026-07-26T17:20:00Z',
-  durationSeconds: 600, centerLatitude: null, centerLongitude: null, radiusMeters: 0,
+  isActive: false, pointCount: 0, durationSeconds: 600, centerLatitude: null, centerLongitude: null, radiusMeters: 0,
   averageAccuracyMeters: 0, distanceToBranchMeters: null, distanceToOrderMeters: null,
   orderAddress: null, orderLatitude: null, orderLongitude: null, orderStatus: null,
   adminNotes: null, deliverymanExplanation: null, reviewedByUserId: null,
@@ -51,10 +51,9 @@ describe('delivery route playback utilities', () => {
     expect(range.to - new Date(incident(false).startedAt).getTime()).toBe(24 * 60 * 60 * 1000)
   })
 
-  it('detecta permanencias usando RecordedAt y tolerancia de precisión', () => {
-    const stays = detectStays([point(1, 0), point(2, 1, 6.2502, 20), point(3, 3, 6.2501)])
-    expect(stays).toHaveLength(1)
-    expect(stays[0]!.end - stays[0]!.start).toBe(180_000)
+  it('formatea duraciones menores y mayores a una hora', () => {
+    expect(formatStayDuration(65)).toBe('01:05')
+    expect(formatStayDuration(3665)).toBe('01:01:05')
   })
 
   it('detecta huecos temporales y técnicos', () => {

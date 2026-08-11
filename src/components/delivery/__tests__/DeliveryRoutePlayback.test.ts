@@ -7,12 +7,14 @@ const markerInstances = vi.hoisted(() => [] as MarkerMock[])
 
 class MarkerMock {
   title = ''
+  options: any
   setMap = vi.fn()
   setPosition = vi.fn()
   setLabel = vi.fn()
   addListener = vi.fn(() => ({ remove: vi.fn() }))
 
   constructor(options: { title?: string }) {
+    this.options = options
     this.title = options.title || ''
     markerInstances.push(this)
   }
@@ -21,6 +23,18 @@ class MarkerMock {
 class PolylineMock {
   setMap = vi.fn()
   setOptions = vi.fn()
+}
+
+class CircleMock {
+  static instances: CircleMock[] = []
+  setMap = vi.fn()
+  setCenter = vi.fn()
+  setRadius = vi.fn()
+  addListener = vi.fn(() => ({ remove: vi.fn() }))
+
+  constructor() {
+    CircleMock.instances.push(this)
+  }
 }
 
 class MapMock {
@@ -53,6 +67,7 @@ const data: DeliveryPlaybackResponse = {
     branchId: 1,
     branchName: 'Centro',
     events: [],
+    stays: [],
     points: [
       {
         id: 1, deliverymanId: 1, latitude: 6.25, longitude: -75.58,
@@ -75,12 +90,14 @@ const data: DeliveryPlaybackResponse = {
 describe('DeliveryRoutePlayback overlays', () => {
   beforeEach(() => {
     markerInstances.length = 0
+    CircleMock.instances.length = 0
     vi.stubEnv('VITE_GOOGLE_MAPS_API_KEY', 'test-key')
     vi.stubGlobal('google', {
       maps: {
         Map: MapMock,
         Marker: MarkerMock,
         Polyline: PolylineMock,
+        Circle: CircleMock,
         LatLngBounds: BoundsMock,
         InfoWindow: class {
           setContent = vi.fn()
@@ -111,5 +128,43 @@ describe('DeliveryRoutePlayback overlays', () => {
     expect(firstPoint!.setMap).not.toHaveBeenCalledWith(null)
     expect(activeMarker!.setPosition).toHaveBeenCalled()
     expect(markerInstances.some(marker => marker.title === 'Punto del incidente')).toBe(true)
+  })
+
+  it('reemplaza los puntos agrupados por círculo y marcador de estadía', async () => {
+    const groupedData: DeliveryPlaybackResponse = {
+      ...data,
+      to: '2026-07-26T17:02:00Z',
+      deliverymen: [{
+        ...data.deliverymen[0]!,
+        stays: [{
+          id: 9,
+          workSessionId: 3,
+          deliveryRouteId: 2,
+          startedAt: '2026-07-26T17:00:00Z',
+          endedAt: '2026-07-26T17:01:00Z',
+          isActive: false,
+          durationSeconds: 60,
+          centerLatitude: 6.2505,
+          centerLongitude: -75.5805,
+          radiusMeters: 20,
+          averageAccuracyMeters: 5,
+          pointCount: 2,
+          firstLocationId: 1,
+          lastLocationId: 2,
+          distanceToBranchMeters: 100,
+          distanceToOrderMeters: 30,
+          classification: 'pending_review',
+          orders: [],
+        }],
+      }],
+    }
+    const wrapper = mount(DeliveryRoutePlayback, { props: { data: groupedData } })
+    await flushPromises()
+    await wrapper.get('input[type="range"]').setValue('1000')
+    await nextTick()
+
+    expect(markerInstances.some(marker => marker.title.includes('punto GPS'))).toBe(false)
+    expect(markerInstances.some(marker => marker.title === 'Ver detalle de la estadía')).toBe(true)
+    expect(CircleMock.instances).toHaveLength(1)
   })
 })

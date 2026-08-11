@@ -5,7 +5,7 @@
     </div>
     <div v-else ref="mapContainer" class="h-[420px] w-full rounded-xl border border-gray-200" />
     <div class="mt-2 flex flex-wrap gap-3 text-xs text-gray-600">
-      <span class="flex items-center gap-1"><i class="h-2.5 w-2.5 rounded-full bg-blue-600" /> Punto de evidencia</span>
+      <span v-if="showStayRadius" class="flex items-center gap-1"><i class="h-2.5 w-2.5 rounded-full bg-amber-400" /> Estadía agrupada</span>
       <span class="flex items-center gap-1"><i class="h-2.5 w-2.5 rounded-full bg-gray-400" /> Margen</span>
       <span v-if="hasOrder()" class="flex items-center gap-1"><i class="h-2.5 w-2.5 rounded-full bg-emerald-600" /> Destino del pedido</span>
     </div>
@@ -15,7 +15,8 @@
 <script setup lang="ts">
 import { onMounted, onUnmounted, ref, watch } from 'vue'
 import { importLibrary, setOptions } from '@googlemaps/js-api-loader'
-import type { DeliveryIncidentLocationEvidence } from '@/services/MainAPI/deliveryTrackingIncidentsApi'
+import { escapeMapHtml, formatStayDuration } from '@/composables/useDeliveryRoutePlayback'
+import type { DeliveryIncidentLocationEvidence, DeliveryPlaybackStay } from '@/services/MainAPI/deliveryTrackingIncidentsApi'
 
 const props = defineProps<{
   locations: DeliveryIncidentLocationEvidence[]
@@ -23,6 +24,17 @@ const props = defineProps<{
   centerLongitude: number | null
   radiusMeters: number
   showStayRadius?: boolean
+  stay?: DeliveryPlaybackStay | null
+  startedAt?: string | null
+  endedAt?: string | null
+  isActive?: boolean
+  durationSeconds?: number
+  pointCount?: number
+  branchName?: string
+  distanceToBranchMeters?: number | null
+  distanceToOrderMeters?: number | null
+  orderId?: number | null
+  orderAddress?: string | null
   orderLatitude?: number | null
   orderLongitude?: number | null
 }>()
@@ -33,8 +45,42 @@ let map: google.maps.Map | null = null
 let markers: google.maps.Marker[] = []
 let routeLine: google.maps.Polyline | null = null
 let stayCircle: google.maps.Circle | null = null
+let stayMarker: google.maps.Marker | null = null
+let infoWindow: google.maps.InfoWindow | null = null
+let counterTimer: number | null = null
 
-const hasOrder = () => props.orderLatitude != null && props.orderLongitude != null
+const hasOrder = () => (props.orderLatitude != null && props.orderLongitude != null)
+  || Boolean(props.stay?.orders.some(order => order.latitude != null && order.longitude != null))
+const formatDateTime = (value: string) => new Date(value).toLocaleString('es-CO', { timeZone: 'America/Bogota' })
+
+function currentDurationSeconds() {
+  const startedAt = props.stay?.startedAt || props.startedAt
+  const active = props.stay?.isActive ?? props.isActive
+  if (active && startedAt) return Math.max(0, Math.floor((Date.now() - new Date(startedAt).getTime()) / 1000))
+  return props.stay?.durationSeconds ?? props.durationSeconds ?? 0
+}
+
+function stayDetails() {
+  const stay = props.stay
+  const startedAt = stay?.startedAt || props.startedAt
+  const endedAt = stay?.endedAt || props.endedAt
+  const active = stay?.isActive ?? props.isActive
+  const orders = stay?.orders || []
+  const orderRows = orders.map(order => {
+    const roles = order.roles.map(role => ({ previous: 'Pedido anterior', related: 'Pedido relacionado', next: 'Pedido siguiente' })[role]).join(' · ')
+    return `<div style="margin-top:6px"><b>${escapeMapHtml(roles)} #${order.orderId}</b><br>${escapeMapHtml(order.address || 'Dirección no disponible')}${order.deliveredAt ? `<br>Entregado: ${formatDateTime(order.deliveredAt)}` : ''}</div>`
+  }).join('')
+  return `<div style="max-width:320px;font-size:12px;line-height:1.45"><b>Estadía agrupada</b><br>Inicio: ${startedAt ? formatDateTime(startedAt) : 'sin dato'}<br>Fin: ${active ? 'Activa' : endedAt ? formatDateTime(endedAt) : 'sin dato'}<br>Duración: <b>${formatStayDuration(currentDurationSeconds())}</b><br>Puntos agrupados: ${stay?.pointCount ?? props.pointCount ?? props.locations.filter(point => point.isCorePoint).length}<br>Ubicación aproximada: ${props.centerLatitude?.toFixed(6) ?? '—'}, ${props.centerLongitude?.toFixed(6) ?? '—'}<br>Radio observado: ${Math.round(props.radiusMeters)} m<br>Sucursal: ${escapeMapHtml(props.branchName || 'sin dato')} · ${props.distanceToBranchMeters == null ? 'sin distancia' : `${Math.round(props.distanceToBranchMeters)} m`}<br>Distancia al pedido: ${props.distanceToOrderMeters == null ? 'sin dato' : `${Math.round(props.distanceToOrderMeters)} m`}${orderRows || (props.orderId ? `<div style="margin-top:6px"><b>Pedido relacionado #${props.orderId}</b><br>${escapeMapHtml(props.orderAddress || 'Dirección no disponible')}</div>` : '<br>Sin pedidos relacionados')}</div>`
+}
+
+function updateStayCounter() {
+  stayMarker?.setLabel({
+    text: formatStayDuration(currentDurationSeconds()),
+    color: '#111827',
+    fontSize: '12px',
+    fontWeight: '700',
+  })
+}
 
 function clearEvidence() {
   markers.forEach(marker => marker.setMap(null))
@@ -43,6 +89,8 @@ function clearEvidence() {
   routeLine = null
   stayCircle?.setMap(null)
   stayCircle = null
+  stayMarker?.setMap(null)
+  stayMarker = null
 }
 
 function renderEvidence() {
@@ -52,6 +100,7 @@ function renderEvidence() {
   const path = props.locations.map(point => ({ lat: point.latitude, lng: point.longitude }))
 
   if (path.length > 0) {
+    path.forEach(position => bounds.extend(position))
     routeLine = new google.maps.Polyline({
       map,
       path,
@@ -60,19 +109,19 @@ function renderEvidence() {
       strokeWeight: 4,
     })
     props.locations.forEach((point, index) => {
+      if (props.showStayRadius && point.isCorePoint) return
       const position = path[index]!
-      bounds.extend(position)
       markers.push(new google.maps.Marker({
         map,
         position,
-        title: `${point.isCorePoint ? 'Punto de evidencia' : 'Margen'} · ${new Date(point.recordedAt).toLocaleString('es-CO')}`,
+        title: `${point.isCorePoint ? 'Punto de evidencia' : 'Margen'} · ${formatDateTime(point.recordedAt)}`,
         icon: {
           path: google.maps.SymbolPath.CIRCLE,
-          fillColor: point.isCorePoint ? '#2563eb' : '#9ca3af',
+          fillColor: '#9ca3af',
           fillOpacity: 1,
           strokeColor: '#ffffff',
           strokeWeight: 2,
-          scale: point.isCorePoint ? 6 : 5,
+          scale: 5,
         },
       }))
     })
@@ -87,32 +136,76 @@ function renderEvidence() {
         center,
         radius: Math.max(props.radiusMeters, 5),
         fillColor: '#f59e0b',
-        fillOpacity: 0.12,
+        fillOpacity: 0.22,
         strokeColor: '#d97706',
         strokeOpacity: 0.8,
         strokeWeight: 2,
+        clickable: true,
       })
+      stayMarker = new google.maps.Marker({
+        map,
+        position: center,
+        title: 'Ver detalle de la estadía',
+        zIndex: 24,
+        label: {
+          text: formatStayDuration(currentDurationSeconds()),
+          color: '#111827',
+          fontSize: '12px',
+          fontWeight: '700',
+        },
+        icon: {
+          path: google.maps.SymbolPath.CIRCLE,
+          fillColor: '#fbbf24',
+          fillOpacity: .95,
+          strokeColor: '#ffffff',
+          strokeWeight: 3,
+          scale: 22,
+        },
+      })
+      const openDetails = () => {
+        infoWindow?.setContent(stayDetails())
+        infoWindow?.open({ map, anchor: stayMarker! })
+      }
+      stayMarker.addListener('click', openDetails)
+      stayCircle.addListener('click', openDetails)
     }
   }
 
-  if (hasOrder()) {
-    const orderPosition = { lat: props.orderLatitude!, lng: props.orderLongitude! }
+  const contextOrders = props.stay?.orders?.length
+    ? props.stay.orders
+    : hasOrder() && props.orderId
+      ? [{ orderId: props.orderId, deliveredAt: null, address: props.orderAddress || null, latitude: props.orderLatitude!, longitude: props.orderLongitude!, roles: ['related'] as const }]
+      : []
+  contextOrders.forEach(order => {
+    if (order.latitude == null || order.longitude == null) return
+    const orderPosition = { lat: order.latitude, lng: order.longitude }
     bounds.extend(orderPosition)
-    markers.push(new google.maps.Marker({
+    const role = order.roles.includes('related') ? 'related' : order.roles[0] || 'next'
+    const styles = role === 'related'
+      ? { color: '#059669', label: 'R' }
+      : role === 'previous'
+        ? { color: '#2563eb', label: 'A' }
+        : { color: '#7c3aed', label: 'S' }
+    const orderMarker = new google.maps.Marker({
       map,
       position: orderPosition,
-      title: 'Destino del pedido',
-      label: { text: 'P', color: '#ffffff', fontWeight: '700' },
+      title: `Pedido #${order.orderId}`,
+      label: { text: styles.label, color: '#ffffff', fontWeight: '700' },
       icon: {
         path: google.maps.SymbolPath.CIRCLE,
-        fillColor: '#059669',
+        fillColor: styles.color,
         fillOpacity: 1,
         strokeColor: '#ffffff',
         strokeWeight: 2,
         scale: 11,
       },
-    }))
-  }
+    })
+    orderMarker.addListener('click', () => {
+      infoWindow?.setContent(`<div style="max-width:260px;font-size:12px"><b>Pedido #${order.orderId}</b><br>${escapeMapHtml(order.address || 'Dirección no disponible')}${order.deliveredAt ? `<br>Entregado: ${formatDateTime(order.deliveredAt)}` : ''}</div>`)
+      infoWindow?.open({ map, anchor: orderMarker })
+    })
+    markers.push(orderMarker)
+  })
 
   if (props.locations.length === 0 && !hasOrder() && center) {
     map.setCenter(center)
@@ -127,7 +220,10 @@ function resolveCenter() {
     return { lat: props.centerLatitude, lng: props.centerLongitude }
   const first = props.locations[0]
   if (first) return { lat: first.latitude, lng: first.longitude }
-  if (hasOrder()) return { lat: props.orderLatitude!, lng: props.orderLongitude! }
+  if (props.orderLatitude != null && props.orderLongitude != null)
+    return { lat: props.orderLatitude, lng: props.orderLongitude }
+  const contextOrder = props.stay?.orders.find(order => order.latitude != null && order.longitude != null)
+  if (contextOrder) return { lat: contextOrder.latitude!, lng: contextOrder.longitude! }
   return null
 }
 
@@ -150,18 +246,25 @@ async function initialize() {
       mapTypeControl: false,
       fullscreenControl: true,
     })
+    infoWindow = new google.maps.InfoWindow()
     renderEvidence()
   } catch {
     error.value = 'No fue posible cargar el mapa. La evidencia numérica continúa disponible.'
   }
 }
 
-watch(() => [props.locations, props.centerLatitude, props.centerLongitude, props.radiusMeters, props.orderLatitude, props.orderLongitude],
+watch(() => [props.locations, props.centerLatitude, props.centerLongitude, props.radiusMeters, props.orderLatitude, props.orderLongitude, props.stay],
   () => renderEvidence(), { deep: true })
 
-onMounted(initialize)
+onMounted(() => {
+  void initialize()
+  counterTimer = window.setInterval(updateStayCounter, 1_000)
+})
 onUnmounted(() => {
+  if (counterTimer != null) window.clearInterval(counterTimer)
   clearEvidence()
+  infoWindow?.close()
+  infoWindow = null
   map = null
 })
 </script>

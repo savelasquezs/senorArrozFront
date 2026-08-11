@@ -4,6 +4,7 @@ import type {
   DeliveryPlaybackDeliveryman,
   DeliveryPlaybackEvent,
   DeliveryPlaybackPoint,
+  DeliveryPlaybackStay,
   DeliveryTrackingIncidentDetail,
 } from '@/services/MainAPI/deliveryTrackingIncidentsApi'
 
@@ -21,13 +22,6 @@ const INVALID_LOCATION_EVENTS = new Set([
   'tracking_stopped',
   'app_stopped',
 ])
-
-export interface PlaybackStay {
-  start: number
-  end: number
-  latitude: number
-  longitude: number
-}
 
 export function colombiaDateTimeLocalToIso(value: string): string {
   const match = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2}))?$/.exec(value)
@@ -58,7 +52,7 @@ export function calculateIncidentPlaybackRange(
   now = Date.now(),
 ) {
   const startedAt = new Date(incident.startedAt).getTime()
-  let referenceEnd = new Date(incident.endedAt).getTime()
+  let referenceEnd = incident.endedAt ? new Date(incident.endedAt).getTime() : now
   let recoveryMissing = false
   if (incident.incidentType === 'location_disabled') {
     const eventRecovery = events
@@ -76,40 +70,41 @@ export function calculateIncidentPlaybackRange(
   }
   return {
     from: startedAt - 5 * 60 * 1000,
-    to: Math.min(referenceEnd + 5 * 60 * 1000, startedAt + 24 * 60 * 60 * 1000),
+    to: Math.min(incident.isActive ? now : referenceEnd + 5 * 60 * 1000, startedAt + 24 * 60 * 60 * 1000),
     recoveryAt: recoveryMissing ? null : referenceEnd,
     recoveryMissing,
   }
 }
 
-export function haversineMeters(a: DeliveryPlaybackPoint, b: DeliveryPlaybackPoint) {
-  const radius = 6_371_000
-  const rad = Math.PI / 180
-  const dLat = (b.latitude - a.latitude) * rad
-  const dLon = (b.longitude - a.longitude) * rad
-  const lat1 = a.latitude * rad
-  const lat2 = b.latitude * rad
-  const h = Math.sin(dLat / 2) ** 2 + Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLon / 2) ** 2
-  return 2 * radius * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h))
+export function formatStayDuration(totalSeconds: number) {
+  const safeSeconds = Math.max(0, Math.floor(totalSeconds))
+  const hours = Math.floor(safeSeconds / 3600)
+  const minutes = Math.floor((safeSeconds % 3600) / 60)
+  const seconds = safeSeconds % 60
+  const minuteText = String(minutes).padStart(2, '0')
+  const secondText = String(seconds).padStart(2, '0')
+  return hours > 0
+    ? `${String(hours).padStart(2, '0')}:${minuteText}:${secondText}`
+    : `${minuteText}:${secondText}`
 }
 
-export function detectStays(points: DeliveryPlaybackPoint[], radius = 30, minimumMs = 60_000): PlaybackStay[] {
-  const result: PlaybackStay[] = []
-  let start = 0
-  for (let index = 1; index <= points.length; index++) {
-    const first = points[start]
-    const point = points[index]
-    const tolerance = point && first
-      ? radius + Math.min(50, Math.max(first.accuracyMeters || 0, point.accuracyMeters || 0))
-      : radius
-    if (point && first && haversineMeters(first, point) <= tolerance) continue
-    const last = points[index - 1]
-    if (first && last && new Date(last.recordedAt).getTime() - new Date(first.recordedAt).getTime() >= minimumMs) {
-      result.push({ start: new Date(first.recordedAt).getTime(), end: new Date(last.recordedAt).getTime(), latitude: first.latitude, longitude: first.longitude })
-    }
-    start = index
-  }
-  return result
+export function escapeMapHtml(value: unknown) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;')
+}
+
+export function isPointInsideStay(point: DeliveryPlaybackPoint, stay: DeliveryPlaybackStay) {
+  if (point.workSessionId !== stay.workSessionId) return false
+  const pointTime = new Date(point.recordedAt).getTime()
+  const endTime = stay.endedAt ? new Date(stay.endedAt).getTime() : Number.POSITIVE_INFINITY
+  return pointTime >= new Date(stay.startedAt).getTime()
+    && pointTime <= endTime
+    && point.id >= stay.firstLocationId
+    && (stay.isActive || point.id <= stay.lastLocationId)
 }
 
 export function gapThreshold(points: DeliveryPlaybackPoint[]) {

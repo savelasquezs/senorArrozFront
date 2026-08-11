@@ -84,7 +84,9 @@ export interface DeliveryTrackingIncidentDetail {
   finalClassification: DeliveryStayClassification | null
   reviewStatus: DeliveryIncidentReviewStatus
   startedAt: string
-  endedAt: string
+  endedAt: string | null
+  isActive: boolean
+  pointCount: number
   durationSeconds: number
   centerLatitude: number | null
   centerLongitude: number | null
@@ -161,6 +163,39 @@ export interface DeliveryPlaybackDeliveryman {
   branchName: string
   points: DeliveryPlaybackPoint[]
   events: DeliveryPlaybackEvent[]
+  stays: DeliveryPlaybackStay[]
+}
+
+export type DeliveryPlaybackOrderRole = 'previous' | 'related' | 'next'
+
+export interface DeliveryPlaybackOrder {
+  orderId: number
+  deliveredAt: string | null
+  address: string | null
+  latitude: number | null
+  longitude: number | null
+  roles: DeliveryPlaybackOrderRole[]
+}
+
+export interface DeliveryPlaybackStay {
+  id: number
+  workSessionId: number
+  deliveryRouteId: number | null
+  startedAt: string
+  endedAt: string | null
+  isActive: boolean
+  durationSeconds: number
+  centerLatitude: number
+  centerLongitude: number
+  radiusMeters: number
+  averageAccuracyMeters: number
+  pointCount: number
+  firstLocationId: number
+  lastLocationId: number
+  distanceToBranchMeters: number | null
+  distanceToOrderMeters: number | null
+  classification: DeliveryStayClassification
+  orders: DeliveryPlaybackOrder[]
 }
 
 export interface DeliveryPlaybackResponse {

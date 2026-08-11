@@ -57,14 +57,17 @@ import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseLoading from '@/components/ui/BaseLoading.vue'
 import type {
   DeliveryPlaybackDeliveryman,
+  DeliveryPlaybackOrder,
   DeliveryPlaybackPoint,
   DeliveryPlaybackResponse,
+  DeliveryPlaybackStay,
 } from '@/services/MainAPI/deliveryTrackingIncidentsApi'
 import {
-  detectStays,
+  escapeMapHtml,
+  formatStayDuration,
   gapThreshold,
   hasTechnicalGap,
-  type PlaybackStay,
+  isPointInsideStay,
   useDeliveryRoutePlayback,
 } from '@/composables/useDeliveryRoutePlayback'
 
@@ -77,7 +80,8 @@ const props = defineProps<{
 
 interface StayOverlay {
   marker: google.maps.Marker
-  stay: PlaybackStay
+  circle: google.maps.Circle
+  stay: DeliveryPlaybackStay
 }
 
 interface DeliverymanMapState {
@@ -86,6 +90,7 @@ interface DeliverymanMapState {
   evidenceHalos: Map<number, google.maps.Marker>
   routeLines: google.maps.Polyline[]
   stayMarkers: Map<string, StayOverlay>
+  orderMarkers: Map<number, google.maps.Marker>
   activeMarker: google.maps.Marker | null
   activePoint: DeliveryPlaybackPoint | null
 }
@@ -105,6 +110,7 @@ const mapStates = new Map<number, DeliverymanMapState>()
 const activePositions = new Map<number, google.maps.LatLngLiteral>()
 const pulseMarkers = new Set<google.maps.Marker>()
 const gapThresholds = new Map<number, number>()
+let counterTimer: number | null = null
 
 let map: google.maps.Map | null = null
 let infoWindow: google.maps.InfoWindow | null = null
@@ -121,12 +127,12 @@ const incidentBandStyle = computed(() => ({
   left: `${percent(props.incidentStart!)}%`,
   width: `${percent(props.incidentEnd!) - percent(props.incidentStart!)}%`,
 }))
+const formatDateTime = (value: string) => new Date(value).toLocaleString('es-CO', { timeZone: 'America/Bogota' })
 const popup = (deliveryman: DeliveryPlaybackDeliveryman, point: DeliveryPlaybackPoint) =>
-  `<div style="max-width:260px;font-size:12px"><b>${deliveryman.deliverymanName}</b><br>${new Date(point.recordedAt).toLocaleString('es-CO', { timeZone: 'America/Bogota' })}<br>${point.latitude.toFixed(6)}, ${point.longitude.toFixed(6)}<br>Precisión: ${point.accuracyMeters == null ? 'sin dato' : `${Math.round(point.accuracyMeters)} m`} · Batería: ${point.batteryLevelPercent == null ? 'sin dato' : `${point.batteryLevelPercent}%`}<br>GPS: ${point.gpsEnabled === false ? 'apagado' : 'activo'} · Internet: ${point.internetAvailable === false ? 'no' : 'sí'}<br>Modo: ${point.trackingMode || 'sin dato'}<br>Sincronización: ${point.syncedAt ? new Date(point.syncedAt).toLocaleString('es-CO', { timeZone: 'America/Bogota' }) : 'sin dato'}${point.syncedAt && time(point.syncedAt) - time(point.recordedAt) > 60000 ? '<br><b>Enviado offline</b>' : ''}<br>Ruta: ${point.deliveryRouteId ?? '—'} · Jornada: ${point.workSessionId ?? '—'}</div>`
+  `<div style="max-width:260px;font-size:12px"><b>${escapeMapHtml(deliveryman.deliverymanName)}</b><br>${formatDateTime(point.recordedAt)}<br>${point.latitude.toFixed(6)}, ${point.longitude.toFixed(6)}<br>Precisión: ${point.accuracyMeters == null ? 'sin dato' : `${Math.round(point.accuracyMeters)} m`} · Batería: ${point.batteryLevelPercent == null ? 'sin dato' : `${point.batteryLevelPercent}%`}<br>GPS: ${point.gpsEnabled === false ? 'apagado' : 'activo'} · Internet: ${point.internetAvailable === false ? 'no' : 'sí'}<br>Modo: ${escapeMapHtml(point.trackingMode || 'sin dato')}<br>Sincronización: ${point.syncedAt ? formatDateTime(point.syncedAt) : 'sin dato'}${point.syncedAt && time(point.syncedAt) - time(point.recordedAt) > 60000 ? '<br><b>Enviado offline</b>' : ''}<br>Ruta: ${point.deliveryRouteId ?? '—'} · Jornada: ${point.workSessionId ?? '—'}</div>`
 
 function formatDuration(milliseconds: number) {
-  const total = Math.floor(milliseconds / 1000)
-  return `${String(Math.floor(total / 60)).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`
+  return formatStayDuration(milliseconds / 1000)
 }
 
 function formatClock(timestamp: number) {
@@ -142,11 +148,12 @@ function getMapState(deliverymanId: number) {
   const existing = mapStates.get(deliverymanId)
   if (existing) return existing
   const state: DeliverymanMapState = {
-    renderedPointCount: 0,
+    renderedPointCount: -1,
     pointMarkers: new Map(),
     evidenceHalos: new Map(),
     routeLines: [],
     stayMarkers: new Map(),
+    orderMarkers: new Map(),
     activeMarker: null,
     activePoint: null,
   }
@@ -157,16 +164,21 @@ function getMapState(deliverymanId: number) {
 function clearMapState(state: DeliverymanMapState) {
   state.pointMarkers.forEach(marker => marker.setMap(null))
   state.evidenceHalos.forEach(marker => marker.setMap(null))
-  state.stayMarkers.forEach(({ marker }) => marker.setMap(null))
+  state.stayMarkers.forEach(({ marker, circle }) => {
+    marker.setMap(null)
+    circle.setMap(null)
+  })
+  state.orderMarkers.forEach(marker => marker.setMap(null))
   state.routeLines.forEach(line => line.setMap(null))
   state.activeMarker?.setMap(null)
   state.pointMarkers.clear()
   state.evidenceHalos.clear()
   state.stayMarkers.clear()
+  state.orderMarkers.clear()
   state.routeLines = []
   state.activeMarker = null
   state.activePoint = null
-  state.renderedPointCount = 0
+  state.renderedPointCount = -1
 }
 
 function clearObjects() {
@@ -348,6 +360,145 @@ function showPointPulse(point: DeliveryPlaybackPoint, color: string) {
   }, 650)
 }
 
+function stayDurationSeconds(stay: DeliveryPlaybackStay, playhead: number) {
+  const start = time(stay.startedAt)
+  const end = stay.endedAt ? time(stay.endedAt) : null
+  const reference = stay.isActive ? Date.now() : playhead
+  if (end != null && reference >= end) return stay.durationSeconds
+  return Math.max(0, Math.floor((reference - start) / 1000))
+}
+
+const roleLabels: Record<string, string> = {
+  previous: 'Pedido anterior',
+  related: 'Pedido relacionado',
+  next: 'Pedido siguiente',
+}
+
+function orderDescription(order: DeliveryPlaybackOrder) {
+  const roles = order.roles.map(role => roleLabels[role]).join(' · ')
+  return `<div style="margin-top:6px"><b>${escapeMapHtml(roles)} #${order.orderId}</b><br>${escapeMapHtml(order.address || 'Dirección no disponible')}${order.deliveredAt ? `<br>Entregado: ${formatDateTime(order.deliveredAt)}` : ''}</div>`
+}
+
+function stayPopup(deliveryman: DeliveryPlaybackDeliveryman, stay: DeliveryPlaybackStay) {
+  const duration = formatStayDuration(stayDurationSeconds(stay, engine.currentTimestamp.value))
+  const end = stay.isActive ? 'Activa' : stay.endedAt ? formatDateTime(stay.endedAt) : 'Sin dato'
+  const relatedOrders = stay.orders.map(orderDescription).join('')
+  return `<div style="max-width:320px;font-size:12px;line-height:1.45"><b>Estadía · ${escapeMapHtml(deliveryman.deliverymanName)}</b><br>Inicio: ${formatDateTime(stay.startedAt)}<br>Fin: ${end}<br>Duración: <b>${duration}</b><br>Puntos agrupados: ${stay.pointCount}<br>Ubicación aproximada: ${stay.centerLatitude.toFixed(6)}, ${stay.centerLongitude.toFixed(6)}<br>Radio observado: ${Math.round(stay.radiusMeters)} m<br>Distancia a sucursal: ${stay.distanceToBranchMeters == null ? 'sin dato' : `${Math.round(stay.distanceToBranchMeters)} m`}<br>Distancia al pedido: ${stay.distanceToOrderMeters == null ? 'sin dato' : `${Math.round(stay.distanceToOrderMeters)} m`}${relatedOrders || '<br>Sin pedidos relacionados'}</div>`
+}
+
+function openStay(deliveryman: DeliveryPlaybackDeliveryman, stay: DeliveryPlaybackStay, anchor: google.maps.Marker) {
+  infoWindow?.setContent(stayPopup(deliveryman, stay))
+  infoWindow?.open({ map, anchor })
+}
+
+function syncStayOverlays(
+  state: DeliverymanMapState,
+  deliveryman: DeliveryPlaybackDeliveryman,
+  playhead: number,
+) {
+  const visibleStays = deliveryman.stays.filter(stay => time(stay.startedAt) <= playhead)
+  const desiredStays = new Set(visibleStays.map(stay => String(stay.id)))
+  state.stayMarkers.forEach(({ marker, circle }, key) => {
+    if (!desiredStays.has(key)) {
+      marker.setMap(null)
+      circle.setMap(null)
+      state.stayMarkers.delete(key)
+    }
+  })
+
+  visibleStays.forEach(stay => {
+    const key = String(stay.id)
+    const position = { lat: stay.centerLatitude, lng: stay.centerLongitude }
+    let overlay = state.stayMarkers.get(key)
+    if (!overlay) {
+      const marker = new google.maps.Marker({
+        map,
+        position,
+        zIndex: 24,
+        title: 'Ver detalle de la estadía',
+        label: {
+          text: formatStayDuration(stayDurationSeconds(stay, playhead)),
+          color: '#111827',
+          fontSize: '12px',
+          fontWeight: '700',
+        },
+        icon: {
+          path: google.maps.SymbolPath.CIRCLE,
+          fillColor: '#fbbf24',
+          fillOpacity: .95,
+          strokeColor: '#ffffff',
+          strokeWeight: 3,
+          scale: 22,
+        },
+      })
+      const circle = new google.maps.Circle({
+        map,
+        center: position,
+        radius: Math.max(stay.radiusMeters, 5),
+        fillColor: '#facc15',
+        fillOpacity: .22,
+        strokeColor: '#d97706',
+        strokeOpacity: .9,
+        strokeWeight: 2,
+        clickable: true,
+      })
+      overlay = { marker, circle, stay }
+      state.stayMarkers.set(key, overlay)
+      marker.addListener('click', () => openStay(deliveryman, state.stayMarkers.get(key)?.stay || stay, marker))
+      circle.addListener('click', () => openStay(deliveryman, state.stayMarkers.get(key)?.stay || stay, marker))
+    } else {
+      overlay.stay = stay
+      overlay.marker.setPosition(position)
+      overlay.circle.setCenter(position)
+      overlay.circle.setRadius(Math.max(stay.radiusMeters, 5))
+    }
+  })
+
+  const orders = new Map<number, DeliveryPlaybackOrder>()
+  visibleStays.flatMap(stay => stay.orders).forEach(order => {
+    const current = orders.get(order.orderId)
+    orders.set(order.orderId, current
+      ? { ...current, roles: [...new Set([...current.roles, ...order.roles])] }
+      : order)
+  })
+  state.orderMarkers.forEach((marker, orderId) => {
+    const order = orders.get(orderId)
+    if (!order || order.latitude == null || order.longitude == null) {
+      marker.setMap(null)
+      state.orderMarkers.delete(orderId)
+    }
+  })
+  orders.forEach(order => {
+    if (order.latitude == null || order.longitude == null || state.orderMarkers.has(order.orderId)) return
+    const role = order.roles.includes('related') ? 'related' : order.roles[0] || 'next'
+    const styles = role === 'related'
+      ? { color: '#059669', label: 'R' }
+      : role === 'previous'
+        ? { color: '#2563eb', label: 'A' }
+        : { color: '#7c3aed', label: 'S' }
+    const marker = new google.maps.Marker({
+      map,
+      position: { lat: order.latitude, lng: order.longitude },
+      title: `${order.roles.map(item => roleLabels[item]).join(' · ')} #${order.orderId}`,
+      zIndex: 18,
+      label: { text: styles.label, color: '#ffffff', fontWeight: '700' },
+      icon: {
+        path: google.maps.SymbolPath.CIRCLE,
+        fillColor: styles.color,
+        fillOpacity: 1,
+        strokeColor: '#ffffff',
+        strokeWeight: 2,
+        scale: 12,
+      },
+    })
+    marker.addListener('click', () => {
+      infoWindow?.setContent(`<div style="max-width:260px;font-size:12px">${orderDescription(order)}</div>`)
+      infoWindow?.open({ map, anchor: marker })
+    })
+    state.orderMarkers.set(order.orderId, marker)
+  })
+}
+
 function syncHistoricalOverlays(
   state: DeliverymanMapState,
   deliveryman: DeliveryPlaybackDeliveryman,
@@ -356,7 +507,8 @@ function syncHistoricalOverlays(
   now: number,
 ) {
   const occurred = deliveryman.points.slice(0, count)
-  const desiredIds = new Set(occurred.map(point => point.id))
+  const visiblePoints = occurred.filter(point => !deliveryman.stays.some(stay => isPointInsideStay(point, stay)))
+  const desiredIds = new Set(visiblePoints.map(point => point.id))
   const evidenceIds = new Set(props.evidencePointIds || [])
 
   state.pointMarkers.forEach((marker, id) => {
@@ -371,7 +523,7 @@ function syncHistoricalOverlays(
       state.evidenceHalos.delete(id)
     }
   })
-  occurred.forEach(point => {
+  visiblePoints.forEach(point => {
     const isEvidence = evidenceIds.has(point.id)
     if (!state.pointMarkers.has(point.id))
       state.pointMarkers.set(point.id, createPointMarker(deliveryman, point, color, isEvidence))
@@ -380,52 +532,22 @@ function syncHistoricalOverlays(
   })
 
   syncRouteLines(state, deliveryman, occurred, color)
-  const stays = detectStays(occurred)
-  const desiredStays = new Set(stays.map(stay => `${stay.start}:${stay.latitude}:${stay.longitude}`))
-  state.stayMarkers.forEach(({ marker }, key) => {
-    if (!desiredStays.has(key)) {
-      marker.setMap(null)
-      state.stayMarkers.delete(key)
-    }
-  })
-  stays.forEach(stay => {
-    const key = `${stay.start}:${stay.latitude}:${stay.longitude}`
-    if (state.stayMarkers.has(key)) return
-    state.stayMarkers.set(key, {
-      stay,
-      marker: new google.maps.Marker({
-        map,
-        position: { lat: stay.latitude, lng: stay.longitude },
-        zIndex: 24,
-        label: {
-          text: formatDuration(Math.max(0, Math.min(now, stay.end) - stay.start)),
-          color: '#111827',
-          fontSize: '11px',
-          fontWeight: '700',
-        },
-        icon: {
-          path: google.maps.SymbolPath.CIRCLE,
-          fillColor: '#fbbf24',
-          fillOpacity: .9,
-          strokeColor: '#fff',
-          strokeWeight: 2,
-          scale: 9,
-        },
-      }),
-    })
-  })
+  syncStayOverlays(state, deliveryman, now)
 
-  if (count > state.renderedPointCount && count > 0)
-    showPointPulse(deliveryman.points[count - 1]!, color)
+  if (count > state.renderedPointCount && count > 0) {
+    const latest = deliveryman.points[count - 1]!
+    if (!deliveryman.stays.some(stay => isPointInsideStay(latest, stay)))
+      showPointPulse(latest, color)
+  }
   state.renderedPointCount = count
 }
 
 function updateStayCounters(state: DeliverymanMapState, now: number) {
   state.stayMarkers.forEach(({ marker, stay }) => {
     marker.setLabel({
-      text: formatDuration(Math.max(0, Math.min(now, stay.end) - stay.start)),
+      text: formatStayDuration(stayDurationSeconds(stay, now)),
       color: '#111827',
-      fontSize: '11px',
+      fontSize: '12px',
       fontWeight: '700',
     })
   })
@@ -563,6 +685,8 @@ async function initialize() {
         if (!cameraMovingProgrammatically) engine.followEnabled.value = false
       }),
     ]
+    if (props.data.deliverymen.some(item => item.stays.some(stay => stay.isActive)))
+      engine.goToEnd()
     centerOnRouteStart()
     render()
   } catch {
@@ -573,11 +697,11 @@ async function initialize() {
 }
 
 watch(() => engine.currentTimestamp.value, render)
-watch(() => props.data, () => {
-  engine.reset()
-  hiddenIds.clear()
+watch(() => props.data, (_value, previous) => {
+  const current = engine.currentTimestamp.value
+  const wasAtLiveEdge = Math.abs(current - new Date(previous.to).getTime()) < 2_000
   clearObjects()
-  centerOnRouteStart()
+  engine.seekTo(wasAtLiveEdge ? new Date(props.data.to).getTime() : current)
   render()
 }, { deep: true })
 watch(() => props.evidencePointIds, () => {
@@ -585,9 +709,15 @@ watch(() => props.evidencePointIds, () => {
   render()
 }, { deep: true })
 
-onMounted(initialize)
+onMounted(() => {
+  void initialize()
+  counterTimer = window.setInterval(() => {
+    mapStates.forEach(state => updateStayCounters(state, engine.currentTimestamp.value))
+  }, 1_000)
+})
 onUnmounted(() => {
   engine.pause()
+  if (counterTimer != null) window.clearInterval(counterTimer)
   listeners.forEach(listener => listener.remove())
   clearObjects()
   infoWindow?.close()
