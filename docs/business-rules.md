@@ -38,7 +38,7 @@ enum UserRole {
 | **Gestión de Pedidos** | | | | | |
 | Crear pedidos | ✅ | ✅ | ✅ | ❌ | ❌ |
 | Editar pedidos | ✅ | ✅ | ✅ | ❌ | ❌ |
-| Cancelar pedidos | ✅ | ✅ | ❌ | ❌ | ❌ |
+| Cancelar pedidos | ✅ | ✅ | ✅ | ❌ | ❌ |
 | Ver todos los pedidos | ✅ | ✅ | ✅ | ❌ | ❌ |
 | **Gestión de Clientes** | | | | | |
 | Crear clientes | ✅ | ✅ | ✅ | ❌ | ❌ |
@@ -411,7 +411,7 @@ Validaciones implementadas antes de enviar un pedido al backend:
 ### Cancelaciones
 - **Motivo obligatorio**: Cancelaciones requieren motivo
 - **Auditoría**: Historial de cambios en pedidos
-- **Permisos**: Admin, Superadmin y Cajero pueden cancelar
+- **Permisos**: Admin, Superadmin y Cajero pueden cancelar. El Cajero queda limitado a pedidos de su propia sucursal.
 
 ## 📍 Sistema de Geolocalización
 
