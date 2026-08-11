@@ -11,11 +11,12 @@
 
                 <div class="flex items-center gap-2 flex-wrap justify-end">
                     <a
-                        :href="deliveryApkPath"
+                        :href="DELIVERY_APP_PLAY_STORE_URL"
                         class="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 shrink-0"
-                        download
+                        target="_blank"
+                        rel="noopener noreferrer"
                     >
-                        App Android
+                        Abrir en Google Play
                     </a>
                     <div
                         v-if="authStore.isAdmin || authStore.isSuperadmin"
@@ -323,13 +324,6 @@
             @assigned="handleAssigned"
         />
 
-        <DeliveryAppUpdateDialog
-            v-if="releaseManifest"
-            v-model="showReleaseDialog"
-            :manifest="releaseManifest"
-            :allow-close="allowReleaseClose"
-            @done="onReleaseDone"
-        />
     </MainLayout>
 </template>
 
@@ -346,7 +340,6 @@ import DeliveryCardGrid from '@/components/delivery/DeliveryCardGrid.vue'
 import DeliveryHistoryTable from '@/components/delivery/DeliveryHistoryTable.vue'
 import ConfirmAssignmentModal from '@/components/delivery/ConfirmAssignmentModal.vue'
 import DeliveryRoutingPanel from '@/components/delivery/DeliveryRoutingPanel.vue'
-import DeliveryAppUpdateDialog from '@/components/delivery/DeliveryAppUpdateDialog.vue'
 import RouteOrderManager from '@/components/delivery/RouteOrderManager.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseDialog from '@/components/ui/BaseDialog.vue'
@@ -362,26 +355,12 @@ import {
     type DeliveryBranchOption,
 } from '@/components/dashboard'
 import { useDeliverySelfAnalytics } from '@/composables/dashboard/useDeliverySelfAnalytics'
-import {
-    useDeliveryAppReleaseGate,
-    DELIVERY_APP_RELEASE_SESSION_KEY,
-} from '@/composables/useDeliveryAppReleaseGate'
-import { DELIVERY_ANDROID_APK_PATH } from '@/constants/downloads'
+import { DELIVERY_APP_PLAY_STORE_URL } from '@/constants/deliveryApp'
 import { branchApi } from '@/services/MainAPI/branchApi'
 import { fcmApi } from '@/services/MainAPI/fcmApi'
 import type { Branch } from '@/types/common'
 import type { DeliveryRouteProposal, DeliveryRoutingPlan } from '@/types/deliveryRouting'
 import { deliveryRoutingApi } from '@/services/MainAPI/deliveryRoutingApi'
-
-const deliveryApkPath = DELIVERY_ANDROID_APK_PATH
-
-const {
-    showReleaseDialog,
-    releaseManifest,
-    allowReleaseClose,
-    onReleaseDone,
-    runGateIfNeeded,
-} = useDeliveryAppReleaseGate()
 
 const router = useRouter()
 const route = useRoute()
@@ -829,14 +808,6 @@ onMounted(async () => {
     ) {
         router.push('/')
         return
-    }
-
-    if (authStore.isDeliveryman && sessionStorage.getItem(DELIVERY_APP_RELEASE_SESSION_KEY) !== '1') {
-        try {
-            await runGateIfNeeded()
-        } finally {
-            sessionStorage.setItem(DELIVERY_APP_RELEASE_SESSION_KEY, '1')
-        }
     }
 
     await loadFcmTestBranches()

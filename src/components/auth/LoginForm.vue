@@ -43,13 +43,6 @@
 		</form>
 	</BaseCard>
 
-	<DeliveryAppUpdateDialog
-		v-if="releaseManifest"
-		v-model="showReleaseDialog"
-		:manifest="releaseManifest"
-		:allow-close="allowReleaseClose"
-		@done="onReleaseDone"
-	/>
 </template>
 
 <script setup lang="ts">
@@ -66,19 +59,10 @@ import BaseAlert from '@/components/ui/BaseAlert.vue';
 import PasswordInput from '@/components/ui/PasswordInput.vue';
 
 import { UserIcon, AtSymbolIcon } from '@heroicons/vue/24/outline';
-import DeliveryAppUpdateDialog from '@/components/delivery/DeliveryAppUpdateDialog.vue';
-import { useDeliveryAppReleaseGate } from '@/composables/useDeliveryAppReleaseGate';
 
 const router = useRouter();
 const authStore = useAuthStore();
 const { success, error: showError } = useToast();
-const {
-	showReleaseDialog,
-	releaseManifest,
-	allowReleaseClose,
-	onReleaseDone,
-	runGateIfNeeded,
-} = useDeliveryAppReleaseGate();
 
 const form = reactive({
 	email: '',
@@ -130,9 +114,6 @@ const handleSubmit = async () => {
 
 		success('Inicio de sesión exitoso', 3000, `Bienvenido ${authStore.user?.name || ''}`);
 		const redirectPath = getRedirectPath(authStore.userRole);
-		if (authStore.isDeliveryman) {
-			await runGateIfNeeded();
-		}
 		await router.push(redirectPath);
 	} catch (error: any) {
 		console.error('Login failed:', error);

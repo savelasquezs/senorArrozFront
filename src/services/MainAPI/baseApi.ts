@@ -4,6 +4,7 @@ import { getAccessToken, refreshAccessToken } from '@/services/auth/authSession'
 import { getStoredUser } from '@/services/auth/authSession';
 import { getSelectedBranchIdForRequest } from '@/services/branchContextSession';
 import { UserRole } from '@/types/auth';
+import { WEB_CLIENT_HEADER, WEB_CLIENT_HEADER_VALUE } from '@/constants/deliveryApp';
 
 export type BranchScope = 'selected' | 'all' | 'none';
 
@@ -26,7 +27,10 @@ export class BaseApi {
 		this.api = axios.create({
 			baseURL: import.meta.env.VITE_API_URL || 'http://localhost:8080/api',
 			timeout: 10000,
-			headers: { 'Content-Type': 'application/json' },
+			headers: {
+				'Content-Type': 'application/json',
+				[WEB_CLIENT_HEADER]: WEB_CLIENT_HEADER_VALUE,
+			},
 		});
 
 		this.setupInterceptors();

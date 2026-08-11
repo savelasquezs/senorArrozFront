@@ -1,6 +1,7 @@
 import axios from 'axios'
 import type { LoginResponse, User } from '@/types/auth'
 import { redirectToLogin } from './authNavigation'
+import { WEB_CLIENT_HEADER, WEB_CLIENT_HEADER_VALUE } from '@/constants/deliveryApp'
 
 const ACCESS_TOKEN_KEY = 'auth_token'
 const REFRESH_TOKEN_KEY = 'refresh_token'
@@ -150,7 +151,10 @@ export async function refreshAccessToken(): Promise<string | null> {
     const refreshClient = axios.create({
         baseURL: getApiBaseUrl(),
         timeout: 10000,
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+            'Content-Type': 'application/json',
+            [WEB_CLIENT_HEADER]: WEB_CLIENT_HEADER_VALUE,
+        },
     })
 
     refreshPromise = refreshClient
