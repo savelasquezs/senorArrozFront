@@ -45,6 +45,9 @@
                             Estado
                         </th>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Acceso web
+                        </th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                             Último Acceso
                         </th>
                         <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -54,7 +57,7 @@
                 </thead>
                 <tbody class="bg-white divide-y divide-gray-200">
                     <tr v-if="filteredUsers.length === 0">
-                        <td colspan="5" class="px-6 py-8 text-center text-gray-500">
+                        <td colspan="6" class="px-6 py-8 text-center text-gray-500">
                             <UserGroupIcon class="mx-auto h-12 w-12 text-gray-400" />
                             <p class="mt-2">
                                 {{ usersTab === 'active' ? 'No hay usuarios activos en esta sucursal' : 'No hay usuarios inactivos en esta sucursal' }}
@@ -94,6 +97,22 @@
                             <BaseBadge :variant="user.active ? 'success' : 'danger'">
                                 {{ user.active ? 'Activo' : 'Inactivo' }}
                             </BaseBadge>
+                        </td>
+
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <div class="flex items-center gap-2">
+                                <BaseBadge :variant="user.role !== 'Deliveryman' || user.webAccessEnabled ? 'success' : 'danger'">
+                                    {{ user.role !== 'Deliveryman' || user.webAccessEnabled ? 'Activo' : 'Bloqueado' }}
+                                </BaseBadge>
+                                <BaseButton
+                                    v-if="isSuperadmin && user.role === 'Deliveryman'"
+                                    @click="toggleWebAccess(user)"
+                                    variant="outline"
+                                    size="sm"
+                                    :icon="GlobeAltIcon"
+                                    :loading="usersStore.isLoading"
+                                    :title="user.webAccessEnabled ? 'Bloquear acceso web' : 'Permitir acceso web'" />
+                            </div>
                         </td>
 
                         <!-- Last Login -->
@@ -161,7 +180,8 @@ import {
     PencilIcon,
     EyeIcon,
     EyeSlashIcon,
-    ChartBarIcon
+    ChartBarIcon,
+    GlobeAltIcon
 } from '@heroicons/vue/24/outline'
 import type { BranchUserSummary } from '@/types/common'
 import { defaultBusinessCalendar } from '@/utils/datetime'
@@ -216,6 +236,7 @@ const canManageUsers = computed(() => {
 })
 
 const canViewPayroll = computed(() => canManageUsers.value)
+const isSuperadmin = computed(() => authStore.user?.role === 'Superadmin')
 
 const showPayrollModal = ref(false)
 const payrollModalUser = ref<BranchUserSummary | null>(null)
@@ -327,6 +348,15 @@ const toggleStatus = async (user: BranchUserSummary) => {
         // Error is handled in the store
         console.error('Error toggling user status:', error)
         emit('error', error.message || 'error al crear usuario')
+    }
+}
+
+const toggleWebAccess = async (user: BranchUserSummary) => {
+    try {
+        const updatedUser = await usersStore.setDeliverymanWebAccess(user.id, !user.webAccessEnabled)
+        emit('userUpdated', updatedUser)
+    } catch (error: any) {
+        emit('error', error.message || 'Error al cambiar el acceso web')
     }
 }
 </script>

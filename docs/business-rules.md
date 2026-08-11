@@ -94,6 +94,9 @@ enum UserRole {
 - Si tras todas las reglas no quedara ningún token, se conserva el nombre original (trim) para no dejar el ítem en blanco (p. ej. solo *arroz con*).
 
 #### Deliveryman
+
+- El acceso al portal web está bloqueado por defecto. Solo Superadmin puede habilitarlo o revocarlo individualmente desde la tabla de usuarios; una revocación se aplica en la siguiente solicitud web.
+- Superadmin, Admin, Cashier y Kitchen conservan siempre su acceso web. Esta autorización excepcional no sustituye el control de versión de la app Flutter.
 - **Pedidos listos**: Solo ve pedidos en estado "Ready" y los suyos propios
 - **Estados**: Puede cambiar a "OnTheWay" o revertir entrega (máximo 3 horas)
 - **Historial**: Ve historial de sus pedidos entregados y abonos

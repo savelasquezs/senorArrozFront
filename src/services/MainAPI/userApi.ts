@@ -35,6 +35,10 @@ class UserApi extends BaseApi {
 		return this.put<User>(`/Users/${id}/toggle-status`);
 	}
 
+	async setDeliverymanWebAccess(id: number, enabled: boolean): Promise<User> {
+		return this.put<User>(`/Users/${id}/web-access`, { enabled });
+	}
+
 	// Reset user password (admin action)
 	async resetUserPassword(id: number): Promise<ApiResponse<{ temporaryPassword: string }>> {
 		return this.post<ApiResponse<{ temporaryPassword: string }>>(`/Users/${id}/reset-password`);

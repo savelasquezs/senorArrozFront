@@ -63,6 +63,7 @@ export interface BranchUserSummary {
   phone: string
   branchId: number
   active: boolean
+  webAccessEnabled: boolean
   lastLogin?: string
   payrollExpenseId?: number | null
   payrollExpenseName?: string | null

@@ -18,10 +18,11 @@ export function useSignalR(hubUrl: string) {
     const scopedHubUrl = () => {
         const user = getStoredUser()
         const branchId = getSelectedBranchIdForRequest()
-        if (user?.role?.toLowerCase() !== 'superadmin' || !branchId) return hubUrl
-
         const separator = hubUrl.includes('?') ? '&' : '?'
-        return `${hubUrl}${separator}branchId=${encodeURIComponent(branchId)}`
+        const branchScope = user?.role?.toLowerCase() === 'superadmin' && branchId
+            ? `&branchId=${encodeURIComponent(branchId)}`
+            : ''
+        return `${hubUrl}${separator}client=web${branchScope}`
     }
 
     const registerHandlers = () => {

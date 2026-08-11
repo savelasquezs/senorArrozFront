@@ -114,6 +114,22 @@ export const useUsersStore = defineStore('users', () => {
         }
     }
 
+    const setDeliverymanWebAccess = async (id: number, enabled: boolean) => {
+        try {
+            isLoading.value = true
+            error.value = null
+            const updatedUser = await userApi.setDeliverymanWebAccess(id, enabled)
+            const index = users.value?.findIndex(user => user.id === id)
+            if (index !== undefined && index >= 0 && users.value) users.value[index] = updatedUser
+            return updatedUser
+        } catch (err: any) {
+            error.value = err.message || 'Error al cambiar el acceso web'
+            throw err
+        } finally {
+            isLoading.value = false
+        }
+    }
+
     const clearError = () => {
         error.value = null
     }
@@ -139,6 +155,7 @@ export const useUsersStore = defineStore('users', () => {
         createUser,
         updateUser,
         toggleUserStatus,
+        setDeliverymanWebAccess,
         clearError,
 
 

@@ -96,7 +96,7 @@ describe('useSignalR', () => {
     await flushPromises()
 
     expect(mocks.builder.withUrl).toHaveBeenCalledWith(
-      '/hubs/whatsapp?branchId=2',
+      '/hubs/whatsapp?client=web&branchId=2',
       expect.any(Object),
     )
     mounted.wrapper.unmount()

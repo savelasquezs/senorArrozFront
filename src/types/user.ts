@@ -10,6 +10,7 @@ export interface User {
     email: string
     phone: string
     active: boolean
+    webAccessEnabled: boolean
     lastLogin?: string
     createdAt: string
     updatedAt: string
