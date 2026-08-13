@@ -118,6 +118,26 @@ describe('OrdersTable delivery location actions', () => {
         expect(wrapper.find('[aria-label="Ver ubicación del pedido 567"]').exists()).toBe(false)
     })
 
+    it('muestra el indicador solo para una entrega automática finalizada', async () => {
+        const wrapper = mountTable(order({
+            status: 'delivered',
+            statusDisplayName: 'Entregado',
+            wasAutomaticallyDelivered: true,
+        }))
+
+        expect(wrapper.get('[aria-label="Entrega automática por GPS"]').text()).toBe('Auto')
+
+        await wrapper.setProps({
+            orders: [order({
+                status: 'delivered',
+                statusDisplayName: 'Entregado',
+                wasAutomaticallyDelivered: false,
+            })],
+        })
+
+        expect(wrapper.find('[aria-label="Entrega automática por GPS"]').exists()).toBe(false)
+    })
+
     it('copia el mensaje contextual del domiciliario', async () => {
         const wrapper = mountTable(order())
         await wrapper.get('[aria-label="Copiar mensaje sobre el pedido 567"]').trigger('click')

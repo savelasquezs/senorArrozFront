@@ -200,6 +200,7 @@ export interface Order {
     appliedBenefitSnapshot?: string | null
     type: OrderType
     status: OrderStatus
+    wasAutomaticallyDelivered?: boolean
     deliveryFee?: number
     reservedFor?: Date
     prepareAt?: Date
@@ -323,6 +324,7 @@ export interface OrderListItem {
     deliveryRouteCompletedAtUtc?: string | null
     deliveryRouteMetaDurationSeconds?: number | null
     deliveryRouteActualDurationSeconds?: number | null
+    wasAutomaticallyDelivered?: boolean
     deliveryManName: string | null
     guestName: string | null
     deliveryAppConnectionId?: number | null

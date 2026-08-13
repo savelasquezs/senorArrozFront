@@ -177,6 +177,15 @@
                         <OrderStatusBadge :status="order.status" :display-name="order.statusDisplayName"
                             :status-time="getStatusTime(order)" :clickable="order.status !== 'cancelled'"
                             @click="$emit('change-status', order)" />
+                        <span
+                            v-if="order.status === 'delivered' && order.wasAutomaticallyDelivered"
+                            class="ml-1 inline-flex items-center gap-0.5 rounded-full bg-sky-50 px-1 py-0.5 align-middle text-[9px] font-semibold uppercase tracking-wide text-sky-700 ring-1 ring-inset ring-sky-200"
+                            aria-label="Entrega automática por GPS"
+                            title="Entrega automática por GPS"
+                        >
+                            <MapPinIcon class="h-2.5 w-2.5" />
+                            Auto
+                        </span>
                         <button
                             v-if="order.status === 'ready' && permissions.canChangeStatus(order, 'in_preparation')"
                             type="button"

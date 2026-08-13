@@ -129,6 +129,8 @@ enum UserRole {
 
 ## 🍽️ Sistema de Pedidos
 
+- En `/orders`, un pedido en estado entregado muestra un indicador pequeño `Auto` cuando la entrega fue completada automáticamente por GPS según la auditoría del backend.
+
 ### Tipos de Pedido
 
 #### Onsite (En el local)
