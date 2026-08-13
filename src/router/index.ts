@@ -5,6 +5,9 @@ import { useBranchContextStore } from '@/store/branchContext'
 import { hasAccessToken } from '@/services/auth/authSession'
 import { UserRole } from '@/types/auth'
 import { bootstrapOrderCatalog } from '@/utils/orderCatalogBootstrap'
+import { usePlatformStore } from '@/store/platform'
+import { useTenantCapabilitiesStore } from '@/store/tenantCapabilities'
+import PlatformLayout from '@/components/platform/PlatformLayout.vue'
 
 // Import views
 import Login from '@/views/Login.vue'
@@ -23,6 +26,31 @@ const routes: RouteRecordRaw[] = [
             requiresAuth: false,
             title: 'Iniciar Sesión'
         }
+    },
+    {
+        path: '/platform/login',
+        name: 'PlatformLogin',
+        component: () => import('@/views/platform/PlatformLogin.vue'),
+        meta: { platformGuest: true, title: 'Acceso plataforma' }
+    },
+    {
+        path: '/platform',
+        component: PlatformLayout,
+        redirect: '/platform/clients',
+        meta: { requiresPlatformAuth: true },
+        children: [
+            { path: 'clients', name: 'PlatformClients', component: () => import('@/views/platform/PlatformClientsView.vue'), meta: { requiresPlatformAuth: true, title: 'Clientes SaaS' } },
+            { path: 'plans', name: 'PlatformPlans', component: () => import('@/views/platform/PlatformPlansView.vue'), meta: { requiresPlatformAuth: true, title: 'Planes SaaS' } },
+            { path: 'settings', name: 'PlatformSettings', component: () => import('@/views/platform/PlatformSettingsView.vue'), meta: { requiresPlatformAuth: true, title: 'Configuración SaaS' } },
+            { path: 'audit', name: 'PlatformAudit', component: () => import('@/views/platform/PlatformAuditView.vue'), meta: { requiresPlatformAuth: true, title: 'Auditoría SaaS' } },
+            { path: 'devices', name: 'PlatformDevices', component: () => import('@/views/platform/PlatformDevicesView.vue'), meta: { requiresPlatformAuth: true, title: 'Dispositivos SaaS' } }
+        ]
+    },
+    {
+        path: '/accept-invitation',
+        name: 'AcceptTenantInvitation',
+        component: () => import('@/views/AcceptTenantInvitation.vue'),
+        meta: { title: 'Activar empresa' }
     },
     {
         path: '/forgot-password',
@@ -58,6 +86,7 @@ const routes: RouteRecordRaw[] = [
         meta: {
             requiresAuth: true,
             requiresRole: [UserRole.SUPERADMIN, UserRole.ADMIN],
+            requiresModule: 'basic_dashboard',
             title: 'Dashboard'
         }
     },
@@ -68,6 +97,7 @@ const routes: RouteRecordRaw[] = [
         meta: {
             requiresAuth: true,
             requiresRole: [UserRole.SUPERADMIN],
+            requiresModule: 'multi_branch',
             title: 'Sucursales'
         }
     },
@@ -88,6 +118,7 @@ const routes: RouteRecordRaw[] = [
         meta: {
             requiresAuth: true,
             requiresRole: [UserRole.SUPERADMIN, UserRole.ADMIN, UserRole.CASHIER],
+            requiresModule: 'customers',
             title: 'Clientes'
         }
     },
@@ -105,6 +136,7 @@ const routes: RouteRecordRaw[] = [
         meta: {
             requiresAuth: true,
             requiresRole: [UserRole.SUPERADMIN, UserRole.ADMIN],
+            requiresModule: 'catalog',
             title: 'Productos'
         }
     },
@@ -204,6 +236,7 @@ const routes: RouteRecordRaw[] = [
         meta: {
             requiresAuth: true,
             requiresRole: [UserRole.KITCHEN, UserRole.ADMIN, UserRole.SUPERADMIN],
+            requiresModule: 'kitchen',
             title: 'Cocina'
         }
     },
@@ -224,6 +257,7 @@ const routes: RouteRecordRaw[] = [
         meta: {
             requiresAuth: true,
             requiresRole: [UserRole.SUPERADMIN, UserRole.ADMIN, UserRole.CASHIER],
+            requiresModule: 'expenses',
             title: 'Gestión de Domiciliarios'
         }
     },
@@ -264,6 +298,7 @@ const routes: RouteRecordRaw[] = [
         meta: {
             requiresAuth: true,
             requiresRole: [UserRole.SUPERADMIN, UserRole.ADMIN],
+            requiresModule: 'cost_attribution',
             title: 'Imputación gastos — menú'
         }
     },
@@ -274,6 +309,7 @@ const routes: RouteRecordRaw[] = [
         meta: {
             requiresAuth: true,
             requiresRole: [UserRole.SUPERADMIN, UserRole.ADMIN, UserRole.CASHIER],
+            requiresModule: 'cash_register',
             title: 'Cuadre de Caja'
         }
     },
@@ -284,6 +320,7 @@ const routes: RouteRecordRaw[] = [
         meta: {
             requiresAuth: true,
             requiresRole: [UserRole.SUPERADMIN, UserRole.ADMIN],
+            requiresModule: 'delivery_tracking',
             title: 'Revisión de seguimiento'
         }
     },
@@ -294,6 +331,7 @@ const routes: RouteRecordRaw[] = [
         meta: {
             requiresAuth: true,
             requiresRole: [UserRole.SUPERADMIN, UserRole.ADMIN],
+            requiresModule: 'delivery_tracking',
             title: 'Alertas de seguimiento'
         }
     },
@@ -304,6 +342,7 @@ const routes: RouteRecordRaw[] = [
         meta: {
             requiresAuth: true,
             requiresRole: [UserRole.SUPERADMIN, UserRole.ADMIN, UserRole.CASHIER],
+            requiresAddon: 'rappi',
             title: 'Pedidos Rappi'
         }
     },
@@ -314,6 +353,7 @@ const routes: RouteRecordRaw[] = [
         meta: {
             requiresAuth: true,
             requiresRole: [UserRole.SUPERADMIN, UserRole.ADMIN, UserRole.CASHIER],
+            requiresAddon: 'whatsapp_ai',
             title: 'WhatsApp'
         }
     },
@@ -349,6 +389,7 @@ const routes: RouteRecordRaw[] = [
                 UserRole.KITCHEN,
                 UserRole.DELIVERYMAN
             ],
+            requiresModule: 'business_documents',
             title: 'Documentos corporativos'
         }
     },
@@ -378,6 +419,16 @@ const router = createRouter({
 router.beforeEach(async (to, _from, next) => {
 	const authStore = useAuthStore()
 	const branchContext = useBranchContextStore()
+	const platformStore = usePlatformStore()
+	const capabilities = useTenantCapabilitiesStore()
+
+    if (to.meta.requiresPlatformAuth || to.meta.platformGuest) {
+        await platformStore.restore()
+        if (to.meta.requiresPlatformAuth && !platformStore.authenticated) return next('/platform/login')
+        if (to.meta.platformGuest && platformStore.authenticated) return next('/platform/clients')
+        document.title = to.meta.title ? `${to.meta.title} - Plataforma` : 'Plataforma SaaS'
+        return next()
+    }
 
 	// Initialize auth state if not already done
 	if (!authStore.isAuthenticated && hasAccessToken()) {
@@ -395,12 +446,16 @@ router.beforeEach(async (to, _from, next) => {
 
     if (authStore.isAuthenticated && authStore.user) {
         try {
+            await capabilities.initialize()
             await branchContext.initializeForUser(authStore.user)
             await bootstrapOrderCatalog(authStore.userRole, branchContext.selectedBranchId)
         } catch (error) {
             console.error('No se pudo inicializar el contexto de sucursal:', error)
         }
     }
+
+    if (to.meta.requiresModule && !capabilities.hasModule(String(to.meta.requiresModule))) return next(getRedirectPath(authStore.userRole))
+    if (to.meta.requiresAddon && !capabilities.hasAddon(String(to.meta.requiresAddon))) return next(getRedirectPath(authStore.userRole))
 
     if (
         authStore.isSuperadmin

@@ -130,6 +130,7 @@ import {
 	ChevronRightIcon,
 } from '@heroicons/vue/24/outline';
 import { UserRole } from '@/types/auth';
+import { useTenantCapabilitiesStore } from '@/store/tenantCapabilities';
 
 interface Props {
 	isOpen: boolean;
@@ -149,6 +150,8 @@ type NavItem = {
 	/** Si true, solo activo en ruta exacta (evita marcar "Gastos" en /expenses/menu-attribution). */
 	exactPath?: boolean;
 	requiresWhatsApp?: boolean;
+	requiresModule?: string;
+	requiresAddon?: string;
 	children?: NavChild[];
 };
 
@@ -179,6 +182,7 @@ function navChildActive(child: NavChild): boolean {
 }
 const deliveryStore = useDeliveryStore();
 const router = useRouter();
+const capabilities = useTenantCapabilitiesStore();
 const expandedGroups = ref<Record<string, boolean>>({});
 const rappiConnection = ref<RappiConnection | null>(null);
 const rappiPending = ref(0);
@@ -266,12 +270,14 @@ const navigationItems = computed((): NavItem[] => [
 		to: '/dashboard',
 		icon: HomeIcon,
 		roles: ['Superadmin', 'Admin'],
+		requiresModule: 'basic_dashboard',
 	},
 	{
 		name: 'Sucursales',
 		to: '/branches',
 		icon: BriefcaseIcon,
 		roles: ['Superadmin'],
+		requiresModule: 'multi_branch',
 		children: branchSectionChildren.value,
 	},
 	{
@@ -286,6 +292,7 @@ const navigationItems = computed((): NavItem[] => [
 		to: '/orders',
 		icon: ShoppingBagIcon,
 		roles: ['Superadmin', 'Admin', 'Cashier'],
+		requiresModule: 'pos',
 	},
 	{ name: 'Cocina', to: '/kitchen', icon: CogIcon, roles: ['Kitchen'] },
 	{
@@ -310,18 +317,21 @@ const navigationItems = computed((): NavItem[] => [
 		to: '/customers',
 		icon: UsersIcon,
 		roles: ['Superadmin', 'Admin', 'Cashier'],
+		requiresModule: 'customers',
 	},
 	{
 		name: 'Productos',
 		to: '/products',
 		icon: CubeIcon,
 		roles: ['Superadmin', 'Admin'],
+		requiresModule: 'catalog',
 	},
 	{
 		name: 'Gastos',
 		to: '/expenses',
 		icon: CurrencyDollarIcon,
 		roles: ['Superadmin', 'Admin', 'Cashier'],
+		requiresModule: 'expenses',
 		exactPath: true,
 	},
 	...(rappiConnection.value?.ready ? [{
@@ -329,6 +339,7 @@ const navigationItems = computed((): NavItem[] => [
 		to: '/integrations/apps',
 		icon: ShoppingBagIcon,
 		roles: ['Superadmin', 'Admin', 'Cashier'],
+		requiresAddon: 'rappi',
 		children: [{ name: rappiPending.value > 0 ? `Rappi (${rappiPending.value})` : 'Rappi', to: `/integrations/apps/rappi${rappiConnection.value.branchId ? `?branchId=${rappiConnection.value.branchId}` : ''}` }],
 	}] : []),
 	{
@@ -342,6 +353,7 @@ const navigationItems = computed((): NavItem[] => [
 		to: '/cash-register',
 		icon: BanknotesIcon,
 		roles: ['Superadmin', 'Admin', 'Cashier'],
+		requiresModule: 'cash_register',
 	},
 	{
 		name: 'WhatsApp',
@@ -349,6 +361,7 @@ const navigationItems = computed((): NavItem[] => [
 		icon: ChatBubbleLeftRightIcon,
 		roles: ['Superadmin', 'Admin', 'Cashier'],
 		requiresWhatsApp: true,
+		requiresAddon: 'whatsapp_ai',
 		exactPath: true,
 	},
 	{
@@ -356,11 +369,14 @@ const navigationItems = computed((): NavItem[] => [
 		to: '/documents',
 		icon: DocumentTextIcon,
 		roles: ['Superadmin', 'Admin', 'Cashier', 'Kitchen', 'Deliveryman'],
+		requiresModule: 'business_documents',
 	},
 ]);
 
 const hasPermission = (roles: string[], item?: NavItem): boolean => {
 	if (!roles.includes(authStore.userRole || '')) return false;
+	if (item?.requiresModule && !capabilities.hasModule(item.requiresModule)) return false;
+	if (item?.requiresAddon && !capabilities.hasAddon(item.requiresAddon)) return false;
 	if (item?.requiresWhatsApp) return whatsappStore.enabled;
 	return true;
 };

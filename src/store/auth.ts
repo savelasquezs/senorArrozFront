@@ -9,6 +9,7 @@ import type {
 	resetPasswordCredentials,
 } from '@/types/auth';
 import { authApi } from '@/services/MainAPI/authApi';
+import { useTenantCapabilitiesStore } from '@/store/tenantCapabilities';
 import {
 	clearSession,
 	getAccessToken,
@@ -93,6 +94,7 @@ export const useAuthStore = defineStore('auth', () => {
 	};
 
 	const setAuthData = (data: LoginResponse): void => {
+		useTenantCapabilitiesStore().reset();
 		user.value = data.user;
 		token.value = data.token;
 		refreshToken.value = data.refreshToken;
@@ -101,6 +103,7 @@ export const useAuthStore = defineStore('auth', () => {
 	};
 
 	const clearAuthData = (): void => {
+		useTenantCapabilitiesStore().reset();
 		user.value = null;
 		token.value = null;
 		refreshToken.value = null;

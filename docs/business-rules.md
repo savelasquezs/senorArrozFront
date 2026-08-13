@@ -112,6 +112,14 @@ enum UserRole {
 - **Entrega automática**: Opción de marcar como entregado al estar a 20m o menos del destino 
 - **Push FCM “pedido listo” (`order_ready`)**: Solo reciben el push los domiciliarios activos de la sucursal que ese día calendario (**America/Bogota**) tienen al menos un pedido con instante de **asignación** incluido en `orders.status_times` (clave preferente `delivery_man_assigned`, guardada en cada asignación/reasignación; si falta en datos antiguos se usa como respaldo `ontheway` / `on_the_way`), que **no** tengan liquidación total del día (`deliveryman_day_states.blocked` para esa fecha), y que **no** estén “ocupados” con algún pedido en estado **OnTheWay** en esa sucursal. SignalR (`OrderReady` en el grupo de delivery de la sucursal) no cambia con esta regla.
 
+## Capacidades SaaS
+
+- `/platform` usa sesion global propia; nunca reutiliza el token operativo.
+- La operacion carga `/api/tenant/context` al autenticarse y usa modulos/add-ons para navegacion y guards.
+- Ocultar una ruta o elemento del sidebar no reemplaza la autorizacion backend.
+- Un `Superadmin` solo puede cambiar de sucursal dentro del tenant firmado en su JWT.
+- Si el tenant queda suspendido/cancelado o pierde una capacidad, el frontend respeta `401/403` y no intenta eludirlo con estado local.
+
 ## Zona horaria y fechas de negocio
 
 - **Persistencia**: Los instantes (`CreatedAt`, `ReservedFor`, etc.) se guardan y comparan como **UTC** en base de datos y en la API (timestamptz).
