@@ -115,6 +115,42 @@
                     @update:model-value="(v) => { form.deliveryTrackingIncidentRetentionDays = positiveInteger(v, 15) }"
                     type="number" :min="1" :step="1" label="Retención de incidentes (días)" />
             </div>
+            <div class="space-y-3 rounded-lg border border-gray-200 bg-white p-4">
+                <div>
+                    <h4 class="font-medium text-gray-900">Entrega automática</h4>
+                    <p class="mt-1 text-xs text-gray-500">
+                        Cuando el domiciliario llega al destino y posteriormente se aleja del radio configurado, el pedido puede marcarse automáticamente como entregado.
+                    </p>
+                </div>
+
+                <label class="flex items-center justify-between gap-4 text-sm font-medium text-gray-800">
+                    <span>Marcar pedidos como entregados automáticamente</span>
+                    <span class="relative inline-flex shrink-0">
+                        <input v-model="form.deliveryAutoCompleteEnabled" type="checkbox" role="switch"
+                            class="peer sr-only" />
+                        <span class="h-6 w-11 rounded-full bg-gray-300 transition peer-checked:bg-emerald-600 peer-focus-visible:ring-2 peer-focus-visible:ring-emerald-500 peer-focus-visible:ring-offset-2"></span>
+                        <span class="pointer-events-none absolute left-0.5 top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform peer-checked:translate-x-5"></span>
+                    </span>
+                </label>
+
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <BaseInput :model-value="form.deliveryAutoCompleteArrivalRadiusMeters"
+                        @update:model-value="(v) => { form.deliveryAutoCompleteArrivalRadiusMeters = boundedInteger(v, 10, 150, 50) }"
+                        type="number" :min="10" :max="150" :step="1"
+                        label="Radio para detectar llegada (m)"
+                        :error="errors.deliveryAutoCompleteArrivalRadiusMeters" />
+                    <BaseInput :model-value="form.deliveryAutoCompleteDepartureRadiusMeters"
+                        @update:model-value="(v) => { form.deliveryAutoCompleteDepartureRadiusMeters = boundedInteger(v, 20, 500, 120) }"
+                        type="number" :min="20" :max="500" :step="1"
+                        label="Radio para detectar salida (m)"
+                        :error="errors.deliveryAutoCompleteDepartureRadiusMeters" />
+                    <BaseInput :model-value="form.deliveryAutoCompleteMinPresenceSeconds"
+                        @update:model-value="(v) => { form.deliveryAutoCompleteMinPresenceSeconds = boundedInteger(v, 5, 300, 15) }"
+                        type="number" :min="5" :max="300" :step="1"
+                        label="Permanencia mínima (seg)"
+                        :error="errors.deliveryAutoCompleteMinPresenceSeconds" />
+                </div>
+            </div>
         </section>
 
         <!-- Validation Info -->
@@ -190,6 +226,10 @@ interface BranchFormData {
     deliveryTrackingAllowedDistanceMeters: number
     deliveryTrackingLocationRetentionDays: number
     deliveryTrackingIncidentRetentionDays: number
+    deliveryAutoCompleteEnabled: boolean
+    deliveryAutoCompleteArrivalRadiusMeters: number
+    deliveryAutoCompleteDepartureRadiusMeters: number
+    deliveryAutoCompleteMinPresenceSeconds: number
 }
 
 const emit = defineEmits<{
@@ -217,11 +257,20 @@ const form = reactive({
     deliveryTrackingAllowedDistanceMeters: 50,
     deliveryTrackingLocationRetentionDays: 3,
     deliveryTrackingIncidentRetentionDays: 15,
+    deliveryAutoCompleteEnabled: true,
+    deliveryAutoCompleteArrivalRadiusMeters: 50,
+    deliveryAutoCompleteDepartureRadiusMeters: 120,
+    deliveryAutoCompleteMinPresenceSeconds: 15,
 })
 
 const positiveInteger = (value: unknown, fallback: number) => {
     const parsed = Math.round(Number(value))
     return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback
+}
+
+const boundedInteger = (value: unknown, min: number, max: number, fallback: number) => {
+    const parsed = Math.round(Number(value))
+    return Number.isFinite(parsed) ? Math.min(max, Math.max(min, parsed)) : fallback
 }
 
 const errors = reactive({
@@ -232,7 +281,37 @@ const errors = reactive({
     phone2: '',
     latitude: '',
     longitude: '',
+    deliveryAutoCompleteArrivalRadiusMeters: '',
+    deliveryAutoCompleteDepartureRadiusMeters: '',
+    deliveryAutoCompleteMinPresenceSeconds: '',
 })
+
+const validateAutoCompletionSettings = () => {
+    errors.deliveryAutoCompleteArrivalRadiusMeters =
+        form.deliveryAutoCompleteArrivalRadiusMeters < 10 || form.deliveryAutoCompleteArrivalRadiusMeters > 150
+            ? 'Debe estar entre 10 y 150 m'
+            : ''
+    errors.deliveryAutoCompleteDepartureRadiusMeters =
+        form.deliveryAutoCompleteDepartureRadiusMeters < 20 || form.deliveryAutoCompleteDepartureRadiusMeters > 500
+            ? 'Debe estar entre 20 y 500 m'
+            : form.deliveryAutoCompleteDepartureRadiusMeters <= form.deliveryAutoCompleteArrivalRadiusMeters
+                ? 'Debe ser mayor que el radio de llegada'
+                : ''
+    errors.deliveryAutoCompleteMinPresenceSeconds =
+        form.deliveryAutoCompleteMinPresenceSeconds < 5 || form.deliveryAutoCompleteMinPresenceSeconds > 300
+            ? 'Debe estar entre 5 y 300 segundos'
+            : ''
+}
+
+watch(
+    () => [
+        form.deliveryAutoCompleteArrivalRadiusMeters,
+        form.deliveryAutoCompleteDepartureRadiusMeters,
+        form.deliveryAutoCompleteMinPresenceSeconds,
+    ],
+    validateAutoCompletionSettings,
+    { immediate: true },
+)
 
 const showValidationInfo = ref(false)
 const selectedLocation = ref<{ lat: number; lng: number } | null>(null)
@@ -254,6 +333,13 @@ const isFormValid = computed(() => {
         form.deliveryTrackingAllowedDistanceMeters > 0 &&
         form.deliveryTrackingLocationRetentionDays > 0 &&
         form.deliveryTrackingIncidentRetentionDays > 0 &&
+        form.deliveryAutoCompleteArrivalRadiusMeters >= 10 &&
+        form.deliveryAutoCompleteArrivalRadiusMeters <= 150 &&
+        form.deliveryAutoCompleteDepartureRadiusMeters >= 20 &&
+        form.deliveryAutoCompleteDepartureRadiusMeters <= 500 &&
+        form.deliveryAutoCompleteDepartureRadiusMeters > form.deliveryAutoCompleteArrivalRadiusMeters &&
+        form.deliveryAutoCompleteMinPresenceSeconds >= 5 &&
+        form.deliveryAutoCompleteMinPresenceSeconds <= 300 &&
         isLocationConfirmed.value &&
         !errors.name &&
         !errors.nit &&
@@ -261,7 +347,10 @@ const isFormValid = computed(() => {
         !errors.phone1 &&
         !errors.phone2 &&
         !errors.latitude &&
-        !errors.longitude
+        !errors.longitude &&
+        !errors.deliveryAutoCompleteArrivalRadiusMeters &&
+        !errors.deliveryAutoCompleteDepartureRadiusMeters &&
+        !errors.deliveryAutoCompleteMinPresenceSeconds
     )
 })
 
@@ -338,6 +427,8 @@ const validateForm = () => {
     } else {
         errors.longitude = ''
     }
+
+    validateAutoCompletionSettings()
 }
 
 const handleSubmit = () => {
@@ -367,6 +458,10 @@ const handleSubmit = () => {
         deliveryTrackingAllowedDistanceMeters: form.deliveryTrackingAllowedDistanceMeters,
         deliveryTrackingLocationRetentionDays: form.deliveryTrackingLocationRetentionDays,
         deliveryTrackingIncidentRetentionDays: form.deliveryTrackingIncidentRetentionDays,
+        deliveryAutoCompleteEnabled: form.deliveryAutoCompleteEnabled,
+        deliveryAutoCompleteArrivalRadiusMeters: form.deliveryAutoCompleteArrivalRadiusMeters,
+        deliveryAutoCompleteDepartureRadiusMeters: form.deliveryAutoCompleteDepartureRadiusMeters,
+        deliveryAutoCompleteMinPresenceSeconds: form.deliveryAutoCompleteMinPresenceSeconds,
     }
 
     emit('submit', formData)
@@ -436,6 +531,10 @@ watch(
             form.deliveryTrackingAllowedDistanceMeters = positiveInteger(newBranch.deliveryTrackingAllowedDistanceMeters, 50)
             form.deliveryTrackingLocationRetentionDays = positiveInteger(newBranch.deliveryTrackingLocationRetentionDays, 3)
             form.deliveryTrackingIncidentRetentionDays = positiveInteger(newBranch.deliveryTrackingIncidentRetentionDays, 15)
+            form.deliveryAutoCompleteEnabled = newBranch.deliveryAutoCompleteEnabled !== false
+            form.deliveryAutoCompleteArrivalRadiusMeters = boundedInteger(newBranch.deliveryAutoCompleteArrivalRadiusMeters, 10, 150, 50)
+            form.deliveryAutoCompleteDepartureRadiusMeters = boundedInteger(newBranch.deliveryAutoCompleteDepartureRadiusMeters, 20, 500, 120)
+            form.deliveryAutoCompleteMinPresenceSeconds = boundedInteger(newBranch.deliveryAutoCompleteMinPresenceSeconds, 5, 300, 15)
             if (lat != null && lng != null && lat !== 0 && lng !== 0) {
                 form.latitude = Number(lat)
                 form.longitude = Number(lng)
@@ -466,6 +565,10 @@ watch(
             form.deliveryTrackingAllowedDistanceMeters = 50
             form.deliveryTrackingLocationRetentionDays = 3
             form.deliveryTrackingIncidentRetentionDays = 15
+            form.deliveryAutoCompleteEnabled = true
+            form.deliveryAutoCompleteArrivalRadiusMeters = 50
+            form.deliveryAutoCompleteDepartureRadiusMeters = 120
+            form.deliveryAutoCompleteMinPresenceSeconds = 15
             showValidationInfo.value = true
             resetMapState()
             setTimeout(() => {
@@ -480,6 +583,9 @@ watch(
         errors.phone2 = ''
         errors.latitude = ''
         errors.longitude = ''
+        errors.deliveryAutoCompleteArrivalRadiusMeters = ''
+        errors.deliveryAutoCompleteDepartureRadiusMeters = ''
+        errors.deliveryAutoCompleteMinPresenceSeconds = ''
     },
     { immediate: true }
 )

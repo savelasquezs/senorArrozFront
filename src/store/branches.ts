@@ -78,6 +78,10 @@ export const useBranchesStore = defineStore('branches', () => {
 			| 'deliveryTrackingAllowedDistanceMeters'
 			| 'deliveryTrackingLocationRetentionDays'
 			| 'deliveryTrackingIncidentRetentionDays'
+			| 'deliveryAutoCompleteEnabled'
+			| 'deliveryAutoCompleteArrivalRadiusMeters'
+			| 'deliveryAutoCompleteDepartureRadiusMeters'
+			| 'deliveryAutoCompleteMinPresenceSeconds'
 		>
 	) => {
 		try {
@@ -117,6 +121,10 @@ export const useBranchesStore = defineStore('branches', () => {
 			| 'deliveryTrackingAllowedDistanceMeters'
 			| 'deliveryTrackingLocationRetentionDays'
 			| 'deliveryTrackingIncidentRetentionDays'
+			| 'deliveryAutoCompleteEnabled'
+			| 'deliveryAutoCompleteArrivalRadiusMeters'
+			| 'deliveryAutoCompleteDepartureRadiusMeters'
+			| 'deliveryAutoCompleteMinPresenceSeconds'
 		>
 	) => {
 		try {

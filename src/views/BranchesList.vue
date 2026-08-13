@@ -302,6 +302,18 @@ const submitCreate = async (data: {
     maxFreeDeliveryDiscount: number
     posCopyEtaMinMinutes: number
     posCopyEtaRangeMinutes: number
+    deliveryTrackingAutoCloseTime: string
+    deliveryTrackingLightIntervalSeconds: number
+    deliveryTrackingActiveIntervalSeconds: number
+    deliveryTrackingStayThresholdMinutes: number
+    deliveryTrackingStayRadiusMeters: number
+    deliveryTrackingAllowedDistanceMeters: number
+    deliveryTrackingLocationRetentionDays: number
+    deliveryTrackingIncidentRetentionDays: number
+    deliveryAutoCompleteEnabled: boolean
+    deliveryAutoCompleteArrivalRadiusMeters: number
+    deliveryAutoCompleteDepartureRadiusMeters: number
+    deliveryAutoCompleteMinPresenceSeconds: number
 }) => {
     try {
         creating.value = true
@@ -317,6 +329,18 @@ const submitCreate = async (data: {
             maxFreeDeliveryDiscount: data.maxFreeDeliveryDiscount,
             posCopyEtaMinMinutes: data.posCopyEtaMinMinutes,
             posCopyEtaRangeMinutes: data.posCopyEtaRangeMinutes,
+            deliveryTrackingAutoCloseTime: data.deliveryTrackingAutoCloseTime,
+            deliveryTrackingLightIntervalSeconds: data.deliveryTrackingLightIntervalSeconds,
+            deliveryTrackingActiveIntervalSeconds: data.deliveryTrackingActiveIntervalSeconds,
+            deliveryTrackingStayThresholdMinutes: data.deliveryTrackingStayThresholdMinutes,
+            deliveryTrackingStayRadiusMeters: data.deliveryTrackingStayRadiusMeters,
+            deliveryTrackingAllowedDistanceMeters: data.deliveryTrackingAllowedDistanceMeters,
+            deliveryTrackingLocationRetentionDays: data.deliveryTrackingLocationRetentionDays,
+            deliveryTrackingIncidentRetentionDays: data.deliveryTrackingIncidentRetentionDays,
+            deliveryAutoCompleteEnabled: data.deliveryAutoCompleteEnabled,
+            deliveryAutoCompleteArrivalRadiusMeters: data.deliveryAutoCompleteArrivalRadiusMeters,
+            deliveryAutoCompleteDepartureRadiusMeters: data.deliveryAutoCompleteDepartureRadiusMeters,
+            deliveryAutoCompleteMinPresenceSeconds: data.deliveryAutoCompleteMinPresenceSeconds,
         })
         showCreate.value = false
         success('Sucursal creada', 3000, `La sucursal "${data.name}" se ha creado correctamente`)

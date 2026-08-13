@@ -182,6 +182,10 @@ export interface Branch {
     deliveryTrackingAllowedDistanceMeters?: number;
     deliveryTrackingLocationRetentionDays?: number;
     deliveryTrackingIncidentRetentionDays?: number;
+    deliveryAutoCompleteEnabled?: boolean;
+    deliveryAutoCompleteArrivalRadiusMeters?: number;
+    deliveryAutoCompleteDepartureRadiusMeters?: number;
+    deliveryAutoCompleteMinPresenceSeconds?: number;
     createdAt: string;
   updatedAt: string;
   totalUsers: number;
