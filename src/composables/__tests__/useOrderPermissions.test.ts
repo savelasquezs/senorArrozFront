@@ -209,7 +209,7 @@ describe.each([UserRole.ADMIN, UserRole.SUPERADMIN])(
             }
         })
 
-        it('permite todas las combinaciones de estado, incluso pedidos externos', () => {
+        it('permite correcciones de estado excepto cancelar manualmente pedidos Rappi', () => {
             const { canChangeStatus, getAllowedStatusTransitions } = useOrderPermissions()
             const statuses = [
                 'taken',
@@ -226,7 +226,7 @@ describe.each([UserRole.ADMIN, UserRole.SUPERADMIN])(
                     externalFulfillmentProvider: 'rappi',
                 })
                 for (const target of statuses) {
-                    expect(canChangeStatus(order, target)).toBe(true)
+                    expect(canChangeStatus(order, target)).toBe(target !== 'cancelled')
                 }
                 expect(getAllowedStatusTransitions(current)).toEqual(
                     statuses.filter((status) => status !== current)
@@ -334,11 +334,11 @@ describe('useOrderPermissions — canCancel', () => {
         expect(canCancel(order)).toBe(true)
     })
 
-    it('Admin puede cancelar un pedido Rappi para sincronizarlo con el proveedor', () => {
+    it('no permite cancelar desde el POS una orden Rappi ya aceptada', () => {
         const { canCancel } = useOrderPermissions()
         const order = baseOrder({ externalFulfillmentProvider: 'rappi' })
 
-        expect(canCancel(order)).toBe(true)
+        expect(canCancel(order)).toBe(false)
     })
 })
 

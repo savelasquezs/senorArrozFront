@@ -156,6 +156,7 @@ export function useOrderPermissions() {
      * Verifica si el usuario puede cancelar el pedido
      */
     const canCancel = (order: OrderListItem | OrderDetailView): boolean => {
+        if (order.externalFulfillmentProvider === 'rappi') return false
         const role = authStore.userRole
 
         if (role !== 'Admin' && role !== 'Superadmin' && role !== 'Cashier') return false
@@ -229,6 +230,8 @@ export function useOrderPermissions() {
     const canChangeStatus = (order: OrderListItem | OrderDetailView, newStatus: OrderStatus): boolean => {
         const role = authStore.userRole
         const currentStatus = order.status
+
+        if (order.externalFulfillmentProvider === 'rappi' && newStatus === 'cancelled') return false
 
         // Admin y Superadmin pueden corregir libremente el estado, incluso si el
         // pedido ya fue entregado, cancelado o proviene de una integración externa.
