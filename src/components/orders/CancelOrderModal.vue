@@ -8,12 +8,20 @@
                     <ExclamationTriangleIcon class="h-5 w-5 text-red-400 flex-shrink-0 mt-0.5" />
                     <div class="ml-3">
                         <h3 class="text-sm font-medium text-red-800">
-                            Esta acción cancelará el pedido y todos sus pagos asociados
+                            {{ isRappiOrder
+                                ? 'Esta acción solicitará la cancelación a Rappi'
+                                : 'Esta acción cancelará el pedido y todos sus pagos asociados' }}
                         </h3>
                         <div class="mt-2 text-sm text-red-700">
                             <ul class="list-disc list-inside space-y-1">
                                 <li>El pedido pasará a estado "Cancelado"</li>
-                                <li>No se podrá revertir esta acción</li>
+                                <li v-if="isRappiOrder">
+                                    Solo se cancelará localmente cuando Rappi acepte la solicitud
+                                </li>
+                                <li v-else>No se podrá revertir esta acción</li>
+                                <li v-if="isRappiOrder">
+                                    El pago Rappi no liquidado se conservará como reversado
+                                </li>
                                 <li v-if="hasReservationAssociatedPayments">
                                     También se eliminarán las transferencias y abonos asociados
                                 </li>
@@ -121,6 +129,8 @@ const hasReservationAssociatedPayments = computed(() =>
     props.order.type === 'reservation' &&
     ((props.order.reservationDeposits?.length ?? 0) > 0 || (props.order.bankPayments?.length ?? 0) > 0)
 )
+
+const isRappiOrder = computed(() => props.order.externalFulfillmentProvider === 'rappi')
 
 // Métodos
 const handleCancel = async () => {

@@ -333,6 +333,13 @@ describe('useOrderPermissions — canCancel', () => {
         })
         expect(canCancel(order)).toBe(true)
     })
+
+    it('Admin puede cancelar un pedido Rappi para sincronizarlo con el proveedor', () => {
+        const { canCancel } = useOrderPermissions()
+        const order = baseOrder({ externalFulfillmentProvider: 'rappi' })
+
+        expect(canCancel(order)).toBe(true)
+    })
 })
 
 describe('useOrderPermissions — cajero con pedido entregado', () => {

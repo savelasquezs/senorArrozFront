@@ -117,7 +117,7 @@
             />
             <label class="flex items-center gap-2 pt-7 text-sm">
               <input v-model="store.manualReadyForPickupEnabled" type="checkbox" class="h-4 w-4 rounded border-gray-300" />
-              Enviar READY_FOR_PICKUP
+              Enviar READY_FOR_PICKUP automáticamente al marcar Listo
             </label>
           </div>
           <p class="text-xs text-amber-700">

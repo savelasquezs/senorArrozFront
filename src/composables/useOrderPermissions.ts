@@ -156,7 +156,6 @@ export function useOrderPermissions() {
      * Verifica si el usuario puede cancelar el pedido
      */
     const canCancel = (order: OrderListItem | OrderDetailView): boolean => {
-        if (order.externalFulfillmentProvider === 'rappi') return false
         const role = authStore.userRole
 
         if (role !== 'Admin' && role !== 'Superadmin' && role !== 'Cashier') return false
