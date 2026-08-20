@@ -34,14 +34,8 @@
             <option v-for="option in reviewStatusOptions" :key="option.value" :value="option.value">{{ option.label }}</option>
           </select>
         </label>
-        <label class="text-sm font-medium text-gray-700">
-          Desde
-          <input v-model="fromDate" type="date" class="mt-1.5 w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100" />
-        </label>
-        <label class="text-sm font-medium text-gray-700">
-          Hasta
-          <input v-model="toDate" type="date" class="mt-1.5 w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100" />
-        </label>
+        <BaseYmdDateRangePicker v-model:from-date="fromDate" v-model:to-date="toDate"
+          label="Periodo" class="lg:col-span-2" />
       </div>
       <div class="mt-4 flex justify-end">
         <BaseButton @click="applyFilters"><MagnifyingGlassIcon class="h-4 w-4" /> Aplicar filtros</BaseButton>
@@ -288,6 +282,7 @@ import BaseDialog from '@/components/ui/BaseDialog.vue'
 import BaseLoading from '@/components/ui/BaseLoading.vue'
 import BaseInput from '@/components/ui/BaseInput.vue'
 import BasePagination from '@/components/ui/BasePaginatiopn.vue'
+import BaseYmdDateRangePicker from '@/components/ui/BaseYmdDateRangePicker.vue'
 import DeliveryIncidentEvidenceMap from '@/components/delivery/DeliveryIncidentEvidenceMap.vue'
 import DeliveryRoutePlayback from '@/components/delivery/DeliveryRoutePlayback.vue'
 import { ArrowPathIcon, ClipboardDocumentCheckIcon, FunnelIcon, MagnifyingGlassIcon, MapIcon, PlayIcon } from '@heroicons/vue/24/outline'
@@ -296,6 +291,7 @@ import { branchApi } from '@/services/MainAPI/branchApi'
 import { useToast } from '@/composables/useToast'
 import { userApi } from '@/services/MainAPI/userApi'
 import { calculateIncidentPlaybackRange, colombiaDateTimeLocalToIso, formatStayDuration, isoToColombiaDateTimeLocal } from '@/composables/useDeliveryRoutePlayback'
+import { defaultBusinessCalendar } from '@/utils/datetime'
 import {
   deliveryTrackingIncidentsApi,
   type DeliveryIncidentReviewStatus,
@@ -324,13 +320,8 @@ const pageSize = 20
 const totalCount = ref(0)
 const branchId = ref('')
 const reviewStatus = ref<DeliveryIncidentReviewStatus | ''>('pending')
-const today = new Date()
-const sevenDaysAgo = new Date(today.getTime() - 6 * 24 * 60 * 60 * 1000)
-const toInputDate = (date: Date) => new Intl.DateTimeFormat('en-CA', {
-  timeZone: 'America/Bogota', year: 'numeric', month: '2-digit', day: '2-digit',
-}).format(date)
-const fromDate = ref(toInputDate(sevenDaysAgo))
-const toDate = ref(toInputDate(today))
+const toDate = ref(defaultBusinessCalendar.todayYmd())
+const fromDate = ref(defaultBusinessCalendar.formatYmd(defaultBusinessCalendar.addZonedDays(Date.now(), -6)))
 const detailOpen = ref(false)
 const detailLoading = ref(false)
 const detail = ref<DeliveryTrackingIncidentDetail | null>(null)
@@ -397,15 +388,17 @@ async function loadBranches() {
   branches.value = response.data.items.map(branch => ({ id: branch.id, name: branch.name }))
 }
 
+function parseYmd(value: string): Date {
+  const [year, month, day] = value.split('-').map(Number)
+  return defaultBusinessCalendar.zonedDayFromPickerLocalDate(new Date(year, month - 1, day))
+}
+
 function colombiaDateStart(value: string): string | undefined {
-  return value ? new Date(`${value}T00:00:00-05:00`).toISOString() : undefined
+  return value ? defaultBusinessCalendar.startOfZonedDayAsDate(parseYmd(value)).toISOString() : undefined
 }
 
 function colombiaDayAfter(value: string): string | undefined {
-  if (!value) return undefined
-  const date = new Date(`${value}T00:00:00-05:00`)
-  date.setUTCDate(date.getUTCDate() + 1)
-  return date.toISOString()
+  return value ? defaultBusinessCalendar.addZonedDays(parseYmd(value), 1).toISOString() : undefined
 }
 
 async function loadIncidents() {
