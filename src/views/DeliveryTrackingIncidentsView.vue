@@ -129,10 +129,16 @@
           <Fact :label="detail.incidentType === 'location_disabled' ? 'Recuperación' : 'Finalización'" :value="detail.isActive ? 'Activa' : detail.endedAt ? formatDateTime(detail.endedAt) : 'Aún no registrada'" />
           <Fact label="Duración" :value="formatDuration(detail.isActive ? Math.floor((liveNow - new Date(detail.startedAt).getTime()) / 1000) : detail.durationSeconds)" />
           <Fact :label="detail.incidentType === 'stay' ? 'Puntos agrupados' : 'Puntos de evidencia'" :value="String(detail.incidentType === 'stay' ? detail.pointCount : detail.locations.length)" />
+          <Fact v-if="detail.incidentType === 'tracking_interruption'" label="Ruta activa" :value="detail.deliveryRouteId ? `#${detail.deliveryRouteId}` : 'No identificada'" />
           <Fact v-if="detail.incidentType === 'stay'" label="Precisión promedio" :value="formatMeters(detail.averageAccuracyMeters)" />
           <Fact v-if="detail.incidentType === 'stay'" label="Radio observado" :value="formatMeters(detail.radiusMeters)" />
           <Fact v-if="detail.incidentType === 'stay'" label="Distancia a sucursal" :value="formatNullableMeters(detail.distanceToBranchMeters)" />
           <Fact v-if="detail.incidentType === 'stay'" label="Distancia al destino" :value="formatNullableMeters(detail.distanceToOrderMeters)" />
+        </div>
+
+        <div v-if="detail.incidentType === 'tracking_interruption'" class="rounded-xl border border-amber-100 bg-amber-50 p-4 text-sm text-amber-900">
+          <p class="font-semibold">Causa observada</p>
+          <p class="mt-1">{{ interruptionCauseLabel(detail.classificationReason) }}</p>
         </div>
 
         <div v-if="detail.orderId" class="rounded-xl border border-blue-100 bg-blue-50 p-4 text-sm">
@@ -659,7 +665,8 @@ function formatNullableMeters(value: number | null) { return value == null ? 'No
 function booleanLabel(value: boolean | null) { return value == null ? 'Sin dato' : value ? 'Sí' : 'No' }
 function stateLabel(name: string, value: boolean | null) { return `${name}: ${value == null ? 'sin dato' : value ? 'activo' : 'inactivo'}` }
 function classificationLabel(value: DeliveryStayClassification | null) { return classificationOptions.find(option => option.value === value)?.label || 'Sin clasificación' }
-function incidentTypeLabel(value: DeliveryTrackingIncidentListItem['incidentType']) { return ({ stay: 'Permanencia', route_deviation: 'Desviación de ruta', location_disabled: 'Ubicación apagada' } as const)[value] }
+function incidentTypeLabel(value: DeliveryTrackingIncidentListItem['incidentType']) { return ({ stay: 'Permanencia', route_deviation: 'Desviación de ruta', location_disabled: 'Ubicación apagada', tracking_interruption: 'Interrupción de seguimiento' } as const)[value] }
+function interruptionCauseLabel(value: string | null) { return ({ app_or_tracking_service_stopped: 'La app o el servicio de seguimiento fue detenido.', connectivity_interruption: 'Se encontró evidencia de interrupción de conectividad o modo avión.', cause_not_determinable: 'La causa exacta no puede determinarse con la evidencia disponible.' } as Record<string, string>)[value || ''] || 'La causa exacta requiere revisión.' }
 function evidencePointLabel(incident: DeliveryTrackingIncidentDetail, index: number) {
   if (incident.incidentType !== 'location_disabled') return incident.locations[index]?.isCorePoint ? 'Permanencia' : 'Margen'
   return index === 0 ? 'Antes del apagado' : 'Después de encender'

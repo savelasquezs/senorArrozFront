@@ -205,7 +205,7 @@ function alertIcon(value: DeliveryTrackingAlertSeverity) { return value === 'inf
 function alertIconClass(value: DeliveryTrackingAlertSeverity) { return value === 'critical' ? 'bg-red-100 text-red-700' : value === 'informational' ? 'bg-blue-100 text-blue-700' : value === 'requires_review' ? 'bg-orange-100 text-orange-700' : 'bg-amber-100 text-amber-700' }
 function alertBorderClass(value: DeliveryTrackingAlertSeverity) { return value === 'critical' ? 'border-red-200' : value === 'informational' ? 'border-blue-200' : value === 'requires_review' ? 'border-orange-200' : 'border-amber-200' }
 function formatDateTime(value: string) { return new Intl.DateTimeFormat('es-CO', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'America/Bogota' }).format(new Date(value)) }
-function hasTrackingEvidence(alert: DeliveryTrackingAlert) { return alert.alertType === 'gps_disabled' || alert.alertType === 'location_permission_revoked' || alert.alertType === 'unexpected_stay' }
+function hasTrackingEvidence(alert: DeliveryTrackingAlert) { return alert.alertType === 'gps_disabled' || alert.alertType === 'location_permission_revoked' || alert.alertType === 'no_communication' || alert.alertType === 'unexpected_stay' }
 function evidenceEnd(alert: DeliveryTrackingAlert) { return alert.recoveredAt || (alert.durationSeconds !== null ? alert.lastOccurredAt : null) }
 function formatDuration(totalSeconds: number | null) {
   if (totalSeconds === null) return 'Pendiente'

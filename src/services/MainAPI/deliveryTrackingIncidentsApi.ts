@@ -21,7 +21,7 @@ export type DeliveryIncidentReviewStatus =
 
 export interface DeliveryTrackingIncidentListItem {
   id: number
-  incidentType: 'stay' | 'route_deviation' | 'location_disabled'
+  incidentType: 'stay' | 'route_deviation' | 'location_disabled' | 'tracking_interruption'
   branchId: number
   branchName: string
   deliverymanId: number
@@ -71,7 +71,7 @@ export interface DeliveryIncidentDeviceEventEvidence {
 
 export interface DeliveryTrackingIncidentDetail {
   id: number
-  incidentType: 'stay' | 'route_deviation' | 'location_disabled'
+  incidentType: 'stay' | 'route_deviation' | 'location_disabled' | 'tracking_interruption'
   branchId: number
   branchName: string
   deliverymanId: number
