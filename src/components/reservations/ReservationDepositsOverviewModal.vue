@@ -16,16 +16,10 @@
           class="w-28"
           @change="applyFilters"
         />
-        <BaseInput
-          v-model="fromDate"
-          type="date"
-          class="w-36"
-          @change="applyFilters"
-        />
-        <BaseInput
-          v-model="toDate"
-          type="date"
-          class="w-36"
+        <BaseYmdDateRangePicker
+          v-model:from-date="fromDate"
+          v-model:to-date="toDate"
+          variant="compact"
           @change="applyFilters"
         />
         <BaseButton
@@ -100,6 +94,7 @@ import type { ReservationDeposit } from '@/types/reservationDeposit'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseDialog from '@/components/ui/BaseDialog.vue'
 import BaseInput from '@/components/ui/BaseInput.vue'
+import BaseYmdDateRangePicker from '@/components/ui/BaseYmdDateRangePicker.vue'
 import ReservationDepositCompactRow from '@/components/reservations/ReservationDepositCompactRow.vue'
 import { useFormatting } from '@/composables/useFormatting'
 import { useToast } from '@/composables/useToast'
