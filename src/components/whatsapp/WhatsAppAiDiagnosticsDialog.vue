@@ -136,9 +136,13 @@
             <h3 class="text-sm font-semibold text-gray-900">Uso y costo de IA</h3>
             <BaseButton size="sm" variant="secondary" :loading="usageLoading" @click="loadUsage">Aplicar filtros</BaseButton>
           </div>
-          <div class="mb-3 grid gap-2 sm:grid-cols-5">
-            <input v-model="usageFilters.from" type="date" aria-label="Fecha desde" class="rounded-md border border-gray-300 px-2 py-1.5 text-sm" />
-            <input v-model="usageFilters.to" type="date" aria-label="Fecha hasta" class="rounded-md border border-gray-300 px-2 py-1.5 text-sm" />
+          <div class="mb-3 grid gap-2 sm:grid-cols-4">
+            <BaseYmdDateRangePicker
+              v-model:from-date="usageFilters.from"
+              v-model:to-date="usageFilters.to"
+              variant="compact"
+              class="sm:col-span-2"
+            />
             <input v-model.trim="usageFilters.provider" placeholder="Proveedor" aria-label="Proveedor" class="rounded-md border border-gray-300 px-2 py-1.5 text-sm" />
             <input v-model.trim="usageFilters.model" placeholder="Modelo" aria-label="Modelo" class="rounded-md border border-gray-300 px-2 py-1.5 text-sm" />
           </div>
@@ -166,8 +170,10 @@ import { CpuChipIcon } from '@heroicons/vue/24/outline'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseDialog from '@/components/ui/BaseDialog.vue'
 import BaseLoading from '@/components/ui/BaseLoading.vue'
+import BaseYmdDateRangePicker from '@/components/ui/BaseYmdDateRangePicker.vue'
 import type { WhatsAppAiDiagnostics, WhatsAppAiProcessing, WhatsAppAiUsage } from '@/types/whatsapp'
 import { whatsappApi } from '@/services/MainAPI/whatsappApi'
+import { defaultBusinessCalendar } from '@/utils/datetime'
 import {
   aiDiagnosticsTone,
   aiProcessingTone,
@@ -207,10 +213,8 @@ function isFailureActivity(processing: WhatsAppAiProcessing) {
 const usage = ref<WhatsAppAiUsage | null>(null)
 const usageLoading = ref(false)
 const usageError = ref<string | null>(null)
-function localDate(value: Date) { const y=value.getFullYear(); const m=String(value.getMonth()+1).padStart(2,'0'); const d=String(value.getDate()).padStart(2,'0'); return `${y}-${m}-${d}` }
-const today = localDate(new Date())
-const prior = new Date(); prior.setDate(prior.getDate()-29)
-const monthAgo = localDate(prior)
+const today = defaultBusinessCalendar.todayYmd()
+const monthAgo = defaultBusinessCalendar.formatYmd(defaultBusinessCalendar.addZonedDays(Date.now(), -29))
 const usageFilters = reactive({ from: monthAgo, to: today, provider: '', model: '' })
 const usageCards = computed(() => usage.value ? [
   { label: 'Invocaciones', value: number(usage.value.totalInvocations) }, { label: 'Mensajes procesados', value: number(usage.value.incomingMessagesProcessed) },
