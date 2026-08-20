@@ -43,8 +43,8 @@
                         :style="columnStyle(column)">
                         <input v-if="column.key === 'headerId'" v-model.trim="filters.headerId" type="number" min="1" placeholder="#"
                             class="w-full rounded border border-gray-200 px-1.5 py-1 text-[11px] font-normal outline-none focus:border-emerald-500">
-                        <input v-else-if="column.key === 'createdAt'" v-model="filters.createdAt" type="date"
-                            class="w-full rounded border border-gray-200 px-1 py-1 text-[11px] font-normal outline-none focus:border-emerald-500">
+                        <BaseDatePicker v-else-if="column.key === 'createdAt'" v-model="filters.createdAt"
+                            variant="compact" class="min-w-0 w-full" />
                         <div v-else-if="isNumericColumn(column.key)" class="flex gap-1">
                             <input :value="numericFilterValue(column.key, 'Min')" type="number" placeholder="Min" @input="setNumericFilter(column.key, 'Min', $event)"
                                 class="min-w-0 w-1/2 rounded border border-gray-200 px-1 py-1 text-[10px] font-normal outline-none focus:border-emerald-500">
@@ -110,6 +110,7 @@ import {
     type ExpenseTableState,
 } from '@/composables/useExpensesViewPersistence'
 import { defaultBusinessCalendar } from '@/utils/datetime'
+import BaseDatePicker from '@/components/ui/BaseDatePicker.vue'
 
 interface ColumnFilters {
     headerId: string

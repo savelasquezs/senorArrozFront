@@ -18,6 +18,11 @@ const rows: ExpenseDetailGridRow[] = [
 function mountTable() {
     return mount(ExpenseDetailsTable, {
         props: { rowData: rows, initialTableState: defaultExpenseTableState() },
+        global: {
+            stubs: {
+                BaseDatePicker: { template: '<input type="text" />' },
+            },
+        },
     })
 }
 
@@ -65,7 +70,10 @@ describe('ExpenseDetailsTable', () => {
     it('restaura visibilidad y emite cambios de estado', async () => {
         const initial = defaultExpenseTableState()
         initial.columns.find(column => column.key === 'notes')!.visible = false
-        const wrapper = mount(ExpenseDetailsTable, { props: { rowData: rows, initialTableState: initial } })
+        const wrapper = mount(ExpenseDetailsTable, {
+            props: { rowData: rows, initialTableState: initial },
+            global: { stubs: { BaseDatePicker: { template: '<input type="text" />' } } },
+        })
 
         expect(wrapper.findAll('thead tr').at(0)!.findAll('th')).toHaveLength(10)
         const checkbox = wrapper.findAll('input[type="checkbox"]').find(input => input.element.parentElement?.textContent?.includes('Notas'))!

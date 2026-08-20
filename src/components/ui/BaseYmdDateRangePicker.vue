@@ -58,8 +58,9 @@ const pickerRange = computed<[Date, Date] | null>(() => {
 })
 
 function onUpdate(range: [Date, Date]) {
-	const fromDate = defaultBusinessCalendar.formatYmd(range[0])
-	const toDate = defaultBusinessCalendar.formatYmd(range[1])
+	const [from, to] = range[0] <= range[1] ? range : [range[1], range[0]]
+	const fromDate = defaultBusinessCalendar.formatYmd(from)
+	const toDate = defaultBusinessCalendar.formatYmd(to)
 	emit('update:fromDate', fromDate)
 	emit('update:toDate', toDate)
 	emit('change', { fromDate, toDate })

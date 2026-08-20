@@ -137,7 +137,7 @@
                 <div class="rounded-xl border border-gray-200 bg-white p-3 sm:p-4">
                     <div class="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
                         <div class="w-full sm:w-52">
-                            <BaseInput v-model="summaryDate" type="date" label="Fecha" />
+                            <BaseDatePicker v-model="summaryDate" label="Fecha" variant="compact" />
                         </div>
                         <div class="text-xs sm:text-sm text-gray-500">
                             <span v-if="hourlySummary.totalOrderCount > 0">
@@ -302,7 +302,7 @@ import MainLayout from '@/components/layout/MainLayout.vue'
 import OrderCardGrid from '@/components/kitchen/OrderCardGrid.vue'
 import ReadyOrdersTable from '@/components/kitchen/ReadyOrdersTable.vue'
 import ConfirmStatusChangeModal from '@/components/kitchen/ConfirmStatusChangeModal.vue'
-import BaseInput from '@/components/ui/BaseInput.vue'
+import BaseDatePicker from '@/components/ui/BaseDatePicker.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import { ArrowPathIcon, SpeakerWaveIcon, SpeakerXMarkIcon, BellIcon } from '@heroicons/vue/24/outline'
 
