@@ -35,9 +35,9 @@
             </ExpensesFilters>
 
             <div class="relative z-0 flex-1 min-h-0 flex flex-col gap-2 min-w-0">
-                <ExpenseDetailsAgGrid class="flex-1 min-h-0 min-w-0" :row-data="gridRowData" :loading="loading"
-                    :initial-column-state="columnState" @summary-change="onSummaryChange"
-                    @column-state-change="onColumnStateChange"
+                <ExpenseDetailsTable class="flex-1 min-h-0 min-w-0" :row-data="gridRowData" :loading="loading"
+                    :initial-table-state="tableState" @summary-change="onSummaryChange"
+                    @table-state-change="onTableStateChange"
                     @view-detail="handleViewDetailByHeaderId" @edit-detail="handleEditDetailLine"
                     @delete-detail="handleDeleteDetailLine" @invoice-click="handleViewDetailByHeaderId" />
 
@@ -123,9 +123,8 @@
 
 <script setup lang="ts">
 import { computed, defineAsyncComponent, nextTick, onMounted, ref, watch } from 'vue'
-import type { ColumnState } from 'ag-grid-community'
 import { ChevronLeftIcon, ChevronRightIcon, PlusIcon } from '@heroicons/vue/24/outline'
-import ExpenseDetailsAgGrid from '@/components/expenses/ExpenseDetailsAgGrid.vue'
+import ExpenseDetailsTable from '@/components/expenses/ExpenseDetailsTable.vue'
 import ExpensesFilters from '@/components/expenses/ExpensesFilters.vue'
 import ExpensesSummary from '@/components/expenses/ExpensesSummary.vue'
 import MainLayout from '@/components/layout/MainLayout.vue'
@@ -133,7 +132,11 @@ import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseDialog from '@/components/ui/BaseDialog.vue'
 import BaseSelect from '@/components/ui/BaseSelect.vue'
 import { type ExpenseFilterState } from '@/composables/useExpenseFilters'
-import { loadExpensesViewState, saveExpensesViewState } from '@/composables/useExpensesViewPersistence'
+import {
+    loadExpensesViewState,
+    saveExpensesViewState,
+    type ExpenseTableState,
+} from '@/composables/useExpensesViewPersistence'
 import { useDebouncedCallback } from '@/composables/useDebouncedCallback'
 import { useExpensePermissions } from '@/composables/useExpensePermissions'
 import { useToast } from '@/composables/useToast'
@@ -195,7 +198,7 @@ const selectedExpense = ref<ExpenseHeader | null>(null)
 const editingExpense = ref<ExpenseHeader | null>(null)
 const formFocusDetailId = ref<number | null>(null)
 const summary = ref({ totalAmount: 0, rowCount: 0 })
-const columnState = ref<ColumnState[] | null>(stored.columnState)
+const tableState = ref<ExpenseTableState>(stored.tableState)
 const availableCategoryOptions = ref<Array<{ value: string; label: string }>>([])
 const availableBankOptions = ref<Array<{ value: string; label: string }>>([])
 const availableSupplierOptions = ref<Array<{ value: number; label: string }>>([])
@@ -307,12 +310,12 @@ function persistState() {
         pageSize: pageSize.value,
         sortBy: sortBy.value,
         sortOrder: sortOrder.value,
-        columnState: columnState.value,
+        tableState: tableState.value,
     })
 }
 
 watch(
-    [presetId, customRange, dateFilters, pageSize, sortBy, sortOrder, columnState],
+    [presetId, customRange, dateFilters, pageSize, sortBy, sortOrder, tableState],
     () => persistState(),
     { deep: true },
 )
@@ -464,7 +467,7 @@ const clearFilters = () => {
         supplierIds: [],
         expenseName: '',
     }
-    presetId.value = 'this_month'
+    presetId.value = 'today'
     customRange.value = null
     syncDatesFromPresetAndFetch()
 }
@@ -487,8 +490,8 @@ function onSummaryChange(p: { totalAmount: number; rowCount: number }) {
     summary.value = p
 }
 
-function onColumnStateChange(state: ColumnState[]) {
-    columnState.value = state
+function onTableStateChange(state: ExpenseTableState) {
+    tableState.value = state
 }
 
 function canEditExpenseHeader(expense: Pick<ExpenseHeader, 'createdAt'>): boolean {
