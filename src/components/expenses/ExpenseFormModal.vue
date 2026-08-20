@@ -1,5 +1,5 @@
 <template>
-    <BaseDialog :model-value="isOpen" @update:model-value="$emit('close')"
+    <BaseDialog :model-value="isOpen" @update:model-value="onMainDialogUpdate"
         :title="editingExpense ? `Editar Gasto #${editingExpense.id}` : 'Nuevo Gasto'" size="4xl">
         <form @submit.prevent="handleSubmit" class="space-y-4">
             <!-- Proveedor -->
@@ -306,11 +306,34 @@
                 :disabled="loading || savingExpense" @click="$emit('delete')">
                 Eliminar factura
             </BaseButton>
-            <BaseButton @click="$emit('close')" variant="secondary">
+            <BaseButton @click="requestClose" variant="secondary">
                 Cancelar
             </BaseButton>
             <BaseButton @click="handleSubmit" variant="primary" :loading="loading || savingExpense" :disabled="!isFormValid">
                 {{ editingExpense ? 'Actualizar' : 'Crear' }} Gasto
+            </BaseButton>
+        </template>
+    </BaseDialog>
+
+    <BaseDialog
+        :model-value="showDraftCloseConfirm"
+        title="¿Guardar borrador?"
+        size="md"
+        z-class="z-[60]"
+        @update:model-value="onDraftCloseDialogUpdate"
+    >
+        <p class="text-sm text-gray-700">
+            Tienes cambios sin guardar. Puedes conservarlos para continuar después o descartarlos.
+        </p>
+        <template #footer>
+            <BaseButton variant="secondary" @click="showDraftCloseConfirm = false">
+                Seguir editando
+            </BaseButton>
+            <BaseButton variant="danger" @click="discardDraftAndClose">
+                Descartar
+            </BaseButton>
+            <BaseButton variant="primary" @click="keepDraftAndClose">
+                Guardar borrador
             </BaseButton>
         </template>
     </BaseDialog>
@@ -387,7 +410,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onMounted, nextTick } from 'vue'
+import { ref, computed, watch, onMounted, onBeforeUnmount, nextTick } from 'vue'
 import type { ExpenseHeader, CreateExpenseHeaderDto, UpdateExpenseHeaderDto, CreateExpenseDetailDto, CreateExpenseBankPaymentDto, SupplierExpenseSuggestion, ExpenseCategory, CreateExpenseCategoryDto, CreateExpenseDto, Expense } from '@/types/expense'
 import type { Supplier, CreateSupplierDto } from '@/types/supplier'
 import { expenseHeaderApi } from '@/services/MainAPI/expenseHeaderApi'
@@ -397,6 +420,15 @@ import { expenseCategoryApi } from '@/services/MainAPI/expenseCategoryApi'
 import { supplierApi } from '@/services/MainAPI/supplierApi'
 import { deliverymanApi } from '@/services/MainAPI/deliverymanApi'
 import { useExpensePermissions } from '@/composables/useExpensePermissions'
+import {
+    clearExpenseFormDraft,
+    hasExpenseFormDraftContent,
+    loadExpenseFormDraft,
+    saveExpenseFormDraft,
+    type ExpenseFormDraftData,
+    type ExpenseFormDraftScope,
+} from '@/composables/useExpenseFormDraft'
+import { useDebouncedCallback } from '@/composables/useDebouncedCallback'
 import { useFormatting } from '@/composables/useFormatting'
 import { useToast } from '@/composables/useToast'
 import BaseDialog from '@/components/ui/BaseDialog.vue'
@@ -409,6 +441,8 @@ import { PlusIcon, TrashIcon, SparklesIcon, ChatBubbleLeftRightIcon } from '@her
 import { distributeExpenseBankPaymentsProportionally } from '@/utils/expenseBankDistribution'
 import { todayYmd, defaultBusinessCalendar } from '@/utils/datetime'
 import { DEFAULT_GENERAL_SUPPLIER_ID } from '@/utils/expenseFormDefaults'
+import { useAuthStore } from '@/store/auth'
+import { useBranchContextStore } from '@/store/branchContext'
 
 interface Props {
     isOpen: boolean
@@ -442,6 +476,8 @@ const emit = defineEmits<{
 const { formatCurrency } = useFormatting()
 const { error, success } = useToast()
 const expensePermissions = useExpensePermissions()
+const authStore = useAuthStore()
+const branchContext = useBranchContextStore()
 
 const EXPENSE_VAT_RATE = 0.19
 
@@ -528,6 +564,144 @@ const editExpensePaymentSnapshot = ref<{ wasFullyBank: boolean } | null>(null)
 const showExpenseBankSyncModal = ref(false)
 const showExpenseAdvanceConfirmModal = ref(false)
 const savingExpense = ref(false)
+const showDraftCloseConfirm = ref(false)
+const draftReady = ref(false)
+const referencesReady = ref(false)
+
+const isExpenseDraftEnabled = computed(() =>
+    !props.editingExpense && !props.presetDeliverymanId && !props.skipAutoAdvance,
+)
+
+function getExpenseDraftScope(): ExpenseFormDraftScope | null {
+    const userId = authStore.user?.id
+    const branchId = branchContext.selectedBranchId ?? authStore.branchId
+    if (!Number.isInteger(userId) || !Number.isInteger(branchId) || !userId || !branchId) return null
+    return { userId, branchId }
+}
+
+function newTemporaryId(prefix: string): string {
+    return `${prefix}-${Date.now()}-${Math.random()}`
+}
+
+function currentExpenseDraftData(): ExpenseFormDraftData {
+    return {
+        supplierId: formData.value.supplierId,
+        notes: formData.value.notes,
+        expenseDetails: formData.value.expenseDetails.map(detail => ({
+            expenseId: Number(detail.expenseId || 0),
+            quantity: Number(detail.quantity || 0),
+            amount: Number(detail.amount || 0),
+            total: Number(detail.total || 0),
+            includeVat: Boolean(detail.includeVat),
+            notes: detail.notes ?? '',
+            expenseName: detail.expenseName ?? '',
+            ...(detail.expenseUnit ? { expenseUnit: detail.expenseUnit } : {}),
+        })),
+        expenseBankPayments: formData.value.expenseBankPayments.map(payment => ({
+            bankId: Number(payment.bankId || 0),
+            amount: Number(payment.amount || 0),
+            syncAmount: Boolean(payment.syncAmount),
+        })),
+        isDeliverymanAdvance: isDeliverymanAdvance.value,
+        selectedDeliverymanId: selectedDeliverymanId.value,
+    }
+}
+
+function hasCurrentExpenseDraftContent(): boolean {
+    return hasExpenseFormDraftContent(currentExpenseDraftData(), DEFAULT_GENERAL_SUPPLIER_ID)
+}
+
+function persistExpenseDraftForScope(scope: ExpenseFormDraftScope) {
+    const data = currentExpenseDraftData()
+    if (hasExpenseFormDraftContent(data, DEFAULT_GENERAL_SUPPLIER_ID)) {
+        saveExpenseFormDraft(scope, data)
+    } else {
+        clearExpenseFormDraft(scope)
+    }
+}
+
+function persistExpenseDraft() {
+    if (!draftReady.value || !isExpenseDraftEnabled.value) return
+    const scope = getExpenseDraftScope()
+    if (scope) persistExpenseDraftForScope(scope)
+}
+
+function discardExpenseDraft() {
+    const scope = getExpenseDraftScope()
+    if (scope) clearExpenseFormDraft(scope)
+}
+
+function restoreExpenseDraft() {
+    if (!isExpenseDraftEnabled.value) return false
+    const scope = getExpenseDraftScope()
+    if (!scope) return false
+    const draft = loadExpenseFormDraft(scope)
+    if (!draft) return false
+
+    formData.value = {
+        supplierId: draft.supplierId,
+        notes: draft.notes,
+        expenseDetails: draft.expenseDetails.map(detail => ({
+            expenseId: detail.expenseId,
+            quantity: detail.quantity,
+            amount: detail.amount,
+            total: detail.total,
+            includeVat: detail.includeVat,
+            notes: detail.notes,
+            tempId: newTemporaryId('detail'),
+            expenseName: detail.expenseName,
+            ...(detail.expenseUnit ? { expenseUnit: detail.expenseUnit } : {}),
+        })),
+        expenseBankPayments: draft.expenseBankPayments.map(payment => ({
+            bankId: payment.bankId,
+            amount: payment.amount,
+            syncAmount: payment.syncAmount,
+            tempId: newTemporaryId('payment'),
+        })),
+    }
+    isDeliverymanAdvance.value = draft.isDeliverymanAdvance
+    selectedDeliverymanId.value = draft.selectedDeliverymanId
+    syncLineNotesVisibilityFromDetails()
+    return true
+}
+
+function closeForm() {
+    draftSave.cancel()
+    draftReady.value = false
+    showDraftCloseConfirm.value = false
+    emit('close')
+}
+
+function requestClose() {
+    if (savingExpense.value) return
+    if (!isExpenseDraftEnabled.value || !hasCurrentExpenseDraftContent()) {
+        discardExpenseDraft()
+        closeForm()
+        return
+    }
+    showDraftCloseConfirm.value = true
+}
+
+function onMainDialogUpdate(open: boolean) {
+    if (!open) requestClose()
+}
+
+function onDraftCloseDialogUpdate(open: boolean) {
+    if (!open) showDraftCloseConfirm.value = false
+}
+
+function keepDraftAndClose() {
+    persistExpenseDraft()
+    closeForm()
+}
+
+function discardDraftAndClose() {
+    draftSave.cancel()
+    discardExpenseDraft()
+    closeForm()
+}
+
+const draftSave = useDebouncedCallback(persistExpenseDraft, 350)
 
 function toggleLineNotes(tempId: string) {
     lineNotesOpen.value = {
@@ -668,9 +842,7 @@ const expenseSelectPlaceholder = computed(() => {
     return 'Buscar gasto...'
 })
 
-// Cargar datos iniciales
 onMounted(async () => {
-    // Cargar bancos
     try {
         const banks = await bankApi.getBanks({ page: 1, pageSize: 100 })
         bankOptions.value = banks.items.map(bank => ({ value: bank.id, label: bank.name }))
@@ -678,10 +850,10 @@ onMounted(async () => {
         console.error('Error loading banks:', err)
     }
 
-    // Cargar gastos disponibles
     await Promise.all([loadExpenses(), loadExpenseCategories()])
-
     await loadSuppliers()
+    referencesReady.value = true
+    await initializeForm()
 })
 
 watch(isDeliverymanAdvance, async (newVal) => {
@@ -732,11 +904,9 @@ watch(() => formData.value.supplierId, async (supplierId) => {
     }
 }, { immediate: true })
 
-// Inicializar formulario cuando se abre el modal
 const initializeForm = async () => {
-    if (!props.isOpen) {
-        return
-    }
+    if (!props.isOpen || !referencesReady.value) return
+    draftReady.value = false
 
     if (props.editingExpense) {
         const hasPersistedIndividualVat = props.editingExpense.expenseDetails
@@ -834,19 +1004,19 @@ const initializeForm = async () => {
             expenseDetails: [],
             expenseBankPayments: [],
         }
-        if (supplierOptions.value.length === 0) {
-            await loadSuppliers()
-        }
         await ensureSupplierOption(DEFAULT_GENERAL_SUPPLIER_ID)
-        if (props.presetDeliverymanId) {
+        const restored = restoreExpenseDraft()
+        if (!restored && props.presetDeliverymanId) {
             selectedDeliverymanId.value = props.presetDeliverymanId
             isDeliverymanAdvance.value = true
-        } else {
+        } else if (!restored) {
             selectedDeliverymanId.value = null
             isDeliverymanAdvance.value = false
         }
+        await ensureSupplierOption(formData.value.supplierId)
         syncLineNotesVisibilityFromDetails()
     }
+    draftReady.value = true
 }
 
 async function scrollToFocusedExpenseLine() {
@@ -859,9 +1029,40 @@ async function scrollToFocusedExpenseLine() {
     })
 }
 
-watch([() => props.isOpen, () => props.editingExpense], async () => {
-    await initializeForm()
-}, { immediate: true })
+watch([() => props.isOpen, () => props.editingExpense], () => {
+    void initializeForm()
+})
+
+watch(
+    [formData, isDeliverymanAdvance, selectedDeliverymanId],
+    () => {
+        if (draftReady.value && isExpenseDraftEnabled.value) draftSave.schedule()
+    },
+    { deep: true },
+)
+
+const activeDraftScopeKey = computed(() => {
+    const scope = getExpenseDraftScope()
+    return scope ? `${scope.userId}:${scope.branchId}` : null
+})
+
+watch(activeDraftScopeKey, (current, previous) => {
+    if (!previous || !current || previous === current || !draftReady.value || !isExpenseDraftEnabled.value) return
+
+    const [userId, branchId] = previous.split(':').map(Number)
+    if (Number.isInteger(userId) && Number.isInteger(branchId) && userId > 0 && branchId > 0) {
+        draftSave.cancel()
+        persistExpenseDraftForScope({ userId, branchId })
+    }
+    void initializeForm()
+})
+
+onBeforeUnmount(() => {
+    if (draftReady.value && isExpenseDraftEnabled.value) {
+        draftSave.cancel()
+        persistExpenseDraft()
+    }
+})
 
 const toggleExpenseOptionMode = () => {
     if (!supplierHasFavoriteExpenses.value) {
@@ -1353,6 +1554,11 @@ async function executeExpenseSave() {
             }
         }
 
+        if (isExpenseDraftEnabled.value) {
+            draftSave.cancel()
+            discardExpenseDraft()
+            draftReady.value = false
+        }
         emit('submit', result)
     } catch (err: any) {
         const msg = err.message || ''
