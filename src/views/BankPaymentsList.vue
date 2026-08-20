@@ -21,8 +21,8 @@
                         placeholder="Todos los bancos" value-key="value" display-key="label" />
                     <BaseSelect v-model="filters.verified" :options="verifiedOptions" label="Estado"
                         placeholder="Todos los estados" />
-                    <BaseInput v-model="filters.fromDate" label="Desde" type="date" />
-                    <BaseInput v-model="filters.toDate" label="Hasta" type="date" />
+                    <BaseYmdDateRangePicker v-model:from-date="filters.fromDate" v-model:to-date="filters.toDate"
+                        label="Periodo" class="md:col-span-2" />
                     <div class="flex items-end">
                         <BaseButton @click="load" variant="primary" size="md" :icon="MagnifyingGlassIcon" full-width>
                             Buscar
@@ -80,6 +80,7 @@ import BaseInput from '@/components/ui/BaseInput.vue'
 import BaseSelect from '@/components/ui/BaseSelect.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseLoading from '@/components/ui/BaseLoading.vue'
+import BaseYmdDateRangePicker from '@/components/ui/BaseYmdDateRangePicker.vue'
 import StatsCard from '@/components/ui/StatsCard.vue'
 import BankPaymentVerification from '@/components/payments/banks/BankPaymentVerification.vue'
 
