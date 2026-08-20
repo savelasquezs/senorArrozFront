@@ -267,11 +267,8 @@
                                     </div>
                                     <div class="flex items-center gap-2 flex-wrap">
                                         <span class="text-xs text-gray-500 whitespace-nowrap">Fecha evento:</span>
-                                        <BaseInput v-model="resFrom" type="date" class="w-32 sm:w-36"
-                                            @change="fetchReservations" />
-                                        <span class="text-gray-400">-</span>
-                                        <BaseInput v-model="resTo" type="date" class="w-32 sm:w-36"
-                                            @change="fetchReservations" />
+                                        <BaseYmdDateRangePicker v-model:from-date="resFrom" v-model:to-date="resTo"
+                                            variant="compact" @change="fetchReservations" />
                                     </div>
                                     <BaseButton v-if="resSearch || resStatus || resFrom || resTo" variant="ghost"
                                         size="sm" class="shrink-0" @click="clearResFilters">
@@ -640,6 +637,7 @@ import BaseSelect from '@/components/ui/BaseSelect.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseDialog from '@/components/ui/BaseDialog.vue'
 import BaseDateRangePicker from '@/components/ui/BaseDateRangePicker.vue'
+import BaseYmdDateRangePicker from '@/components/ui/BaseYmdDateRangePicker.vue'
 import {
     MagnifyingGlassIcon,
     ArrowPathIcon,

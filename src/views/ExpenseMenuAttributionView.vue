@@ -14,16 +14,8 @@
             </div>
 
             <div class="flex flex-wrap gap-4 items-end bg-white border border-gray-200 rounded-lg p-4">
-                <div>
-                    <label class="block text-xs font-medium text-gray-600 mb-1">Desde</label>
-                    <input v-model="fromDate" type="date"
-                        class="border border-gray-300 rounded-md px-3 py-2 text-sm" />
-                </div>
-                <div>
-                    <label class="block text-xs font-medium text-gray-600 mb-1">Hasta</label>
-                    <input v-model="toDate" type="date"
-                        class="border border-gray-300 rounded-md px-3 py-2 text-sm" />
-                </div>
+                <BaseYmdDateRangePicker v-model:from-date="fromDate" v-model:to-date="toDate"
+                    label="Periodo" />
                 <div v-if="authStore.isSuperadmin" class="min-w-[200px]">
                     <label class="block text-xs font-medium text-gray-600 mb-1">Sucursal</label>
                     <select v-model.number="branchFilter"
@@ -83,10 +75,12 @@
 import { ref, onMounted } from 'vue'
 import MainLayout from '@/components/layout/MainLayout.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
+import BaseYmdDateRangePicker from '@/components/ui/BaseYmdDateRangePicker.vue'
 import { expenseApi } from '@/services/MainAPI/expenseApi'
 import { branchApi } from '@/services/MainAPI/branchApi'
 import { useAuthStore } from '@/store/auth'
 import { formatCurrency, formatNumber } from '@/composables/useFormatting'
+import { defaultBusinessCalendar } from '@/utils/datetime'
 import type { ExpenseMenuAttributionLine, ExpenseMenuAttributionResponse } from '@/types/expense'
 import type { Branch } from '@/types/common'
 
@@ -101,18 +95,21 @@ const fromDate = ref('')
 const toDate = ref('')
 const branchFilter = ref(0)
 
+function parseYmd(ymd: string): Date {
+    const [year, month, day] = ymd.split('-').map(Number)
+    return defaultBusinessCalendar.zonedDayFromPickerLocalDate(new Date(year, month - 1, day))
+}
+
 function padRange() {
-    const end = new Date()
-    const start = new Date()
-    start.setDate(end.getDate() - 29)
-    const iso = (d: Date) => d.toISOString().slice(0, 10)
-    toDate.value = iso(end)
-    fromDate.value = iso(start)
+    const end = defaultBusinessCalendar.zonedDayFromPickerLocalDate(new Date())
+    const start = defaultBusinessCalendar.addZonedDays(end, -29)
+    toDate.value = defaultBusinessCalendar.formatYmd(end)
+    fromDate.value = defaultBusinessCalendar.formatYmd(start)
 }
 
 function toUtcBounds(): { fromUtc: string; toUtc: string } {
-    const from = new Date(fromDate.value + 'T00:00:00.000Z')
-    const to = new Date(toDate.value + 'T23:59:59.999Z')
+    const from = defaultBusinessCalendar.startOfZonedDayAsDate(parseYmd(fromDate.value))
+    const to = defaultBusinessCalendar.endOfZonedDayAsDate(parseYmd(toDate.value))
     return { fromUtc: from.toISOString(), toUtc: to.toISOString() }
 }
 

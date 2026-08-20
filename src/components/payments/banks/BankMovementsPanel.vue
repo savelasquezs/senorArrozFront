@@ -14,16 +14,8 @@
                     </p>
                 </div>
                 <div v-if="!lockDateRange" class="flex flex-wrap items-end gap-2">
-                    <div>
-                        <label class="block text-xs font-medium text-gray-600 mb-0.5">Desde</label>
-                        <input v-model="fromDate" type="date"
-                            class="border border-gray-300 rounded-md px-2 py-1.5 text-sm" />
-                    </div>
-                    <div>
-                        <label class="block text-xs font-medium text-gray-600 mb-0.5">Hasta</label>
-                        <input v-model="toDate" type="date"
-                            class="border border-gray-300 rounded-md px-2 py-1.5 text-sm" />
-                    </div>
+                    <BaseYmdDateRangePicker v-model:from-date="fromDate" v-model:to-date="toDate"
+                        variant="compact" />
                     <BaseButton variant="primary" size="sm" :loading="summaryLoading" @click="applyRange">
                         Aplicar
                     </BaseButton>
@@ -283,6 +275,7 @@ import { formatYmdBogota } from '@/utils/colombiaDate'
 import { defaultBusinessCalendar } from '@/utils/datetime'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseLoading from '@/components/ui/BaseLoading.vue'
+import BaseYmdDateRangePicker from '@/components/ui/BaseYmdDateRangePicker.vue'
 
 type TabId = 'orders' | 'expenses' | 'out' | 'in' | 'delivery' | 'deposits'
 

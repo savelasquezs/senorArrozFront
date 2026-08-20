@@ -164,7 +164,7 @@ describe('DeliverymenManagementView focused order navigation', () => {
             global: {
                 stubs: {
                     MainLayout: { template: '<main><slot /></main>' },
-                    BaseInput: { template: '<input />' },
+                    BaseDatePicker: { template: '<input />' },
                     BaseButton: { template: '<button><slot /></button>' },
                     DeliverymanCard: true,
                     AdvancesTable: true,
@@ -218,7 +218,7 @@ describe('DeliverymenManagementView focused order navigation', () => {
             global: {
                 stubs: {
                     MainLayout: { template: '<main><slot /></main>' },
-                    BaseInput: { template: '<input />' },
+                    BaseDatePicker: { template: '<input />' },
                     BaseButton: { template: '<button><slot /></button>' },
                     DeliverymanCard: true,
                     AdvancesTable: true,

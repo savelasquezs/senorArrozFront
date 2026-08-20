@@ -10,26 +10,16 @@
                 <NeighborhoodFilter :model-value="neighborhoodId" :options="neighborhoodOptions"
                     @update:model-value="onNeighborhoodChange" />
 
-                <div class="flex items-center gap-2">
-                    <BaseInput :model-value="fromDate" type="date" placeholder="Desde" class="w-40"
-                        @update:model-value="onFromDate" />
-                    <span class="text-gray-500">-</span>
-                    <BaseInput :model-value="toDate" type="date" placeholder="Hasta" class="w-40"
-                        @update:model-value="onToDate" />
-                </div>
+                <BaseYmdDateRangePicker :from-date="fromDate" :to-date="toDate" variant="compact"
+                    @change="onDateRangeChange" />
             </div>
 
             <!-- Filtros en mobile: apilados -->
             <div class="md:hidden space-y-2">
                 <NeighborhoodFilter :model-value="neighborhoodId" :options="neighborhoodOptions"
                     @update:model-value="onNeighborhoodChange" />
-                <div class="flex items-center gap-2">
-                    <BaseInput :model-value="fromDate" type="date" placeholder="Desde" class="text-sm"
-                        @update:model-value="onFromDate" />
-                    <span class="text-gray-500">-</span>
-                    <BaseInput :model-value="toDate" type="date" placeholder="Hasta" class="text-sm"
-                        @update:model-value="onToDate" />
-                </div>
+                <BaseYmdDateRangePicker :from-date="fromDate" :to-date="toDate" variant="compact"
+                    @change="onDateRangeChange" />
             </div>
         </div>
 
@@ -267,7 +257,7 @@ import { computed, ref, watch } from 'vue'
 import type { OrderListItem } from '@/types/order'
 import { DeliveryService } from '@/services/domain/DeliveryService'
 import { useFormatting } from '@/composables/useFormatting'
-import BaseInput from '@/components/ui/BaseInput.vue'
+import BaseYmdDateRangePicker from '@/components/ui/BaseYmdDateRangePicker.vue'
 import BasePagination from '@/components/ui/BasePaginatiopn.vue'
 import NeighborhoodFilter from './NeighborhoodFilter.vue'
 import { ClockIcon, CheckCircleIcon, PencilSquareIcon } from '@heroicons/vue/24/outline'
@@ -333,16 +323,8 @@ const displayedOrders = computed(() => props.orders)
 
 const displayedTotals = computed(() => DeliveryService.calculateTotals(displayedOrders.value))
 
-const emitDateFilterChange = (fromDate: string, toDate: string) => {
-    emit('filter-change', { fromDate, toDate })
-}
-
-const onFromDate = (v: string | number | null) => {
-    emitDateFilterChange(String(v ?? ''), props.toDate)
-}
-
-const onToDate = (v: string | number | null) => {
-    emitDateFilterChange(props.fromDate, String(v ?? ''))
+const onDateRangeChange = (range: { fromDate: string; toDate: string }) => {
+    emit('filter-change', range)
 }
 
 const onNeighborhoodChange = (id: number | null) => {

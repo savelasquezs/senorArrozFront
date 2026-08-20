@@ -10,9 +10,9 @@
                 
                 <!-- Filtro de fecha -->
                 <div class="flex items-center gap-3">
-                    <BaseInput
+                    <BaseDatePicker
                         v-model="selectedDate"
-                        type="date"
+                        variant="compact"
                         @change="handleDateChange"
                         class="w-48"
                     />
@@ -170,7 +170,7 @@ import type { OrderListItem } from '@/types/order'
 import type { DeliverymanStats, DeliverymanAdvance, DeliverymanDetail, SettleDeliverymanDayResultDto } from '@/types/deliveryman'
 import { useOrdersDraftsStore } from '@/store/ordersDrafts'
 import MainLayout from '@/components/layout/MainLayout.vue'
-import BaseInput from '@/components/ui/BaseInput.vue'
+import BaseDatePicker from '@/components/ui/BaseDatePicker.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import DeliverymanCard from '@/components/deliverymen/DeliverymanCard.vue'
 import AdvancesTable from '@/components/deliverymen/AdvancesTable.vue'
