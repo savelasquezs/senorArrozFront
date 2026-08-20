@@ -37,7 +37,7 @@ describe('useExpensesViewPersistence', () => {
         expect(state.tableState.sortColumn).toBe('total')
         expect(state.tableState.sortDirection).toBe('desc')
         expect(state.tableState.columns.find(column => column.key === 'supplierName')).toMatchObject({ visible: false, width: 160 })
-        expect(state.tableState.columns.at(-1)).toMatchObject({ key: 'actions', visible: true, width: 300 })
+        expect(state.tableState.columns.at(-1)).toMatchObject({ key: 'actions', visible: true, width: 180 })
     })
 
     it('guarda el estado v2 normalizado y elimina la preferencia anterior', () => {

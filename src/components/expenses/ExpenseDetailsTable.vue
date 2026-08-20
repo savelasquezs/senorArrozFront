@@ -33,7 +33,7 @@
                                 {{ sortIndicator(column.key) }}
                             </span>
                         </button>
-                        <span :data-column-resize="column.key" class="absolute right-0 top-0 h-full w-1.5 cursor-col-resize touch-none hover:bg-emerald-300"
+                        <span v-if="column.key !== 'actions'" :data-column-resize="column.key" class="absolute right-0 top-0 h-full w-1.5 cursor-col-resize touch-none hover:bg-emerald-300"
                             @pointerdown="startResize($event, column.key)" />
                     </th>
                 </tr>

@@ -45,7 +45,7 @@ const columnDefaults: Array<Pick<ExpenseTableColumnState, 'key' | 'width' | 'vis
     { key: 'total', width: 135, visible: true },
     { key: 'notes', width: 200, visible: true },
     { key: 'createdByName', width: 150, visible: true },
-    { key: 'actions', width: 220, visible: true },
+    { key: 'actions', width: 180, visible: true },
 ]
 
 const knownColumnKeys = new Set<ExpenseTableColumnKey>(columnDefaults.map(column => column.key))
@@ -96,7 +96,7 @@ export function normalizeExpenseTableState(value: unknown): ExpenseTableState {
         const stored = byKey.get(column.key)
         return {
             key: column.key,
-            width: normalizeWidth(stored?.width, column.width),
+            width: column.key === 'actions' ? 180 : normalizeWidth(stored?.width, column.width),
             visible: column.key === 'actions' ? true : stored?.visible !== false,
             order: Number.isInteger(stored?.order) ? Number(stored?.order) : column.order,
         }
@@ -138,7 +138,7 @@ function migrateLegacyTableState(value: unknown): ExpenseTableState {
         const old = legacy.find(item => item.colId === column.key)
         return {
             ...column,
-            width: normalizeWidth(old?.width, column.width),
+            width: column.key === 'actions' ? 180 : normalizeWidth(old?.width, column.width),
             visible: column.key === 'actions' ? true : old?.hide !== true,
             order: old ? legacy.indexOf(old) : legacy.length + order,
         }
