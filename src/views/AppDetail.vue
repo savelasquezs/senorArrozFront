@@ -100,24 +100,14 @@
                     </template>
 
                     <!-- Filters -->
-                    <div class="mb-6 flex flex-wrap gap-4">
+                    <div class="mb-6 flex flex-wrap items-end gap-4">
                         <div class="flex items-center space-x-2">
                             <label class="text-sm font-medium text-gray-700">Estado:</label>
                             <BaseSelect v-model="paymentFilter" :options="paymentFilterOptions" placeholder="Todos"
                                 size="sm" @update:model-value="fetchAppPayments" />
                         </div>
-                        <div class="flex items-center space-x-2">
-                            <label class="text-sm font-medium text-gray-700">Desde:</label>
-                            <input v-model="fromDate" type="date"
-                                class="text-sm border border-gray-300 rounded-md px-3 py-1"
-                                @change="fetchAppPayments" />
-                        </div>
-                        <div class="flex items-center space-x-2">
-                            <label class="text-sm font-medium text-gray-700">Hasta:</label>
-                            <input v-model="toDate" type="date"
-                                class="text-sm border border-gray-300 rounded-md px-3 py-1"
-                                @change="fetchAppPayments" />
-                        </div>
+                        <BaseYmdDateRangePicker v-model:from-date="fromDate" v-model:to-date="toDate"
+                            variant="compact" @change="fetchAppPayments" />
                     </div>
 
                     <!-- App Payments Table -->
@@ -241,6 +231,7 @@ import BaseDialog from '@/components/ui/BaseDialog.vue'
 import BaseLoading from '@/components/ui/BaseLoading.vue'
 import BaseAlert from '@/components/ui/BaseAlert.vue'
 import BaseSelect from '@/components/ui/BaseSelect.vue'
+import BaseYmdDateRangePicker from '@/components/ui/BaseYmdDateRangePicker.vue'
 import StatsCard from '@/components/ui/StatsCard.vue'
 import AppForm from '@/components/payments/apps/AppForm.vue'
 
