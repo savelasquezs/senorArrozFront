@@ -36,8 +36,8 @@
           <label class="text-sm font-medium text-gray-700">Nivel
             <select v-model="severity" class="mt-1.5 w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"><option value="">Todos</option><option v-for="option in severityOptions" :key="option.value" :value="option.value">{{ option.label }}</option></select>
           </label>
-          <label class="text-sm font-medium text-gray-700">Desde<input v-model="fromDate" type="date" class="mt-1.5 w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100" /></label>
-          <label class="text-sm font-medium text-gray-700">Hasta<input v-model="toDate" type="date" class="mt-1.5 w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100" /></label>
+          <BaseYmdDateRangePicker v-model:from-date="fromDate" v-model:to-date="toDate"
+            label="Periodo" class="lg:col-span-2" />
         </div>
         <div class="mt-5 flex justify-end"><BaseButton @click="applyFilters"><MagnifyingGlassIcon class="h-4 w-4" /> Aplicar filtros</BaseButton></div>
       </BaseCard>
@@ -110,10 +110,12 @@ import BaseCard from '@/components/ui/BaseCard.vue'
 import BaseDialog from '@/components/ui/BaseDialog.vue'
 import BaseLoading from '@/components/ui/BaseLoading.vue'
 import BasePagination from '@/components/ui/BasePaginatiopn.vue'
+import BaseYmdDateRangePicker from '@/components/ui/BaseYmdDateRangePicker.vue'
 import { ArrowPathIcon, BellSlashIcon, BuildingStorefrontIcon, ClockIcon, ExclamationCircleIcon, ExclamationTriangleIcon, FunnelIcon, InformationCircleIcon, MagnifyingGlassIcon, MapPinIcon, ShieldExclamationIcon, UserCircleIcon } from '@heroicons/vue/24/outline'
 import { branchApi } from '@/services/MainAPI/branchApi'
 import { useAuthStore } from '@/store/auth'
 import { useToast } from '@/composables/useToast'
+import { defaultBusinessCalendar } from '@/utils/datetime'
 import {
   deliveryTrackingAlertsApi,
   type DeliveryTrackingAlert,
@@ -133,10 +135,8 @@ const totalCount = ref(0)
 const branchId = ref('')
 const status = ref<DeliveryTrackingAlertStatus | ''>('active')
 const severity = ref<DeliveryTrackingAlertSeverity | ''>('')
-const formatInputDate = (date: Date) => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Bogota', year: 'numeric', month: '2-digit', day: '2-digit' }).format(date)
-const now = new Date()
-const fromDate = ref(formatInputDate(new Date(now.getTime() - 6 * 86400000)))
-const toDate = ref(formatInputDate(now))
+const toDate = ref(defaultBusinessCalendar.todayYmd())
+const fromDate = ref(defaultBusinessCalendar.formatYmd(defaultBusinessCalendar.addZonedDays(Date.now(), -6)))
 const resolveOpen = ref(false)
 const selectedAlert = ref<DeliveryTrackingAlert | null>(null)
 const resolutionReason = ref('')
@@ -149,8 +149,16 @@ const severityOptions: Array<{ value: DeliveryTrackingAlertSeverity; label: stri
   { value: 'critical', label: 'Crítica' },
 ]
 
-function dateStart(value: string) { return value ? new Date(`${value}T00:00:00-05:00`).toISOString() : undefined }
-function dayAfter(value: string) { if (!value) return undefined; const date = new Date(`${value}T00:00:00-05:00`); date.setUTCDate(date.getUTCDate() + 1); return date.toISOString() }
+function parseYmd(value: string): Date {
+  const [year, month, day] = value.split('-').map(Number)
+  return defaultBusinessCalendar.zonedDayFromPickerLocalDate(new Date(year, month - 1, day))
+}
+function dateStart(value: string) {
+  return value ? defaultBusinessCalendar.startOfZonedDayAsDate(parseYmd(value)).toISOString() : undefined
+}
+function dayAfter(value: string) {
+  return value ? defaultBusinessCalendar.addZonedDays(parseYmd(value), 1).toISOString() : undefined
+}
 
 async function loadAlerts() {
   loading.value = true
