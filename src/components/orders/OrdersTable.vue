@@ -249,6 +249,7 @@
                             <div v-if="order.appPayments && order.appPayments.length > 0" class="space-y-1">
                                 <OrderAppPaymentRow v-for="payment in order.appPayments" :key="payment.id"
                                     :payment="payment" :show-settle-actions="showSettleAppActions(order)"
+                                    :show-unsettle-action="showUnsettleAppAction(order)"
                                     @settle="emit('settle-app-payment', order, payment)"
                                     @unsettle="emit('settle-app-payment', order, payment)" />
                             </div>
@@ -515,6 +516,11 @@ const showUnverifyBankAction = (order: OrderListItem): boolean =>
 const showSettleAppActions = (order: OrderListItem): boolean =>
     props.enableAppSettleQuickAction &&
     permissions.canSettleAppPayments() &&
+    order.status !== 'cancelled'
+
+const showUnsettleAppAction = (order: OrderListItem): boolean =>
+    props.enableAppSettleQuickAction &&
+    permissions.canUnsettleAppPayments() &&
     order.status !== 'cancelled'
 
 // Valida si se puede asignar domiciliario al pedido

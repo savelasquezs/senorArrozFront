@@ -149,6 +149,11 @@ export function useOrderPermissions() {
      */
     const canSettleAppPayments = (): boolean => {
         const role = authStore.userRole
+        return role === 'Superadmin' || role === 'Admin' || role === 'Cashier'
+    }
+
+    const canUnsettleAppPayments = (): boolean => {
+        const role = authStore.userRole
         return role === 'Superadmin' || role === 'Admin'
     }
 
@@ -364,6 +369,7 @@ export function useOrderPermissions() {
         canUnverifyPayments,
         canReprintThermalTickets,
         canSettleAppPayments,
+        canUnsettleAppPayments,
         canUncancel,
         canChangeStatus,
         canCancel,

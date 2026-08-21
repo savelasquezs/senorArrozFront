@@ -53,12 +53,12 @@
                     </div>
                 </div>
                 <div class="flex gap-1">
-                    <!-- Botones de liquidación (Admin/Superadmin) -->
+                    <!-- Liquidar incluye Cajero; desliquidar permanece administrativo -->
                     <BaseButton v-if="canSettle && !appPayments[0].isSettled && !appPayments[0].isReversed"
                         @click="handleSettlePayment(appPayments[0].id)" variant="ghost" size="sm" title="Liquidar pago">
                         <CheckIcon class="w-4 h-4 text-emerald-600" />
                     </BaseButton>
-                    <BaseButton v-if="canSettle && appPayments[0].isSettled"
+                    <BaseButton v-if="canUnsettle && appPayments[0].isSettled"
                         @click="handleUnsettlePayment(appPayments[0].id)" variant="ghost" size="sm"
                         title="Desliquidar pago">
                         <XMarkIcon class="w-4 h-4 text-gray-600" />
@@ -259,6 +259,7 @@ const canEdit = computed(() => permissions.canEditPayments(props.order))
 const canVerify = computed(() => permissions.canVerifyPayments())
 const canUnverify = computed(() => permissions.canUnverifyPayments())
 const canSettle = computed(() => permissions.canSettleAppPayments())
+const canUnsettle = computed(() => permissions.canUnsettleAppPayments())
 
 // State
 const showAppModal = ref(false)

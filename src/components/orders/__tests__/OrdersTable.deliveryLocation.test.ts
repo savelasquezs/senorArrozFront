@@ -20,6 +20,7 @@ vi.mock('@/composables/useOrderPermissions', () => ({
         canVerifyPayments: () => false,
         canUnverifyPayments: () => false,
         canSettleAppPayments: () => false,
+        canUnsettleAppPayments: () => false,
     }),
 }))
 

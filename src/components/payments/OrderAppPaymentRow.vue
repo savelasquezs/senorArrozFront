@@ -15,7 +15,7 @@
                 @click.stop="emit('settle', payment)">
                 <CheckIcon class="w-3.5 h-3.5 text-emerald-600" />
             </button>
-            <button v-if="showSettleActions && liquidado" type="button"
+            <button v-if="showUnsettleAction && liquidado" type="button"
                 class="p-0.5 rounded text-gray-500 hover:bg-gray-100 transition-colors" title="Desliquidar pago"
                 @click.stop="emit('unsettle', payment)">
                 <XMarkIcon class="w-3.5 h-3.5 text-gray-600" />
@@ -39,6 +39,7 @@ import {
 const props = defineProps<{
     payment: OrderAppPaymentDetail
     showSettleActions?: boolean
+    showUnsettleAction?: boolean
 }>()
 
 const emit = defineEmits<{

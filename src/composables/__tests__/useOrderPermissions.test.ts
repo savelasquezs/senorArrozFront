@@ -128,6 +128,39 @@ describe('useOrderPermissions — verificación de pagos bancarios', () => {
     })
 })
 
+describe('useOrderPermissions - app payment settlement', () => {
+    beforeEach(() => {
+        setActivePinia(createPinia())
+        const auth = useAuthStore()
+        auth.user = {
+            id: 1,
+            name: 'Caja',
+            email: 'caja@test.com',
+            phone: '',
+            active: true,
+            role: UserRole.CASHIER,
+            branchId: 1,
+            branchName: 'B',
+        }
+    })
+
+    it('permite al cajero liquidar pero no desliquidar', () => {
+        const { canSettleAppPayments, canUnsettleAppPayments } = useOrderPermissions()
+        expect(canSettleAppPayments()).toBe(true)
+        expect(canUnsettleAppPayments()).toBe(false)
+    })
+
+    it.each([UserRole.ADMIN, UserRole.SUPERADMIN])('%s puede liquidar y desliquidar', (role) => {
+        const auth = useAuthStore()
+        if (!auth.user) throw new Error('expected user')
+        auth.user = { ...auth.user, role }
+
+        const { canSettleAppPayments, canUnsettleAppPayments } = useOrderPermissions()
+        expect(canSettleAppPayments()).toBe(true)
+        expect(canUnsettleAppPayments()).toBe(true)
+    })
+})
+
 describe('useOrderPermissions - canUncancel', () => {
     beforeEach(() => {
         setActivePinia(createPinia())
