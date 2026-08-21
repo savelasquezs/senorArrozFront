@@ -200,8 +200,7 @@ const productOptions = computed(() => {
 })
 
 const giftProductOptions = computed(() => {
-  const gifts = productOptions.value.filter((p) => normalize(p.categoryName) === 'regalos')
-  return gifts.length > 0 ? gifts : productOptions.value
+  return productOptions.value.filter((p) => normalize(p.categoryName) === 'regalos')
 })
 
 const displayedPromotion = computed(() => activePromotion.value ?? currentPromotion.value)
