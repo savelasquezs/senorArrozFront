@@ -19,6 +19,18 @@ export type DeliveryIncidentReviewStatus =
   | 'closed_without_action'
   | 'referred_to_disciplinary_process'
 
+export type DeliveryInterruptionCause =
+  | 'gps_disabled'
+  | 'location_permission_revoked'
+  | 'airplane_mode_enabled'
+  | 'app_or_tracking_service_stopped'
+  | 'wifi_disabled'
+  | 'connectivity_interruption'
+  | 'device_restarted'
+  | 'not_determined'
+
+export type DeliveryInterruptionCertainty = 'confirmed_by_device' | 'technical_evidence' | 'not_determined'
+
 export interface DeliveryTrackingIncidentListItem {
   id: number
   incidentType: 'stay' | 'route_deviation' | 'location_disabled' | 'tracking_interruption'
@@ -30,6 +42,8 @@ export interface DeliveryTrackingIncidentListItem {
   startedAt: string
   endedAt: string
   durationSeconds: number
+  interruptionCause: DeliveryInterruptionCause | null
+  interruptionCertainty: DeliveryInterruptionCertainty | null
   automaticClassification: DeliveryStayClassification | null
   finalClassification: DeliveryStayClassification | null
   reviewStatus: DeliveryIncidentReviewStatus
@@ -65,6 +79,9 @@ export interface DeliveryIncidentDeviceEventEvidence {
   gpsEnabled: boolean | null
   locationPermissionGranted: boolean | null
   details: string | null
+  offlineLocationCount: number | null
+  offlineStartedAt: string | null
+  offlineEndedAt: string | null
   recordedAt: string
   syncedAt: string
 }
@@ -81,6 +98,8 @@ export interface DeliveryTrackingIncidentDetail {
   orderId: number | null
   automaticClassification: DeliveryStayClassification | null
   classificationReason: string | null
+  interruptionCause: DeliveryInterruptionCause | null
+  interruptionCertainty: DeliveryInterruptionCertainty | null
   finalClassification: DeliveryStayClassification | null
   reviewStatus: DeliveryIncidentReviewStatus
   startedAt: string
@@ -153,6 +172,9 @@ export interface DeliveryPlaybackEvent {
   gpsEnabled: boolean | null
   locationPermissionGranted: boolean | null
   details: string | null
+  offlineLocationCount: number | null
+  offlineStartedAt: string | null
+  offlineEndedAt: string | null
   workSessionId: number
 }
 
