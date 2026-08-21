@@ -193,9 +193,8 @@ const activePromotion = computed(() =>
 )
 
 const productOptions = computed(() => {
-  const branchId = props.branchId
   return productsStore.currentProducts
-    .filter((p) => p.active && (!branchId || p.branchId === branchId))
+    .filter((p) => p.active)
     .map((p) => ({ id: p.id, name: p.name, categoryName: p.categoryName }))
 })
 
