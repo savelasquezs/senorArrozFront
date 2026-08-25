@@ -320,6 +320,8 @@ Admin y Superadmin pueden cambiar un pedido desde cualquier estado hacia cualqui
 - **Stock**: Control de inventario por sucursal
 - **Precios**: Precios dinámicos por sucursal
 - **Activos**: Productos pueden activarse/desactivarse por sucursal
+- **Pedidos web**: Cada categoría define explícitamente si se usa como arroz, combo, bebida, adición o si permanece oculta. Los productos públicos definen presentación y orden web; las fichas comerciales agrupan sus presentaciones.
+- **Control editorial**: Una ficha vinculada a arroces o combos debe tener fotografía oficial y descripción antes de publicar el storefront.
 
 ### Reglas de Stock
 

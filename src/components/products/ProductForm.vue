@@ -42,6 +42,12 @@
                     placeholder="Opcional" :error="errors.servesPeopleMax" @input="validateForm" />
             </div>
             <p class="text-xs text-gray-500">Ejemplo: 7 y 9 se mostrará como “7-9 personas”.</p>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <BaseInput v-model="form.storefrontVariantLabel" label="Presentación web" :maxlength="80"
+                    placeholder="Ej: Personal, 1.5 L o 250 g" />
+                <BaseInput v-model.number="form.storefrontSortOrder" label="Orden web" type="number" :min="0" :step="1"
+                    placeholder="0" :error="errors.storefrontSortOrder" @input="validateForm" />
+            </div>
         </div>
 
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -213,6 +219,8 @@ const form = reactive({
     ,commercialProfileId: null as number | null,
     servesPeopleMin: null as number | null,
     servesPeopleMax: null as number | null,
+    storefrontVariantLabel: '',
+    storefrontSortOrder: 0,
 })
 
 const errors = reactive({
@@ -223,6 +231,7 @@ const errors = reactive({
     weightGrams: '',
     servesPeopleMin: '',
     servesPeopleMax: '',
+    storefrontSortOrder: '',
 })
 
 const commercialProfiles = ref<CommercialProfile[]>([])
@@ -259,7 +268,7 @@ const isFormValid = computed(() => {
         !errors.name &&
         !errors.price &&
         !errors.weightGrams
-        && !errors.servesPeopleMin && !errors.servesPeopleMax
+        && !errors.servesPeopleMin && !errors.servesPeopleMax && !errors.storefrontSortOrder
 
     // Only validate stock for new products
     if (!props.product) {
@@ -306,6 +315,7 @@ const validateForm = () => {
     const hasMax = form.servesPeopleMax != null && String(form.servesPeopleMax) !== ''
     errors.servesPeopleMin = hasMin && Number(form.servesPeopleMin) <= 0 ? 'Debe ser mayor que cero' : (hasMin !== hasMax ? 'Completa ambos valores' : '')
     errors.servesPeopleMax = hasMax && Number(form.servesPeopleMax) < Number(form.servesPeopleMin) ? 'Debe ser igual o mayor que el mínimo' : (hasMin !== hasMax ? 'Completa ambos valores' : '')
+    errors.storefrontSortOrder = form.storefrontSortOrder < 0 ? 'El orden no puede ser negativo' : ''
 
     // Validate stock (only for new products)
     if (!props.product) {
@@ -329,6 +339,8 @@ const buildFormData = (): ProductFormData => ({
     commercialProfileId: form.commercialProfileId,
     servesPeopleMin: form.servesPeopleMin === null || String(form.servesPeopleMin) === '' ? null : Number(form.servesPeopleMin),
     servesPeopleMax: form.servesPeopleMax === null || String(form.servesPeopleMax) === '' ? null : Number(form.servesPeopleMax),
+    storefrontVariantLabel: form.storefrontVariantLabel.trim() || null,
+    storefrontSortOrder: Number(form.storefrontSortOrder) || 0,
 })
 
 const handleSubmit = () => {
@@ -380,6 +392,8 @@ watch(() => props.product, (newProduct) => {
         form.commercialProfileId = newProduct.commercialProfileId ?? null
         form.servesPeopleMin = newProduct.servesPeopleMin ?? null
         form.servesPeopleMax = newProduct.servesPeopleMax ?? null
+        form.storefrontVariantLabel = newProduct.storefrontVariantLabel ?? ''
+        form.storefrontSortOrder = newProduct.storefrontSortOrder ?? 0
     } else {
         form.categoryId = 0
         form.name = ''
@@ -391,6 +405,8 @@ watch(() => props.product, (newProduct) => {
         form.commercialProfileId = null
         form.servesPeopleMin = null
         form.servesPeopleMax = null
+        form.storefrontVariantLabel = ''
+        form.storefrontSortOrder = 0
     }
 
     errors.categoryId = ''
@@ -400,6 +416,7 @@ watch(() => props.product, (newProduct) => {
     errors.weightGrams = ''
     errors.servesPeopleMin = ''
     errors.servesPeopleMax = ''
+    errors.storefrontSortOrder = ''
 }, { immediate: true })
 
 // Load categories on mount

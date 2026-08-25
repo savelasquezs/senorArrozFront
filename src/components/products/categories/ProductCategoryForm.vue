@@ -11,6 +11,12 @@
             </BaseInput>
         </div>
 
+        <div>
+            <BaseSelect v-model="form.storefrontRole" :options="storefrontRoleOptions" label="Uso en pedidos web"
+                value-key="value" display-key="label" />
+            <p class="mt-1 text-xs text-gray-500">Las categorías operativas deben permanecer en “No mostrar”.</p>
+        </div>
+
         <!-- Sucursal de la categoría (Admin elige; por defecto la suya) -->
         <div v-if="authStore.isSuperadmin || authStore.isAdmin">
             <BaseSelect v-model="form.branchId" :options="branchOptions" label="Sucursal"
@@ -39,7 +45,7 @@
 import { ref, reactive, computed, watch, onMounted } from 'vue'
 import { useBranchesStore } from '@/store/branches'
 import { useAuthStore } from '@/store/auth'
-import type { ProductCategory, ProductCategoryFormData } from '@/types/product'
+import type { ProductCategory, ProductCategoryFormData, StorefrontRole } from '@/types/product'
 import BaseInput from '@/components/ui/BaseInput.vue'
 import BaseSelect from '@/components/ui/BaseSelect.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
@@ -67,8 +73,17 @@ const authStore = useAuthStore()
 
 const form = reactive({
     name: '',
-    branchId: authStore.branchId ?? 0
+    branchId: authStore.branchId ?? 0,
+    storefrontRole: 'hidden' as StorefrontRole
 })
+
+const storefrontRoleOptions = [
+    { value: 'hidden', label: 'No mostrar' },
+    { value: 'rice', label: 'Arroz' },
+    { value: 'combo', label: 'Combo' },
+    { value: 'beverage', label: 'Bebida' },
+    { value: 'addition', label: 'Adición' },
+]
 
 const errors = reactive({
     name: '',
@@ -122,6 +137,7 @@ const handleSubmit = () => {
 
     const formData: ProductCategoryFormData & { branchId?: number } = {
         name: form.name.trim(),
+        storefrontRole: form.storefrontRole,
         ...(needsBranchPick.value && { branchId: form.branchId })
     }
 
@@ -133,10 +149,12 @@ watch(() => props.category, (newCategory) => {
     if (newCategory) {
         form.name = newCategory.name
         form.branchId = newCategory.branchId
+        form.storefrontRole = newCategory.storefrontRole
     } else {
         // Reset form for new category
         form.name = ''
         form.branchId = authStore.branchId ?? 0
+        form.storefrontRole = 'hidden'
     }
 
     // Clear errors

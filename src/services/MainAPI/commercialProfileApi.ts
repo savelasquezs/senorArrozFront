@@ -14,5 +14,5 @@ class CommercialProfileApi extends BaseApi {
   getProducts(id: number) { return this.get<ApiResponse<CommercialProfileProduct[]>>(`/commercial-profiles/${id}/products`) }
   setProducts(id: number, productIds: number[]) { return this.put<ApiResponse<number[]>>(`/commercial-profiles/${id}/products`, { productIds }) }
 }
-export interface CommercialProfileProduct { id:number; name:string; active:boolean; commercialProfileId:number|null; commercialProfileName:string|null }
+export interface CommercialProfileProduct { id:number; name:string; active:boolean; commercialProfileId:number|null; commercialProfileName:string|null; storefrontRole:string }
 export const commercialProfileApi = new CommercialProfileApi()

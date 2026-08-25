@@ -23,6 +23,9 @@
     <BaseDialog v-model="showProducts" title="Productos que usan esta ficha" size="sm">
       <BaseInput v-model="productSearch" placeholder="Buscar productos..." />
       <p class="my-3 text-xs text-gray-500">{{ selectedProductIds.size }} productos seleccionados</p>
+      <p v-if="mainProfileIncomplete" class="my-3 rounded-lg border border-amber-300 bg-amber-50 p-3 text-xs text-amber-800">
+        Esta ficha agrupa arroces o combos y necesita fotografía y descripción antes de publicarse.
+      </p>
       <div v-if="loadingProducts" class="py-8 text-center text-sm text-gray-500">Cargando productos...</div>
       <div v-else class="max-h-80 space-y-1 overflow-y-auto">
         <label v-for="product in filteredProducts" :key="product.id" class="flex cursor-pointer items-start gap-3 rounded-lg p-2 hover:bg-gray-50">
@@ -50,6 +53,7 @@ const form = reactive({ name: '', description: '', ingredients: '' })
 const showProducts=ref(false),loadingProducts=ref(false),savingProducts=ref(false),productSearch=ref('')
 const products=ref<CommercialProfileProduct[]>([]),selectedProductIds=ref(new Set<number>())
 const filteredProducts=computed(()=>{const q=productSearch.value.trim().toLocaleLowerCase();return q?products.value.filter(x=>x.name.toLocaleLowerCase().includes(q)):products.value})
+const mainProfileIncomplete=computed(()=>products.value.some(x=>selectedProductIds.value.has(x.id)&&['rice','combo'].includes(x.storefrontRole))&&(!editing.value?.photoUrl||!form.description.trim()))
 async function load() { profiles.value = (await commercialProfileApi.getAll(props.branchId)).data }
 function startNew() { editing.value = { id: 0, branchId: props.branchId, name: '' }; Object.assign(form, { name: '', description: '', ingredients: '' }) }
 function edit(item: CommercialProfile) { editing.value = item; Object.assign(form, { name: item.name, description: item.description || '', ingredients: item.ingredients || '' }) }
