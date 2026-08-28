@@ -1,12 +1,25 @@
 import { BaseApi } from './baseApi'
-import type { ApiResponse } from '@/types/common'
+import type { ApiResponse, PagedResult } from '@/types/common'
 import type {
   BlogArticlePreview,
   BlogArticleSummary,
+  BlogPublishingQueueItem,
   BlogPublishResult,
 } from '@/types/blogPublishing'
 
 class BlogPublishingApi extends BaseApi {
+  async getQueue(page = 1, pageSize = 100): Promise<ApiResponse<BlogPublishingQueueItem[]>> {
+    const response = await this.get<ApiResponse<PagedResult<BlogPublishingQueueItem>>>(
+      `/blog-publishing/queue?page=${page}&pageSize=${pageSize}`,
+      { branchScope: 'none' },
+    )
+
+    return {
+      ...response,
+      data: response.data?.items ?? [],
+    }
+  }
+
   getApproved(): Promise<ApiResponse<BlogArticleSummary[]>> {
     return this.get<ApiResponse<BlogArticleSummary[]>>('/blog-publishing/approved', {
       branchScope: 'none',

@@ -29,6 +29,22 @@ export interface BlogArticleSummary {
   lastEditedAt?: string | null
 }
 
+export type BlogPublicationStatus =
+  | 'readyToPublish'
+  | 'changesPending'
+  | 'upToDate'
+  | 'notReady'
+  | 'checkFailed'
+
+export interface BlogPublishingQueueItem extends BlogArticleSummary {
+  publicationStatus: BlogPublicationStatus
+  hasUnpublishedChanges: boolean
+  publicUrl?: string | null
+  publishedAt?: string | null
+  publishedUpdatedAt?: string | null
+  checkError?: string | null
+}
+
 export interface BlogArticlePreview extends BlogArticleSummary {
   metaTitle: string
   metaDescription: string
