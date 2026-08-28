@@ -3,6 +3,18 @@ import router from './router'
 import { createPinia } from 'pinia'
 import './style.css'
 import App from './App.vue'
+import { UserRole } from '@/types/auth'
+
+router.addRoute({
+    path: '/blog-seo',
+    name: 'BlogPublishing',
+    component: () => import('@/views/BlogPublishingView.vue'),
+    meta: {
+        requiresAuth: true,
+        requiresRole: [UserRole.SUPERADMIN],
+        title: 'Blog / SEO'
+    }
+})
 
 // Global error handler for unhandled promise rejections and errors
 window.addEventListener('unhandledrejection', (event) => {
