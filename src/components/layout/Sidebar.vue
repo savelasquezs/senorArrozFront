@@ -357,6 +357,12 @@ const navigationItems = computed((): NavItem[] => [
 		icon: DocumentTextIcon,
 		roles: ['Superadmin', 'Admin', 'Cashier', 'Kitchen', 'Deliveryman'],
 	},
+	{
+		name: 'Blog / SEO',
+		to: '/blog-seo',
+		icon: DocumentTextIcon,
+		roles: ['Superadmin'],
+	},
 ]);
 
 const hasPermission = (roles: string[], item?: NavItem): boolean => {
