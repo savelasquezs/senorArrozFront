@@ -1,5 +1,5 @@
 import { BaseApi } from './baseApi'
-import type { ApiResponse } from '@/types/common'
+import type { ApiResponse, PagedResult } from '@/types/common'
 import type {
   BlogArticlePreview,
   BlogArticleSummary,
@@ -8,10 +8,11 @@ import type {
 } from '@/types/blogPublishing'
 
 class BlogPublishingApi extends BaseApi {
-  getQueue(): Promise<ApiResponse<BlogPublishingQueueItem[]>> {
-    return this.get<ApiResponse<BlogPublishingQueueItem[]>>('/blog-publishing/queue', {
-      branchScope: 'none',
-    })
+  getQueue(page = 1, pageSize = 100): Promise<ApiResponse<PagedResult<BlogPublishingQueueItem>>> {
+    return this.get<ApiResponse<PagedResult<BlogPublishingQueueItem>>>(
+      `/blog-publishing/queue?page=${page}&pageSize=${pageSize}`,
+      { branchScope: 'none' },
+    )
   }
 
   getApproved(): Promise<ApiResponse<BlogArticleSummary[]>> {
