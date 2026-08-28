@@ -8,11 +8,16 @@ import type {
 } from '@/types/blogPublishing'
 
 class BlogPublishingApi extends BaseApi {
-  getQueue(page = 1, pageSize = 100): Promise<ApiResponse<PagedResult<BlogPublishingQueueItem>>> {
-    return this.get<ApiResponse<PagedResult<BlogPublishingQueueItem>>>(
+  async getQueue(page = 1, pageSize = 100): Promise<ApiResponse<BlogPublishingQueueItem[]>> {
+    const response = await this.get<ApiResponse<PagedResult<BlogPublishingQueueItem>>>(
       `/blog-publishing/queue?page=${page}&pageSize=${pageSize}`,
       { branchScope: 'none' },
     )
+
+    return {
+      ...response,
+      data: response.data?.items ?? [],
+    }
   }
 
   getApproved(): Promise<ApiResponse<BlogArticleSummary[]>> {
