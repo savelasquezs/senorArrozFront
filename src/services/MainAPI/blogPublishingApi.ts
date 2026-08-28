@@ -3,10 +3,17 @@ import type { ApiResponse } from '@/types/common'
 import type {
   BlogArticlePreview,
   BlogArticleSummary,
+  BlogPublishingQueueItem,
   BlogPublishResult,
 } from '@/types/blogPublishing'
 
 class BlogPublishingApi extends BaseApi {
+  getQueue(): Promise<ApiResponse<BlogPublishingQueueItem[]>> {
+    return this.get<ApiResponse<BlogPublishingQueueItem[]>>('/blog-publishing/queue', {
+      branchScope: 'none',
+    })
+  }
+
   getApproved(): Promise<ApiResponse<BlogArticleSummary[]>> {
     return this.get<ApiResponse<BlogArticleSummary[]>>('/blog-publishing/approved', {
       branchScope: 'none',
