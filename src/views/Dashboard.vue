@@ -13,6 +13,16 @@
             </div>
         </template>
 
+        <div v-if="authStore.userRole === UserRole.SUPERADMIN" class="mb-5 flex justify-end">
+            <router-link
+                to="/blog-seo"
+                class="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-emerald-700"
+            >
+                Blog / SEO
+                <span aria-hidden="true">→</span>
+            </router-link>
+        </div>
+
         <GlobalDashboard v-if="authStore.userRole === UserRole.SUPERADMIN" />
         <AdminDashboard v-else-if="authStore.userRole === UserRole.ADMIN" />
         <div v-else class="rounded-lg bg-amber-50 border border-amber-200 p-4 text-sm text-amber-900">
