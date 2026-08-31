@@ -36,6 +36,7 @@ describe('authSession', () => {
     }
 
     beforeEach(() => {
+        localStorage.clear()
         axiosCreateMock.mockReset()
         redirectToLoginMock.mockReset()
     })
@@ -62,7 +63,7 @@ describe('authSession', () => {
         expect(authSession.hasAccessToken()).toBe(false)
     })
 
-    it('refreshes the session and updates the stored tokens', async () => {
+    it('refreshes the session using the expired access token and updates stored tokens', async () => {
         vi.resetModules()
 
         const refreshClient = {
@@ -77,11 +78,17 @@ describe('authSession', () => {
         axiosCreateMock.mockReturnValue(refreshClient)
 
         const authSession = await import('@/services/auth/authSession')
+        localStorage.setItem('auth_token', 'expired-access-token')
         localStorage.setItem('refresh_token', 'stale-refresh-token')
 
         const token = await authSession.refreshAccessToken()
 
         expect(token).toBe('new-access-token')
+        expect(axiosCreateMock).toHaveBeenCalledWith(expect.objectContaining({
+            headers: expect.objectContaining({
+                Authorization: 'Bearer expired-access-token',
+            }),
+        }))
         expect(refreshClient.post).toHaveBeenCalledWith('/auth/refresh', {
             refreshToken: 'stale-refresh-token',
         })
