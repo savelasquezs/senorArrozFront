@@ -21,8 +21,7 @@ router.addRoute({
 // commonly because the browser still has an older deployment open.
 window.addEventListener('vite:preloadError', (event) => {
     event.preventDefault()
-    const payload = (event as Event & { payload?: unknown }).payload
-    recoverFromStaleChunk(payload)
+    recoverFromStaleChunk()
 })
 
 router.onError((error) => {
