@@ -265,8 +265,8 @@
                                     @remove="emit('remove-paid-in-store-cash', order)" />
                             </div>
 
-                            <!-- Sin electrónicos: atajos Pagó? + transferencia rápida -->
-                            <div v-if="!orderHasElectronicPayments(order) && !order.paidInStoreCash"
+                            <!-- Atajos disponibles mientras exista saldo pendiente -->
+                            <div v-if="showQuickPaymentActions(order)"
                                 class="flex flex-wrap items-center gap-1">
                                 <button v-if="showPaidInStoreQuickButton(order)" type="button"
                                     class="text-[11px] font-medium text-amber-800 bg-amber-100 hover:bg-amber-200 border border-amber-300 rounded px-1.5 py-0.5 disabled:opacity-50"
@@ -281,17 +281,6 @@
                                     class="text-[11px] text-blue-600 hover:text-blue-800 underline decoration-dotted"
                                     @click.stop="emit('quick-bank-transfer', order, bank.id)">
                                     {{ formatQuickLabel(bank.name) }}
-                                </button>
-                            </div>
-
-                            <!-- Con electrónicos y remanente: solo atajo Pagó? (evita duplicar con bloque sin electrónicos) -->
-                            <div v-if="orderHasElectronicPayments(order) && showPaidInStoreQuickButton(order)"
-                                class="flex flex-wrap items-center gap-1">
-                                <button type="button"
-                                    class="text-[11px] font-medium text-amber-800 bg-amber-100 hover:bg-amber-200 border border-amber-300 rounded px-1.5 py-0.5 disabled:opacity-50"
-                                    :disabled="savingPaidInStoreId === order.id"
-                                    @click.stop="quickMarkPaidInStore(order)">
-                                    {{ savingPaidInStoreId === order.id ? '…' : 'Pagó?' }}
                                 </button>
                             </div>
                         </div>
@@ -362,7 +351,6 @@ import { defaultBusinessCalendar } from '@/utils/datetime'
 import { useToast } from '@/composables/useToast'
 import { orderApi } from '@/services/MainAPI/orderApi'
 import { orderCashToCollect, sumPaymentsAmounts } from '@/utils/orderCashToCollect'
-import { orderHasElectronicPayments } from '@/utils/orderListPayments'
 import { buildDeliveryInquiryMessage } from '@/utils/deliveryInquiryMessage'
 import {
     ArrowsUpDownIcon,
@@ -423,6 +411,16 @@ const showPaidInStoreQuickButton = (order: OrderListItem): boolean =>
     order.status !== 'cancelled' &&
     permissions.canEditPayments(order) &&
     order.paidInStoreCash !== true &&
+    orderCashToCollect(
+        order.total,
+        { bankPayments: order.bankPayments, appPayments: order.appPayments },
+        { floorAtZero: true },
+    ) > 0
+
+const showQuickPaymentActions = (order: OrderListItem): boolean =>
+    order.paidInStoreCash !== true &&
+    order.status !== 'cancelled' &&
+    permissions.canEditPayments(order) &&
     orderCashToCollect(
         order.total,
         { bankPayments: order.bankPayments, appPayments: order.appPayments },
