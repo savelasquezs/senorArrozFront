@@ -57,6 +57,27 @@ describe('apps store', () => {
         expect(store.list).toEqual(payload)
     })
 
+    it('treats an empty app list as loaded for the same branch', async () => {
+        const store = useAppsStore()
+        store.clearList()
+        const payload: PagedResult<App> = {
+            items: [],
+            totalCount: 0,
+            page: 1,
+            pageSize: 100,
+            totalPages: 0,
+            hasPreviousPage: false,
+            hasNextPage: false,
+        }
+        appApiMock.getApps.mockResolvedValue(payload)
+
+        await store.ensureListLoaded(77)
+        await store.ensureListLoaded(77)
+
+        expect(appApiMock.getApps).toHaveBeenCalledTimes(1)
+        expect(store.list?.items).toEqual([])
+    })
+
     it('fetches apps by bank into the side list', async () => {
         const store = useAppsStore()
         const apps = [makeApp()]
