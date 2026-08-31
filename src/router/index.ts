@@ -4,7 +4,6 @@ import { useAuthStore } from '@/store/auth'
 import { useBranchContextStore } from '@/store/branchContext'
 import { hasAccessToken } from '@/services/auth/authSession'
 import { UserRole } from '@/types/auth'
-import { bootstrapOrderCatalog } from '@/utils/orderCatalogBootstrap'
 
 // Import views
 import Login from '@/views/Login.vue'
@@ -374,15 +373,16 @@ const router = createRouter({
     }
 })
 
-// Navigation guards
+// Navigation guards. Keep this guard limited to auth/authorization/context only:
+// route changes must never wait for page catalog/data prefetches.
 router.beforeEach(async (to, _from, next) => {
-	const authStore = useAuthStore()
-	const branchContext = useBranchContextStore()
+    const authStore = useAuthStore()
+    const branchContext = useBranchContextStore()
 
-	// Initialize auth state if not already done
-	if (!authStore.isAuthenticated && hasAccessToken()) {
-		authStore.initializeAuth()
-	}
+    // Initialize auth state if not already done
+    if (!authStore.isAuthenticated && hasAccessToken()) {
+        authStore.initializeAuth()
+    }
 
     // Set page title
     document.title = to.meta.title ? `${to.meta.title} - Señor Arroz` : 'Señor Arroz'
@@ -396,8 +396,9 @@ router.beforeEach(async (to, _from, next) => {
     if (authStore.isAuthenticated && authStore.user) {
         try {
             await branchContext.initializeForUser(authStore.user)
-            await bootstrapOrderCatalog(authStore.userRole, branchContext.selectedBranchId)
         } catch (error) {
+            // A temporary branch-options failure must not freeze navigation or poison the store.
+            // The context store remains uninitialized so a later navigation can retry.
             console.error('No se pudo inicializar el contexto de sucursal:', error)
         }
     }
