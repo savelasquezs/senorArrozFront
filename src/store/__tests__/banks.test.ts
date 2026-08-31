@@ -58,6 +58,27 @@ describe('banks store', () => {
         expect(store.list).toEqual(payload)
     })
 
+    it('treats an empty bank list as loaded for the same branch', async () => {
+        const store = useBanksStore()
+        store.clearList()
+        const payload: PagedResult<Bank> = {
+            items: [],
+            totalCount: 0,
+            page: 1,
+            pageSize: 100,
+            totalPages: 0,
+            hasPreviousPage: false,
+            hasNextPage: false,
+        }
+        bankApiMock.getBanks.mockResolvedValue(payload)
+
+        await store.ensureListLoaded(77)
+        await store.ensureListLoaded(77)
+
+        expect(bankApiMock.getBanks).toHaveBeenCalledTimes(1)
+        expect(store.list?.items).toEqual([])
+    })
+
     it('creates a bank and prepends it to the list', async () => {
         const store = useBanksStore()
         store.list = {
