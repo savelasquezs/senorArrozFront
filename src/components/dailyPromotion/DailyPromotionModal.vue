@@ -139,6 +139,7 @@ import BaseSelect from '@/components/ui/BaseSelect.vue'
 import { useDailyPromotionStore } from '@/store/dailyPromotion'
 import { useProductsStore } from '@/store/products'
 import type { DailyPromotion, DailyPromotionDiscountScope, DailyPromotionType, UpsertDailyPromotion } from '@/types/dailyPromotion'
+import { getDailyPromotionProductOptions } from '@/utils/dailyPromotionProductOptions'
 import { getTodayDailyPromotionWindow } from '@/utils/dailyPromotionWindow'
 
 const props = defineProps<{
@@ -192,11 +193,9 @@ const activePromotion = computed(() =>
   props.branchId ? dailyPromotionStore.activeByBranch[props.branchId] ?? null : null,
 )
 
-const productOptions = computed(() => {
-  return productsStore.currentProducts
-    .filter((p) => p.active)
-    .map((p) => ({ id: p.id, name: p.name, categoryName: p.categoryName }))
-})
+const productOptions = computed(() =>
+  getDailyPromotionProductOptions(productsStore.currentProducts, props.branchId),
+)
 
 const giftProductOptions = computed(() => {
   return productOptions.value.filter((p) => normalize(p.categoryName) === 'regalos')
