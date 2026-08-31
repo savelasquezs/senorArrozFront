@@ -209,6 +209,7 @@ describe('customers store', () => {
 
     it('loads neighborhoods only once through ensureNeighborhoodsLoaded', async () => {
         const store = useCustomersStore()
+        store.clearList()
         const neighborhoods = [makeNeighborhood()]
         customerApiMock.getNeighborhoods.mockResolvedValue({
             data: neighborhoods,
@@ -219,6 +220,20 @@ describe('customers store', () => {
 
         expect(customerApiMock.getNeighborhoods).toHaveBeenCalledTimes(1)
         expect(store.availableNeighborhoods).toEqual(neighborhoods)
+    })
+
+    it('treats an empty neighborhood list as loaded for the same branch', async () => {
+        const store = useCustomersStore()
+        store.clearList()
+        customerApiMock.getNeighborhoods.mockResolvedValue({
+            data: [],
+        } satisfies ApiResponse<Neighborhood[]>)
+
+        await store.ensureNeighborhoodsLoaded(77)
+        await store.ensureNeighborhoodsLoaded(77)
+
+        expect(customerApiMock.getNeighborhoods).toHaveBeenCalledTimes(1)
+        expect(store.availableNeighborhoods).toEqual([])
     })
 
     it('stores the API error message on failure', async () => {
