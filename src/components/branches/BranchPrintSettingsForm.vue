@@ -56,6 +56,23 @@
         </div>
 
         <div class="border-t border-gray-200 pt-4 space-y-3">
+            <p class="text-sm font-medium text-gray-900">Momento de impresión automática de cocina</p>
+            <BaseSelect
+                v-model="form.kitchenAutoPrintTrigger"
+                :options="kitchenAutoPrintOptions"
+                :searchable="false"
+                :disabled="!form.enableKitchenJobs"
+                label="Imprimir comanda"
+                value-key="value"
+                display-key="label"
+            />
+            <p class="text-xs text-gray-500">
+                Solo controla la impresión automática. Las reimpresiones manuales y las pruebas siguen disponibles.
+                Las reservas futuras se imprimen cuando llega su hora de preparación.
+            </p>
+        </div>
+
+        <div class="border-t border-gray-200 pt-4 space-y-3">
             <p class="text-sm font-medium text-gray-900">Cabecera cocina (opcional)</p>
             <BaseInput v-model="form.kitchenHeaderLine1" label="Línea 1" :maxlength="80" />
             <BaseInput v-model="form.kitchenHeaderLine2" label="Línea 2" :maxlength="80" />
@@ -237,6 +254,10 @@ const paperWidthOptions = [
     { value: 58, label: '58 mm' },
     { value: 80, label: '80 mm' },
 ]
+const kitchenAutoPrintOptions = [
+    { value: 'whenMarkedReady', label: 'Cuando Cocina marque el pedido como listo' },
+    { value: 'whenOrderCreated', label: 'Al crear el pedido' },
+]
 
 const logoPreviewSrc = computed(() => {
     const p = props.initial?.receiptLogoPath
@@ -266,6 +287,7 @@ function emptyForm(): UpdateBranchPrintSettingsPayload {
         enableKitchenJobs: true,
         enableDeliveryJobs: true,
         enableCashierJobs: false,
+        kitchenAutoPrintTrigger: 'whenMarkedReady',
         printerQueueKitchen: '',
         printerQueueDelivery: '',
         printerQueueCashier: '',
@@ -292,6 +314,7 @@ function fromSettings(p: BranchPrintSettings): UpdateBranchPrintSettingsPayload 
         enableKitchenJobs: p.enableKitchenJobs,
         enableDeliveryJobs: p.enableDeliveryJobs,
         enableCashierJobs: p.enableCashierJobs,
+        kitchenAutoPrintTrigger: p.kitchenAutoPrintTrigger ?? 'whenMarkedReady',
         printerQueueKitchen: p.printerQueueKitchen ?? '',
         printerQueueDelivery: p.printerQueueDelivery ?? '',
         printerQueueCashier: p.printerQueueCashier ?? '',

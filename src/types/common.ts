@@ -98,6 +98,8 @@ export interface NeighborhoodSummary {
 }
 
 /** Configuración térmica / agente (api/Branches/{id} → printSettings). */
+export type KitchenAutoPrintTrigger = 'whenMarkedReady' | 'whenOrderCreated';
+
 export interface BranchPrintSettings {
   branchId: number;
   kitchenHeaderLine1?: string | null;
@@ -120,6 +122,7 @@ export interface BranchPrintSettings {
   enableKitchenJobs: boolean;
   enableDeliveryJobs: boolean;
   enableCashierJobs: boolean;
+  kitchenAutoPrintTrigger: KitchenAutoPrintTrigger;
   printerQueueKitchen?: string | null;
   printerQueueDelivery?: string | null;
   printerQueueCashier?: string | null;
@@ -150,6 +153,7 @@ export interface UpdateBranchPrintSettingsPayload {
   enableKitchenJobs: boolean;
   enableDeliveryJobs: boolean;
   enableCashierJobs: boolean;
+  kitchenAutoPrintTrigger: KitchenAutoPrintTrigger;
   printerQueueKitchen: string;
   printerQueueDelivery: string;
   printerQueueCashier: string;
