@@ -144,15 +144,19 @@ export async function refreshAccessToken(): Promise<string | null> {
     }
 
     const refreshToken = getRefreshToken()
-    if (!refreshToken) {
+    const accessToken = getAccessToken()
+    if (!refreshToken || !accessToken) {
         return null
     }
 
+    // The API intentionally reads identity/session data from the expired access token
+    // while validating the refresh token. Therefore refresh must send both tokens.
     const refreshClient = axios.create({
         baseURL: getApiBaseUrl(),
         timeout: 10000,
         headers: {
             'Content-Type': 'application/json',
+            Authorization: `Bearer ${accessToken}`,
             [WEB_CLIENT_HEADER]: WEB_CLIENT_HEADER_VALUE,
         },
     })
