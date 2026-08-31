@@ -22,6 +22,7 @@ import {
 
 let neighborhoodsLoadInFlight: Promise<void> | null = null;
 let neighborhoodsLoadedBranchId: number | null = null;
+let neighborhoodsLoaded = false;
 
 type FetchOpts = ResourceActionOptions;
 
@@ -157,17 +158,21 @@ export const useCustomersStore = defineStore('customers', () => {
 
     const ensureNeighborhoodsLoaded = async (branchId?: number | null) => {
         const normalizedBranchId = branchId && branchId > 0 ? branchId : null;
-        if (neighborhoods.value.length > 0 && neighborhoodsLoadedBranchId === normalizedBranchId) {
+        if (neighborhoodsLoaded && neighborhoodsLoadedBranchId === normalizedBranchId) {
             return;
         }
         if (neighborhoodsLoadInFlight) {
             return neighborhoodsLoadInFlight;
         }
-        if (neighborhoodsLoadedBranchId !== normalizedBranchId) neighborhoods.value = [];
+        if (neighborhoodsLoadedBranchId !== normalizedBranchId) {
+            neighborhoods.value = [];
+            neighborhoodsLoaded = false;
+        }
         neighborhoodsLoadInFlight = (async () => {
             try {
                 await fetchNeighborhoods();
                 neighborhoodsLoadedBranchId = normalizedBranchId;
+                neighborhoodsLoaded = true;
             } finally {
                 neighborhoodsLoadInFlight = null;
             }
@@ -221,6 +226,7 @@ export const useCustomersStore = defineStore('customers', () => {
         list.value = null;
         neighborhoods.value = [];
         neighborhoodsLoadedBranchId = null;
+        neighborhoodsLoaded = false;
         clearError();
     };
 

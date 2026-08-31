@@ -68,6 +68,22 @@ describe('branch context store', () => {
         expect(store.selectedBranchId).toBe(1)
     })
 
+    it('retries initialization after a transient branch-options failure', async () => {
+        const store = useBranchContextStore()
+        branchApiMock.getBranchOptions
+            .mockRejectedValueOnce(new Error('temporary network error'))
+            .mockResolvedValueOnce({ data: [{ id: 1, name: 'Santander' }] })
+
+        await expect(store.initializeForUser(superadmin)).rejects.toThrow('temporary network error')
+        expect(store.isInitialized).toBe(false)
+        expect(store.selectedBranchId).toBeNull()
+
+        await expect(store.initializeForUser(superadmin)).resolves.toBeUndefined()
+        expect(branchApiMock.getBranchOptions).toHaveBeenCalledTimes(2)
+        expect(store.isInitialized).toBe(true)
+        expect(store.selectedBranchId).toBe(1)
+    })
+
     it('persists selection and increments the revision used to invalidate views', async () => {
         const store = useBranchContextStore()
         await store.initializeForUser(superadmin)

@@ -4,6 +4,7 @@ import { createPinia } from 'pinia'
 import './style.css'
 import App from './App.vue'
 import { UserRole } from '@/types/auth'
+import { recoverFromStaleChunk } from '@/utils/chunkRecovery'
 
 router.addRoute({
     path: '/blog-seo',
@@ -16,11 +17,26 @@ router.addRoute({
     }
 })
 
-// Global error handler for unhandled promise rejections and errors
-window.addEventListener('unhandledrejection', (event) => {
-    console.error('Unhandled promise rejection:', event.reason)
-    // Prevent the error from being logged to console as an unhandled error
+// Vite emits this event when a lazy-loaded asset can no longer be fetched,
+// commonly because the browser still has an older deployment open.
+window.addEventListener('vite:preloadError', (event) => {
     event.preventDefault()
+    recoverFromStaleChunk()
+})
+
+router.onError((error) => {
+    if (recoverFromStaleChunk(error)) return
+    console.error('Router error:', error)
+})
+
+// Global error handler for unhandled promise rejections and errors.
+// Do not suppress unrelated errors: they must stay visible for diagnosis.
+window.addEventListener('unhandledrejection', (event) => {
+    if (recoverFromStaleChunk(event.reason)) {
+        event.preventDefault()
+        return
+    }
+    console.error('Unhandled promise rejection:', event.reason)
 })
 
 window.addEventListener('error', (event) => {
@@ -47,4 +63,4 @@ app.config.errorHandler = (err, _instance, info) => {
 
 app.use(createPinia());
 app.use(router);
-app.mount("#app");
+app.mount('#app');

@@ -18,6 +18,7 @@ import {
 
 let appsListEnsureInFlight: Promise<void> | null = null
 let appsLoadedBranchId: number | null = null
+let appsListLoaded = false
 
 type FetchOpts = ResourceActionOptions
 
@@ -36,7 +37,7 @@ export const useAppsStore = defineStore('apps', () => {
 
     const ensureListLoaded = async (branchId?: number | null) => {
         const normalizedBranchId = branchId && branchId > 0 ? branchId : null
-        if (list.value?.items?.length && appsLoadedBranchId === normalizedBranchId) {
+        if (appsListLoaded && appsLoadedBranchId === normalizedBranchId) {
             return
         }
         if (appsListEnsureInFlight) {
@@ -45,6 +46,7 @@ export const useAppsStore = defineStore('apps', () => {
         if (appsLoadedBranchId !== normalizedBranchId) {
             list.value = null
             byBank.value = null
+            appsListLoaded = false
         }
         appsListEnsureInFlight = fetch({
             page: 1,
@@ -52,6 +54,7 @@ export const useAppsStore = defineStore('apps', () => {
             branchId: normalizedBranchId ?? undefined,
         }).then(() => {
             appsLoadedBranchId = normalizedBranchId
+            appsListLoaded = true
         }).finally(() => {
             appsListEnsureInFlight = null
         })
@@ -123,6 +126,7 @@ export const useAppsStore = defineStore('apps', () => {
         list.value = null
         byBank.value = null
         appsLoadedBranchId = null
+        appsListLoaded = false
         clearError()
     }
 

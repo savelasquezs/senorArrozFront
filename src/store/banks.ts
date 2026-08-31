@@ -19,6 +19,7 @@ import {
 
 let banksListEnsureInFlight: Promise<void> | null = null
 let banksLoadedBranchId: number | null = null
+let banksListLoaded = false
 
 type FetchOpts = ResourceActionOptions
 
@@ -37,19 +38,23 @@ export const useBanksStore = defineStore('banks', () => {
 
     const ensureListLoaded = async (branchId?: number | null) => {
         const normalizedBranchId = branchId && branchId > 0 ? branchId : null
-        if (list.value?.items?.length && banksLoadedBranchId === normalizedBranchId) {
+        if (banksListLoaded && banksLoadedBranchId === normalizedBranchId) {
             return
         }
         if (banksListEnsureInFlight) {
             return banksListEnsureInFlight
         }
-        if (banksLoadedBranchId !== normalizedBranchId) list.value = null
+        if (banksLoadedBranchId !== normalizedBranchId) {
+            list.value = null
+            banksListLoaded = false
+        }
         banksListEnsureInFlight = fetch({
             page: 1,
             pageSize: 100,
             branchId: normalizedBranchId ?? undefined,
         }).then(() => {
             banksLoadedBranchId = normalizedBranchId
+            banksListLoaded = true
         }).finally(() => {
             banksListEnsureInFlight = null
         })
@@ -115,6 +120,7 @@ export const useBanksStore = defineStore('banks', () => {
     const clearList = () => {
         list.value = null
         banksLoadedBranchId = null
+        banksListLoaded = false
         clearError()
     }
 
