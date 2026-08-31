@@ -90,7 +90,9 @@ export const useBranchContextStore = defineStore('branchContext', () => {
             options.value = []
             selectedBranchId.value = null
             clearSelectedBranchIdForRequest()
-            initializedUserId.value = user.id
+            // A failed request is not a successful initialization. Leaving this null
+            // allows the next navigation/mount to retry instead of poisoning the session.
+            initializedUserId.value = null
             throw cause
         } finally {
             isLoading.value = false
