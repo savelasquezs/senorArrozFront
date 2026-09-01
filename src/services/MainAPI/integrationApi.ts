@@ -8,6 +8,10 @@ import type {
   RappiMenuPreview,
   UpdateRappiCatalogProduct,
   UpsertRappiConnection,
+  UpsertWompiPaymentIntegration,
+  WompiIntegrationSettings,
+  WompiPaymentIntegration,
+  WompiPaymentReview,
 } from '@/types/integrations'
 
 class IntegrationApi extends BaseApi {
@@ -69,6 +73,26 @@ class IntegrationApi extends BaseApi {
 
   rejectRappiOrder(id: number, reason: string) {
     return this.post<ApiResponse<string>>(`/integrations/apps/rappi/orders/${id}/reject`, { reason })
+  }
+
+  getWompi(branchId: number) {
+    return this.get<ApiResponse<WompiIntegrationSettings>>(`/branches/${branchId}/payment-integrations/wompi`)
+  }
+
+  saveWompi(branchId: number, data: UpsertWompiPaymentIntegration) {
+    return this.put<ApiResponse<WompiPaymentIntegration>>(`/branches/${branchId}/payment-integrations/wompi`, data)
+  }
+
+  testWompi(branchId: number) {
+    return this.post<ApiResponse<WompiPaymentIntegration>>(`/branches/${branchId}/payment-integrations/wompi/test`, {})
+  }
+
+  getWompiReviews(branchId: number) {
+    return this.get<ApiResponse<WompiPaymentReview[]>>('/payments/wompi/reviews', { params: { branchId } })
+  }
+
+  resolveWompiReview(attemptId: number, approve: boolean) {
+    return this.post<ApiResponse<unknown>>(`/payments/wompi/reviews/${attemptId}/resolve`, { approve })
   }
 }
 

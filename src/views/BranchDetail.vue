@@ -176,9 +176,10 @@
                     <div class="py-10 text-center"><h3 class="text-lg font-semibold">Factura electrónica</h3><p class="mt-2 text-sm text-gray-500">Aquí podrás crear y configurar proveedores como Siigo.</p><BaseButton class="mt-4" disabled>Crear proveedor</BaseButton></div>
                 </BaseCard>
 
-                <BaseCard v-if="canEditBranchProfile && activeBranchSection === 'payment-integrations'">
-                    <div class="py-10 text-center"><h3 class="text-lg font-semibold">Integraciones de pago</h3><p class="mt-2 text-sm text-gray-500">Aquí podrás crear y configurar proveedores como Stripe.</p><BaseButton class="mt-4" disabled>Crear proveedor</BaseButton></div>
-                </BaseCard>
+                <BranchWompiPaymentSection
+                    v-if="canEditBranchProfile && activeBranchSection === 'payment-integrations'"
+                    :branch-id="branchId"
+                />
 
                 <BranchDiscountCodesSection
                     v-if="canEditBranchProfile && activeBranchSection === 'discount-codes'"
@@ -436,6 +437,7 @@ import BranchUsersTable from '@/components/branches/BranchUsersTable.vue'
 import BranchPrintingSection from '@/components/branches/BranchPrintingSection.vue'
 import BranchWhatsAppAiSettingsSection from '@/components/branches/BranchWhatsAppAiSettingsSection.vue'
 import BranchDeliveryAppsSection from '@/components/branches/BranchDeliveryAppsSection.vue'
+import BranchWompiPaymentSection from '@/components/branches/BranchWompiPaymentSection.vue'
 import BranchBanksAppsSection from '@/components/branches/BranchBanksAppsSection.vue'
 import BranchExpensesSection from '@/components/branches/BranchExpensesSection.vue'
 import BranchLoyaltySection from '@/components/branches/BranchLoyaltySection.vue'

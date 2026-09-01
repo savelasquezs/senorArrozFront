@@ -9,7 +9,7 @@ import type { Product, ProductCategory } from './product'
 
 // ===== TIPOS BÁSICOS =====
 export type OrderType = 'onsite' | 'delivery' | 'reservation'
-export type OrderStatus = 'taken' | 'in_preparation' | 'ready' | 'on_the_way' | 'delivered' | 'cancelled'
+export type OrderStatus = 'awaiting_payment' | 'taken' | 'in_preparation' | 'ready' | 'on_the_way' | 'delivered' | 'cancelled'
 export type AppliedBenefitType = 'DailyPromotion' | 'Loyalty' | 'DiscountCode' | 'Manual' | 'None'
 
 export interface OrderItem {

@@ -56,6 +56,7 @@ onUnmounted(() => {
 // Mapeo de colores por estado
 const colorClasses = computed(() => {
     const colorMap: Record<OrderStatus, string> = {
+        awaiting_payment: 'bg-gray-100 text-gray-800 border-gray-200',
         taken: 'bg-blue-100 text-blue-800 border-blue-200',
         in_preparation: 'bg-yellow-100 text-yellow-800 border-yellow-200',
         ready: 'bg-orange-100 text-orange-800 border-orange-200',
@@ -69,6 +70,7 @@ const colorClasses = computed(() => {
 // Mapeo de iconos por estado
 const statusIcon = computed(() => {
     const iconMap: Record<OrderStatus, any> = {
+        awaiting_payment: ClockIcon,
         taken: ClockIcon,
         in_preparation: FireIcon,
         ready: CheckCircleIcon,

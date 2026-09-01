@@ -16,6 +16,7 @@ export interface TableColumn {
 
 // Order related types (matching your backend enums)
 export const OrderStatus = {
+  AWAITING_PAYMENT: 'awaiting_payment',
   TAKEN: 'taken',
   IN_PREPARATION: 'in_preparation',
   READY: 'ready',
