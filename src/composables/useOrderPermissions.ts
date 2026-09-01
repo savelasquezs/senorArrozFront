@@ -193,6 +193,7 @@ export function useOrderPermissions() {
 
         // Mapeo de transiciones según tipo de pedido
         const transitions: Record<OrderStatus, OrderStatus | null> = {
+            awaiting_payment: null,
             taken: 'in_preparation',
             in_preparation: 'ready',
             ready: orderType === 'onsite' ? 'delivered' : 'on_the_way', // onsite salta on_the_way
@@ -233,6 +234,7 @@ export function useOrderPermissions() {
      * Verifica si el usuario puede cambiar el pedido a un nuevo estado
      */
     const canChangeStatus = (order: OrderListItem | OrderDetailView, newStatus: OrderStatus): boolean => {
+        if (order.status === 'awaiting_payment' || newStatus === 'awaiting_payment') return false
         const role = authStore.userRole
         const currentStatus = order.status
 

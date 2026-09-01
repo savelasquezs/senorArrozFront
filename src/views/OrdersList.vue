@@ -614,7 +614,7 @@ import { useDebouncedCallback } from '@/composables/useDebouncedCallback'
 import { useOrderPermissions } from '@/composables/useOrderPermissions'
 import { useToast } from '@/composables/useToast'
 import { getOrderStatusDisplayName, getOrderTypeDisplayName, useFormatting } from '@/composables/useFormatting'
-import { sumPaymentsAmounts } from '@/utils/orderCashToCollect'
+import { orderCashToCollect, sumPaymentsAmounts } from '@/utils/orderCashToCollect'
 import { defaultBusinessCalendar, todayYmd } from '@/utils/datetime'
 import { getDateRangeForPreset, type DashboardPeriodPresetId } from '@/utils/dashboardPeriodPresets'
 import { bankPaymentApi } from '@/services/MainAPI/bankPaymentApi'
@@ -2031,16 +2031,21 @@ const clearPendingStatusChange = () => {
 
 const handleQuickBankTransfer = async (order: OrderListItem, bankId: number) => {
     try {
-        if ((order.bankPayments && order.bankPayments.length > 0) ||
-            (order.appPayments && order.appPayments.length > 0)) {
-            error('No se puede convertir', 'El pedido ya tiene pagos registrados')
+        const remainingAmount = orderCashToCollect(
+            order.total,
+            { bankPayments: order.bankPayments, appPayments: order.appPayments },
+            { floorAtZero: true },
+        )
+
+        if (remainingAmount <= 0 || order.paidInStoreCash) {
+            error('Pedido pagado', 'El pedido no tiene saldo pendiente')
             return
         }
 
         const created = await bankPaymentApi.createBankPayment({
             orderId: order.id,
             bankId,
-            amount: order.total,
+            amount: remainingAmount,
         })
 
         patchListOrderBankPayment(order.id, created)

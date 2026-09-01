@@ -189,3 +189,62 @@ export interface UpdateRappiCatalogProduct {
   overrideImageUrl?: string
   overridePrice?: number
 }
+
+export interface WompiEnvironmentConfiguration {
+  publicKey?: string | null
+  integritySecretConfigured: boolean
+  eventsSecretConfigured: boolean
+  lastWebhookAt?: string | null
+}
+
+export interface WompiPaymentIntegration {
+  id: number
+  branchId: number
+  financialAppId: number
+  financialAppName?: string | null
+  activeEnvironment: 'sandbox' | 'production'
+  isEnabled: boolean
+  estimatedCommissionRate: number
+  sandbox: WompiEnvironmentConfiguration
+  production: WompiEnvironmentConfiguration
+  lastTestedAt?: string | null
+  lastError?: string | null
+}
+
+export interface WompiFinancialApp {
+  id: number
+  name: string
+  bankName: string
+}
+
+export interface WompiIntegrationSettings {
+  integration: WompiPaymentIntegration | null
+  financialApps: WompiFinancialApp[]
+}
+
+export interface UpsertWompiPaymentIntegration {
+  financialAppId: number
+  activeEnvironment: 'sandbox' | 'production'
+  isEnabled: boolean
+  estimatedCommissionRate: number
+  sandbox: WompiEnvironmentCredentials
+  production: WompiEnvironmentCredentials
+}
+
+export interface WompiEnvironmentCredentials {
+  publicKey?: string
+  integritySecret?: string
+  eventsSecret?: string
+}
+
+export interface WompiPaymentReview {
+  id: number
+  orderId: number
+  reference: string
+  amount: number
+  manualReviewReason?: string | null
+  approvedAt?: string | null
+  expiresAt: string
+  createdAt: string
+  canApprove: boolean
+}

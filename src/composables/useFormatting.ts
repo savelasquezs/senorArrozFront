@@ -182,6 +182,8 @@ export const capitalizeFirst = (text: string): string => {
  */
 export const getOrderStatusDisplayName = (status: string): string => {
     const displayNames: Record<string, string> = {
+        'awaiting_payment': 'Esperando pago',
+        'awaitingPayment': 'Esperando pago',
         'taken': 'Tomado',
         'in_preparation': 'En preparación',
         'inPreparation': 'En preparación',

@@ -106,6 +106,7 @@ const { formatTime, formatTimeAgo } = useFormatting()
 // Normalizar claves de statusTimes del backend
 const normalizedStatusTimes = computed(() => {
     return {
+        awaiting_payment: props.statusTimes.awaitingpayment,
         taken: props.statusTimes.taken,
         in_preparation: props.statusTimes.inpreparation,
         ready: props.statusTimes.ready,
@@ -171,6 +172,7 @@ const getStepIcon = (status: OrderStatus): any => {
 
     // Iconos específicos por estado
     const iconMap: Record<OrderStatus, any> = {
+        awaiting_payment: ClockIcon,
         taken: ClockIcon,
         in_preparation: FireIcon,
         ready: CheckCircleIcon,

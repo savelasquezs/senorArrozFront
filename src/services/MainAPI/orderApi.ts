@@ -122,6 +122,7 @@ class OrderApi extends BaseApi {
     async updateStatus(id: number, status: OrderStatus, reason?: string): Promise<Order> {
         // Convertir status de snake_case a camelCase para el backend C#
         const statusMap: Record<OrderStatus, string> = {
+            'awaiting_payment': 'awaitingPayment',
             'taken': 'taken',
             'in_preparation': 'inPreparation',
             'ready': 'ready',

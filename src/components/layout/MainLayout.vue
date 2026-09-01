@@ -67,7 +67,7 @@ import { useToast } from '@/composables/useToast';
 import { useNotifications } from '@/composables/useNotifications';
 import { useNotificationSound } from '@/composables/useNotificationSound';
 import { useSignalR } from '@/composables/useSignalR';
-import { WHATSAPP_SIGNALR_HUB_URL } from '@/config/signalr';
+import { ORDERS_SIGNALR_HUB_URL, WHATSAPP_SIGNALR_HUB_URL } from '@/config/signalr';
 import type { WhatsAppRealtimeMessagePayload } from '@/types/whatsapp';
 
 interface Props {
@@ -81,10 +81,11 @@ const router = useRouter();
 const authStore = useAuthStore();
 const whatsappStore = useWhatsAppStore();
 const branchContext = useBranchContextStore();
-const { toasts, removeToast } = useToast();
+const { toasts, removeToast, addToast } = useToast();
 const { permission, requestPermission, notify } = useNotifications();
 const { playWhatsAppMessageSound } = useNotificationSound();
 const { on: onWhatsAppSignalR, off: offWhatsAppSignalR } = useSignalR(WHATSAPP_SIGNALR_HUB_URL);
+const { on: onOrdersSignalR, off: offOrdersSignalR } = useSignalR(ORDERS_SIGNALR_HUB_URL);
 
 const sidebarOpen = ref(false);
 let whatsAppPollingId: number | undefined;
@@ -114,6 +115,35 @@ const isOrdersPage = computed(() => {
 const isWhatsAppPage = computed(() => {
 	return route.path.startsWith('/whatsapp');
 });
+
+const canReviewPayments = computed(() => authStore.isAdmin || authStore.isSuperadmin);
+
+interface PaymentReviewRequiredPayload {
+	branchId: number;
+	orderId: number;
+	paymentAttemptId: number;
+	reason: string;
+}
+
+function handlePaymentReviewRequired(payload: PaymentReviewRequiredPayload) {
+	if (!canReviewPayments.value || !payload?.orderId) return;
+	addToast({
+		title: `Pago del pedido #${payload.orderId} requiere revisión`,
+		message: payload.reason || 'El pago no pudo aprobarse automáticamente.',
+		variant: 'warning',
+		duration: 0,
+		actions: [{
+			label: 'Revisar',
+			action: () => void router.push(`/branches/${payload.branchId}?section=payment-integrations`),
+		}],
+	});
+	if (permission.value === 'granted') {
+		notify('Pago pendiente de revisión', {
+			body: `Pedido #${payload.orderId}`,
+			tag: `payment-review-${payload.paymentAttemptId}`,
+		});
+	}
+}
 
 // Navigate to new order
 const navigateToNewOrder = () => {
@@ -213,6 +243,7 @@ onMounted(() => {
 		return;
 	}
 	onWhatsAppSignalR('WhatsAppMessageCreated', handleWhatsAppRealtimeMessage);
+	if (canReviewPayments.value) onOrdersSignalR('PaymentReviewRequired', handlePaymentReviewRequired);
 	startWhatsAppUnreadPolling();
 	// En detalle de sucursal, el GET /Branches/:id es pesado; retrasar el prefetch evita competir por red/DB.
 	if (isBranchDetailPath(route.path)) {
@@ -224,6 +255,7 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
 	offWhatsAppSignalR('WhatsAppMessageCreated', handleWhatsAppRealtimeMessage);
+	offOrdersSignalR('PaymentReviewRequired', handlePaymentReviewRequired);
 	stopWhatsAppUnreadPolling();
 });
 </script>
