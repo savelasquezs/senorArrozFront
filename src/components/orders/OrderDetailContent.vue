@@ -11,6 +11,7 @@
 					<h1 class="text-2xl sm:text-3xl font-bold text-gray-900">
 						#{{ order.id }}
 					</h1>
+					<OrderSourceBadge :source="order.orderSource" />
 					<OrderTypeBadge
 						:type="order.type"
 						:display-name="order.typeDisplayName"
@@ -839,6 +840,7 @@
 
 <script setup lang="ts">
 import OrderTypeBadge from '@/components/orders/OrderTypeBadge.vue';
+import OrderSourceBadge from '@/components/orders/OrderSourceBadge.vue';
 import OrderProgressBar from '@/components/orders/OrderProgressBar.vue';
 import OrderDetailProductsList from '@/components/orders/OrderDetailProductsList.vue';
 import PaidInStoreCashPanel from '@/components/orders/PaidInStoreCashPanel.vue';

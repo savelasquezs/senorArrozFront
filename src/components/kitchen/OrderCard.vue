@@ -17,6 +17,7 @@
         <div class="flex items-center justify-between gap-1.5 mb-1 sm:mb-1.5">
             <div class="flex items-center flex-wrap gap-x-1.5 sm:gap-2 gap-y-0.5 min-w-0">
                 <span class="text-base sm:text-lg font-bold text-gray-900">#{{ order.id }}</span>
+                <OrderSourceBadge :source="order.orderSource" />
                 <BaseBadge v-if="variant !== 'kitchen'" :variant="getStatusVariant()"
                     class="text-[10px] sm:text-xs px-1 sm:px-1.5 py-0.5">
                     {{ order.statusDisplayName }}
@@ -132,6 +133,7 @@ import { defaultBusinessCalendar } from '@/utils/datetime'
 import { orderListRecipientDisplayName } from '@/utils/orderRecipientDisplay'
 import { ClockIcon, HomeIcon, TruckIcon, CalendarIcon, CheckIcon, MapPinIcon, ShoppingBagIcon, UserIcon } from '@heroicons/vue/24/outline'
 import BaseBadge from '@/components/ui/BaseBadge.vue'
+import OrderSourceBadge from '@/components/orders/OrderSourceBadge.vue'
 
 interface Props {
     order: OrderListItem
