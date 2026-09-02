@@ -43,6 +43,7 @@
                             class="text-emerald-600 hover:text-emerald-800 font-medium text-sm">
                             #{{ order.id }}
                         </router-link>
+                        <OrderSourceBadge :source="order.orderSource" class="ml-1.5" />
                     </td>
                     <td class="px-3 py-2 whitespace-nowrap text-xs text-gray-800">
                         <div>{{ formatDate(order.createdAt) }}</div>
@@ -122,6 +123,7 @@
 import type { OrderListItem, OrderDetailItem } from '@/types/order'
 import OrderStatusBadge from '@/components/orders/OrderStatusBadge.vue'
 import OrderTypeBadge from '@/components/orders/OrderTypeBadge.vue'
+import OrderSourceBadge from '@/components/orders/OrderSourceBadge.vue'
 import BaseLoading from '@/components/ui/BaseLoading.vue'
 import { useFormatting, getStatusTimeFromRecord } from '@/composables/useFormatting'
 import { defaultBusinessCalendar } from '@/utils/datetime'

@@ -19,6 +19,7 @@
                         <td class="px-3 sm:px-4 md:px-6 py-3 sm:py-4 whitespace-nowrap">
                             <div class="flex items-center gap-1.5 sm:gap-2">
                                 <span class="text-base sm:text-lg font-bold text-gray-900">#{{ order.id }}</span>
+                                <OrderSourceBadge :source="order.orderSource" />
                                 <BaseBadge variant="success" class="text-[10px] sm:text-xs">Listo</BaseBadge>
                             </div>
                         </td>
@@ -78,6 +79,7 @@ import type { OrderListItem, OrderDetailItem } from '@/types/order'
 import { KitchenService } from '@/services/domain/KitchenService'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseBadge from '@/components/ui/BaseBadge.vue'
+import OrderSourceBadge from '@/components/orders/OrderSourceBadge.vue'
 import { PrinterIcon, ClockIcon } from '@heroicons/vue/24/outline'
 
 interface Props {

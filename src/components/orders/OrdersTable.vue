@@ -89,6 +89,7 @@
                                 class="shrink-0 text-sm font-medium text-emerald-600 hover:text-emerald-700 hover:underline whitespace-nowrap tabular-nums">
                                 #{{ order.id }}
                             </router-link>
+                            <OrderSourceBadge :source="order.orderSource" />
                             <router-link
                                 v-if="canViewDeliveryLocation(order)"
                                 :to="deliveryLocationRoute(order)"
@@ -335,6 +336,7 @@ import type { ReservationDeposit } from '@/types/reservationDeposit'
 import type { Bank } from '@/types/bank'
 import OrderStatusBadge from './OrderStatusBadge.vue'
 import OrderTypeBadge from './OrderTypeBadge.vue'
+import OrderSourceBadge from './OrderSourceBadge.vue'
 import BaseLoading from '@/components/ui/BaseLoading.vue'
 import OrderBankPaymentRow from '@/components/payments/OrderBankPaymentRow.vue'
 import OrderAppPaymentRow from '@/components/payments/OrderAppPaymentRow.vue'
