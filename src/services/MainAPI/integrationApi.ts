@@ -2,6 +2,7 @@ import { BaseApi } from './baseApi'
 import type { ApiResponse } from '@/types/common'
 import type {
   DeliveryProviderCard,
+  MetaConversionsDiagnostics,
   RappiCatalog,
   RappiConnection,
   RappiExternalOrder,
@@ -93,6 +94,10 @@ class IntegrationApi extends BaseApi {
 
   resolveWompiReview(attemptId: number, approve: boolean) {
     return this.post<ApiResponse<unknown>>(`/payments/wompi/reviews/${attemptId}/resolve`, { approve })
+  }
+
+  getMetaConversionsDiagnostics() {
+    return this.get<ApiResponse<MetaConversionsDiagnostics>>('/integrations/meta/conversions/status')
   }
 }
 

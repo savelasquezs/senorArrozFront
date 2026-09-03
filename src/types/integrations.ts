@@ -248,3 +248,27 @@ export interface WompiPaymentReview {
   createdAt: string
   canApprove: boolean
 }
+
+export interface MetaConversionsDiagnostics {
+  configured: boolean
+  pixelId?: string | null
+  graphApiVersion: string
+  eventSourceUrl: string
+  testMode: boolean
+  windowDays: number
+  processed: number
+  pending: number
+  failed: number
+  ignored: number
+  latestProcessed?: {
+    orderId: number
+    metaProcessedAt?: string | null
+  } | null
+  latestFailure?: {
+    orderId: number
+    metaStatus: string
+    metaAttemptCount: number
+    metaLastError?: string | null
+    metaNextAttemptAt?: string | null
+  } | null
+}
