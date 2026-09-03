@@ -9,8 +9,14 @@
       <BaseAlert v-else-if="diagnostics.testMode" type="warning">
         Meta CAPI está en modo de prueba. Antes de pautar, elimina <code>META_CAPI_TEST_EVENT_CODE</code> del backend y vuelve a desplegar.
       </BaseAlert>
+      <BaseAlert v-else-if="diagnostics.failed > 0" type="error">
+        Meta CAPI está configurada, pero existen envíos fallidos. Revisa el último error antes de usar Purchase como señal principal de campaña.
+      </BaseAlert>
+      <BaseAlert v-else-if="diagnostics.processed === 0" type="info">
+        La configuración de Meta CAPI está completa. Falta confirmar el primer Purchase real de servidor antes de considerarla validada en producción.
+      </BaseAlert>
       <BaseAlert v-else type="success">
-        Meta CAPI está configurada para compras web en producción.
+        Meta CAPI está configurada y ya existen compras confirmadas por el servidor en esta ventana.
       </BaseAlert>
 
       <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
