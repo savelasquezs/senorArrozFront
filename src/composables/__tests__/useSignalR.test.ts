@@ -72,6 +72,7 @@ function mountSignalR() {
 describe('useSignalR', () => {
   beforeEach(() => {
     vi.useFakeTimers()
+    vi.spyOn(Math, 'random').mockReturnValue(0.5)
     vi.clearAllMocks()
     mocks.connection.state = 'Disconnected'
     mocks.user = null
@@ -104,6 +105,7 @@ describe('useSignalR', () => {
 
   afterEach(() => {
     vi.runOnlyPendingTimers()
+    vi.restoreAllMocks()
     vi.useRealTimers()
   })
 
@@ -155,6 +157,23 @@ describe('useSignalR', () => {
     expect(mounted.signalR.connectionState.value).toBe('error')
 
     await vi.advanceTimersByTimeAsync(3000)
+    await flushPromises()
+
+    expect(mocks.connection.start).toHaveBeenCalledTimes(2)
+    expect(mounted.signalR.connectionState.value).toBe('connected')
+    mounted.wrapper.unmount()
+  })
+
+  it('allows an immediate manual wake during initial backoff', async () => {
+    mocks.connection.start
+      .mockRejectedValueOnce(new Error('Hub no disponible'))
+      .mockImplementationOnce(async () => {
+        mocks.connection.state = 'Connected'
+      })
+    const mounted = mountSignalR()
+    await flushPromises()
+
+    mounted.signalR.reconnectNow()
     await flushPromises()
 
     expect(mocks.connection.start).toHaveBeenCalledTimes(2)

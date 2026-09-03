@@ -1,11 +1,20 @@
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, onMounted, onUnmounted, watch } from 'vue'
 import * as signalR from '@microsoft/signalr'
 import { getValidAccessToken, getStoredUser } from '@/services/auth/authSession'
 import { getSelectedBranchIdForRequest } from '@/services/branchContextSession'
+import { useNetworkActivityManager } from '@/composables/useNetworkActivityManager'
 
 export type SignalRConnectionState = 'disconnected' | 'connecting' | 'connected' | 'reconnecting' | 'error'
 
+const RECONNECT_DELAYS_MS = [3_000, 10_000, 30_000, 60_000]
+
+export function nextSignalRRetryDelay(previousRetryCount: number, random = Math.random) {
+    const base = RECONNECT_DELAYS_MS[Math.min(previousRetryCount, RECONNECT_DELAYS_MS.length - 1)]
+    return Math.round(base * (0.9 + random() * 0.2))
+}
+
 export function useSignalR(hubUrl: string) {
+    const { isPageVisible, isOnline } = useNetworkActivityManager()
     const connection = ref<signalR.HubConnection | null>(null)
     const isConnected = ref(false)
     const error = ref<string | null>(null)
@@ -14,6 +23,7 @@ export function useSignalR(hubUrl: string) {
     let isConnecting = false
     let reconnectTimer: number | undefined
     let shouldReconnect = true
+    let initialReconnectAttempt = 0
 
     const scopedHubUrl = () => {
         const user = getStoredUser()
@@ -33,6 +43,15 @@ export function useSignalR(hubUrl: string) {
         })
     }
 
+    const scheduleReconnect = () => {
+        if (!shouldReconnect || !isOnline.value || reconnectTimer) return
+        const delay = nextSignalRRetryDelay(initialReconnectAttempt++)
+        reconnectTimer = window.setTimeout(() => {
+            reconnectTimer = undefined
+            void connect()
+        }, delay)
+    }
+
     const connect = async () => {
         shouldReconnect = true
         if (isConnecting || connection.value?.state === signalR.HubConnectionState.Connected) return
@@ -48,7 +67,8 @@ export function useSignalR(hubUrl: string) {
                     accessTokenFactory: async () => (await getValidAccessToken()) || ''
                 })
                 .withAutomaticReconnect({
-                    nextRetryDelayInMilliseconds: () => 3000
+                    nextRetryDelayInMilliseconds: context =>
+                        nextSignalRRetryDelay(context.previousRetryCount)
                 })
                 .configureLogging(signalR.LogLevel.Information)
                 .build()
@@ -63,6 +83,7 @@ export function useSignalR(hubUrl: string) {
             })
 
             connection.value.onreconnected(() => {
+                initialReconnectAttempt = 0
                 isConnected.value = true
                 connectionState.value = 'connected'
                 error.value = null
@@ -74,18 +95,14 @@ export function useSignalR(hubUrl: string) {
                 connectionState.value = closeError ? 'error' : 'disconnected'
                 error.value = closeError?.message ?? null
                 if (closeError) console.error('SignalR cerrado con error:', closeError)
-                if (shouldReconnect && !reconnectTimer) {
-                    reconnectTimer = window.setTimeout(() => {
-                        reconnectTimer = undefined
-                        void connect()
-                    }, 3000)
-                }
+                scheduleReconnect()
             })
 
             await connection.value.start()
             isConnected.value = true
             connectionState.value = 'connected'
             error.value = null
+            initialReconnectAttempt = 0
             if (reconnectTimer) {
                 window.clearTimeout(reconnectTimer)
                 reconnectTimer = undefined
@@ -103,12 +120,7 @@ export function useSignalR(hubUrl: string) {
             connectionState.value = 'error'
             isConnected.value = false
             console.error('Error SignalR:', err)
-            if (shouldReconnect && !reconnectTimer) {
-                reconnectTimer = window.setTimeout(() => {
-                    reconnectTimer = undefined
-                    void connect()
-                }, 3000)
-            }
+            scheduleReconnect()
         } finally {
             isConnecting = false
         }
@@ -128,6 +140,21 @@ export function useSignalR(hubUrl: string) {
         connectionState.value = 'disconnected'
         error.value = null
     }
+
+    const reconnectNow = () => {
+        if (!shouldReconnect || !isOnline.value) return
+        if (connection.value?.state === signalR.HubConnectionState.Connected) return
+        if (connection.value?.state === signalR.HubConnectionState.Connecting
+            || connection.value?.state === signalR.HubConnectionState.Reconnecting) return
+        if (reconnectTimer) window.clearTimeout(reconnectTimer)
+        reconnectTimer = undefined
+        initialReconnectAttempt = 0
+        void connect()
+    }
+
+    watch([isPageVisible, isOnline], ([visible, online], [wasVisible, wasOnline]) => {
+        if (visible && online && (!wasVisible || !wasOnline)) reconnectNow()
+    })
 
     const on = (eventName: string, callback: (...args: any[]) => void) => {
         const callbacks = handlers.get(eventName) ?? new Set<(...args: any[]) => void>()
@@ -155,6 +182,6 @@ export function useSignalR(hubUrl: string) {
         disconnect()
     })
 
-    return { connection, isConnected, connectionState, error, connect, disconnect, on, off }
+    return { connection, isConnected, connectionState, error, connect, disconnect, reconnectNow, on, off }
 }
 
