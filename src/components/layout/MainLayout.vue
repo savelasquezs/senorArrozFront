@@ -52,7 +52,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onBeforeUnmount, onMounted } from 'vue';
+import { ref, computed, onBeforeUnmount, onMounted, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useAuthStore } from '@/store/auth';
 import { useWhatsAppStore } from '@/store/whatsapp';
@@ -67,6 +67,7 @@ import { useToast } from '@/composables/useToast';
 import { useNotifications } from '@/composables/useNotifications';
 import { useNotificationSound } from '@/composables/useNotificationSound';
 import { useSignalR } from '@/composables/useSignalR';
+import { useNetworkActivityManager } from '@/composables/useNetworkActivityManager';
 import { ORDERS_SIGNALR_HUB_URL, WHATSAPP_SIGNALR_HUB_URL } from '@/config/signalr';
 import type { WhatsAppRealtimeMessagePayload } from '@/types/whatsapp';
 
@@ -84,13 +85,15 @@ const branchContext = useBranchContextStore();
 const { toasts, removeToast, addToast } = useToast();
 const { permission, requestPermission, notify } = useNotifications();
 const { playWhatsAppMessageSound } = useNotificationSound();
-const { on: onWhatsAppSignalR, off: offWhatsAppSignalR } = useSignalR(WHATSAPP_SIGNALR_HUB_URL);
+const { on: onWhatsAppSignalR, off: offWhatsAppSignalR, connectionState: whatsAppConnectionState } = useSignalR(WHATSAPP_SIGNALR_HUB_URL);
 const { on: onOrdersSignalR, off: offOrdersSignalR } = useSignalR(ORDERS_SIGNALR_HUB_URL);
+const { isPageVisible, isUserActive } = useNetworkActivityManager();
 
 const sidebarOpen = ref(false);
 let whatsAppPollingId: number | undefined;
 let previousWhatsAppLatestMessageAt: string | null = null;
 let whatsAppSummaryInitialized = false;
+let lastWhatsAppSummaryRefreshAt = 0;
 
 const mainContentClasses = computed(() => [
 	'flex flex-col flex-1 min-w-0 transition-all duration-300 ease-in-out',
@@ -165,9 +168,12 @@ function prefetchOrderCatalog() {
 
 async function refreshWhatsAppUnreadSummary(options?: { notifyNewMessages?: boolean }) {
 	if (!authStore.isAuthenticated || !canTakeOrders.value) return;
+	const now = Date.now();
+	if (now - lastWhatsAppSummaryRefreshAt < 5000) return;
+	lastWhatsAppSummaryRefreshAt = now;
 
 	try {
-		await whatsappStore.ensureStatus();
+		await whatsappStore.ensureStatus(10 * 60_000);
 		if (!whatsappStore.enabled) return;
 
 		const previousLatest = previousWhatsAppLatestMessageAt;
@@ -227,8 +233,9 @@ function startWhatsAppUnreadPolling() {
 	}
 
 	whatsAppPollingId = window.setInterval(() => {
+		if (!isPageVisible.value || !isUserActive.value) return;
 		void refreshWhatsAppUnreadSummary({ notifyNewMessages: true });
-	}, 60000);
+	}, 10 * 60_000);
 }
 
 function stopWhatsAppUnreadPolling() {
@@ -257,5 +264,17 @@ onBeforeUnmount(() => {
 	offWhatsAppSignalR('WhatsAppMessageCreated', handleWhatsAppRealtimeMessage);
 	offOrdersSignalR('PaymentReviewRequired', handlePaymentReviewRequired);
 	stopWhatsAppUnreadPolling();
+});
+
+watch(whatsAppConnectionState, (state, previous) => {
+	if (state === 'connected' && previous && previous !== 'connected') {
+		void refreshWhatsAppUnreadSummary({ notifyNewMessages: false });
+	}
+});
+
+watch([isPageVisible, isUserActive], ([visible, active], [wasVisible, wasActive]) => {
+	if (visible && active && (!wasVisible || !wasActive)) {
+		void refreshWhatsAppUnreadSummary({ notifyNewMessages: false });
+	}
 });
 </script>

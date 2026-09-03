@@ -658,6 +658,7 @@ import { whatsappApi } from '@/services/MainAPI/whatsappApi'
 import { useToast } from '@/composables/useToast'
 import { useDialog } from '@/composables/useDialog'
 import { useSignalR } from '@/composables/useSignalR'
+import { useNetworkActivityManager } from '@/composables/useNetworkActivityManager'
 import { WHATSAPP_SIGNALR_HUB_URL } from '@/config/signalr'
 import type {
   WhatsAppAiDiagnostics,
@@ -695,6 +696,7 @@ const {
   on: onSignalR,
   off: offSignalR,
 } = useSignalR(WHATSAPP_SIGNALR_HUB_URL)
+const { isPageVisible, isUserActive } = useNetworkActivityManager()
 const loadingStatus = ref(true)
 const statusLoadError = ref('')
 const selectedConversation = ref<WhatsAppConversation | null>(null)
@@ -931,13 +933,13 @@ async function refreshAiDiagnostics(showErrors = false) {
 
 function openAiDiagnostics() {
   showAiDiagnosticsDialog.value = true
-  void refreshAiDiagnostics()
 }
 
 function startAiDiagnosticsPolling() {
   if (aiDiagnosticsPollingId) window.clearInterval(aiDiagnosticsPollingId)
   void refreshAiDiagnostics()
   aiDiagnosticsPollingId = window.setInterval(() => {
+    if (!showAiDiagnosticsDialog.value || !isPageVisible.value || !isUserActive.value) return
     void refreshAiDiagnostics()
   }, 15000)
 }
@@ -958,7 +960,6 @@ async function retryWhatsAppStatus() {
         whatsappStore.fetchQuickReplies(),
         reloadConversations(),
       ])
-      startAiDiagnosticsPolling()
     } else {
       stopAiDiagnosticsPolling()
     }
@@ -1716,12 +1717,31 @@ watch(
 watch(
   () => [selectedConversation.value?.id ?? 0, selectedBranchId.value],
   () => {
-    if (whatsappStore.enabled) void refreshAiDiagnostics()
+    if (whatsappStore.enabled && showAiDiagnosticsDialog.value) void refreshAiDiagnostics()
   },
 )
 
+watch(showAiDiagnosticsDialog, (open) => {
+  if (open && whatsappStore.enabled) startAiDiagnosticsPolling()
+  else stopAiDiagnosticsPolling()
+})
+
 watch(connectionState, (current, previous) => {
-  if (current === 'connected' && previous !== 'connected' && whatsappStore.enabled) {
+  if (current === 'connected'
+    && previous !== 'connected'
+    && whatsappStore.enabled
+    && showAiDiagnosticsDialog.value
+    && isPageVisible.value) {
+    void refreshAiDiagnostics()
+  }
+})
+
+watch([isPageVisible, isUserActive], ([visible, active], [wasVisible, wasActive]) => {
+  if (showAiDiagnosticsDialog.value
+    && whatsappStore.enabled
+    && visible
+    && active
+    && (!wasVisible || !wasActive)) {
     void refreshAiDiagnostics()
   }
 })

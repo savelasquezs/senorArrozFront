@@ -14,6 +14,12 @@ const routerMocks = vi.hoisted(() => ({
     push: vi.fn(),
 }))
 const scrollIntoView = vi.hoisted(() => vi.fn())
+const signalRMocks = vi.hoisted(() => ({
+    on: vi.fn(),
+    off: vi.fn(),
+    reconnectNow: vi.fn(),
+    connectionState: { __v_isRef: true, value: 'connected' },
+}))
 
 vi.mock('vue-router', () => ({
     useRoute: () => ({
@@ -48,7 +54,7 @@ vi.mock('@/composables/useToast', () => ({
 }))
 
 vi.mock('@/composables/useSignalR', () => ({
-    useSignalR: () => ({ on: vi.fn() }),
+    useSignalR: () => signalRMocks,
 }))
 
 vi.mock('@/services/MainAPI/orderApi', () => ({

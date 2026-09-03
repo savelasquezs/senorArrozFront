@@ -158,11 +158,12 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, computed, defineAsyncComponent, nextTick } from 'vue'
+import { ref, onMounted, onUnmounted, computed, defineAsyncComponent, nextTick, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/store/auth'
 import { useToast } from '@/composables/useToast'
 import { useSignalR } from '@/composables/useSignalR'
+import { useNetworkActivityManager } from '@/composables/useNetworkActivityManager'
 import { ORDERS_SIGNALR_HUB_URL } from '@/config/signalr'
 import { deliverymanApi, type DeliverymanLastLocationDto } from '@/services/MainAPI/deliverymanApi'
 import { orderApi } from '@/services/MainAPI/orderApi'
@@ -190,7 +191,8 @@ const route = useRoute()
 const router = useRouter()
 const authStore = useAuthStore()
 const { success, error } = useToast()
-const { on } = useSignalR(ORDERS_SIGNALR_HUB_URL)
+const { on, off, connectionState, reconnectNow } = useSignalR(ORDERS_SIGNALR_HUB_URL)
+const { isPageVisible } = useNetworkActivityManager()
 
 // Estado
 function queryValue(value: unknown): string | null {
@@ -303,8 +305,12 @@ const resolvedBranchId = computed((): number | undefined => {
     return authStore.user?.branchId ?? undefined
 })
 
-let _pollInterval: ReturnType<typeof setInterval> | null = null
+let _watchdogInterval: ReturnType<typeof setInterval> | null = null
 let _pollInFlight = false
+let _lastRealtimeLocationAt = 0
+let _orderRefreshTimer: ReturnType<typeof setTimeout> | null = null
+
+const MAP_FALLBACK_STALE_MS = 2 * 60_000
 
 /** Incorpora última ubicación del API sin pisar una marca temporal más reciente (p. ej. SignalR). */
 function mergeLastLocationFromApi(
@@ -402,42 +408,97 @@ async function refreshDriverLocationsFromApi(stats: DeliverymanStats[]) {
     driverLocations.value = acc
 }
 
-const startPolling = () => {
-    if (_pollInterval) return
-    _pollInterval = setInterval(async () => {
-        if (_pollInFlight || deliverymenStats.value.length === 0) return
-        _pollInFlight = true
-        try {
-            const list = deliverymenStats.value
-            await Promise.all([
-                refreshDriverLocationsFromApi(list),
-                loadMapOrdersForDeliverymen(list),
-            ])
-        } finally {
-            _pollInFlight = false
-        }
-    }, 30_000)
+async function refreshLiveMapFromApi() {
+    if (_pollInFlight || !liveMapActivated.value || !isPageVisible.value || deliverymenStats.value.length === 0) return
+    _pollInFlight = true
+    try {
+        const list = deliverymenStats.value
+        await Promise.all([
+            refreshDriverLocationsFromApi(list),
+            loadMapOrdersForDeliverymen(list),
+        ])
+        _lastRealtimeLocationAt = Date.now()
+    } catch (err) {
+        console.error('Error al sincronizar el mapa en vivo:', err)
+    } finally {
+        _pollInFlight = false
+    }
+}
+
+const startWatchdog = () => {
+    if (_watchdogInterval) return
+    _watchdogInterval = setInterval(() => {
+        if (connectionState.value === 'connected'
+            && Date.now() - _lastRealtimeLocationAt < MAP_FALLBACK_STALE_MS) return
+        void refreshLiveMapFromApi()
+    }, 60_000)
 }
 
 async function activateLiveMap() {
     if (liveMapActivated.value || deliverymenStats.value.length === 0) return
     liveMapActivated.value = true
     liveMapBootstrapping.value = true
+    _pollInFlight = true
     try {
         const list = deliverymenStats.value
         await refreshDriverLocationsFromApi(list)
         await loadMapOrdersForDeliverymen(list)
-        startPolling()
+        _lastRealtimeLocationAt = Date.now()
+        startWatchdog()
     } catch (err: any) {
         error('Error al cargar ubicaciones', err.message)
     } finally {
+        _pollInFlight = false
         liveMapBootstrapping.value = false
     }
 }
 
 const stopPolling = () => {
-    if (_pollInterval) { clearInterval(_pollInterval); _pollInterval = null }
+    if (_watchdogInterval) { clearInterval(_watchdogInterval); _watchdogInterval = null }
+    if (_orderRefreshTimer) { clearTimeout(_orderRefreshTimer); _orderRefreshTimer = null }
 }
+
+function scheduleMapOrdersRefresh() {
+    if (!liveMapActivated.value || !isPageVisible.value || _orderRefreshTimer) return
+    _orderRefreshTimer = setTimeout(() => {
+        _orderRefreshTimer = null
+        void loadMapOrdersForDeliverymen(deliverymenStats.value).catch(err => {
+            console.error('Error al sincronizar pedidos del mapa:', err)
+        })
+    }, 500)
+}
+
+function handleDeliverymanLocationUpdate(data: any) {
+    if (!liveMapActivated.value || !data?.deliverymanId) return
+    if (!deliverymenStats.value.some((s) => s.deliverymanId === data.deliverymanId)) return
+    const stat = deliverymenStats.value.find(s => s.deliverymanId === data.deliverymanId)
+    const t = new Date(data.recordedAt).getTime()
+    const cur = driverLocations.value[data.deliverymanId]
+    if (cur && cur.updatedAt.getTime() > t) return
+    const previousRouteId = cur?.deliveryRouteId ?? null
+    const nextRouteId = typeof data.deliveryRouteId === 'number' ? data.deliveryRouteId : null
+    _lastRealtimeLocationAt = Date.now()
+    driverLocations.value = {
+        ...driverLocations.value,
+        [data.deliverymanId]: {
+            lat: data.latitude,
+            lng: data.longitude,
+            updatedAt: new Date(data.recordedAt),
+            name: stat?.deliverymanName,
+            deliveryRouteId: nextRouteId,
+        },
+    }
+    if (previousRouteId !== nextRouteId) scheduleMapOrdersRefresh()
+}
+
+const mapOrderEvents = [
+    'OrderAssigned',
+    'OrderModified',
+    'OrderStatusChanged',
+    'OrderCancelled',
+    'DeliveryRoutingPlanChanged',
+    'RouteProposalClaimed',
+]
 
 // ─── Carga de datos ──────────────────────────────────────────────────────────
 
@@ -495,7 +556,10 @@ async function initializeView() {
 
     try {
         await loadData()
-        if (liveMapActivated.value && deliverymenStats.value.length > 0) startPolling()
+        if (liveMapActivated.value && deliverymenStats.value.length > 0) {
+            _lastRealtimeLocationAt = Date.now()
+            startWatchdog()
+        }
         if (focusOrderId.value != null) {
             await nextTick()
             liveMapSection.value?.scrollIntoView({ behavior: 'smooth', block: 'start' })
@@ -680,35 +744,25 @@ onMounted(() => {
     ordersDraftsStore.loadBanks()
     void initializeView()
 
-    // GPS en tiempo real solo con mapa activo y domiciliario presente en el resumen del día
-    on('DeliverymanLocationUpdate', (data: any) => {
-        if (!liveMapActivated.value || !data?.deliverymanId) return
-        if (!deliverymenStats.value.some((s) => s.deliverymanId === data.deliverymanId)) return
-        const stat = deliverymenStats.value.find(s => s.deliverymanId === data.deliverymanId)
-        const t = new Date(data.recordedAt).getTime()
-        const cur = driverLocations.value[data.deliverymanId]
-        if (cur && cur.updatedAt.getTime() > t) return
-        const previousRouteId = cur?.deliveryRouteId ?? null
-        const nextRouteId =
-            typeof data.deliveryRouteId === 'number' ? data.deliveryRouteId : null
-        driverLocations.value = {
-            ...driverLocations.value,
-            [data.deliverymanId]: {
-                lat: data.latitude,
-                lng: data.longitude,
-                updatedAt: new Date(data.recordedAt),
-                name: stat?.deliverymanName,
-                deliveryRouteId: nextRouteId,
-            },
-        }
-        if (previousRouteId !== nextRouteId) {
-            void loadMapOrdersForDeliverymen(deliverymenStats.value)
-        }
-    })
+    on('DeliverymanLocationUpdate', handleDeliverymanLocationUpdate)
+    mapOrderEvents.forEach(eventName => on(eventName, scheduleMapOrdersRefresh))
 })
 
 onUnmounted(() => {
     stopPolling()
+    off('DeliverymanLocationUpdate', handleDeliverymanLocationUpdate)
+    mapOrderEvents.forEach(eventName => off(eventName, scheduleMapOrdersRefresh))
+})
+
+watch(connectionState, (state, previous) => {
+    if (!liveMapActivated.value || state !== 'connected' || !previous || previous === 'connected') return
+    void refreshLiveMapFromApi()
+})
+
+watch(isPageVisible, (visible, wasVisible) => {
+    if (!liveMapActivated.value || !visible || wasVisible) return
+    reconnectNow()
+    void refreshLiveMapFromApi()
 })
 </script>
 
