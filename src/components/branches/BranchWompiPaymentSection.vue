@@ -69,6 +69,8 @@
         </form>
       </BaseCard>
 
+      <MetaConversionsDiagnosticsCard />
+
       <BaseCard title="Pagos que requieren revisión manual">
         <BaseLoading v-if="reviewsLoading" text="Cargando revisiones..." />
         <p v-else-if="reviews.length === 0" class="py-5 text-center text-sm text-gray-500">No hay pagos pendientes de revisión.</p>
@@ -100,6 +102,7 @@
 
 <script setup lang="ts">
 import { computed, defineComponent, h, onMounted, reactive, ref, watch, type PropType } from 'vue'
+import MetaConversionsDiagnosticsCard from '@/components/branches/MetaConversionsDiagnosticsCard.vue'
 import BaseAlert from '@/components/ui/BaseAlert.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseCard from '@/components/ui/BaseCard.vue'
