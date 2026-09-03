@@ -27,8 +27,9 @@
           <strong class="mt-1 block text-2xl" :class="diagnostics.failed ? 'text-red-700' : 'text-gray-900'">{{ diagnostics.failed }}</strong>
         </article>
         <article class="rounded-xl border border-gray-200 p-4">
-          <span class="text-xs font-medium uppercase tracking-wide text-gray-500">Sin medición</span>
+          <span class="text-xs font-medium uppercase tracking-wide text-gray-500">Omitidas</span>
           <strong class="mt-1 block text-2xl text-gray-700">{{ diagnostics.ignored }}</strong>
+          <span class="mt-1 block text-xs text-gray-500">Sin consentimiento o anteriores a la activación</span>
         </article>
       </div>
 
