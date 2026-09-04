@@ -30,7 +30,7 @@
             <BaseInput v-model="channel.displayPhoneNumber" label="Número visible" required />
             <BaseInput v-model="channel.flowId" label="Flow ID publicado en Meta" />
             <BaseInput v-model="channel.accessToken" type="password" label="Access Token" :placeholder="settings?.channel?.accessTokenConfigured ? 'Dejar vacío para conservar' : ''" />
-            <BaseInput v-model="channel.appSecret" type="password" label="App Secret" :placeholder="settings?.channel?.appSecretConfigured ? 'Dejar vacío para conservar' : ''" />
+            <BaseInput v-model="channel.appSecret" type="password" label="Clave secreta de la app (App Secret)" :placeholder="settings?.channel?.appSecretConfigured ? 'Dejar vacío para conservar' : 'Clave de 32 caracteres de Meta; no el ID de la app'" />
             <BaseInput v-model="channel.webhookVerifyToken" label="Webhook Verify Token" required />
           </div>
 
@@ -58,7 +58,7 @@
           <div class="flex items-center justify-between gap-3">
             <div>
               <h2 class="text-lg font-semibold text-gray-950">IA central</h2>
-              <p class="mt-1 text-sm text-gray-500">Se usa cuando el clasificador no detecta una intención directa de compra.</p>
+              <p class="mt-1 text-sm text-gray-500">Opcional: responde consultas fuera del menú. El Flow funciona también con la IA apagada y durante atención humana. Un saludo o «pedido» muestra el botón del menú.</p>
             </div>
             <span class="rounded-full px-3 py-1 text-xs font-semibold" :class="ai.isVerified ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'">{{ ai.isVerified ? 'Verificada' : 'Sin verificar' }}</span>
           </div>

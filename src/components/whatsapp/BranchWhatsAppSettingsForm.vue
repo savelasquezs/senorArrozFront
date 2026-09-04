@@ -71,8 +71,8 @@
           v-model="form.appSecret"
           class="lg:col-span-2"
           type="password"
-          label="App Secret opcional"
-          :placeholder="setting?.appSecretConfigured ? 'App Secret configurado. Déjalo vacío para quitarlo.' : 'App Secret'"
+            label="Clave secreta de la app (App Secret)"
+            :placeholder="setting?.appSecretConfigured ? 'Déjalo vacío para conservar la clave actual.' : 'Clave de 32 caracteres de Meta; no el ID de la app'"
           :maxlength="255"
         />
       </div>
