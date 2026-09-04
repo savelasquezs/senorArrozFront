@@ -327,6 +327,16 @@ const routes: RouteRecordRaw[] = [
         }
     },
     {
+        path: '/whatsapp/settings',
+        name: 'WhatsAppChannelSettings',
+        component: () => import('@/views/WhatsAppChannelSettingsView.vue'),
+        meta: {
+            requiresAuth: true,
+            requiresRole: [UserRole.SUPERADMIN, UserRole.ADMIN],
+            title: 'Canal central de WhatsApp'
+        }
+    },
+    {
         path: '/profile',
         name: 'Profile',
         component: () => import('@/views/Profile.vue'),

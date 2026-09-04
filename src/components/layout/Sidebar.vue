@@ -352,6 +352,12 @@ const navigationItems = computed((): NavItem[] => [
 		exactPath: true,
 	},
 	{
+		name: 'Canal central WhatsApp',
+		to: '/whatsapp/settings',
+		icon: ChatBubbleLeftRightIcon,
+		roles: ['Superadmin', 'Admin'],
+	},
+	{
 		name: 'Documentos',
 		to: '/documents',
 		icon: DocumentTextIcon,

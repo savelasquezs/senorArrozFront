@@ -150,7 +150,8 @@
             <p class="font-semibold text-gray-900">{{ conversationTitle(selectedConversation) }}</p>
             <p class="text-sm text-gray-500">
               {{ conversationIdentityLabel(selectedConversation) }}
-              <span v-if="selectedConversation.branchName"> · {{ selectedConversation.branchName }}</span>
+              <span v-if="selectedConversation.isCentralChannel"> · {{ selectedConversation.operationalBranchName || 'Cola central' }}</span>
+              <span v-else-if="selectedConversation.branchName"> · {{ selectedConversation.branchName }}</span>
             </p>
             </div>
             <div class="flex flex-wrap justify-end gap-2">
