@@ -55,6 +55,40 @@
         </article>
 
         <article class="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+          <div>
+            <h2 class="text-lg font-semibold text-gray-950">Actividad reciente del Flow</h2>
+            <p class="mt-1 text-sm text-gray-500">Diagnóstico sin nombres, teléfonos, direcciones ni contenido del carrito.</p>
+          </div>
+          <div class="mt-4 overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200 text-left text-sm">
+              <thead class="text-xs uppercase tracking-wide text-gray-500">
+                <tr>
+                  <th class="px-3 py-2">Versión</th>
+                  <th class="px-3 py-2">Pantalla</th>
+                  <th class="px-3 py-2">Categoría</th>
+                  <th class="px-3 py-2">Estado</th>
+                  <th class="px-3 py-2">Correlación</th>
+                  <th class="px-3 py-2">Actualizado</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-gray-100 text-gray-700">
+                <tr v-for="session in settings?.flowSessions || []" :key="session.correlationId">
+                  <td class="px-3 py-2 font-medium">{{ session.flowVersion }}</td>
+                  <td class="px-3 py-2">{{ session.screen }}</td>
+                  <td class="px-3 py-2">{{ categoryLabel(session.category) }}</td>
+                  <td class="px-3 py-2">{{ session.status }}</td>
+                  <td class="px-3 py-2 font-mono text-xs">{{ session.correlationId.slice(0, 8) }}</td>
+                  <td class="whitespace-nowrap px-3 py-2">{{ formatDate(session.updatedAt) }}</td>
+                </tr>
+                <tr v-if="!settings?.flowSessions?.length">
+                  <td colspan="6" class="px-3 py-6 text-center text-gray-500">Todavía no hay sesiones registradas.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </article>
+
+        <article class="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
           <div class="flex items-center justify-between gap-3">
             <div>
               <h2 class="text-lg font-semibold text-gray-950">IA central</h2>
@@ -154,5 +188,7 @@ async function testAi() {
   finally { testingAi.value = false }
 }
 const statusPill = (ready?: boolean) => ready ? 'rounded-full bg-emerald-100 px-2.5 py-1 text-emerald-800' : 'rounded-full bg-red-100 px-2.5 py-1 text-red-700'
+const categoryLabel = (category?: string | null) => ({ rice: 'Arroces', combo: 'Combos', beverage: 'Bebidas', addition: 'Adiciones' }[category || ''] || '—')
+const formatDate = (value: string) => new Intl.DateTimeFormat('es-CO', { dateStyle: 'short', timeStyle: 'short' }).format(new Date(value))
 onMounted(load)
 </script>

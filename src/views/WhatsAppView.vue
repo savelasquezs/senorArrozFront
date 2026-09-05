@@ -803,8 +803,8 @@ const signalRStatusLabel = computed(() => ({
   connected: 'En vivo',
   connecting: 'Conectando',
   reconnecting: 'Reconectando',
-  error: 'Sin conexión en vivo',
-  disconnected: 'Sin conexión en vivo',
+  error: 'Actualización de respaldo',
+  disconnected: 'Actualización de respaldo',
 }[connectionState.value]))
 
 const signalRStatusClasses = computed(() => connectionState.value === 'connected'
@@ -1055,6 +1055,24 @@ async function reloadConversations() {
     selectedConversation.value = refreshed ?? null
   }
   await selectConversationFromRoute()
+}
+
+let realtimeFallbackId: number | undefined
+
+function stopRealtimeFallback() {
+  if (!realtimeFallbackId) return
+  window.clearInterval(realtimeFallbackId)
+  realtimeFallbackId = undefined
+}
+
+function startRealtimeFallback() {
+  if (realtimeFallbackId || connectionState.value === 'connected') return
+  realtimeFallbackId = window.setInterval(async () => {
+    if (!whatsappStore.enabled || !isPageVisible.value || !isUserActive.value) return
+    const activeId = selectedConversation.value?.id
+    await reloadConversations()
+    if (activeId) await whatsappStore.fetchMessages(activeId)
+  }, 15_000)
 }
 
 async function selectConversation(conversation: WhatsAppConversation) {
@@ -1698,6 +1716,7 @@ onMounted(async () => {
   onSignalR('WhatsAppAttentionChanged', handleAttentionChanged)
   onSignalR('WhatsAppAiProcessingChanged', handleAiProcessingChanged)
   await retryWhatsAppStatus()
+  startRealtimeFallback()
 })
 
 onBeforeUnmount(() => {
@@ -1705,6 +1724,7 @@ onBeforeUnmount(() => {
   offSignalR('WhatsAppAttentionChanged', handleAttentionChanged)
   offSignalR('WhatsAppAiProcessingChanged', handleAiProcessingChanged)
   stopAiDiagnosticsPolling()
+  stopRealtimeFallback()
   if (searchTimeout) window.clearTimeout(searchTimeout)
 })
 
@@ -1728,6 +1748,8 @@ watch(showAiDiagnosticsDialog, (open) => {
 })
 
 watch(connectionState, (current, previous) => {
+  if (current === 'connected') stopRealtimeFallback()
+  else startRealtimeFallback()
   if (current === 'connected'
     && previous !== 'connected'
     && whatsappStore.enabled

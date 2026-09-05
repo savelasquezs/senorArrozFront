@@ -318,6 +318,17 @@ export interface TenantWhatsAppSettings {
   dataExchangeUrl?: string | null
   flowEnvironmentEnabled: boolean
   privateKeyConfigured: boolean
+  flowSessions: WhatsAppFlowSession[]
+}
+
+export interface WhatsAppFlowSession {
+  correlationId: string
+  flowVersion: string
+  status: string
+  screen: string
+  category?: string | null
+  updatedAt: string
+  expiresAt: string
 }
 
 export interface UpdateTenantWhatsAppChannel {
