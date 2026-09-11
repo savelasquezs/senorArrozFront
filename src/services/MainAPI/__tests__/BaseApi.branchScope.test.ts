@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import type { AxiosRequestConfig } from 'axios'
-import { BaseApi, type BranchScope } from '../BaseApi'
+import { BaseApi, type BranchScope } from '../baseApi'
 import { setSelectedBranchIdForRequest } from '@/services/branchContextSession'
 import { UserRole, type User } from '@/types/auth'
 

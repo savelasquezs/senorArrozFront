@@ -48,7 +48,7 @@ vi.mock('@microsoft/signalr', () => ({
 }))
 
 vi.mock('@/services/auth/authSession', () => ({
-  getAccessToken: vi.fn(() => 'test-token'),
+  getValidAccessToken: vi.fn(async () => 'test-token'),
   getStoredUser: vi.fn(() => mocks.user),
 }))
 
@@ -125,6 +125,21 @@ describe('useSignalR', () => {
     expect(mounted.signalR.connectionState.value).toBe('connected')
     expect(mounted.signalR.error.value).toBeNull()
     mounted.wrapper.unmount()
+  })
+
+  it('shares one connection per hub until the last consumer unmounts', async () => {
+    const first = mountSignalR()
+    const second = mountSignalR()
+    await flushPromises()
+
+    expect(mocks.HubConnectionBuilder).toHaveBeenCalledTimes(1)
+    first.wrapper.unmount()
+    await flushPromises()
+    expect(mocks.connection.stop).not.toHaveBeenCalled()
+
+    second.wrapper.unmount()
+    await flushPromises()
+    expect(mocks.connection.stop).toHaveBeenCalledTimes(1)
   })
 
   it('retries an initial connection failure after three seconds', async () => {

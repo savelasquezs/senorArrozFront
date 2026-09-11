@@ -219,6 +219,9 @@ export interface WhatsAppConversation {
   id: number
   branchId: number
   branchName?: string | null
+  isCentralChannel: boolean
+  operationalBranchId?: number | null
+  operationalBranchName?: string | null
   customerId?: number | null
   customerName?: string | null
   phoneNumber?: string | null
@@ -277,4 +280,65 @@ export interface WhatsAppRealtimeMessagePayload {
   branchId: number
   conversation: WhatsAppConversation
   message: WhatsAppMessage
+}
+export interface TenantWhatsAppChannel {
+  publicId: string
+  phoneNumberId: string
+  businessAccountId: string
+  displayPhoneNumber: string
+  accessTokenConfigured: boolean
+  webhookVerifyToken: string
+  appSecretConfigured: boolean
+  flowId?: string | null
+  isActive: boolean
+  isVerified: boolean
+  flowEnabled: boolean
+  lastVerifiedAt?: string | null
+}
+
+export interface TenantAiSetting {
+  provider: string
+  model: string
+  isActive: boolean
+  isVerified: boolean
+  temperature?: number | null
+  maxContextMessages: number
+  assistantName: string
+  promptObjective?: string | null
+  promptPersonality?: string | null
+  promptRequiredRules?: string | null
+  promptFixedBranchInfo?: string | null
+  promptAdditionalInstructions?: string | null
+  transferMessage: string
+}
+
+export interface TenantWhatsAppSettings {
+  channel?: TenantWhatsAppChannel | null
+  ai?: TenantAiSetting | null
+  dataExchangeUrl?: string | null
+  flowEnvironmentEnabled: boolean
+  privateKeyConfigured: boolean
+  flowSessions: WhatsAppFlowSession[]
+}
+
+export interface WhatsAppFlowSession {
+  correlationId: string
+  flowVersion: string
+  status: string
+  screen: string
+  category?: string | null
+  updatedAt: string
+  expiresAt: string
+}
+
+export interface UpdateTenantWhatsAppChannel {
+  phoneNumberId: string
+  businessAccountId: string
+  displayPhoneNumber: string
+  accessToken?: string
+  webhookVerifyToken: string
+  appSecret?: string
+  flowId?: string
+  isActive: boolean
+  flowEnabled: boolean
 }

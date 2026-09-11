@@ -21,6 +21,10 @@ import type {
   WhatsAppTestConnectionResult,
   WhatsAppUnreadSummary,
   SendWhatsAppTemplate,
+  TenantAiSetting,
+  TenantWhatsAppChannel,
+  TenantWhatsAppSettings,
+  UpdateTenantWhatsAppChannel,
 } from '@/types/whatsapp'
 
 export function whatsappWebhookUrl(): string {
@@ -29,6 +33,25 @@ export function whatsappWebhookUrl(): string {
 }
 
 class WhatsAppApi extends BaseApi {
+  getTenantSettings(): Promise<ApiResponse<TenantWhatsAppSettings>> {
+    return this.get<ApiResponse<TenantWhatsAppSettings>>('/tenant/whatsapp', { branchScope: 'none' })
+  }
+
+  saveTenantChannel(payload: UpdateTenantWhatsAppChannel): Promise<ApiResponse<TenantWhatsAppChannel>> {
+    return this.put<ApiResponse<TenantWhatsAppChannel>>('/tenant/whatsapp/channel', payload, { branchScope: 'none' })
+  }
+
+  testTenantChannel(): Promise<ApiResponse<TenantWhatsAppChannel>> {
+    return this.post<ApiResponse<TenantWhatsAppChannel>>('/tenant/whatsapp/channel/test-connection', {}, { branchScope: 'none' })
+  }
+
+  saveTenantAi(payload: TenantAiSetting): Promise<ApiResponse<TenantAiSetting>> {
+    return this.put<ApiResponse<TenantAiSetting>>('/tenant/whatsapp/ai', payload, { branchScope: 'none' })
+  }
+
+  testTenantAi(): Promise<ApiResponse<TenantAiSetting>> {
+    return this.post<ApiResponse<TenantAiSetting>>('/tenant/whatsapp/ai/test-connection', {}, { branchScope: 'none' })
+  }
   getStatus(): Promise<ApiResponse<WhatsAppStatus>> {
     return this.get<ApiResponse<WhatsAppStatus>>('/whatsapp/status')
   }
