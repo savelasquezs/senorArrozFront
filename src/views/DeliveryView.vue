@@ -333,6 +333,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/store/auth'
 import { useDeliveryStore } from '@/store/delivery'
 import { useSignalR } from '@/composables/useSignalR'
+import { ORDERS_SIGNALR_HUB_URL } from '@/config/signalr'
 import { useToast } from '@/composables/useToast'
 import type { DeliverymanHistoryBranchSummary, OrderListItem } from '@/types/order'
 import MainLayout from '@/components/layout/MainLayout.vue'
@@ -368,8 +369,7 @@ const authStore = useAuthStore()
 const deliveryStore = useDeliveryStore()
 const { success, error, warning } = useToast()
 
-const SIGNALR_HUB_URL = import.meta.env.VITE_SIGNALR_HUB_URL || 'http://localhost:5000/hubs/orders'
-const { isConnected, on } = useSignalR(SIGNALR_HUB_URL)
+const { isConnected, on } = useSignalR(ORDERS_SIGNALR_HUB_URL)
 
 const activeTab = ref<'available' | 'preparation' | 'analytics' | 'routing' | 'route'>('available')
 const isLoading = ref(false)

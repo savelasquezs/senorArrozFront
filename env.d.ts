@@ -5,7 +5,8 @@ interface ImportMetaEnv {
     readonly VITE_API_URL: string
     readonly VITE_APP_NAME: string
     readonly VITE_LOGO_URL: string
-    readonly VITE_WHATSAPP_API_URL: string
+    readonly VITE_SIGNALR_HUB_URL?: string
+    readonly VITE_WHATSAPP_SIGNALR_HUB_URL?: string
     readonly VITE_GOOGLE_MAPS_API_KEY: string
     readonly VITE_GOOGLE_MAPS_MAP_ID?: string
     /** Si es `true`, la sección Principal del dashboard usa mocks en lugar de `GET /api/dashboard/main`. */

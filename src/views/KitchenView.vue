@@ -288,6 +288,7 @@ import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/store/auth'
 import { useOrdersDataStore } from '@/store/ordersData'
 import { useSignalR } from '@/composables/useSignalR'
+import { ORDERS_SIGNALR_HUB_URL } from '@/config/signalr'
 import { useTextToSpeech } from '@/composables/useTextToSpeech'
 import { useNotifications } from '@/composables/useNotifications'
 import { useToast } from '@/composables/useToast'
@@ -313,8 +314,7 @@ const { success, error } = useToast()
 const { speak, cancel } = useTextToSpeech()
 const { permission, requestPermission, notify } = useNotifications()
 
-const SIGNALR_HUB_URL = import.meta.env.VITE_SIGNALR_HUB_URL || 'http://localhost:5000/hubs/orders'
-const { isConnected, on, off } = useSignalR(SIGNALR_HUB_URL)
+const { isConnected, on, off } = useSignalR(ORDERS_SIGNALR_HUB_URL)
 
 const KITCHEN_COMBINED_MODE_KEY = 'senorarroz.kitchen.combinedMode'
 const combinedKitchenMode = ref(

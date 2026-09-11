@@ -4,9 +4,9 @@ FROM node:20-alpine AS build
 WORKDIR /app
 
 # Build arguments for environment variables
-ARG VITE_API_URL=http://localhost:5000/api
-ARG VITE_SIGNALR_HUB_URL=http://localhost:5000/hubs/orders
-ARG VITE_WHATSAPP_SIGNALR_HUB_URL=http://localhost:5000/hubs/whatsapp
+ARG VITE_API_URL
+ARG VITE_SIGNALR_HUB_URL
+ARG VITE_WHATSAPP_SIGNALR_HUB_URL
 ARG VITE_GOOGLE_MAPS_API_KEY
 ARG VITE_GOOGLE_MAPS_MAP_ID
 
