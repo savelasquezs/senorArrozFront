@@ -8,6 +8,7 @@ export interface Customer {
     whatsAppUsername?: string | null;
     hasWhatsAppIdentity?: boolean;
     branchId: number;
+    originBranchId?: number;
     branchName?: string;
     active: boolean;
     createdAt: string;
@@ -43,6 +44,16 @@ export interface CustomerAddress {
     updatedAt: string;
     deliveryFee: number;
     neighborhood?: Neighborhood;
+    branchServices?: CustomerAddressBranch[];
+}
+
+export interface CustomerAddressBranch {
+    branchId: number;
+    neighborhoodId?: number | null;
+    neighborhoodName?: string | null;
+    deliveryFee: number;
+    isCovered: boolean;
+    validatedAt?: string | null;
 }
 
 export interface Neighborhood {

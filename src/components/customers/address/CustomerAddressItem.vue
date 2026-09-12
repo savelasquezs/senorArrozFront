@@ -15,7 +15,7 @@
             </div>
             <div class="text-right">
                 <div class="text-sm font-medium text-gray-900">
-                    {{ formatCurrency(address.deliveryFee) }}
+                    {{ formatCurrency(address.branchServices?.find(service => service.branchId === effectiveBranchId)?.deliveryFee ?? address.deliveryFee) }}
                 </div>
                 <div class="text-xs text-gray-500">Domicilio</div>
             </div>
@@ -47,11 +47,14 @@
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue'
 import type { Customer, CustomerAddress } from '@/types/customer'
 import { useFormatting } from '@/composables/useFormatting'
 import { useCustomersStore } from '@/store/customers'
 import { useToast } from '@/composables/useToast'
 import { useDialog } from '@/composables/useDialog'
+import { useBranchContextStore } from '@/store/branchContext'
+import { useAuthStore } from '@/store/auth'
 
 // Components
 import BaseButton from '@/components/ui/BaseButton.vue'
@@ -84,6 +87,9 @@ const { formatCurrency } = useFormatting()
 const { success, error: showError } = useToast()
 const { confirmDialog } = useDialog()
 const customersStore = useCustomersStore()
+const branchContext = useBranchContextStore()
+const authStore = useAuthStore()
+const effectiveBranchId = computed(() => branchContext.selectedBranchId ?? authStore.branchId ?? null)
 
 // Methods
 const handleEditAddress = () => {

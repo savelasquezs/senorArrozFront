@@ -16,6 +16,7 @@ import type {
 import type {
     Customer,
     CustomerAddress,
+    CustomerAddressBranch,
 } from '@/types/customer'
 import type {
     Bank,
@@ -250,7 +251,9 @@ export const useOrdersDraftsStore = defineStore('ordersDrafts', () => {
             addressId: numericAddressId,
             addressDescription: address ? address.address : null,
             addressAdditionalInfo: address ? (address.additionalInfo ?? null) : null,
-            deliveryFee: address ? (address.deliveryFee || 0) : 0,
+            deliveryFee: address
+                ? (address.branchServices?.find((service: CustomerAddressBranch) => service.branchId === order.branchId)?.deliveryFee ?? address.deliveryFee ?? 0)
+                : 0,
         }
 
         // Recalcular totales (esto también hace el set en el Map)
@@ -1523,12 +1526,14 @@ export const useOrdersDraftsStore = defineStore('ordersDrafts', () => {
      * Misma lógica que al elegir dirección en `updateAddress`.
      */
     const resolveDeliveryFeeFromSelectedAddress = (
-        o: Pick<DraftOrder, 'customerId' | 'addressId'>,
+        o: Pick<DraftOrder, 'customerId' | 'addressId' | 'branchId'>,
     ): number => {
         if (o.customerId == null || o.addressId == null) return 0
         const c = customers.value.find((x) => x.id === o.customerId)
         const a = c?.addresses?.find((x) => x.id === o.addressId)
-        return a ? (a.deliveryFee ?? 0) : 0
+        return a
+            ? (a.branchServices?.find((service) => service.branchId === o.branchId)?.deliveryFee ?? a.deliveryFee ?? 0)
+            : 0
     }
 
     const createOrReuseWhatsAppDraft = (payload: CreateWhatsAppDraftPayload): DraftOrder | null => {

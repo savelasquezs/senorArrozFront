@@ -43,7 +43,7 @@
                                 </div>
                                 
                                 <div class="text-xs text-green-600">
-                                    Costo envío: {{ formatCurrency(selectedAddress.deliveryFee) }}
+                                    Costo envío: {{ formatCurrency(branchDeliveryFee(selectedAddress)) }}
                                 </div>
                                 <p v-if="!hasMapCoordinates(selectedAddress)" class="text-xs text-red-600 mt-1">
                                     Sin ubicación en mapa
@@ -103,7 +103,7 @@
                                 </div>
                             </div>
                             <div class="text-xs text-gray-500 mt-1 flex items-center">
-                                {{ address.neighborhoodName }} - {{ formatCurrency(address.deliveryFee) }}
+                                {{ address.neighborhoodName }} - {{ formatCurrency(branchDeliveryFee(address)) }}
                                 <BaseBadge v-if="address.isPrimary" type="success" size="sm"
                                     class="ml-2 flex-shrink-0">
                                     Principal
@@ -249,6 +249,11 @@ const formatCurrency = (amount: number): string => {
     }).format(amount)
 }
 
+const branchDeliveryFee = (address: CustomerAddress): number =>
+    address.branchServices?.find((service) => service.branchId === props.branchId)?.deliveryFee
+        ?? address.deliveryFee
+        ?? 0
+
 function hasMapCoordinates(addr: CustomerAddress): boolean {
     const lat = addr.latitude
     const lng = addr.longitude
@@ -345,7 +350,7 @@ const editAddress = (address: CustomerAddress) => {
         latitude: address.latitude,
         longitude: address.longitude,
         isPrimary: address.isPrimary,
-        deliveryFee: address.deliveryFee || 0
+        deliveryFee: branchDeliveryFee(address)
     }
     showEditModal.value = true
 }

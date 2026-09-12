@@ -430,12 +430,13 @@ onMounted(async () => {
             try {
                 const address = await customersStore.fetchAddressById(props.addressId)
                 if (address) {
-                    localForm.neighborhoodId = address.neighborhoodId
+                    const branchService = address.branchServices?.find((service) => service.branchId === props.branchId)
+                    localForm.neighborhoodId = branchService?.neighborhoodId ?? address.neighborhoodId
                     localForm.address = address.address
                     localForm.additionalInfo = address.additionalInfo ?? ''
                     localForm.latitude = address.latitude ?? 0
                     localForm.longitude = address.longitude ?? 0
-                    localForm.deliveryFee = address.deliveryFee
+                    localForm.deliveryFee = branchService?.deliveryFee ?? address.deliveryFee
                     localForm.isPrimary = address.isPrimary
 
                     baselineAddress.value = normAddr(address.address)
