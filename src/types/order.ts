@@ -451,6 +451,7 @@ export interface OrderAppPaymentDetail {
 // ===== TIPOS PARA CREACIÓN/ACTUALIZACIÓN =====
 export interface CreateOrderDto {
     branchId: number
+    whatsappConversationId?: number
     takenById: number
     customerId?: number
     addressId?: number

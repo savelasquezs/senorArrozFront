@@ -19,7 +19,7 @@ export function useOrderSubmission() {
         if (!takenById || !branchId) {
             throw new Error('Usuario o sucursal no disponible')
         }
-        if (activeBranchId == null || branchId !== activeBranchId) {
+        if (activeBranchId == null || (branchId !== activeBranchId && !draft.whatsappConversationId)) {
             throw new Error('El borrador pertenece a otra sucursal. Cambia a esa sucursal antes de enviarlo.')
         }
 
@@ -58,6 +58,7 @@ export function useOrderSubmission() {
         // Build the DTO
         const dto: CreateOrderDto = {
             branchId,
+            whatsappConversationId: draft.whatsappConversationId ?? undefined,
             takenById,
             type: draft.type,
             status: 'taken',

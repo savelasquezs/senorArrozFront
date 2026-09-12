@@ -114,14 +114,15 @@ export const useOrdersDraftsStore = defineStore('ordersDrafts', () => {
 
     const visibleDraftOrders = computed(() =>
         Array.from(draftOrders.value.values()).filter(
-            order => order.branchId === activeBranchId.value,
+            order => order.branchId === activeBranchId.value
+                || (order.whatsappConversationId != null && order.tabId === currentTabId.value),
         ),
     )
 
     const currentOrder = computed(() => {
         if (!currentTabId.value) return null
         const order = draftOrders.value.get(currentTabId.value) || null
-        return order?.branchId === activeBranchId.value ? order : null
+        return order?.branchId === activeBranchId.value || order?.whatsappConversationId != null ? order : null
     })
 
     const orderTabs = computed((): OrderTab[] => {
@@ -1657,7 +1658,7 @@ export const useOrdersDraftsStore = defineStore('ordersDrafts', () => {
         const active = currentTabId.value
             ? draftOrders.value.get(currentTabId.value)
             : null
-        if (active?.branchId === branchId) return
+        if (active?.branchId === branchId || active?.whatsappConversationId != null) return
 
         currentTabId.value =
             Array.from(draftOrders.value.values()).find(order => order.branchId === branchId)?.tabId

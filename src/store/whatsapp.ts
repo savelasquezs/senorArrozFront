@@ -4,6 +4,7 @@ import { whatsappApi } from '@/services/MainAPI/whatsappApi'
 import type {
   WhatsAppConversation,
   WhatsAppConversationFilters,
+  WhatsAppOperationalBranchOption,
   WhatsAppAiDiagnostics,
   WhatsAppAiProcessingChangedPayload,
   WhatsAppMessage,
@@ -26,6 +27,7 @@ export const useWhatsAppStore = defineStore('whatsapp', () => {
   const status = ref<WhatsAppStatus | null>(null)
   const unreadSummary = ref<WhatsAppUnreadSummary>({ totalUnread: 0, unreadConversations: 0, latestMessageAt: null })
   const conversations = ref<WhatsAppConversation[]>([])
+  const operationalBranches = ref<WhatsAppOperationalBranchOption[]>([])
   const messages = ref<Record<number, WhatsAppMessage[]>>({})
   const quickReplies = ref<WhatsAppQuickReply[]>([])
   const aiDiagnosticsByBranch = ref<Record<number, WhatsAppAiDiagnostics>>({})
@@ -117,6 +119,19 @@ export const useWhatsAppStore = defineStore('whatsapp', () => {
     } finally {
       isLoadingConversations.value = false
     }
+  }
+
+  async function fetchOperationalBranches() {
+    const res = await whatsappApi.getOperationalBranches()
+    operationalBranches.value = res.data ?? []
+    return operationalBranches.value
+  }
+
+  async function updateOperationalBranch(conversationId: number, branchId: number | null) {
+    const res = await whatsappApi.updateOperationalBranch(conversationId, branchId)
+    const conversation = conversations.value.find(x => x.id === conversationId)
+    if (conversation && res.data) Object.assign(conversation, res.data)
+    return res.data
   }
 
   async function fetchMessages(conversationId: number) {
@@ -459,6 +474,7 @@ export const useWhatsAppStore = defineStore('whatsapp', () => {
 
   function clear() {
     conversations.value = []
+    operationalBranches.value = []
     messages.value = {}
     quickReplies.value = []
     aiDiagnosticsByBranch.value = {}
@@ -472,6 +488,7 @@ export const useWhatsAppStore = defineStore('whatsapp', () => {
     status,
     unreadSummary,
     conversations,
+    operationalBranches,
     messages,
     quickReplies,
     aiDiagnosticsByBranch,
@@ -492,6 +509,8 @@ export const useWhatsAppStore = defineStore('whatsapp', () => {
     fetchUnreadSummary,
     fetchAiDiagnostics,
     fetchConversations,
+    fetchOperationalBranches,
+    updateOperationalBranch,
     fetchMessages,
     sendMessage,
     changeAttention,

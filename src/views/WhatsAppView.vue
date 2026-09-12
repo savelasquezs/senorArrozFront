@@ -103,40 +103,43 @@
             </BaseButton>
           </div>
           <div class="flex-1 min-h-0 overflow-y-auto">
-            <button
-              v-for="conversation in whatsappStore.conversations"
-              :key="conversation.id"
-              type="button"
-              class="w-full border-b border-gray-100 px-3 py-2 text-left hover:bg-gray-50"
-              :class="selectedConversation?.id === conversation.id ? 'bg-emerald-50' : conversation.attentionMode === 'waitingForHuman' ? 'bg-amber-50 ring-1 ring-inset ring-amber-300' : 'bg-white'"
-              @click="selectConversation(conversation)"
-            >
-              <div class="flex items-center justify-between gap-2">
-                <div class="flex min-w-0 flex-1 items-baseline gap-1.5">
-                  <span class="min-w-0 truncate text-sm font-semibold text-gray-950">{{ conversationTitle(conversation) }}</span>
-                  <span class="shrink-0 text-xs text-gray-300">-</span>
-                  <span class="truncate text-xs font-medium" :class="conversation.phoneNumber ? 'text-gray-500' : 'text-emerald-700'">{{ conversationIdentityLabel(conversation) }}</span>
+            <template v-for="section in inboxSections" :key="section.key">
+              <p class="border-b border-gray-100 bg-gray-50 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-gray-500">{{ section.label }}</p>
+              <button
+                v-for="conversation in section.conversations"
+                :key="conversation.id"
+                type="button"
+                class="w-full border-b border-gray-100 px-3 py-2 text-left hover:bg-gray-50"
+                :class="selectedConversation?.id === conversation.id ? 'bg-emerald-50' : conversation.attentionMode === 'waitingForHuman' ? 'bg-amber-50 ring-1 ring-inset ring-amber-300' : 'bg-white'"
+                @click="selectConversation(conversation)"
+              >
+                <div class="flex items-center justify-between gap-2">
+                  <div class="flex min-w-0 flex-1 items-baseline gap-1.5">
+                    <span class="min-w-0 truncate text-sm font-semibold text-gray-950">{{ conversationTitle(conversation) }}</span>
+                    <span class="shrink-0 text-xs text-gray-300">-</span>
+                    <span class="truncate text-xs font-medium" :class="conversation.phoneNumber ? 'text-gray-500' : 'text-emerald-700'">{{ conversationIdentityLabel(conversation) }}</span>
+                  </div>
+                  <span v-if="conversation.unreadCount > 0" class="shrink-0 rounded-full bg-emerald-600 px-2 py-0.5 text-xs font-semibold text-white">
+                    {{ conversation.unreadCount }}
+                  </span>
                 </div>
-                <span v-if="conversation.unreadCount > 0" class="shrink-0 rounded-full bg-emerald-600 px-2 py-0.5 text-xs font-semibold text-white">
-                  {{ conversation.unreadCount }}
-                </span>
-              </div>
-              <div class="mt-1 flex min-w-0 items-baseline gap-2 text-xs">
-                <span
-                  class="min-w-0 flex-1 truncate"
-                  :class="conversation.unreadCount > 0 ? 'font-semibold text-gray-800' : 'font-medium text-gray-600'"
-                >
-                  {{ shortConversationPreview(conversation.lastMessagePreview) }}
-                </span>
-                <span
-                  class="shrink-0 font-medium"
-                  :class="conversation.unreadCount > 0 ? 'text-emerald-700' : 'text-gray-400'"
-                >
-                  {{ formatRelativeConversationTime(conversation.lastMessageAt || conversation.createdAt) }}
-                </span>
-              </div>
-              <div class="mt-1"><span class="rounded-full px-2 py-0.5 text-[10px] font-semibold" :class="attentionBadgeClass(conversation.attentionMode)" :title="attentionTooltip(conversation)">{{ attentionLabel(conversation) }}</span></div>
-            </button>
+                <div class="mt-1 flex min-w-0 items-baseline gap-2 text-xs">
+                  <span
+                    class="min-w-0 flex-1 truncate"
+                    :class="conversation.unreadCount > 0 ? 'font-semibold text-gray-800' : 'font-medium text-gray-600'"
+                  >
+                    {{ shortConversationPreview(conversation.lastMessagePreview) }}
+                  </span>
+                  <span
+                    class="shrink-0 font-medium"
+                    :class="conversation.unreadCount > 0 ? 'text-emerald-700' : 'text-gray-400'"
+                  >
+                    {{ formatRelativeConversationTime(conversation.lastMessageAt || conversation.createdAt) }}
+                  </span>
+                </div>
+                <div class="mt-1"><span class="rounded-full px-2 py-0.5 text-[10px] font-semibold" :class="attentionBadgeClass(conversation.attentionMode)" :title="attentionTooltip(conversation)">{{ attentionLabel(conversation) }}</span></div>
+              </button>
+            </template>
 
             <div v-if="!whatsappStore.isLoadingConversations && whatsappStore.conversations.length === 0" class="p-6 text-center text-sm text-gray-500">
               No hay conversaciones para los filtros actuales.
@@ -150,9 +153,21 @@
             <p class="font-semibold text-gray-900">{{ conversationTitle(selectedConversation) }}</p>
             <p class="text-sm text-gray-500">
               {{ conversationIdentityLabel(selectedConversation) }}
-              <span v-if="selectedConversation.isCentralChannel"> · {{ selectedConversation.operationalBranchName || 'Cola central' }}</span>
+              <span v-if="selectedConversation.isCentralChannel"> · {{ selectedConversation.operationalBranchName || 'Sin asignar' }}</span>
               <span v-else-if="selectedConversation.branchName"> · {{ selectedConversation.branchName }}</span>
             </p>
+            <label v-if="canAssignOperationalBranch" class="mt-2 flex items-center gap-2 text-xs font-medium text-gray-600">
+              Sucursal operativa
+              <select
+                class="rounded-md border border-gray-300 bg-white px-2 py-1 text-sm text-gray-900 focus:border-emerald-500 focus:ring-emerald-500"
+                :value="selectedConversation.operationalBranchId ?? 0"
+                :disabled="changingOperationalBranch"
+                @change="changeOperationalBranch"
+              >
+                <option :value="0">Sin asignar</option>
+                <option v-for="branch in whatsappStore.operationalBranches" :key="branch.id" :value="branch.id">{{ branch.name }}</option>
+              </select>
+            </label>
             </div>
             <div class="flex flex-wrap justify-end gap-2">
               <BaseButton v-if="canTakeAttention" size="sm" :loading="changingAttention" @click="changeAttention('take')">Tomar conversación</BaseButton>
@@ -668,6 +683,7 @@ import type {
   WhatsAppAttentionChangedPayload,
   WhatsAppAttentionMode,
   WhatsAppConversation,
+  WhatsAppConversationRoutingChangedPayload,
   WhatsAppMessage,
   WhatsAppOrderDraft,
   WhatsAppQuickReply,
@@ -713,6 +729,7 @@ const fileInput = ref<HTMLInputElement | null>(null)
 const sending = ref(false)
 const sendingMenu = ref(false)
 const changingAttention = ref(false)
+const changingOperationalBranch = ref(false)
 const resettingConversation = ref(false)
 const contextLoading = ref(false)
 const creatingCustomer = ref(false)
@@ -745,7 +762,8 @@ const currentMessages = computed<WhatsAppMessage[]>(() =>
 )
 
 const diagnosticsBranchId = computed(() =>
-  selectedConversation.value?.branchId
+  selectedConversation.value?.operationalBranchId
+  || selectedConversation.value?.branchId
   || selectedBranchId.value
   || whatsappStore.enabledBranchIds[0]
   || 0,
@@ -823,6 +841,19 @@ const canTakeAttention = computed(() => !!selectedConversation.value && ['ai', '
 const canReturnToAi = computed(() => !!selectedConversation.value && ['human', 'waitingForHuman', 'paused'].includes(selectedConversation.value.attentionMode))
 const canPauseAi = computed(() => selectedConversation.value?.attentionMode === 'ai')
 const canResetTestContext = computed(() => authStore.isSuperadmin || authStore.isAdmin)
+const canAssignOperationalBranch = computed(() => !!selectedConversation.value?.isCentralChannel)
+const inboxSections = computed(() => {
+  const unassigned = whatsappStore.conversations.filter(conversation =>
+    conversation.isCentralChannel && !conversation.operationalBranchId,
+  )
+  const branch = whatsappStore.conversations.filter(conversation =>
+    !conversation.isCentralChannel || conversation.operationalBranchId,
+  )
+  return [
+    { key: 'branch', label: authStore.isSuperadmin ? 'Sucursales' : 'Mi sucursal', conversations: branch },
+    { key: 'unassigned', label: 'Sin asignar', conversations: unassigned },
+  ].filter(section => section.conversations.length > 0)
+})
 function attentionLabel(conversation: WhatsAppConversation) { const labels: Record<WhatsAppAttentionMode, string> = { ai: 'Atendida por IA', human: 'Atendida por una persona', waitingForHuman: 'Esperando asesor', paused: 'IA pausada', closed: 'Conversación cerrada' }; const label = labels[conversation.attentionMode] || labels.human; return conversation.attentionMode === 'human' && conversation.assignedUserName ? `${label}: ${conversation.assignedUserName}` : label }
 function attentionBadgeClass(mode: WhatsAppAttentionMode) { return { ai: 'bg-violet-100 text-violet-700', human: 'bg-blue-100 text-blue-700', waitingForHuman: 'bg-amber-200 text-amber-900', paused: 'bg-gray-200 text-gray-700', closed: 'bg-red-100 text-red-700' }[mode] }
 function attentionTooltip(conversation: WhatsAppConversation) {
@@ -859,6 +890,43 @@ async function changeAttention(action: 'take' | 'return-to-ai' | 'pause-ai' | 'c
     showError('Atención', error.message || 'No se pudo cambiar el estado.')
   } finally {
     changingAttention.value = false
+  }
+}
+
+async function changeOperationalBranch(event: Event) {
+  const conversation = selectedConversation.value
+  if (!conversation) return
+  const input = event.target as HTMLSelectElement
+  const selectedValue = Number(input.value)
+  const branchId = selectedValue > 0 ? selectedValue : null
+  if (branchId === conversation.operationalBranchId) return
+
+  if (conversation.operationalBranchId && branchId) {
+    const confirmed = await confirmDialog({
+      title: 'Transferir conversación',
+      message: 'La conversación cambiará de sucursal y se liberará el asesor asignado. ¿Deseas continuar?',
+      confirmLabel: 'Transferir',
+      tone: 'warning',
+    })
+    if (!confirmed) {
+      input.value = String(conversation.operationalBranchId)
+      return
+    }
+  }
+
+  try {
+    changingOperationalBranch.value = true
+    const updated = await whatsappStore.updateOperationalBranch(conversation.id, branchId)
+    if (!updated) return
+    selectedConversation.value = updated
+    await reloadConversations()
+    if (selectedConversation.value?.id === updated.id) await loadConversationContext(updated)
+    success('Sucursal operativa actualizada', 2200)
+  } catch (error: any) {
+    input.value = String(conversation.operationalBranchId ?? 0)
+    showError('Sucursal operativa', error.message || 'No se pudo actualizar la sucursal.')
+  } finally {
+    changingOperationalBranch.value = false
   }
 }
 async function resetConversationForTesting() {
@@ -898,6 +966,14 @@ function handleAttentionChanged(payload: WhatsAppAttentionChangedPayload) {
   void loadConversationContext(selectedConversation.value)
 }
 
+function handleConversationRoutingChanged(payload: WhatsAppConversationRoutingChangedPayload) {
+  if (!payload?.conversation?.id) return
+  if (selectedConversation.value?.id === payload.conversation.id) {
+    selectedConversation.value = payload.conversation
+  }
+  void reloadConversations()
+}
+
 function handleAiProcessingChanged(payload: WhatsAppAiProcessingChangedPayload) {
   whatsappStore.applyAiProcessingChanged(payload)
   if (selectedConversation.value?.attentionMode === 'ai'
@@ -913,7 +989,7 @@ async function refreshAiDiagnostics(showErrors = false) {
 
   try {
     if (selected) {
-      await whatsappStore.fetchAiDiagnostics(selected.branchId, selected.id, 50)
+      await whatsappStore.fetchAiDiagnostics(selected.operationalBranchId ?? selected.branchId, selected.id, 50)
       return
     }
 
@@ -959,6 +1035,7 @@ async function retryWhatsAppStatus() {
     if (whatsappStore.enabled) {
       await Promise.allSettled([
         whatsappStore.fetchQuickReplies(),
+        whatsappStore.fetchOperationalBranches(),
         reloadConversations(),
       ])
     } else {
@@ -1044,15 +1121,19 @@ const slashQuickReplyMatches = computed(() => {
 })
 
 async function reloadConversations() {
+  const previousSelected = selectedConversation.value
   await whatsappStore.fetchConversations({
     branchId: selectedBranchId.value || undefined,
     search: search.value.trim() || undefined,
     unreadOnly: unreadOnly.value || undefined,
   })
   await whatsappStore.fetchUnreadSummary()
-  if (selectedConversation.value) {
-    const refreshed = whatsappStore.conversations.find(c => c.id === selectedConversation.value?.id)
-    selectedConversation.value = refreshed ?? null
+  if (previousSelected) {
+    const refreshed = whatsappStore.conversations.find(c => c.id === previousSelected.id)
+    selectedConversation.value = refreshed
+      ?? (previousSelected.isCentralChannel && previousSelected.assignedUserId === authStore.user?.id
+        ? previousSelected
+        : null)
   }
   await selectConversationFromRoute()
 }
@@ -1093,7 +1174,9 @@ async function selectConversationFromRoute() {
 }
 
 function conversationMatchesCurrentFilters(conversation: WhatsAppConversation) {
-  if (selectedBranchId.value && conversation.branchId !== selectedBranchId.value) return false
+  if (selectedBranchId.value && (conversation.isCentralChannel
+    ? conversation.operationalBranchId !== selectedBranchId.value
+    : conversation.branchId !== selectedBranchId.value)) return false
   if (unreadOnly.value && conversation.unreadCount <= 0) return false
 
   const term = search.value.trim().toLowerCase()
@@ -1468,7 +1551,7 @@ async function takeOrderFromWhatsApp() {
         ? ordersStore.createOrReuseWhatsAppDraft({
             mode: 'manual',
             conversationId: selectedConversation.value.id,
-            branchId: selectedConversation.value.branchId,
+            branchId: selectedConversation.value.operationalBranchId ?? selectedConversation.value.branchId,
             customer: selectedCustomer.value,
             address: selectedAddress.value,
           })
@@ -1477,7 +1560,7 @@ async function takeOrderFromWhatsApp() {
         ? ordersStore.createOrReuseWhatsAppDraft({
             mode: 'ai',
             conversationId: selectedConversation.value.id,
-            branchId: selectedConversation.value.branchId,
+            branchId: selectedConversation.value.operationalBranchId ?? selectedConversation.value.branchId,
             customer: selectedCustomer.value,
             address: selectedAddress.value,
             draft: aiOrderDraft.value,
@@ -1714,6 +1797,7 @@ function mediaFallbackLabel(message: WhatsAppMessage) {
 onMounted(async () => {
   onSignalR('WhatsAppMessageCreated', handleRealtimeMessage)
   onSignalR('WhatsAppAttentionChanged', handleAttentionChanged)
+  onSignalR('WhatsAppConversationRoutingChanged', handleConversationRoutingChanged)
   onSignalR('WhatsAppAiProcessingChanged', handleAiProcessingChanged)
   await retryWhatsAppStatus()
   startRealtimeFallback()
@@ -1722,6 +1806,7 @@ onMounted(async () => {
 onBeforeUnmount(() => {
   offSignalR('WhatsAppMessageCreated', handleRealtimeMessage)
   offSignalR('WhatsAppAttentionChanged', handleAttentionChanged)
+  offSignalR('WhatsAppConversationRoutingChanged', handleConversationRoutingChanged)
   offSignalR('WhatsAppAiProcessingChanged', handleAiProcessingChanged)
   stopAiDiagnosticsPolling()
   stopRealtimeFallback()

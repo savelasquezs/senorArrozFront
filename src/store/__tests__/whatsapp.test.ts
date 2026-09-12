@@ -7,7 +7,9 @@ const { whatsappApiMock } = vi.hoisted(() => ({
   whatsappApiMock: {
     getStatus: vi.fn(),
     getAiDiagnostics: vi.fn(),
+    getOperationalBranches: vi.fn(),
     resetConversationForTesting: vi.fn(),
+    updateOperationalBranch: vi.fn(),
   },
 }))
 
@@ -198,5 +200,43 @@ describe('WhatsApp store AI diagnostics', () => {
     expect(store.aiDiagnosticsByConversation[20]).toBeUndefined()
     expect(store.conversations[0].status).toBe('open')
     expect(store.conversations[0].attentionMode).toBe('ai')
+  })
+})
+
+describe('WhatsApp operational branch', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia())
+    vi.clearAllMocks()
+  })
+
+  it('loads operational branches and applies the central conversation update', async () => {
+    const store = useWhatsAppStore()
+    const conversation = {
+      id: 20,
+      branchId: 1,
+      isCentralChannel: true,
+      operationalBranchId: null,
+      phoneNumber: '573001234567',
+      status: 'open',
+      unreadCount: 0,
+      createdAt: '2026-07-13T15:00:00Z',
+      updatedAt: '2026-07-13T15:00:00Z',
+      attentionMode: 'human',
+      assignedUserId: 7,
+      attentionModeUpdatedAt: '2026-07-13T15:00:00Z',
+    }
+    store.conversations = [conversation]
+    whatsappApiMock.getOperationalBranches.mockResolvedValue({ data: [{ id: 2, name: 'Manrique' }] })
+    whatsappApiMock.updateOperationalBranch.mockResolvedValue({
+      data: { ...conversation, operationalBranchId: 2, operationalBranchName: 'Manrique' },
+    })
+
+    await store.fetchOperationalBranches()
+    await store.updateOperationalBranch(conversation.id, 2)
+
+    expect(store.operationalBranches).toEqual([{ id: 2, name: 'Manrique' }])
+    expect(whatsappApiMock.updateOperationalBranch).toHaveBeenCalledWith(20, 2)
+    expect(store.conversations[0].operationalBranchId).toBe(2)
+    expect(store.conversations[0].assignedUserId).toBe(7)
   })
 })

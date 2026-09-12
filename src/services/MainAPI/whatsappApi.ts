@@ -9,6 +9,7 @@ import type {
   WhatsAppAiUsageFilters,
   WhatsAppConversation,
   WhatsAppConversationFilters,
+  WhatsAppOperationalBranchOption,
   WhatsAppMessage,
   WhatsAppOrderDraft,
   WhatsAppQuickReply,
@@ -88,6 +89,14 @@ class WhatsAppApi extends BaseApi {
 
   getConversations(filters?: WhatsAppConversationFilters): Promise<ApiResponse<WhatsAppConversation[]>> {
     return this.get<ApiResponse<WhatsAppConversation[]>>('/whatsapp/conversations', { params: filters })
+  }
+
+  getOperationalBranches(): Promise<ApiResponse<WhatsAppOperationalBranchOption[]>> {
+    return this.get<ApiResponse<WhatsAppOperationalBranchOption[]>>('/whatsapp/operational-branches')
+  }
+
+  updateOperationalBranch(conversationId: number, branchId: number | null): Promise<ApiResponse<WhatsAppConversation>> {
+    return this.put<ApiResponse<WhatsAppConversation>>(`/whatsapp/conversations/${conversationId}/operational-branch`, { branchId })
   }
 
   getMessages(conversationId: number): Promise<ApiResponse<WhatsAppMessage[]>> {

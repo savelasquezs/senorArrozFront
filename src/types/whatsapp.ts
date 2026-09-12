@@ -248,6 +248,8 @@ export interface WhatsAppConversation {
 export type WhatsAppAttentionMode = 'ai' | 'human' | 'waitingForHuman' | 'paused' | 'closed'
 export interface WhatsAppAttention { conversationId: number; attentionMode: WhatsAppAttentionMode; attentionReason?: string | null; assignedUserId?: number | null; assignedUserName?: string | null; aiPausedAt?: string | null; humanAssignedAt?: string | null; closedAt?: string | null; attentionModeUpdatedAt: string; attentionModeUpdatedByUserId?: number | null }
 export interface WhatsAppAttentionChangedPayload { branchId: number; conversation: WhatsAppConversation }
+export interface WhatsAppConversationRoutingChangedPayload { branchId: number; previousOperationalBranchId?: number | null; conversation: WhatsAppConversation }
+export interface WhatsAppOperationalBranchOption { id: number; name: string }
 
 export interface WhatsAppMessage {
   id: number
