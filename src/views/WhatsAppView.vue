@@ -137,7 +137,10 @@
                     {{ formatRelativeConversationTime(conversation.lastMessageAt || conversation.createdAt) }}
                   </span>
                 </div>
-                <div class="mt-1"><span class="rounded-full px-2 py-0.5 text-[10px] font-semibold" :class="attentionBadgeClass(conversation.attentionMode)" :title="attentionTooltip(conversation)">{{ attentionLabel(conversation) }}</span></div>
+                <div class="mt-1 flex items-center justify-between gap-2">
+                  <span class="rounded-full px-2 py-0.5 text-[10px] font-semibold" :class="attentionBadgeClass(conversation.attentionMode)" :title="attentionTooltip(conversation)">{{ attentionLabel(conversation) }}</span>
+                  <span class="min-w-0 truncate text-[10px] font-medium text-gray-500">{{ whatsappConversationBranchLabel(conversation) }}</span>
+                </div>
               </button>
             </template>
 
@@ -699,6 +702,7 @@ import {
 } from '@/utils/whatsappAiDiagnostics'
 import { whatsappOrderContextMode } from '@/utils/whatsappOrderContextMode'
 import { matchesWhatsAppUsername } from '@/utils/whatsappIdentity'
+import { buildWhatsAppInboxSections, whatsappConversationBranchLabel } from '@/utils/whatsappInbox'
 
 const whatsappStore = useWhatsAppStore()
 const authStore = useAuthStore()
@@ -842,18 +846,12 @@ const canReturnToAi = computed(() => !!selectedConversation.value && ['human', '
 const canPauseAi = computed(() => selectedConversation.value?.attentionMode === 'ai')
 const canResetTestContext = computed(() => authStore.isSuperadmin || authStore.isAdmin)
 const canAssignOperationalBranch = computed(() => !!selectedConversation.value?.isCentralChannel)
-const inboxSections = computed(() => {
-  const unassigned = whatsappStore.conversations.filter(conversation =>
-    conversation.isCentralChannel && !conversation.operationalBranchId,
-  )
-  const branch = whatsappStore.conversations.filter(conversation =>
-    !conversation.isCentralChannel || conversation.operationalBranchId,
-  )
-  return [
-    { key: 'branch', label: authStore.isSuperadmin ? 'Sucursales' : 'Mi sucursal', conversations: branch },
-    { key: 'unassigned', label: 'Sin asignar', conversations: unassigned },
-  ].filter(section => section.conversations.length > 0)
-})
+const inboxSections = computed(() => buildWhatsAppInboxSections(
+  whatsappStore.conversations,
+  authStore.user?.id,
+  authStore.user?.branchId,
+  authStore.isSuperadmin,
+))
 function attentionLabel(conversation: WhatsAppConversation) { const labels: Record<WhatsAppAttentionMode, string> = { ai: 'Atendida por IA', human: 'Atendida por una persona', waitingForHuman: 'Esperando asesor', paused: 'IA pausada', closed: 'Conversación cerrada' }; const label = labels[conversation.attentionMode] || labels.human; return conversation.attentionMode === 'human' && conversation.assignedUserName ? `${label}: ${conversation.assignedUserName}` : label }
 function attentionBadgeClass(mode: WhatsAppAttentionMode) { return { ai: 'bg-violet-100 text-violet-700', human: 'bg-blue-100 text-blue-700', waitingForHuman: 'bg-amber-200 text-amber-900', paused: 'bg-gray-200 text-gray-700', closed: 'bg-red-100 text-red-700' }[mode] }
 function attentionTooltip(conversation: WhatsAppConversation) {

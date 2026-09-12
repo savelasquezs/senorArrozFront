@@ -27,6 +27,8 @@ jobs:
         run: npm ci
 
       - name: Typecheck and build
+        env:
+          VITE_API_URL: https://api.example.invalid
         run: npm run build
 
       - name: Tests
