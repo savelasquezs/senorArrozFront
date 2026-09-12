@@ -10,7 +10,7 @@ vi.mock('@/services/MainAPI/integrationApi', () => ({
 
 const baseDiagnostics = {
   configured: true,
-  pixelId: '2113461422629399',
+  pixelId: '1941546679814779',
   graphApiVersion: 'v25.0',
   eventSourceUrl: 'https://senorarroz.com',
   testMode: false,
@@ -32,7 +32,7 @@ describe('MetaConversionsDiagnosticsCard', () => {
     const wrapper = mount(MetaConversionsDiagnosticsCard)
     await flushPromises()
 
-    expect(wrapper.text()).toContain('2113461422629399')
+    expect(wrapper.text()).toContain('1941546679814779')
     expect(wrapper.text()).toContain('ya existen compras confirmadas por el servidor')
     expect(wrapper.text()).toContain('#8450')
     expect(wrapper.text()).toContain('Omitidas')
