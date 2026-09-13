@@ -1,23 +1,19 @@
 <template>
     <div class="address-selector">
-        <!-- Error Message -->
         <div v-if="errorMessage" class="mb-3 p-3 bg-red-50 border border-red-200 rounded-lg">
             <p class="text-sm text-red-600">{{ errorMessage }}</p>
         </div>
 
         <div class="space-y-3">
-            <!-- Loading State -->
             <div v-if="isLoading" class="text-center py-4">
                 <BaseLoading text="Cargando direcciones..." size="sm" />
             </div>
 
-            <!-- No Customer Selected -->
             <div v-else-if="!customerId" class="text-center py-4 border-2 border-dashed border-gray-300 rounded-lg">
                 <MapPinIcon class="mx-auto h-8 w-8 text-gray-400 mb-2" />
                 <p class="text-sm text-gray-500">Selecciona un cliente para ver sus direcciones</p>
             </div>
 
-            <!-- No Addresses -->
             <div v-else-if="customerAddresses.length === 0"
                 class="text-center py-4 border-2 border-dashed border-gray-300 rounded-lg">
                 <MapPinIcon class="mx-auto h-8 w-8 text-gray-400 mb-2" />
@@ -28,47 +24,44 @@
                 </BaseButton>
             </div>
 
-            <!-- Address List -->
             <div v-else class="space-y-2">
-                <!-- Selected Address (when one is selected) -->
                 <div v-if="selectedAddress && !showAddressSelection"
                     class="p-3 bg-green-50 border border-green-200 rounded-lg">
-                    <div class="flex items-center justify-between">
-                        <div class="flex items-center">
-                            <MapPinIcon class="w-6 h-6 text-green-600 mr-3" />
-                            <div>
-                                <div class="text-sm font-medium flex items-center">
-                                    {{ selectedAddress.address }} - {{ selectedAddress.additionalInfo }} - {{ selectedAddress.neighborhoodName }}
-
+                    <div class="flex items-center justify-between gap-3">
+                        <div class="flex min-w-0 items-center">
+                            <MapPinIcon class="w-6 h-6 text-green-600 mr-3 shrink-0" />
+                            <div class="min-w-0">
+                                <div class="truncate text-sm font-medium">
+                                    {{ selectedAddress.address }}<span v-if="selectedAddress.additionalInfo"> · {{ selectedAddress.additionalInfo }}</span>
                                 </div>
-                                
-                                <div class="text-xs text-green-600">
-                                    Costo envío: {{ formatCurrency(branchDeliveryFee(selectedAddress)) }}
-                                </div>
+                                <button
+                                    type="button"
+                                    class="mt-0.5 text-xs font-semibold"
+                                    :class="branchDeliveryFee(selectedAddress) == null
+                                        ? 'text-amber-700 hover:text-amber-800'
+                                        : 'text-emerald-700 hover:text-emerald-800'"
+                                    @click.stop="openDeliveryFee(selectedAddress)"
+                                >
+                                    {{ branchDeliveryFee(selectedAddress) == null
+                                        ? 'Calcular domicilio'
+                                        : `Domicilio ${formatCurrency(branchDeliveryFee(selectedAddress)!)}` }}
+                                </button>
                                 <p v-if="!hasMapCoordinates(selectedAddress)" class="text-xs text-red-600 mt-1">
                                     Sin ubicación en mapa
                                 </p>
                             </div>
                         </div>
                     </div>
+
                     <div class="flex justify-center items-center gap-2">
-                        <!-- Change Address Button -->
                         <BaseButton @click="showAddressSelection = true" variant="outline" size="sm"
                             class="text-blue-600 hover:text-blue-700" v-if="customerAddresses.length > 1">
-                            <span class="flex items-center">
-                                <ArrowsRightLeftIcon class="w-4 h-4 mr-1" />
-
-                            </span>
+                            <ArrowsRightLeftIcon class="w-4 h-4" />
                         </BaseButton>
-                        <!-- Edit Address Button -->
                         <BaseButton @click="editAddress(selectedAddress)" variant="outline" size="sm"
                             class="text-orange-600 hover:text-orange-700">
-                            <span class="flex items-center">
-                                <PencilIcon class="w-4 h-4 mr-1" />
-
-                            </span>
+                            <PencilIcon class="w-4 h-4" />
                         </BaseButton>
-                        <!-- Clear Address Button -->
                         <BaseButton @click="clearAddress" variant="outline" size="sm"
                             class="text-red-600 hover:text-red-700">
                             <XMarkIcon class="w-4 h-4" />
@@ -76,7 +69,6 @@
                     </div>
                 </div>
 
-                <!-- Address Selection Grid (when showing selection) -->
                 <div v-if="showAddressSelection || !selectedAddress" class="space-y-3">
                     <div v-if="showAddressSelection && selectedAddress" class="flex items-center justify-between mb-2">
                         <h4 class="text-sm font-medium text-gray-700">Selecciona una dirección:</h4>
@@ -94,45 +86,60 @@
                                     : 'border-gray-200 hover:border-indigo-300 hover:bg-indigo-50'
                             ]">
                             <div class="flex items-start">
-                                <MapPinIcon class="w-5 h-5 text-gray-400 mr-2 mt-0.5 flex-shrink-0" />
-                                <div class="flex-1 min-w-0">
-                                    <div class="text-sm font-medium flex items-center">
-                                        {{ address.address }},  {{ address.additionalInfo }}
-                    
+                                <MapPinIcon class="w-5 h-5 text-gray-400 mr-2 mt-0.5 shrink-0" />
+                                <div class="min-w-0 flex-1">
+                                    <div class="truncate text-sm font-medium">
+                                        {{ address.address }}<span v-if="address.additionalInfo"> · {{ address.additionalInfo }}</span>
+                                    </div>
+                                    <div class="mt-1 flex items-center gap-2 text-xs text-gray-500">
+                                        <span class="truncate">{{ address.neighborhoodName }}</span>
+                                        <button
+                                            v-if="branchDeliveryFee(address) == null"
+                                            type="button"
+                                            class="shrink-0 font-semibold text-amber-700 hover:text-amber-800"
+                                            @click.stop="openDeliveryFee(address)"
+                                        >
+                                            Calcular domicilio
+                                        </button>
+                                        <span v-else class="shrink-0 font-semibold text-emerald-700">
+                                            {{ formatCurrency(branchDeliveryFee(address)!) }}
+                                        </span>
+                                        <BaseBadge v-if="address.isPrimary" type="success" size="sm" class="shrink-0">
+                                            Principal
+                                        </BaseBadge>
                                     </div>
                                 </div>
-                            </div>
-                            <div class="text-xs text-gray-500 mt-1 flex items-center">
-                                {{ address.neighborhoodName }} - {{ formatCurrency(branchDeliveryFee(address)) }}
-                                <BaseBadge v-if="address.isPrimary" type="success" size="sm"
-                                    class="ml-2 flex-shrink-0">
-                                    Principal
-                                </BaseBadge>
                             </div>
                         </div>
                     </div>
 
-                    <!-- Create New Address Button -->
                     <div class="pt-2 border-t border-gray-200">
                         <BaseButton @click="showCreateAddress" variant="outline" size="sm" class="w-full">
-                            
-                           <span class="flex items-center"><PlusIcon class="w-4 h-4 mr-2" />Nueva Dirección</span>
+                            <span class="flex items-center"><PlusIcon class="w-4 h-4 mr-2" />Nueva Dirección</span>
                         </BaseButton>
                     </div>
                 </div>
             </div>
         </div>
 
-        <!-- Create Address Modal -->
         <BaseDialog v-model="showCreateModal" title="Agregar Nueva Dirección" size="lg">
-            <CustomerAddressForm v-model="addressFormData" :branch-id="branchId" :can-edit-delivery-fee="true" @submit="createAddress"
-                @cancel="closeCreateModal" />
+            <CustomerAddressForm v-model="addressFormData" :branch-id="effectiveBranchId || undefined"
+                :can-edit-delivery-fee="true" @submit="createAddress" @cancel="closeCreateModal" />
         </BaseDialog>
 
-        <!-- Edit Address Modal -->
         <BaseDialog v-model="showEditModal" title="Editar Dirección" size="lg">
             <CustomerAddressForm v-if="editingAddress" v-model="editFormData" :addressId="editingAddress.id"
-                :branch-id="branchId" :can-edit-delivery-fee="true" @submit="updateAddress" @cancel="closeEditModal" />
+                :branch-id="effectiveBranchId || undefined" :can-edit-delivery-fee="true" @submit="updateAddress"
+                @cancel="closeEditModal" />
+        </BaseDialog>
+
+        <BaseDialog v-model="showDeliveryFeeModal" title="Domicilio" size="lg">
+            <AddressDeliveryFeeDialog
+                v-if="deliveryFeeAddress && effectiveBranchId"
+                :address="deliveryFeeAddress"
+                :branch-id="effectiveBranchId"
+                @saved="handleDeliveryFeeSaved"
+            />
         </BaseDialog>
     </div>
 </template>
@@ -142,17 +149,19 @@ import { ref, computed, watch } from 'vue'
 import { useCustomersStore } from '@/store/customers'
 import { useOrdersDraftsStore } from '@/store/ordersDrafts'
 import { useOrdersDataStore } from '@/store/ordersData'
+import { useBranchContextStore } from '@/store/branchContext'
+import { useAuthStore } from '@/store/auth'
 import { useToast } from '@/composables/useToast'
 import type { CustomerAddress, CreateCustomerAddressDto, CustomerAddressFormData, UpdateCustomerAddressDto } from '@/types/customer'
+import type { AddressBranchService } from '@/services/MainAPI/addressBranchApi'
 
-// Components
 import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseBadge from '@/components/ui/BaseBadge.vue'
 import BaseLoading from '@/components/ui/BaseLoading.vue'
 import BaseDialog from '@/components/ui/BaseDialog.vue'
 import CustomerAddressForm from '@/components/customers/address/CustomerAddressForm.vue'
+import AddressDeliveryFeeDialog from '@/components/customers/address/AddressDeliveryFeeDialog.vue'
 
-// Icons
 import {
     MapPinIcon,
     PlusIcon,
@@ -161,7 +170,6 @@ import {
     ArrowsRightLeftIcon
 } from '@heroicons/vue/24/outline'
 
-// Props
 interface Props {
     customerId?: number
     selectedAddress?: number
@@ -176,18 +184,17 @@ const props = withDefaults(defineProps<Props>(), {
     mode: 'draft'
 })
 
-// Emits
 const emit = defineEmits<{
     addressSelected: [address: CustomerAddress | undefined]
 }>()
 
-// Composables
 const customersStore = useCustomersStore()
 const draftStore = useOrdersDraftsStore()
 const dataStore = useOrdersDataStore()
+const branchContext = useBranchContextStore()
+const authStore = useAuthStore()
 const { success, error: showError } = useToast()
 
-// State
 const customerAddresses = ref<CustomerAddress[]>([])
 const isLoading = ref(false)
 const showCreateModal = ref(false)
@@ -196,6 +203,19 @@ const showEditModal = ref(false)
 const isEditing = ref(false)
 const showAddressSelection = ref(false)
 const editingAddress = ref<CustomerAddress | null>(null)
+const showDeliveryFeeModal = ref(false)
+const deliveryFeeAddress = ref<CustomerAddress | null>(null)
+
+const effectiveBranchId = computed<number | null>(() => {
+    const orderBranchId = props.mode === 'draft'
+        ? draftStore.currentOrder?.branchId
+        : dataStore.current?.branchId
+    return orderBranchId
+        ?? branchContext.selectedBranchId
+        ?? authStore.branchId
+        ?? props.branchId
+        ?? null
+})
 
 const addressFormData = ref<CustomerAddressFormData>({
     neighborhoodId: 0,
@@ -217,15 +237,11 @@ const editFormData = ref<CustomerAddressFormData>({
     deliveryFee: 0
 })
 
-
 const selectedAddress = computed(() => {
     if (!props.selectedAddress || !customerAddresses.value) return null
     return customerAddresses.value.find(a => a.id === props.selectedAddress) || null
 })
 
-
-
-// Mostrar error si intenta guardar sin dirección
 const errorMessage = computed(() => {
     const orderType = props.mode === 'draft'
         ? draftStore?.currentOrder?.type
@@ -238,28 +254,22 @@ const errorMessage = computed(() => {
     return null
 })
 
-// Computed para obtener branchId del cliente
+const formatCurrency = (amount: number): string => new Intl.NumberFormat('es-CO', {
+    style: 'currency',
+    currency: 'COP',
+    minimumFractionDigits: 0,
+}).format(amount)
 
-// Methods
-const formatCurrency = (amount: number): string => {
-    return new Intl.NumberFormat('es-CO', {
-        style: 'currency',
-        currency: 'COP',
-        minimumFractionDigits: 0,
-    }).format(amount)
+const branchDeliveryFee = (address: CustomerAddress): number | null => {
+    const branchId = effectiveBranchId.value
+    if (!branchId) return null
+    return address.branchServices?.find(service => service.branchId === branchId)?.deliveryFee ?? null
 }
 
-const branchDeliveryFee = (address: CustomerAddress): number =>
-    address.branchServices?.find((service) => service.branchId === props.branchId)?.deliveryFee
-        ?? address.deliveryFee
-        ?? 0
-
 function hasMapCoordinates(addr: CustomerAddress): boolean {
-    const lat = addr.latitude
-    const lng = addr.longitude
-    if (lat == null || lng == null) return false
-    if (lat === 0 && lng === 0) return false
-    return true
+    const lat = Number(addr.latitude)
+    const lng = Number(addr.longitude)
+    return Number.isFinite(lat) && Number.isFinite(lng) && !(lat === 0 && lng === 0)
 }
 
 const loadCustomerAddresses = async (options?: { skipAutoSelect?: boolean }) => {
@@ -273,11 +283,18 @@ const loadCustomerAddresses = async (options?: { skipAutoSelect?: boolean }) => 
         await customersStore.fetchAddresses(props.customerId)
         customerAddresses.value = customersStore.addresses || []
 
-        // Auto-seleccionar solo en modo draft y si no se pidió omitir (p. ej. tras crear dirección, el caller emitirá con el deliveryFee correcto)
+        const selected = props.selectedAddress
+            ? customerAddresses.value.find(address => address.id === props.selectedAddress)
+            : null
+        if (selected && branchDeliveryFee(selected) == null) {
+            emit('addressSelected', undefined)
+        }
+
         if (!options?.skipAutoSelect && props.mode === 'draft' && customerAddresses.value.length > 0 && !props.selectedAddress) {
-            const primaryAddress = customerAddresses.value.find(addr => addr.isPrimary)
-            const addressToSelect = primaryAddress || customerAddresses.value[0]
-            emit('addressSelected', addressToSelect)
+            const usable = customerAddresses.value.filter(address => branchDeliveryFee(address) != null)
+            const primaryAddress = usable.find(addr => addr.isPrimary)
+            const addressToSelect = primaryAddress || usable[0]
+            if (addressToSelect) emit('addressSelected', addressToSelect)
         }
     } catch (error) {
         console.error('Error loading addresses:', error)
@@ -288,18 +305,47 @@ const loadCustomerAddresses = async (options?: { skipAutoSelect?: boolean }) => 
 }
 
 const selectAddress = (address: CustomerAddress) => {
+    if (branchDeliveryFee(address) == null) {
+        openDeliveryFee(address)
+        return
+    }
     emit('addressSelected', address)
-    showAddressSelection.value = false // Close selection after choosing
-    console.log('Address selected:', address)
-
+    showAddressSelection.value = false
 }
 
 const clearAddress = () => {
     emit('addressSelected', undefined)
 }
 
+const openDeliveryFee = (address: CustomerAddress) => {
+    if (!effectiveBranchId.value) {
+        showError('Sucursal requerida', 'Selecciona una sucursal antes de calcular el domicilio')
+        return
+    }
+    if (!hasMapCoordinates(address)) {
+        showError('Ubicación requerida', 'Edita la dirección y confirma su ubicación en el mapa')
+        editAddress(address)
+        return
+    }
+    deliveryFeeAddress.value = address
+    showDeliveryFeeModal.value = true
+}
+
+const handleDeliveryFeeSaved = async (_service: AddressBranchService) => {
+    const addressId = deliveryFeeAddress.value?.id
+    showDeliveryFeeModal.value = false
+    deliveryFeeAddress.value = null
+    await loadCustomerAddresses({ skipAutoSelect: true })
+
+    const updatedAddress = customerAddresses.value.find(address => address.id === addressId)
+    if (updatedAddress) {
+        emit('addressSelected', updatedAddress)
+        showAddressSelection.value = false
+    }
+    success('Domicilio actualizado', 2000)
+}
+
 const showCreateAddress = () => {
-    // Reset form data
     addressFormData.value = {
         neighborhoodId: 0,
         address: '',
@@ -318,15 +364,10 @@ const createAddress = async (addressData: CreateCustomerAddressDto) => {
     isCreating.value = true
     try {
         const address = await customersStore.createAddress(props.customerId, addressData)
-
-        // Refresh addresses list sin auto-select: nosotros emitimos la dirección con el deliveryFee del formulario
         await loadCustomerAddresses({ skipAutoSelect: true })
 
-        // Auto-select created address. Usar deliveryFee del formulario para que el padre guarde ese valor
-        // en el pedido; el backend puede devolver el del barrio. Asegurar número (el form puede enviar string).
-        const formFee = Number(addressData.deliveryFee) || address.deliveryFee || 0
-        emit('addressSelected', { ...address, deliveryFee: formFee })
-
+        const createdAddress = customerAddresses.value.find(item => item.id === address.id) ?? address
+        emit('addressSelected', createdAddress)
         success('Dirección creada', 3000, 'La dirección ha sido creada correctamente')
     } catch (error: any) {
         showError('Error al crear dirección', error.message || 'No se pudo crear la dirección')
@@ -342,7 +383,6 @@ const closeCreateModal = () => {
 
 const editAddress = (address: CustomerAddress) => {
     editingAddress.value = address
-    // Populate edit form with current address data
     editFormData.value = {
         neighborhoodId: address.neighborhoodId,
         address: address.address,
@@ -350,7 +390,7 @@ const editAddress = (address: CustomerAddress) => {
         latitude: address.latitude,
         longitude: address.longitude,
         isPrimary: address.isPrimary,
-        deliveryFee: branchDeliveryFee(address)
+        deliveryFee: branchDeliveryFee(address) ?? address.deliveryFee ?? 0
     }
     showEditModal.value = true
 }
@@ -371,18 +411,11 @@ const updateAddress = async (addressData: CustomerAddressFormData) => {
         }
 
         await customersStore.updateAddress(props.customerId, editingAddress.value.id, updateData)
-
-        // Refresh addresses list
         await loadCustomerAddresses({ skipAutoSelect: true })
 
-        // Update selected address if it was the one being edited
         if (selectedAddress.value?.id === editingAddress.value.id) {
-            // The address is still selected, but now updated
             const updatedAddress = customerAddresses.value.find(a => a.id === editingAddress.value!.id)
-            if (updatedAddress) {
-                const formFee = Number(addressData.deliveryFee) || updatedAddress.deliveryFee || 0
-                emit('addressSelected', { ...updatedAddress, deliveryFee: formFee })
-            }
+            if (updatedAddress) emit('addressSelected', updatedAddress)
         }
 
         success('Dirección actualizada', 3000, 'La dirección ha sido actualizada correctamente')
@@ -400,19 +433,17 @@ const closeEditModal = () => {
     editingAddress.value = null
 }
 
-// Watch for customer changes
-watch(() => props.customerId, (newCustomerId) => {
+watch(() => [props.customerId, effectiveBranchId.value], ([newCustomerId]) => {
     if (newCustomerId) {
         loadCustomerAddresses()
     } else {
         customerAddresses.value = []
         emit('addressSelected', undefined)
     }
-    // Reset selection state when customer changes
     showAddressSelection.value = false
 }, { immediate: true })
 </script>
 
 <style scoped>
-/* Custom styles if needed */
+/* Intencionalmente mínimo: usa el sistema visual existente. */
 </style>
