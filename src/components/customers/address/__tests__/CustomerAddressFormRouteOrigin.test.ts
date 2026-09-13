@@ -12,6 +12,9 @@ const dependencies = vi.hoisted(() => ({
             branchLongitude: -75.5812 as number | null,
         },
     },
+    branchContext: {
+        selectedBranchId: 4 as number | null,
+    },
     customersStore: {
         neighborhoods: [] as any[],
         fetchNeighborhoods: vi.fn().mockResolvedValue(undefined),
@@ -27,6 +30,9 @@ const dependencies = vi.hoisted(() => ({
 
 vi.mock('@/store/auth', () => ({
     useAuthStore: () => dependencies.authStore,
+}))
+vi.mock('@/store/branchContext', () => ({
+    useBranchContextStore: () => dependencies.branchContext,
 }))
 vi.mock('@/store/customers', () => ({
     useCustomersStore: () => dependencies.customersStore,
@@ -111,14 +117,15 @@ describe('CustomerAddressForm route origin', () => {
             branchLatitude: 6.2442,
             branchLongitude: -75.5812,
         }
+        dependencies.branchContext.selectedBranchId = 4
         dependencies.branchesStore.current = null
         dependencies.branchesStore.list = null
         dependencies.getBranchById.mockReset()
         dependencies.customersStore.fetchNeighborhoods.mockClear()
     })
 
-    it('uses the authenticated branch coordinates without another request', async () => {
-        const wrapper = mountForm(4)
+    it('uses the active POS branch even when the customer belongs to another branch', async () => {
+        const wrapper = mountForm(9)
         await openMap(wrapper)
 
         expect(wrapper.getComponent(GoogleMapsSelectorStub).props('routeOrigin')).toEqual({
@@ -129,38 +136,54 @@ describe('CustomerAddressForm route origin', () => {
         expect(dependencies.getBranchById).not.toHaveBeenCalled()
     })
 
-    it('loads coordinates for the branch associated with another customer or order', async () => {
+    it('loads coordinates for the branch currently selected in the POS', async () => {
+        dependencies.branchContext.selectedBranchId = 9
         dependencies.getBranchById.mockResolvedValue({
             data: {
                 id: 9,
-                name: 'Poblado',
-                latitude: 6.2088,
-                longitude: -75.5654,
+                name: 'Manrique',
+                latitude: 6.278,
+                longitude: -75.553,
             },
         })
 
-        const wrapper = mountForm(9)
+        const wrapper = mountForm(4)
         await openMap(wrapper)
 
         expect(dependencies.getBranchById).toHaveBeenCalledWith(9)
         expect(wrapper.getComponent(GoogleMapsSelectorStub).props('routeOrigin')).toEqual({
-            label: 'Poblado',
-            lat: 6.2088,
-            lng: -75.5654,
+            label: 'Manrique',
+            lat: 6.278,
+            lng: -75.553,
         })
     })
 
-    it('passes null when the selected branch has no valid coordinates', async () => {
+    it('falls back to the authenticated branch when there is no selected POS branch', async () => {
+        dependencies.branchContext.selectedBranchId = null
+
+        const wrapper = mountForm(9)
+        await openMap(wrapper)
+
+        expect(wrapper.getComponent(GoogleMapsSelectorStub).props('routeOrigin')).toEqual({
+            label: 'Castilla',
+            lat: 6.2442,
+            lng: -75.5812,
+        })
+        expect(dependencies.getBranchById).not.toHaveBeenCalled()
+    })
+
+    it('passes null when the active branch has no valid coordinates', async () => {
+        dependencies.branchContext.selectedBranchId = 9
         dependencies.getBranchById.mockResolvedValue({
             data: {
                 id: 9,
-                name: 'Poblado',
+                name: 'Manrique',
                 latitude: null,
                 longitude: null,
             },
         })
 
-        const wrapper = mountForm(9)
+        const wrapper = mountForm(4)
         await openMap(wrapper)
 
         expect(wrapper.getComponent(GoogleMapsSelectorStub).props('routeOrigin')).toBeNull()
