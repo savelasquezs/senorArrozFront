@@ -19,7 +19,7 @@ function conversation(overrides: Partial<WhatsAppConversation>): WhatsAppConvers
 }
 
 describe('WhatsApp inbox sections', () => {
-  it('separates own branch, personally assigned cross-branch and unassigned conversations without duplicates', () => {
+  it('prioritizes unassigned conversations before personal and branch sections without duplicates', () => {
     const own = conversation({ id: 1, operationalBranchId: 1, operationalBranchName: 'Santander', assignedUserId: 7 })
     const assigned = conversation({ id: 2, operationalBranchId: 2, operationalBranchName: 'Manrique', assignedUserId: 7 })
     const unassigned = conversation({ id: 3, operationalBranchId: null, operationalBranchName: null, assignedUserId: 7 })
@@ -27,9 +27,9 @@ describe('WhatsApp inbox sections', () => {
     const sections = buildWhatsAppInboxSections([own, assigned, unassigned], 7, 1, false)
 
     expect(sections.map(section => [section.label, section.conversations.map(item => item.id)])).toEqual([
-      ['Mi sucursal', [1]],
-      ['Asignadas a mí', [2]],
       ['Sin asignar', [3]],
+      ['Asignadas a mí', [2]],
+      ['Mi sucursal', [1]],
     ])
     expect(sections.flatMap(section => section.conversations)).toHaveLength(3)
     expect(whatsappConversationBranchLabel(assigned)).toBe('Manrique')
