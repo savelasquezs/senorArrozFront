@@ -32,9 +32,9 @@ export function buildWhatsAppInboxSections(
   }
 
   return [
-    { key: 'branch', label: isSuperadmin ? 'Sucursales' : 'Mi sucursal', conversations: branch },
-    { key: 'assigned', label: 'Asignadas a mí', conversations: assigned },
     { key: 'unassigned', label: 'Sin asignar', conversations: unassigned },
+    { key: 'assigned', label: 'Asignadas a mí', conversations: assigned },
+    { key: 'branch', label: isSuperadmin ? 'Sucursales' : 'Mi sucursal', conversations: branch },
   ].filter(section => section.conversations.length > 0) as WhatsAppInboxSection[]
 }
 
