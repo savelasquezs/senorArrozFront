@@ -60,6 +60,7 @@ const props = withDefaults(defineProps<{
 })
 
 const activeKey = ref<InboxKey>('unassigned')
+const initialized = ref(false)
 
 const sectionMap = computed(() => new Map(props.sections.map(section => [section.key, section])))
 
@@ -90,19 +91,43 @@ function tabForConversation(conversationId: number | null | undefined) {
   return tabs.value.find(tab => tab.conversations.some(conversation => conversation.id === conversationId)) ?? null
 }
 
+const selectedConversationTabKey = computed<InboxKey | null>(() =>
+  tabForConversation(props.selectedConversationId)?.key ?? null,
+)
+
+function bestAvailableTab() {
+  return tabs.value.find(tab => tab.conversations.length > 0)?.key
+    ?? tabs.value[0]?.key
+    ?? 'unassigned'
+}
+
 watch(
-  () => [props.selectedConversationId, props.sections] as const,
-  ([selectedConversationId]) => {
-    const selectedTab = tabForConversation(selectedConversationId)
-    if (selectedTab) {
-      activeKey.value = selectedTab.key
+  tabs,
+  () => {
+    if (!initialized.value) {
+      activeKey.value = selectedConversationTabKey.value ?? bestAvailableTab()
+      initialized.value = true
       return
     }
 
     if (!tabs.value.some(tab => tab.key === activeKey.value)) {
-      activeKey.value = tabs.value[0]?.key ?? 'unassigned'
+      activeKey.value = bestAvailableTab()
     }
   },
   { immediate: true, deep: true },
 )
+
+watch(
+  () => props.selectedConversationId,
+  () => {
+    const key = selectedConversationTabKey.value
+    if (key) activeKey.value = key
+  },
+)
+
+watch(selectedConversationTabKey, (current, previous) => {
+  if (current && previous && activeKey.value === previous) {
+    activeKey.value = current
+  }
+})
 </script>
