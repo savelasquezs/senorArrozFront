@@ -84,6 +84,7 @@ import { ref, reactive, computed, watch, onMounted } from "vue"
 import { useCustomersStore } from "@/store/customers"
 import { useBranchesStore } from "@/store/branches"
 import { useAuthStore } from "@/store/auth"
+import { useBranchContextStore } from "@/store/branchContext"
 import { useToast } from "@/composables/useToast"
 import { branchApi } from "@/services/MainAPI/branchApi"
 import type { CustomerAddressFormData } from "@/types/customer"
@@ -124,6 +125,7 @@ const customersStore = useCustomersStore()
 const { error: showError } = useToast()
 const branchesStore = useBranchesStore()
 const authStore = useAuthStore()
+const branchContext = useBranchContextStore()
 
 // Proxy local state with v-model
 const localForm = reactive({
@@ -193,7 +195,9 @@ const buildRouteOrigin = (
 const resolveRouteOrigin = async () => {
     const requestId = ++routeOriginRequestId
     routeOrigin.value = undefined
-    const branchId = props.branchId || authStore.branchId
+    // El origen del recorrido siempre es la sucursal activa del POS.
+    // props.branchId puede ser la sucursal histórica del cliente y no debe afectar el cálculo.
+    const branchId = branchContext.selectedBranchId ?? authStore.branchId
     if (!branchId) {
         routeOrigin.value = null
         return
@@ -239,7 +243,7 @@ const resolveRouteOrigin = async () => {
 
 watch(
     () => [
-        props.branchId,
+        branchContext.selectedBranchId,
         authStore.branchId,
         authStore.user?.branchLatitude,
         authStore.user?.branchLongitude,
