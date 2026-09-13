@@ -240,8 +240,8 @@ onMounted(async () => {
 onBeforeUnmount(() => {
     destroyed = true
     routePolyline?.setMap(null)
-    branchMarker!.map = null
-    addressMarker!.map = null
+    if (branchMarker) branchMarker.map = null
+    if (addressMarker) addressMarker.map = null
     map = null
 })
 </script>
