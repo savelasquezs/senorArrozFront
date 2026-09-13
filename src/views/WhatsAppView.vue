@@ -102,11 +102,15 @@
               Actualizar
             </BaseButton>
           </div>
-          <div class="flex-1 min-h-0 overflow-y-auto">
-            <template v-for="section in inboxSections" :key="section.key">
-              <p class="border-b border-gray-100 bg-gray-50 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-gray-500">{{ section.label }}</p>
+          <WhatsAppInboxTabs
+            :sections="inboxSections"
+            :selected-conversation-id="selectedConversation?.id"
+            :loading="whatsappStore.isLoadingConversations"
+            :is-superadmin="authStore.isSuperadmin"
+          >
+            <template #default="{ conversations }">
               <button
-                v-for="conversation in section.conversations"
+                v-for="conversation in conversations"
                 :key="conversation.id"
                 type="button"
                 class="w-full border-b border-gray-100 px-3 py-2 text-left hover:bg-gray-50"
@@ -143,11 +147,7 @@
                 </div>
               </button>
             </template>
-
-            <div v-if="!whatsappStore.isLoadingConversations && whatsappStore.conversations.length === 0" class="p-6 text-center text-sm text-gray-500">
-              No hay conversaciones para los filtros actuales.
-            </div>
-          </div>
+          </WhatsAppInboxTabs>
         </aside>
 
         <section class="min-h-0 flex flex-col bg-gray-50">
@@ -216,7 +216,6 @@
               <p class="mt-3 text-sm">Selecciona una conversación para ver los mensajes.</p>
             </div>
           </div>
-
           <template v-else>
             <div class="flex-1 min-h-0 overflow-y-auto px-4 py-4 space-y-3">
               <div
@@ -669,6 +668,7 @@ import CustomerSelector from '@/components/customers/CustomerSelector.vue'
 import AddressSelector from '@/components/customers/address/AddressSelector.vue'
 import WhatsAppAiDiagnosticsDialog from '@/components/whatsapp/WhatsAppAiDiagnosticsDialog.vue'
 import WhatsAppAiStatusStrip from '@/components/whatsapp/WhatsAppAiStatusStrip.vue'
+import WhatsAppInboxTabs from '@/components/whatsapp/WhatsAppInboxTabs.vue'
 import { useWhatsAppStore } from '@/store/whatsapp'
 import { useAuthStore } from '@/store/auth'
 import { useOrdersDraftsStore } from '@/store/ordersDrafts'
