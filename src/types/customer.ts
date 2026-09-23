@@ -28,6 +28,7 @@ export interface Customer {
     /** Mensaje listo para mostrar al tomar pedido. */
     loyaltyNextRewardMessage?: string | null;
     addresses?: CustomerAddress[];
+    wasCreated?: boolean;
 }
 
 export interface CustomerAddress {
@@ -142,6 +143,7 @@ export interface CustomerFormData {
         longitude?: number;
         isPrimary?: boolean;
         deliveryFee: number;
+        serviceBranchId?: number;
     };
 }
 
@@ -153,6 +155,7 @@ export interface CustomerAddressFormData {
     longitude?: number;
     isPrimary: boolean;
     deliveryFee: number;
+    serviceBranchId?: number;
 }
 
 export interface NeighborhoodFormData {

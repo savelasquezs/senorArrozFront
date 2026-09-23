@@ -101,8 +101,13 @@ class CustomerApi extends BaseApi {
         return this.put<ApiResponse<CustomerAddress>>(`/customers/${customerId}/addresses/${addressId}/set-primary`);
     }
 
-    async getNeighborhoods(): Promise<ApiResponse<Neighborhood[]>> {
-        return this.get<ApiResponse<Neighborhood[]>>('/customers/neighborhoods');
+    async getNeighborhoods(branchId?: number, forOrderAddress = false): Promise<ApiResponse<Neighborhood[]>> {
+        return this.get<ApiResponse<Neighborhood[]>>('/customers/neighborhoods', {
+            params: {
+                ...(branchId ? { branchId } : {}),
+                ...(forOrderAddress ? { forOrderAddress: true } : {}),
+            },
+        });
     }
 
     async createNeighborhood(payload: { name: string; deliveryFee: number; branchId: number }): Promise<ApiResponse<Neighborhood>> {

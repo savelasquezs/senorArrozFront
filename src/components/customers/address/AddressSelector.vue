@@ -127,6 +127,7 @@
 
         <BaseDialog v-model="showCreateModal" title="Agregar Nueva Dirección" size="lg">
             <CustomerAddressForm v-model="addressFormData" :branch-id="effectiveBranchId || undefined"
+                :default-service-branch-id="effectiveBranchId || undefined" :allow-branch-selection="props.mode === 'draft'"
                 :can-edit-delivery-fee="true" @submit="createAddress" @cancel="closeCreateModal" />
         </BaseDialog>
 
@@ -428,15 +429,23 @@ const showCreateAddress = () => {
     showCreateModal.value = true
 }
 
-const createAddress = async (addressData: CreateCustomerAddressDto) => {
+const createAddress = async (addressData: CustomerAddressFormData) => {
     if (!props.customerId) return
 
     isCreating.value = true
     try {
-        const address = await customersStore.createAddress(props.customerId, addressData)
+        const { serviceBranchId, ...createData } = addressData
+        const address = await customersStore.createAddress(props.customerId, createData as CreateCustomerAddressDto)
         await loadCustomerAddresses({ skipAutoSelect: true })
 
         const createdAddress = customerAddresses.value.find(item => item.id === address.id) ?? address
+        if (
+            props.mode === 'draft'
+            && serviceBranchId
+            && serviceBranchId !== effectiveBranchId.value
+        ) {
+            await draftStore.changeOperationalBranch(serviceBranchId, createdAddress)
+        }
         emit('addressSelected', createdAddress)
         success('Dirección creada', 3000, 'La dirección ha sido creada correctamente')
     } catch (error: any) {

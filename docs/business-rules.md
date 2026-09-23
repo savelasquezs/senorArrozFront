@@ -141,6 +141,9 @@ enum UserRole {
 - Al elegir una dirección se muestran dinámicamente todas las sucursales cubiertas en `branchServices`. La elección siempre es explícita cuando existe una alternativa y nunca se decide por tarifa, orden, cercanía o sucursal histórica del cliente.
 - Cambiar la sucursal operativa recalcula el domicilio, invalida beneficios y medios de pago dependientes de sucursal, recarga configuración POS, bancos y apps, recalcula totales y persiste únicamente el borrador actual.
 - Si la sucursal actual no tiene `AddressBranch` pero otra sí, se permite elegir la alternativa o calcular el domicilio para la actual. Una relación con `isCovered = false` no se ofrece.
+- Al crear un cliente con dirección inicial o agregar una dirección desde el POS, la sucursal operativa actual queda seleccionada por defecto. Admin, Cajero y Superadmin pueden elegir otra sucursal activa del mismo tenant sin cambiar sesión, JWT, `branchContext` ni la sucursal global.
+- Al elegir otra sucursal para una dirección, barrios, tarifa y origen del mapa se obtienen de esa sucursal. La dirección conserva únicamente el `NeighborhoodId`; `AddressRepository.CreateAsync()` crea el `AddressBranch` de la sucursal del barrio y el pedido actual adopta esa sucursal mediante el mecanismo cross-branch existente.
+- `Customer.BranchId` conserva la sucursal legacy de origen del cliente y no cambia por la sucursal que atiende una dirección.
 
 #### Onsite (En el local)
 - **Cliente**: Opcional

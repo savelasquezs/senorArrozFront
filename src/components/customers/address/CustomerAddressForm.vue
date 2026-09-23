@@ -1,8 +1,22 @@
 <!-- src/components/CustomerAddressForm.vue -->
 <template>
     <form @submit.prevent="handleSubmit" class="space-y-6">
+        <div v-if="canSelectServiceBranch && alternativeBranches.length" class="rounded-lg border border-gray-200 bg-gray-50 p-3">
+            <label class="flex cursor-pointer items-center gap-2 text-sm font-medium text-gray-700">
+                <input v-model="useAlternativeBranch" type="checkbox"
+                    class="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500" />
+                Atender desde otra sucursal
+            </label>
+
+            <BaseSelect v-if="useAlternativeBranch" v-model="selectedServiceBranchId" class="mt-3"
+                :options="alternativeBranches" label="Sucursal que atenderÃ¡ esta direcciÃ³n"
+                placeholder="Selecciona una sucursal" value-key="id" display-key="name" required />
+        </div>
+
         <!-- Step 1: Neighborhood Selection -->
         <NeighborhoodSearch v-model="localForm.neighborhoodId" :required="true" :error="errors.neighborhoodId"
+            :branch-id="effectiveServiceBranchId" :for-order-address="canSelectServiceBranch"
+            :allow-create="effectiveServiceBranchId === sessionBranchId"
             @update:model-value="validateNeighborhood" />
 
         <!-- Step 2: Address Input -->
@@ -90,6 +104,7 @@ import { branchApi } from "@/services/MainAPI/branchApi"
 import type { CustomerAddressFormData } from "@/types/customer"
 import BaseInput from "@/components/ui/BaseInput.vue"
 import BaseButton from "@/components/ui/BaseButton.vue"
+import BaseSelect from "@/components/ui/BaseSelect.vue"
 import GoogleMapsSelector, { type RouteOrigin } from "@/components/ui/GoogleMapsSelector.vue"
 import NeighborhoodSearch from "@/components/neighborhoods/NeighborhoodSearch.vue"
 import {
@@ -111,6 +126,8 @@ interface Props {
     loading?: boolean
     customerId?: number
     branchId?: number
+    defaultServiceBranchId?: number
+    allowBranchSelection?: boolean
 }
 
 const props = defineProps<Props>()
@@ -126,12 +143,43 @@ const { error: showError } = useToast()
 const branchesStore = useBranchesStore()
 const authStore = useAuthStore()
 const branchContext = useBranchContextStore()
+const defaultServiceBranchId = computed(() =>
+    props.defaultServiceBranchId
+    ?? branchContext.selectedBranchId
+    ?? authStore.branchId
+    ?? props.branchId
+    ?? null,
+)
+const canSelectServiceBranch = computed(() => props.allowBranchSelection === true && !props.addressId)
+const sessionBranchId = computed(() => branchContext.selectedBranchId ?? authStore.branchId ?? null)
+const branchOptions = ref<Array<{ id: number; name: string }>>([])
+const initialServiceBranchId = props.modelValue.serviceBranchId
+const useAlternativeBranch = ref(Boolean(
+    canSelectServiceBranch.value
+    && initialServiceBranchId
+    && initialServiceBranchId !== defaultServiceBranchId.value,
+))
+const selectedServiceBranchId = ref<number | null>(useAlternativeBranch.value ? initialServiceBranchId! : null)
+const alternativeBranches = computed(() =>
+    branchOptions.value.filter(branch => branch.id !== defaultServiceBranchId.value),
+)
+const effectiveServiceBranchId = computed(() =>
+    useAlternativeBranch.value
+        ? selectedServiceBranchId.value
+        : defaultServiceBranchId.value,
+)
 
 // Proxy local state with v-model
 const localForm = reactive({
     ...props.modelValue,
     additionalInfo: props.modelValue.additionalInfo ?? ''
 })
+
+const loadBranchOptions = async () => {
+    if (!canSelectServiceBranch.value) return
+    const response = await branchApi.getBranchOptions()
+    branchOptions.value = response.data ?? []
+}
 
 watch(
     () => props.modelValue,
@@ -140,6 +188,16 @@ watch(
             ...newVal,
             additionalInfo: newVal.additionalInfo ?? ''
         })
+        if (canSelectServiceBranch.value && branchOptions.value.length) {
+            const requestedBranchId = newVal.serviceBranchId
+            const useAlternative = Boolean(
+                requestedBranchId
+                && requestedBranchId !== defaultServiceBranchId.value
+                && branchOptions.value.some(branch => branch.id === requestedBranchId),
+            )
+            useAlternativeBranch.value = useAlternative
+            selectedServiceBranchId.value = useAlternative ? requestedBranchId! : null
+        }
     },
     { deep: true }
 )
@@ -197,7 +255,7 @@ const resolveRouteOrigin = async () => {
     routeOrigin.value = undefined
     // El origen del recorrido siempre es la sucursal activa del POS.
     // props.branchId puede ser la sucursal histórica del cliente y no debe afectar el cálculo.
-    const branchId = branchContext.selectedBranchId ?? authStore.branchId
+    const branchId = effectiveServiceBranchId.value
     if (!branchId) {
         routeOrigin.value = null
         return
@@ -227,7 +285,7 @@ const resolveRouteOrigin = async () => {
     }
 
     try {
-        const response = await branchApi.getBranchById(branchId)
+        const response = await branchApi.getBranchById(branchId, canSelectServiceBranch.value)
         if (requestId !== routeOriginRequestId) return
         routeOrigin.value = buildRouteOrigin(
             response.data.name,
@@ -243,8 +301,7 @@ const resolveRouteOrigin = async () => {
 
 watch(
     () => [
-        branchContext.selectedBranchId,
-        authStore.branchId,
+        effectiveServiceBranchId.value,
         authStore.user?.branchLatitude,
         authStore.user?.branchLongitude,
     ],
@@ -299,6 +356,7 @@ const isFormValid = computed(() => {
     const feeOk = props.canEditDeliveryFee === false ? true : Number(localForm.deliveryFee) >= 0
     return (
         localForm.neighborhoodId > 0 &&
+        effectiveServiceBranchId.value != null &&
         localForm.address.trim() &&
         localForm.latitude !== 0 &&
         localForm.longitude !== 0 &&
@@ -382,7 +440,10 @@ const handleSubmit = () => {
     validateForm()
     if (!isFormValid.value) return
 
-    emit("submit", { ...localForm })
+    emit("submit", {
+        ...localForm,
+        serviceBranchId: effectiveServiceBranchId.value ?? undefined,
+    })
 }
 
 // Watch for location changes
@@ -429,6 +490,20 @@ const handleAddressBlur = () => {
 // Load neighborhoods and address if editing
 onMounted(async () => {
     try {
+        await loadBranchOptions()
+        const requestedServiceBranchId = props.modelValue.serviceBranchId
+        if (
+            requestedServiceBranchId
+            && requestedServiceBranchId !== defaultServiceBranchId.value
+            && branchOptions.value.some(branch => branch.id === requestedServiceBranchId)
+        ) {
+            selectedServiceBranchId.value = requestedServiceBranchId
+            useAlternativeBranch.value = true
+        } else if (useAlternativeBranch.value) {
+            useAlternativeBranch.value = false
+            selectedServiceBranchId.value = null
+        }
+
         // Load address data if editing
         if (props.addressId) {
             try {
@@ -470,11 +545,28 @@ onMounted(async () => {
         }
 
         // Load neighborhoods
-        await customersStore.fetchNeighborhoods()
+        await customersStore.ensureNeighborhoodsLoaded(
+            effectiveServiceBranchId.value,
+            canSelectServiceBranch.value,
+        )
 
     } catch (error) {
         console.error("Error loading neighborhoods:", error)
         showError("Error de Carga", "No se pudieron cargar los barrios disponibles.")
+    }
+})
+
+watch(effectiveServiceBranchId, async (branchId, previousBranchId) => {
+    if (!branchId || branchId === previousBranchId) return
+    localForm.neighborhoodId = 0
+    localForm.deliveryFee = 0
+    await customersStore.ensureNeighborhoodsLoaded(branchId, canSelectServiceBranch.value)
+    await resolveRouteOrigin()
+})
+
+watch(useAlternativeBranch, enabled => {
+    if (!enabled) {
+        selectedServiceBranchId.value = null
     }
 })
 </script>

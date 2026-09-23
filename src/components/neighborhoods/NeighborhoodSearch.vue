@@ -2,7 +2,7 @@
 <template>
     <div class="space-y-2">
         <BaseSelect v-model="selectedNeighborhoodId" :options="neighborhoodOptions" label="Barrio"
-            placeholder="Buscar barrio..." :required="required" :error="error" :searchable="true" :allow-create="true"
+            placeholder="Buscar barrio..." :required="required" :error="error" :searchable="true" :allow-create="allowCreate"
             create-label="Crear barrio" value-key="id" display-key="name" @update:model-value="handleSelection"
             @create="handleCreateRequest">
             <template #icon>
@@ -25,7 +25,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onMounted } from 'vue'
+import { ref, computed, watch } from 'vue'
 import BaseSelect from '@/components/ui/BaseSelect.vue'
 import BaseDialog from '@/components/ui/BaseDialog.vue'
 import NeighborhoodForm from '@/components/neighborhoods/NeighborhoodForm.vue'
@@ -49,10 +49,16 @@ interface Props {
     modelValue?: number | null
     required?: boolean
     error?: string
+    branchId?: number | null
+    allowCreate?: boolean
+    forOrderAddress?: boolean
 }
 
 const props = withDefaults(defineProps<Props>(), {
-    required: false
+    required: false,
+    branchId: null,
+    allowCreate: true,
+    forOrderAddress: false,
 })
 
 const emit = defineEmits<{
@@ -63,7 +69,8 @@ const customersStore = useCustomersStore()
 const { success, error: showError } = useToast()
 
 // Reactive state
-const branchId = computed(() => useAuthStore().branchId)
+const authStore = useAuthStore()
+const branchId = computed(() => props.branchId ?? authStore.branchId)
 const selectedNeighborhoodId = ref<number | null>(null)
 const showCreateForm = ref(false)
 const createLoading = ref(false)
@@ -92,14 +99,12 @@ const selectedNeighborhood = computed(() => {
     return branchesStore.currentNeighborhoods?.find((n) => n.id === id) ?? null
 })
 
-onMounted(() => {
-    if (customersStore.neighborhoods.length === 0) {
-        customersStore.fetchNeighborhoods().catch((err) => {
+watch(branchId, (value) => {
+    customersStore.ensureNeighborhoodsLoaded(value, props.forOrderAddress).catch((err) => {
             console.error('Error loading neighborhoods:', err)
             showError('Error de carga', 'No se pudieron cargar los barrios.')
-        })
-    }
-})
+    })
+}, { immediate: true })
 
 // Methods
 const handleSelection = (value: number | null) => {

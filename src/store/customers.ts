@@ -21,6 +21,7 @@ import {
 } from './helpers/resourceStore';
 
 let neighborhoodsLoadInFlight: Promise<void> | null = null;
+let neighborhoodsLoadInFlightBranchId: number | null = null;
 let neighborhoodsLoadedBranchId: number | null = null;
 let neighborhoodsLoaded = false;
 
@@ -149,20 +150,28 @@ export const useCustomersStore = defineStore('customers', () => {
         }, { ...opts, errorMessage: 'Error al establecer direccion como principal' });
     };
 
-    const fetchNeighborhoods = async (opts?: FetchOpts) => {
+    const fetchNeighborhoods = async (
+        branchId?: number | null,
+        forOrderAddress = false,
+        opts?: FetchOpts,
+    ) => {
         await run(async () => {
-            const res = await customerApi.getNeighborhoods();
+            const res = await customerApi.getNeighborhoods(branchId ?? undefined, forOrderAddress);
             neighborhoods.value = res.data;
         }, { ...opts, errorMessage: 'Error al cargar barrios' });
     };
 
-    const ensureNeighborhoodsLoaded = async (branchId?: number | null) => {
+    const ensureNeighborhoodsLoaded = async (branchId?: number | null, forOrderAddress = false) => {
         const normalizedBranchId = branchId && branchId > 0 ? branchId : null;
         if (neighborhoodsLoaded && neighborhoodsLoadedBranchId === normalizedBranchId) {
             return;
         }
         if (neighborhoodsLoadInFlight) {
-            return neighborhoodsLoadInFlight;
+            if (neighborhoodsLoadInFlightBranchId === normalizedBranchId) {
+                return neighborhoodsLoadInFlight;
+            }
+            await neighborhoodsLoadInFlight;
+            return ensureNeighborhoodsLoaded(branchId, forOrderAddress);
         }
         if (neighborhoodsLoadedBranchId !== normalizedBranchId) {
             neighborhoods.value = [];
@@ -170,13 +179,15 @@ export const useCustomersStore = defineStore('customers', () => {
         }
         neighborhoodsLoadInFlight = (async () => {
             try {
-                await fetchNeighborhoods();
+                await fetchNeighborhoods(normalizedBranchId, forOrderAddress);
                 neighborhoodsLoadedBranchId = normalizedBranchId;
                 neighborhoodsLoaded = true;
             } finally {
                 neighborhoodsLoadInFlight = null;
+                neighborhoodsLoadInFlightBranchId = null;
             }
         })();
+        neighborhoodsLoadInFlightBranchId = normalizedBranchId;
         return neighborhoodsLoadInFlight;
     };
 
@@ -226,6 +237,7 @@ export const useCustomersStore = defineStore('customers', () => {
         list.value = null;
         neighborhoods.value = [];
         neighborhoodsLoadedBranchId = null;
+        neighborhoodsLoadInFlightBranchId = null;
         neighborhoodsLoaded = false;
         clearError();
     };

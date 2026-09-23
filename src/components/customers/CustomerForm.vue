@@ -113,7 +113,8 @@ c<!-- src/components/CustomerForm.vue -->
 
     <!-- Address Modal (Dual: Create or Edit) -->
     <BaseDialog v-model="showAddressModal" title="Dirección Inicial" size="lg">
-        <CustomerAddressForm v-model="addressFormData" :branch-id="form.branchId" :can-edit-delivery-fee="true"
+        <CustomerAddressForm v-model="addressFormData" :branch-id="form.branchId"
+            :default-service-branch-id="form.branchId" :allow-branch-selection="true" :can-edit-delivery-fee="true"
             @submit="handleAddressSubmit" @cancel="closeAddressModal" />
     </BaseDialog>
 </template>
@@ -179,7 +180,8 @@ const form = reactive({
         latitude: 0,
         longitude: 0,
         isPrimary: true,
-        deliveryFee: 0
+        deliveryFee: 0,
+        serviceBranchId: undefined as number | undefined
     }
 })
 
@@ -192,7 +194,8 @@ const addressFormData = ref<CustomerAddressFormData>({
     latitude: undefined,
     longitude: undefined,
     isPrimary: true,
-    deliveryFee: 0
+    deliveryFee: 0,
+    serviceBranchId: undefined
 })
 
 const errors = reactive({
@@ -332,7 +335,8 @@ const openAddressModal = () => {
             latitude: undefined,
             longitude: undefined,
             isPrimary: true,
-            deliveryFee: 0
+            deliveryFee: 0,
+            serviceBranchId: undefined
         }
     }
     showAddressModal.value = true
@@ -351,7 +355,8 @@ const handleAddressSubmit = (data: CustomerAddressFormData) => {
         latitude: data.latitude || 0,
         longitude: data.longitude || 0,
         isPrimary: data.isPrimary,
-        deliveryFee: data.deliveryFee
+        deliveryFee: data.deliveryFee,
+        serviceBranchId: data.serviceBranchId
     }
     closeAddressModal()
 }
@@ -451,7 +456,8 @@ watch(() => props.customer, (newCustomer) => {
             latitude: 0,
             longitude: 0,
             isPrimary: true,
-            deliveryFee: 0
+            deliveryFee: 0,
+            serviceBranchId: undefined
         }
     }
 

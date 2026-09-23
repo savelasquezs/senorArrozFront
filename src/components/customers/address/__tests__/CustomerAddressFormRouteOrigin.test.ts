@@ -17,7 +17,7 @@ const dependencies = vi.hoisted(() => ({
     },
     customersStore: {
         neighborhoods: [] as any[],
-        fetchNeighborhoods: vi.fn().mockResolvedValue(undefined),
+        ensureNeighborhoodsLoaded: vi.fn().mockResolvedValue(undefined),
         fetchAddressById: vi.fn(),
     },
     branchesStore: {
@@ -26,6 +26,7 @@ const dependencies = vi.hoisted(() => ({
         currentNeighborhoods: [] as any[],
     },
     getBranchById: vi.fn(),
+    getBranchOptions: vi.fn(),
 }))
 
 vi.mock('@/store/auth', () => ({
@@ -43,6 +44,7 @@ vi.mock('@/store/branches', () => ({
 vi.mock('@/services/MainAPI/branchApi', () => ({
     branchApi: {
         getBranchById: dependencies.getBranchById,
+        getBranchOptions: dependencies.getBranchOptions,
     },
 }))
 vi.mock('@/composables/useToast', () => ({
@@ -73,6 +75,18 @@ const BaseInputStub = {
     `,
 }
 
+const BaseSelectStub = {
+    props: ['modelValue', 'options'],
+    emits: ['update:modelValue'],
+    template: `
+        <select data-testid="branch-select" :value="modelValue ?? ''"
+            @change="$emit('update:modelValue', Number($event.target.value))">
+            <option value=""></option>
+            <option v-for="option in options" :key="option.id" :value="option.id">{{ option.name }}</option>
+        </select>
+    `,
+}
+
 const modelValue = {
     neighborhoodId: 1,
     address: 'Cra 68 # 98-137',
@@ -83,10 +97,11 @@ const modelValue = {
     deliveryFee: 5000,
 }
 
-const mountForm = (branchId: number) => mount(CustomerAddressForm, {
+const mountForm = (branchId: number, extraProps: Record<string, unknown> = {}) => mount(CustomerAddressForm, {
     props: {
         branchId,
         modelValue,
+        ...extraProps,
     },
     global: {
         stubs: {
@@ -96,6 +111,7 @@ const mountForm = (branchId: number) => mount(CustomerAddressForm, {
                 template: '<div></div>',
             },
             BaseInput: BaseInputStub,
+            BaseSelect: BaseSelectStub,
             BaseButton: {
                 template: '<button><slot /></button>',
             },
@@ -121,7 +137,13 @@ describe('CustomerAddressForm route origin', () => {
         dependencies.branchesStore.current = null
         dependencies.branchesStore.list = null
         dependencies.getBranchById.mockReset()
-        dependencies.customersStore.fetchNeighborhoods.mockClear()
+        dependencies.getBranchOptions.mockReset().mockResolvedValue({
+            data: [
+                { id: 4, name: 'Castilla' },
+                { id: 9, name: 'Manrique' },
+            ],
+        })
+        dependencies.customersStore.ensureNeighborhoodsLoaded.mockClear()
     })
 
     it('uses the active POS branch even when the customer belongs to another branch', async () => {
@@ -150,8 +172,8 @@ describe('CustomerAddressForm route origin', () => {
         const wrapper = mountForm(4)
         await openMap(wrapper)
 
-        expect(dependencies.getBranchById).toHaveBeenCalledWith(9)
-        expect(wrapper.getComponent(GoogleMapsSelectorStub).props('routeOrigin')).toEqual({
+        expect(dependencies.getBranchById).toHaveBeenCalledWith(9, false)
+        expect((wrapper.vm as any).routeOrigin).toEqual({
             label: 'Manrique',
             lat: 6.278,
             lng: -75.553,
@@ -187,5 +209,34 @@ describe('CustomerAddressForm route origin', () => {
         await openMap(wrapper)
 
         expect(wrapper.getComponent(GoogleMapsSelectorStub).props('routeOrigin')).toBeNull()
+    })
+
+    it('loads neighborhoods and route origin from the explicitly selected service branch', async () => {
+        dependencies.getBranchById.mockResolvedValue({
+            data: {
+                id: 9,
+                name: 'Manrique',
+                latitude: 6.278,
+                longitude: -75.553,
+            },
+        })
+
+        const wrapper = mountForm(4, {
+            defaultServiceBranchId: 4,
+            allowBranchSelection: true,
+        })
+        await flushPromises()
+
+        await wrapper.get('input[type="checkbox"]').setValue(true)
+        await wrapper.get('[data-testid="branch-select"]').setValue('9')
+        await flushPromises()
+
+        expect(dependencies.customersStore.ensureNeighborhoodsLoaded).toHaveBeenCalledWith(9, true)
+        expect(dependencies.getBranchById).toHaveBeenCalledWith(9, true)
+        expect((wrapper.vm as any).routeOrigin).toEqual({
+            label: 'Manrique',
+            lat: 6.278,
+            lng: -75.553,
+        })
     })
 })

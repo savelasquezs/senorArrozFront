@@ -80,7 +80,7 @@
 import { ref, watch, onUnmounted } from 'vue'
 import { useCustomersStore } from '@/store/customers'
 import { useToast } from '@/composables/useToast'
-import type { Customer } from '@/types/customer'
+import type { Customer, CustomerFormData } from '@/types/customer'
 import type { CreateCustomerDto } from '@/types/customer'
 import { isLikelyPhoneNumber, normalizePhoneForSearch } from '@/utils/phoneInput'
 
@@ -117,7 +117,7 @@ const props = withDefaults(defineProps<Props>(), {
 
 // Emits
 const emit = defineEmits<{
-    customerSelected: [customer: Customer]
+    customerSelected: [customer: Customer, addressServiceBranchId?: number]
 }>()
 
 // Composables
@@ -132,6 +132,7 @@ const searchResults = ref<Customer[]>([])
 const showCreateModal = ref(false)
 const isCreating = ref(false)
 const createdCustomer = ref<Customer | null>(null)
+const createdAddressServiceBranchId = ref<number | undefined>(undefined)
 const error = ref('')
 
 let searchDebounceTimer: ReturnType<typeof setTimeout> | null = null
@@ -187,9 +188,9 @@ const handlePaste = (event: ClipboardEvent) => {
     handleSearch()
 }
 
-const selectCustomer = (customer: Customer) => {
+const selectCustomer = (customer: Customer, addressServiceBranchId?: number) => {
     cancelPendingSearch()
-    emit('customerSelected', customer)
+    emit('customerSelected', customer, addressServiceBranchId)
     searchQuery.value = ''
     searchResults.value = []
 }
@@ -201,15 +202,19 @@ const showCreateCustomer = () => {
     showCreateModal.value = true
 }
 
-const createCustomerWrapper = async (customerData: any) => {
+const createCustomerWrapper = async (customerData: CustomerFormData) => {
+    const serviceBranchId = customerData.initialAddress?.serviceBranchId
+    const initialAddress = customerData.initialAddress
+        ? (({ serviceBranchId: _, ...address }) => address)(customerData.initialAddress)
+        : undefined
     const createCustomerDto: CreateCustomerDto = {
         name: customerData.name,
         phone1: customerData.phone1,
         phone2: customerData.phone2,
         whatsAppUsername: customerData.whatsAppUsername,
         branchId: customerData.branchId,
-        initialAddress: customerData.initialAddress?.address?.trim()
-            ? customerData.initialAddress
+        initialAddress: initialAddress?.address.trim()
+            ? initialAddress as CreateCustomerDto['initialAddress']
             : undefined
     }
 
@@ -217,6 +222,9 @@ const createCustomerWrapper = async (customerData: any) => {
     try {
         const customer = await customersStore.create(createCustomerDto)
         createdCustomer.value = customer
+        createdAddressServiceBranchId.value = customer.wasCreated === false
+            ? undefined
+            : serviceBranchId
 
         // No need to refresh - customersStore updates optimistically
 
@@ -230,8 +238,7 @@ const createCustomerWrapper = async (customerData: any) => {
 
 const selectCreatedCustomer = () => {
     if (createdCustomer.value) {
-        emit('customerSelected', createdCustomer.value)
-        selectCustomer(createdCustomer.value)
+        selectCustomer(createdCustomer.value, createdAddressServiceBranchId.value)
     }
     closeCreateModal()
 }
@@ -239,6 +246,7 @@ const selectCreatedCustomer = () => {
 const closeCreateModal = () => {
     showCreateModal.value = false
     createdCustomer.value = null
+    createdAddressServiceBranchId.value = undefined
 }
 
 onUnmounted(() => {
