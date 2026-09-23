@@ -106,6 +106,7 @@ export interface OrderAppPayment {
 export interface DraftOrder {
     tabId: string
     tabName: string
+    workspaceBranchId?: number | null
     branchId?: number | null
     source?: 'WhatsApp' | null
     whatsappConversationId?: number | null

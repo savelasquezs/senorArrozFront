@@ -17,6 +17,7 @@ import {
 } from './helpers/resourceStore'
 
 let appsListEnsureInFlight: Promise<void> | null = null
+let appsEnsureInFlightBranchId: number | null = null
 let appsLoadedBranchId: number | null = null
 let appsListLoaded = false
 
@@ -35,13 +36,17 @@ export const useAppsStore = defineStore('apps', () => {
         }, { ...opts, errorMessage: 'Error al obtener apps' })
     }
 
-    const ensureListLoaded = async (branchId?: number | null) => {
+    const ensureListLoaded = async (branchId?: number | null, forOrderCreation = false) => {
         const normalizedBranchId = branchId && branchId > 0 ? branchId : null
         if (appsListLoaded && appsLoadedBranchId === normalizedBranchId) {
             return
         }
         if (appsListEnsureInFlight) {
-            return appsListEnsureInFlight
+            if (appsEnsureInFlightBranchId === normalizedBranchId) {
+                return appsListEnsureInFlight
+            }
+            await appsListEnsureInFlight
+            return ensureListLoaded(branchId, forOrderCreation)
         }
         if (appsLoadedBranchId !== normalizedBranchId) {
             list.value = null
@@ -52,12 +57,15 @@ export const useAppsStore = defineStore('apps', () => {
             page: 1,
             pageSize: 100,
             branchId: normalizedBranchId ?? undefined,
+            forOrderCreation,
         }).then(() => {
             appsLoadedBranchId = normalizedBranchId
             appsListLoaded = true
         }).finally(() => {
             appsListEnsureInFlight = null
+            appsEnsureInFlightBranchId = null
         })
+        appsEnsureInFlightBranchId = normalizedBranchId
         return appsListEnsureInFlight
     }
 
@@ -126,6 +134,7 @@ export const useAppsStore = defineStore('apps', () => {
         list.value = null
         byBank.value = null
         appsLoadedBranchId = null
+        appsEnsureInFlightBranchId = null
         appsListLoaded = false
         clearError()
     }

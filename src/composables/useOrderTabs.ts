@@ -14,6 +14,7 @@ export function useOrderTabs() {
         const newOrder: DraftOrder = {
             tabId,
             tabName,
+            workspaceBranchId: store.activeBranchId,
             branchId: store.activeBranchId,
             source: null,
             whatsappConversationId: null,
@@ -81,9 +82,10 @@ export function useOrderTabs() {
 
     const switchTab = (tabId: string) => {
         const order = store.draftOrders.get(tabId)
-        if (order?.branchId === store.activeBranchId) {
+        if (order && (order.workspaceBranchId ?? order.branchId) === store.activeBranchId) {
             store.currentTabId = tabId
             store.saveToLocalStorage()
+            void store.loadOperationalContext(order.branchId)
         }
     }
 
@@ -93,7 +95,7 @@ export function useOrderTabs() {
 
             if (store.currentTabId === tabId) {
                 const remainingTab = Array.from(store.draftOrders.values())
-                    .find(order => order.branchId === store.activeBranchId)
+                    .find(order => (order.workspaceBranchId ?? order.branchId) === store.activeBranchId)
                 store.currentTabId = remainingTab?.tabId ?? null
             }
 

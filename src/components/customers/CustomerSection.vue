@@ -177,16 +177,7 @@ const handleCustomerSelected = (customer: Customer) => {
             ordersDraftsStore!.updateGuestName('')
         }
 
-        // Auto-selección de dirección (no para reservas: la dirección es opcional)
-        const currentOrderType = ordersDraftsStore!.currentOrder?.type
-        if (currentOrderType !== 'reservation' && customer && customer.addresses && customer.addresses.length > 0) {
-            const primaryAddress = customer.addresses.find(a => a.isPrimary)
-            const addressToSelect = primaryAddress || customer.addresses[0]
-            ordersDraftsStore!.addAddressToCustomer(customer.id, addressToSelect, customer)
-            ordersDraftsStore!.updateAddress(addressToSelect)
-        } else {
-            ordersDraftsStore!.updateAddress(null)
-        }
+        ordersDraftsStore!.updateAddress(null)
     } else {
         // Modo 'persisted' - emitir evento para que el modal maneje
         emit('customer-selected', customer || null)

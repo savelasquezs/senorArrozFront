@@ -872,7 +872,7 @@ async function sendWhatsAppConfirmation() {
 
     isSendingWhatsAppConfirmation.value = true
     try {
-        await branchPosSettings.ensureForBranch(order.branchId)
+        await branchPosSettings.ensureForBranch(order.branchId, { forOrderCreation: true })
         const message = buildWhatsAppOrderConfirmationMessage(
             order,
             branchPosSettings.posCopyMessageEtaPhrase,

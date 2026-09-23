@@ -50,16 +50,17 @@ export function buildWhatsAppInboxSections(
   sortConversationsByLatest(assigned)
   sortConversationsByLatest(branch)
 
-  return [
+  const sections: WhatsAppInboxSection[] = [
     { key: 'unassigned', label: 'Sin asignar', conversations: unassigned },
     { key: 'assigned', label: 'Asignadas a mí', conversations: assigned },
     { key: 'branch', label: isSuperadmin ? 'Sucursales' : 'Mi sucursal', conversations: branch },
   ]
-    .filter(section => section.conversations.length > 0)
+
+  return sections.filter(section => section.conversations.length > 0)
     .sort((a, b) => {
       const latestDifference = conversationActivityAt(b.conversations[0]) - conversationActivityAt(a.conversations[0])
       return latestDifference || sectionPriority[a.key] - sectionPriority[b.key]
-    }) as WhatsAppInboxSection[]
+    })
 }
 
 export function whatsappConversationBranchLabel(conversation: WhatsAppConversation): string {

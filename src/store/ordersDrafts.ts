@@ -115,7 +115,7 @@ export const useOrdersDraftsStore = defineStore('ordersDrafts', () => {
 
     const visibleDraftOrders = computed(() =>
         Array.from(draftOrders.value.values()).filter(
-            order => order.branchId === activeBranchId.value
+            order => (order.workspaceBranchId ?? order.branchId) === activeBranchId.value
                 || (order.whatsappConversationId != null && order.tabId === currentTabId.value),
         ),
     )
@@ -123,7 +123,10 @@ export const useOrdersDraftsStore = defineStore('ordersDrafts', () => {
     const currentOrder = computed(() => {
         if (!currentTabId.value) return null
         const order = draftOrders.value.get(currentTabId.value) || null
-        return order?.branchId === activeBranchId.value || order?.whatsappConversationId != null ? order : null
+        return (order?.workspaceBranchId ?? order?.branchId) === activeBranchId.value
+            || order?.whatsappConversationId != null
+            ? order
+            : null
     })
 
     const orderTabs = computed((): OrderTab[] => {
@@ -259,6 +262,49 @@ export const useOrdersDraftsStore = defineStore('ordersDrafts', () => {
         // Recalcular totales (esto también hace el set en el Map)
         recalculateTotals(updatedOrder)
         saveToLocalStorage()
+    }
+
+    const changeOperationalBranch = async (branchId: number, address?: CustomerAddress | null) => {
+        if (!currentTabId.value || !Number.isInteger(branchId) || branchId <= 0) return false
+
+        const tabId = currentTabId.value
+        const order = draftOrders.value.get(tabId)
+        if (!order) return false
+
+        const selectedAddress = address
+            ?? customers.value.find(customer => customer.id === order.customerId)
+                ?.addresses?.find(candidate => candidate.id === order.addressId)
+            ?? null
+        const service = selectedAddress?.branchServices?.find(candidate =>
+            candidate.branchId === branchId && candidate.isCovered,
+        )
+        if (selectedAddress && !service) return false
+
+        const branchPosSettings = useBranchPosSettingsStore()
+        await branchPosSettings.ensureForBranch(branchId, { forOrderCreation: true })
+
+        const current = draftOrders.value.get(tabId)
+        if (!current) return false
+        const cleared = clearBenefitEffectsFromOrder(current, { clearSelection: true })
+        const updatedOrder: DraftOrder = {
+            ...cleared,
+            branchId,
+            deliveryFee: selectedAddress ? service?.deliveryFee ?? 0 : current.deliveryFee,
+            bankPayments: [],
+            appPayment: null,
+            paidInStoreCash: false,
+            paidInStoreCashAmount: null,
+            activeDiscountCode: null,
+            discountCodeError: null,
+            updatedAt: new Date(),
+        }
+
+        recalculateTotals(updatedOrder)
+        saveToLocalStorage()
+        if (currentTabId.value === tabId) {
+            await Promise.all([loadBanks(branchId), loadApps(branchId)])
+        }
+        return true
     }
 
     /** Añade o actualiza una dirección en la lista de clientes del store para que getAddress la encuentre (p. ej. tras crear una nueva). */
@@ -1332,6 +1378,7 @@ export const useOrdersDraftsStore = defineStore('ordersDrafts', () => {
             const migratedDrafts = data.draftOrders.map((order: any) => ({
                 ...order,
                 branchId: order.branchId ?? legacyBranchId,
+                workspaceBranchId: order.workspaceBranchId ?? order.branchId ?? legacyBranchId,
                 source: order.source ?? null,
                 whatsappConversationId: order.whatsappConversationId ?? null,
                 prepareAt: order.prepareAt ?? null,
@@ -1488,24 +1535,33 @@ export const useOrdersDraftsStore = defineStore('ordersDrafts', () => {
         )
     }
 
-    const loadBanks = async () => {
+    const loadBanks = async (branchId = currentOrder.value?.branchId ?? activeBranchId.value) => {
         try {
             const banksStore = useBanksStore()
-            await banksStore.ensureListLoaded(activeBranchId.value)
+            await banksStore.ensureListLoaded(branchId, true)
             banks.value = banksStore.list?.items ?? []
         } catch (error) {
             console.error('Error loading banks:', error)
         }
     }
 
-    const loadApps = async () => {
+    const loadApps = async (branchId = currentOrder.value?.branchId ?? activeBranchId.value) => {
         try {
             const appsStore = useAppsStore()
-            await appsStore.ensureListLoaded(activeBranchId.value)
+            await appsStore.ensureListLoaded(branchId, true)
             apps.value = appsStore.list?.items ?? []
         } catch (error) {
             console.error('Error loading apps:', error)
         }
+    }
+
+    const loadOperationalContext = async (branchId = currentOrder.value?.branchId ?? activeBranchId.value) => {
+        const branchPosSettings = useBranchPosSettingsStore()
+        await Promise.all([
+            branchPosSettings.ensureForBranch(branchId, { forOrderCreation: true }),
+            loadBanks(branchId),
+            loadApps(branchId),
+        ])
     }
 
     // Search and filters - COPIAR líneas 308-314
@@ -1579,6 +1635,7 @@ export const useOrdersDraftsStore = defineStore('ordersDrafts', () => {
         const newOrder: DraftOrder = {
             tabId,
             tabName,
+            workspaceBranchId: activeBranchId.value,
             branchId: payload.branchId || authStore.branchId || null,
             source: 'WhatsApp',
             whatsappConversationId: payload.conversationId,
@@ -1663,10 +1720,12 @@ export const useOrdersDraftsStore = defineStore('ordersDrafts', () => {
         const active = currentTabId.value
             ? draftOrders.value.get(currentTabId.value)
             : null
-        if (active?.branchId === branchId || active?.whatsappConversationId != null) return
+        if ((active?.workspaceBranchId ?? active?.branchId) === branchId || active?.whatsappConversationId != null) return
 
         currentTabId.value =
-            Array.from(draftOrders.value.values()).find(order => order.branchId === branchId)?.tabId
+            Array.from(draftOrders.value.values()).find(
+                order => (order.workspaceBranchId ?? order.branchId) === branchId,
+            )?.tabId
             ?? null
         saveToLocalStorage()
     }
@@ -1713,6 +1772,7 @@ export const useOrdersDraftsStore = defineStore('ordersDrafts', () => {
         // Acciones
         updateCustomer,
         updateAddress,
+        changeOperationalBranch,
         addAddressToCustomer,
         replaceCustomerAddresses,
         ensureCustomerInList,
@@ -1744,6 +1804,7 @@ export const useOrdersDraftsStore = defineStore('ordersDrafts', () => {
         rehydrateCustomersFromDrafts,
         loadBanks,
         loadApps,
+        loadOperationalContext,
         setSearchQuery,
         setSelectedCategoryIds,
         setSelectedCategory,

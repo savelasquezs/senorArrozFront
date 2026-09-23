@@ -49,6 +49,7 @@ export interface CustomerAddress {
 
 export interface CustomerAddressBranch {
     branchId: number;
+    branchName?: string | null;
     neighborhoodId?: number | null;
     neighborhoodName?: string | null;
     deliveryFee: number;

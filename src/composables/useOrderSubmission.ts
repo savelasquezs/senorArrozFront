@@ -14,13 +14,9 @@ export function useOrderSubmission() {
         // Get user and branch info
         const takenById = authStore.user?.id
         const branchId = draft.branchId || authStore.branchId
-        const activeBranchId = ordersStore.activeBranchId
 
         if (!takenById || !branchId) {
             throw new Error('Usuario o sucursal no disponible')
-        }
-        if (activeBranchId == null || (branchId !== activeBranchId && !draft.whatsappConversationId)) {
-            throw new Error('El borrador pertenece a otra sucursal. Cambia a esa sucursal antes de enviarlo.')
         }
 
         // Transform order items to orderDetails

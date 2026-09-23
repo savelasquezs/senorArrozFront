@@ -104,6 +104,9 @@
                                         <span v-else class="shrink-0 font-semibold text-emerald-700">
                                             {{ formatCurrency(branchDeliveryFee(address)!) }}
                                         </span>
+                                        <BaseBadge v-if="coveredBranchCount(address) > 1" variant="info" size="sm" class="shrink-0">
+                                            {{ coveredBranchCount(address) }} sucursales
+                                        </BaseBadge>
                                         <BaseBadge v-if="address.isPrimary" type="success" size="sm" class="shrink-0">
                                             Principal
                                         </BaseBadge>
@@ -141,6 +144,15 @@
                 @saved="handleDeliveryFeeSaved"
             />
         </BaseDialog>
+
+        <OrderBranchSelectionDialog
+            v-model="showBranchSelectionModal"
+            :options="pendingBranchOptions"
+            :current-branch-name="currentBranchName"
+            :allow-calculate-current="!pendingBranchOptions.some(option => option.branchId === effectiveBranchId)"
+            @select="selectOperationalBranch"
+            @calculate-current="calculateForCurrentBranch"
+        />
     </div>
 </template>
 
@@ -154,6 +166,11 @@ import { useAuthStore } from '@/store/auth'
 import { useToast } from '@/composables/useToast'
 import type { CustomerAddress, CreateCustomerAddressDto, CustomerAddressFormData, UpdateCustomerAddressDto } from '@/types/customer'
 import type { AddressBranchService } from '@/services/MainAPI/addressBranchApi'
+import {
+    coveredOrderBranchOptions,
+    requiresOrderBranchSelection,
+    type OrderBranchOption,
+} from '@/helpers/orderBranchOptions'
 
 import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseBadge from '@/components/ui/BaseBadge.vue'
@@ -161,6 +178,7 @@ import BaseLoading from '@/components/ui/BaseLoading.vue'
 import BaseDialog from '@/components/ui/BaseDialog.vue'
 import CustomerAddressForm from '@/components/customers/address/CustomerAddressForm.vue'
 import AddressDeliveryFeeDialog from '@/components/customers/address/AddressDeliveryFeeDialog.vue'
+import OrderBranchSelectionDialog from '@/components/orders/OrderBranchSelectionDialog.vue'
 
 import {
     MapPinIcon,
@@ -205,6 +223,9 @@ const showAddressSelection = ref(false)
 const editingAddress = ref<CustomerAddress | null>(null)
 const showDeliveryFeeModal = ref(false)
 const deliveryFeeAddress = ref<CustomerAddress | null>(null)
+const showBranchSelectionModal = ref(false)
+const pendingBranchAddress = ref<CustomerAddress | null>(null)
+const pendingBranchOptions = ref<OrderBranchOption[]>([])
 
 const effectiveBranchId = computed<number | null>(() => {
     const orderBranchId = props.mode === 'draft'
@@ -215,6 +236,14 @@ const effectiveBranchId = computed<number | null>(() => {
         ?? authStore.branchId
         ?? props.branchId
         ?? null
+})
+
+const currentBranchName = computed(() => {
+    const branchId = effectiveBranchId.value
+    if (!branchId) return 'esta sucursal'
+    return branchContext.options.find(branch => branch.id === branchId)?.name
+        || (authStore.branchId === branchId ? authStore.user?.branchName : null)
+        || `Sucursal ${branchId}`
 })
 
 const addressFormData = ref<CustomerAddressFormData>({
@@ -263,8 +292,11 @@ const formatCurrency = (amount: number): string => new Intl.NumberFormat('es-CO'
 const branchDeliveryFee = (address: CustomerAddress): number | null => {
     const branchId = effectiveBranchId.value
     if (!branchId) return null
-    return address.branchServices?.find(service => service.branchId === branchId)?.deliveryFee ?? null
+    return address.branchServices?.find(service => service.branchId === branchId && service.isCovered)?.deliveryFee ?? null
 }
+
+const coveredBranchCount = (address: CustomerAddress) =>
+    coveredOrderBranchOptions(address, effectiveBranchId.value).length
 
 function hasMapCoordinates(addr: CustomerAddress): boolean {
     const lat = Number(addr.latitude)
@@ -287,14 +319,23 @@ const loadCustomerAddresses = async (options?: { skipAutoSelect?: boolean }) => 
             ? customerAddresses.value.find(address => address.id === props.selectedAddress)
             : null
         if (selected && branchDeliveryFee(selected) == null) {
-            emit('addressSelected', undefined)
+            const options = coveredOrderBranchOptions(selected, effectiveBranchId.value)
+            if (options.length === 0) emit('addressSelected', undefined)
         }
 
-        if (!options?.skipAutoSelect && props.mode === 'draft' && customerAddresses.value.length > 0 && !props.selectedAddress) {
-            const usable = customerAddresses.value.filter(address => branchDeliveryFee(address) != null)
+        if (
+            !options?.skipAutoSelect
+            && props.mode === 'draft'
+            && draftStore.currentOrder?.type !== 'reservation'
+            && customerAddresses.value.length > 0
+            && !props.selectedAddress
+        ) {
+            const usable = customerAddresses.value.filter(address =>
+                coveredOrderBranchOptions(address, effectiveBranchId.value).length > 0,
+            )
             const primaryAddress = usable.find(addr => addr.isPrimary)
             const addressToSelect = primaryAddress || usable[0]
-            if (addressToSelect) emit('addressSelected', addressToSelect)
+            if (addressToSelect) await selectAddress(addressToSelect)
         }
     } catch (error) {
         console.error('Error loading addresses:', error)
@@ -304,13 +345,42 @@ const loadCustomerAddresses = async (options?: { skipAutoSelect?: boolean }) => 
     }
 }
 
-const selectAddress = (address: CustomerAddress) => {
+const selectAddress = async (address: CustomerAddress) => {
+    const branchOptions = coveredOrderBranchOptions(address, effectiveBranchId.value)
+    if (requiresOrderBranchSelection(branchOptions, effectiveBranchId.value)) {
+        pendingBranchAddress.value = address
+        pendingBranchOptions.value = branchOptions
+        showBranchSelectionModal.value = true
+        return
+    }
     if (branchDeliveryFee(address) == null) {
         openDeliveryFee(address)
         return
     }
     emit('addressSelected', address)
     showAddressSelection.value = false
+}
+
+const selectOperationalBranch = async (branchId: number) => {
+    const address = pendingBranchAddress.value
+    if (!address) return
+
+    if (branchId !== effectiveBranchId.value) {
+        await draftStore.changeOperationalBranch(branchId, address)
+    }
+    emit('addressSelected', address)
+    showAddressSelection.value = false
+    showBranchSelectionModal.value = false
+    pendingBranchAddress.value = null
+    pendingBranchOptions.value = []
+}
+
+const calculateForCurrentBranch = () => {
+    const address = pendingBranchAddress.value
+    showBranchSelectionModal.value = false
+    pendingBranchAddress.value = null
+    pendingBranchOptions.value = []
+    if (address) openDeliveryFee(address)
 }
 
 const clearAddress = () => {

@@ -43,8 +43,10 @@ class BranchApi extends BaseApi {
 		});
 	}
 
-	async getBranchById(id: number): Promise<ApiResponse<Branch>> {
-		return this.get<ApiResponse<Branch>>(`/Branches/${id}`);
+	async getBranchById(id: number, forOrderCreation = false): Promise<ApiResponse<Branch>> {
+		return this.get<ApiResponse<Branch>>(`/Branches/${id}`, {
+			params: forOrderCreation ? { forOrderCreation: true } : undefined,
+		});
 	}
 
 	async createBranch(

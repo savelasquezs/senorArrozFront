@@ -59,6 +59,7 @@ export interface DeliverymanBankAdvanceLine {
 export interface BankFilters {
     name?: string
     branchId?: number
+    forOrderCreation?: boolean
     active?: boolean
     page: number
     pageSize: number
@@ -108,6 +109,7 @@ export interface AppFilters {
     bankId?: number
     name?: string
     branchId?: number
+    forOrderCreation?: boolean
     active?: boolean
     page: number
     pageSize: number

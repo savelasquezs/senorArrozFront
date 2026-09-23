@@ -102,6 +102,16 @@ describe('useOrderSubmission', () => {
         expect(dto.deliveryFee).toBeUndefined()
     })
 
+    it('permite enviar un borrador para una sucursal distinta a la del usuario', () => {
+        const { transformDraftToCreateDto } = useOrderSubmission()
+
+        const dto = transformDraftToCreateDto(minimalDraft({ branchId: 12 }))
+
+        expect(dto.branchId).toBe(12)
+        expect(dto.takenById).toBe(99)
+        expect(useAuthStore().branchId).toBe(5)
+    })
+
     it('envía discount en línea como manual + domicilio gratis', () => {
         const { transformDraftToCreateDto } = useOrderSubmission()
         const dto = transformDraftToCreateDto(

@@ -19,6 +19,7 @@ class AppApi extends BaseApi {
             BankId: 'bankId',
             Name: 'name',
             BranchId: 'branchId',
+            ForOrderCreation: 'forOrderCreation',
             Active: 'active',
             Page: (value) => value.page ?? 1,
             PageSize: (value) => value.pageSize ?? 10,

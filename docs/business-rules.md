@@ -134,6 +134,14 @@ enum UserRole {
 
 ### Tipos de Pedido
 
+#### Sucursal operativa del borrador
+
+- Admin, Cajero y Superadmin pueden tomar un pedido para cualquier sucursal activa del mismo tenant sin cambiar `authStore.branchId` ni el contexto global de sucursal.
+- `DraftOrder.workspaceBranchId` conserva la partición visual donde se abrió el tab; `DraftOrder.branchId` es independiente por borrador y determina la sucursal que prepara, cobra y despacha el pedido.
+- Al elegir una dirección se muestran dinámicamente todas las sucursales cubiertas en `branchServices`. La elección siempre es explícita cuando existe una alternativa y nunca se decide por tarifa, orden, cercanía o sucursal histórica del cliente.
+- Cambiar la sucursal operativa recalcula el domicilio, invalida beneficios y medios de pago dependientes de sucursal, recarga configuración POS, bancos y apps, recalcula totales y persiste únicamente el borrador actual.
+- Si la sucursal actual no tiene `AddressBranch` pero otra sí, se permite elegir la alternativa o calcular el domicilio para la actual. Una relación con `isCovered = false` no se ofrece.
+
 #### Onsite (En el local)
 - **Cliente**: Opcional
 - **Dirección**: No aplica

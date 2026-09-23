@@ -18,6 +18,7 @@ import {
 } from './helpers/resourceStore'
 
 let banksListEnsureInFlight: Promise<void> | null = null
+let banksEnsureInFlightBranchId: number | null = null
 let banksLoadedBranchId: number | null = null
 let banksListLoaded = false
 
@@ -36,13 +37,17 @@ export const useBanksStore = defineStore('banks', () => {
         }, { ...opts, errorMessage: 'Error al obtener bancos' })
     }
 
-    const ensureListLoaded = async (branchId?: number | null) => {
+    const ensureListLoaded = async (branchId?: number | null, forOrderCreation = false) => {
         const normalizedBranchId = branchId && branchId > 0 ? branchId : null
         if (banksListLoaded && banksLoadedBranchId === normalizedBranchId) {
             return
         }
         if (banksListEnsureInFlight) {
-            return banksListEnsureInFlight
+            if (banksEnsureInFlightBranchId === normalizedBranchId) {
+                return banksListEnsureInFlight
+            }
+            await banksListEnsureInFlight
+            return ensureListLoaded(branchId, forOrderCreation)
         }
         if (banksLoadedBranchId !== normalizedBranchId) {
             list.value = null
@@ -52,12 +57,15 @@ export const useBanksStore = defineStore('banks', () => {
             page: 1,
             pageSize: 100,
             branchId: normalizedBranchId ?? undefined,
+            forOrderCreation,
         }).then(() => {
             banksLoadedBranchId = normalizedBranchId
             banksListLoaded = true
         }).finally(() => {
             banksListEnsureInFlight = null
+            banksEnsureInFlightBranchId = null
         })
+        banksEnsureInFlightBranchId = normalizedBranchId
         return banksListEnsureInFlight
     }
 
@@ -120,6 +128,7 @@ export const useBanksStore = defineStore('banks', () => {
     const clearList = () => {
         list.value = null
         banksLoadedBranchId = null
+        banksEnsureInFlightBranchId = null
         banksListLoaded = false
         clearError()
     }

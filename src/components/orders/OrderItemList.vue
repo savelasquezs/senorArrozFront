@@ -88,7 +88,6 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
-import { useAuthStore } from '@/store/auth'
 import { useOrdersDraftsStore } from '@/store/ordersDrafts'
 import { useBranchPosSettingsStore } from '@/store/branchPosSettings'
 import { useOrderItems } from '@/composables/useOrderItems'
@@ -129,7 +128,6 @@ const { formatCurrency, formatTime, formatDateShort } = useFormatting()
 const { success, error: showError } = useToast()
 const { confirmDialog } = useDialog()
 const ordersStore = useOrdersDraftsStore()
-const authStore = useAuthStore()
 const branchPosSettings = useBranchPosSettingsStore()
 const orderItems = useOrderItems()
 
@@ -161,10 +159,15 @@ const onFreeDeliveryCheckboxChange = (e: Event) => {
 }
 
 onMounted(async () => {
-    await branchPosSettings.ensureForBranch(authStore.branchId ?? undefined)
+    await branchPosSettings.ensureForBranch(currentOrder.value?.branchId, { forOrderCreation: true })
     const o = ordersStore.currentOrder
     if (o) ordersStore.recalculateTotals(o)
 })
+
+watch(
+    () => currentOrder.value?.branchId,
+    branchId => void branchPosSettings.ensureForBranch(branchId, { forOrderCreation: true }),
+)
 
 watch(
     () => branchPosSettings.maxFreeDeliveryDiscount,

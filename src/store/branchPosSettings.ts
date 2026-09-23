@@ -19,6 +19,7 @@ export const useBranchPosSettingsStore = defineStore('branchPosSettings', () => 
     const posCopyEtaRangeMinutes = ref(DEFAULT_POS_COPY_ETA_RANGE_MINUTES)
     const loadedBranchId = ref<number | null>(null)
     const isLoading = ref(false)
+    let requestVersion = 0
 
     const posCopyMessageEtaPhrase = computed(() =>
         formatPosCopyEtaPhrase(posCopyEtaMinMinutes.value, posCopyEtaRangeMinutes.value),
@@ -26,8 +27,9 @@ export const useBranchPosSettingsStore = defineStore('branchPosSettings', () => 
 
     async function ensureForBranch(
         branchId: number | null | undefined,
-        options?: { force?: boolean },
+        options?: { force?: boolean; forOrderCreation?: boolean },
     ): Promise<void> {
+        const version = ++requestVersion
         if (branchId == null || branchId <= 0) {
             maxFreeDeliveryDiscount.value = DEFAULT_MAX_FREE_DELIVERY
             posCopyEtaMinMinutes.value = DEFAULT_POS_COPY_ETA_MIN_MINUTES
@@ -44,7 +46,8 @@ export const useBranchPosSettingsStore = defineStore('branchPosSettings', () => 
         }
         isLoading.value = true
         try {
-            const res = await branchApi.getBranchById(branchId)
+            const res = await branchApi.getBranchById(branchId, options?.forOrderCreation === true)
+            if (version !== requestVersion) return
             const v = res.data?.maxFreeDeliveryDiscount
             maxFreeDeliveryDiscount.value =
                 typeof v === 'number' && Number.isFinite(v) && v >= 0 ? Math.round(v) : DEFAULT_MAX_FREE_DELIVERY
@@ -53,16 +56,18 @@ export const useBranchPosSettingsStore = defineStore('branchPosSettings', () => 
             posCopyEtaRangeMinutes.value = parsed.range
             loadedBranchId.value = branchId
         } catch {
+            if (version !== requestVersion) return
             maxFreeDeliveryDiscount.value = DEFAULT_MAX_FREE_DELIVERY
             posCopyEtaMinMinutes.value = DEFAULT_POS_COPY_ETA_MIN_MINUTES
             posCopyEtaRangeMinutes.value = DEFAULT_POS_COPY_ETA_RANGE_MINUTES
             loadedBranchId.value = branchId
         } finally {
-            isLoading.value = false
+            if (version === requestVersion) isLoading.value = false
         }
     }
 
     function clear() {
+        requestVersion++
         maxFreeDeliveryDiscount.value = DEFAULT_MAX_FREE_DELIVERY
         posCopyEtaMinMinutes.value = DEFAULT_POS_COPY_ETA_MIN_MINUTES
         posCopyEtaRangeMinutes.value = DEFAULT_POS_COPY_ETA_RANGE_MINUTES

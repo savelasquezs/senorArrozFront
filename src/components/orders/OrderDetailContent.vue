@@ -1623,9 +1623,9 @@ watch(
 
 // Cargar bancos y apps para el selector de pagos (solo se cargan en /orders, no en /orders/:id)
 onMounted(() => {
-	ordersStore.loadBanks();
-	ordersStore.loadApps();
-	void branchPosSettings.ensureForBranch(authStore.branchId ?? undefined);
+	ordersStore.loadBanks(order.value?.branchId);
+	ordersStore.loadApps(order.value?.branchId);
+	void branchPosSettings.ensureForBranch(order.value?.branchId ?? authStore.branchId, { forOrderCreation: true });
 	if (canGrantManualBenefit.value) void productsStore.ensureCatalogLoaded();
 });
 
