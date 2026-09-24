@@ -346,6 +346,7 @@ export interface OrderListItem {
     freeDeliveryRequested?: boolean
     reservedFor: string | null
     prepareAt: string | null
+    inventoryIssue?: string | null
     status: OrderStatus
     statusDisplayName: string
     statusTimes: Record<string, string>

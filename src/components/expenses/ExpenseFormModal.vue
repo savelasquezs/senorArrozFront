@@ -146,6 +146,15 @@
                                 </BaseButton>
                             </div>
                             </div>
+                            <div v-if="inventoryExpense(detail.expenseId)" class="flex items-center gap-2 border-t border-emerald-100 pt-1.5">
+                                <span class="text-[11px] font-medium text-emerald-700">Presentación comprada</span>
+                                <select v-model.number="detail.inventoryConversionId" class="min-w-48 rounded-md border border-emerald-200 bg-white px-2 py-1 text-xs" required>
+                                    <option :value="null">Selecciona presentación</option>
+                                    <option v-for="conversion in inventoryExpense(detail.expenseId)?.inventoryConversions" :key="conversion.id" :value="conversion.id" :disabled="!conversion.active">
+                                        {{ conversion.name }} · {{ conversion.baseQuantity }} {{ inventoryUnitLabel(inventoryExpense(detail.expenseId)?.inventoryBaseUnit) }}
+                                    </option>
+                                </select>
+                            </div>
                             <div
                                 v-show="lineNotesOpen[detail.tempId]"
                                 class="pt-1.5 mt-0.5 border-t border-gray-100/80"
@@ -507,6 +516,9 @@ const formData = ref<{
 const supplierOptions = ref<Array<{ value: number; label: string }>>([])
 const bankOptions = ref<Array<{ value: number; label: string }>>([])
 const expenseOptions = ref<Array<{ value: number; label: string; description?: string }>>([])
+const expenseInventoryCatalog = ref<Expense[]>([])
+const inventoryExpense = (expenseId: number) => expenseInventoryCatalog.value.find(x => x.id === expenseId && x.tracksInventory)
+const inventoryUnitLabel = (value?: string) => ({ unit: 'un', gram: 'g', milliliter: 'ml' }[value || ''] || value || '')
 
 // Crear categoría / gasto "al vuelo"
 const allExpenseCategories = ref<ExpenseCategory[]>([])
@@ -594,6 +606,7 @@ function currentExpenseDraftData(): ExpenseFormDraftData {
             total: Number(detail.total || 0),
             includeVat: Boolean(detail.includeVat),
             notes: detail.notes ?? '',
+            inventoryConversionId: detail.inventoryConversionId ?? null,
             expenseName: detail.expenseName ?? '',
             ...(detail.expenseUnit ? { expenseUnit: detail.expenseUnit } : {}),
         })),
@@ -648,6 +661,7 @@ function restoreExpenseDraft() {
             total: detail.total,
             includeVat: detail.includeVat,
             notes: detail.notes,
+            inventoryConversionId: detail.inventoryConversionId ?? null,
             tempId: newTemporaryId('detail'),
             expenseName: detail.expenseName,
             ...(detail.expenseUnit ? { expenseUnit: detail.expenseUnit } : {}),
@@ -950,6 +964,7 @@ const initializeForm = async () => {
                     expenseUnit,
                     includeVat: Boolean(detail.includeVat || legacyVatAppliesToAll),
                     notes: detail.notes ?? '',
+                    inventoryConversionId: detail.inventoryConversionId ?? null,
                 }
             })
         )
@@ -1118,7 +1133,8 @@ const canSaveEditingExpense = computed(() => {
 const isFormValid = computed(() => {
     return formData.value.supplierId !== null &&
         formData.value.expenseDetails.length > 0 &&
-        formData.value.expenseDetails.every(d => d.expenseId > 0 && d.quantity > 0 && lineTotal(d) > 0) &&
+        formData.value.expenseDetails.every(d => d.expenseId > 0 && d.quantity > 0 && lineTotal(d) > 0 &&
+            (!inventoryExpense(d.expenseId) || Boolean(d.inventoryConversionId))) &&
         (!isDeliverymanAdvance.value || selectedDeliverymanId.value != null) &&
         cashDifference.value >= 0 &&
         canSaveEditingExpense.value
@@ -1156,6 +1172,7 @@ async function loadExpenses() {
     try {
         const response = await expenseApi.getAllExpenses()
         if (response.isSuccess && response.data) {
+            expenseInventoryCatalog.value = response.data
             expenseOptions.value = response.data.map(expense => ({
                 value: expense.id,
                 label: `${expense.name} - ${expense.unitDisplay}`,
@@ -1303,6 +1320,10 @@ const handleSupplierCreate = async () => {
 const onExpenseSelected = async (index: number, expenseId: number) => {
     const expense = expenseOptions.value.find(e => e.value === expenseId)
     if (expense && formData.value.expenseDetails[index]) {
+        const inventoryItem = inventoryExpense(expenseId)
+        formData.value.expenseDetails[index].inventoryConversionId = inventoryItem?.inventoryConversions.filter(x => x.active).length === 1
+            ? inventoryItem.inventoryConversions.find(x => x.active)?.id ?? null
+            : null
         // Cargar la unidad del gasto y actualizar el nombre para mostrar "nombre - unidad"
         try {
             const response = await expenseApi.getExpenseById(expenseId)
@@ -1377,6 +1398,7 @@ const addDetail = () => {
         amount: 0,
         total: 0,
         includeVat,
+        inventoryConversionId: null,
         notes: '',
         tempId: `temp-${Date.now()}-${Math.random()}`,
         expenseName: '',
@@ -1491,6 +1513,7 @@ async function executeExpenseSave() {
             supplierId: formData.value.supplierId!,
             ...(deliverymanForHeader ? { deliverymanId: deliverymanForHeader } : {}),
             includeVat: applyVat.value,
+            idempotencyKey: crypto.randomUUID(),
             ...(headerNotes ? { notes: headerNotes.slice(0, 2000) } : { notes: null }),
             expenseDetails: formData.value.expenseDetails.map(d => {
                 const userTotal = roundMoney(Number(d.total ?? 0) || 0)
@@ -1502,6 +1525,7 @@ async function executeExpenseSave() {
                     amount: unitAmount,
                     total: userTotal,
                     includeVat: Boolean(d.includeVat),
+                    inventoryConversionId: d.inventoryConversionId ?? null,
                     ...(lineNotes ? { notes: lineNotes.slice(0, 1000) } : { notes: null }),
                 }
                 if (props.editingExpense && d.detailId != null && d.detailId > 0) {

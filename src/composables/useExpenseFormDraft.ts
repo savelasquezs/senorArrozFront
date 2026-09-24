@@ -15,6 +15,7 @@ export interface ExpenseFormDraftDetail {
     notes: string
     expenseName: string
     expenseUnit?: string
+    inventoryConversionId?: number | null
 }
 
 export interface ExpenseFormDraftPayment {
@@ -87,6 +88,9 @@ function sanitizeDetail(value: unknown): ExpenseFormDraftDetail | null {
         includeVat: Boolean(detail.includeVat),
         notes: sanitizeText(detail.notes, 1000),
         expenseName: sanitizeText(detail.expenseName, 500),
+        ...('inventoryConversionId' in detail
+            ? { inventoryConversionId: optionalPositiveInteger(detail.inventoryConversionId) }
+            : {}),
         ...(typeof detail.expenseUnit === 'string'
             ? { expenseUnit: sanitizeText(detail.expenseUnit, 100) }
             : {}),

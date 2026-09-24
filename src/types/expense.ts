@@ -38,6 +38,9 @@ export interface ExpenseDetail {
     quantity: number
     amount: number
     total?: number
+    inventoryConversionId?: number | null
+    inventoryBaseQuantity?: number | null
+    inventoryUnitCost?: number | null
     /** La línea integra la base gravable del IVA 19 %. */
     includeVat: boolean
     /** Notas de la línea */
@@ -80,6 +83,7 @@ export interface CreateExpenseHeaderDto {
     expenseBankPayments?: CreateExpenseBankPaymentDto[]
     /** Atajo para aplicar IVA 19 % a todas las líneas. */
     includeVat?: boolean
+    idempotencyKey?: string
 }
 
 export interface CreateExpenseDetailDto {
@@ -89,6 +93,7 @@ export interface CreateExpenseDetailDto {
     total?: number
     includeVat?: boolean
     notes?: string | null
+    inventoryConversionId?: number | null
 }
 
 export interface CreateExpenseBankPaymentDto {
@@ -103,6 +108,7 @@ export interface UpdateExpenseHeaderDto {
     expenseDetails?: UpdateExpenseDetailDto[]
     expenseBankPayments?: CreateExpenseBankPaymentDto[]
     includeVat?: boolean
+    idempotencyKey?: string
 }
 
 export interface UpdateExpenseDetailDto {
@@ -113,6 +119,7 @@ export interface UpdateExpenseDetailDto {
     total?: number
     includeVat?: boolean
     notes?: string | null
+    inventoryConversionId?: number | null
 }
 
 export interface ExpenseHeaderFilters {
@@ -186,6 +193,10 @@ export interface Expense {
     createdAt: string
     updatedAt: string
     menuTargets?: ExpenseMenuTarget[]
+    tracksInventory: boolean
+    inventoryActive: boolean
+    inventoryBaseUnit: 'unit' | 'gram' | 'milliliter'
+    inventoryConversions: Array<{ id: number; name: string; baseQuantity: number; active: boolean }>
 }
 
 export interface CreateExpenseDto {
@@ -193,6 +204,10 @@ export interface CreateExpenseDto {
     categoryId: number
     unit: ExpenseUnit
     menuTargets: ExpenseMenuTargetInput[]
+    tracksInventory?: boolean
+    inventoryActive?: boolean
+    inventoryBaseUnit?: 'unit' | 'gram' | 'milliliter'
+    inventoryConversions?: Array<{ name: string; baseQuantity: number; active: boolean }>
 }
 
 export interface UpdateExpenseDto {
@@ -200,6 +215,10 @@ export interface UpdateExpenseDto {
     categoryId: number
     unit: ExpenseUnit
     menuTargets: ExpenseMenuTargetInput[]
+    tracksInventory?: boolean
+    inventoryActive?: boolean
+    inventoryBaseUnit?: 'unit' | 'gram' | 'milliliter'
+    inventoryConversions?: Array<{ name: string; baseQuantity: number; active: boolean }>
 }
 
 export interface ExpenseMenuAttributionLine {
