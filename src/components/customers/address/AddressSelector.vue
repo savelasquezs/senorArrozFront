@@ -305,7 +305,7 @@ function hasMapCoordinates(addr: CustomerAddress): boolean {
     return Number.isFinite(lat) && Number.isFinite(lng) && !(lat === 0 && lng === 0)
 }
 
-const loadCustomerAddresses = async (options?: { skipAutoSelect?: boolean }) => {
+const loadCustomerAddresses = async () => {
     if (!props.customerId) {
         customerAddresses.value = []
         return
@@ -325,19 +325,14 @@ const loadCustomerAddresses = async (options?: { skipAutoSelect?: boolean }) => 
         }
 
         if (
-            !options?.skipAutoSelect
-            && props.mode === 'draft'
+            props.mode === 'draft'
             && draftStore.currentOrder?.type !== 'reservation'
-            && customerAddresses.value.length > 0
+            && customerAddresses.value.length === 1
             && !props.selectedAddress
         ) {
-            const usable = customerAddresses.value.filter(address =>
-                coveredOrderBranchOptions(address, effectiveBranchId.value).length > 0,
-            )
-            const primaryAddress = usable.find(addr => addr.isPrimary)
-            const addressToSelect = primaryAddress || usable[0]
-            if (addressToSelect) await selectAddress(addressToSelect)
+            await selectAddress(customerAddresses.value[0])
         }
+
     } catch (error) {
         console.error('Error loading addresses:', error)
         customerAddresses.value = []
@@ -406,7 +401,7 @@ const handleDeliveryFeeSaved = async (_service: AddressBranchService) => {
     const addressId = deliveryFeeAddress.value?.id
     showDeliveryFeeModal.value = false
     deliveryFeeAddress.value = null
-    await loadCustomerAddresses({ skipAutoSelect: true })
+    await loadCustomerAddresses()
 
     const updatedAddress = customerAddresses.value.find(address => address.id === addressId)
     if (updatedAddress) {
@@ -436,7 +431,7 @@ const createAddress = async (addressData: CustomerAddressFormData) => {
     try {
         const { serviceBranchId, ...createData } = addressData
         const address = await customersStore.createAddress(props.customerId, createData as CreateCustomerAddressDto)
-        await loadCustomerAddresses({ skipAutoSelect: true })
+        await loadCustomerAddresses()
 
         const createdAddress = customerAddresses.value.find(item => item.id === address.id) ?? address
         if (
@@ -490,7 +485,7 @@ const updateAddress = async (addressData: CustomerAddressFormData) => {
         }
 
         await customersStore.updateAddress(props.customerId, editingAddress.value.id, updateData)
-        await loadCustomerAddresses({ skipAutoSelect: true })
+        await loadCustomerAddresses()
 
         if (selectedAddress.value?.id === editingAddress.value.id) {
             const updatedAddress = customerAddresses.value.find(a => a.id === editingAddress.value!.id)
