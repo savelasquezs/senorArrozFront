@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia';
 import { computed, ref } from 'vue';
 import { productApi } from '@/services/MainAPI/productApi';
+import { inventoryApi } from '@/services/MainAPI/inventoryApi';
 import type {
     Product,
     ProductDetail,
@@ -36,6 +37,17 @@ export const useProductsStore = defineStore('products', () => {
     const fetch = async (filters?: ProductFilters, opts?: FetchOpts) => {
         await run(async () => {
             const res = await productApi.getProducts(filters);
+            if (res.data?.items?.length) {
+                try {
+                    const availability = await inventoryApi.getAvailability(res.data.items.map(product => product.id));
+                    const byProduct = new Map(availability.map(item => [item.productId, item]));
+                    res.data.items = res.data.items.map(product => {
+                        const item = byProduct.get(product.id);
+                        if (!item || item.controlMode === 'estimated') return product;
+                        return { ...product, stock: item.maximumQuantity ?? (item.available ? null : 0) };
+                    });
+                } catch {}
+            }
             list.value = res.data;
         }, { ...opts, errorMessage: 'Error al cargar productos' });
     };

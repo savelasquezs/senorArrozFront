@@ -94,6 +94,12 @@
             </div>
           </div>
 
+          <div class="rounded-xl border border-sky-200 bg-sky-50/70 px-4 py-3">
+            <p class="text-xs text-sky-800">Inventario valorizado</p>
+            <p class="font-bold tabular-nums text-gray-900">{{ formatCurrency(expected.inventoryValue ?? 0) }}</p>
+            <p class="text-[11px] text-sky-900/80 mt-1">Activo operativo informativo; no se suma al cuadre de dinero.</p>
+          </div>
+
           <!-- Apps: pendiente por liquidar (suma al total global contado; se guarda snapshot al cerrar) -->
           <div v-if="(expected.unsettledAppLines?.length ?? 0) > 0 || (expected.unsettledAppsTotal ?? 0) > 0"
             class="rounded-xl border border-violet-200 bg-violet-50/70 px-4 py-3">

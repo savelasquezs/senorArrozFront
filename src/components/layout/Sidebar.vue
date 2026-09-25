@@ -324,6 +324,12 @@ const navigationItems = computed((): NavItem[] => [
 		roles: ['Superadmin', 'Admin', 'Cashier'],
 		exactPath: true,
 	},
+	{
+		name: 'Inventario',
+		to: '/inventory',
+		icon: ClipboardDocumentListIcon,
+		roles: ['Superadmin', 'Admin'],
+	},
 	...(rappiConnection.value?.ready ? [{
 		name: 'Apps',
 		to: '/integrations/apps',

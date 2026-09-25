@@ -130,6 +130,7 @@ export interface CashRegisterExpected {
   bankPaymentsAddedToGlobalTotal?: number
   expectedGlobalTotal: number
   informalLoansActiveTotal: number
+  inventoryValue: number
   undeliveredOrdersCount: number
   asOf: string
   lastClosureAt?: string

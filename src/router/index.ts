@@ -257,6 +257,16 @@ const routes: RouteRecordRaw[] = [
         }
     },
     {
+        path: '/inventory',
+        name: 'Inventory',
+        component: () => import('@/views/InventoryView.vue'),
+        meta: {
+            requiresAuth: true,
+            requiresRole: [UserRole.SUPERADMIN, UserRole.ADMIN],
+            title: 'Inventario'
+        }
+    },
+    {
         path: '/expenses/menu-attribution',
         name: 'ExpenseMenuAttribution',
         component: () => import('@/views/ExpenseMenuAttributionView.vue'),

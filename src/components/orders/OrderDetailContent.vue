@@ -1,5 +1,8 @@
 <template>
 	<div class="space-y-4 md:space-y-6" v-if="order">
+		<div v-if="order.inventoryIssue" class="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-800">
+			Alerta de inventario: {{ order.inventoryIssue }}
+		</div>
 		<!-- Header con ID y acciones -->
 		<div
 			class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-0"

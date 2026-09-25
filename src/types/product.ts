@@ -11,6 +11,8 @@ export interface Product {
     stock: number | null
     weightGrams?: number | null
     active: boolean
+    inventoryEnabled: boolean
+    inventoryControlMode: 'estimated' | 'strict'
     commercialProfileId?: number | null
     commercialProfileName?: string | null
     description?: string | null
