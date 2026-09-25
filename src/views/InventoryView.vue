@@ -28,7 +28,7 @@
 
       <section v-else-if="tab === 'movements'" class="overflow-x-auto">
         <table class="min-w-full text-sm"><thead><tr class="text-left text-gray-500"><th>Fecha</th><th>Insumo</th><th>Tipo</th><th class="text-right">Existencia</th><th class="text-right">Reserva</th><th>Origen</th></tr></thead>
-          <tbody><tr v-for="row in store.movements" :key="row.id" class="border-t"><td class="py-2">{{ date(row.createdAt) }}</td><td>{{ row.expenseName }}</td><td>{{ movement(row.type) }}</td><td class="text-right">{{ signed(row.onHandDelta) }}</td><td class="text-right">{{ signed(row.reservedDelta) }}</td><td>{{ row.orderId ? `Pedido #${row.orderId}` : row.reason || '—' }}</td></tr></tbody>
+          <tbody><tr v-for="row in store.movements" :key="row.id" class="border-t"><td class="py-2">{{ date(row.createdAt) }}</td><td>{{ row.expenseName }}</td><td>{{ movement(row.type) }}</td><td class="text-right">{{ signed(row.onHandDelta) }}</td><td class="text-right">{{ signed(row.reservedDelta) }}</td><td>{{ movementSource(row) }}</td></tr></tbody>
         </table>
       </section>
 
@@ -162,4 +162,5 @@ const date = (value: string) => new Intl.DateTimeFormat('es-CO', { dateStyle: 's
 const signed = (value: number) => `${value > 0 ? '+' : ''}${qty(value)}`
 const unit = (value: string) => ({ unit: 'un', gram: 'g', milliliter: 'ml' }[value] || value)
 const movement = (value: string) => ({ opening_balance: 'Apertura', purchase: 'Compra', reservation: 'Reserva', reservation_release: 'Liberación', estimated_consumption: 'Consumo estimado', strict_consumption: 'Consumo estricto', adjustment_increase: 'Ajuste +', adjustment_decrease: 'Ajuste -', waste: 'Merma', transfer_out: 'Transferencia salida', transfer_in: 'Transferencia entrada', reversal: 'Reversión' }[value] || value)
+const movementSource = (row: import('@/types/inventory').InventoryMovement) => row.orderId ? `Pedido #${row.orderId}` : row.expenseHeaderId ? `Compra #${row.expenseHeaderId}` : row.transferId ? `Transferencia #${row.transferId}` : row.inventoryCountId ? `Conteo #${row.inventoryCountId}` : row.reason || '—'
 </script>

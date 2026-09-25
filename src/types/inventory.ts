@@ -22,6 +22,9 @@ export interface InventoryMovement {
   reservedDelta: number
   unitCost: number
   orderId?: number | null
+  expenseHeaderId?: number | null
+  transferId?: number | null
+  inventoryCountId?: number | null
   operationKey: string
   reason?: string | null
   createdAt: string
