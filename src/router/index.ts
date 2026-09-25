@@ -258,7 +258,7 @@ const routes: RouteRecordRaw[] = [
     },
     {
         path: '/inventory',
-        name: 'Inventory',
+        name: 'Inventario',
         component: () => import('@/views/InventoryView.vue'),
         meta: {
             requiresAuth: true,

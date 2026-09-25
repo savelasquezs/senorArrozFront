@@ -37,13 +37,16 @@ import { computed } from 'vue';
 import { useRoute } from 'vue-router';
 
 const route = useRoute();
+const labels: Record<string, string> = {
+	inventory: 'Inventario',
+};
 const breadcrumbs = computed(() => {
 	const pathSegments = route.path.split('/').filter(Boolean);
 	let currentPath = '';
 	return pathSegments.map((segment) => {
 		currentPath += `/${segment}`;
 		return {
-			name: segment.charAt(0).toUpperCase() + segment.slice(1),
+			name: labels[segment] || segment.charAt(0).toUpperCase() + segment.slice(1),
 			to: currentPath,
 		};
 	});

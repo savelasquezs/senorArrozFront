@@ -38,7 +38,7 @@
 		</div>
 
 		<!-- Floating Action Button (FAB) for Quick Order -->
-		<button v-if="canTakeOrders && !isOrdersPage" @click="navigateToNewOrder"
+		<button v-if="canTakeOrders && !isOrdersPage && !hideQuickOrder" @click="navigateToNewOrder"
 			class="fixed bottom-6 right-6 z-40 w-14 h-14 bg-emerald-600 hover:bg-emerald-700 text-white rounded-full shadow-lg hover:shadow-xl transition-all duration-200 flex items-center justify-center group"
 			title="Nuevo Pedido">
 			<PlusIcon class="w-6 h-6" />
@@ -74,6 +74,7 @@ import type { WhatsAppRealtimeMessagePayload } from '@/types/whatsapp';
 interface Props {
 	pageTitle?: string;
 	noCard?: boolean; // ✅ Nuevo prop para mostrar contenido sin el card wrapper
+	hideQuickOrder?: boolean;
 }
 
 const props = defineProps<Props>();
