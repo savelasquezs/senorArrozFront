@@ -13,6 +13,9 @@ class InventoryApi extends BaseApi {
   getMovements(take = 200) { return this.get<InventoryMovement[]>('/inventory/movements', { params: { take } }) }
   getCounts() { return this.get<InventoryCount[]>('/inventory/counts') }
   startCount() { return this.post<InventoryCount>('/inventory/counts') }
+  saveCountDraft(id: number, lines: Array<{ expenseId: number; countedQuantity: number | null }>) {
+    return this.put<InventoryCount>(`/inventory/counts/${id}/draft-lines`, lines)
+  }
   confirmCount(id: number, lines: Array<{ expenseId: number; countedQuantity: number }>) {
     return this.post<InventoryCount>(`/inventory/counts/${id}/confirm`, lines, operationConfig())
   }
@@ -30,6 +33,9 @@ class InventoryApi extends BaseApi {
   getRecipe(productId: number) { return this.get<InventoryRecipe>(`/inventory/products/${productId}/recipe`) }
   setRecipe(productId: number, payload: { controlMode: 'estimated' | 'strict'; enabled: boolean; requirements: Array<{ expenseId: number; baseQuantity: number }> }) {
     return this.put<InventoryRecipe>(`/inventory/products/${productId}/recipe`, payload)
+  }
+  copyCatalogConfiguration(sourceExpenseId: number, targetExpenseIds: number[]) {
+    return this.post<{ sourceExpenseId: number; updatedExpenseIds: number[] }>('/inventory/catalog/copy-configuration', { sourceExpenseId, targetExpenseIds })
   }
   getReport(fromUtc: string, toUtc: string) { return this.get<InventoryReportRow[]>('/inventory/report', { params: { fromUtc, toUtc } }) }
   getDeviation(fromUtc: string, toUtc: string) { return this.get<InventoryDeviationPoint[]>('/inventory/deviation', { params: { fromUtc, toUtc } }) }

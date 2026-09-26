@@ -25,7 +25,7 @@ const count: InventoryCount = {
   status: 'draft',
   createdAt: '2026-09-25T00:00:00Z',
   lines: [
-    { expenseId: 7, expenseName: 'Coca-Cola 1.5 L', baseUnit: 'unit', expectedQuantity: 24, countedQuantity: 24 },
+    { expenseId: 7, expenseName: 'Coca-Cola 1.5 L', baseUnit: 'unit', expectedQuantity: 24 },
     { expenseId: 8, expenseName: 'Coca Cola personal', baseUnit: 'unit', expectedQuantity: 12 },
   ],
 }
@@ -62,6 +62,11 @@ describe('inventory UI helpers', () => {
 
   it('restaura únicamente cantidades válidas guardadas en el navegador', () => {
     expect(restoreCountDraft(count, JSON.stringify({ 7: 22, 8: null, 99: 3 }))).toEqual({ 7: 22, 8: null })
+  })
+
+  it('restaura el borrador persistido por el servidor cuando no hay respaldo local', () => {
+    const serverDraft = { ...count, lines: count.lines.map((line, index) => ({ ...line, countedQuantity: index === 0 ? 23 : null })) }
+    expect(restoreCountDraft(serverDraft, null)).toEqual({ 7: 23, 8: null })
   })
 
   it('calcula rangos inclusivos', () => {

@@ -123,7 +123,7 @@
         <template v-else>
           <article v-if="activeCount" class="overflow-hidden rounded-xl border border-emerald-200 bg-white shadow-sm">
             <header class="border-b border-emerald-100 bg-emerald-50 p-4 sm:p-5">
-              <div class="flex flex-wrap items-start justify-between gap-3"><div><div class="flex items-center gap-2"><h3 class="font-bold text-gray-900">Conteo #{{ activeCount.id }}</h3><BaseBadge variant="warning" size="sm">En progreso</BaseBadge></div><p class="mt-1 text-sm text-gray-600">Iniciado {{ date(activeCount.createdAt) }} · se guarda en este navegador hasta confirmar.</p></div><div class="text-right"><p class="text-2xl font-bold text-emerald-700">{{ countProgress.completed }}/{{ countProgress.total }}</p><p class="text-xs text-gray-500">insumos contados</p></div></div>
+              <div class="flex flex-wrap items-start justify-between gap-3"><div><div class="flex items-center gap-2"><h3 class="font-bold text-gray-900">Conteo #{{ activeCount.id }}</h3><BaseBadge variant="warning" size="sm">En progreso</BaseBadge></div><p class="mt-1 text-sm text-gray-600">Iniciado {{ date(activeCount.createdAt) }} · {{ countDraftStatusText(activeCount.id) }}</p></div><div class="text-right"><p class="text-2xl font-bold text-emerald-700">{{ countProgress.completed }}/{{ countProgress.total }}</p><p class="text-xs text-gray-500">insumos contados</p></div></div>
               <div class="mt-3 h-2 overflow-hidden rounded-full bg-emerald-100"><div class="h-full rounded-full bg-emerald-600 transition-all" :style="{ width: `${countProgress.percent}%` }" /></div>
             </header>
             <div class="p-4 sm:p-5">
@@ -247,8 +247,8 @@
     </div>
 
     <BaseDialog v-model="bulkPreviewOpen" title="Aplicar configuración a seleccionados" size="2xl">
-      <div v-if="catalogTemplate" class="space-y-4"><div class="rounded-lg bg-emerald-50 p-4"><p class="text-sm text-emerald-900"><strong>Plantilla:</strong> {{ catalogTemplate.name }}</p><p class="mt-1 text-xs text-emerald-700">{{ catalogTemplate.inventoryActive ? 'Inventario activo' : 'Inventario inactivo' }} · {{ unit(catalogTemplate.inventoryBaseUnit) }} · {{ catalogTemplate.inventoryConversions.map(item => `${item.name}: ${qty(item.baseQuantity)}`).join(', ') || 'Sin presentaciones' }}</p></div><div class="max-h-72 overflow-y-auto rounded-lg border"><table class="w-full text-sm"><thead class="sticky top-0 bg-gray-50 text-left text-xs uppercase text-gray-500"><tr><th class="px-3 py-2">Destino</th><th class="px-3 py-2">Configuración actual</th><th class="px-3 py-2">Nueva configuración</th></tr></thead><tbody class="divide-y"><tr v-for="item in catalogBulkTargets" :key="item.id"><td class="px-3 py-3 font-medium">{{ item.name }}</td><td class="px-3 py-3 text-gray-500">{{ item.inventoryActive ? 'Activo' : 'Inactivo' }} · {{ unit(item.inventoryBaseUnit) }}</td><td class="px-3 py-3 text-emerald-700">{{ catalogTemplate.inventoryActive ? 'Activo' : 'Inactivo' }} · {{ unit(catalogTemplate.inventoryBaseUnit) }}</td></tr></tbody></table></div><p class="rounded-lg bg-amber-50 p-3 text-xs text-amber-900">El API actual guarda cada insumo por separado. Si uno falla, la interfaz informará cuántos requieren revisión; no se mostrará la operación como atómica.</p></div>
-      <template #footer><BaseButton variant="secondary" :disabled="saving" @click="bulkPreviewOpen = false">Cancelar</BaseButton><BaseButton :loading="saving" :disabled="!catalogTemplate || catalogBulkTargets.length === 0 || !catalogTemplateHasConversions" @click="applyCatalogTemplate">Aplicar a {{ catalogBulkTargets.length }} insumos</BaseButton></template>
+      <div v-if="catalogTemplate" class="space-y-4"><div class="rounded-lg bg-emerald-50 p-4"><p class="text-sm text-emerald-900"><strong>Plantilla:</strong> {{ catalogTemplate.name }}</p><p class="mt-1 text-xs text-emerald-700">{{ catalogTemplate.inventoryActive ? 'Inventario activo' : 'Inventario inactivo' }} · {{ unit(catalogTemplate.inventoryBaseUnit) }} · {{ catalogTemplate.inventoryConversions.map(item => `${item.name}: ${qty(item.baseQuantity)}`).join(', ') || 'Sin presentaciones' }}</p></div><div class="max-h-72 overflow-y-auto rounded-lg border"><table class="w-full text-sm"><thead class="sticky top-0 bg-gray-50 text-left text-xs uppercase text-gray-500"><tr><th class="px-3 py-2">Destino</th><th class="px-3 py-2">Configuración actual</th><th class="px-3 py-2">Nueva configuración</th></tr></thead><tbody class="divide-y"><tr v-for="item in catalogBulkTargets" :key="item.id"><td class="px-3 py-3 font-medium">{{ item.name }}</td><td class="px-3 py-3 text-gray-500">{{ item.inventoryActive ? 'Activo' : 'Inactivo' }} · {{ unit(item.inventoryBaseUnit) }}</td><td class="px-3 py-3 text-emerald-700">{{ catalogTemplate.inventoryActive ? 'Activo' : 'Inactivo' }} · {{ unit(catalogTemplate.inventoryBaseUnit) }}</td></tr></tbody></table></div><p class="rounded-lg bg-blue-50 p-3 text-xs text-blue-900">La configuración se aplicará en una sola transacción. Si algún destino no es válido, ninguno será modificado.</p></div>
+      <template #footer><BaseButton variant="secondary" :disabled="saving" @click="bulkPreviewOpen = false">Cancelar</BaseButton><BaseButton :loading="saving" :disabled="!catalogTemplate || catalogBulkTargets.length === 0" @click="applyCatalogTemplate">Aplicar a {{ catalogBulkTargets.length }} insumos</BaseButton></template>
     </BaseDialog>
 
     <BaseDialog v-model="countPreviewOpen" title="Revisar conteo físico" size="2xl">
@@ -369,6 +369,10 @@ function clearMovementFilters() { Object.assign(movementFilters, { from: default
 function openMovements(expenseId: number) { movementFilters.search = expenseById(expenseId)?.name || ''; void selectSection('movements') }
 
 const countValues = reactive<Record<number, Record<number, number | null>>>({})
+const countDraftStatuses = reactive<Record<number, 'idle' | 'saving' | 'saved' | 'error'>>({})
+const countDraftTimers = new Map<number, ReturnType<typeof setTimeout>>()
+const countDraftSaving = new Set<number>()
+const countDraftPending = new Set<number>()
 const countSearch = ref('')
 const countPreviewOpen = ref(false)
 const activeCount = computed(() => store.counts.find(item => item.status === 'draft') || null)
@@ -396,6 +400,36 @@ function setCountValue(count: InventoryCount, expenseId: number, event: Event) {
   countValues[count.id] ??= {}
   countValues[count.id][expenseId] = raw === '' ? null : Math.max(Number(raw), 0)
   localStorage.setItem(countDraftStorageKey(auth.user?.id, count.branchId, count.id), JSON.stringify(countValues[count.id]))
+  scheduleCountDraftSave(count)
+}
+function scheduleCountDraftSave(count: InventoryCount) {
+  const currentTimer = countDraftTimers.get(count.id)
+  if (currentTimer) clearTimeout(currentTimer)
+  countDraftStatuses[count.id] = 'idle'
+  countDraftTimers.set(count.id, setTimeout(() => void saveCountDraft(count), 600))
+}
+async function saveCountDraft(count: InventoryCount) {
+  countDraftTimers.delete(count.id)
+  if (countDraftSaving.has(count.id)) { countDraftPending.add(count.id); return }
+  countDraftSaving.add(count.id)
+  do {
+    countDraftPending.delete(count.id)
+    countDraftStatuses[count.id] = 'saving'
+    try {
+      await inventoryApi.saveCountDraft(count.id, count.lines.map(line => ({ expenseId: line.expenseId, countedQuantity: countValue(count.id, line.expenseId) })))
+      countDraftStatuses[count.id] = 'saved'
+    } catch {
+      countDraftStatuses[count.id] = 'error'
+    }
+  } while (countDraftPending.has(count.id))
+  countDraftSaving.delete(count.id)
+}
+function countDraftStatusText(countId: number) {
+  const status = countDraftStatuses[countId]
+  if (status === 'saving') return 'guardando avance en el servidor…'
+  if (status === 'saved') return 'avance guardado en servidor y navegador.'
+  if (status === 'error') return 'sin conexión: el avance permanece respaldado en este navegador.'
+  return 'el avance se guarda automáticamente.'
 }
 function countDifference(countId: number, expenseId: number, expected: number) { const value = countValue(countId, expenseId); return value == null ? 0 : value - expected }
 function countTotalDifference(count: InventoryCount) { return count.lines.reduce((sum, line) => sum + (line.difference || 0), 0) }
@@ -405,6 +439,8 @@ async function startCount() {
 }
 async function confirmCount(count: InventoryCount) {
   const values = countValues[count.id]
+  const pendingTimer = countDraftTimers.get(count.id)
+  if (pendingTimer) { clearTimeout(pendingTimer); countDraftTimers.delete(count.id) }
   await mutate(async () => {
     await inventoryApi.confirmCount(count.id, count.lines.map(line => ({ expenseId: line.expenseId, countedQuantity: Number(values[line.expenseId]) })))
     localStorage.removeItem(countDraftStorageKey(auth.user?.id, count.branchId, count.id))
@@ -486,7 +522,6 @@ const bulkPreviewOpen = ref(false)
 const allVisibleCatalogSelected = computed(() => filteredCatalog.value.length > 0 && filteredCatalog.value.every(item => selectedCatalogIds.value.includes(item.id)))
 const catalogTemplate = computed(() => expenses.value.find(item => item.id === catalogTemplateId.value) || null)
 const catalogBulkTargets = computed(() => expenses.value.filter(item => selectedCatalogIds.value.includes(item.id) && item.id !== catalogTemplateId.value))
-const catalogTemplateHasConversions = computed(() => !!catalogTemplate.value?.inventoryConversions.length)
 const catalogEditorIsValid = computed(() => catalogEditor.conversions.length > 0 && catalogEditor.conversions.every(item => item.name.trim() && Number(item.baseQuantity) > 0))
 function toggleAllVisibleCatalog(event: Event) {
   const checked = (event.target as HTMLInputElement).checked
@@ -514,20 +549,13 @@ async function saveCatalog() {
 }
 async function applyCatalogTemplate() {
   const source = catalogTemplate.value
-  if (!source || !source.inventoryConversions.length) return
-  saving.value = true
-  const failed: string[] = []
-  try {
-    const configuration = { active: source.inventoryActive, baseUnit: source.inventoryBaseUnit, conversions: source.inventoryConversions.map(row => ({ name: row.name, baseQuantity: row.baseQuantity, active: row.active })) }
-    for (const target of catalogBulkTargets.value) {
-      try { await expenseApi.updateExpense(target.id, expenseInventoryPayload(target, configuration)) } catch { failed.push(target.name) }
-    }
+  if (!source) return
+  await mutate(async () => {
+    await inventoryApi.copyCatalogConfiguration(source.id, catalogBulkTargets.value.map(item => item.id))
     await loadCatalogs()
     bulkPreviewOpen.value = false
     clearCatalogSelection()
-    if (failed.length) toast.error('Aplicación parcial', `${failed.length} insumo(s) requieren revisión: ${failed.join(', ')}`)
-    else toast.success('Configuración aplicada', 3500)
-  } finally { saving.value = false }
+  }, 'Configuración aplicada de forma atómica')
 }
 
 const recipeFilters = reactive({ categoryId: 0, search: '', status: 'all' })
@@ -682,7 +710,7 @@ onMounted(async () => {
   initializeCounts(); initializeTransfers(); loadedSections.balances = loadedSections.counts = loadedSections.transfers = true
   await ensureSection(tab.value)
 })
-onBeforeUnmount(() => { offSignalR('InventoryChanged', handleInventoryChanged); offSignalR('InventoryTransferPending', handleTransferPending); branches.markDirty('inventory-catalog', false) })
+onBeforeUnmount(() => { offSignalR('InventoryChanged', handleInventoryChanged); offSignalR('InventoryTransferPending', handleTransferPending); countDraftTimers.forEach(timer => clearTimeout(timer)); countDraftTimers.clear(); branches.markDirty('inventory-catalog', false) })
 
 const qty = (value: number) => new Intl.NumberFormat('es-CO', { maximumFractionDigits: 3 }).format(Number(value) || 0)
 const money = (value: number) => new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(Number(value) || 0)

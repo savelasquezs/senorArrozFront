@@ -50,7 +50,7 @@ export function countDraftStorageKey(userId: number | undefined, branchId: numbe
 }
 
 export function restoreCountDraft(count: InventoryCount, stored: string | null) {
-  if (!stored) return Object.fromEntries(count.lines.map(line => [line.expenseId, null]))
+  if (!stored) return Object.fromEntries(count.lines.map(line => [line.expenseId, line.countedQuantity ?? null]))
   try {
     const values = JSON.parse(stored) as Record<string, number | null>
     return Object.fromEntries(count.lines.map(line => {
@@ -58,7 +58,7 @@ export function restoreCountDraft(count: InventoryCount, stored: string | null) 
       return [line.expenseId, typeof value === 'number' && Number.isFinite(value) ? value : null]
     }))
   } catch {
-    return Object.fromEntries(count.lines.map(line => [line.expenseId, null]))
+    return Object.fromEntries(count.lines.map(line => [line.expenseId, line.countedQuantity ?? null]))
   }
 }
 
