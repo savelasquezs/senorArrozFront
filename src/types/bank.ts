@@ -1,6 +1,8 @@
 // src/types/bank.ts
 
 // ===== BANKS =====
+export type BankType = 'normal' | 'cash_vault' | 'real_vault'
+
 export interface Bank {
     id: number
     branchId: number
@@ -9,7 +11,7 @@ export interface Bank {
     imageUrl?: string
     active: boolean
     /** Tipo de banco (enum en snake_case desde la API). */
-    type?: string
+    type?: BankType
     isHidden?: boolean
     createdAt: string
     updatedAt: string
@@ -72,6 +74,7 @@ export interface CreateBankDto {
     name: string
     imageUrl?: string
     active?: boolean
+    type?: Extract<BankType, 'normal' | 'cash_vault'>
 }
 
 export interface UpdateBankDto {
@@ -85,6 +88,7 @@ export interface BankFormData {
     imageUrl?: string
     active: boolean
     branchId?: number // Optional for superadmin creating new banks
+    type?: Extract<BankType, 'normal' | 'cash_vault'>
 }
 
 // ===== APPS =====
