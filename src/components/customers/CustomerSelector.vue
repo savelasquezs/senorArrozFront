@@ -117,7 +117,7 @@ const props = withDefaults(defineProps<Props>(), {
 
 // Emits
 const emit = defineEmits<{
-    customerSelected: [customer: Customer, addressServiceBranchId?: number]
+    customerSelected: [customer: Customer, addressServiceBranchId?: number, createdAddressId?: number]
 }>()
 
 // Composables
@@ -133,6 +133,7 @@ const showCreateModal = ref(false)
 const isCreating = ref(false)
 const createdCustomer = ref<Customer | null>(null)
 const createdAddressServiceBranchId = ref<number | undefined>(undefined)
+const createdAddressId = ref<number | undefined>(undefined)
 const error = ref('')
 
 let searchDebounceTimer: ReturnType<typeof setTimeout> | null = null
@@ -188,9 +189,9 @@ const handlePaste = (event: ClipboardEvent) => {
     handleSearch()
 }
 
-const selectCustomer = (customer: Customer, addressServiceBranchId?: number) => {
+const selectCustomer = (customer: Customer, addressServiceBranchId?: number, addressId?: number) => {
     cancelPendingSearch()
-    emit('customerSelected', customer, addressServiceBranchId)
+    emit('customerSelected', customer, addressServiceBranchId, addressId)
     searchQuery.value = ''
     searchResults.value = []
 }
@@ -222,9 +223,13 @@ const createCustomerWrapper = async (customerData: CustomerFormData) => {
     try {
         const customer = await customersStore.create(createCustomerDto)
         createdCustomer.value = customer
-        createdAddressServiceBranchId.value = customer.wasCreated === false
-            ? undefined
-            : serviceBranchId
+        createdAddressServiceBranchId.value = serviceBranchId
+        createdAddressId.value = initialAddress
+            ? customer.addresses?.find(address =>
+                address.neighborhoodId === initialAddress.neighborhoodId
+                && address.address.trim().toLocaleLowerCase() === initialAddress.address.trim().toLocaleLowerCase(),
+            )?.id
+            : undefined
 
         // No need to refresh - customersStore updates optimistically
 
@@ -238,7 +243,7 @@ const createCustomerWrapper = async (customerData: CustomerFormData) => {
 
 const selectCreatedCustomer = () => {
     if (createdCustomer.value) {
-        selectCustomer(createdCustomer.value, createdAddressServiceBranchId.value)
+        selectCustomer(createdCustomer.value, createdAddressServiceBranchId.value, createdAddressId.value)
     }
     closeCreateModal()
 }
@@ -247,6 +252,7 @@ const closeCreateModal = () => {
     showCreateModal.value = false
     createdCustomer.value = null
     createdAddressServiceBranchId.value = undefined
+    createdAddressId.value = undefined
 }
 
 onUnmounted(() => {

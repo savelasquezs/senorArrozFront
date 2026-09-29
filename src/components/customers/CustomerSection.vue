@@ -157,7 +157,7 @@ const loyaltyRewardDue = computed(() =>
 )
 
 // Methods
-const handleCustomerSelected = async (customer: Customer, addressServiceBranchId?: number) => {
+const handleCustomerSelected = async (customer: Customer, addressServiceBranchId?: number, createdAddressId?: number) => {
     if (props.mode === 'draft') {
         // Asegurar que el cliente esté en la lista del store (p. ej. recién creado) para que getCustomer lo encuentre
         if (customer) {
@@ -178,9 +178,10 @@ const handleCustomerSelected = async (customer: Customer, addressServiceBranchId
         }
 
         const createdAddress = addressServiceBranchId
-            ? customer.addresses?.find(address =>
-                address.branchServices?.some(service => service.branchId === addressServiceBranchId && service.isCovered),
-            )
+            ? customer.addresses?.find(address => address.id === createdAddressId)
+                ?? customer.addresses?.find(address =>
+                    address.branchServices?.some(service => service.branchId === addressServiceBranchId && service.isCovered),
+                )
             : null
         if (createdAddress && addressServiceBranchId) {
             await ordersDraftsStore!.changeOperationalBranch(addressServiceBranchId, createdAddress)

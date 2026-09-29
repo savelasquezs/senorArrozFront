@@ -145,6 +145,7 @@ enum UserRole {
 - Al crear un cliente con dirección inicial o agregar una dirección desde el POS, la sucursal operativa actual queda seleccionada por defecto. Admin, Cajero y Superadmin pueden elegir otra sucursal activa del mismo tenant sin cambiar sesión, JWT, `branchContext` ni la sucursal global.
 - Al elegir otra sucursal para una dirección, barrios, tarifa y origen del mapa se obtienen de esa sucursal. La dirección conserva únicamente el `NeighborhoodId`; `AddressRepository.CreateAsync()` crea el `AddressBranch` de la sucursal del barrio y el pedido actual adopta esa sucursal mediante el mecanismo cross-branch existente.
 - `Customer.BranchId` conserva la sucursal legacy de origen del cliente y no cambia por la sucursal que atiende una dirección.
+- Si el teléfono ingresado pertenece a un cliente existente de otra sucursal, el alta reutiliza ese cliente, conserva la dirección nueva y cambia únicamente el borrador actual a la sucursal que presta el servicio. La dirección exacta recién enviada tiene prioridad frente a otras direcciones cubiertas por esa sucursal.
 
 #### Onsite (En el local)
 - **Cliente**: Opcional
@@ -297,6 +298,7 @@ Admin y Superadmin pueden cambiar un pedido desde cualquier estado hacia cualqui
 - Un préstamo sin banco es de efectivo y conserva la fórmula actual. Uno asociado a un banco normal activo descuenta su saldo pendiente del esperado de ese banco, sin crear movimientos ni modificar el saldo general de Bancos.
 - Los abonos directos reducen el préstamo y recuperan el esperado del banco de origen. No generan movimientos de caja ni bancarios. Los abonos convertidos en gasto no recuperan ese esperado; la baja manual sí recupera el saldo restante.
 - Cada cierre guarda por banco la deducción acumulada por préstamos para aplicar solo su variación en el período siguiente.
+- Desde cada fila de banco puede abrirse el detalle de sus préstamos activos e históricos; los saldos en cero se identifican como `Liquidado` y las bajas con saldo como `Dado de baja`.
 - Un abono puede registrarse como nuevo gasto. El total del comprobante se aplica al préstamo de forma atómica, sin pagos bancarios ni compras de inventario. Admin y Superadmin consultan el historial completo y el préstamo se inactiva al quedar en cero.
 
 ## 👤 Gestión de Clientes

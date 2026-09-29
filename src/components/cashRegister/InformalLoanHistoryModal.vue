@@ -29,7 +29,7 @@
                   <h3 class="font-semibold text-gray-900">{{ loan.concept }}</h3>
                   <span class="rounded-full px-2 py-0.5 text-xs font-medium"
                     :class="loan.deactivatedAt ? 'bg-gray-100 text-gray-600' : 'bg-emerald-50 text-emerald-700'">
-                    {{ loan.deactivatedAt ? 'Inactivo' : 'Activo' }}
+                    {{ loan.deactivatedAt ? (loan.amount <= 0 ? 'Liquidado' : 'Dado de baja') : 'Activo' }}
                   </span>
                   <span class="rounded-full bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700">
                     {{ loan.bankName || 'Efectivo' }}
@@ -95,8 +95,14 @@ import type { BranchInformalLoanHistory, InformalLoanSource } from '@/types/cash
 import type { Bank } from '@/types/bank'
 import { defaultBusinessCalendar } from '@/utils/datetime'
 
-const props = withDefaults(defineProps<{ modelValue: boolean; branchId?: number | null; banks?: Bank[] }>(), {
+const props = withDefaults(defineProps<{
+  modelValue: boolean
+  branchId?: number | null
+  banks?: Bank[]
+  initialBankId?: number | null
+}>(), {
   banks: () => [],
+  initialBankId: null,
 })
 const emit = defineEmits<{ 'update:modelValue': [value: boolean] }>()
 const open = computed({ get: () => props.modelValue, set: value => emit('update:modelValue', value) })
@@ -143,15 +149,20 @@ async function loadHistory(targetPage = 1) {
 }
 
 watch(() => props.modelValue, value => {
-  if (value) void loadHistory(1)
+  if (!value) return
+  const nextSource: InformalLoanSource = props.initialBankId ? 'bank' : 'all'
+  const nextBankId = props.initialBankId ?? null
+  const filtersChanged = source.value !== nextSource || bankId.value !== nextBankId
+  source.value = nextSource
+  bankId.value = nextBankId
+  if (!filtersChanged) void loadHistory(1)
 })
 
-watch(source, value => {
-  if (value !== 'bank') bankId.value = null
+watch([source, bankId], ([nextSource]) => {
+  if (nextSource !== 'bank' && bankId.value !== null) {
+    bankId.value = null
+    return
+  }
   if (props.modelValue) void loadHistory(1)
-})
-
-watch(bankId, () => {
-  if (props.modelValue && source.value === 'bank') void loadHistory(1)
 })
 </script>

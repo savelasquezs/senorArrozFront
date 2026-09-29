@@ -1,4 +1,4 @@
-c<!-- src/components/CustomerForm.vue -->
+<!-- src/components/CustomerForm.vue -->
 <template>
     <form @submit.prevent="handleSubmit" class="space-y-6">
         <!-- Customer Information -->

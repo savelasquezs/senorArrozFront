@@ -216,7 +216,7 @@
                       </BaseButton>
                       <BaseButton v-if="canViewClosureHistory" variant="outline" size="sm"
                         class="text-xs shrink-0 border-gray-200 text-gray-700"
-                        @click="loanHistoryOpen = true">
+                        @click="openLoanHistory()">
                         Ver historial
                       </BaseButton>
                     </div>
@@ -459,6 +459,11 @@
                           @click="toggleMovements(recon.bankId)">
                           {{ movementsBankId === recon.bankId ? 'Ocultar' : 'Ver' }}
                         </BaseButton>
+                        <BaseButton v-if="recon.bankType === 'normal'" variant="outline" size="sm"
+                          class="text-[10px] px-1.5 py-0.5 min-h-0 h-auto"
+                          @click="openBankLoanHistory(recon.bankId)">
+                          Préstamos
+                        </BaseButton>
                       </div>
                     </div>
                   </div>
@@ -504,7 +509,8 @@
     </div>
 
     <CashClosureHistoryModal v-model="showHistoryModal" :branch-id="activeBranchId" />
-    <InformalLoanHistoryModal v-model="loanHistoryOpen" :branch-id="activeBranchId" :banks="loanFilterBanks" />
+    <InformalLoanHistoryModal v-model="loanHistoryOpen" :branch-id="activeBranchId" :banks="loanFilterBanks"
+      :initial-bank-id="loanHistoryBankId" />
     <CashVaultMovementHistoryModal v-model="showVaultHistoryModal" :branch-id="activeBranchId" />
     <BankTransfersModal
       v-if="activeBranchId != null"
@@ -772,6 +778,7 @@ const { success: toastSuccess, error: toastError } = useToast()
 
 const showHistoryModal = ref(false)
 const loanHistoryOpen = ref(false)
+const loanHistoryBankId = ref<number | null>(null)
 const showVaultHistoryModal = ref(false)
 const showBankTransfersModal = ref(false)
 const showExpenseFormModal = ref(false)
@@ -1133,6 +1140,15 @@ const loansCollapsedSummary = computed(() => {
 // ===== METHODS =====
 function toggleMovements(bankId: number) {
   movementsBankId.value = movementsBankId.value === bankId ? null : bankId
+}
+
+function openLoanHistory(bankId: number | null = null) {
+  loanHistoryBankId.value = bankId
+  loanHistoryOpen.value = true
+}
+
+function openBankLoanHistory(bankId: number) {
+  openLoanHistory(bankId)
 }
 
 function formatCurrency(value: number): string {
