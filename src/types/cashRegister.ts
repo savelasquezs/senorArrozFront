@@ -112,6 +112,9 @@ export interface BankExpectedBalance {
   bankType?: string
   openingBalance: number
   expectedBalance: number
+  openingInformalLoanDeduction: number
+  informalLoanDeduction: number
+  informalLoanAdjustment: number
 }
 
 export interface UnsettledAppLine {
@@ -142,6 +145,8 @@ export interface CashRegisterExpected {
 export interface BranchInformalLoan {
   id: number
   branchId: number
+  bankId?: number | null
+  bankName?: string | null
   concept: string
   amount: number
   createdAt: string
@@ -194,8 +199,11 @@ export interface CreateDeliveryAdvanceInformalLoanDto {
 export interface CreateBranchInformalLoanDto {
   concept?: string
   amount?: number
+  bankId?: number | null
   deliveryAdvance?: CreateDeliveryAdvanceInformalLoanDto
 }
+
+export type InformalLoanSource = 'all' | 'cash' | 'bank'
 
 export interface DeliveryAdvanceOrderRow {
   id: number

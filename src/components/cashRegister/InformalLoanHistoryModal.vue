@@ -2,6 +2,19 @@
   <BaseDialog v-model="open" title="Historial de préstamos informales" size="5xl">
     <div class="space-y-4 -mt-2">
       <p class="text-sm text-gray-500">Préstamos, abonos y gastos vinculados de la sucursal.</p>
+      <div class="flex flex-wrap items-center gap-2">
+        <button v-for="option in sourceOptions" :key="option.value" type="button"
+          class="rounded-md border px-3 py-1.5 text-xs font-medium"
+          :class="source === option.value ? 'border-orange-400 bg-orange-50 text-orange-800' : 'border-gray-200 text-gray-600'"
+          @click="source = option.value">
+          {{ option.label }}
+        </button>
+        <select v-if="source === 'bank'" v-model="bankId"
+          class="rounded-md border border-gray-300 bg-white px-2 py-1.5 text-xs text-gray-700">
+          <option :value="null">Todos los bancos</option>
+          <option v-for="bank in banks" :key="bank.id" :value="bank.id">{{ bank.name }}</option>
+        </select>
+      </div>
 
       <div v-if="loadError" class="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">{{ loadError }}</div>
       <div v-if="loading" class="py-12 text-center text-sm text-gray-500">Cargando...</div>
@@ -17,6 +30,9 @@
                   <span class="rounded-full px-2 py-0.5 text-xs font-medium"
                     :class="loan.deactivatedAt ? 'bg-gray-100 text-gray-600' : 'bg-emerald-50 text-emerald-700'">
                     {{ loan.deactivatedAt ? 'Inactivo' : 'Activo' }}
+                  </span>
+                  <span class="rounded-full bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700">
+                    {{ loan.bankName || 'Efectivo' }}
                   </span>
                 </div>
                 <p class="mt-1 text-xs text-gray-500">
@@ -41,7 +57,7 @@
                     <td class="px-3 py-2">
                       <span class="rounded-full px-2 py-0.5 font-medium"
                         :class="payment.kind === 'expense' ? 'bg-violet-50 text-violet-700' : 'bg-emerald-50 text-emerald-700'">
-                        {{ payment.kind === 'expense' ? `Gasto #${payment.expenseHeaderId}` : 'Efectivo' }}
+                        {{ payment.kind === 'expense' ? `Gasto #${payment.expenseHeaderId}` : 'Abono directo' }}
                       </span>
                     </td>
                     <td class="px-3 py-2 text-right font-medium tabular-nums">{{ formatCurrency(payment.amount) }}</td>
@@ -75,10 +91,13 @@ import { computed, ref, watch } from 'vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseDialog from '@/components/ui/BaseDialog.vue'
 import { cashRegisterApi } from '@/services/MainAPI/cashRegisterApi'
-import type { BranchInformalLoanHistory } from '@/types/cashRegister'
+import type { BranchInformalLoanHistory, InformalLoanSource } from '@/types/cashRegister'
+import type { Bank } from '@/types/bank'
 import { defaultBusinessCalendar } from '@/utils/datetime'
 
-const props = defineProps<{ modelValue: boolean; branchId?: number | null }>()
+const props = withDefaults(defineProps<{ modelValue: boolean; branchId?: number | null; banks?: Bank[] }>(), {
+  banks: () => [],
+})
 const emit = defineEmits<{ 'update:modelValue': [value: boolean] }>()
 const open = computed({ get: () => props.modelValue, set: value => emit('update:modelValue', value) })
 const loading = ref(false)
@@ -87,6 +106,13 @@ const items = ref<BranchInformalLoanHistory[]>([])
 const page = ref(1)
 const totalCount = ref(0)
 const totalPages = ref(0)
+const source = ref<InformalLoanSource>('all')
+const bankId = ref<number | null>(null)
+const sourceOptions: Array<{ value: InformalLoanSource; label: string }> = [
+  { value: 'all', label: 'Todos' },
+  { value: 'cash', label: 'Efectivo' },
+  { value: 'bank', label: 'Bancos' },
+]
 
 const formatCurrency = (value: number) => new Intl.NumberFormat('es-CO', {
   style: 'currency', currency: 'COP', maximumFractionDigits: 0,
@@ -97,7 +123,13 @@ async function loadHistory(targetPage = 1) {
   loading.value = true
   loadError.value = ''
   try {
-    const result = await cashRegisterApi.getInformalLoanHistory(props.branchId ?? undefined, targetPage, 10)
+    const result = await cashRegisterApi.getInformalLoanHistory(
+      props.branchId ?? undefined,
+      targetPage,
+      10,
+      source.value,
+      source.value === 'bank' ? bankId.value ?? undefined : undefined,
+    )
     items.value = result.items
     page.value = result.page
     totalCount.value = result.totalCount
@@ -112,5 +144,14 @@ async function loadHistory(targetPage = 1) {
 
 watch(() => props.modelValue, value => {
   if (value) void loadHistory(1)
+})
+
+watch(source, value => {
+  if (value !== 'bank') bankId.value = null
+  if (props.modelValue) void loadHistory(1)
+})
+
+watch(bankId, () => {
+  if (props.modelValue && source.value === 'bank') void loadHistory(1)
 })
 </script>

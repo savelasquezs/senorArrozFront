@@ -15,6 +15,7 @@ import type {
   DeactivateBranchInformalLoanDto,
   DeliveryAdvanceOrderRow,
   LiquidatedDeliverymanOption,
+  InformalLoanSource,
   UpdateBranchInformalLoanDto,
 } from '@/types/cashRegister'
 
@@ -36,9 +37,15 @@ class CashRegisterApi extends BaseApi {
     return this.get<CashRegisterExpected>('/cash-register/expected', { params })
   }
 
-  async getInformalLoans(branchId?: number, scope: 'active' | 'inactive' | 'all' = 'active'): Promise<BranchInformalLoan[]> {
-    const params: Record<string, any> = { Scope: scope }
+  async getInformalLoans(
+    branchId?: number,
+    scope: 'active' | 'inactive' | 'all' = 'active',
+    source: InformalLoanSource = 'all',
+    bankId?: number,
+  ): Promise<BranchInformalLoan[]> {
+    const params: Record<string, any> = { Scope: scope, Source: source }
     if (branchId !== undefined) params.BranchId = branchId
+    if (bankId !== undefined) params.BankId = bankId
     return this.get<BranchInformalLoan[]>('/cash-register/informal-loans', { params })
   }
 
@@ -58,9 +65,16 @@ class CashRegisterApi extends BaseApi {
     return this.post<BranchInformalLoanPayment>(`/cash-register/informal-loans/${id}/payments`, dto, { params })
   }
 
-  async getInformalLoanHistory(branchId?: number, page = 1, pageSize = 10): Promise<PagedResult<BranchInformalLoanHistory>> {
-    const params: Record<string, any> = { Page: page, PageSize: pageSize }
+  async getInformalLoanHistory(
+    branchId?: number,
+    page = 1,
+    pageSize = 10,
+    source: InformalLoanSource = 'all',
+    bankId?: number,
+  ): Promise<PagedResult<BranchInformalLoanHistory>> {
+    const params: Record<string, any> = { Page: page, PageSize: pageSize, Source: source }
     if (branchId !== undefined) params.BranchId = branchId
+    if (bankId !== undefined) params.BankId = bankId
     return this.get<PagedResult<BranchInformalLoanHistory>>('/cash-register/informal-loans/history', { params })
   }
 

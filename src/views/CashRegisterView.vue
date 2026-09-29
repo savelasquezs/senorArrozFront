@@ -246,6 +246,20 @@
                       cajón en este momento).
                     </p>
 
+                    <div class="mb-3 flex flex-wrap items-center gap-2">
+                      <button v-for="option in loanSourceOptions" :key="option.value" type="button"
+                        class="rounded-md border px-2.5 py-1 text-xs font-medium"
+                        :class="loanSourceFilter === option.value ? 'border-orange-400 bg-orange-50 text-orange-800' : 'border-gray-200 text-gray-600'"
+                        @click="loanSourceFilter = option.value">
+                        {{ option.label }}
+                      </button>
+                      <select v-if="loanSourceFilter === 'bank'" v-model.number="loanBankFilter"
+                        class="rounded-md border border-gray-300 bg-white px-2 py-1 text-xs text-gray-700">
+                        <option :value="null">Todos los bancos</option>
+                        <option v-for="bank in loanFilterBanks" :key="bank.id" :value="bank.id">{{ bank.name }}</option>
+                      </select>
+                    </div>
+
                     <div v-if="informalLoansLoading" class="text-center py-6 text-gray-500 text-sm">Cargando…</div>
 
                     <template v-else>
@@ -262,6 +276,9 @@
                           <div class="flex-1 min-w-0">
                             <p class="text-sm font-medium text-gray-900">{{ loan.concept }}</p>
                             <div class="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-gray-500">
+                              <span class="rounded-full bg-blue-50 px-2 py-0.5 font-medium text-blue-700">
+                                {{ loan.bankName || 'Efectivo' }}
+                              </span>
                               <span class="tabular-nums font-medium text-gray-700">{{ formatCurrency(loan.amount) }}</span>
                               <span v-if="loan.totalPaid > 0" class="text-emerald-700">
                                 Abonado: {{ formatCurrency(loan.totalPaid) }}
@@ -300,7 +317,7 @@
 
                       <div v-if="loansTab === 'active' && branchInformalLoans.length > 0" class="mt-2 flex justify-end">
                         <span class="text-xs sm:text-sm font-medium text-gray-700">
-                          Total activos: {{ formatCurrency(totalActiveLoans) }}
+                          Total filtrado: {{ formatCurrency(totalActiveLoans) }}
                         </span>
                       </div>
                     </template>
@@ -386,6 +403,12 @@
                         <p class="text-xs sm:text-sm font-medium text-gray-800 truncate">{{ recon.bankName }}</p>
                         <p class="text-[10px] sm:text-xs text-gray-400 tabular-nums">
                           Sis.: {{ isCashVaultRecon(recon) ? maskedCashVaultAmount(recon.expectedBalance) : formatCurrency(recon.expectedBalance) }}
+                        </p>
+                        <p v-if="bankLoanExpected(recon.bankId)?.informalLoanDeduction" class="text-[10px] text-blue-600">
+                          Préstamos asociados: {{ formatCurrency(bankLoanExpected(recon.bankId)?.informalLoanDeduction ?? 0) }}
+                          <span v-if="bankLoanExpected(recon.bankId)?.informalLoanAdjustment">
+                            · ajuste {{ formatSignedCurrency(-(bankLoanExpected(recon.bankId)?.informalLoanAdjustment ?? 0)) }}
+                          </span>
                         </p>
                       </div>
                       <div class="col-span-1">
@@ -481,7 +504,7 @@
     </div>
 
     <CashClosureHistoryModal v-model="showHistoryModal" :branch-id="activeBranchId" />
-    <InformalLoanHistoryModal v-model="loanHistoryOpen" :branch-id="activeBranchId" />
+    <InformalLoanHistoryModal v-model="loanHistoryOpen" :branch-id="activeBranchId" :banks="loanFilterBanks" />
     <CashVaultMovementHistoryModal v-model="showVaultHistoryModal" :branch-id="activeBranchId" />
     <BankTransfersModal
       v-if="activeBranchId != null"
@@ -556,6 +579,29 @@
       @update:model-value="onCreateLoanDialogToggle">
       <div class="space-y-3">
         <div>
+          <label class="text-xs text-gray-500 block mb-1.5">Origen del dinero</label>
+          <div class="grid grid-cols-2 gap-2">
+            <button type="button" class="rounded-lg border px-3 py-2 text-left text-sm"
+              :class="newLoanSource === 'cash' ? 'border-orange-400 bg-orange-50 text-orange-900' : 'border-gray-200'"
+              @click="newLoanSource = 'cash'; newLoanBankId = null">
+              <strong>Efectivo</strong><span class="block text-xs mt-0.5">No cambia esperados bancarios.</span>
+            </button>
+            <button type="button" class="rounded-lg border px-3 py-2 text-left text-sm"
+              :class="newLoanSource === 'bank' ? 'border-blue-400 bg-blue-50 text-blue-900' : 'border-gray-200'"
+              @click="newLoanSource = 'bank'">
+              <strong>Banco</strong><span class="block text-xs mt-0.5">Descuenta del esperado.</span>
+            </button>
+          </div>
+        </div>
+        <div v-if="newLoanSource === 'bank'">
+          <label class="text-xs text-gray-500 block mb-1">Banco</label>
+          <select v-model.number="newLoanBankId"
+            class="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300">
+            <option :value="null">Seleccionar banco</option>
+            <option v-for="bank in loanBanks" :key="bank.id" :value="bank.id">{{ bank.name }}</option>
+          </select>
+        </div>
+        <div>
           <label class="text-xs text-gray-500 block mb-1">Concepto</label>
           <input v-model="newLoanConcept" type="text" maxlength="500" placeholder="Ej. Domiciliario ruta noche"
             class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-300" />
@@ -611,7 +657,7 @@
           <button type="button" class="rounded-lg border px-3 py-2 text-left text-sm"
             :class="loanPaymentKind === 'cash' ? 'border-emerald-400 bg-emerald-50 text-emerald-900' : 'border-gray-200'"
             @click="loanPaymentKind = 'cash'">
-            <strong>Efectivo</strong><span class="block text-xs mt-0.5">Solo reduce el préstamo.</span>
+            <strong>Abono directo</strong><span class="block text-xs mt-0.5">Reduce el préstamo y, si aplica, recupera el esperado bancario.</span>
           </button>
           <button type="button" class="rounded-lg border px-3 py-2 text-left text-sm"
             :class="loanPaymentKind === 'expense' ? 'border-violet-400 bg-violet-50 text-violet-900' : 'border-gray-200'"
@@ -650,6 +696,10 @@
       @update:model-value="onDeactivateDialogToggle">
       <p class="text-sm text-gray-600 mb-3">
         Opcional: nota interna (quién devolvió, acuerdo, etc.).
+      </p>
+      <p v-if="loanToDeactivate?.bankId && loanToDeactivate.amount > 0"
+        class="text-sm text-orange-700 bg-orange-50 border border-orange-200 rounded-md px-3 py-2 mb-3">
+        El saldo pendiente se entenderá como devuelto y recuperará el esperado de {{ loanToDeactivate.bankName }}.
       </p>
       <textarea v-model="deactivateNotes" rows="3" maxlength="500" placeholder="Nota (opcional)"
         class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-300" />
@@ -706,8 +756,10 @@ import {
   EyeSlashIcon,
 } from '@heroicons/vue/24/outline'
 import { cashRegisterApi } from '@/services/MainAPI/cashRegisterApi'
+import { bankApi } from '@/services/MainAPI/bankApi'
 import { useToast } from '@/composables/useToast'
-import type { BranchInformalLoan, CashRegisterExpected, CloseBankReconciliationDto } from '@/types/cashRegister'
+import type { BranchInformalLoan, CashRegisterExpected, CloseBankReconciliationDto, InformalLoanSource } from '@/types/cashRegister'
+import type { Bank } from '@/types/bank'
 import type { ExpenseHeader } from '@/types/expense'
 import { DENOMINATIONS } from '@/types/cashRegister'
 
@@ -740,12 +792,23 @@ const denominationCounts = ref<Record<number, number>>(emptyDenominationCounts()
 const closingCash = ref(0)
 
 const loansTab = ref<'active' | 'inactive'>('active')
+const loanSourceFilter = ref<InformalLoanSource>('all')
+const loanBankFilter = ref<number | null>(null)
+const loanBanks = ref<Bank[]>([])
+const loanFilterBanks = ref<Bank[]>([])
+const loanSourceOptions: Array<{ value: InformalLoanSource; label: string }> = [
+  { value: 'all', label: 'Todos' },
+  { value: 'cash', label: 'Efectivo' },
+  { value: 'bank', label: 'Bancos' },
+]
 const loansSectionExpanded = ref(false)
 const branchInformalLoans = ref<BranchInformalLoan[]>([])
 const informalLoansLoading = ref(false)
 const createLoanDialogOpen = ref(false)
 const newLoanConcept = ref('')
 const newLoanAmount = ref<number>(0)
+const newLoanSource = ref<'cash' | 'bank'>('cash')
+const newLoanBankId = ref<number | null>(null)
 const savingLoan = ref(false)
 const editLoanDialogOpen = ref(false)
 const editLoanConcept = ref('')
@@ -1078,6 +1141,15 @@ function formatCurrency(value: number): string {
   )
 }
 
+function formatSignedCurrency(value: number): string {
+  const amount = Number(value) || 0
+  return `${amount > 0 ? '+' : ''}${formatCurrency(amount)}`
+}
+
+function bankLoanExpected(bankId: number) {
+  return expected.value?.banks.find(bank => bank.bankId === bankId)
+}
+
 function maskedCashVaultAmount(value: number): string {
   if (!shouldMaskCashVaultBalance.value || showCashVaultBalance.value) {
     return formatCurrency(value)
@@ -1165,7 +1237,12 @@ async function loadBranchInformalLoans() {
   informalLoansLoading.value = true
   try {
     const scope = loansTab.value === 'inactive' ? 'inactive' : 'active'
-    branchInformalLoans.value = await cashRegisterApi.getInformalLoans(activeBranchId.value ?? undefined, scope)
+    branchInformalLoans.value = await cashRegisterApi.getInformalLoans(
+      activeBranchId.value ?? undefined,
+      scope,
+      loanSourceFilter.value,
+      loanSourceFilter.value === 'bank' ? loanBankFilter.value ?? undefined : undefined,
+    )
   } catch (e) {
     console.error('Error cargando préstamos informales:', e)
     branchInformalLoans.value = []
@@ -1174,7 +1251,8 @@ async function loadBranchInformalLoans() {
   }
 }
 
-watch(loansTab, () => {
+watch([loansTab, loanSourceFilter, loanBankFilter], ([, source]) => {
+  if (source !== 'bank') loanBankFilter.value = null
   void loadBranchInformalLoans()
 })
 
@@ -1251,6 +1329,8 @@ function onCreateLoanDialogToggle(open: boolean) {
   if (!open && !savingLoan.value) {
     newLoanConcept.value = ''
     newLoanAmount.value = 0
+    newLoanSource.value = 'cash'
+    newLoanBankId.value = null
     createLoanDialogOpen.value = false
   }
 }
@@ -1271,14 +1351,24 @@ async function submitNewLoan() {
     toastError('Concepto obligatorio', 'Escribe un concepto para el préstamo.')
     return
   }
+  if (newLoanSource.value === 'bank' && !newLoanBankId.value) {
+    toastError('Banco obligatorio', 'Selecciona el banco del que salió el dinero.')
+    return
+  }
   savingLoan.value = true
   try {
     await cashRegisterApi.createInformalLoan(
-      { concept: c, amount: Number(newLoanAmount.value) || 0 },
+      {
+        concept: c,
+        amount: Number(newLoanAmount.value) || 0,
+        bankId: newLoanSource.value === 'bank' ? newLoanBankId.value : undefined,
+      },
       activeBranchId.value ?? undefined
     )
     newLoanConcept.value = ''
     newLoanAmount.value = 0
+    newLoanSource.value = 'cash'
+    newLoanBankId.value = null
     createLoanDialogOpen.value = false
     toastSuccess('Préstamo registrado', 4000)
     await refreshExpectedPreservingBankActuals()
@@ -1461,7 +1551,13 @@ async function loadData() {
   loading.value = true
   try {
     const branchId = activeBranchId.value ?? undefined
-    expected.value = await cashRegisterApi.getExpected(branchId)
+    const [expectedResult, banksResult] = await Promise.all([
+      cashRegisterApi.getExpected(branchId),
+      bankApi.getBanks({ branchId, page: 1, pageSize: 200 }),
+    ])
+    expected.value = expectedResult
+    loanFilterBanks.value = banksResult.items.filter(bank => bank.type === 'normal')
+    loanBanks.value = loanFilterBanks.value.filter(bank => bank.active)
     movementsBankId.value = null
 
     // Inicializar conciliaciones con valores del sistema
