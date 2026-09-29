@@ -152,6 +152,33 @@ export interface BranchInformalLoan {
   deactivatedById?: number | null
   deactivatedByName?: string | null
   deactivationNotes?: string | null
+  totalPaid: number
+  paymentsCount: number
+}
+
+export type BranchInformalLoanPaymentKind = 'cash' | 'expense'
+
+export interface BranchInformalLoanPayment {
+  id: number
+  kind: BranchInformalLoanPaymentKind
+  amount: number
+  balanceBefore: number
+  balanceAfter: number
+  notes?: string | null
+  createdAt: string
+  createdById: number
+  createdByName: string
+  expenseHeaderId?: number | null
+}
+
+export interface BranchInformalLoanHistory extends BranchInformalLoan {
+  initialAmount: number
+  payments: BranchInformalLoanPayment[]
+}
+
+export interface CreateBranchInformalLoanPaymentDto {
+  amount: number
+  notes?: string | null
 }
 
 export interface DeliveryAdvanceLineDto {

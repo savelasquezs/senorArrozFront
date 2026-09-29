@@ -1,7 +1,11 @@
 <template>
     <BaseDialog :model-value="isOpen" @update:model-value="onMainDialogUpdate"
-        :title="editingExpense ? `Editar Gasto #${editingExpense.id}` : 'Nuevo Gasto'" size="4xl">
+        :title="editingExpense ? `Editar Gasto #${editingExpense.id}` : informalLoanId ? 'Nuevo gasto para abono' : 'Nuevo Gasto'" size="4xl">
         <form @submit.prevent="handleSubmit" class="space-y-4">
+            <div v-if="informalLoanId" class="rounded-xl border border-violet-200 bg-violet-50 px-3 py-2.5 text-sm text-violet-900">
+                El total del gasto se aplicará como abono a <strong>{{ informalLoanConcept }}</strong>.
+                Saldo máximo: <strong>{{ formatCurrency(informalLoanMaxAmount ?? 0) }}</strong>.
+            </div>
             <!-- Proveedor -->
             <div class="rounded-xl border border-gray-200/80 bg-gray-50/40 px-3 py-2.5">
                 <div class="flex flex-wrap items-end gap-2">
@@ -185,7 +189,7 @@
                 </label>
             </div>
 
-            <div class="rounded-xl border border-gray-200/80 bg-white px-3 py-2.5 shadow-sm">
+            <div v-if="!informalLoanId" class="rounded-xl border border-gray-200/80 bg-white px-3 py-2.5 shadow-sm">
                 <div class="flex items-center justify-between gap-2 mb-2">
                     <label class="text-xs font-semibold text-gray-600 uppercase tracking-wide">
                         Pagos (opcional)
@@ -465,6 +469,9 @@ interface Props {
     skipAutoAdvance?: boolean
     /** Permite eliminar el ExpenseHeader completo al editar. */
     canDelete?: boolean
+    informalLoanId?: number | null
+    informalLoanConcept?: string
+    informalLoanMaxAmount?: number | null
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -474,6 +481,9 @@ const props = withDefaults(defineProps<Props>(), {
     presetDeliverymanId: null,
     skipAutoAdvance: false,
     canDelete: false,
+    informalLoanId: null,
+    informalLoanConcept: 'el préstamo',
+    informalLoanMaxAmount: null,
 })
 
 const emit = defineEmits<{
@@ -581,7 +591,7 @@ const draftReady = ref(false)
 const referencesReady = ref(false)
 
 const isExpenseDraftEnabled = computed(() =>
-    !props.editingExpense && !props.presetDeliverymanId && !props.skipAutoAdvance,
+    !props.editingExpense && !props.presetDeliverymanId && !props.skipAutoAdvance && !props.informalLoanId,
 )
 
 function getExpenseDraftScope(): ExpenseFormDraftScope | null {
@@ -777,10 +787,14 @@ const formatLastUsedAt = (value?: string | null) => {
     }
 }
 
+const availableExpenseOptions = computed(() => props.informalLoanId
+    ? expenseOptions.value.filter(option => !expenseInventoryCatalog.value.find(expense => expense.id === option.value)?.tracksInventory)
+    : expenseOptions.value)
+
 const favoriteExpenseOptions = computed(() => {
     if (!supplierExpenseSuggestions.value.length) return []
 
-    const optionMap = new Map(expenseOptions.value.map(option => [option.value, option]))
+    const optionMap = new Map(availableExpenseOptions.value.map(option => [option.value, option]))
 
     return supplierExpenseSuggestions.value.map((suggestion) => {
         const baseOption = optionMap.get(suggestion.expenseId)
@@ -804,7 +818,7 @@ const favoriteExpenseOptions = computed(() => {
             label: baseOption?.label ?? `${suggestion.expenseName} - ${suggestion.expenseUnit}`,
             description: mergedDescription
         }
-    })
+    }).filter(option => optionMap.has(option.value))
 })
 
 const selectedExpenseIds = computed(() => {
@@ -817,7 +831,7 @@ const selectedExpenseIds = computed(() => {
 
 const prioritizedExpenseOptions = computed(() => {
     if (!favoriteExpenseOptions.value.length) {
-        return expenseOptions.value
+        return availableExpenseOptions.value
     }
 
     const seen = new Set<number>()
@@ -831,15 +845,15 @@ const prioritizedExpenseOptions = computed(() => {
 
     favoriteExpenseOptions.value.forEach(pushOption)
     selectedExpenseIds.value.forEach(id => {
-        const existing = expenseOptions.value.find(option => option.value === id)
+        const existing = availableExpenseOptions.value.find(option => option.value === id)
         pushOption(existing)
     })
 
     if (showAllSupplierExpenses.value) {
-        expenseOptions.value.forEach(pushOption)
+        availableExpenseOptions.value.forEach(pushOption)
     }
 
-    return result.length > 0 ? result : expenseOptions.value
+    return result.length > 0 ? result : availableExpenseOptions.value
 })
 
 const supplierHasFavoriteExpenses = computed(() => favoriteExpenseOptions.value.length > 0)
@@ -1137,6 +1151,7 @@ const isFormValid = computed(() => {
             (!inventoryExpense(d.expenseId) || Boolean(d.inventoryConversionId))) &&
         (!isDeliverymanAdvance.value || selectedDeliverymanId.value != null) &&
         cashDifference.value >= 0 &&
+        (!props.informalLoanId || props.informalLoanMaxAmount == null || invoiceGrossTotal.value <= props.informalLoanMaxAmount) &&
         canSaveEditingExpense.value
 })
 
@@ -1484,7 +1499,11 @@ const handleSubmit = async () => {
     }
 
     if (!isFormValid.value) {
-        error('Formulario inválido', 'Por favor completa todos los campos requeridos')
+        if (props.informalLoanId && props.informalLoanMaxAmount != null && invoiceGrossTotal.value > props.informalLoanMaxAmount) {
+            error('El gasto supera el saldo', `El máximo permitido es ${formatCurrency(props.informalLoanMaxAmount)}.`)
+        } else {
+            error('Formulario inválido', 'Por favor completa todos los campos requeridos')
+        }
         return
     }
 
@@ -1510,6 +1529,7 @@ async function executeExpenseSave() {
 
         const headerNotes = (formData.value.notes || '').trim()
         const payload: CreateExpenseHeaderDto | UpdateExpenseHeaderDto = {
+            ...(props.informalLoanId ? { informalLoanId: props.informalLoanId } : {}),
             supplierId: formData.value.supplierId!,
             ...(deliverymanForHeader ? { deliverymanId: deliverymanForHeader } : {}),
             includeVat: applyVat.value,

@@ -214,6 +214,11 @@
                         @click="openDeliveryAdvanceModal">
                         Pedidos domicilio…
                       </BaseButton>
+                      <BaseButton v-if="canViewClosureHistory" variant="outline" size="sm"
+                        class="text-xs shrink-0 border-gray-200 text-gray-700"
+                        @click="loanHistoryOpen = true">
+                        Ver historial
+                      </BaseButton>
                     </div>
                     <div v-else class="text-xs text-gray-500">
                       Historial de préstamos dados de baja
@@ -225,7 +230,7 @@
                       ]" @click="loansTab = 'active'">
                         Activos
                       </button>
-                      <button type="button" :class="[
+                      <button v-if="canViewClosureHistory" type="button" :class="[
                         'px-2 sm:px-3 py-1 rounded font-medium transition-colors',
                         loansTab === 'inactive' ? 'bg-orange-500 text-white shadow-sm' : 'text-gray-600 hover:bg-orange-50',
                       ]" @click="loansTab = 'inactive'">
@@ -258,6 +263,9 @@
                             <p class="text-sm font-medium text-gray-900">{{ loan.concept }}</p>
                             <div class="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-gray-500">
                               <span class="tabular-nums font-medium text-gray-700">{{ formatCurrency(loan.amount) }}</span>
+                              <span v-if="loan.totalPaid > 0" class="text-emerald-700">
+                                Abonado: {{ formatCurrency(loan.totalPaid) }}
+                              </span>
                               <span v-if="loan.updatedAt">Modificado: {{ formatDate(loan.updatedAt) }}</span>
                             </div>
                             <p v-if="loansTab === 'inactive' && loan.deactivatedAt"
@@ -271,6 +279,11 @@
                             </p>
                           </div>
                           <div class="shrink-0 flex flex-wrap gap-1.5">
+                            <BaseButton v-if="loansTab === 'active' && loan.amount > 0" variant="outline" size="sm"
+                              class="text-emerald-700 border-emerald-200 text-xs py-0.5"
+                              @click="openLoanPayment(loan)">
+                              Abonar
+                            </BaseButton>
                             <BaseButton variant="outline" size="sm"
                               class="text-orange-800 border-orange-200 text-xs py-0.5"
                               @click="openEditLoan(loan)">
@@ -468,6 +481,7 @@
     </div>
 
     <CashClosureHistoryModal v-model="showHistoryModal" :branch-id="activeBranchId" />
+    <InformalLoanHistoryModal v-model="loanHistoryOpen" :branch-id="activeBranchId" />
     <CashVaultMovementHistoryModal v-model="showVaultHistoryModal" :branch-id="activeBranchId" />
     <BankTransfersModal
       v-if="activeBranchId != null"
@@ -477,6 +491,10 @@
     />
     <ExpenseFormModal v-if="showExpenseFormModal" :is-open="showExpenseFormModal" @close="closeExpenseFormModal"
       @submit="onExpenseSaved" />
+    <ExpenseFormModal v-if="loanExpenseModalOpen && loanToPay" :is-open="loanExpenseModalOpen"
+      :informal-loan-id="loanToPay.id" :informal-loan-concept="loanToPay.concept"
+      :informal-loan-max-amount="loanToPay.amount" @close="closeLoanExpenseModal"
+      @submit="onLoanExpenseSaved" />
 
     <BaseDialog v-model="vaultAbonoOpen" title="Abonar a caja mayor (efectivo)" size="md"
       @update:model-value="onVaultAbonoToggle">
@@ -567,13 +585,60 @@
         <div>
           <label class="text-xs text-gray-500 block mb-1">Monto (COP)</label>
           <input v-model.number="editLoanAmount" type="number" step="1000"
+            :disabled="Boolean(loanToEdit?.paymentsCount)"
             class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-300" />
+          <p v-if="loanToEdit?.paymentsCount" class="mt-1 text-xs text-gray-500">
+            El saldo no se edita después de registrar abonos.
+          </p>
         </div>
       </div>
       <template #footer>
         <BaseButton variant="outline" @click="editLoanDialogOpen = false">Cancelar</BaseButton>
         <BaseButton variant="primary" :loading="savingLoanEdit" @click="submitEditLoan">
           Guardar cambios
+        </BaseButton>
+      </template>
+    </BaseDialog>
+
+    <BaseDialog v-model="loanPaymentDialogOpen" title="Registrar abono" size="md"
+      @update:model-value="onLoanPaymentDialogToggle">
+      <div v-if="loanToPay" class="space-y-4">
+        <div class="rounded-lg bg-orange-50 px-3 py-2 text-sm text-orange-900">
+          <strong>{{ loanToPay.concept }}</strong>
+          <span class="block text-xs mt-0.5">Saldo: {{ formatCurrency(loanToPay.amount) }}</span>
+        </div>
+        <div class="grid grid-cols-2 gap-2">
+          <button type="button" class="rounded-lg border px-3 py-2 text-left text-sm"
+            :class="loanPaymentKind === 'cash' ? 'border-emerald-400 bg-emerald-50 text-emerald-900' : 'border-gray-200'"
+            @click="loanPaymentKind = 'cash'">
+            <strong>Efectivo</strong><span class="block text-xs mt-0.5">Solo reduce el préstamo.</span>
+          </button>
+          <button type="button" class="rounded-lg border px-3 py-2 text-left text-sm"
+            :class="loanPaymentKind === 'expense' ? 'border-violet-400 bg-violet-50 text-violet-900' : 'border-gray-200'"
+            @click="loanPaymentKind = 'expense'">
+            <strong>Nuevo gasto</strong><span class="block text-xs mt-0.5">El total será el abono.</span>
+          </button>
+        </div>
+        <template v-if="loanPaymentKind === 'cash'">
+          <div>
+            <label class="text-xs text-gray-500 block mb-1">Monto (COP)</label>
+            <input v-model.number="loanPaymentAmount" type="number" min="1" :max="loanToPay.amount" step="1000"
+              class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-300" />
+          </div>
+          <div>
+            <label class="text-xs text-gray-500 block mb-1">Nota (opcional)</label>
+            <input v-model="loanPaymentNotes" type="text" maxlength="500"
+              class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-300" />
+          </div>
+        </template>
+        <p v-else class="text-sm text-gray-600">
+          Se abrirá el formulario de gastos. No se registrará pago bancario ni movimiento de caja.
+        </p>
+      </div>
+      <template #footer>
+        <BaseButton variant="outline" @click="loanPaymentDialogOpen = false">Cancelar</BaseButton>
+        <BaseButton variant="primary" :loading="savingLoanPayment" @click="submitLoanPayment">
+          {{ loanPaymentKind === 'expense' ? 'Crear gasto' : 'Registrar abono' }}
         </BaseButton>
       </template>
     </BaseDialog>
@@ -615,6 +680,7 @@ import MainLayout from '@/components/layout/MainLayout.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseDialog from '@/components/ui/BaseDialog.vue'
 import CashClosureHistoryModal from '@/components/cashRegister/CashClosureHistoryModal.vue'
+import InformalLoanHistoryModal from '@/components/cashRegister/InformalLoanHistoryModal.vue'
 import CashVaultMovementHistoryModal from '@/components/cashRegister/CashVaultMovementHistoryModal.vue'
 import DeliveryAdvanceLoanModal from '@/components/cashRegister/DeliveryAdvanceLoanModal.vue'
 import BankTransfersModal from '@/components/cashRegister/BankTransfersModal.vue'
@@ -653,6 +719,7 @@ const activeBranchId = computed(() =>
 const { success: toastSuccess, error: toastError } = useToast()
 
 const showHistoryModal = ref(false)
+const loanHistoryOpen = ref(false)
 const showVaultHistoryModal = ref(false)
 const showBankTransfersModal = ref(false)
 const showExpenseFormModal = ref(false)
@@ -691,6 +758,13 @@ const secondClosureConfirmOpen = ref(false)
 const deactivateNotes = ref('')
 const loanToDeactivate = ref<BranchInformalLoan | null>(null)
 const deactivatingLoan = ref(false)
+const loanPaymentDialogOpen = ref(false)
+const loanExpenseModalOpen = ref(false)
+const loanToPay = ref<BranchInformalLoan | null>(null)
+const loanPaymentKind = ref<'cash' | 'expense'>('cash')
+const loanPaymentAmount = ref<number>(0)
+const loanPaymentNotes = ref('')
+const savingLoanPayment = ref(false)
 
 const vaultAbonoOpen = ref(false)
 const vaultDescargaOpen = ref(false)
@@ -1107,6 +1181,70 @@ watch(loansTab, () => {
 function openCreateLoanModal() {
   loansSectionExpanded.value = true
   createLoanDialogOpen.value = true
+}
+
+function openLoanPayment(loan: BranchInformalLoan) {
+  loanToPay.value = loan
+  loanPaymentKind.value = 'cash'
+  loanPaymentAmount.value = 0
+  loanPaymentNotes.value = ''
+  loanPaymentDialogOpen.value = true
+}
+
+function onLoanPaymentDialogToggle(open: boolean) {
+  if (!open && !savingLoanPayment.value && !loanExpenseModalOpen.value) {
+    loanToPay.value = null
+    loanPaymentAmount.value = 0
+    loanPaymentNotes.value = ''
+  }
+}
+
+async function submitLoanPayment() {
+  const loan = loanToPay.value
+  if (!loan) return
+
+  if (loanPaymentKind.value === 'expense') {
+    loanExpenseModalOpen.value = true
+    loanPaymentDialogOpen.value = false
+    return
+  }
+
+  const amount = Number(loanPaymentAmount.value)
+  if (!Number.isFinite(amount) || amount <= 0 || amount > loan.amount) {
+    toastError('Monto inválido', `El abono debe estar entre $1 y ${formatCurrency(loan.amount)}.`)
+    return
+  }
+
+  savingLoanPayment.value = true
+  try {
+    await cashRegisterApi.createInformalLoanPayment(
+      loan.id,
+      { amount, notes: loanPaymentNotes.value.trim() || undefined },
+      activeBranchId.value ?? undefined,
+    )
+    loanPaymentDialogOpen.value = false
+    toastSuccess('Abono registrado', 4000)
+    await refreshExpectedPreservingBankActuals()
+    await loadBranchInformalLoans()
+    loanToPay.value = null
+  } catch (e: any) {
+    toastError('No se pudo registrar el abono', e.message || 'Error')
+  } finally {
+    savingLoanPayment.value = false
+  }
+}
+
+function closeLoanExpenseModal() {
+  loanExpenseModalOpen.value = false
+  loanToPay.value = null
+}
+
+async function onLoanExpenseSaved(_expense: ExpenseHeader) {
+  loanExpenseModalOpen.value = false
+  loanToPay.value = null
+  toastSuccess('Gasto creado y aplicado al préstamo', 5000)
+  await refreshExpectedPreservingBankActuals()
+  await loadBranchInformalLoans()
 }
 
 function onCreateLoanDialogToggle(open: boolean) {

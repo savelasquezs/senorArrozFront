@@ -2,12 +2,15 @@ import { BaseApi } from './baseApi'
 import type { PagedResult } from '@/types/common'
 import type {
   BranchInformalLoan,
+  BranchInformalLoanHistory,
+  BranchInformalLoanPayment,
   CashClosure,
   CashClosureAuditSummary,
   CashRegisterExpected,
   CashVaultMovement,
   CloseCashRegisterDto,
   CreateBranchInformalLoanDto,
+  CreateBranchInformalLoanPaymentDto,
   CreateCashVaultMovementDto,
   DeactivateBranchInformalLoanDto,
   DeliveryAdvanceOrderRow,
@@ -43,6 +46,22 @@ class CashRegisterApi extends BaseApi {
     const params: Record<string, any> = {}
     if (branchId !== undefined) params.BranchId = branchId
     return this.post<BranchInformalLoan>('/cash-register/informal-loans', dto, { params })
+  }
+
+  async createInformalLoanPayment(
+    id: number,
+    dto: CreateBranchInformalLoanPaymentDto,
+    branchId?: number,
+  ): Promise<BranchInformalLoanPayment> {
+    const params: Record<string, any> = {}
+    if (branchId !== undefined) params.BranchId = branchId
+    return this.post<BranchInformalLoanPayment>(`/cash-register/informal-loans/${id}/payments`, dto, { params })
+  }
+
+  async getInformalLoanHistory(branchId?: number, page = 1, pageSize = 10): Promise<PagedResult<BranchInformalLoanHistory>> {
+    const params: Record<string, any> = { Page: page, PageSize: pageSize }
+    if (branchId !== undefined) params.BranchId = branchId
+    return this.get<PagedResult<BranchInformalLoanHistory>>('/cash-register/informal-loans/history', { params })
   }
 
   async updateInformalLoan(id: number, dto: UpdateBranchInformalLoanDto, branchId?: number): Promise<BranchInformalLoan> {

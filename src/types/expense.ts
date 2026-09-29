@@ -76,6 +76,7 @@ export interface ExpenseBankPayment {
 }
 
 export interface CreateExpenseHeaderDto {
+    informalLoanId?: number | null
     supplierId: number
     deliverymanId?: number | null
     notes?: string | null
