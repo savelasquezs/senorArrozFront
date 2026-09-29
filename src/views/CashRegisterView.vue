@@ -404,12 +404,6 @@
                         <p class="text-[10px] sm:text-xs text-gray-400 tabular-nums">
                           Sis.: {{ isCashVaultRecon(recon) ? maskedCashVaultAmount(recon.expectedBalance) : formatCurrency(recon.expectedBalance) }}
                         </p>
-                        <p v-if="bankLoanExpected(recon.bankId)?.informalLoanDeduction" class="text-[10px] text-blue-600">
-                          Préstamos asociados: {{ formatCurrency(bankLoanExpected(recon.bankId)?.informalLoanDeduction ?? 0) }}
-                          <span v-if="bankLoanExpected(recon.bankId)?.informalLoanAdjustment">
-                            · ajuste {{ formatSignedCurrency(-(bankLoanExpected(recon.bankId)?.informalLoanAdjustment ?? 0)) }}
-                          </span>
-                        </p>
                       </div>
                       <div class="col-span-1">
                         <label class="text-[10px] text-gray-500 block mb-0.5">Saldo real</label>
@@ -1155,15 +1149,6 @@ function formatCurrency(value: number): string {
   return new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(
     value ?? 0
   )
-}
-
-function formatSignedCurrency(value: number): string {
-  const amount = Number(value) || 0
-  return `${amount > 0 ? '+' : ''}${formatCurrency(amount)}`
-}
-
-function bankLoanExpected(bankId: number) {
-  return expected.value?.banks.find(bank => bank.bankId === bankId)
 }
 
 function maskedCashVaultAmount(value: number): string {
