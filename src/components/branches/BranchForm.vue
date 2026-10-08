@@ -96,12 +96,8 @@
             </div>
 
             <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <BaseInput :model-value="form.deliveryTrackingStayThresholdMinutes"
-                    @update:model-value="(v) => { form.deliveryTrackingStayThresholdMinutes = positiveInteger(v, 10) }"
-                    type="number" :min="1" :step="1" label="Permanencia mínima (min)" />
-                <BaseInput :model-value="form.deliveryTrackingStayRadiusMeters"
-                    @update:model-value="(v) => { form.deliveryTrackingStayRadiusMeters = positiveInteger(v, 50) }"
-                    type="number" :min="1" :step="1" label="Radio de permanencia (m)" />
+                <BaseInput :model-value="10" disabled type="number" label="Permanencia mínima (min)" />
+                <BaseInput :model-value="20" disabled type="number" label="Radio de permanencia (m)" />
                 <BaseInput :model-value="form.deliveryTrackingAllowedDistanceMeters"
                     @update:model-value="(v) => { form.deliveryTrackingAllowedDistanceMeters = positiveInteger(v, 50) }"
                     type="number" :min="1" :step="1" label="Distancia permitida (m)" />
@@ -253,7 +249,7 @@ const form = reactive({
     deliveryTrackingLightIntervalSeconds: 300,
     deliveryTrackingActiveIntervalSeconds: 30,
     deliveryTrackingStayThresholdMinutes: 10,
-    deliveryTrackingStayRadiusMeters: 50,
+    deliveryTrackingStayRadiusMeters: 20,
     deliveryTrackingAllowedDistanceMeters: 50,
     deliveryTrackingLocationRetentionDays: 3,
     deliveryTrackingIncidentRetentionDays: 15,

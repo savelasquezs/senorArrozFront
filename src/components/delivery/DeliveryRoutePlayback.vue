@@ -54,6 +54,7 @@
 </template>
 
 <script setup lang="ts">
+import { supportedStayDuration } from '@/utils/trackingEvidence'
 import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import { importLibrary, setOptions } from '@googlemaps/js-api-loader'
 import BaseButton from '@/components/ui/BaseButton.vue'
@@ -368,11 +369,7 @@ function showPointPulse(point: DeliveryPlaybackPoint, color: string) {
 }
 
 function stayDurationSeconds(stay: DeliveryPlaybackStay, playhead: number) {
-  const start = time(stay.startedAt)
-  const end = stay.endedAt ? time(stay.endedAt) : null
-  const reference = stay.isActive ? Date.now() : playhead
-  if (end != null && reference >= end) return stay.durationSeconds
-  return Math.max(0, Math.floor((reference - start) / 1000))
+  return supportedStayDuration(stay, playhead)
 }
 
 const roleLabels: Record<string, string> = {
@@ -388,9 +385,9 @@ function orderDescription(order: DeliveryPlaybackOrder) {
 
 function stayPopup(deliveryman: DeliveryPlaybackDeliveryman, stay: DeliveryPlaybackStay) {
   const duration = formatStayDuration(stayDurationSeconds(stay, engine.currentTimestamp.value))
-  const end = stay.isActive ? 'Activa' : stay.endedAt ? formatDateTime(stay.endedAt) : 'Sin dato'
+  const end = stay.endedAt ? formatDateTime(stay.endedAt) : 'Sin dato'
   const relatedOrders = stay.orders.map(orderDescription).join('')
-  return `<div style="max-width:320px;font-size:12px;line-height:1.45"><b>Estadía · ${escapeMapHtml(deliveryman.deliverymanName)}</b><br>Inicio: ${formatDateTime(stay.startedAt)}<br>Fin: ${end}<br>Duración: <b>${duration}</b><br>Puntos agrupados: ${stay.pointCount}<br>Ubicación aproximada: ${stay.centerLatitude.toFixed(6)}, ${stay.centerLongitude.toFixed(6)}<br>Radio observado: ${Math.round(stay.radiusMeters)} m<br>Distancia a sucursal: ${stay.distanceToBranchMeters == null ? 'sin dato' : `${Math.round(stay.distanceToBranchMeters)} m`}<br>Distancia al pedido: ${stay.distanceToOrderMeters == null ? 'sin dato' : `${Math.round(stay.distanceToOrderMeters)} m`}${relatedOrders || '<br>Sin pedidos relacionados'}</div>`
+  return `<div style="max-width:320px;font-size:12px;line-height:1.45"><b>Estadía · ${escapeMapHtml(deliveryman.deliverymanName)}</b><br>Inicio: ${formatDateTime(stay.startedAt)}<br>Evidencia hasta: ${end}<br>Duración respaldada: <b>${duration}</b><br>Puntos agrupados: ${stay.pointCount}<br>Ubicación aproximada: ${stay.centerLatitude.toFixed(6)}, ${stay.centerLongitude.toFixed(6)}<br>Radio observado: ${Math.round(stay.radiusMeters)} m<br>Distancia a sucursal: ${stay.distanceToBranchMeters == null ? 'sin dato' : `${Math.round(stay.distanceToBranchMeters)} m`}<br>Distancia al pedido: ${stay.distanceToOrderMeters == null ? 'sin dato' : `${Math.round(stay.distanceToOrderMeters)} m`}${relatedOrders || '<br>Sin pedidos relacionados'}</div>`
 }
 
 function openStay(deliveryman: DeliveryPlaybackDeliveryman, stay: DeliveryPlaybackStay, anchor: google.maps.Marker) {

@@ -123,6 +123,9 @@ export interface DeliveryTrackingIncidentDetail {
   reviewedByUserName: string | null
   reviewedAt: string | null
   evidenceComplete: boolean
+  evidenceThrough?: string | null
+  evidenceRetracted?: boolean
+  sampleAgreementPercent?: number | null
   locations: DeliveryIncidentLocationEvidence[]
   deviceEvents: DeliveryIncidentDeviceEventEvidence[]
 }

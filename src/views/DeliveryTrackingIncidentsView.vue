@@ -128,8 +128,9 @@
 
         <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <Fact label="Inicio" :value="formatDateTime(detail.startedAt)" />
-          <Fact :label="detail.incidentType === 'location_disabled' ? 'Recuperación' : 'Finalización'" :value="detail.isActive ? 'Activa' : detail.endedAt ? formatDateTime(detail.endedAt) : 'Aún no registrada'" />
-          <Fact label="Duración" :value="formatDuration(detail.isActive ? Math.floor((liveNow - new Date(detail.startedAt).getTime()) / 1000) : detail.durationSeconds)" />
+          <Fact :label="detail.incidentType === 'stay' ? 'Evidencia hasta' : 'Recuperación'" :value="detail.incidentType === 'stay' ? formatDateTime(detail.evidenceThrough || detail.endedAt || detail.startedAt) : detail.evidenceComplete && detail.endedAt ? formatDateTime(detail.endedAt) : 'No registrada'" />
+          <Fact :label="detail.incidentType === 'stay' ? 'Duración respaldada' : 'Duración registrada'" :value="formatDuration(detail.durationSeconds)" />
+          <Fact v-if="detail.incidentType === 'stay' && detail.sampleAgreementPercent != null" label="Muestras coincidentes" :value="`${detail.sampleAgreementPercent}%`" />
           <Fact :label="detail.incidentType === 'stay' ? 'Puntos agrupados' : 'Puntos de evidencia'" :value="String(detail.incidentType === 'stay' ? detail.pointCount : detail.locations.length)" />
           <Fact v-if="detail.incidentType === 'tracking_interruption'" label="Ruta activa" :value="detail.deliveryRouteId ? `#${detail.deliveryRouteId}` : 'No identificada'" />
           <Fact v-if="detail.incidentType === 'stay'" label="Precisión promedio" :value="formatMeters(detail.averageAccuracyMeters)" />
@@ -138,6 +139,11 @@
           <Fact v-if="detail.incidentType === 'stay'" label="Distancia al destino" :value="formatNullableMeters(detail.distanceToOrderMeters)" />
         </div>
 
+        <p v-if="detail.evidenceRetracted" class="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">La evidencia recuperada ya no respalda esta permanencia. Se conserva el historial y cualquier revisión administrativa anterior.</p>
+        <div v-if="detail.incidentType === 'tracking_interruption' && lastKnownLocation" class="rounded-lg border border-gray-200 p-3 text-sm">
+          <span class="font-medium">Última ubicación conocida, no actual: </span>
+          <a class="underline" :href="mapUrl(lastKnownLocation.latitude, lastKnownLocation.longitude)" target="_blank" rel="noopener noreferrer">{{ formatDateTime(lastKnownLocation.recordedAt) }}</a>
+        </div>
         <div v-if="detail.interruptionCause" class="rounded-xl border border-amber-100 bg-amber-50 p-4 text-sm text-amber-900">
           <p class="font-semibold">Causa observada</p>
           <p class="mt-1">{{ interruptionCauseLabel(detail.interruptionCause) }}</p>
@@ -208,7 +214,7 @@
           <p v-if="detail.deviceEvents.length === 0" class="rounded-xl bg-gray-50 p-4 text-sm text-gray-500">No se registraron eventos técnicos durante este periodo.</p>
           <div v-else class="space-y-2">
             <div v-for="event in detail.deviceEvents" :key="event.sourceDeviceEventId" class="flex flex-col gap-1 rounded-xl border border-gray-200 p-3 text-sm sm:flex-row sm:items-center sm:justify-between">
-              <div><p class="font-medium text-gray-900">{{ deviceEventLabel(event.eventType) }}</p><p v-if="event.details" class="text-xs text-gray-500">{{ event.details }}</p><p v-if="event.offlineLocationCount" class="text-xs text-gray-500">{{ event.offlineLocationCount }} ubicaciones offline<span v-if="event.offlineStartedAt && event.offlineEndedAt"> · {{ formatDuration(Math.round((new Date(event.offlineEndedAt).getTime() - new Date(event.offlineStartedAt).getTime()) / 1000)) }}</span></p></div>
+              <div><p class="font-medium text-gray-900">{{ trackingEventLabel(event) }}</p><p v-if="event.details" class="text-xs text-gray-500">{{ event.details }}</p><p v-if="event.offlineLocationCount" class="text-xs text-gray-500">{{ event.offlineLocationCount }} ubicaciones recuperadas<span v-if="event.offlineStartedAt && event.offlineEndedAt"> · {{ formatDuration(Math.round((new Date(event.offlineEndedAt).getTime() - new Date(event.offlineStartedAt).getTime()) / 1000)) }}</span></p></div>
               <span class="text-xs text-gray-500">{{ formatDateTime(event.recordedAt) }}</span>
             </div>
           </div>
@@ -283,6 +289,7 @@
 
 <script setup lang="ts">
 import { computed, defineComponent, h, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
+import { trackingEventLabel } from '@/utils/trackingEvidence'
 import MainLayout from '@/components/layout/MainLayout.vue'
 import BaseBadge from '@/components/ui/BaseBadge.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
@@ -349,11 +356,10 @@ const contextIncidentStay = computed(() => {
     stay.workSessionId === detail.value!.workSessionId
     && Math.abs(new Date(stay.startedAt).getTime() - new Date(detail.value!.startedAt).getTime()) < 1_000) || null
 })
-const liveNow = ref(Date.now())
+const lastKnownLocation = computed(() => detail.value?.locations.filter(point => new Date(point.recordedAt).getTime() <= new Date(detail.value!.startedAt).getTime()).sort((a, b) => Date.parse(b.recordedAt) - Date.parse(a.recordedAt))[0] ?? null)
 const contextLiveFollow = ref(false)
 const explorerLiveFollow = ref(false)
 let liveRefreshTimer: number | null = null
-let liveClockTimer: number | null = null
 let liveRefreshRunning = false
 const explorerOpen = ref(false)
 const explorerBranchId = ref('')
@@ -669,8 +675,8 @@ function booleanLabel(value: boolean | null) { return value == null ? 'Sin dato'
 function stateLabel(name: string, value: boolean | null) { return `${name}: ${value == null ? 'sin dato' : value ? 'activo' : 'inactivo'}` }
 function classificationLabel(value: DeliveryStayClassification | null) { return classificationOptions.find(option => option.value === value)?.label || 'Sin clasificación' }
 function incidentTypeLabel(value: DeliveryTrackingIncidentListItem['incidentType']) { return ({ stay: 'Permanencia', route_deviation: 'Desviación de ruta', location_disabled: 'Ubicación apagada', tracking_interruption: 'Interrupción de seguimiento' } as const)[value] }
-function interruptionCauseLabel(value: DeliveryTrackingIncidentDetail['interruptionCause']) { return ({ gps_disabled: 'GPS apagado.', location_permission_revoked: 'Permiso de ubicación retirado.', airplane_mode_enabled: 'Modo avión activado.', app_or_tracking_service_stopped: 'La app o el servicio de seguimiento fue detenido.', wifi_disabled: 'Wi-Fi desactivado durante la pérdida de conectividad.', connectivity_interruption: 'Interrupción de conectividad.', device_restarted: 'Dispositivo reiniciado.', not_determined: 'La causa exacta no puede determinarse con la evidencia disponible.' } as const)[value || 'not_determined'] }
-function interruptionCertaintyLabel(value: DeliveryTrackingIncidentDetail['interruptionCertainty']) { return ({ confirmed_by_device: 'Causa confirmada por el dispositivo', technical_evidence: 'Causa sustentada por evidencia técnica', not_determined: 'Causa no determinable' } as const)[value || 'not_determined'] }
+function interruptionCauseLabel(value: DeliveryTrackingIncidentDetail['interruptionCause']) { return ({ gps_disabled: 'GPS apagado.', location_permission_revoked: 'Permiso de ubicación retirado.', airplane_mode_enabled: 'Modo avión activado.', app_or_tracking_service_stopped: 'La app o el servicio de seguimiento fue detenido.', wifi_disabled: 'Wi-Fi desactivado; no demuestra pérdida de Internet.', connectivity_interruption: 'Interrupción de comunicación; no demuestra falta de Internet.', device_restarted: 'Dispositivo reiniciado.', not_determined: 'La causa exacta no puede determinarse con la evidencia disponible.' } as const)[value || 'not_determined'] }
+function interruptionCertaintyLabel(value: DeliveryTrackingIncidentDetail['interruptionCertainty']) { return ({ confirmed_by_device: 'Estado reportado por el dispositivo; revisar contexto', technical_evidence: 'Causa sustentada por evidencia técnica', not_determined: 'Causa no determinable' } as const)[value || 'not_determined'] }
 function evidencePointLabel(incident: DeliveryTrackingIncidentDetail, index: number) {
   if (incident.incidentType !== 'location_disabled') return incident.locations[index]?.isCorePoint ? 'Permanencia' : 'Margen'
   return index === 0 ? 'Antes del apagado' : 'Después de encender'
@@ -678,18 +684,16 @@ function evidencePointLabel(incident: DeliveryTrackingIncidentDetail, index: num
 function mapUrl(latitude: number, longitude: number) { return `https://www.google.com/maps?q=${latitude},${longitude}` }
 function reviewStatusLabel(value: DeliveryIncidentReviewStatus) { return reviewStatusOptions.find(option => option.value === value)?.label || value }
 function reviewVariant(value: DeliveryIncidentReviewStatus): 'warning' | 'success' | 'danger' | 'info' | 'secondary' { if (value === 'pending') return 'warning'; if (value === 'justified' || value === 'closed_without_action') return 'success'; if (value === 'not_justified' || value === 'referred_to_disciplinary_process') return 'danger'; if (value === 'gps_error' || value === 'technical_failure') return 'info'; return 'secondary' }
-function trackingModeLabel(value: string | null) { return ({ light: 'Liviano', active_delivery: 'Pedido activo', offline: 'Sin conexión', stopped: 'Detenido' } as Record<string, string>)[value || ''] || 'Sin dato' }
+function trackingModeLabel(value: string | null) { return ({ light: 'Liviano', active_delivery: 'Pedido activo', offline: 'Pendiente de sincronización', stopped: 'Detenido' } as Record<string, string>)[value || ''] || 'Sin dato' }
 function orderStatusLabel(value: string | null) { return ({ OnTheWay: 'En camino', Delivered: 'Entregado', Ready: 'Listo' } as Record<string, string>)[value || ''] || value || 'Sin dato' }
-function deviceEventLabel(value: string) { return ({ gps_disabled: 'GPS apagado', gps_enabled: 'GPS recuperado', internet_lost: 'Internet perdido', internet_recovered: 'Internet recuperado', airplane_mode_enabled: 'Modo avión activado', airplane_mode_disabled: 'Modo avión desactivado', wifi_disabled: 'Wi-Fi desactivado', wifi_enabled: 'Wi-Fi activado', device_restarted: 'Dispositivo reiniciado', location_permission_revoked: 'Permiso retirado', location_permission_recovered: 'Permiso recuperado', battery_low: 'Batería baja', app_stopped: 'Aplicación detenida', location_service_restarted: 'Servicio reiniciado', automatic_closure: 'Cierre automático', total_settlement: 'Cierre por liquidación', tracking_started: 'Seguimiento iniciado', tracking_stopped: 'Seguimiento detenido' } as Record<string, string>)[value] || value.replace(/_/g, ' ') }
+
 
 onMounted(async () => {
-  liveClockTimer = window.setInterval(() => { liveNow.value = Date.now() }, 1_000)
   try { await loadBranches() } catch (error: any) { toast.error('No se pudieron cargar las sucursales', error.message) }
   await loadIncidents()
 })
 
 onUnmounted(() => {
-  if (liveClockTimer != null) window.clearInterval(liveClockTimer)
   if (liveRefreshTimer != null) window.clearInterval(liveRefreshTimer)
 })
 

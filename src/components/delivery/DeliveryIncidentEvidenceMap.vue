@@ -17,6 +17,7 @@
 <script setup lang="ts">
 import { onMounted, onUnmounted, ref, watch } from 'vue'
 import { importLibrary, setOptions } from '@googlemaps/js-api-loader'
+import { supportedStayDuration } from '@/utils/trackingEvidence'
 import { escapeMapHtml, formatStayDuration } from '@/composables/useDeliveryRoutePlayback'
 import type { DeliveryIncidentLocationEvidence, DeliveryPlaybackStay } from '@/services/MainAPI/deliveryTrackingIncidentsApi'
 
@@ -59,23 +60,20 @@ const hasRelatedOrder = () => Boolean(props.orderId || props.stay?.orders.some(o
 const formatDateTime = (value: string) => new Date(value).toLocaleString('es-CO', { timeZone: 'America/Bogota' })
 
 function currentDurationSeconds() {
-  const startedAt = props.stay?.startedAt || props.startedAt
-  const active = props.stay?.isActive ?? props.isActive
-  if (active && startedAt) return Math.max(0, Math.floor((Date.now() - new Date(startedAt).getTime()) / 1000))
-  return props.stay?.durationSeconds ?? props.durationSeconds ?? 0
+  return supportedStayDuration({ startedAt: props.stay?.startedAt ?? props.startedAt ?? '',
+    durationSeconds: props.stay?.durationSeconds ?? props.durationSeconds ?? 0 })
 }
 
 function stayDetails() {
   const stay = props.stay
   const startedAt = stay?.startedAt || props.startedAt
   const endedAt = stay?.endedAt || props.endedAt
-  const active = stay?.isActive ?? props.isActive
   const orders = stay?.orders || []
   const orderRows = orders.map(order => {
     const roles = order.roles.map(role => ({ current_route: 'Pedido de la ruta en curso', previous_route: 'Pedido de la ruta anterior', related: 'Ubicación relacionada' })[role]).join(' · ')
     return `<div style="margin-top:6px"><b>${escapeMapHtml(roles)} #${order.orderId}</b><br>${escapeMapHtml(order.address || 'Dirección no disponible')}${order.deliveredAt ? `<br>Entregado: ${formatDateTime(order.deliveredAt)}` : ''}</div>`
   }).join('')
-  return `<div style="max-width:320px;font-size:12px;line-height:1.45"><b>Estadía agrupada</b><br>Inicio: ${startedAt ? formatDateTime(startedAt) : 'sin dato'}<br>Fin: ${active ? 'Activa' : endedAt ? formatDateTime(endedAt) : 'sin dato'}<br>Duración: <b>${formatStayDuration(currentDurationSeconds())}</b><br>Puntos agrupados: ${stay?.pointCount ?? props.pointCount ?? props.locations.filter(point => point.isCorePoint).length}<br>Ubicación aproximada: ${props.centerLatitude?.toFixed(6) ?? '—'}, ${props.centerLongitude?.toFixed(6) ?? '—'}<br>Radio observado: ${Math.round(props.radiusMeters)} m<br>Sucursal: ${escapeMapHtml(props.branchName || 'sin dato')} · ${props.distanceToBranchMeters == null ? 'sin distancia' : `${Math.round(props.distanceToBranchMeters)} m`}<br>Distancia al pedido: ${props.distanceToOrderMeters == null ? 'sin dato' : `${Math.round(props.distanceToOrderMeters)} m`}${orderRows || (props.orderId ? `<div style="margin-top:6px"><b>Pedido relacionado #${props.orderId}</b><br>${escapeMapHtml(props.orderAddress || 'Dirección no disponible')}</div>` : '<br>Sin pedidos relacionados')}</div>`
+  return `<div style="max-width:320px;font-size:12px;line-height:1.45"><b>Estadía agrupada</b><br>Inicio: ${startedAt ? formatDateTime(startedAt) : 'sin dato'}<br>Evidencia hasta: ${endedAt ? formatDateTime(endedAt) : 'sin dato'}<br>Duración respaldada: <b>${formatStayDuration(currentDurationSeconds())}</b><br>Puntos agrupados: ${stay?.pointCount ?? props.pointCount ?? props.locations.filter(point => point.isCorePoint).length}<br>Ubicación aproximada: ${props.centerLatitude?.toFixed(6) ?? '—'}, ${props.centerLongitude?.toFixed(6) ?? '—'}<br>Radio observado: ${Math.round(props.radiusMeters)} m<br>Sucursal: ${escapeMapHtml(props.branchName || 'sin dato')} · ${props.distanceToBranchMeters == null ? 'sin distancia' : `${Math.round(props.distanceToBranchMeters)} m`}<br>Distancia al pedido: ${props.distanceToOrderMeters == null ? 'sin dato' : `${Math.round(props.distanceToOrderMeters)} m`}${orderRows || (props.orderId ? `<div style="margin-top:6px"><b>Pedido relacionado #${props.orderId}</b><br>${escapeMapHtml(props.orderAddress || 'Dirección no disponible')}</div>` : '<br>Sin pedidos relacionados')}</div>`
 }
 
 function updateStayCounter() {
