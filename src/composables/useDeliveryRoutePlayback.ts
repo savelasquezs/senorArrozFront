@@ -100,11 +100,11 @@ export function escapeMapHtml(value: unknown) {
 export function isPointInsideStay(point: DeliveryPlaybackPoint, stay: DeliveryPlaybackStay) {
   if (point.workSessionId !== stay.workSessionId) return false
   const pointTime = new Date(point.recordedAt).getTime()
-  const endTime = stay.endedAt ? new Date(stay.endedAt).getTime() : Number.POSITIVE_INFINITY
-  return pointTime >= new Date(stay.startedAt).getTime()
-    && pointTime <= endTime
-    && point.id >= stay.firstLocationId
-    && (stay.isActive || point.id <= stay.lastLocationId)
+  const startTime = new Date(stay.startedAt).getTime()
+  const endTime = Math.min(stay.endedAt ? new Date(stay.endedAt).getTime() : Infinity,
+    startTime + Math.max(0, stay.durationSeconds) * 1000)
+  // Late points have larger IDs despite older timestamps. IDs do not define time.
+  return pointTime >= startTime && pointTime <= endTime
 }
 
 export function gapThreshold(points: DeliveryPlaybackPoint[]) {

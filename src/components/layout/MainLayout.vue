@@ -63,6 +63,7 @@ import Sidebar from '@/components/layout/Sidebar.vue';
 import TopNavigation from '@/components/layout/TopNavigation.vue';
 import Toast from '@/components/ui/Toast.vue';
 import { PlusIcon } from '@heroicons/vue/24/outline';
+import { createTrackingAlertDeduplicator, type TrackingAlertNotification } from '@/utils/trackingEvidence';
 import { useToast } from '@/composables/useToast';
 import { useNotifications } from '@/composables/useNotifications';
 import { useNotificationSound } from '@/composables/useNotificationSound';
@@ -147,6 +148,18 @@ function handlePaymentReviewRequired(payload: PaymentReviewRequiredPayload) {
 			tag: `payment-review-${payload.paymentAttemptId}`,
 		});
 	}
+}
+
+const acceptTrackingAlert = createTrackingAlertDeduplicator();
+function handleTrackingAlert(payload: TrackingAlertNotification) {
+  if (!canReviewPayments.value || !acceptTrackingAlert(payload, String(authStore.user?.id ?? ''))) return;
+  addToast({ title: payload.title || 'Seguimiento pendiente de revisión',
+    message: payload.message, variant: 'warning', duration: 0,
+    actions: [{ label: 'Revisar seguimiento', action: () => void router.push('/delivery-incidents') }],
+  });
+  if (permission.value === 'granted') notify('Seguimiento pendiente de revisión', {
+    body: payload.title, tag: `tracking-alert-${payload.branchId}-${payload.alertId}`,
+  });
 }
 
 // Navigate to new order
@@ -251,7 +264,10 @@ onMounted(() => {
 		return;
 	}
 	onWhatsAppSignalR('WhatsAppMessageCreated', handleWhatsAppRealtimeMessage);
-	if (canReviewPayments.value) onOrdersSignalR('PaymentReviewRequired', handlePaymentReviewRequired);
+	if (canReviewPayments.value) {
+    onOrdersSignalR('PaymentReviewRequired', handlePaymentReviewRequired);
+    onOrdersSignalR('DeliveryTrackingAlertChanged', handleTrackingAlert);
+  }
 	startWhatsAppUnreadPolling();
 	// En detalle de sucursal, el GET /Branches/:id es pesado; retrasar el prefetch evita competir por red/DB.
 	if (isBranchDetailPath(route.path)) {
@@ -264,6 +280,7 @@ onMounted(() => {
 onBeforeUnmount(() => {
 	offWhatsAppSignalR('WhatsAppMessageCreated', handleWhatsAppRealtimeMessage);
 	offOrdersSignalR('PaymentReviewRequired', handlePaymentReviewRequired);
+  offOrdersSignalR('DeliveryTrackingAlertChanged', handleTrackingAlert);
 	stopWhatsAppUnreadPolling();
 });
 
