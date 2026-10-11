@@ -21,9 +21,12 @@ import {
 } from './helpers/resourceStore';
 
 let neighborhoodsLoadInFlight: Promise<void> | null = null;
-let neighborhoodsLoadInFlightBranchId: number | null = null;
-let neighborhoodsLoadedBranchId: number | null = null;
-let neighborhoodsLoaded = false;
+let neighborhoodsLoadInFlightKey: string | null = null;
+let neighborhoodsLoadedKey: string | null = null;
+let latestNeighborhoodsRequestKey: string | null = null;
+
+const neighborhoodsKey = (branchId?: number | null, forOrderAddress = false) =>
+    `${branchId && branchId > 0 ? branchId : 'default'}:${forOrderAddress ? 'order' : 'regular'}`;
 
 type FetchOpts = ResourceActionOptions;
 
@@ -155,40 +158,42 @@ export const useCustomersStore = defineStore('customers', () => {
         forOrderAddress = false,
         opts?: FetchOpts,
     ) => {
+        const normalizedBranchId = branchId && branchId > 0 ? branchId : null;
+        const requestKey = neighborhoodsKey(normalizedBranchId, forOrderAddress);
+        latestNeighborhoodsRequestKey = requestKey;
         await run(async () => {
-            const res = await customerApi.getNeighborhoods(branchId ?? undefined, forOrderAddress);
+            const res = await customerApi.getNeighborhoods(normalizedBranchId ?? undefined, forOrderAddress);
+            if (latestNeighborhoodsRequestKey !== requestKey) return;
             neighborhoods.value = res.data;
+            neighborhoodsLoadedKey = requestKey;
         }, { ...opts, errorMessage: 'Error al cargar barrios' });
     };
 
     const ensureNeighborhoodsLoaded = async (branchId?: number | null, forOrderAddress = false) => {
         const normalizedBranchId = branchId && branchId > 0 ? branchId : null;
-        if (neighborhoodsLoaded && neighborhoodsLoadedBranchId === normalizedBranchId) {
+        const requestKey = neighborhoodsKey(normalizedBranchId, forOrderAddress);
+        latestNeighborhoodsRequestKey = requestKey;
+        if (neighborhoodsLoadedKey === requestKey) {
             return;
         }
-        if (neighborhoodsLoadInFlight) {
-            if (neighborhoodsLoadInFlightBranchId === normalizedBranchId) {
-                return neighborhoodsLoadInFlight;
-            }
-            await neighborhoodsLoadInFlight;
-            return ensureNeighborhoodsLoaded(branchId, forOrderAddress);
+        if (neighborhoodsLoadInFlight && neighborhoodsLoadInFlightKey === requestKey) {
+            return neighborhoodsLoadInFlight;
         }
-        if (neighborhoodsLoadedBranchId !== normalizedBranchId) {
-            neighborhoods.value = [];
-            neighborhoodsLoaded = false;
-        }
-        neighborhoodsLoadInFlight = (async () => {
+        neighborhoods.value = [];
+        let request!: Promise<void>;
+        request = (async () => {
             try {
                 await fetchNeighborhoods(normalizedBranchId, forOrderAddress);
-                neighborhoodsLoadedBranchId = normalizedBranchId;
-                neighborhoodsLoaded = true;
             } finally {
-                neighborhoodsLoadInFlight = null;
-                neighborhoodsLoadInFlightBranchId = null;
+                if (neighborhoodsLoadInFlight === request) {
+                    neighborhoodsLoadInFlight = null;
+                    neighborhoodsLoadInFlightKey = null;
+                }
             }
         })();
-        neighborhoodsLoadInFlightBranchId = normalizedBranchId;
-        return neighborhoodsLoadInFlight;
+        neighborhoodsLoadInFlight = request;
+        neighborhoodsLoadInFlightKey = requestKey;
+        return request;
     };
 
     const searchCustomersByName = async (name: string, branchId?: number): Promise<Customer[]> => {
@@ -236,9 +241,10 @@ export const useCustomersStore = defineStore('customers', () => {
     const clearList = () => {
         list.value = null;
         neighborhoods.value = [];
-        neighborhoodsLoadedBranchId = null;
-        neighborhoodsLoadInFlightBranchId = null;
-        neighborhoodsLoaded = false;
+        neighborhoodsLoadedKey = null;
+        neighborhoodsLoadInFlight = null;
+        neighborhoodsLoadInFlightKey = null;
+        latestNeighborhoodsRequestKey = null;
         clearError();
     };
 

@@ -8,16 +8,25 @@
                 Atender desde otra sucursal
             </label>
 
-            <BaseSelect v-if="useAlternativeBranch" v-model="selectedServiceBranchId" class="mt-3"
+            <BaseSelect v-if="useAlternativeBranch && alternativeBranches.length > 1"
+                v-model="selectedServiceBranchId" class="mt-3"
                 :options="alternativeBranches" label="Sucursal que atenderá esta dirección"
                 placeholder="Selecciona una sucursal" value-key="id" display-key="name" required />
+
+            <p v-else-if="useAlternativeBranch && selectedServiceBranch" class="mt-3 text-sm text-gray-600">
+                Se atenderá desde <span class="font-medium text-gray-900">{{ selectedServiceBranch.name }}</span>.
+            </p>
         </div>
 
         <!-- Step 1: Neighborhood Selection -->
-        <NeighborhoodSearch v-model="localForm.neighborhoodId" :required="true" :error="errors.neighborhoodId"
+        <NeighborhoodSearch v-if="effectiveServiceBranchId" v-model="localForm.neighborhoodId"
+            :required="true" :error="errors.neighborhoodId"
             :branch-id="effectiveServiceBranchId" :for-order-address="canSelectServiceBranch"
             :allow-create="effectiveServiceBranchId === sessionBranchId"
             @update:model-value="validateNeighborhood" />
+        <p v-else-if="useAlternativeBranch" class="rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm text-blue-700">
+            Selecciona primero la sucursal que atenderá el pedido para consultar sus barrios.
+        </p>
 
         <!-- Step 2: Address Input -->
         <div v-if="localForm.neighborhoodId > 0">
@@ -163,6 +172,9 @@ const selectedServiceBranchId = ref<number | null>(useAlternativeBranch.value ? 
 const alternativeBranches = computed(() =>
     branchOptions.value.filter(branch => branch.id !== defaultServiceBranchId.value),
 )
+const selectedServiceBranch = computed(() =>
+    alternativeBranches.value.find(branch => branch.id === selectedServiceBranchId.value) ?? null,
+)
 const effectiveServiceBranchId = computed(() =>
     useAlternativeBranch.value
         ? selectedServiceBranchId.value
@@ -187,10 +199,15 @@ watch(
     (newVal) => {
         Object.assign(localForm, {
             ...newVal,
-            additionalInfo: newVal.additionalInfo ?? ''
+            additionalInfo: newVal.additionalInfo ?? '',
+            serviceBranchId: newVal.serviceBranchId ?? defaultServiceBranchId.value ?? undefined,
         })
         if (canSelectServiceBranch.value && branchOptions.value.length) {
             const requestedBranchId = newVal.serviceBranchId
+            // Al haber varias alternativas, marcar el checkbox crea un estado válido
+            // pero todavía incompleto. El eco del v-model no debe cancelar esa intención
+            // mientras el usuario está eligiendo la sucursal.
+            if (useAlternativeBranch.value && selectedServiceBranchId.value == null) return
             const useAlternative = Boolean(
                 requestedBranchId
                 && requestedBranchId !== defaultServiceBranchId.value
@@ -558,20 +575,28 @@ onMounted(async () => {
 })
 
 watch(effectiveServiceBranchId, async (branchId, previousBranchId) => {
-    // Mantener la sucursal elegida dentro del v-model. Sin esto, cualquier cambio
-    // posterior (por ejemplo seleccionar el barrio) hace que el padre devuelva un
-    // modelValue sin serviceBranchId y el formulario desactive la sucursal remota.
-    localForm.serviceBranchId = branchId ?? undefined
-    if (!branchId || branchId === previousBranchId) return
+    if (branchId === previousBranchId) return
     localForm.neighborhoodId = 0
     localForm.deliveryFee = 0
+    errors.neighborhoodId = ""
+    if (!branchId) return
+
+    // Solo publicar una sucursal remota cuando la selección ya está resuelta.
+    // En el estado intermedio (varias alternativas, ninguna elegida) conservamos
+    // el valor anterior para que el padre no desmonte el flujo remoto.
+    localForm.serviceBranchId = branchId
     await customersStore.ensureNeighborhoodsLoaded(branchId, canSelectServiceBranch.value)
-    await resolveRouteOrigin()
 })
 
 watch(useAlternativeBranch, enabled => {
-    if (!enabled) {
-        selectedServiceBranchId.value = null
+    if (enabled) {
+        if (alternativeBranches.value.length === 1) {
+            selectedServiceBranchId.value = alternativeBranches.value[0].id
+        } else if (!alternativeBranches.value.some(branch => branch.id === selectedServiceBranchId.value)) {
+            selectedServiceBranchId.value = null
+        }
+        return
     }
+    selectedServiceBranchId.value = null
 })
 </script>

@@ -141,6 +141,7 @@ describe('CustomerAddressForm route origin', () => {
             data: [
                 { id: 4, name: 'Castilla' },
                 { id: 9, name: 'Manrique' },
+                { id: 10, name: 'Laureles' },
             ],
         })
         dependencies.customersStore.ensureNeighborhoodsLoaded.mockClear()
@@ -238,6 +239,68 @@ describe('CustomerAddressForm route origin', () => {
             lat: 6.278,
             lng: -75.553,
         })
+    })
+
+    it('automatically selects the only alternative branch and restores the local branch when unchecked', async () => {
+        dependencies.getBranchOptions.mockResolvedValue({
+            data: [
+                { id: 4, name: 'Castilla' },
+                { id: 9, name: 'Manrique' },
+            ],
+        })
+        dependencies.getBranchById.mockResolvedValue({
+            data: {
+                id: 9,
+                name: 'Manrique',
+                latitude: 6.278,
+                longitude: -75.553,
+            },
+        })
+
+        const wrapper = mountForm(4, {
+            defaultServiceBranchId: 4,
+            allowBranchSelection: true,
+        })
+        await flushPromises()
+
+        const checkbox = wrapper.get('input[type="checkbox"]')
+        await checkbox.setValue(true)
+        await flushPromises()
+
+        expect(wrapper.find('[data-testid="branch-select"]').exists()).toBe(false)
+        expect(wrapper.text()).toContain('Se atenderá desde Manrique')
+        expect((wrapper.vm as any).effectiveServiceBranchId).toBe(9)
+        expect(dependencies.customersStore.ensureNeighborhoodsLoaded).toHaveBeenCalledWith(9, true)
+        expect((wrapper.emitted('update:modelValue')?.at(-1)?.[0] as any).serviceBranchId).toBe(9)
+
+        await checkbox.setValue(false)
+        await flushPromises()
+
+        expect((wrapper.vm as any).effectiveServiceBranchId).toBe(4)
+        expect(dependencies.customersStore.ensureNeighborhoodsLoaded).toHaveBeenCalledWith(4, true)
+        expect((wrapper.emitted('update:modelValue')?.at(-1)?.[0] as any).serviceBranchId).toBe(4)
+    })
+
+    it('keeps remote mode open while one of several alternative branches is being chosen', async () => {
+        const wrapper = mountForm(4, {
+            defaultServiceBranchId: 4,
+            allowBranchSelection: true,
+        })
+        await flushPromises()
+
+        await wrapper.get('input[type="checkbox"]').setValue(true)
+        await flushPromises()
+
+        expect(wrapper.find('[data-testid="branch-select"]').exists()).toBe(true)
+        expect(wrapper.text()).toContain('Selecciona primero la sucursal')
+        expect((wrapper.vm as any).effectiveServiceBranchId).toBeNull()
+
+        const echoedModel = wrapper.emitted('update:modelValue')?.at(-1)?.[0] as typeof modelValue
+        await wrapper.setProps({ modelValue: echoedModel })
+        await flushPromises()
+
+        expect((wrapper.get('input[type="checkbox"]').element as HTMLInputElement).checked).toBe(true)
+        expect(wrapper.find('[data-testid="branch-select"]').exists()).toBe(true)
     })
 
     it('keeps the remote branch selected when the parent echoes the form v-model', async () => {

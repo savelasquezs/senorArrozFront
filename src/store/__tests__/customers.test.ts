@@ -236,6 +236,44 @@ describe('customers store', () => {
         expect(store.availableNeighborhoods).toEqual([])
     })
 
+    it('loads the same branch again when the order-address scope changes', async () => {
+        const store = useCustomersStore()
+        const regular = [makeNeighborhood({ id: 88, branchId: 88, name: 'Regular' })]
+        const forOrder = [makeNeighborhood({ id: 89, branchId: 88, name: 'Pedido' })]
+        customerApiMock.getNeighborhoods
+            .mockResolvedValueOnce({ data: regular } satisfies ApiResponse<Neighborhood[]>)
+            .mockResolvedValueOnce({ data: forOrder } satisfies ApiResponse<Neighborhood[]>)
+
+        await store.ensureNeighborhoodsLoaded(88, false)
+        await store.ensureNeighborhoodsLoaded(88, true)
+
+        expect(customerApiMock.getNeighborhoods).toHaveBeenNthCalledWith(1, 88, false)
+        expect(customerApiMock.getNeighborhoods).toHaveBeenNthCalledWith(2, 88, true)
+        expect(store.availableNeighborhoods).toEqual(forOrder)
+    })
+
+    it('ignores a stale neighborhood response after the active branch changes', async () => {
+        const store = useCustomersStore()
+        let resolveFirst!: (value: ApiResponse<Neighborhood[]>) => void
+        let resolveSecond!: (value: ApiResponse<Neighborhood[]>) => void
+        customerApiMock.getNeighborhoods.mockImplementation((branchId: number) => new Promise((resolve) => {
+            if (branchId === 91) resolveFirst = resolve
+            if (branchId === 92) resolveSecond = resolve
+        }))
+
+        const firstRequest = store.ensureNeighborhoodsLoaded(91, true)
+        const secondRequest = store.ensureNeighborhoodsLoaded(92, true)
+        const latest = [makeNeighborhood({ id: 92, branchId: 92, name: 'Sucursal vigente' })]
+        const stale = [makeNeighborhood({ id: 91, branchId: 91, name: 'Sucursal anterior' })]
+
+        resolveSecond({ data: latest } as ApiResponse<Neighborhood[]>)
+        await secondRequest
+        resolveFirst({ data: stale } as ApiResponse<Neighborhood[]>)
+        await firstRequest
+
+        expect(store.availableNeighborhoods).toEqual(latest)
+    })
+
     it('stores the API error message on failure', async () => {
         const store = useCustomersStore()
         customerApiMock.getCustomers.mockRejectedValue(new Error('fallo clientes'))
