@@ -239,4 +239,37 @@ describe('CustomerAddressForm route origin', () => {
             lng: -75.553,
         })
     })
+
+    it('keeps the remote branch selected when the parent echoes the form v-model', async () => {
+        dependencies.getBranchById.mockResolvedValue({
+            data: {
+                id: 9,
+                name: 'Manrique',
+                latitude: 6.278,
+                longitude: -75.553,
+            },
+        })
+
+        const wrapper = mountForm(4, {
+            defaultServiceBranchId: 4,
+            allowBranchSelection: true,
+        })
+        await flushPromises()
+
+        await wrapper.get('input[type="checkbox"]').setValue(true)
+        await wrapper.get('[data-testid="branch-select"]').setValue('9')
+        await flushPromises()
+
+        const updates = wrapper.emitted('update:modelValue') ?? []
+        const latestModel = updates.at(-1)?.[0] as typeof modelValue & { serviceBranchId?: number }
+        expect(latestModel.serviceBranchId).toBe(9)
+
+        // Reproduce el ciclo real de v-model del padre que antes desmarcaba el checkbox.
+        await wrapper.setProps({ modelValue: { ...latestModel, neighborhoodId: 22 } })
+        await flushPromises()
+
+        expect((wrapper.get('input[type="checkbox"]').element as HTMLInputElement).checked).toBe(true)
+        expect((wrapper.get('[data-testid="branch-select"]').element as HTMLSelectElement).value).toBe('9')
+        expect((wrapper.vm as any).effectiveServiceBranchId).toBe(9)
+    })
 })

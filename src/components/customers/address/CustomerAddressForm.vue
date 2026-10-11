@@ -9,7 +9,7 @@
             </label>
 
             <BaseSelect v-if="useAlternativeBranch" v-model="selectedServiceBranchId" class="mt-3"
-                :options="alternativeBranches" label="Sucursal que atenderÃ¡ esta direcciÃ³n"
+                :options="alternativeBranches" label="Sucursal que atenderá esta dirección"
                 placeholder="Selecciona una sucursal" value-key="id" display-key="name" required />
         </div>
 
@@ -172,7 +172,8 @@ const effectiveServiceBranchId = computed(() =>
 // Proxy local state with v-model
 const localForm = reactive({
     ...props.modelValue,
-    additionalInfo: props.modelValue.additionalInfo ?? ''
+    additionalInfo: props.modelValue.additionalInfo ?? '',
+    serviceBranchId: props.modelValue.serviceBranchId ?? effectiveServiceBranchId.value ?? undefined,
 })
 
 const loadBranchOptions = async () => {
@@ -557,6 +558,10 @@ onMounted(async () => {
 })
 
 watch(effectiveServiceBranchId, async (branchId, previousBranchId) => {
+    // Mantener la sucursal elegida dentro del v-model. Sin esto, cualquier cambio
+    // posterior (por ejemplo seleccionar el barrio) hace que el padre devuelva un
+    // modelValue sin serviceBranchId y el formulario desactive la sucursal remota.
+    localForm.serviceBranchId = branchId ?? undefined
     if (!branchId || branchId === previousBranchId) return
     localForm.neighborhoodId = 0
     localForm.deliveryFee = 0
