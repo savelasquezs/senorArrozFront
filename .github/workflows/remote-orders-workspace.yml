@@ -28,14 +28,22 @@ jobs:
           path: /tmp/remote-orders-source.tar.gz
           retention-days: 3
       - uses: actions/setup-node@v4
-        if: hashFiles('.remote-orders-edit.py') != ''
         with:
           node-version: 22
           cache: npm
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Package isolated test tooling
+        if: hashFiles('.remote-orders-edit.py') == ''
+        run: tar -czf /tmp/remote-orders-tooling.tar.gz node_modules
+      - uses: actions/upload-artifact@v4
+        if: hashFiles('.remote-orders-edit.py') == ''
+        with:
+          name: remote-orders-tooling
+          path: /tmp/remote-orders-tooling.tar.gz
+          retention-days: 1
       - name: Build and test
-        if: hashFiles('.remote-orders-edit.py') != ''
         run: |
-          npm ci
           npm run build
           npm run test:run
       - name: Commit validated implementation to feature branch only
