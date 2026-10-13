@@ -634,6 +634,7 @@ import { orderApi } from '@/services/MainAPI/orderApi'
 import { reservationDepositApi } from '@/services/MainAPI/reservationDepositApi'
 import { type OrderFilterState } from '@/composables/useOrderFilters'
 import { buildOrderSearchBody } from '@/composables/useOrderSearchPayload'
+import { deliverymenFromCompleteOrderPage } from '@/helpers/orderDeliverymenOptions'
 import { useDebouncedCallback } from '@/composables/useDebouncedCallback'
 import { useOrderPermissions } from '@/composables/useOrderPermissions'
 import { useToast } from '@/composables/useToast'
@@ -801,7 +802,7 @@ async function activateTab(tab: TabValue) {
     pendingUpdates.value = false
     if (tab === 'reservations') { void fetchReservations({ background: reservations.value.length > 0 }); return }
     await loadWorkspaceOptions()
-    await Promise.all([loadDeliverymenInRange(), fetchOrders()])
+    await fetchOrdersWithDeliverymen()
 }
 
 async function switchTab(tab: TabValue) {
@@ -1236,7 +1237,12 @@ function searchOrdersOnce(scope: TabValue, body: Record<string, unknown>) {
     void request.then(clear, clear)
     return request
 }
-const fetchOrders = async (options: { background?: boolean } = {}) => {
+type OrdersSearchSnapshot = {
+    response: Awaited<ReturnType<typeof orderApi.searchOrders>>
+    body: Record<string, unknown>
+    scope: TabValue
+}
+const fetchOrders = async (options: { background?: boolean } = {}): Promise<OrdersSearchSnapshot | null> => {
     const request = ++ordersRequest
     const scope = activeTab.value
     // A background refresh must never replace existing rows with the spinner.
@@ -1277,6 +1283,7 @@ const fetchOrders = async (options: { background?: boolean } = {}) => {
         orders.value = response.items
         totalCount.value = response.totalCount
         lastOrdersFetchedAt = Date.now()
+        return { response, body, scope }
     } catch (err: any) {
         if (request !== ordersRequest || scope !== activeTab.value) return
         if (!options.background) {
@@ -1285,6 +1292,7 @@ const fetchOrders = async (options: { background?: boolean } = {}) => {
         }
         ordersLoadError.value = err.message || 'No se pudieron cargar los pedidos.'
         if (!options.background) error('Error al cargar pedidos', err.message)
+        return null
     } finally {
         if (request === ordersRequest) loading.value = false
     }
@@ -1350,7 +1358,7 @@ const buildDeliverymenInRangeSearchBody = (page: number, pageSizeValue: number) 
         status: null,
     })
 
-const loadDeliverymenInRange = async () => {
+const loadDeliverymenInRange = async (mainPage: OrdersSearchSnapshot | null = null) => {
     if (remoteBranchId.value != null && !remoteBranches.value.some(b => b.id === remoteBranchId.value)) {
         deliverymenInRange.value = []
         return
@@ -1358,6 +1366,17 @@ const loadDeliverymenInRange = async () => {
     const request = ++deliverymenRequest
     const scope = activeTab.value
     try {
+        // The ordinary search already contains EVERY deliveryman's orders
+        // when the complete, unfiltered day fits on the main page.
+        // Keep the original exhaustive search as the fallback for pagination
+        // and any filtering. No deliveryman disappears from the dropdown.
+        const completeOptions = mainPage?.scope === scope
+            ? deliverymenFromCompleteOrderPage(mainPage.body, mainPage.response)
+            : null
+        if (completeOptions !== null && completeOptions !== undefined) {
+            deliverymenInRange.value = completeOptions
+            return
+        }
         const pageSizeValue = 200
         let page = 1
         let totalPagesCount = 1
@@ -1396,6 +1415,13 @@ const loadDeliverymenInRange = async () => {
     }
 }
 
+const fetchOrdersWithDeliverymen = async () => {
+    const scope = activeTab.value
+    const mainPage = await fetchOrders()
+    if (scope !== activeTab.value) return
+    await loadDeliverymenInRange(mainPage)
+}
+
 const applyOrdersDateFilters = async (
     value: DashboardPeriodPresetId,
     range?: [Date, Date],
@@ -1413,8 +1439,7 @@ const applyOrdersDateFilters = async (
 
     currentPage.value = 1
     debouncedRefetchOrders.cancel()
-    await loadDeliverymenInRange()
-    await fetchOrders()
+    await fetchOrdersWithDeliverymen()
 }
 
 const clearFilters = () => {
@@ -2610,7 +2635,7 @@ watch(workspaceBranchId, () => {
 async function retryRemoteWorkspace() {
     await loadRemoteBranches()
     await loadWorkspaceOptions()
-    if (activeTab.value !== 'reservations') await Promise.all([loadDeliverymenInRange(), fetchOrders()])
+    if (activeTab.value !== 'reservations') await fetchOrdersWithDeliverymen()
 }
 onMounted(async () => {
     mounted = true
@@ -2622,7 +2647,7 @@ onMounted(async () => {
         loadRemoteBranches(),
     ])
     await loadWorkspaceOptions()
-    await Promise.all([loadDeliverymenInRange(), fetchOrders()])
+    await fetchOrdersWithDeliverymen()
 })
 onUnmounted(() => {
     mounted = false
