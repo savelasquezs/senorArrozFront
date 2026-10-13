@@ -4,6 +4,7 @@ import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest'
 import OrdersList from '@/views/OrdersList.vue'
 import OrdersTable from '@/components/orders/OrdersTable.vue'
 import EditCustomerModal from '@/components/orders/EditCustomerModal.vue'
+import BaseSelect from '@/components/ui/BaseSelect.vue'
 
 const mocks = vi.hoisted(() => ({
     search: vi.fn(), branches: vi.fn(), options: vi.fn(), payment: vi.fn(), toast: vi.fn(), replace: vi.fn(),
@@ -87,6 +88,26 @@ describe('remote order workspaces', () => {
         mountView(); await flushPromises()
         expect(mocks.search).toHaveBeenCalledTimes(2)
         expect(mocks.search.mock.calls.filter(([body]) => body.type === 'delivery')).toHaveLength(1)
+        expect(wrapper.findComponent(OrdersTable).props('orders')).toEqual([local])
+    })
+
+    it('coalesces identical in-flight deliverymen searches during an overlapping date refresh', async () => {
+        let finishDeliverymen!: (value: any) => void
+        mocks.search.mockImplementation((body) => body.type === 'delivery'
+            ? new Promise(resolve => { finishDeliverymen = resolve })
+            : Promise.resolve({ ...paged([local]), totalCount: 150 }))
+        mountView()
+        await flushPromises()
+
+        // The first page is incomplete; the dropdown requests a full deliverymen
+        // search. A second refresh with the same date must join that HTTP request.
+        expect(mocks.search.mock.calls.filter(([body]) => body.type === 'delivery')).toHaveLength(1)
+        wrapper.findComponent(BaseSelect).vm.$emit('update:modelValue', 'today')
+        await flushPromises()
+        expect(mocks.search.mock.calls.filter(([body]) => body.type === 'delivery')).toHaveLength(1)
+
+        finishDeliverymen(paged([{ ...local, deliveryManId: 17, deliveryManName: 'Kevin' }]))
+        await flushPromises()
         expect(wrapper.findComponent(OrdersTable).props('orders')).toEqual([local])
     })
 
