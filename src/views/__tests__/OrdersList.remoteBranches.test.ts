@@ -7,15 +7,20 @@ import EditCustomerModal from '@/components/orders/EditCustomerModal.vue'
 
 const mocks = vi.hoisted(() => ({
     search: vi.fn(), branches: vi.fn(), options: vi.fn(), payment: vi.fn(), toast: vi.fn(), replace: vi.fn(),
-    changes: { changed: null as null | ((event: any) => void) },
+    changes: {
+        changed: null as null | ((event: any) => void),
+        resume: null as null | (() => void),
+    },
+    banksLoaded: vi.fn().mockResolvedValue(undefined),
+    appsLoaded: vi.fn().mockResolvedValue(undefined),
 }))
 const state = reactive({ role: 'Cashier', branchId: 1, query: {} as Record<string, string> })
 const localBanks = [{ id: 101, name: 'Banco Origen', branchId: 1, active: true }]
 vi.mock('vue-router', () => ({ useRoute: () => ({ get query() { return state.query } }), useRouter: () => ({ replace: mocks.replace }) }))
 vi.mock('@/store/auth', () => ({ useAuthStore: () => ({ get userRole() { return state.role }, get branchId() { return state.branchId }, isSuperadmin: false }) }))
 vi.mock('@/store/branchContext', () => ({ useBranchContextStore: () => ({ selectedBranchId: 1 }) }))
-vi.mock('@/store/banks', () => ({ useBanksStore: () => ({ list: { items: localBanks }, ensureListLoaded: async () => {} }) }))
-vi.mock('@/store/apps', () => ({ useAppsStore: () => ({ list: { items: [] }, ensureListLoaded: async () => {} }) }))
+vi.mock('@/store/banks', () => ({ useBanksStore: () => ({ list: { items: localBanks }, ensureListLoaded: mocks.banksLoaded }) }))
+vi.mock('@/store/apps', () => ({ useAppsStore: () => ({ list: { items: [] }, ensureListLoaded: mocks.appsLoaded }) }))
 vi.mock('@/services/MainAPI/orderApi', () => ({ orderApi: { searchOrders: mocks.search } }))
 vi.mock('@/services/MainAPI/orderManagementApi', () => ({ orderManagementApi: { remoteBranches: mocks.branches, options: mocks.options } }))
 vi.mock('@/services/MainAPI/bankPaymentApi', () => ({ bankPaymentApi: { createBankPayment: mocks.payment } }))
@@ -23,8 +28,9 @@ vi.mock('@/composables/useToast', () => ({ useToast: () => ({ success: vi.fn(), 
 vi.mock('@/composables/useOrderPermissions', () => ({ useOrderPermissions: () => ({
     getNextAllowedStatus: vi.fn(), canChangeStatus: () => true, canVerifyPayments: () => true, canUnverifyPayments: () => true,
 }) }))
-vi.mock('@/composables/useOrderManagementUpdates', () => ({ useOrderManagementUpdates: (changed: any) => {
+vi.mock('@/composables/useOrderManagementUpdates', () => ({ useOrderManagementUpdates: (changed: any, resume: any) => {
     mocks.changes.changed = changed
+    mocks.changes.resume = resume
     return { isPageVisible: ref(true), isOnline: ref(true) }
 } }))
 const local = { id: 10, branchId: 1, branchName: 'Santander', type: 'delivery', status: 'taken',
@@ -46,6 +52,7 @@ async function clickTab(label: string) {
     await button!.trigger('click'); await flushPromises()
 }
 beforeEach(() => {
+    vi.clearAllMocks()
     state.role = 'Cashier'; state.branchId = 1; state.query = {}
     mocks.branches.mockResolvedValue([{ id: 2, name: 'Manrique', sampleOrderId: 20 }])
     mocks.options.mockResolvedValue({ branchId: 2, branchName: 'Manrique', banks: [{ id: 202, name: 'Banco Destino', active: true }], apps: [], deliverymen: [], maxFreeDeliveryDiscount: 3000 })
@@ -56,6 +63,51 @@ beforeEach(() => {
 afterEach(() => { wrapper?.unmount(); vi.useRealTimers() })
 
 describe('remote order workspaces', () => {
+    it('shares catalog requests with MainLayout using the actual branch scope', async () => {
+        mountView(); await flushPromises()
+        expect(mocks.banksLoaded).toHaveBeenCalledWith(1)
+        expect(mocks.appsLoaded).toHaveBeenCalledWith(1)
+        expect(mocks.branches).toHaveBeenCalledTimes(1)
+    })
+
+    it('does not reload fresh order data just because a tab loses and regains focus', async () => {
+        mountView(); await flushPromises()
+        const searchesBefore = mocks.search.mock.calls.length
+        const branchesBefore = mocks.branches.mock.calls.length
+        vi.useFakeTimers()
+        mocks.changes.resume!()
+        await vi.advanceTimersByTimeAsync(850)
+        expect(mocks.search.mock.calls.length).toBe(searchesBefore)
+        expect(mocks.branches.mock.calls.length).toBe(branchesBefore)
+    })
+
+    it('keeps all order rows visible on a later background refresh', async () => {
+        mountView(); await flushPromises()
+        const before = mocks.search.mock.calls.length
+        let resolveSearch!: (value: any) => void
+        mocks.search.mockImplementation(() => new Promise(resolve => { resolveSearch = resolve }))
+        vi.useFakeTimers()
+        await vi.advanceTimersByTimeAsync(31_000)
+        mocks.changes.resume!()
+        await vi.advanceTimersByTimeAsync(650)
+        expect(mocks.search).toHaveBeenCalledTimes(before + 1)
+        expect(wrapper.findComponent(OrdersTable).props('loading')).toBe(false)
+        expect(wrapper.findComponent(OrdersTable).props('orders')).toEqual([local])
+        resolveSearch(paged([local]))
+        await flushPromises()
+        expect(mocks.branches).toHaveBeenCalledTimes(1)
+    })
+
+    it('ignores unrelated remote events while monitoring local orders', async () => {
+        mountView(); await flushPromises()
+        const before = mocks.search.mock.calls.length
+        vi.useFakeTimers()
+        mocks.changes.changed!({ orderId: 20, branchId: 2, originBranchId: 1, managementVersion: 2 })
+        await vi.advanceTimersByTimeAsync(750)
+        expect(mocks.search).toHaveBeenCalledTimes(before)
+        expect(mocks.branches).toHaveBeenCalledTimes(1)
+    })
+
     it('reuses the normal table and sends source-filtered destination queries without changing the session', async () => {
         mountView(); await flushPromises()
         expect(wrapper.findComponent(OrdersTable).props('orders')).toEqual([local])
