@@ -1,5 +1,6 @@
 // src/services/MainAPI/bankPaymentApi.ts
 import { BaseApi } from './baseApi';
+import { orderMutationConfig, type OrderMutationSnapshot } from './orderMutation';
 import type {
     PagedResult,
 } from '@/types/common';
@@ -47,22 +48,24 @@ class BankPaymentApi extends BaseApi {
 
     // 4. Crear pago bancario
     async createBankPayment(
-        payload: CreateBankPaymentDto
+        payload: CreateBankPaymentDto,
+        snapshot?: OrderMutationSnapshot
     ): Promise<BankPayment> {
-        return this.post<BankPayment>('/bankpayments', payload);
+        return this.post<BankPayment>('/bankpayments', payload, orderMutationConfig(snapshot));
     }
 
     // 5. Verificar pago bancario
     async verifyBankPayment(
         id: number,
-        payload?: VerifyBankPaymentDto
+        payload?: VerifyBankPaymentDto,
+        snapshot?: OrderMutationSnapshot
     ): Promise<string> {
-        return this.post<string>(`/bankpayments/${id}/verify`, payload || {});
+        return this.post<string>(`/bankpayments/${id}/verify`, payload || {}, orderMutationConfig(snapshot));
     }
 
     // 6. Desverificar pago bancario
-    async unverifyBankPayment(id: number): Promise<string> {
-        return this.post<string>(`/bankpayments/${id}/unverify`, {});
+    async unverifyBankPayment(id: number, snapshot?: OrderMutationSnapshot): Promise<string> {
+        return this.post<string>(`/bankpayments/${id}/unverify`, {}, orderMutationConfig(snapshot));
     }
 
     async unverifyTodayBankPayments(bankId: number): Promise<{ count: number; message: string }> {
@@ -72,26 +75,26 @@ class BankPaymentApi extends BaseApi {
 
 
     // 8. Actualizar monto de pago bancario
-    async updateBankPayment(id: number, amount: number): Promise<BankPayment> {
-        return this.put<BankPayment>(`/bankpayments/${id}`, { amount });
+    async updateBankPayment(id: number, amount: number, snapshot?: OrderMutationSnapshot): Promise<BankPayment> {
+        return this.put<BankPayment>(`/bankpayments/${id}`, { amount }, orderMutationConfig(snapshot));
     }
 
     // Alias para mantener consistencia con el plan
-    async verify(id: number): Promise<void> {
-        await this.verifyBankPayment(id);
+    async verify(id: number, snapshot?: OrderMutationSnapshot): Promise<void> {
+        await this.verifyBankPayment(id, undefined, snapshot);
     }
 
-    async unverify(id: number): Promise<void> {
-        await this.unverifyBankPayment(id);
+    async unverify(id: number, snapshot?: OrderMutationSnapshot): Promise<void> {
+        await this.unverifyBankPayment(id, snapshot);
     }
 
-    async update(id: number, amount: number): Promise<BankPayment> {
-        return this.updateBankPayment(id, amount);
+    async update(id: number, amount: number, snapshot?: OrderMutationSnapshot): Promise<BankPayment> {
+        return this.updateBankPayment(id, amount, snapshot);
     }
 
     // 9. Eliminar pago bancario
-    async deletePayment(id: number): Promise<void> {
-        await this.api.delete(`/bankpayments/${id}`)
+    async deletePayment(id: number, snapshot?: OrderMutationSnapshot): Promise<void> {
+        await this.delete(`/bankpayments/${id}`, orderMutationConfig(snapshot))
     }
 }
 

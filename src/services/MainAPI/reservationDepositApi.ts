@@ -1,4 +1,5 @@
 import { BaseApi } from './baseApi'
+import { orderMutationConfig, type OrderMutationSnapshot } from './orderMutation'
 import type { PagedResult } from '@/types/common'
 import type { ReservationDeposit, CreateReservationDepositDto } from '@/types/reservationDeposit'
 
@@ -7,17 +8,17 @@ class ReservationDepositApi extends BaseApi {
     return this.get<ReservationDeposit[]>(`/reservationdeposits/by-order/${orderId}`)
   }
 
-  async create(dto: CreateReservationDepositDto): Promise<ReservationDeposit> {
-    return this.post<ReservationDeposit>('/reservationdeposits', dto)
+  async create(dto: CreateReservationDepositDto, snapshot?: OrderMutationSnapshot): Promise<ReservationDeposit> {
+    return this.post<ReservationDeposit>('/reservationdeposits', dto, orderMutationConfig(snapshot))
   }
 
-  async updateAmount(id: number, amount: number): Promise<ReservationDeposit> {
-    return this.put<ReservationDeposit>(`/reservationdeposits/${id}`, { amount })
+  async updateAmount(id: number, amount: number, snapshot?: OrderMutationSnapshot): Promise<ReservationDeposit> {
+    return this.put<ReservationDeposit>(`/reservationdeposits/${id}`, { amount }, orderMutationConfig(snapshot))
   }
 
-  async remove(id: number): Promise<void> {
+  async remove(id: number, snapshot?: OrderMutationSnapshot): Promise<void> {
     try {
-      await this.api.delete(`/reservationdeposits/${id}`)
+      await this.api.delete(`/reservationdeposits/${id}`, orderMutationConfig(snapshot))
     } catch (error: any) {
       throw this.handleError(error)
     }

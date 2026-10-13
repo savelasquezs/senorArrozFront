@@ -21,6 +21,7 @@ export interface OrderSearchPayloadInput {
     type: OrderType | null
     status: OrderStatus | null
     customerId?: number
+    remoteOnly?: boolean
     branchId?: number
     deliveryManId?: number
     minAmount?: number
@@ -44,6 +45,7 @@ export function buildOrderSearchBody(input: OrderSearchPayloadInput): Record<str
         appPaymentsUnsettledOnly: input.appPaymentsUnsettledOnly === true,
     }
 
+    if (input.remoteOnly === true) body.remoteOnly = true
     if (input.fromDate) body.fromDate = input.fromDate
     if (input.toDate) body.toDate = input.toDate
     if (input.bankId != null) body.bankId = input.bankId
