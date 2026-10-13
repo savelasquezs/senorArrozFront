@@ -2517,7 +2517,8 @@ const confirmCancelReservation = async () => {
     }
 }
 
-// Realtime only invalidates this authorized workspace. Open forms keep their original version.
+// Realtime notifications update the selected authorized scope. Keep edits intact;
+// coalesce focus/reconnect/events without re-querying other branches.
 const hasOpenEditor = computed(() => showEditCustomerModal.value || showAssignDeliveryModal.value
     || showEditOrderTypeModal.value || showDepositModal.value || showEditBankPaymentDialog.value
     || showRemoveBankPaymentDialog.value || showEditReservationDepositDialog.value
@@ -2526,23 +2527,68 @@ const hasOpenEditor = computed(() => showEditCustomerModal.value || showAssignDe
     || showCancelReservationDialog.value || showBulkUnverifyDialog.value)
 let updatesTimer: ReturnType<typeof setTimeout> | null = null
 let mounted = false
+let refreshInFlight = false
+let refreshAgain = false
+let lastAutoRefreshAt = 0
 async function refreshWorkspace() {
     if (!mounted || !isPageVisible.value || !isOnline.value) return
     if (hasOpenEditor.value) { pendingUpdates.value = true; return }
+    if (refreshInFlight) { refreshAgain = true; return }
+    refreshInFlight = true
     pendingUpdates.value = false
-    await loadRemoteBranches()
-    if (activeTab.value === 'reservations') await fetchReservations()
-    else await fetchOrders()
+    try {
+        await loadRemoteBranches()
+        if (activeTab.value === 'reservations') await fetchReservations({ background: true })
+        else await fetchOrders({ background: true })
+    } finally {
+        refreshInFlight = false
+        lastAutoRefreshAt = Date.now()
+        if (refreshAgain) {
+            refreshAgain = false
+            scheduleWorkspaceRefresh()
+        }
+    }
 }
 function scheduleWorkspaceRefresh() {
     if (!mounted) return
-    pendingUpdates.value = true
-    if (updatesTimer) clearTimeout(updatesTimer)
-    updatesTimer = setTimeout(() => { updatesTimer = null; void refreshWorkspace() }, 500)
+    if (hasOpenEditor.value) { pendingUpdates.value = true; return }
+    if (updatesTimer) return
+    const delay = Math.max(500, 1_200 - (Date.now() - lastAutoRefreshAt))
+    updatesTimer = setTimeout(() => { updatesTimer = null; void refreshWorkspace() }, delay)
+}
+function onResumeWorkspace() {
+    // A brief switch between apps does not require rereading an already fresh list.
+    const lastLoaded = activeTab.value === 'reservations' ? lastReservationsFetchedAt : lastOrdersFetchedAt
+    if (!pendingUpdates.value && lastLoaded && Date.now() - lastLoaded < 20_000) return
+    scheduleWorkspaceRefresh()
+}
+function onOrderManagementChanged(event: { orderId: number; branchId?: number; originBranchId?: number | null }) {
+    const workspaceId = workspaceBranchId.value
+    if (!workspaceId) return
+    // Legacy events with no branch metadata can only refresh a row already visible.
+    if (event.branchId == null) {
+        if (orders.value.some(order => order.id === event.orderId)
+            || reservations.value.some(order => order.id === event.orderId)) scheduleWorkspaceRefresh()
+        return
+    }
+    const localChange = event.branchId === workspaceId
+    const remoteChange = event.originBranchId === workspaceId && event.branchId !== workspaceId
+
+    if (remoteChange && !remoteBranches.value.some(branch => branch.id === event.branchId)) {
+        // This may be the first order taken for a new destination branch.
+        void loadRemoteBranches(true)
+    }
+    if (activeTab.value === 'reservations') {
+        if (localChange) scheduleWorkspaceRefresh()
+    } else if (remoteBranchId.value == null) {
+        if (localChange) scheduleWorkspaceRefresh()
+    } else if (remoteChange && event.branchId === remoteBranchId.value) {
+        scheduleWorkspaceRefresh()
+    }
 }
 const { isPageVisible, isOnline } = useOrderManagementUpdates(
-    scheduleWorkspaceRefresh,
-    scheduleWorkspaceRefresh,
+    onOrderManagementChanged,
+    onResumeWorkspace,
     (orderId) => {
         if (orders.value.some(o => o.id === orderId) || reservations.value.some(o => o.id === orderId)) pendingUpdates.value = true
     },
