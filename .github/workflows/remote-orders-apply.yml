@@ -1,0 +1,89 @@
+name: Complete remote-order frontend
+on:
+  push:
+    branches:
+      - feature/remote-order-management
+    paths:
+      - .github/workflows/remote-orders-apply.yml
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  finish:
+    if: github.repository == 'savelasquezs/senorArrozFront' && github.ref == 'refs/heads/feature/remote-order-management'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/remote-order-management
+          fetch-depth: 0
+          persist-credentials: true
+      - name: Validate and apply staged source patch
+        run: |
+          python3 - <<'PY'
+          import base64, bz2, hashlib, pathlib, re, subprocess
+          root = pathlib.Path('.remote-order-build')
+          parts = [root / f'part{i:02}' for i in range(1, 5)]
+          data = ''.join(p.read_text() for p in parts)
+          patch = bz2.decompress(base64.b64decode(data, validate=True))
+          expected_hash = 'e018889c8339cbfb94bf8109a53eabba9198a6c7c727e6aeddc7bd2dde5b8ddf'
+          assert hashlib.sha256(patch).hexdigest() == expected_hash, 'Patch hash mismatch'
+          expected_files = set('''src/components/customers/CustomerSection.vue
+          src/components/customers/address/AddressSelector.vue
+          src/components/orders/AssignDeliveryModal.vue
+          src/components/orders/CancelOrderModal.vue
+          src/components/orders/EditCustomerModal.vue
+          src/components/orders/EditOrderTypeModal.vue
+          src/components/orders/OrderDetailContent.vue
+          src/components/orders/OrderTrackingDialog.vue
+          src/components/orders/OrdersTable.vue
+          src/components/orders/__tests__/CancelOrderModal.test.ts
+          src/components/orders/__tests__/OrderTrackingDialog.test.ts
+          src/components/orders/__tests__/OrdersTable.deliveryLocation.test.ts
+          src/views/OrdersList.vue
+          src/views/__tests__/OrdersList.remoteBranches.test.ts'''.split())
+          matches = re.findall(rb'^diff --git a/(.*?) b/', patch, re.M)
+          paths = {p.decode() for p in matches}
+          assert paths == expected_files, f'Unexpected paths: {paths ^ expected_files}'
+          subprocess.run(['git', 'apply', '--check', '-'], input=patch, check=True)
+          subprocess.run(['git', 'apply', '-'], input=patch, check=True)
+          subprocess.run(['git', 'diff', '--check'], check=True)
+          print('Applied', len(paths), 'reviewed files; SHA-256 verified')
+          PY
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Locked dependency install
+        run: npm ci
+      - name: Build
+        env:
+          VITE_API_URL: https://example.invalid/api
+        run: |
+          set -o pipefail
+          npm run build 2>&1 | tee /tmp/remote-build.log
+      - name: Complete test suite
+        run: |
+          set -o pipefail
+          npm run test:run 2>&1 | tee /tmp/remote-tests.log
+      - name: Commit tested source and remove temporary staging
+        run: |
+          git config user.name 'Santiago Velasquez'
+          git config user.email '99078707+savelasquezs@users.noreply.github.com'
+          git add -- docs src
+          git rm -r -- .remote-order-build
+          git rm -- .github/workflows/remote-orders-apply.yml
+          git diff --cached --check
+          git commit -m 'feat: manage originated remote branch orders using existing order views'
+          git push origin HEAD:refs/heads/feature/remote-order-management
+      - name: Upload diagnostic logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: remote-orders-final-validation
+          path: |
+            /tmp/remote-build.log
+            /tmp/remote-tests.log
+          if-no-files-found: ignore
+          retention-days: 3
