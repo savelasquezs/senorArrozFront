@@ -141,7 +141,7 @@
                                     {{ groupByRoute ? 'Ver lista plana' : 'Agrupar por ruta' }}
                                 </BaseButton>
                                 <BaseButton variant="secondary" size="sm" class="shrink-0" :loading="loading"
-                                    @click="fetchOrders">
+                                    @click="fetchOrders()">
                                     <ArrowPathIcon class="w-4 h-4" />
                                 </BaseButton>
                             </div>
@@ -278,12 +278,12 @@
                                     <div class="w-44 sm:w-48">
                                         <BaseSelect v-model="resStatus" :options="resStatusOptions" value-key="value"
                                             display-key="label" placeholder="Estado"
-                                            @update:model-value="fetchReservations" />
+                                            @update:model-value="fetchReservations()" />
                                     </div>
                                     <div class="flex items-center gap-2 flex-wrap">
                                         <span class="text-xs text-gray-500 whitespace-nowrap">Fecha evento:</span>
                                         <BaseYmdDateRangePicker v-model:from-date="resFrom" v-model:to-date="resTo"
-                                            variant="compact" @change="fetchReservations" />
+                                            variant="compact" @change="fetchReservations()" />
                                     </div>
                                     <BaseButton v-if="resSearch || resStatus || resFrom || resTo" variant="ghost"
                                         size="sm" class="shrink-0" @click="clearResFilters">
@@ -322,7 +322,7 @@
                             <div class="flex items-center gap-2 shrink-0">
                                 <ReservationDepositsOverviewModal />
                                 <BaseButton variant="secondary" size="sm" class="shrink-0" :loading="resLoading"
-                                    @click="fetchReservations">
+                                    @click="fetchReservations()">
                                     <ArrowPathIcon class="w-4 h-4" />
                                 </BaseButton>
                             </div>
