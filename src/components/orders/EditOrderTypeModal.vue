@@ -282,7 +282,7 @@ async function persistTypeChange(deleteReservationAssociatedPayments = false) {
     }
 
     const paymentSnapshotBefore = toPaymentSnapshot(props.order)
-    const updatedOrder = await ordersStore.update(props.order.id, updateData as any)
+    const updatedOrder = await ordersStore.update(props.order.id, updateData as any, { order: props.order })
 
     success('Tipo de pedido actualizado', 5000)
     emit('updated', updatedOrder, paymentSnapshotBefore)

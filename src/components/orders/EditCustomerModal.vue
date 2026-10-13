@@ -15,7 +15,7 @@
             <!-- Selector de cliente con dirección -->
             <div>
                 <CustomerSection :selected-customer="selectedCustomer" :selected-address="selectedAddress"
-                    :order-type="props.order.type" :show-type-selector="false" mode="persisted"
+                    :order-type="props.order.type" :show-type-selector="false" mode="persisted" :operation-branch-id="props.order.branchId"
                     @customer-selected="handleCustomerSelected" @address-selected="handleAddressSelected"
                     @view-customer-detail="handleViewCustomerDetail" />
             </div>
@@ -282,7 +282,9 @@ const handleAddressSelected = (address: CustomerAddress | null | undefined) => {
         }
     }
 
-    autoCompleteFromAddress(address ?? null)
+    const service = address?.branchServices?.find(item => item.branchId === props.order.branchId && item.isCovered)
+    // Do not copy the historical customer's branch fee into a remotely fulfilled order.
+    autoCompleteFromAddress(address && service ? { ...address, deliveryFee: service.deliveryFee ?? 0 } : null)
 }
 
 const handleViewCustomerDetail = () => {
@@ -344,7 +346,7 @@ const saveOrderChanges = async (deleteReservationAssociatedPayments: boolean) =>
         }
 
         const paymentSnapshotBefore = toPaymentSnapshot(props.order)
-        const updatedOrder = await ordersStore.update(props.order.id, updateData)
+        const updatedOrder = await ordersStore.update(props.order.id, updateData, { order: props.order })
 
         showSuccess('Cliente actualizado', 5000)
 

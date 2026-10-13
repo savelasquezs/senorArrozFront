@@ -18,12 +18,15 @@ import {
     type ResourceActionOptions,
 } from './helpers/resourceStore'
 
-type FetchOpts = ResourceActionOptions
+import type { OrderMutationSnapshot } from '@/services/MainAPI/orderMutation'
+
+type FetchOpts = ResourceActionOptions & { order?: OrderMutationSnapshot }
 
 export const useOrdersDataStore = defineStore('ordersData', () => {
     const list = ref<PagedResult<OrderListItem> | null>(null)
     const current = ref<OrderDetailView | null>(null)
     const users = ref<User[]>([])
+    let detailRequest = 0
     const { isLoading, error, run, clearError } = createResourceState()
 
     const fetch = async (filters?: OrderFilters, opts?: FetchOpts) => {
@@ -34,15 +37,18 @@ export const useOrdersDataStore = defineStore('ordersData', () => {
     }
 
     const fetchById = async (id: number, opts?: FetchOpts) => {
+        const request = ++detailRequest
         await run(async () => {
-            current.value = await orderApi.fetchDetail(id)
+            const detail = await orderApi.fetchDetail(id)
+            if (request === detailRequest) current.value = detail
         }, { ...opts, errorMessage: 'Error al cargar el pedido' })
     }
 
     const update = async (id: number, payload: UpdateOrderDto, opts?: FetchOpts) => {
         return run(
             async () => {
-                const response = await orderApi.updateOrder(id, payload)
+                const snapshot = opts?.order ?? (current.value?.id === id ? current.value : list.value?.items.find(o => o.id === id))
+                const response = await orderApi.updateOrder(id, payload, snapshot)
 
                 if (list.value) {
                     const index = list.value.items.findIndex((item) => item.id === id)
@@ -59,11 +65,15 @@ export const useOrdersDataStore = defineStore('ordersData', () => {
                 }
 
                 if (current.value?.id === id) {
+                    const refresh = ++detailRequest
                     try {
-                        current.value = await orderApi.fetchDetail(id)
+                        const detail = await orderApi.fetchDetail(id)
+                        if (refresh === detailRequest && current.value?.id === id) current.value = detail
                     } catch (fetchError) {
                         console.error('Error fetching updated order details:', fetchError)
-                        current.value = response as unknown as OrderDetailView
+                        if (refresh === detailRequest && current.value?.id === id) {
+                            current.value = { ...current.value, ...response } as unknown as OrderDetailView
+                        }
                     }
                 }
 
@@ -89,7 +99,8 @@ export const useOrdersDataStore = defineStore('ordersData', () => {
 
     const updateStatus = async (id: number, status: OrderStatus, opts?: FetchOpts) => {
         return run(async () => {
-            const response = await orderApi.updateStatus(id, status)
+            const snapshot = opts?.order ?? (current.value?.id === id ? current.value : list.value?.items.find(o => o.id === id))
+            const response = await orderApi.updateStatus(id, status, undefined, snapshot)
 
             if (list.value) {
                 const index = list.value.items.findIndex((item) => item.id === id)
@@ -129,11 +140,13 @@ export const useOrdersDataStore = defineStore('ordersData', () => {
     }
 
     const clear = () => {
+        detailRequest++
         current.value = null
         clearError()
     }
 
     const clearAll = () => {
+        detailRequest++
         list.value = null
         current.value = null
         users.value = []

@@ -148,4 +148,18 @@ describe('OrdersTable delivery location actions', () => {
         )
         expect(toastMocks.success).toHaveBeenCalledWith('Mensaje copiado', 2500, 'Pedido #567')
     })
+    it('uses an order-scoped tracking dialog and preserves the return tab for remote orders', async () => {
+        const row = order({ branchId: 2, originBranchId: 1, managementVersion: 7 })
+        const wrapper = mountTable(row)
+        await wrapper.setProps({ useOrderTracking: true, detailQuery: { remoteBranchId: '2' } })
+        const button = wrapper.get('[aria-label="Ver ubicación del pedido 567"]')
+        expect(button.element.tagName).toBe('BUTTON')
+        await button.trigger('click')
+        expect(wrapper.emitted('track-order')?.[0]).toEqual([row])
+        expect(wrapper.findAllComponents(RouterLinkStub)[0]!.props('to')).toEqual({
+            name: 'OrderDetail', params: { id: 567 }, query: { remoteBranchId: '2' },
+        })
+        wrapper.unmount()
+    })
+
 })

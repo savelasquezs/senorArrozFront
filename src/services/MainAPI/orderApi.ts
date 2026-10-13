@@ -1,5 +1,6 @@
 // src/services/MainAPI/orderApi.ts
 import { BaseApi } from './baseApi';
+import { orderMutationConfig, type OrderMutationSnapshot } from './orderMutation';
 import type {
     PagedResult,
 } from '@/types/common';
@@ -58,9 +59,10 @@ class OrderApi extends BaseApi {
     // 4. Actualizar pedido
     async updateOrder(
         id: number,
-        payload: UpdateOrderDto
+        payload: UpdateOrderDto,
+        snapshot?: OrderMutationSnapshot
     ): Promise<Order> {
-        return this.put<Order>(`/orders/${id}`, payload);
+        return this.put<Order>(`/orders/${id}`, payload, orderMutationConfig(snapshot));
     }
 
     // 5. Cancelar pedido
@@ -114,12 +116,12 @@ class OrderApi extends BaseApi {
     }
 
     // 13. Actualizar pedido (datos básicos y productos)
-    async update(id: number, dto: UpdateOrderDto): Promise<Order> {
-        return this.put<Order>(`/orders/${id}`, dto);
+    async update(id: number, dto: UpdateOrderDto, snapshot?: OrderMutationSnapshot): Promise<Order> {
+        return this.put<Order>(`/orders/${id}`, dto, orderMutationConfig(snapshot));
     }
 
     // 14. Cambiar estado del pedido
-    async updateStatus(id: number, status: OrderStatus, reason?: string): Promise<Order> {
+    async updateStatus(id: number, status: OrderStatus, reason?: string, snapshot?: OrderMutationSnapshot): Promise<Order> {
         // Convertir status de snake_case a camelCase para el backend C#
         const statusMap: Record<OrderStatus, string> = {
             'awaiting_payment': 'awaitingPayment',
@@ -132,22 +134,22 @@ class OrderApi extends BaseApi {
         };
 
         const backendStatus = statusMap[status] || status;
-        return this.put<Order>(`/orders/${id}/status`, { status: backendStatus, reason });
+        return this.put<Order>(`/orders/${id}/status`, { status: backendStatus, reason }, orderMutationConfig(snapshot));
     }
 
     // 15. Cancelar pedido con razón
-    async cancel(id: number, reason: string): Promise<Order> {
-        return this.put<Order>(`/orders/${id}/cancel`, { reason });
+    async cancel(id: number, reason: string, snapshot?: OrderMutationSnapshot): Promise<Order> {
+        return this.put<Order>(`/orders/${id}/cancel`, { reason }, orderMutationConfig(snapshot));
     }
 
     // 16. Asignar domiciliario a pedido
-    async assignDelivery(id: number, deliveryManId: number): Promise<Order> {
-        return this.put<Order>(`/orders/${id}/assign-delivery`, { deliveryManId });
+    async assignDelivery(id: number, deliveryManId: number, snapshot?: OrderMutationSnapshot): Promise<Order> {
+        return this.put<Order>(`/orders/${id}/assign-delivery`, { deliveryManId }, orderMutationConfig(snapshot));
     }
 
     // 17. Desasignar domiciliario de pedido
-    async unassignDelivery(id: number): Promise<Order> {
-        return this.put<Order>(`/orders/${id}/unassign-delivery`, {});
+    async unassignDelivery(id: number, snapshot?: OrderMutationSnapshot): Promise<Order> {
+        return this.put<Order>(`/orders/${id}/unassign-delivery`, {}, orderMutationConfig(snapshot));
     }
 
     /**
@@ -157,7 +159,8 @@ class OrderApi extends BaseApi {
     async setPaidInStoreCash(
         id: number,
         paidInStoreCash: boolean,
-        paidInStoreCashAmount?: number | null
+        paidInStoreCashAmount?: number | null,
+        snapshot?: OrderMutationSnapshot
     ): Promise<Order> {
         const body: {
             paidInStoreCash: boolean
@@ -166,7 +169,7 @@ class OrderApi extends BaseApi {
         if (paidInStoreCashAmount !== undefined && paidInStoreCashAmount !== null) {
             body.paidInStoreCashAmount = paidInStoreCashAmount
         }
-        return this.put<Order>(`/orders/${id}/paid-in-store-cash`, body)
+        return this.put<Order>(`/orders/${id}/paid-in-store-cash`, body, orderMutationConfig(snapshot))
     }
 
     // ===== MÉTODOS PARA MÓDULO DE DOMICILIARIOS =====

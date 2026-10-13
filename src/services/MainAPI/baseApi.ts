@@ -4,6 +4,7 @@ import { getAccessToken, refreshAccessToken } from '@/services/auth/authSession'
 import { getStoredUser } from '@/services/auth/authSession';
 import { getSelectedBranchIdForRequest } from '@/services/branchContextSession';
 import { UserRole } from '@/types/auth';
+import { notifyOrderConflict } from './orderMutation';
 import { WEB_CLIENT_HEADER, WEB_CLIENT_HEADER_VALUE } from '@/constants/deliveryApp';
 
 export type BranchScope = 'selected' | 'all' | 'none';
@@ -12,11 +13,13 @@ declare module 'axios' {
 	interface AxiosRequestConfig {
 		branchScope?: BranchScope;
 		_branchContextId?: number | null;
+		onOrderVersion?: (orderId: number, version: number) => void;
 	}
 
 	interface InternalAxiosRequestConfig {
 		branchScope?: BranchScope;
 		_branchContextId?: number | null;
+		onOrderVersion?: (orderId: number, version: number) => void;
 	}
 }
 
@@ -77,11 +80,17 @@ export class BaseApi {
 				) {
 					throw new CanceledError('La sucursal activa cambió durante la solicitud.');
 				}
-				return response;
+                const returnedOrderId = Number(response.headers['x-order-id']);
+                const returnedVersion = Number(response.headers['x-order-version']);
+                response.config.onOrderVersion?.(returnedOrderId, returnedVersion);
+                return response;
 			},
 			async (error) => {
 				const originalRequest = error.config;
-				const url = String(originalRequest?.url ?? '');
+                const url = String(originalRequest?.url ?? '');
+                if (error.response?.status === 409) {
+                    notifyOrderConflict(Number(originalRequest?.headers?.['X-Order-Id']));
+                }
 
 				if (
 					url.includes('/auth/login') ||

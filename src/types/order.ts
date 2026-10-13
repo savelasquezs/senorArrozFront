@@ -177,6 +177,8 @@ export interface DraftOrder {
 
 // ===== TIPOS DE PEDIDOS COMPLETADOS =====
 export interface Order {
+    originBranchId?: number | null
+    managementVersion?: number
     id: number
     branchId: number
     branchName: string
@@ -300,6 +302,8 @@ export interface DeliverymanHistoryNeighborhood {
 }
 
 export interface OrderListItem {
+    originBranchId?: number | null
+    managementVersion?: number
     id: number
     branchId: number
     branchName: string

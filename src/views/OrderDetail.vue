@@ -7,13 +7,17 @@
 
 
 
+        <div v-if="detailError" role="alert" class="p-4 text-red-700">
+            {{ detailError }}
+            <button class="ml-3 underline" @click="fetchOrderDetail">Reintentar</button>
+        </div>
         <!-- Order detail -->
         <OrderDetailContent v-else-if="order" :flat-order="order" />
     </MainLayout>
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, watch, ref } from 'vue'
 import { useRoute } from 'vue-router'
 
 import OrderDetailContent from '@/components/orders/OrderDetailContent.vue'
@@ -39,28 +43,23 @@ const route = useRoute()
 const order = ref<OrderDetailView | null>(null)
 const loading = computed(() => ordersDataStore.isLoading)
 
+const detailError = ref('')
+let detailRequest = 0
 const fetchOrderDetail = async () => {
+    const request = ++detailRequest
+    order.value = null
+    detailError.value = ''
     try {
         const orderId = parseInt(route.params.id as string)
         await ordersDataStore.fetchById(orderId)
-        order.value = ordersDataStore.current
+        if (request === detailRequest) order.value = ordersDataStore.current
         // editableGuestName.value = order.value?.guestName || ''
         // editableNotes.value = order.value?.notes || ''
     } catch (err: any) {
-        console.error('Error loading order:', err)
+        if (request === detailRequest) detailError.value = err.message || 'No se pudo cargar el pedido.'
     }
 }
-onMounted(async () => {
-    await Promise.all([
-        fetchOrderDetail(),
-        // loadPaymentData()
-    ])
-
-    // Cargar cliente completo si hay customerId (después de que fetchOrderDetail termine)
-    if (order.value?.customerId) {
-        // await loadCustomer(order.value.customerId)
-    }
-})
+watch(() => route.params.id, () => { void fetchOrderDetail() }, { immediate: true })
 
 
 

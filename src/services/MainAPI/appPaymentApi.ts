@@ -1,5 +1,6 @@
 // src/services/MainAPI/appPaymentApi.ts
 import { BaseApi } from './baseApi';
+import { orderMutationConfig, type OrderMutationSnapshot } from './orderMutation';
 import type {
     PagedResult,
 } from '@/types/common';
@@ -67,51 +68,53 @@ class AppPaymentApi extends BaseApi {
 
     // 4. Crear pago de app (SOLO desde toma de pedidos)
     async createAppPayment(
-        payload: CreateAppPaymentDto
+        payload: CreateAppPaymentDto,
+        snapshot?: OrderMutationSnapshot
     ): Promise<AppPayment> {
-        return this.post<AppPayment>('/apppayments', payload);
+        return this.post<AppPayment>('/apppayments', payload, orderMutationConfig(snapshot));
     }
 
     // 5. Liquidar pago individual
-    async settleAppPayment(id: number): Promise<string> {
-        return this.post<string>(`/apppayments/${id}/settle`, {});
+    async settleAppPayment(id: number, snapshot?: OrderMutationSnapshot): Promise<string> {
+        return this.post<string>(`/apppayments/${id}/settle`, {}, orderMutationConfig(snapshot));
     }
 
     // 6. Liquidar múltiples pagos
     async settleMultipleAppPayments(
-        payload: SettleMultipleAppPaymentsDto
+        payload: SettleMultipleAppPaymentsDto,
+        snapshot?: OrderMutationSnapshot
     ): Promise<string> {
-        return this.post<string>('/apppayments/settle-multiple', payload);
+        return this.post<string>('/apppayments/settle-multiple', payload, orderMutationConfig(snapshot));
     }
 
     // 7. Desliquidar pago
-    async unsettleAppPayment(id: number): Promise<string> {
-        return this.post<string>(`/apppayments/${id}/unsettle`, {});
+    async unsettleAppPayment(id: number, snapshot?: OrderMutationSnapshot): Promise<string> {
+        return this.post<string>(`/apppayments/${id}/unsettle`, {}, orderMutationConfig(snapshot));
     }
 
 
 
     // 9. Actualizar monto de pago de app
-    async updateAppPayment(id: number, amount: number): Promise<AppPayment> {
-        return this.put<AppPayment>(`/apppayments/${id}`, { amount });
+    async updateAppPayment(id: number, amount: number, snapshot?: OrderMutationSnapshot): Promise<AppPayment> {
+        return this.put<AppPayment>(`/apppayments/${id}`, { amount }, orderMutationConfig(snapshot));
     }
 
     // Alias para mantener consistencia con el plan
-    async settle(id: number): Promise<void> {
-        await this.settleAppPayment(id);
+    async settle(id: number, snapshot?: OrderMutationSnapshot): Promise<void> {
+        await this.settleAppPayment(id, snapshot);
     }
 
-    async unsettle(id: number): Promise<void> {
-        await this.unsettleAppPayment(id);
+    async unsettle(id: number, snapshot?: OrderMutationSnapshot): Promise<void> {
+        await this.unsettleAppPayment(id, snapshot);
     }
 
-    async update(id: number, amount: number): Promise<AppPayment> {
-        return this.updateAppPayment(id, amount);
+    async update(id: number, amount: number, snapshot?: OrderMutationSnapshot): Promise<AppPayment> {
+        return this.updateAppPayment(id, amount, snapshot);
     }
 
     // 10. Eliminar pago de app
-    async deletePayment(id: number): Promise<void> {
-        await this.api.delete(`/apppayments/${id}`)
+    async deletePayment(id: number, snapshot?: OrderMutationSnapshot): Promise<void> {
+        await this.delete(`/apppayments/${id}`, orderMutationConfig(snapshot))
     }
 }
 

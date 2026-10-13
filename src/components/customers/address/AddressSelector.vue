@@ -193,6 +193,7 @@ interface Props {
     customerId?: number
     selectedAddress?: number
     branchId?: number
+    operationBranchId?: number
     mode?: 'draft' | 'persisted'
 }
 
@@ -232,7 +233,7 @@ const effectiveBranchId = computed<number | null>(() => {
     const orderBranchId = props.mode === 'draft'
         ? draftStore.currentOrder?.branchId
         : dataStore.current?.branchId
-    return orderBranchId
+    return props.operationBranchId ?? orderBranchId
         ?? branchContext.selectedBranchId
         ?? authStore.branchId
         ?? props.branchId

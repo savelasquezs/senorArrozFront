@@ -73,7 +73,7 @@ describe('CancelOrderModal', () => {
         await confirmButton!.trigger('click')
         await flushPromises()
 
-        expect(cancelMock).toHaveBeenCalledWith(42, 'El cliente cambió de opinión')
+        expect(cancelMock).toHaveBeenCalledWith(42, 'El cliente cambió de opinión', order)
         expect(wrapper.emitted('cancelled')).toEqual([[cancelledOrder]])
         expect(wrapper.emitted('close')).toHaveLength(1)
         expect(successMock).toHaveBeenCalledWith(

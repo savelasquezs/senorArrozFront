@@ -1,6 +1,7 @@
 import { ref } from 'vue'
 import type { OrderListItem, OrderStatus, Order } from '@/types/order'
 import { orderApi } from '@/services/MainAPI/orderApi'
+import type { OrderMutationSnapshot } from '@/services/MainAPI/orderMutation'
 import { useOrderPermissions } from '@/composables/useOrderPermissions'
 import { useToast } from '@/composables/useToast'
 
@@ -40,7 +41,7 @@ export function useOrderStatusChange() {
         }
 
         // Ejecutar cambio de estado directamente
-        await executeStatusChange(order.id, newStatus, onSuccess)
+        await executeStatusChange(order.id, newStatus, onSuccess, order)
         return false
     }
 
@@ -50,10 +51,11 @@ export function useOrderStatusChange() {
     const executeStatusChange = async (
         orderId: number,
         newStatus: OrderStatus,
-        onSuccess?: (updatedOrder: Order) => void
+        onSuccess?: (updatedOrder: Order) => void,
+        snapshot?: OrderMutationSnapshot
     ): Promise<void> => {
         try {
-            const updatedOrder = await orderApi.updateStatus(orderId, newStatus)
+            const updatedOrder = await orderApi.updateStatus(orderId, newStatus, undefined, snapshot)
             const orderAny = updatedOrder as any
             success(
                 'Estado actualizado',

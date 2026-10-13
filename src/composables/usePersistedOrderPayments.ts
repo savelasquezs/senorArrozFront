@@ -67,7 +67,7 @@ export function usePersistedOrderPayments(
                 orderId: order.value.id,
                 appId,
                 amount
-            })
+            }, order.value)
 
             success('Pago agregado', 5000, 'Pago por app agregado exitosamente')
 
@@ -87,7 +87,7 @@ export function usePersistedOrderPayments(
         if (!order.value) return null
 
         try {
-            const updated = await appPaymentApi.update(paymentId, amount)
+            const updated = await appPaymentApi.update(paymentId, amount, order.value)
             success('Pago actualizado', 5000, 'Monto actualizado exitosamente')
 
             // Actualización optimista
@@ -107,7 +107,7 @@ export function usePersistedOrderPayments(
         if (!order.value) return false
 
         try {
-            await appPaymentApi.deletePayment(paymentId)
+            await appPaymentApi.deletePayment(paymentId, order.value)
             success('Pago eliminado', 5000, 'Pago por app eliminado')
 
             // Actualización optimista
@@ -131,7 +131,7 @@ export function usePersistedOrderPayments(
                 orderId: order.value.id,
                 bankId,
                 amount
-            })
+            }, order.value)
 
             success('Pago agregado', 5000, 'Pago bancario agregado exitosamente')
 
@@ -151,7 +151,7 @@ export function usePersistedOrderPayments(
         if (!order.value) return null
 
         try {
-            const updated = await bankPaymentApi.update(paymentId, amount)
+            const updated = await bankPaymentApi.update(paymentId, amount, order.value)
             success('Pago actualizado', 5000, 'Monto actualizado exitosamente')
 
             // Actualización optimista
@@ -171,7 +171,7 @@ export function usePersistedOrderPayments(
         if (!order.value) return false
 
         try {
-            await bankPaymentApi.deletePayment(paymentId)
+            await bankPaymentApi.deletePayment(paymentId, order.value)
             success('Pago eliminado', 5000, 'Pago bancario eliminado')
 
             // Actualización optimista
