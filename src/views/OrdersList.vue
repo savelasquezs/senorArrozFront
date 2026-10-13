@@ -1279,13 +1279,13 @@ const fetchOrders = async (options: { background?: boolean } = {}): Promise<Orde
             throw new Error('No se pudo validar la sucursal remota. Reintenta cargar las sucursales.')
         }
         const response = await searchOrdersOnce(scope, body)
-        if (request !== ordersRequest || scope !== activeTab.value) return
+        if (request !== ordersRequest || scope !== activeTab.value) return null
         orders.value = response.items
         totalCount.value = response.totalCount
         lastOrdersFetchedAt = Date.now()
         return { response, body, scope }
     } catch (err: any) {
-        if (request !== ordersRequest || scope !== activeTab.value) return
+        if (request !== ordersRequest || scope !== activeTab.value) return null
         if (!options.background) {
             orders.value = []
             totalCount.value = 0
