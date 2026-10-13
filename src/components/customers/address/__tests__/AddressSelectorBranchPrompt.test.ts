@@ -97,6 +97,8 @@ describe('AddressSelector branch prompt', () => {
     it('does not offer a duplicate branch checkbox when creating an address inside an order', async () => {
         const wrapper = shallowMount(AddressSelector, {
             props: { customerId: 7, mode: 'draft' },
+            // Shallow BaseDialog hides its slot by default; render it to inspect the form props.
+            global: { stubs: { BaseDialog: { template: '<div><slot /></div>' } } },
         })
         await flushPromises()
         expect(wrapper.getComponent(CustomerAddressForm).props('allowBranchSelection')).toBe(false)
