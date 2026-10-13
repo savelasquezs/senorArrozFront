@@ -802,6 +802,7 @@ async function activateTab(tab: TabValue) {
     ordersRequest++
     deliverymenRequest++
     debouncedRefetchOrders.cancel()
+    if (updatesTimer) { clearTimeout(updatesTimer); updatesTimer = null }
     activeTab.value = tab
     currentPage.value = 1
     deliverymenInRange.value = []
@@ -1400,48 +1401,50 @@ const buildDeliverymenInRangeSearchBody = (page: number, pageSizeValue: number) 
         status: null,
     })
 
-const loadDeliverymenInRange = async () => {
+const loadDeliverymenInRange = async (force = false) => {
+    // This is an advanced filter; do not paginate every order in the background.
+    if (!showAdvancedFilters.value && deliveryManFilterId.value == null) return
+    const scope = activeTab.value
+    const cacheKey = JSON.stringify([workspaceBranchId.value, scope, dateFilters.value.fromDate, dateFilters.value.toDate])
+    const cached = deliverymenCache.get(cacheKey)
+    if (cached) {
+        deliverymenInRange.value = cached.options
+        if (!force && Date.now() - cached.loadedAt < DELIVERYMEN_CACHE_TTL_MS) return
+    }
     if (remoteBranchId.value != null && !remoteBranches.value.some(b => b.id === remoteBranchId.value)) {
         deliverymenInRange.value = []
         return
     }
     const request = ++deliverymenRequest
-    const scope = activeTab.value
     try {
         const pageSizeValue = 200
         let page = 1
         let totalPagesCount = 1
         const unique = new Map<number, string>()
-
         while (page <= totalPagesCount) {
             const response = await orderApi.searchOrders(buildDeliverymenInRangeSearchBody(page, pageSizeValue))
             if (request !== deliverymenRequest || scope !== activeTab.value) return
-
             for (const order of response.items) {
                 if (order.deliveryManId == null) continue
                 const label = order.deliveryManName?.trim() || `Domiciliario #${order.deliveryManId}`
-                if (!unique.has(order.deliveryManId)) {
-                    unique.set(order.deliveryManId, label)
-                }
+                if (!unique.has(order.deliveryManId)) unique.set(order.deliveryManId, label)
             }
-
             totalPagesCount = Math.max(1, Math.ceil(response.totalCount / pageSizeValue))
-            page += 1
+            page++
         }
-
-        deliverymenInRange.value = [...unique.entries()]
+        const options = [...unique.entries()]
             .map(([value, label]) => ({ value, label }))
             .sort((a, b) => a.label.localeCompare(b.label))
-
-        if (
-            deliveryManFilterId.value != null &&
-            !deliverymenInRange.value.some((item) => item.value === deliveryManFilterId.value)
-        ) {
+        deliverymenCache.set(cacheKey, { options, loadedAt: Date.now() })
+        deliverymenInRange.value = options
+        if (deliveryManFilterId.value != null
+            && !deliverymenInRange.value.some(item => item.value === deliveryManFilterId.value)) {
             deliveryManFilterId.value = null
         }
     } catch (err: any) {
         if (request !== deliverymenRequest || scope !== activeTab.value) return
-        deliverymenInRange.value = []
+        // Preserve the last usable filter options if refreshing fails.
+        if (!cached) deliverymenInRange.value = []
         error('Error al cargar domiciliarios', err.message)
     }
 }
@@ -1463,7 +1466,7 @@ const applyOrdersDateFilters = async (
 
     currentPage.value = 1
     debouncedRefetchOrders.cancel()
-    await loadDeliverymenInRange()
+    if (showAdvancedFilters.value) void loadDeliverymenInRange()
     await fetchOrders()
 }
 
@@ -2450,8 +2453,9 @@ const reservedColombiaDateToIsoUtc = (dateStr: string, endOfDay: boolean): strin
     return new Date(`${dateStr}${suffix}`).toISOString()
 }
 
-const fetchReservations = async () => {
-    resLoading.value = true
+let reservationsSearchKey = ''
+let reservationsLastLoadedAt = 0
+const fetchReservations = async (options: { preferCache?: boolean; silent?: boolean } = {}) => {
     try {
         let statusPayload: string | undefined = undefined
 
@@ -2482,6 +2486,11 @@ const fetchReservations = async () => {
         if (resFrom.value) body.reservedFromDate = reservedColombiaDateToIsoUtc(resFrom.value, false)
         if (resTo.value) body.reservedToDate = reservedColombiaDateToIsoUtc(resTo.value, true)
 
+        const key = JSON.stringify([workspaceBranchId.value, body])
+        if (options.preferCache && key === reservationsSearchKey
+            && Date.now() - reservationsLastLoadedAt < ORDER_CACHE_TTL_MS) return
+        // Keep the existing reservation rows while syncing a previously loaded tab.
+        resLoading.value = reservationsSearchKey !== key && reservations.value.length === 0
         const response = await orderApi.searchOrders(body)
 
         let items = response.items
@@ -2491,8 +2500,10 @@ const fetchReservations = async () => {
 
         reservations.value = items
         resTotalCount.value = resStatus.value === null ? items.length : response.totalCount
+        reservationsSearchKey = key
+        reservationsLastLoadedAt = Date.now()
     } catch (err: any) {
-        error('Error al cargar reservas', err.message)
+        if (!options.silent) error('Error al cargar reservas', err.message)
     } finally {
         resLoading.value = false
     }
@@ -2565,7 +2576,7 @@ const confirmCancelReservation = async () => {
     }
 }
 
-// Realtime only invalidates this authorized workspace. Open forms keep their original version.
+// Realtime invalidation is scoped by branch and batched. Editing snapshots remain immutable.
 const hasOpenEditor = computed(() => showEditCustomerModal.value || showAssignDeliveryModal.value
     || showEditOrderTypeModal.value || showDepositModal.value || showEditBankPaymentDialog.value
     || showRemoveBankPaymentDialog.value || showEditReservationDepositDialog.value
@@ -2574,23 +2585,66 @@ const hasOpenEditor = computed(() => showEditCustomerModal.value || showAssignDe
     || showCancelReservationDialog.value || showBulkUnverifyDialog.value)
 let updatesTimer: ReturnType<typeof setTimeout> | null = null
 let mounted = false
+let autoRefreshInFlight = false
+let refreshAgain = false
+let lastAutomaticRefreshAt = 0
+
 async function refreshWorkspace() {
     if (!mounted || !isPageVisible.value || !isOnline.value) return
     if (hasOpenEditor.value) { pendingUpdates.value = true; return }
+    if (autoRefreshInFlight) { refreshAgain = true; return }
+    autoRefreshInFlight = true
     pendingUpdates.value = false
-    await loadRemoteBranches()
-    if (activeTab.value === 'reservations') await fetchReservations()
-    else await fetchOrders()
+    try {
+        await loadRemoteBranches()
+        if (activeTab.value === 'reservations') await fetchReservations({ silent: true })
+        else await fetchOrders({ silent: true })
+    } finally {
+        autoRefreshInFlight = false
+        lastAutomaticRefreshAt = Date.now()
+        if (refreshAgain) {
+            refreshAgain = false
+            scheduleWorkspaceRefresh()
+        }
+    }
 }
 function scheduleWorkspaceRefresh() {
     if (!mounted) return
-    pendingUpdates.value = true
-    if (updatesTimer) clearTimeout(updatesTimer)
-    updatesTimer = setTimeout(() => { updatesTimer = null; void refreshWorkspace() }, 500)
+    if (hasOpenEditor.value) { pendingUpdates.value = true; return }
+    if (updatesTimer) return
+    // Many order/payment events may arrive together. Fetch the list at most once per batch.
+    const delay = Math.max(500, 1_800 - (Date.now() - lastAutomaticRefreshAt))
+    updatesTimer = setTimeout(() => {
+        updatesTimer = null
+        void refreshWorkspace()
+    }, delay)
+}
+function scheduleBackgroundRefresh() {
+    // Switching to another application briefly should not immediately re-fetch.
+    if (!pendingUpdates.value && Date.now() - lastSuccessfulListRefreshAt < 30_000) return
+    scheduleWorkspaceRefresh()
+}
+function handleOrderManagementEvent(event: { orderId: number; branchId?: number; originBranchId?: number | null }) {
+    const origin = workspaceBranchId.value
+    if (!origin) return
+    // Only the current workspace's changes warrant a full list refresh.
+    if (event.branchId != null && event.branchId !== origin) {
+        if (event.originBranchId === origin && event.branchId !== remoteBranchId.value) {
+            // A new remote destination must appear in the tabs, without refreshing local orders.
+            if (!remoteBranches.value.some(b => b.id === event.branchId)) void loadRemoteBranches(true)
+            return
+        }
+        if (event.originBranchId !== origin || event.branchId !== remoteBranchId.value) return
+    }
+    if (remoteBranchId.value != null && event.branchId != null
+        && (event.branchId !== remoteBranchId.value || event.originBranchId !== origin)) return
+    if (event.branchId == null && !orders.value.some(o => o.id === event.orderId)
+        && !reservations.value.some(o => o.id === event.orderId)) return
+    scheduleWorkspaceRefresh()
 }
 const { isPageVisible, isOnline } = useOrderManagementUpdates(
-    scheduleWorkspaceRefresh,
-    scheduleWorkspaceRefresh,
+    handleOrderManagementEvent,
+    scheduleBackgroundRefresh,
     (orderId) => {
         if (orders.value.some(o => o.id === orderId) || reservations.value.some(o => o.id === orderId)) pendingUpdates.value = true
     },
@@ -2602,29 +2656,42 @@ watch(() => route.query.remoteBranchId, () => {
     else if (remoteBranchId.value != null) void activateTab('orders')
 })
 watch(workspaceBranchId, () => {
-    // Global branch changes remount MainLayout in production; invalidate pending reads as a safeguard.
+    // Invalidate all old-scope snapshots; no cross-branch rows may survive a context change.
     ordersRequest++; deliverymenRequest++; branchOptionsRequest++; branchesRequest++
+    orderPageCache.clear(); deliverymenCache.clear(); operationOptionsCache.clear()
+    remoteBranchesLoadedAt = 0
+    remoteBranchesPromise = null
+    reservationsSearchKey = ''
+    reservationsLastLoadedAt = 0
+    displayedSearchKey = null
     remoteBranches.value = []; remoteOptions.value = null; orders.value = []; totalCount.value = 0
     activeTab.value = 'orders'
     void retryRemoteWorkspace()
 })
 async function retryRemoteWorkspace() {
     await loadRemoteBranches()
-    await loadWorkspaceOptions()
-    if (activeTab.value !== 'reservations') await Promise.all([loadDeliverymenInRange(), fetchOrders()])
+    void loadWorkspaceOptions()
+    if (activeTab.value !== 'reservations') {
+        if (showAdvancedFilters.value) void loadDeliverymenInRange()
+        await fetchOrders({ preferCache: true })
+    }
 }
 onMounted(async () => {
     mounted = true
-    await Promise.allSettled([
-        banksStore.ensureListLoaded(), appsStore.ensureListLoaded(), loadRemoteBranches(),
-    ])
-    await loadWorkspaceOptions()
-    await Promise.all([loadDeliverymenInRange(), fetchOrders()])
+    // Payment catalogs load independently instead of delaying the first order list.
+    void Promise.allSettled([banksStore.ensureListLoaded(), appsStore.ensureListLoaded()])
+    const branches = loadRemoteBranches()
+    if (remoteBranchId.value != null) await branches
+    void loadWorkspaceOptions()
+    if (showAdvancedFilters.value) void loadDeliverymenInRange()
+    await fetchOrders({ preferCache: true })
 })
 onUnmounted(() => {
     mounted = false
     ordersRequest++; deliverymenRequest++; branchOptionsRequest++; branchesRequest++
     debouncedRefetchOrders.cancel()
     if (updatesTimer) clearTimeout(updatesTimer)
+    orderPageCache.clear()
+    pendingOrderSearches.clear()
 })
 </script>
