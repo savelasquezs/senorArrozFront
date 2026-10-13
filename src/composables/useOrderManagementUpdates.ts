@@ -31,8 +31,13 @@ export function useOrderManagementUpdates(
         off('OrderManagementChanged', handle)
         window.removeEventListener(ORDER_CONFLICT_EVENT, onConflict)
     })
-    watch(connectionState, (value, prior) => {
-        if (value === 'connected' && prior && prior !== 'connected') refresh()
+    // La primera conexión SignalR no es una reconexión: la vista ya hace la carga inicial.
+    // Antes, connecting -> connected ejecutaba un segundo GET/POST innecesario.
+    let hasConnectedOnce = connectionState.value === 'connected'
+    watch(connectionState, (value) => {
+        if (value !== 'connected') return
+        if (hasConnectedOnce) refresh()
+        hasConnectedOnce = true
     })
     watch([isPageVisible, isOnline], ([visible, online], [wasVisible, wasOnline]) => {
         if (visible && online && (!wasVisible || !wasOnline)) refresh()
