@@ -55,6 +55,7 @@ describe('OrderFulfillmentBranchSelector', () => {
         expect(wrapper.getComponent(BaseSelect).props('options')).toEqual([
             { id: 2, name: 'Manrique' },
         ])
+        expect(wrapper.getComponent(BaseSelect).props('label')).toBe('Sucursal donde se recoge')
     })
 
     it('does not change a branch until a destination is selected when multiple exist', async () => {

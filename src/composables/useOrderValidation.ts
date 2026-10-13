@@ -42,10 +42,12 @@ export function useOrderValidation(): UseOrderValidationReturn {
             }
         }
 
-        // Todos los pedidos requieren un destinatario identificable, incluso
-        // recogidas locales sin cliente registrado.
-        if (!order.guestName?.trim()) {
-            errors.push(order.type === 'onsite'
+        // Las recogidas remotas deben tener un nombre para identificarlas en destino;
+        // no modificar la regla histórica de los pedidos onsite locales.
+        const remotePickup = order.type === 'onsite'
+            && order.branchId !== (order.workspaceBranchId ?? order.branchId)
+        if (!order.guestName?.trim() && (order.type !== 'onsite' || remotePickup)) {
+            errors.push(remotePickup
                 ? 'Debe indicar el nombre de quien recoge'
                 : 'El nombre de quien recibe es obligatorio para pedidos de domicilio y reservaciones')
         }
