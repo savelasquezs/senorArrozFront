@@ -696,6 +696,20 @@ const canManageRemoteOrders = computed(() => ['Admin', 'Superadmin', 'Cashier'].
 const remoteBranches = ref<RemoteOrderBranch[]>([])
 const remoteOptions = ref<OrderOperationOptions | null>(null)
 const remoteOptionsLoading = ref(false)
+const ORDER_CACHE_TTL_MS = 20_000
+const BRANCH_CACHE_TTL_MS = 90_000
+const REMOTE_OPTIONS_TTL_MS = 120_000
+const DELIVERYMEN_CACHE_TTL_MS = 60_000
+type CachedOrderPage = { items: OrderListItem[]; totalCount: number; loadedAt: number }
+type SearchResponse = Awaited<ReturnType<typeof orderApi.searchOrders>>
+const orderPageCache = new Map<string, CachedOrderPage>()
+const pendingOrderSearches = new Map<string, Promise<SearchResponse>>()
+const operationOptionsCache = new Map<number, { data: OrderOperationOptions; loadedAt: number }>()
+const deliverymenCache = new Map<string, { options: Array<{ value: number; label: string }>; loadedAt: number }>()
+let displayedSearchKey: string | null = null
+let lastSuccessfulListRefreshAt = 0
+let remoteBranchesLoadedAt = 0
+let remoteBranchesPromise: Promise<void> | null = null
 const remoteLoadError = ref('')
 const ordersLoadError = ref('')
 const pendingUpdates = ref(false)
@@ -719,34 +733,61 @@ let ordersRequest = 0
 let deliverymenRequest = 0
 let branchesRequest = 0
 
-async function loadRemoteBranches() {
-    const request = ++branchesRequest
+async function loadRemoteBranches(force = false): Promise<void> {
+    const request = branchesRequest + 1
     if (!canManageRemoteOrders.value || !workspaceBranchId.value) {
+        branchesRequest = request
         remoteBranches.value = []
+        remoteBranchesLoadedAt = 0
         return
     }
-    try {
-        const result = await orderManagementApi.remoteBranches()
-        if (request !== branchesRequest) return
-        remoteBranches.value = result
-        remoteLoadError.value = ''
-    } catch (err: unknown) {
-        if (request !== branchesRequest) return
-        remoteLoadError.value = err instanceof Error ? err.message : 'No se pudieron cargar las sucursales con pedidos remotos.'
-    }
+    if (!force && remoteBranchesLoadedAt && Date.now() - remoteBranchesLoadedAt < BRANCH_CACHE_TTL_MS) return
+    // A visibility/reconnect event can arrive while the initial call is still running.
+    if (remoteBranchesPromise) return remoteBranchesPromise
+    branchesRequest = request
+    remoteBranchesPromise = (async () => {
+        try {
+            const result = await orderManagementApi.remoteBranches()
+            if (request !== branchesRequest) return
+            remoteBranches.value = result
+            remoteBranchesLoadedAt = Date.now()
+            remoteLoadError.value = ''
+        } catch (err: unknown) {
+            if (request !== branchesRequest) return
+            remoteLoadError.value = err instanceof Error ? err.message : 'No se pudieron cargar las sucursales con pedidos remotos.'
+        } finally {
+            remoteBranchesPromise = null
+        }
+    })()
+    return remoteBranchesPromise
 }
 
 async function loadWorkspaceOptions() {
     const request = ++branchOptionsRequest
-    remoteOptions.value = null
-    if (remoteBranchId.value == null) { remoteOptionsLoading.value = false; return }
-    const branch = remoteBranches.value.find(item => item.id === remoteBranchId.value)
+    const branchId = remoteBranchId.value
+    if (branchId == null) {
+        remoteOptions.value = null
+        remoteOptionsLoading.value = false
+        return
+    }
+    const cached = operationOptionsCache.get(branchId)
+    if (cached) {
+        remoteOptions.value = cached.data
+        if (Date.now() - cached.loadedAt < REMOTE_OPTIONS_TTL_MS) {
+            remoteOptionsLoading.value = false
+            return
+        }
+    } else {
+        remoteOptions.value = null
+    }
+    const branch = remoteBranches.value.find(item => item.id === branchId)
     if (!branch) { remoteOptionsLoading.value = false; return }
-    remoteOptionsLoading.value = true
+    remoteOptionsLoading.value = !cached
     try {
         const result = await orderManagementApi.options(branch.sampleOrderId)
         if (request !== branchOptionsRequest || result.branchId !== remoteBranchId.value) return
         remoteOptions.value = result
+        operationOptionsCache.set(result.branchId, { data: result, loadedAt: Date.now() })
         remoteLoadError.value = ''
     } catch (err: unknown) {
         if (request === branchOptionsRequest) remoteLoadError.value = err instanceof Error ? err.message : 'No se pudieron cargar los medios de pago de la sede destino.'
@@ -762,8 +803,6 @@ async function activateTab(tab: TabValue) {
     deliverymenRequest++
     debouncedRefetchOrders.cancel()
     activeTab.value = tab
-    orders.value = []
-    totalCount.value = 0
     currentPage.value = 1
     deliverymenInRange.value = []
     deliveryManFilterId.value = null
@@ -773,9 +812,20 @@ async function activateTab(tab: TabValue) {
     isTransferVerificationMode.value = false
     transferVerificationBankId.value = null
     pendingUpdates.value = false
-    if (tab === 'reservations') { void fetchReservations(); return }
-    await loadWorkspaceOptions()
-    await Promise.all([loadDeliverymenInRange(), fetchOrders()])
+    if (tab === 'reservations') {
+        await fetchReservations({ preferCache: true })
+        return
+    }
+    // Restore the exact query/scope snapshot. Never display another branch's orders.
+    const key = currentOrderSearchKey(tab, currentOrderSearchBody())
+    const cached = orderPageCache.get(key)
+    orders.value = cached?.items ?? []
+    totalCount.value = cached?.totalCount ?? 0
+    displayedSearchKey = cached ? key : null
+    loading.value = !cached
+    void loadWorkspaceOptions()
+    if (showAdvancedFilters.value) void loadDeliverymenInRange()
+    await fetchOrders({ preferCache: true })
 }
 
 async function switchTab(tab: TabValue) {
@@ -1193,54 +1243,98 @@ const applyDateRange = (range: [Date, Date]) => {
 
 const toggleAdvancedFilters = () => {
     showAdvancedFilters.value = !showAdvancedFilters.value
+    // Avoid an extra full order search just to build a closed filter's options.
+    if (showAdvancedFilters.value) void loadDeliverymenInRange()
 }
 
 // Métodos
-const fetchOrders = async () => {
+function currentOrderSearchBody(): Record<string, unknown> {
+    const searchParts = [filters.value.search, filters.value.customer]
+        .map((s) => s.trim())
+        .filter(Boolean)
+    const combinedSearch = searchParts.join(' ').trim()
+
+    const body = buildOrderSearchBody({
+        page: currentPage.value,
+        pageSize: pageSize.value,
+        sortBy: sortBy.value,
+        sortOrder: sortOrder.value,
+        excludeFutureReservations: remoteBranchId.value == null,
+        remoteOnly: remoteBranchId.value != null,
+        branchId: remoteBranchId.value ?? undefined,
+        fromDate: dateFilters.value.fromDate || undefined,
+        toDate: dateFilters.value.toDate || undefined,
+        bankId: bankFilterId.value,
+        transferVerificationMode: isTransferVerificationMode.value,
+        appId: appFilterId.value,
+        appPaymentsUnsettledOnly: appUnsettledOnly.value,
+        search: combinedSearch,
+        totalQuery: filters.value.totalQuery,
+        type: filters.value.type,
+        status: filters.value.status,
+        deliveryManId: deliveryManFilterId.value ?? undefined,
+    })
+    return body
+}
+
+function currentOrderSearchKey(scope: TabValue, body: Record<string, unknown>): string {
+    return JSON.stringify([authStore.user?.id ?? 0, workspaceBranchId.value, scope, body])
+}
+
+function searchOrdersOnce(key: string, body: Record<string, unknown>): Promise<SearchResponse> {
+    const existing = pendingOrderSearches.get(key)
+    if (existing) return existing
+    const pending = orderApi.searchOrders(body)
+    pendingOrderSearches.set(key, pending)
+    void pending.then(
+        () => { if (pendingOrderSearches.get(key) === pending) pendingOrderSearches.delete(key) },
+        () => { if (pendingOrderSearches.get(key) === pending) pendingOrderSearches.delete(key) },
+    )
+    return pending
+}
+
+// Stale-while-revalidate: keep already rendered rows visible during background sync.
+const fetchOrders = async (options: { preferCache?: boolean; silent?: boolean } = {}) => {
     const request = ++ordersRequest
     const scope = activeTab.value
-    loading.value = true
+    const body = currentOrderSearchBody()
+    const key = currentOrderSearchKey(scope, body)
+    const cached = orderPageCache.get(key)
+    if (cached && displayedSearchKey !== key) {
+        orders.value = cached.items
+        totalCount.value = cached.totalCount
+        displayedSearchKey = key
+    }
+    if (options.preferCache && cached && Date.now() - cached.loadedAt < ORDER_CACHE_TTL_MS) {
+        loading.value = false
+        return
+    }
+
+    // Only show the table skeleton if there has never been a result for this scope.
+    loading.value = displayedSearchKey !== key && orders.value.length === 0
     ordersLoadError.value = ''
     try {
-        const searchParts = [filters.value.search, filters.value.customer]
-            .map((s) => s.trim())
-            .filter(Boolean)
-        const combinedSearch = searchParts.join(' ').trim()
-
-        const body = buildOrderSearchBody({
-            page: currentPage.value,
-            pageSize: pageSize.value,
-            sortBy: sortBy.value,
-            sortOrder: sortOrder.value,
-            excludeFutureReservations: remoteBranchId.value == null,
-            remoteOnly: remoteBranchId.value != null,
-            branchId: remoteBranchId.value ?? undefined,
-            fromDate: dateFilters.value.fromDate || undefined,
-            toDate: dateFilters.value.toDate || undefined,
-            bankId: bankFilterId.value,
-            transferVerificationMode: isTransferVerificationMode.value,
-            appId: appFilterId.value,
-            appPaymentsUnsettledOnly: appUnsettledOnly.value,
-            search: combinedSearch,
-            totalQuery: filters.value.totalQuery,
-            type: filters.value.type,
-            status: filters.value.status,
-            deliveryManId: deliveryManFilterId.value ?? undefined,
-        })
-
         if (remoteBranchId.value != null && !remoteBranches.value.some(b => b.id === remoteBranchId.value)) {
             throw new Error('No se pudo validar la sucursal remota. Reintenta cargar las sucursales.')
         }
-        const response = await orderApi.searchOrders(body)
+        const response = await searchOrdersOnce(key, body)
+        const entry = { items: response.items, totalCount: response.totalCount, loadedAt: Date.now() }
+        orderPageCache.set(key, entry)
+        if (orderPageCache.size > 12) orderPageCache.delete(orderPageCache.keys().next().value!)
         if (request !== ordersRequest || scope !== activeTab.value) return
-        orders.value = response.items
-        totalCount.value = response.totalCount
+        orders.value = entry.items
+        totalCount.value = entry.totalCount
+        displayedSearchKey = key
+        lastSuccessfulListRefreshAt = entry.loadedAt
     } catch (err: any) {
         if (request !== ordersRequest || scope !== activeTab.value) return
-        orders.value = []
-        totalCount.value = 0
+        // A failed background refresh must never discard a correctly loaded table.
+        if (displayedSearchKey !== key && orders.value.length === 0) {
+            orders.value = []
+            totalCount.value = 0
+        }
         ordersLoadError.value = err.message || 'No se pudieron cargar los pedidos.'
-        error('Error al cargar pedidos', err.message)
+        if (!options.silent) error('Error al cargar pedidos', err.message)
     } finally {
         if (request === ordersRequest) loading.value = false
     }
