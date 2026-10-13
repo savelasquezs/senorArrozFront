@@ -3,9 +3,7 @@
     <router-view v-slot="{ Component, route }">
       <component
         :is="Component"
-        :key="route.path.startsWith('/branches/')
-          ? route.fullPath
-          : `${route.fullPath}:${branchContext.revision}`"
+        :key="getRouteViewKey(route.path, route.fullPath, branchContext.revision)"
       />
     </router-view>
     <DialogHost />
@@ -17,6 +15,7 @@ import { onMounted } from 'vue'
 import { useAuthStore } from '@/store/auth'
 import { useBranchContextStore } from '@/store/branchContext'
 import DialogHost from '@/components/ui/DialogHost.vue'
+import { getRouteViewKey } from '@/utils/routeViewKey'
 
 const authStore = useAuthStore()
 const branchContext = useBranchContextStore()
