@@ -15,11 +15,14 @@
             </label>
             <div v-if="alternativeEnabled" class="mt-3">
                 <BaseSelect :model-value="selectedRemoteBranchId" :options="otherBranches"
-                    label="Sucursal que prepara y entrega" size="sm" value-key="id" display-key="name"
+                    :label="order.type === 'onsite' ? 'Sucursal donde se recoge' : 'Sucursal que prepara y entrega'"
+                    size="sm" value-key="id" display-key="name"
                     placeholder="Selecciona la sucursal" :disabled="changingBranch"
                     @update:model-value="selectBranch" />
                 <p class="mt-2 text-xs text-gray-600">
-                    Los pagos y el despacho corresponden a la sucursal que atiende el pedido.
+                    {{ order.type === 'onsite'
+                        ? 'La preparación, los pagos y la recogida corresponden a la sucursal seleccionada.'
+                        : 'Los pagos y el despacho corresponden a la sucursal que atiende el pedido.' }}
                 </p>
                 <p v-if="hasPayments" class="mt-1 text-xs text-amber-700">
                     Cambiar de sucursal reinicia los pagos y beneficios de este borrador.
