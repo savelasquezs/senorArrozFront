@@ -119,4 +119,20 @@ describe('AddressSelector branch prompt', () => {
         expect(dependencies.draftStore.changeOperationalBranch).not.toHaveBeenCalled()
         expect(wrapper.emitted('addressSelected')).toBeUndefined()
     })
+    it('keeps a shared covered address selectable without switching branches', async () => {
+        const shared = dependencies.customersStore.addresses[1]
+        shared.branchServices.push({
+            branchId: 2, branchName: 'Manrique', neighborhoodId: 21,
+            neighborhoodName: 'Santander', deliveryFee: 8000, isCovered: true,
+        })
+        dependencies.customersStore.addresses = [shared]
+        const wrapper = shallowMount(AddressSelector, {
+            props: { customerId: 7, mode: 'draft' },
+        })
+        await flushPromises()
+        expect(dependencies.showError).not.toHaveBeenCalled()
+        expect(wrapper.emitted('addressSelected')?.[0]?.[0]).toMatchObject({ id: 11 })
+        expect(dependencies.draftStore.changeOperationalBranch).not.toHaveBeenCalled()
+    })
+
 })

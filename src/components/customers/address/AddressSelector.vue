@@ -159,7 +159,7 @@ import { useAuthStore } from '@/store/auth'
 import { useToast } from '@/composables/useToast'
 import type { CustomerAddress, CreateCustomerAddressDto, CustomerAddressFormData, UpdateCustomerAddressDto } from '@/types/customer'
 import type { AddressBranchService } from '@/services/MainAPI/addressBranchApi'
-import { coveredOrderBranchOptions, requiresOrderBranchSelection } from '@/helpers/orderBranchOptions'
+import { coveredOrderBranchOptions } from '@/helpers/orderBranchOptions'
 
 import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseBadge from '@/components/ui/BaseBadge.vue'
@@ -320,7 +320,9 @@ const loadCustomerAddresses = async () => {
 
 const selectAddress = async (address: CustomerAddress) => {
     const branchOptions = coveredOrderBranchOptions(address, effectiveBranchId.value)
-    if (props.mode === 'draft' && requiresOrderBranchSelection(branchOptions, effectiveBranchId.value)) {
+    // An address covered by both branches remains selectable in the chosen
+    // destination. Only ask to change branch when coverage is exclusively remote.
+    if (props.mode === 'draft' && branchDeliveryFee(address) == null && branchOptions.length > 0) {
         showError('Sucursal que atiende', 'Selecciona primero la sucursal que prepara el pedido en el panel del pedido.')
         return
     }
