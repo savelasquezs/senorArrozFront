@@ -13,13 +13,18 @@ const createDraft = (type: DraftOrder['type'], branchId: number, guestName: stri
     bankPayments: [], appPayment: null, total: 10000,
 } as unknown as DraftOrder)
 
-describe('pickup name validation for every branch', () => {
+describe('pickup name validation for remote branch orders', () => {
     const { validateOrder } = useOrderValidation()
 
-    it.each([1, 2])('rejects onsite pickups without a name for destination branch %i', branchId => {
-        const result = validateOrder(createDraft('onsite', branchId, '   '))
+    it('rejects an unregistered remote onsite pickup without a name', () => {
+        const result = validateOrder(createDraft('onsite', 2, '   '))
         expect(result.isValid).toBe(false)
         expect(result.errors).toContain('Debe indicar el nombre de quien recoge')
+    })
+
+    it('preserves the existing optional name for local onsite orders', () => {
+        const result = validateOrder(createDraft('onsite', 1, null))
+        expect(result.isValid).toBe(true)
     })
 
     it.each([1, 2])('accepts unregistered onsite pickup with name at destination branch %i', branchId => {
