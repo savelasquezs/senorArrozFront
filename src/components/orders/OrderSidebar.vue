@@ -28,7 +28,12 @@
                 <div class="px-4">
                     <CustomerSection :selected-customer="getCustomer(currentOrder.customerId)"
                         :selected-address="getAddress(currentOrder.addressId, getCustomer(currentOrder.customerId))"
-                        :order-type="currentOrder.type" mode="draft" @view-customer-detail="handleViewCustomerDetail" />
+                        :order-type="currentOrder.type" :operation-branch-id="currentOrder.branchId ?? undefined" mode="draft"
+                        @view-customer-detail="handleViewCustomerDetail">
+                        <template #order-branch-selector>
+                            <OrderFulfillmentBranchSelector :order="currentOrder" />
+                        </template>
+                    </CustomerSection>
 
                     <div v-if="showCopyAddressesButton" class="py-1">
                         <BaseButton type="button" variant="outline" size="sm" class="w-full"
@@ -43,15 +48,14 @@
                     <!-- Guest Name / Recipient Name -->
                     <div class="py-3 border-b border-gray-200">
                         <label class="block text-sm font-medium text-gray-700 mb-2">
-                            Nombre de quien recibe
-                            <span v-if="currentOrder.type === 'delivery' || currentOrder.type === 'reservation'"
-                                class="text-red-500">*</span>
+                            {{ currentOrder.type === 'onsite' ? 'Nombre de quien recoge' : 'Nombre de quien recibe' }}
+                            <span class="text-red-500">*</span>
                         </label>
                         <BaseInput :model-value="currentOrder.guestName || ''"
                             @update:model-value="(value) => updateGuestName(String(value || ''))"
                             placeholder="Ej: Juan Pérez, María López..." :error="guestNameError" />
                         <p class="text-xs text-gray-500 mt-1">
-                            Nombre de quien recibirá el pedido (editable)
+                            {{ currentOrder.type === 'onsite' ? 'Persona que recogerá en la sucursal seleccionada.' : 'Nombre de quien recibirá el pedido (editable)' }}
                         </p>
                     </div>
                     <!-- "Para más tarde" solo para onsite/delivery -->
@@ -391,6 +395,7 @@ import BaseInput from '@/components/ui/BaseInput.vue'
 import OrderTabs from '@/components/orders/OrderTabs.vue'
 import OrderItemList from '@/components/orders/OrderItemList.vue'
 import CustomerSection from '@/components/customers/CustomerSection.vue'
+import OrderFulfillmentBranchSelector from '@/components/orders/OrderFulfillmentBranchSelector.vue'
 import CustomerDetailModal from '@/components/customers/CustomerDetailModal.vue'
 import PaymentSelector from '@/components/payments/PaymentSelector.vue'
 import PaidInStoreCashPanel from '@/components/orders/PaidInStoreCashPanel.vue'
@@ -731,10 +736,10 @@ function chooseNoBenefit() {
 
 const guestNameError = computed(() => {
     if (!currentOrder.value) return ''
-    // Required for delivery and reservation orders
-    const requiresGuestName = currentOrder.value.type === 'delivery' || currentOrder.value.type === 'reservation'
-    if (requiresGuestName && !currentOrder.value.guestName?.trim()) {
-        return 'El nombre de quien recibe es obligatorio para este tipo de pedido'
+    if (!currentOrder.value.guestName?.trim()) {
+        return currentOrder.value.type === 'onsite'
+            ? 'El nombre de quien recoge es obligatorio'
+            : 'El nombre de quien recibe es obligatorio'
     }
     return ''
 })

@@ -51,7 +51,10 @@
         <BaseDialog v-model="showCreateModal" title="Crear Nuevo Cliente" size="lg">
             <div v-if="!createdCustomer">
                 <CustomerForm @submit="createCustomerWrapper" @cancel="closeCreateModal" :loading="isCreating"
-                    :initial-phone="initialPhone" :initial-username="initialUsername" :initial-branch-id="branchId" submit-button-text="Crear Cliente" />
+                    :initial-phone="initialPhone" :initial-username="initialUsername"
+                    :initial-branch-id="initialBranchId ?? branchId"
+                    :allow-address-branch-selection="allowAddressBranchSelection"
+                    submit-button-text="Crear Cliente" />
             </div>
 
             <div v-else class="text-center py-6">
@@ -106,6 +109,8 @@ interface Props {
     branchId?: number
     label?: string
     allowCreate?: boolean
+    initialBranchId?: number
+    allowAddressBranchSelection?: boolean
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -113,6 +118,7 @@ const props = withDefaults(defineProps<Props>(), {
     branchId: undefined,
     label: 'Cliente',
     allowCreate: true,
+    allowAddressBranchSelection: true,
 })
 
 // Emits

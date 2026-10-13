@@ -169,4 +169,55 @@ describe('order drafts branch partition', () => {
         expect(restored.currentTabId).toBe(tabId)
         expect(restored.currentOrder).toMatchObject({ workspaceBranchId: 1, branchId: 3 })
     })
+    it('can direct unregistered onsite pickup to another branch without address coverage', async () => {
+        const context = useBranchContextStore()
+        context.selectedBranchId = 1
+        const drafts = useOrdersDraftsStore()
+        const tabs = useOrderTabs()
+        tabs.createNewTab()
+        tabs.updateOrderType('onsite')
+        drafts.updateGuestName('Carlos Pérez')
+
+        const changed = await drafts.changeOperationalBranch(3)
+
+        expect(changed).toBe(true)
+        expect(drafts.currentOrder).toMatchObject({
+            workspaceBranchId: 1,
+            branchId: 3,
+            type: 'onsite',
+            guestName: 'Carlos Pérez',
+            addressId: null,
+            deliveryFee: 0,
+        })
+        expect(useAuthStore().branchId).toBe(7)
+        expect(context.selectedBranchId).toBe(1)
+    })
+
+    it('clears an uncovered address rather than sending a remote delivery with a wrong tariff', async () => {
+        useBranchContextStore().selectedBranchId = 1
+        const drafts = useOrdersDraftsStore()
+        useOrderTabs().createNewTab()
+        const tabId = drafts.currentTabId!
+        const order = drafts.currentOrder!
+        const address = {
+            id: 19, customerId: 25, address: 'Carrera 1', neighborhoodId: 2,
+            deliveryFee: 5000, isPrimary: true, createdAt: '', updatedAt: '',
+            branchServices: [{ branchId: 1, deliveryFee: 5000, isCovered: true }],
+        }
+        drafts.ensureCustomerInList({
+            id: 25, name: 'Cliente', branchId: 1, active: true,
+            createdAt: '', updatedAt: '', addresses: [address],
+        })
+        drafts.draftOrders.set(tabId, {
+            ...order, customerId: 25, addressId: 19,
+            addressDescription: 'Carrera 1', deliveryFee: 5000,
+        })
+
+        expect(await drafts.changeOperationalBranch(3)).toBe(true)
+        expect(drafts.currentOrder).toMatchObject({
+            customerId: 25, branchId: 3,
+            addressId: null, addressDescription: null, deliveryFee: 0,
+        })
+    })
+
 })

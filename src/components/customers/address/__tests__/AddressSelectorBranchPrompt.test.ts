@@ -2,6 +2,7 @@ import { flushPromises, shallowMount } from '@vue/test-utils'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const dependencies = vi.hoisted(() => ({
+    showError: vi.fn(),
     customersStore: {
         addresses: [] as any[],
         fetchAddresses: vi.fn().mockResolvedValue(undefined),
@@ -40,11 +41,10 @@ vi.mock('@/store/auth', () => ({
     useAuthStore: () => dependencies.authStore,
 }))
 vi.mock('@/composables/useToast', () => ({
-    useToast: () => ({ success: vi.fn(), error: vi.fn() }),
+    useToast: () => ({ success: vi.fn(), error: dependencies.showError }),
 }))
 
 import AddressSelector from '@/components/customers/address/AddressSelector.vue'
-import OrderBranchSelectionDialog from '@/components/orders/OrderBranchSelectionDialog.vue'
 
 describe('AddressSelector branch prompt', () => {
     beforeEach(() => {
@@ -90,40 +90,33 @@ describe('AddressSelector branch prompt', () => {
         ]
         dependencies.customersStore.fetchAddresses.mockClear()
         dependencies.draftStore.changeOperationalBranch.mockClear()
+        dependencies.showError.mockClear()
     })
 
-    it('waits for an explicit address click before showing the branch dialog', async () => {
+    it('asks for a single branch selection in the OrderSidebar', async () => {
         const wrapper = shallowMount(AddressSelector, {
             props: { customerId: 7, mode: 'draft' },
         })
         await flushPromises()
-
-        const dialog = wrapper.getComponent(OrderBranchSelectionDialog)
-        expect(dialog.props('modelValue')).toBe(false)
         expect(wrapper.emitted('addressSelected')).toBeUndefined()
-
         await wrapper.findAll('.cursor-pointer')[0].trigger('click')
         await flushPromises()
-
-        expect(dialog.props('modelValue')).toBe(true)
-        expect(dialog.props('options')).toEqual([
-            expect.objectContaining({ branchId: 2, branchName: 'Manrique' }),
-        ])
+        expect(dependencies.showError).toHaveBeenCalledWith(
+            'Sucursal que atiende', expect.stringContaining('panel del pedido'),
+        )
+        expect(dependencies.draftStore.changeOperationalBranch).not.toHaveBeenCalled()
     })
 
-    it('opens the branch dialog automatically when the customer has only one address', async () => {
+    it('does not change branches just because a customer has one address', async () => {
         dependencies.customersStore.addresses = [dependencies.customersStore.addresses[0]]
-
         const wrapper = shallowMount(AddressSelector, {
             props: { customerId: 7, mode: 'draft' },
         })
         await flushPromises()
-
-        const dialog = wrapper.getComponent(OrderBranchSelectionDialog)
-        expect(dialog.props('modelValue')).toBe(true)
-        expect(dialog.props('options')).toEqual([
-            expect.objectContaining({ branchId: 2, branchName: 'Manrique' }),
-        ])
+        expect(dependencies.showError).toHaveBeenCalledWith(
+            'Sucursal que atiende', expect.stringContaining('panel del pedido'),
+        )
+        expect(dependencies.draftStore.changeOperationalBranch).not.toHaveBeenCalled()
         expect(wrapper.emitted('addressSelected')).toBeUndefined()
     })
 })

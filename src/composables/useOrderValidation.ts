@@ -42,10 +42,12 @@ export function useOrderValidation(): UseOrderValidationReturn {
             }
         }
 
-        // Validación de guestName para delivery y reservation
-        const requiresGuestName = order.type === 'delivery' || order.type === 'reservation'
-        if (requiresGuestName && !order.guestName?.trim()) {
-            errors.push('El nombre de quien recibe es obligatorio para pedidos de domicilio y reservaciones')
+        // Todos los pedidos requieren un destinatario identificable, incluso
+        // recogidas locales sin cliente registrado.
+        if (!order.guestName?.trim()) {
+            errors.push(order.type === 'onsite'
+                ? 'Debe indicar el nombre de quien recoge'
+                : 'El nombre de quien recibe es obligatorio para pedidos de domicilio y reservaciones')
         }
 
         // Validaciones de pagos
