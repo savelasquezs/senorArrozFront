@@ -128,7 +128,7 @@ const handleCancel = async () => {
 
     cancelling.value = true
     try {
-        const cancelledOrder = await orderApi.cancel(props.order.id, cancelReason.value.trim())
+        const cancelledOrder = await orderApi.cancel(props.order.id, cancelReason.value.trim(), props.order)
 
         success('Pedido cancelado', 5000, 'El pedido ha sido cancelado correctamente')
         emit('cancelled', cancelledOrder)

@@ -85,13 +85,19 @@
                     <!-- ID + productos (máx. 2 ítems + ....; hasta 2 líneas por nombre) -->
                     <td class="min-w-0 px-3 py-2 align-top">
                         <div class="contextual-action-group flex items-start gap-1.5 min-w-0 w-full">
-                            <router-link :to="{ name: 'OrderDetail', params: { id: order.id } }"
+                            <router-link :to="{ name: 'OrderDetail', params: { id: order.id }, query: detailQuery }"
                                 class="shrink-0 text-sm font-medium text-emerald-600 hover:text-emerald-700 hover:underline whitespace-nowrap tabular-nums">
                                 #{{ order.id }}
                             </router-link>
                             <OrderSourceBadge :source="order.orderSource" />
+                            <button v-if="useOrderTracking && canViewDeliveryLocation(order)" type="button"
+                                class="shrink-0 rounded px-1 py-0.5 text-[10px] font-medium text-emerald-700 ring-1 ring-inset ring-emerald-200 hover:bg-emerald-50"
+                                :aria-label="`Ver ubicación del pedido ${order.id}`"
+                                @click.stop="emit('track-order', order)">
+                                Ver ubicación
+                            </button>
                             <router-link
-                                v-if="canViewDeliveryLocation(order)"
+                                v-else-if="canViewDeliveryLocation(order)"
                                 :to="deliveryLocationRoute(order)"
                                 class="contextual-hover-action flex shrink-0 items-center gap-0.5 rounded px-1 py-0.5 text-[10px] font-medium text-emerald-700 ring-1 ring-inset ring-emerald-200 transition hover:bg-emerald-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
                                 :aria-label="`Ver ubicación del pedido ${order.id}`"
@@ -367,7 +373,9 @@ interface Props {
     loading?: boolean
     sortBy?: 'id' | 'total' | 'createdAt'
     sortOrder?: 'asc' | 'desc'
-    quickBanks?: Bank[]
+    quickBanks?: Array<Pick<Bank, 'id' | 'name'>>
+    useOrderTracking?: boolean
+    detailQuery?: Record<string, string>
     /** Si true, muestra acción rápida “Pagó” (listado de pedidos). */
     enablePaidInStoreQuickAction?: boolean
     /** Si true, liquidar/desliquidar app desde la columna Pagos (solo listado; requiere handler en el padre). */
@@ -377,11 +385,14 @@ interface Props {
 const props = withDefaults(defineProps<Props>(), {
     enablePaidInStoreQuickAction: false,
     enableAppSettleQuickAction: false,
+    useOrderTracking: false,
+    detailQuery: () => ({}),
 })
 
 const permissions = useOrderPermissions()
 
 const emit = defineEmits<{
+    'track-order': [order: OrderListItem]
     'edit-customer': [order: OrderListItem]
     'edit-address': [order: OrderListItem]
     'change-status': [order: OrderListItem]
@@ -433,7 +444,7 @@ async function quickMarkPaidInStore(order: OrderListItem) {
     if (!showPaidInStoreQuickButton(order)) return
     savingPaidInStoreId.value = order.id
     try {
-        const updated = await orderApi.setPaidInStoreCash(order.id, true)
+        const updated = await orderApi.setPaidInStoreCash(order.id, true, undefined, order)
         const u = updated as unknown as {
             paidInStoreCash?: boolean
             paidInStoreCashAt?: string | null

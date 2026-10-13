@@ -1,5 +1,20 @@
 <template>
 	<div class="space-y-4 md:space-y-6" v-if="order">
+        <div v-if="isRemoteOrder" class="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-900">
+            Pedido tomado desde esta sede · prepara y despacha <strong>{{ order.branchName }}</strong>.
+            Los cobros registrados corresponden a esa sucursal.
+        </div>
+        <div v-if="staleSnapshot" role="status" class="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+            El pedido pudo cambiar en otra pantalla. Actualiza antes de continuar; se descartarán los cambios sin guardar.
+            <BaseButton size="sm" variant="outline" :loading="refreshingOrder" @click="reloadOrder">Descartar cambios y actualizar</BaseButton>
+        </div>
+        <p v-if="optionsLoading" class="text-sm text-gray-500">Cargando opciones de {{ order.branchName }}…</p>
+        <div v-if="operationOptionsError" role="alert" class="text-sm text-red-700">
+            {{ operationOptionsError }}
+            <BaseButton size="sm" variant="ghost" @click="loadOperationOptions">Reintentar</BaseButton>
+        </div>
+        <OrderTrackingDialog v-if="showTracking" v-model="showTracking" :order="order" />
+
 		<div v-if="order.inventoryIssue" class="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-800">
 			Alerta de inventario: {{ order.inventoryIssue }}
 		</div>
@@ -33,11 +48,13 @@
 					variant="secondary"
 					size="sm"
 					class="w-full sm:w-auto"
-					@click="$router.push({ name: 'OrdersList' })"
+					@click="$router.push({ name: 'OrdersList', query: orderReturnQuery })"
 				>
 					<ArrowLeftIcon class="w-4 h-4 mr-1" />
 					Volver
 				</BaseButton>
+                <BaseButton v-if="!isDeliveryman && order.type === 'delivery' && order.status === 'on_the_way'"
+                    size="sm" variant="outline" @click="showTracking = true">Ver ubicación</BaseButton>
 				<template v-if="permissions.canReprintThermalTickets() && order">
 					<BaseButton
 						variant="outline"
@@ -544,12 +561,12 @@
 						:delivery-fee="order?.deliveryFee ?? 0"
 						:order-type="order?.type"
 						:address-id="order?.addressId ?? null"
-						:max-free-delivery-discount="branchPosSettings.maxFreeDeliveryDiscount"
+						:max-free-delivery-discount="maxFreeDeliveryDiscount"
 						:free-delivery-requested="order?.freeDeliveryRequested === true"
 						:show-delivery-fee-line="
 							order.type === 'delivery' || order.type === 'reservation'
 						"
-						:can-edit="permissions.canEditProducts(order)"
+						:can-edit="permissions.canEditProducts(order) && !!operationOptions && !optionsLoading"
 						:saving="savingProducts"
 						@save="handleProductsUpdate"
 						@request-cancel-order="handleRequestCancelOrderFromProducts"
@@ -875,9 +892,7 @@ import type {
 } from '@/types/order';
 import type { DiscountCode } from '@/types/discountCode';
 import type { Customer } from '@/types/customer';
-import { useOrdersDraftsStore } from '@/store/ordersDrafts';
 import { useOrdersDataStore } from '@/store/ordersData';
-import { useBranchPosSettingsStore } from '@/store/branchPosSettings';
 import { useAuthStore } from '@/store/auth';
 import { useProductsStore } from '@/store/products';
 import type { Product } from '@/types/product';
@@ -885,7 +900,11 @@ import { customerApi } from '@/services/MainAPI/customerApi';
 import { orderApi } from '@/services/MainAPI/orderApi';
 import { discountCodeApi } from '@/services/MainAPI/discountCodeApi';
 import { bankPaymentApi } from '@/services/MainAPI/bankPaymentApi';
-import { printJobsApi } from '@/services/MainAPI/printJobsApi';
+import { orderManagementApi } from '@/services/MainAPI/orderManagementApi';
+import type { OrderOperationOptions } from '@/types/orderManagement';
+import { useOrderManagementUpdates } from '@/composables/useOrderManagementUpdates';
+import { useBranchContextStore } from '@/store/branchContext';
+import OrderTrackingDialog from '@/components/orders/OrderTrackingDialog.vue';
 import {
 	toPaymentSnapshot,
 	evaluateBankSyncAfterTotalChange,
@@ -921,7 +940,14 @@ import { ref, computed, watch, onMounted, nextTick } from 'vue';
 const permissions = useOrderPermissions();
 const authStore = useAuthStore();
 const productsStore = useProductsStore();
-const branchPosSettings = useBranchPosSettingsStore();
+const branchContext = useBranchContextStore();
+const operationOptions = ref<OrderOperationOptions | null>(null);
+const operationOptionsError = ref('');
+const optionsLoading = ref(false);
+const maxFreeDeliveryDiscount = computed(() => operationOptions.value?.maxFreeDeliveryDiscount ?? 0);
+const staleSnapshot = ref(false);
+const refreshingOrder = ref(false);
+const showTracking = ref(false);
 const isDeliveryman = computed(() => authStore.userRole === 'Deliveryman');
 const pendingOrderType = ref<'onsite' | 'delivery' | 'reservation' | null>(
 	null,
@@ -1048,7 +1074,7 @@ function removePercentageBenefit(lines: DetailLineDraft[], percentage: number) {
 }
 
 function removeFreeDeliveryBenefit(lines: DetailLineDraft[], sourceOrder: OrderDetailView) {
-	const budget = deliveryDiscountBudget(sourceOrder.deliveryFee ?? 0, branchPosSettings.maxFreeDeliveryDiscount);
+	const budget = deliveryDiscountBudget(sourceOrder.deliveryFee ?? 0, maxFreeDeliveryDiscount.value);
 	if (budget <= 0 || lines.length === 0) return lines;
 	const caps = lines.map((item) => Math.min(
 		Math.max(0, Math.round(Number(item.discount ?? 0))),
@@ -1090,7 +1116,7 @@ function applyPercentageCode(lines: DetailLineDraft[], code: DiscountCode) {
 }
 
 function applyFreeDeliveryCode(lines: DetailLineDraft[], sourceOrder: OrderDetailView) {
-	const budget = deliveryDiscountBudget(sourceOrder.deliveryFee ?? 0, branchPosSettings.maxFreeDeliveryDiscount);
+	const budget = deliveryDiscountBudget(sourceOrder.deliveryFee ?? 0, maxFreeDeliveryDiscount.value);
 	const caps = lines.map((item) =>
 		lineCapacityCop({
 			quantity: item.quantity,
@@ -1191,7 +1217,7 @@ async function applyManualDeliveryToDetail() {
 }
 
 async function updateDetailBenefit(payload: UpdateOrderDto, successMessage: string) {
-	if (!order.value) return;
+	if (!order.value || !operationOptions.value || optionsLoading.value) return;
 	savingBenefit.value = true;
 	detailBenefitError.value = '';
 	const paymentSnapshotBefore = captureOrderPaymentSnapshot();
@@ -1279,7 +1305,7 @@ async function onReprintKitchen() {
 	}
 	reprintKitchenLoading.value = true;
 	try {
-		const res = await printJobsApi.enqueueKitchenJob(branchId, [o.id]);
+		const res = await orderManagementApi.reprint(o.id, 'kitchen');
 		if (!res.isSuccess) {
 			error('Reimpresión', res.message || 'No se pudo encolar la comanda.');
 			return;
@@ -1308,7 +1334,7 @@ async function onReprintDelivery() {
 	}
 	reprintDeliveryLoading.value = true;
 	try {
-		const res = await printJobsApi.enqueueDeliveryJob(branchId, [o.id]);
+		const res = await orderManagementApi.reprint(o.id, 'delivery');
 		if (!res.isSuccess) {
 			error('Reimpresión', res.message || 'No se pudo encolar el ticket.');
 			return;
@@ -1334,20 +1360,20 @@ const {
 	clearPendingStatusChange,
 } = useOrderStatusChange();
 
-const ordersStore = useOrdersDraftsStore();
+
 
 // Store
 const ordersDataStore = useOrdersDataStore();
 
 // Opciones para selectores de pagos
 const bankOptions = computed(() => {
-	return ordersStore.banks
+	return (operationOptions.value?.banks ?? [])
 		.filter((bank) => bank.active)
 		.map((bank) => ({ value: bank.id, label: bank.name }));
 });
 
 const appOptions = computed(() => {
-	return ordersStore.apps
+	return (operationOptions.value?.apps ?? [])
 		.filter((app) => app.active)
 		.map((app) => ({ value: app.id, label: app.name }));
 });
@@ -1394,8 +1420,7 @@ async function onConfirmBankPaymentAdjust() {
 	try {
 		const updated = await bankPaymentApi.updateBankPayment(
 			p.paymentId,
-			p.newTotal,
-		);
+			p.newTotal, order.value);
 		const newPayments = order.value.bankPayments.map((bp) =>
 			bp.id === p.paymentId ? { ...bp, ...(updated as object) } : bp,
 		) as OrderDetailView['bankPayments'];
@@ -1527,7 +1552,7 @@ async function confirmRemovePaidInStoreDetail() {
 	if (!order.value) return;
 	removePaidInStoreDetailLoading.value = true;
 	try {
-		const updated = await orderApi.setPaidInStoreCash(order.value.id, false);
+		const updated = await orderApi.setPaidInStoreCash(order.value.id, false, undefined, order.value);
 		const u = updated as unknown as {
 			paidInStoreCash?: boolean;
 			paidInStoreCashAt?: string | null;
@@ -1568,7 +1593,7 @@ async function confirmEditPaidInStoreDetail() {
 	}
 	editPaidInStoreDetailLoading.value = true;
 	try {
-		const updated = await orderApi.setPaidInStoreCash(o.id, true, amount);
+		const updated = await orderApi.setPaidInStoreCash(o.id, true, amount, o);
 		const u = updated as unknown as {
 			paidInStoreCash?: boolean;
 			paidInStoreCashAt?: string | null;
@@ -1624,13 +1649,53 @@ watch(
 	{ immediate: true },
 );
 
-// Cargar bancos y apps para el selector de pagos (solo se cargan en /orders, no en /orders/:id)
+// Keep destination-specific options local; never replace the active POS draft catalogs.
+let optionsRequest = 0;
+async function loadOperationOptions() {
+    const o = order.value;
+    const request = ++optionsRequest;
+    operationOptions.value = null;
+    if (!o || !['Admin', 'Superadmin', 'Cashier'].includes(authStore.userRole ?? '')) return;
+    optionsLoading.value = true;
+    try {
+        const response = await orderManagementApi.options(o.id);
+        if (request !== optionsRequest || order.value?.id !== o.id) return;
+        operationOptions.value = response;
+        operationOptionsError.value = '';
+    } catch (err: unknown) {
+        if (request === optionsRequest) operationOptionsError.value = err instanceof Error ? err.message : 'No se pudieron cargar las opciones del pedido.';
+    } finally {
+        if (request === optionsRequest) optionsLoading.value = false;
+    }
+}
+watch(() => order.value?.id, () => { staleSnapshot.value = false; void loadOperationOptions(); }, { immediate: true });
 onMounted(() => {
-	ordersStore.loadBanks(order.value?.branchId);
-	ordersStore.loadApps(order.value?.branchId);
-	void branchPosSettings.ensureForBranch(order.value?.branchId ?? authStore.branchId, { forOrderCreation: true });
-	if (canGrantManualBenefit.value) void productsStore.ensureCatalogLoaded();
+    if (canGrantManualBenefit.value) void productsStore.ensureCatalogLoaded();
 });
+const isRemoteOrder = computed(() => {
+    const workspace = authStore.isSuperadmin ? branchContext.selectedBranchId : authStore.branchId;
+    return !!order.value && workspace != null && order.value.originBranchId === workspace && order.value.branchId !== workspace;
+});
+const orderReturnQuery = computed<Record<string, string>>((): Record<string, string> => isRemoteOrder.value && order.value
+    ? { remoteBranchId: String(order.value.branchId) } : {});
+async function reloadOrder() {
+    if (!order.value) return;
+    refreshingOrder.value = true;
+    try {
+        await ordersDataStore.fetchById(order.value.id, { silent: true });
+        staleSnapshot.value = false;
+        await loadOperationOptions();
+    } catch (err: unknown) {
+        error('No se pudo actualizar', err instanceof Error ? err.message : 'Intenta nuevamente.');
+    } finally { refreshingOrder.value = false; }
+}
+useOrderManagementUpdates(
+    event => {
+        if (event.orderId === order.value?.id && event.managementVersion > (order.value.managementVersion ?? 0)) staleSnapshot.value = true;
+    },
+    () => { if (order.value) staleSnapshot.value = true; },
+    id => { if (order.value?.id === id) staleSnapshot.value = true; },
+);
 
 const handleStatusChange = async (newStatus: OrderStatus) => {
 	if (!order.value) return;
@@ -1646,7 +1711,7 @@ const confirmUncancelOrder = async () => {
 
 	uncancelLoading.value = true;
 	try {
-		const updatedOrder = await orderApi.updateStatus(order.value.id, 'ready');
+		const updatedOrder = await orderApi.updateStatus(order.value.id, 'ready', undefined, order.value);
 		const orderAny = updatedOrder as any;
 		ordersDataStore.updateCurrent({
 			status: updatedOrder.status,
@@ -1656,6 +1721,7 @@ const confirmUncancelOrder = async () => {
 			typeDisplayName: orderAny.typeDisplayName ?? order.value.typeDisplayName,
 			cancelledReason: null,
 			updatedAt: orderAny.updatedAt,
+        managementVersion: orderAny.managementVersion ?? order.value?.managementVersion,
 		});
 		success('Pedido descancelado', 4000, 'El pedido quedo como Listo');
 		showUncancelConfirm.value = false;
@@ -1865,14 +1931,15 @@ const handleRequestCancelOrderFromProducts = () => {
 };
 
 const handlePaymentUpdated = (updates: Partial<OrderDetailView>) => {
-	ordersDataStore.updateCurrent(updates);
+    ordersDataStore.updateCurrent(updates);
+    if (order.value) void ordersDataStore.fetchById(order.value.id, { silent: true }).catch(() => { staleSnapshot.value = true; });
 };
 
 const onPaidInStoreChange = async (checked: boolean) => {
 	if (!order.value || order.value.paidInStoreCash === checked) return;
 	savingPaidInStore.value = true;
 	try {
-		const updated = await orderApi.setPaidInStoreCash(order.value.id, checked);
+		const updated = await orderApi.setPaidInStoreCash(order.value.id, checked, undefined, order.value);
 		const u = updated as unknown as {
 			paidInStoreCash?: boolean;
 			paidInStoreCashAt?: string | null;
@@ -1917,7 +1984,7 @@ const handleStatusChanged = async (newStatus: OrderStatus) => {
 
 	await executeStatusChange(order.value.id, newStatus, (updatedOrder) => {
 		updateOrderDeliveryman(updatedOrder);
-	});
+	}, order.value);
 };
 
 const handleOrderCancelled = (updatedOrder: Order) => {
@@ -1963,6 +2030,7 @@ const handleOrderTypeUpdated = (
 		addressDescription: orderAny.addressDescription || null,
 		addressAdditionalInfo: orderAny.addressAdditionalInfo ?? null,
 		updatedAt: orderAny.updatedAt,
+        managementVersion: orderAny.managementVersion ?? order.value?.managementVersion,
 		...(typeof orderAny.total === 'number'
 			? {
 					total: orderAny.total,
@@ -2023,6 +2091,7 @@ const updateOrderStatus = (updatedOrder: any) => {
 		statusDisplayName: orderAny.statusDisplayName,
 		statusTimes: orderAny.statusTimes || order.value!.statusTimes,
 		updatedAt: orderAny.updatedAt,
+        managementVersion: orderAny.managementVersion ?? order.value?.managementVersion,
 	});
 };
 
@@ -2035,6 +2104,7 @@ const updateOrderDeliveryman = (updatedOrder: any) => {
 		statusDisplayName: orderAny.statusDisplayName,
 		statusTimes: orderAny.statusTimes || order.value!.statusTimes,
 		updatedAt: orderAny.updatedAt,
+        managementVersion: orderAny.managementVersion ?? order.value?.managementVersion,
 	});
 };
 
@@ -2087,6 +2157,7 @@ const handleCustomerUpdated = async (
 			guestName: orderAny.guestName,
 			deliveryFee: orderAny.deliveryFee || order.value?.deliveryFee || 0,
 			updatedAt: orderAny.updatedAt,
+        managementVersion: orderAny.managementVersion ?? order.value?.managementVersion,
 			...(typeof orderAny.total === 'number'
 				? {
 						total: orderAny.total,
@@ -2132,6 +2203,7 @@ const updateOrderCustomer = (updatedOrder: any) => {
 		guestName: orderAny.guestName || null,
 		deliveryFee: orderAny.deliveryFee ?? null,
 		updatedAt: orderAny.updatedAt,
+        managementVersion: orderAny.managementVersion ?? order.value?.managementVersion,
 		...(typeof orderAny.total === 'number'
 			? {
 					total: orderAny.total,

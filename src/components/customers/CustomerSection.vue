@@ -78,7 +78,7 @@
                     </span>
                 </div>
                 <AddressSelector :customer-id="props.selectedCustomer.id"
-                    :branch-id="props.selectedCustomer.branchId"
+                    :branch-id="props.selectedCustomer.branchId" :operation-branch-id="props.operationBranchId"
                     :selected-address="props.selectedAddress?.id || undefined" :mode="props.mode"
                     @address-selected="handleAddressSelected" />
             </div>
@@ -116,6 +116,7 @@ interface Props {
     selectedAddress?: CustomerAddress | null
     mode?: 'draft' | 'persisted'
     showTypeSelector?: boolean
+    operationBranchId?: number
 }
 
 const props = withDefaults(defineProps<Props>(), {

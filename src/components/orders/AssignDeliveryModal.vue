@@ -28,7 +28,7 @@
             <BaseButton variant="secondary" @click="$emit('close')">
                 Cancelar
             </BaseButton>
-            <BaseButton variant="primary" :loading="saving" :disabled="selectedDeliveryManId === order.deliveryManId"
+            <BaseButton variant="primary" :loading="saving" :disabled="loading || saving || selectedDeliveryManId === order.deliveryManId"
                 @click="handleSave">
                 {{ selectedDeliveryManId === null ? 'Desasignar' : 'Asignar' }}
             </BaseButton>
@@ -39,9 +39,8 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted } from 'vue'
 import type { OrderListItem, Order, OrderStatus } from '@/types/order'
-import type { User } from '@/types/user'
+import { orderManagementApi } from '@/services/MainAPI/orderManagementApi'
 import { orderApi } from '@/services/MainAPI/orderApi'
-import { userApi } from '@/services/MainAPI/userApi'
 import { useToast } from '@/composables/useToast'
 import BaseDialog from '@/components/ui/BaseDialog.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
@@ -67,7 +66,7 @@ const { success, error } = useToast()
 // Estado
 const loading = ref(false)
 const saving = ref(false)
-const deliverymen = ref<User[]>([])
+const deliverymen = ref<Array<{ id: number; name: string }>>([])
 const selectedDeliveryManId = ref<number | null>(props.order.deliveryManId)
 
 // Computed
@@ -89,14 +88,11 @@ const deliverymanOptions = computed<Array<{ value: number | null; label: string 
 // Métodos
 const fetchDeliverymen = async () => {
     loading.value = true
+    deliverymen.value = []
     try {
-        // Obtener usuarios con rol Deliveryman
-        const response = await userApi.getUsers({
-            role: 'Deliveryman',
-            active: true
-        })
-        // El backend devuelve directamente PagedResult
-        deliverymen.value = response?.items || []
+        const orderId = props.order.id
+        const response = await orderManagementApi.options(orderId)
+        if (props.order.id === orderId && props.open) deliverymen.value = response.deliverymen
     } catch (err: any) {
         error('Error al cargar domiciliarios', err.message)
     } finally {
@@ -112,11 +108,11 @@ const handleSave = async () => {
 
         if (selectedDeliveryManId.value === null) {
             // Desasignar
-            updatedOrder = await orderApi.unassignDelivery(props.order.id)
+            updatedOrder = await orderApi.unassignDelivery(props.order.id, props.order)
             success('Domiciliario desasignado', 5000, 'El domiciliario ha sido removido del pedido')
         } else {
             // Asignar — el backend ya cambia Ready → OnTheWay automáticamente, no llamar updateStatus
-            updatedOrder = await orderApi.assignDelivery(props.order.id, selectedDeliveryManId.value)
+            updatedOrder = await orderApi.assignDelivery(props.order.id, selectedDeliveryManId.value, props.order)
 
             statusChangedByBackend = updatedOrder.status === 'on_the_way' && props.order.status === 'ready'
             if (statusChangedByBackend) {

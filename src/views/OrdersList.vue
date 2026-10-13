@@ -1,8 +1,21 @@
 <template>
     <MainLayout>
         <div class="w-full space-y-6">
+            <div v-if="remoteLoadError" role="alert" class="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+                {{ remoteLoadError }}
+                <BaseButton size="sm" variant="ghost" @click="retryRemoteWorkspace">Reintentar</BaseButton>
+            </div>
+            <div v-if="remoteBranchId" class="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-900" data-test="remote-scope">
+                Tomados desde esta sede · prepara y despacha <strong>{{ remoteBranchName }}</strong>.
+                <span v-if="remoteOptionsLoading">Cargando medios de pago…</span>
+            </div>
+            <div v-if="pendingUpdates" role="status" class="flex flex-wrap items-center gap-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+                Hay cambios en los pedidos. Cierra la edición y actualiza antes de continuar.
+                <BaseButton size="sm" variant="outline" :disabled="hasOpenEditor" @click="refreshWorkspace">Actualizar</BaseButton>
+            </div>
+            <p v-if="ordersLoadError" role="alert" class="text-sm text-red-700">{{ ordersLoadError }}</p>
                 <!-- ===== TAB: PEDIDOS DEL DÍA ===== -->
-                <template v-if="activeTab === 'orders'">
+                <template v-if="activeTab !== 'reservations'">
                     <div class="bg-white rounded-lg shadow mb-6">
                         <div class="p-4 border-b border-gray-200">
 	                            <div class="flex flex-wrap items-end gap-3">
@@ -94,7 +107,7 @@
                             </div>
                             <div class="flex flex-wrap items-center gap-3 min-w-0">
                                 <div
-                                    class="flex rounded-lg border border-gray-200 bg-white p-0.5 gap-0.5 shrink-0">
+                                    class="flex max-w-full overflow-x-auto rounded-lg border border-gray-200 bg-white p-0.5 gap-0.5 shrink-0">
                                     <button v-for="tab in tabs" :key="tab.value" type="button"
                                         @click="switchTab(tab.value)" :class="[
                                             'inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors',
@@ -140,6 +153,7 @@
                             <template v-if="!groupByRoute">
                                 <OrdersTable :orders="displayedOrders" :loading="loading" :sort-by="sortBy"
                                     :sort-order="sortOrder" :quick-banks="quickBanks"
+                                    :use-order-tracking="remoteBranchId != null" :detail-query="detailQuery" @track-order="handleTrackOrder"
                                     enable-paid-in-store-quick-action enable-app-settle-quick-action
                                     @edit-customer="handleEditCustomer" @edit-address="handleEditAddress"
                                     @change-status="handleChangeStatus" @assign-delivery="handleAssignDelivery"
@@ -167,6 +181,7 @@
                                     </div>
                                     <OrdersTable :orders="block.orders" :loading="loading" :sort-by="sortBy"
                                         :sort-order="sortOrder" :quick-banks="quickBanks"
+                                    :use-order-tracking="remoteBranchId != null" :detail-query="detailQuery" @track-order="handleTrackOrder"
                                         enable-paid-in-store-quick-action enable-app-settle-quick-action
                                         @edit-customer="handleEditCustomer" @edit-address="handleEditAddress"
                                         @change-status="handleChangeStatus" @assign-delivery="handleAssignDelivery"
@@ -283,7 +298,7 @@
                         <div class="px-4 py-3 bg-gray-50 flex flex-wrap items-center justify-between gap-3">
                             <div class="flex flex-wrap items-center gap-3 min-w-0">
                                 <div
-                                    class="flex rounded-lg border border-gray-200 bg-white p-0.5 gap-0.5 shrink-0">
+                                    class="flex max-w-full overflow-x-auto rounded-lg border border-gray-200 bg-white p-0.5 gap-0.5 shrink-0">
                                     <button v-for="tab in tabs" :key="'res-' + tab.value" type="button"
                                         @click="switchTab(tab.value)" :class="[
                                             'inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors',
@@ -356,6 +371,7 @@
 
         </div>
 
+        <OrderTrackingDialog v-if="trackingOrder" v-model="showTrackingDialog" :order="trackingOrder" />
         <!-- Modales -->
         <EditCustomerModal v-if="showEditCustomerModal && selectedOrder" :open="showEditCustomerModal"
             :order="selectedOrder"
@@ -400,7 +416,7 @@
                     @click="startTransferVerification">
                     Verificar
                 </BaseButton>
-                <BaseButton variant="primary" size="sm" :disabled="!transferVerificationBankId"
+                <BaseButton v-if="remoteBranchId == null" variant="primary" size="sm" :disabled="!transferVerificationBankId"
                     @click="requestBulkUnverify">
                     Desverificar las verificadas
                 </BaseButton>
@@ -604,6 +620,14 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import { useAuthStore } from '@/store/auth'
+import { useBranchContextStore } from '@/store/branchContext'
+import { orderManagementApi } from '@/services/MainAPI/orderManagementApi'
+import { useOrderManagementUpdates } from '@/composables/useOrderManagementUpdates'
+import type { RemoteOrderBranch, OrderOperationOptions } from '@/types/orderManagement'
+import OrderTrackingDialog from '@/components/orders/OrderTrackingDialog.vue'
+
 import type { OrderListItem, Order, OrderStatus, OrderBankPaymentDetail, OrderAppPaymentDetail } from '@/types/order'
 import type { ReservationDeposit } from '@/types/reservationDeposit'
 import { orderApi } from '@/services/MainAPI/orderApi'
@@ -661,19 +685,112 @@ const {
     canUnverifyPayments,
 } = useOrderPermissions()
 
-// ===== TABS =====
-type TabValue = 'orders' | 'reservations'
-const activeTab = ref<TabValue>('orders')
-const tabs = [
+// ===== TABS: same table and actions; only the server-side order scope changes. =====
+type TabValue = 'orders' | 'reservations' | `remote:${number}`
+const route = useRoute()
+const router = useRouter()
+const authStore = useAuthStore()
+const branchContext = useBranchContextStore()
+const workspaceBranchId = computed(() => authStore.isSuperadmin ? branchContext.selectedBranchId : authStore.branchId)
+const canManageRemoteOrders = computed(() => ['Admin', 'Superadmin', 'Cashier'].includes(authStore.userRole ?? ''))
+const remoteBranches = ref<RemoteOrderBranch[]>([])
+const remoteOptions = ref<OrderOperationOptions | null>(null)
+const remoteOptionsLoading = ref(false)
+const remoteLoadError = ref('')
+const ordersLoadError = ref('')
+const pendingUpdates = ref(false)
+const trackingOrder = ref<OrderListItem | null>(null)
+const showTrackingDialog = ref(false)
+const requestedRemoteBranch = () => {
+    const id = Number(route.query.remoteBranchId)
+    return Number.isSafeInteger(id) && id > 0 ? id : null
+}
+const activeTab = ref<TabValue>(requestedRemoteBranch() ? `remote:${requestedRemoteBranch()!}` : 'orders')
+const remoteBranchId = computed(() => activeTab.value.startsWith('remote:') ? Number(activeTab.value.slice(7)) : null)
+const remoteBranchName = computed(() => remoteBranches.value.find(b => b.id === remoteBranchId.value)?.name ?? `Sucursal ${remoteBranchId.value ?? ''}`)
+const detailQuery = computed<Record<string, string>>((): Record<string, string> => remoteBranchId.value == null ? {} : { remoteBranchId: String(remoteBranchId.value) })
+const tabs = computed(() => [
     { value: 'orders' as TabValue, label: 'Pedidos del día', icon: ClipboardDocumentListIcon },
     { value: 'reservations' as TabValue, label: 'Reservas', icon: CalendarDaysIcon },
-]
-const switchTab = (tab: TabValue) => {
-    activeTab.value = tab
-    if (tab === 'reservations') {
-        void fetchReservations()
+    ...remoteBranches.value.map(branch => ({ value: `remote:${branch.id}` as TabValue, label: `Pedidos de ${branch.name}`, icon: ClipboardDocumentListIcon })),
+])
+let branchOptionsRequest = 0
+let ordersRequest = 0
+let deliverymenRequest = 0
+let branchesRequest = 0
+
+async function loadRemoteBranches() {
+    const request = ++branchesRequest
+    if (!canManageRemoteOrders.value || !workspaceBranchId.value) {
+        remoteBranches.value = []
+        return
+    }
+    try {
+        const result = await orderManagementApi.remoteBranches()
+        if (request !== branchesRequest) return
+        remoteBranches.value = result
+        remoteLoadError.value = ''
+    } catch (err: unknown) {
+        if (request !== branchesRequest) return
+        remoteLoadError.value = err instanceof Error ? err.message : 'No se pudieron cargar las sucursales con pedidos remotos.'
     }
 }
+
+async function loadWorkspaceOptions() {
+    const request = ++branchOptionsRequest
+    remoteOptions.value = null
+    if (remoteBranchId.value == null) { remoteOptionsLoading.value = false; return }
+    const branch = remoteBranches.value.find(item => item.id === remoteBranchId.value)
+    if (!branch) { remoteOptionsLoading.value = false; return }
+    remoteOptionsLoading.value = true
+    try {
+        const result = await orderManagementApi.options(branch.sampleOrderId)
+        if (request !== branchOptionsRequest || result.branchId !== remoteBranchId.value) return
+        remoteOptions.value = result
+        remoteLoadError.value = ''
+    } catch (err: unknown) {
+        if (request === branchOptionsRequest) remoteLoadError.value = err instanceof Error ? err.message : 'No se pudieron cargar los medios de pago de la sede destino.'
+    } finally {
+        if (request === branchOptionsRequest) remoteOptionsLoading.value = false
+    }
+}
+
+async function activateTab(tab: TabValue) {
+    if (tab.startsWith('remote:') && !remoteBranches.value.some(b => `remote:${b.id}` === tab)) return
+    if (activeTab.value === tab) return
+    ordersRequest++
+    deliverymenRequest++
+    debouncedRefetchOrders.cancel()
+    activeTab.value = tab
+    orders.value = []
+    totalCount.value = 0
+    currentPage.value = 1
+    deliverymenInRange.value = []
+    deliveryManFilterId.value = null
+    bankFilterId.value = null
+    appFilterId.value = null
+    appUnsettledOnly.value = false
+    isTransferVerificationMode.value = false
+    transferVerificationBankId.value = null
+    pendingUpdates.value = false
+    if (tab === 'reservations') { void fetchReservations(); return }
+    await loadWorkspaceOptions()
+    await Promise.all([loadDeliverymenInRange(), fetchOrders()])
+}
+
+async function switchTab(tab: TabValue) {
+    await activateTab(tab)
+    const query = { ...route.query }
+    if (remoteBranchId.value) query.remoteBranchId = String(remoteBranchId.value)
+    else delete query.remoteBranchId
+    await router.replace({ query })
+}
+
+function handleTrackOrder(order: OrderListItem) {
+    trackingOrder.value = order
+    showTrackingDialog.value = true
+}
+
 const { success, error } = useToast()
 const { formatCurrency } = useFormatting()
 
@@ -825,7 +942,7 @@ const deliveryManFilterOptions = computed(() => [
 ])
 
 const bankFilterOptions = computed(() => {
-    const items = banksStore.list?.items || []
+    const items = remoteBranchId.value == null ? banksStore.list?.items || [] : remoteOptions.value?.banks || []
     const active = items.filter((b) => b.active).sort((a, b) => a.name.localeCompare(b.name))
     return [
         { value: null as number | null, label: 'Todos los bancos' },
@@ -867,7 +984,7 @@ const displayedOrders = computed<OrderListItem[]>(() => {
 })
 
 const appFilterOptions = computed(() => {
-    const items = appsStore.list?.items || []
+    const items = remoteBranchId.value == null ? appsStore.list?.items || [] : remoteOptions.value?.apps || []
     const active = items.filter((a) => a.active).sort((a, b) => a.name.localeCompare(b.name))
     return [
         { value: null as number | null, label: 'Todas las apps' },
@@ -1080,7 +1197,10 @@ const toggleAdvancedFilters = () => {
 
 // Métodos
 const fetchOrders = async () => {
+    const request = ++ordersRequest
+    const scope = activeTab.value
     loading.value = true
+    ordersLoadError.value = ''
     try {
         const searchParts = [filters.value.search, filters.value.customer]
             .map((s) => s.trim())
@@ -1092,7 +1212,9 @@ const fetchOrders = async () => {
             pageSize: pageSize.value,
             sortBy: sortBy.value,
             sortOrder: sortOrder.value,
-            excludeFutureReservations: true,
+            excludeFutureReservations: remoteBranchId.value == null,
+            remoteOnly: remoteBranchId.value != null,
+            branchId: remoteBranchId.value ?? undefined,
             fromDate: dateFilters.value.fromDate || undefined,
             toDate: dateFilters.value.toDate || undefined,
             bankId: bankFilterId.value,
@@ -1106,13 +1228,21 @@ const fetchOrders = async () => {
             deliveryManId: deliveryManFilterId.value ?? undefined,
         })
 
+        if (remoteBranchId.value != null && !remoteBranches.value.some(b => b.id === remoteBranchId.value)) {
+            throw new Error('No se pudo validar la sucursal remota. Reintenta cargar las sucursales.')
+        }
         const response = await orderApi.searchOrders(body)
+        if (request !== ordersRequest || scope !== activeTab.value) return
         orders.value = response.items
         totalCount.value = response.totalCount
     } catch (err: any) {
+        if (request !== ordersRequest || scope !== activeTab.value) return
+        orders.value = []
+        totalCount.value = 0
+        ordersLoadError.value = err.message || 'No se pudieron cargar los pedidos.'
         error('Error al cargar pedidos', err.message)
     } finally {
-        loading.value = false
+        if (request === ordersRequest) loading.value = false
     }
 }
 
@@ -1165,7 +1295,9 @@ const buildDeliverymenInRangeSearchBody = (page: number, pageSizeValue: number) 
         pageSize: pageSizeValue,
         sortBy: 'createdAt',
         sortOrder: 'desc',
-        excludeFutureReservations: true,
+        excludeFutureReservations: remoteBranchId.value == null,
+        remoteOnly: remoteBranchId.value != null,
+        branchId: remoteBranchId.value ?? undefined,
         fromDate: dateFilters.value.fromDate || undefined,
         toDate: dateFilters.value.toDate || undefined,
         search: '',
@@ -1175,6 +1307,12 @@ const buildDeliverymenInRangeSearchBody = (page: number, pageSizeValue: number) 
     })
 
 const loadDeliverymenInRange = async () => {
+    if (remoteBranchId.value != null && !remoteBranches.value.some(b => b.id === remoteBranchId.value)) {
+        deliverymenInRange.value = []
+        return
+    }
+    const request = ++deliverymenRequest
+    const scope = activeTab.value
     try {
         const pageSizeValue = 200
         let page = 1
@@ -1183,6 +1321,7 @@ const loadDeliverymenInRange = async () => {
 
         while (page <= totalPagesCount) {
             const response = await orderApi.searchOrders(buildDeliverymenInRangeSearchBody(page, pageSizeValue))
+            if (request !== deliverymenRequest || scope !== activeTab.value) return
 
             for (const order of response.items) {
                 if (order.deliveryManId == null) continue
@@ -1207,6 +1346,7 @@ const loadDeliverymenInRange = async () => {
             deliveryManFilterId.value = null
         }
     } catch (err: any) {
+        if (request !== deliverymenRequest || scope !== activeTab.value) return
         deliverymenInRange.value = []
         error('Error al cargar domiciliarios', err.message)
     }
@@ -1294,6 +1434,7 @@ const startTransferVerification = async () => {
 }
 
 const requestBulkUnverify = async () => {
+    if (remoteBranchId.value != null) return
     const bankId = transferVerificationBankId.value
     if (bankId == null || !canUnverifyPayments()) return
 
@@ -1321,6 +1462,7 @@ const requestBulkUnverify = async () => {
 }
 
 const confirmBulkUnverify = async () => {
+    if (remoteBranchId.value != null) return
     const bankId = transferVerificationBankId.value
     if (bankId == null || bulkUnverifyCount.value === 0) return
 
@@ -1411,7 +1553,7 @@ const handleChangeStatus = async (order: OrderListItem) => {
 
     // Proceder con cambio de estado
     try {
-        const updatedOrder = await orderApi.updateStatus(order.id, nextStatus)
+        const updatedOrder = await orderApi.updateStatus(order.id, nextStatus, undefined, order)
 
         // ✅ ACTUALIZACIÓN OPTIMISTA - actualizar en la lista local
         const index = orders.value.findIndex(o => o.id === order.id)
@@ -1437,7 +1579,7 @@ const handleReturnToPreparation = async (order: OrderListItem) => {
     }
 
     try {
-        const updatedOrder = await orderApi.updateStatus(order.id, 'in_preparation')
+        const updatedOrder = await orderApi.updateStatus(order.id, 'in_preparation', undefined, order)
         const index = orders.value.findIndex(o => o.id === order.id)
         if (index !== -1) {
             orders.value[index] = {
@@ -1474,7 +1616,7 @@ const confirmUncancelOrder = async () => {
 
     uncancelOrderLoading.value = true
     try {
-        const updatedOrder = await orderApi.updateStatus(order.id, 'ready')
+        const updatedOrder = await orderApi.updateStatus(order.id, 'ready', undefined, order)
         updateOrderInList(updatedOrder)
         success('Pedido descancelado', 4000, 'El pedido quedo como Listo')
         closeUncancelOrderDialog()
@@ -1502,11 +1644,11 @@ const handleVerifyBankPayment = async (order: OrderListItem, payment: OrderBankP
     try {
         if (payment.isVerified) {
             // Desverificar
-            await bankPaymentApi.unverifyBankPayment(payment.id)
+            await bankPaymentApi.unverifyBankPayment(payment.id, order)
             success('Pago desverificado', 5000)
         } else {
             // Verificar
-            await bankPaymentApi.verifyBankPayment(payment.id)
+            await bankPaymentApi.verifyBankPayment(payment.id, undefined, order)
             success('Pago verificado', 5000)
         }
 
@@ -1561,20 +1703,21 @@ const handleSettleAppPayment = async (order: OrderListItem, payment: OrderAppPay
     const settled = appPaymentIsSettled(payment)
     try {
         if (settled) {
-            await appPaymentApi.unsettleAppPayment(payment.id)
+            await appPaymentApi.unsettleAppPayment(payment.id, order)
             success('Liquidación removida', 5000, 'El pago por app quedó pendiente de liquidar')
         } else if (payment.expectedNetAmount != null) {
             const actualAmount = await requestActualSettlementAmount(payment.expectedNetAmount, formatCurrency)
             if (actualAmount == null) return
-            await appPaymentApi.settleMultipleAppPayments({ paymentIds: [payment.id], actualAmount })
+            await appPaymentApi.settleMultipleAppPayments({ paymentIds: [payment.id], actualAmount }, order)
             success('Pago liquidado', 5000, 'La consignación real fue registrada')
         } else {
-            await appPaymentApi.settleAppPayment(payment.id)
+            await appPaymentApi.settleAppPayment(payment.id, order)
             success('Pago liquidado', 5000, 'El pago por app fue liquidado')
         }
 
         const next = !settled
         patchOrderListAppPaymentSettled(orders.value, order.id, payment.id, next)
+        await fetchOrders()
     } catch (err: any) {
         error(settled ? 'Error al desliquidar' : 'Error al liquidar', err.message)
     }
@@ -1595,7 +1738,7 @@ const confirmRemoveBankPayment = async () => {
     if (!t) return
     removeBankPaymentLoading.value = true
     try {
-        await bankPaymentApi.deletePayment(t.payment.id)
+        await bankPaymentApi.deletePayment(t.payment.id, t.order)
         success('Pago eliminado', 5000, 'La transferencia fue eliminada')
         const index = orders.value.findIndex((o) => o.id === t.order.id)
         if (index !== -1) {
@@ -1642,7 +1785,7 @@ const confirmEditBankPayment = async () => {
     }
     editBankPaymentLoading.value = true
     try {
-        const u = await bankPaymentApi.updateBankPayment(t.payment.id, amount)
+        const u = await bankPaymentApi.updateBankPayment(t.payment.id, amount, t.order)
         const next: OrderBankPaymentDetail = {
             ...t.payment,
             ...u,
@@ -1700,7 +1843,7 @@ const confirmRemoveReservationDeposit = async () => {
     if (!t) return
     removeReservationDepositLoading.value = true
     try {
-        await reservationDepositApi.remove(t.deposit.id)
+        await reservationDepositApi.remove(t.deposit.id, t.order)
         success('Abono eliminado', 4000, 'El abono fue eliminado')
         reservations.value = patchReservationDepositsInList(reservations.value, t.order.id, (deps) =>
             deps.filter((d) => d.id !== t.deposit.id),
@@ -1743,7 +1886,7 @@ const confirmEditReservationDeposit = async () => {
     }
     editReservationDepositLoading.value = true
     try {
-        const u = await reservationDepositApi.updateAmount(t.deposit.id, amount)
+        const u = await reservationDepositApi.updateAmount(t.deposit.id, amount, t.order)
         const merged: ReservationDeposit = { ...t.deposit, ...u, amount: Number(u.amount) }
         reservations.value = patchReservationDepositsInList(reservations.value, t.order.id, (deps) =>
             deps.map((d) => (d.id === merged.id ? merged : d)),
@@ -1787,7 +1930,7 @@ const confirmRemovePaidInStore = async () => {
     if (!t) return
     removePaidInStoreLoading.value = true
     try {
-        const updated = await orderApi.setPaidInStoreCash(t.order.id, false)
+        const updated = await orderApi.setPaidInStoreCash(t.order.id, false, undefined, t.order)
         const u = updated as unknown as {
             paidInStoreCash?: boolean
             paidInStoreCashAt?: string | null
@@ -1844,7 +1987,7 @@ const confirmEditPaidInStore = async () => {
     }
     editPaidInStoreLoading.value = true
     try {
-        const updated = await orderApi.setPaidInStoreCash(t.id, true, amount)
+        const updated = await orderApi.setPaidInStoreCash(t.id, true, amount, t)
         const u = updated as unknown as {
             paidInStoreCash?: boolean
             paidInStoreCashAt?: string | null
@@ -1975,7 +2118,7 @@ const handleOrderUpdated = async (updatedOrder?: Order) => {
                         ...(pendingDeleteReservationAssociations.value
                             ? { deleteReservationAssociatedPayments: true }
                             : {}),
-                    })
+                    }, selectedOrder.value!)
 
                     // Actualización optimista con la respuesta del backend
                     orders.value[index] = {
@@ -2046,7 +2189,7 @@ const handleQuickBankTransfer = async (order: OrderListItem, bankId: number) => 
             orderId: order.id,
             bankId,
             amount: remainingAmount,
-        })
+        }, order)
 
         patchListOrderBankPayment(order.id, created)
         success('Pago bancario creado', 4000, 'Se registró el pago en el banco seleccionado')
@@ -2061,7 +2204,7 @@ const handleAssignDeliveryModalClose = () => {
 }
 
 const quickBanks = computed(() => {
-    const items = banksStore.list?.items || []
+    const items = remoteBranchId.value == null ? banksStore.list?.items || [] : remoteOptions.value?.banks || []
     return items
         .filter(b => b.active)
         .sort((a, b) => a.id - b.id)
@@ -2127,6 +2270,7 @@ const depositOrder = ref<{
     guestName?: string
     total: number
     branchId: number
+    managementVersion?: number
 } | null>(null)
 
 const handleOpenDeposit = (order: OrderListItem) => {
@@ -2136,6 +2280,7 @@ const handleOpenDeposit = (order: OrderListItem) => {
         guestName: order.guestName ?? undefined,
         total: order.total,
         branchId: order.branchId,
+        managementVersion: order.managementVersion,
     }
     showDepositModal.value = true
 }
@@ -2147,6 +2292,8 @@ const handleDeposited = (deposit: ReservationDeposit) => {
         deposit,
     ])
     orders.value = patchReservationDepositsInList(orders.value, deposit.orderId, (deps) => [...deps, deposit])
+    void fetchOrders()
+    if (activeTab.value === 'reservations') void fetchReservations()
 }
 
 // ===== RESERVACIONES TAB =====
@@ -2278,7 +2425,7 @@ const handleResQuickBankTransfer = async (order: OrderListItem, bankId: number) 
             error('No se puede convertir', 'El pedido ya tiene pagos registrados')
             return
         }
-        const created = await bankPaymentApi.createBankPayment({ orderId: order.id, bankId, amount: order.total })
+        const created = await bankPaymentApi.createBankPayment({ orderId: order.id, bankId, amount: order.total }, order)
         patchReservationBankPayment(order.id, created)
         success('Pago bancario creado', 4000, 'Se registró el pago en el banco seleccionado')
     } catch (err: any) {
@@ -2313,7 +2460,7 @@ const confirmCancelReservation = async () => {
     if (!order) return
     cancelReservationLoading.value = true
     try {
-        await orderApi.cancel(order.id, 'Cancelada manualmente')
+        await orderApi.cancel(order.id, 'Cancelada manualmente', order)
         success('Reserva cancelada', 3000)
         await Promise.all([fetchReservations(), fetchOrders()])
         closeCancelReservationDialog()
@@ -2324,13 +2471,66 @@ const confirmCancelReservation = async () => {
     }
 }
 
-// Lifecycle
+// Realtime only invalidates this authorized workspace. Open forms keep their original version.
+const hasOpenEditor = computed(() => showEditCustomerModal.value || showAssignDeliveryModal.value
+    || showEditOrderTypeModal.value || showDepositModal.value || showEditBankPaymentDialog.value
+    || showRemoveBankPaymentDialog.value || showEditReservationDepositDialog.value
+    || showRemoveReservationDepositDialog.value || showEditPaidInStoreDialog.value
+    || showRemovePaidInStoreDialog.value || showUncancelOrderDialog.value
+    || showCancelReservationDialog.value || showBulkUnverifyDialog.value)
+let updatesTimer: ReturnType<typeof setTimeout> | null = null
+let mounted = false
+async function refreshWorkspace() {
+    if (!mounted || !isPageVisible.value || !isOnline.value) return
+    if (hasOpenEditor.value) { pendingUpdates.value = true; return }
+    pendingUpdates.value = false
+    await loadRemoteBranches()
+    if (activeTab.value === 'reservations') await fetchReservations()
+    else await fetchOrders()
+}
+function scheduleWorkspaceRefresh() {
+    if (!mounted) return
+    pendingUpdates.value = true
+    if (updatesTimer) clearTimeout(updatesTimer)
+    updatesTimer = setTimeout(() => { updatesTimer = null; void refreshWorkspace() }, 500)
+}
+const { isPageVisible, isOnline } = useOrderManagementUpdates(
+    scheduleWorkspaceRefresh,
+    scheduleWorkspaceRefresh,
+    (orderId) => {
+        if (orders.value.some(o => o.id === orderId) || reservations.value.some(o => o.id === orderId)) pendingUpdates.value = true
+    },
+)
+watch(hasOpenEditor, (open) => { if (!open && pendingUpdates.value) scheduleWorkspaceRefresh() })
+watch(() => route.query.remoteBranchId, () => {
+    const id = requestedRemoteBranch()
+    if (id != null) void activateTab(`remote:${id}`)
+    else if (remoteBranchId.value != null) void activateTab('orders')
+})
+watch(workspaceBranchId, () => {
+    // Global branch changes remount MainLayout in production; invalidate pending reads as a safeguard.
+    ordersRequest++; deliverymenRequest++; branchOptionsRequest++; branchesRequest++
+    remoteBranches.value = []; remoteOptions.value = null; orders.value = []; totalCount.value = 0
+    activeTab.value = 'orders'
+    void retryRemoteWorkspace()
+})
+async function retryRemoteWorkspace() {
+    await loadRemoteBranches()
+    await loadWorkspaceOptions()
+    if (activeTab.value !== 'reservations') await Promise.all([loadDeliverymenInRange(), fetchOrders()])
+}
 onMounted(async () => {
-    await Promise.all([
-        banksStore.ensureListLoaded(),
-        appsStore.ensureListLoaded(),
+    mounted = true
+    await Promise.allSettled([
+        banksStore.ensureListLoaded(), appsStore.ensureListLoaded(), loadRemoteBranches(),
     ])
-    await loadDeliverymenInRange()
-    await fetchOrders()
+    await loadWorkspaceOptions()
+    await Promise.all([loadDeliverymenInRange(), fetchOrders()])
+})
+onUnmounted(() => {
+    mounted = false
+    ordersRequest++; deliverymenRequest++; branchOptionsRequest++; branchesRequest++
+    debouncedRefetchOrders.cancel()
+    if (updatesTimer) clearTimeout(updatesTimer)
 })
 </script>
