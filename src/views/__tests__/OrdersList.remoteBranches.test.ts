@@ -63,6 +63,33 @@ beforeEach(() => {
 afterEach(() => { wrapper?.unmount(); vi.useRealTimers() })
 
 describe('remote order workspaces', () => {
+    it('makes only one orders/search call per complete local and remote tab', async () => {
+        const withDriver = (o: typeof local) => ({
+            ...o, deliveryManId: 17, deliveryManName: 'Kevin',
+        })
+        mocks.search.mockImplementation(async body => paged(
+            body.remoteOnly ? [withDriver(remote)] : [withDriver(local)],
+        ))
+        mountView(); await flushPromises()
+        expect(mocks.search).toHaveBeenCalledTimes(1)
+        expect(mocks.search.mock.calls[0]![0].type).toBeUndefined()
+        await clickTab('Pedidos de Manrique')
+        expect(mocks.search).toHaveBeenCalledTimes(2)
+        expect(mocks.search.mock.calls[1]![0]).toMatchObject({ remoteOnly: true, branchId: 2 })
+        await clickTab('Pedidos del día')
+        expect(mocks.search).toHaveBeenCalledTimes(3)
+    })
+
+    it('keeps the exhaustive deliveryman query if the main page is incomplete', async () => {
+        mocks.search.mockImplementation(async body => body.type === 'delivery'
+            ? paged([{ ...local, deliveryManId: 17, deliveryManName: 'Kevin' }])
+            : { ...paged([local]), totalCount: 150 })
+        mountView(); await flushPromises()
+        expect(mocks.search).toHaveBeenCalledTimes(2)
+        expect(mocks.search.mock.calls.filter(([body]) => body.type === 'delivery')).toHaveLength(1)
+        expect(wrapper.findComponent(OrdersTable).props('orders')).toEqual([local])
+    })
+
     it('shares catalog requests with MainLayout using the actual branch scope', async () => {
         mountView(); await flushPromises()
         expect(mocks.banksLoaded).toHaveBeenCalledWith(1)
