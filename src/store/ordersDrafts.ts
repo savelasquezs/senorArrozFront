@@ -270,15 +270,19 @@ export const useOrdersDraftsStore = defineStore('ordersDrafts', () => {
         const tabId = currentTabId.value
         const order = draftOrders.value.get(tabId)
         if (!order) return false
+        if (order.branchId === branchId) return true
 
-        const selectedAddress = address
+        // Pickup never needs an address. A delivery/reservation can retain its
+        // address only when the destination branch actually covers it.
+        const selectedAddress = order.type === 'onsite' ? null : (address
             ?? customers.value.find(customer => customer.id === order.customerId)
                 ?.addresses?.find(candidate => candidate.id === order.addressId)
-            ?? null
+            ?? null)
         const service = selectedAddress?.branchServices?.find(candidate =>
             candidate.branchId === branchId && candidate.isCovered,
         )
-        if (selectedAddress && !service) return false
+        // Explicit address selection must not silently accept an uncovered address.
+        if (address && !service && order.type !== 'onsite') return false
 
         const branchPosSettings = useBranchPosSettingsStore()
         await branchPosSettings.ensureForBranch(branchId, { forOrderCreation: true })
@@ -289,7 +293,11 @@ export const useOrdersDraftsStore = defineStore('ordersDrafts', () => {
         const updatedOrder: DraftOrder = {
             ...cleared,
             branchId,
-            deliveryFee: selectedAddress ? service?.deliveryFee ?? 0 : current.deliveryFee,
+            addressId: service && selectedAddress ? selectedAddress.id : null,
+            addressDescription: service && selectedAddress ? selectedAddress.address : null,
+            addressAdditionalInfo: service && selectedAddress ? selectedAddress.additionalInfo ?? null : null,
+            deliveryFee: service?.deliveryFee ?? 0,
+            ...(current.type === 'onsite' ? { freeDeliveryRequested: false } : {}),
             bankPayments: [],
             appPayment: null,
             paidInStoreCash: false,

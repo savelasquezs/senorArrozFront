@@ -7,11 +7,15 @@
                 @update:model-value="(value) => handleOrderTypeChanged(value as 'onsite' | 'delivery' | 'reservation')"
                 size="sm" />
         </div>
+        <slot name="order-branch-selector" />
         <!-- No Customer Selected -->
         <div v-if="!props.selectedCustomer" class="space-y-3">
 
 
-            <CustomerSelector :required="orderType === 'delivery'" @customer-selected="handleCustomerSelected" />
+            <CustomerSelector :required="orderType === 'delivery'"
+                :initial-branch-id="props.mode === 'draft' ? props.operationBranchId : undefined"
+                :allow-address-branch-selection="props.mode !== 'draft'"
+                @customer-selected="handleCustomerSelected" />
         </div>
 
         <!-- Customer Selected -->
@@ -185,7 +189,10 @@ const handleCustomerSelected = async (customer: Customer, addressServiceBranchId
                 )
             : null
         if (createdAddress && addressServiceBranchId) {
-            await ordersDraftsStore!.changeOperationalBranch(addressServiceBranchId, createdAddress)
+            if (ordersDraftsStore!.currentOrder?.branchId !== addressServiceBranchId) {
+                const changed = await ordersDraftsStore!.changeOperationalBranch(addressServiceBranchId, createdAddress)
+                if (!changed) return
+            }
             ordersDraftsStore!.updateAddress(createdAddress)
         } else {
             ordersDraftsStore!.updateAddress(null)

@@ -138,20 +138,19 @@ enum UserRole {
 
 - Admin, Cajero y Superadmin pueden tomar un pedido para cualquier sucursal activa del mismo tenant sin cambiar `authStore.branchId` ni el contexto global de sucursal.
 - `DraftOrder.workspaceBranchId` conserva la partición visual donde se abrió el tab; `DraftOrder.branchId` es independiente por borrador y determina la sucursal que prepara, cobra y despacha el pedido.
-- Si el cliente tiene varias direcciones, seleccionarlo solo carga la lista y el diálogo de sucursal operativa aparece cuando el usuario elige explícitamente una dirección con alternativas. Si tiene una sola dirección y el pedido es a domicilio, se auto-selecciona y puede abrir el diálogo inmediatamente; las reservas mantienen la dirección opcional sin auto-selección.
-- Al elegir una dirección se muestran dinámicamente todas las sucursales cubiertas en `branchServices`. La elección siempre es explícita cuando existe una alternativa y nunca se decide por tarifa, orden, cercanía o sucursal histórica del cliente.
+- La selección de sucursal que prepara y despacha está centralizada en el checkbox **Atender desde otra sucursal** del `OrderSidebar`, debajo del tipo de pedido. Aplica a `onsite`, `delivery` y `reservation`, incluso sin cliente ni dirección.
+- La selección de sucursal no cambia la sucursal de sesión, el JWT ni `branchContext`; solo actualiza el borrador activo.
+- Si la dirección existente no tiene cobertura en el nuevo destino, se limpia y debe seleccionarse una dirección cubierta. En recogidas `onsite` siempre se limpia dirección y el domicilio queda en 0.
 - Cambiar la sucursal operativa recalcula el domicilio, invalida beneficios y medios de pago dependientes de sucursal, recarga configuración POS, bancos y apps, recalcula totales y persiste únicamente el borrador actual.
-- Si la sucursal actual no tiene `AddressBranch` pero otra sí, se permite elegir la alternativa o calcular el domicilio para la actual. Una relación con `isCovered = false` no se ofrece.
-- Al crear un cliente con dirección inicial o agregar una dirección desde el POS, la sucursal operativa actual queda seleccionada por defecto. Admin, Cajero y Superadmin pueden elegir otra sucursal activa del mismo tenant sin cambiar sesión, JWT, `branchContext` ni la sucursal global.
-- Al elegir otra sucursal para una dirección, barrios, tarifa y origen del mapa se obtienen de esa sucursal. La dirección conserva únicamente el `NeighborhoodId`; `AddressRepository.CreateAsync()` crea el `AddressBranch` de la sucursal del barrio y el pedido actual adopta esa sucursal mediante el mecanismo cross-branch existente.
+- Los formularios de dirección abiertos desde Pedidos no ofrecen un segundo selector de sucursal: usan el destino elegido en `OrderSidebar`; si una dirección solo está cubierta por otra sede, se pide cambiar la sucursal desde el panel. En el módulo independiente de Clientes permanece el selector de servicio de direcciones.
 - `Customer.BranchId` conserva la sucursal legacy de origen del cliente y no cambia por la sucursal que atiende una dirección.
 - Si el teléfono ingresado pertenece a un cliente existente de otra sucursal, el alta reutiliza ese cliente, conserva la dirección nueva y cambia únicamente el borrador actual a la sucursal que presta el servicio. La dirección exacta recién enviada tiene prioridad frente a otras direcciones cubiertas por esa sucursal.
 
 #### Onsite (En el local)
 - **Cliente**: Opcional
 - **Dirección**: No aplica
-- **Delivery Fee**: No aplica. En el **borrador del POS**, al pasar a onsite el monto de envío se pone en **0**; al volver a **delivery** se reajusta a la tarifa de la **dirección** si ya está seleccionada. Las **reservas** no cambian el envío solo por el selector de tipo.
-- **guestName**: Campo opcional
+- **Delivery Fee**: No aplica. Al pasar a onsite se eliminan dirección y costo de envío; al volver a delivery se debe elegir una dirección con cobertura en la sucursal seleccionada. Las reservas no cambian el envío solo por el selector de tipo.
+- **guestName**: Obligatorio incluso sin cliente registrado; identifica a la persona que recoge, tanto en la sucursal actual como en una remota.
 - **Fidelización**: Se aplica si se asigna cliente
 - **Status inicial**: `'taken'`
 
@@ -410,6 +409,7 @@ Validaciones implementadas antes de enviar un pedido al backend:
 
 **Onsite:**
 - Al menos 1 producto
+- Nombre de quien recoge obligatorio (`guestName`) en todas las sucursales, haya o no cliente registrado
 
 **Delivery:**
 - Al menos 1 producto

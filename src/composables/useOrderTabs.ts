@@ -129,7 +129,12 @@ export function useOrderTabs() {
             type,
             deliveryFee,
             updatedAt: new Date(),
-            ...(type === 'onsite' ? { freeDeliveryRequested: false } : {}),
+            ...(type === 'onsite' ? {
+                freeDeliveryRequested: false,
+                addressId: null,
+                addressDescription: null,
+                addressAdditionalInfo: null,
+            } : {}),
         }
         store.draftOrders.set(store.currentTabId, updated)
         store.recalculateTotals(updated)

@@ -114,7 +114,7 @@
     <!-- Address Modal (Dual: Create or Edit) -->
     <BaseDialog v-model="showAddressModal" title="Dirección Inicial" size="lg">
         <CustomerAddressForm v-model="addressFormData" :branch-id="form.branchId"
-            :default-service-branch-id="form.branchId" :allow-branch-selection="true" :can-edit-delivery-fee="true"
+            :default-service-branch-id="form.branchId" :allow-branch-selection="allowAddressBranchSelection" :can-edit-delivery-fee="true"
             @submit="handleAddressSubmit" @cancel="closeAddressModal" />
     </BaseDialog>
 </template>
@@ -141,6 +141,7 @@ interface Props {
     customer?: Customer | null
     loading?: boolean
     canSelectBranch?: boolean
+    allowAddressBranchSelection?: boolean
     initialPhone?: string
     initialUsername?: string
     initialBranchId?: number
@@ -151,6 +152,7 @@ interface Props {
 const props = withDefaults(defineProps<Props>(), {
     loading: false,
     canSelectBranch: false,
+    allowAddressBranchSelection: true,
     initialPhone: '',
     initialUsername: '',
     initialBranchId: 0,
