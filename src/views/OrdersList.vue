@@ -141,7 +141,7 @@
                                     {{ groupByRoute ? 'Ver lista plana' : 'Agrupar por ruta' }}
                                 </BaseButton>
                                 <BaseButton variant="secondary" size="sm" class="shrink-0" :loading="loading"
-                                    @click="fetchOrders">
+                                    @click="fetchOrders()">
                                     <ArrowPathIcon class="w-4 h-4" />
                                 </BaseButton>
                             </div>
@@ -278,12 +278,12 @@
                                     <div class="w-44 sm:w-48">
                                         <BaseSelect v-model="resStatus" :options="resStatusOptions" value-key="value"
                                             display-key="label" placeholder="Estado"
-                                            @update:model-value="fetchReservations" />
+                                            @update:model-value="fetchReservations()" />
                                     </div>
                                     <div class="flex items-center gap-2 flex-wrap">
                                         <span class="text-xs text-gray-500 whitespace-nowrap">Fecha evento:</span>
                                         <BaseYmdDateRangePicker v-model:from-date="resFrom" v-model:to-date="resTo"
-                                            variant="compact" @change="fetchReservations" />
+                                            variant="compact" @change="fetchReservations()" />
                                     </div>
                                     <BaseButton v-if="resSearch || resStatus || resFrom || resTo" variant="ghost"
                                         size="sm" class="shrink-0" @click="clearResFilters">
@@ -322,7 +322,7 @@
                             <div class="flex items-center gap-2 shrink-0">
                                 <ReservationDepositsOverviewModal />
                                 <BaseButton variant="secondary" size="sm" class="shrink-0" :loading="resLoading"
-                                    @click="fetchReservations">
+                                    @click="fetchReservations()">
                                     <ArrowPathIcon class="w-4 h-4" />
                                 </BaseButton>
                             </div>
@@ -718,21 +718,46 @@ let branchOptionsRequest = 0
 let ordersRequest = 0
 let deliverymenRequest = 0
 let branchesRequest = 0
-
-async function loadRemoteBranches() {
-    const request = ++branchesRequest
-    if (!canManageRemoteOrders.value || !workspaceBranchId.value) {
+// Se actualiza al crear un nuevo destino remoto; en el resto de casos la lista
+// de sucursales no necesita otra consulta por cada evento o cambio de visibilidad.
+let remoteBranchesLoadedAt = 0
+let remoteBranchesLoadedFor: number | null = null
+let remoteBranchesInFlight: Promise<void> | null = null
+let remoteBranchesInFlightFor: number | null = null
+async function loadRemoteBranches(force = false): Promise<void> {
+    const originId = workspaceBranchId.value
+    if (!canManageRemoteOrders.value || !originId) {
+        ++branchesRequest
         remoteBranches.value = []
+        remoteBranchesLoadedAt = 0
         return
     }
+    if (remoteBranchesInFlight && remoteBranchesInFlightFor === originId) return remoteBranchesInFlight
+    if (!force && originId === remoteBranchesLoadedFor && Date.now() - remoteBranchesLoadedAt < 60_000) return
+
+    const request = ++branchesRequest
+    const pending = (async () => {
+        try {
+            const result = await orderManagementApi.remoteBranches()
+            if (request !== branchesRequest || workspaceBranchId.value !== originId) return
+            remoteBranches.value = result
+            remoteBranchesLoadedFor = originId
+            remoteBranchesLoadedAt = Date.now()
+            remoteLoadError.value = ''
+        } catch (err: unknown) {
+            if (request !== branchesRequest || workspaceBranchId.value !== originId) return
+            remoteLoadError.value = err instanceof Error ? err.message : 'No se pudieron cargar las sucursales con pedidos remotos.'
+        }
+    })()
+    remoteBranchesInFlight = pending
+    remoteBranchesInFlightFor = originId
     try {
-        const result = await orderManagementApi.remoteBranches()
-        if (request !== branchesRequest) return
-        remoteBranches.value = result
-        remoteLoadError.value = ''
-    } catch (err: unknown) {
-        if (request !== branchesRequest) return
-        remoteLoadError.value = err instanceof Error ? err.message : 'No se pudieron cargar las sucursales con pedidos remotos.'
+        await pending
+    } finally {
+        if (remoteBranchesInFlight === pending) {
+            remoteBranchesInFlight = null
+            remoteBranchesInFlightFor = null
+        }
     }
 }
 
@@ -761,6 +786,7 @@ async function activateTab(tab: TabValue) {
     ordersRequest++
     deliverymenRequest++
     debouncedRefetchOrders.cancel()
+    if (updatesTimer) { clearTimeout(updatesTimer); updatesTimer = null }
     activeTab.value = tab
     orders.value = []
     totalCount.value = 0
@@ -773,7 +799,7 @@ async function activateTab(tab: TabValue) {
     isTransferVerificationMode.value = false
     transferVerificationBankId.value = null
     pendingUpdates.value = false
-    if (tab === 'reservations') { void fetchReservations(); return }
+    if (tab === 'reservations') { void fetchReservations({ background: reservations.value.length > 0 }); return }
     await loadWorkspaceOptions()
     await Promise.all([loadDeliverymenInRange(), fetchOrders()])
 }
@@ -1196,10 +1222,25 @@ const toggleAdvancedFilters = () => {
 }
 
 // Métodos
-const fetchOrders = async () => {
+let lastOrdersFetchedAt = 0
+const inFlightOrderSearches = new Map<string, ReturnType<typeof orderApi.searchOrders>>()
+function searchOrdersOnce(scope: TabValue, body: Record<string, unknown>) {
+    // Coalesce equal queries (initial load + reconnect) without deduplicating
+    // the separate deliverymen search that keeps the full driver filter updated.
+    const key = JSON.stringify([workspaceBranchId.value, scope, body])
+    const pending = inFlightOrderSearches.get(key)
+    if (pending) return pending
+    const request = orderApi.searchOrders(body)
+    inFlightOrderSearches.set(key, request)
+    const clear = () => { if (inFlightOrderSearches.get(key) === request) inFlightOrderSearches.delete(key) }
+    void request.then(clear, clear)
+    return request
+}
+const fetchOrders = async (options: { background?: boolean } = {}) => {
     const request = ++ordersRequest
     const scope = activeTab.value
-    loading.value = true
+    // A background refresh must never replace existing rows with the spinner.
+    if (!options.background) loading.value = true
     ordersLoadError.value = ''
     try {
         const searchParts = [filters.value.search, filters.value.customer]
@@ -1231,16 +1272,19 @@ const fetchOrders = async () => {
         if (remoteBranchId.value != null && !remoteBranches.value.some(b => b.id === remoteBranchId.value)) {
             throw new Error('No se pudo validar la sucursal remota. Reintenta cargar las sucursales.')
         }
-        const response = await orderApi.searchOrders(body)
+        const response = await searchOrdersOnce(scope, body)
         if (request !== ordersRequest || scope !== activeTab.value) return
         orders.value = response.items
         totalCount.value = response.totalCount
+        lastOrdersFetchedAt = Date.now()
     } catch (err: any) {
         if (request !== ordersRequest || scope !== activeTab.value) return
-        orders.value = []
-        totalCount.value = 0
+        if (!options.background) {
+            orders.value = []
+            totalCount.value = 0
+        }
         ordersLoadError.value = err.message || 'No se pudieron cargar los pedidos.'
-        error('Error al cargar pedidos', err.message)
+        if (!options.background) error('Error al cargar pedidos', err.message)
     } finally {
         if (request === ordersRequest) loading.value = false
     }
@@ -2356,8 +2400,9 @@ const reservedColombiaDateToIsoUtc = (dateStr: string, endOfDay: boolean): strin
     return new Date(`${dateStr}${suffix}`).toISOString()
 }
 
-const fetchReservations = async () => {
-    resLoading.value = true
+let lastReservationsFetchedAt = 0
+const fetchReservations = async (options: { background?: boolean } = {}) => {
+    if (!options.background) resLoading.value = true
     try {
         let statusPayload: string | undefined = undefined
 
@@ -2397,8 +2442,9 @@ const fetchReservations = async () => {
 
         reservations.value = items
         resTotalCount.value = resStatus.value === null ? items.length : response.totalCount
+        lastReservationsFetchedAt = Date.now()
     } catch (err: any) {
-        error('Error al cargar reservas', err.message)
+        if (!options.background) error('Error al cargar reservas', err.message)
     } finally {
         resLoading.value = false
     }
@@ -2471,7 +2517,8 @@ const confirmCancelReservation = async () => {
     }
 }
 
-// Realtime only invalidates this authorized workspace. Open forms keep their original version.
+// Realtime notifications update the selected authorized scope. Keep edits intact;
+// coalesce focus/reconnect/events without re-querying other branches.
 const hasOpenEditor = computed(() => showEditCustomerModal.value || showAssignDeliveryModal.value
     || showEditOrderTypeModal.value || showDepositModal.value || showEditBankPaymentDialog.value
     || showRemoveBankPaymentDialog.value || showEditReservationDepositDialog.value
@@ -2480,23 +2527,68 @@ const hasOpenEditor = computed(() => showEditCustomerModal.value || showAssignDe
     || showCancelReservationDialog.value || showBulkUnverifyDialog.value)
 let updatesTimer: ReturnType<typeof setTimeout> | null = null
 let mounted = false
+let refreshInFlight = false
+let refreshAgain = false
+let lastAutoRefreshAt = 0
 async function refreshWorkspace() {
     if (!mounted || !isPageVisible.value || !isOnline.value) return
     if (hasOpenEditor.value) { pendingUpdates.value = true; return }
+    if (refreshInFlight) { refreshAgain = true; return }
+    refreshInFlight = true
     pendingUpdates.value = false
-    await loadRemoteBranches()
-    if (activeTab.value === 'reservations') await fetchReservations()
-    else await fetchOrders()
+    try {
+        await loadRemoteBranches()
+        if (activeTab.value === 'reservations') await fetchReservations({ background: true })
+        else await fetchOrders({ background: true })
+    } finally {
+        refreshInFlight = false
+        lastAutoRefreshAt = Date.now()
+        if (refreshAgain) {
+            refreshAgain = false
+            scheduleWorkspaceRefresh()
+        }
+    }
 }
 function scheduleWorkspaceRefresh() {
     if (!mounted) return
-    pendingUpdates.value = true
-    if (updatesTimer) clearTimeout(updatesTimer)
-    updatesTimer = setTimeout(() => { updatesTimer = null; void refreshWorkspace() }, 500)
+    if (hasOpenEditor.value) { pendingUpdates.value = true; return }
+    if (updatesTimer) return
+    const delay = Math.max(500, 1_200 - (Date.now() - lastAutoRefreshAt))
+    updatesTimer = setTimeout(() => { updatesTimer = null; void refreshWorkspace() }, delay)
+}
+function onResumeWorkspace() {
+    // A brief switch between apps does not require rereading an already fresh list.
+    const lastLoaded = activeTab.value === 'reservations' ? lastReservationsFetchedAt : lastOrdersFetchedAt
+    if (!pendingUpdates.value && lastLoaded && Date.now() - lastLoaded < 20_000) return
+    scheduleWorkspaceRefresh()
+}
+function onOrderManagementChanged(event: { orderId: number; branchId?: number; originBranchId?: number | null }) {
+    const workspaceId = workspaceBranchId.value
+    if (!workspaceId) return
+    // Legacy events with no branch metadata can only refresh a row already visible.
+    if (event.branchId == null) {
+        if (orders.value.some(order => order.id === event.orderId)
+            || reservations.value.some(order => order.id === event.orderId)) scheduleWorkspaceRefresh()
+        return
+    }
+    const localChange = event.branchId === workspaceId
+    const remoteChange = event.originBranchId === workspaceId && event.branchId !== workspaceId
+
+    if (remoteChange && !remoteBranches.value.some(branch => branch.id === event.branchId)) {
+        // This may be the first order taken for a new destination branch.
+        void loadRemoteBranches(true)
+    }
+    if (activeTab.value === 'reservations') {
+        if (localChange) scheduleWorkspaceRefresh()
+    } else if (remoteBranchId.value == null) {
+        if (localChange) scheduleWorkspaceRefresh()
+    } else if (remoteChange && event.branchId === remoteBranchId.value) {
+        scheduleWorkspaceRefresh()
+    }
 }
 const { isPageVisible, isOnline } = useOrderManagementUpdates(
-    scheduleWorkspaceRefresh,
-    scheduleWorkspaceRefresh,
+    onOrderManagementChanged,
+    onResumeWorkspace,
     (orderId) => {
         if (orders.value.some(o => o.id === orderId) || reservations.value.some(o => o.id === orderId)) pendingUpdates.value = true
     },
@@ -2510,6 +2602,7 @@ watch(() => route.query.remoteBranchId, () => {
 watch(workspaceBranchId, () => {
     // Global branch changes remount MainLayout in production; invalidate pending reads as a safeguard.
     ordersRequest++; deliverymenRequest++; branchOptionsRequest++; branchesRequest++
+    remoteBranchesLoadedAt = 0; remoteBranchesLoadedFor = null
     remoteBranches.value = []; remoteOptions.value = null; orders.value = []; totalCount.value = 0
     activeTab.value = 'orders'
     void retryRemoteWorkspace()
@@ -2522,7 +2615,11 @@ async function retryRemoteWorkspace() {
 onMounted(async () => {
     mounted = true
     await Promise.allSettled([
-        banksStore.ensureListLoaded(), appsStore.ensureListLoaded(), loadRemoteBranches(),
+        // Same branch scope as MainLayout/bootstrapOrderCatalog: share the
+        // existing in-flight requests instead of fetching banks/apps twice.
+        banksStore.ensureListLoaded(workspaceBranchId.value),
+        appsStore.ensureListLoaded(workspaceBranchId.value),
+        loadRemoteBranches(),
     ])
     await loadWorkspaceOptions()
     await Promise.all([loadDeliverymenInRange(), fetchOrders()])

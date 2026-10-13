@@ -31,8 +31,13 @@ export function useOrderManagementUpdates(
         off('OrderManagementChanged', handle)
         window.removeEventListener(ORDER_CONFLICT_EVENT, onConflict)
     })
-    watch(connectionState, (value, prior) => {
-        if (value === 'connected' && prior && prior !== 'connected') refresh()
+    // La carga inicial ya la realiza la vista. No disparar otra consulta cuando
+    // SignalR pasa de "connecting" a "connected" por primera vez.
+    let hasConnectedOnce = connectionState.value === 'connected'
+    watch(connectionState, (value) => {
+        if (value !== 'connected') return
+        if (hasConnectedOnce) refresh()
+        hasConnectedOnce = true
     })
     watch([isPageVisible, isOnline], ([visible, online], [wasVisible, wasOnline]) => {
         if (visible && online && (!wasVisible || !wasOnline)) refresh()
