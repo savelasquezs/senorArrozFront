@@ -127,7 +127,7 @@
 
         <BaseDialog v-model="showCreateModal" title="Agregar Nueva Dirección" size="lg">
             <CustomerAddressForm v-model="addressFormData" :branch-id="effectiveBranchId || undefined"
-                :default-service-branch-id="effectiveBranchId || undefined" :allow-branch-selection="props.mode === 'draft'"
+                :default-service-branch-id="effectiveBranchId || undefined" :allow-branch-selection="false"
                 :can-edit-delivery-fee="true" @submit="createAddress" @cancel="closeCreateModal" />
         </BaseDialog>
 

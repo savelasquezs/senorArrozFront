@@ -45,6 +45,7 @@ vi.mock('@/composables/useToast', () => ({
 }))
 
 import AddressSelector from '@/components/customers/address/AddressSelector.vue'
+import CustomerAddressForm from '@/components/customers/address/CustomerAddressForm.vue'
 
 describe('AddressSelector branch prompt', () => {
     beforeEach(() => {
@@ -91,6 +92,14 @@ describe('AddressSelector branch prompt', () => {
         dependencies.customersStore.fetchAddresses.mockClear()
         dependencies.draftStore.changeOperationalBranch.mockClear()
         dependencies.showError.mockClear()
+    })
+
+    it('does not offer a duplicate branch checkbox when creating an address inside an order', async () => {
+        const wrapper = shallowMount(AddressSelector, {
+            props: { customerId: 7, mode: 'draft' },
+        })
+        await flushPromises()
+        expect(wrapper.getComponent(CustomerAddressForm).props('allowBranchSelection')).toBe(false)
     })
 
     it('asks for a single branch selection in the OrderSidebar', async () => {

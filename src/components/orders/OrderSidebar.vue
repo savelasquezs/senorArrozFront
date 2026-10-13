@@ -49,7 +49,7 @@
                     <div class="py-3 border-b border-gray-200">
                         <label class="block text-sm font-medium text-gray-700 mb-2">
                             {{ currentOrder.type === 'onsite' ? 'Nombre de quien recoge' : 'Nombre de quien recibe' }}
-                            <span class="text-red-500">*</span>
+                            <span v-if="currentOrder.type !== 'onsite' || (currentOrder.branchId !== (currentOrder.workspaceBranchId ?? ordersStore.activeBranchId))" class="text-red-500">*</span>
                         </label>
                         <BaseInput :model-value="currentOrder.guestName || ''"
                             @update:model-value="(value) => updateGuestName(String(value || ''))"
@@ -735,10 +735,13 @@ function chooseNoBenefit() {
 }
 
 const guestNameError = computed(() => {
-    if (!currentOrder.value) return ''
-    if (!currentOrder.value.guestName?.trim()) {
-        return currentOrder.value.type === 'onsite'
-            ? 'El nombre de quien recoge es obligatorio'
+    const order = currentOrder.value
+    if (!order) return ''
+    const remotePickup = order.type === 'onsite'
+        && order.branchId !== (order.workspaceBranchId ?? ordersStore.activeBranchId)
+    if (!order.guestName?.trim() && (order.type !== 'onsite' || remotePickup)) {
+        return remotePickup
+            ? 'El nombre de quien recoge es obligatorio para pedidos de otra sucursal'
             : 'El nombre de quien recibe es obligatorio'
     }
     return ''

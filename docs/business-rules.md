@@ -150,7 +150,7 @@ enum UserRole {
 - **Cliente**: Opcional
 - **Dirección**: No aplica
 - **Delivery Fee**: No aplica. Al pasar a onsite se eliminan dirección y costo de envío; al volver a delivery se debe elegir una dirección con cobertura en la sucursal seleccionada. Las reservas no cambian el envío solo por el selector de tipo.
-- **guestName**: Obligatorio incluso sin cliente registrado; identifica a la persona que recoge, tanto en la sucursal actual como en una remota.
+- **guestName**: Obligatorio para recogidas de otra sucursal, incluso sin cliente registrado; opcional en pedidos onsite locales como antes.
 - **Fidelización**: Se aplica si se asigna cliente
 - **Status inicial**: `'taken'`
 
@@ -409,7 +409,7 @@ Validaciones implementadas antes de enviar un pedido al backend:
 
 **Onsite:**
 - Al menos 1 producto
-- Nombre de quien recoge obligatorio (`guestName`) en todas las sucursales, haya o no cliente registrado
+- Nombre de quien recoge obligatorio (`guestName`) solo cuando el destino de onsite es otra sucursal, haya o no cliente registrado
 
 **Delivery:**
 - Al menos 1 producto
