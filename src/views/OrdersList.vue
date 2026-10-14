@@ -1383,7 +1383,7 @@ const loadDeliverymenInRange = async (mainPage: OrdersSearchSnapshot | null = nu
         const unique = new Map<number, string>()
 
         while (page <= totalPagesCount) {
-            const response = await orderApi.searchOrders(buildDeliverymenInRangeSearchBody(page, pageSizeValue))
+            const response = await searchOrdersOnce(scope, buildDeliverymenInRangeSearchBody(page, pageSizeValue))
             if (request !== deliverymenRequest || scope !== activeTab.value) return
 
             for (const order of response.items) {
