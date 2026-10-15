@@ -449,14 +449,19 @@ const ensureOrderDetails = async (orderIds: number[]) => {
     const idsToFetch = uniqueIds.filter((id) => !orderItemsMap.value.has(id))
     if (idsToFetch.length === 0) return
 
-    const results = await Promise.allSettled(idsToFetch.map((id) => orderApi.fetchDetail(id)))
-    results.forEach((result, index) => {
-        if (result.status === 'fulfilled') {
-            orderItemsMap.value.set(idsToFetch[index]!, [...(result.value.orderDetails || [])])
-        } else {
-            console.error(`Error loading details for order ${idsToFetch[index]}:`, result.reason)
-        }
-    })
+    // Only the legacy backend needs per-order fallback. Bound concurrent
+    // requests to avoid saturating the browser/backend during an old deployment.
+    for (let offset = 0; offset < idsToFetch.length; offset += 5) {
+        const batch = idsToFetch.slice(offset, offset + 5)
+        const results = await Promise.allSettled(batch.map((id) => orderApi.fetchDetail(id)))
+        results.forEach((result, index) => {
+            if (result.status === 'fulfilled') {
+                orderItemsMap.value.set(batch[index]!, [...(result.value.orderDetails || [])])
+            } else {
+                console.error(`Error loading details for order ${batch[index]}:`, result.reason)
+            }
+        })
+    }
 }
 
 const loadOrderDetails = async () => {
