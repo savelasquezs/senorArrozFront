@@ -1,4 +1,7 @@
 import type { OrderDetailItem, OrderListItem } from '@/types/order'
+
+// A complete kitchen order or a date-scoped summary row are both valid.
+type KitchenSummarySource = Pick<OrderListItem, 'id' | 'status' | 'prepareAt' | 'createdAt'>
 import { formatKitchenProductDisplayName } from '@/composables/useKitchenProductDisplayName'
 import { sortProductsByPortionOrder } from '@/config/orderPosCategories'
 import { defaultBusinessCalendar } from '@/utils/datetime'
@@ -62,12 +65,12 @@ function hourKeyFromHour(hour: number): string {
     return String(hour).padStart(2, '0')
 }
 
-function orderMatchesSelectedDate(order: OrderListItem, selectedDate: string): boolean {
+function orderMatchesSelectedDate(order: KitchenSummarySource, selectedDate: string): boolean {
     const anchor = order.prepareAt || order.createdAt
     return getBusinessDateKey(anchor) === selectedDate
 }
 
-function getOrderHourKey(order: OrderListItem, now: Date): string | null {
+function getOrderHourKey(order: KitchenSummarySource, now: Date): string | null {
     const hour = order.prepareAt ? getBusinessHour(order.prepareAt) : getBusinessHour(now)
     return hour == null ? null : hourKeyFromHour(hour)
 }
@@ -96,7 +99,7 @@ function createCategoryAccumulator(): KitchenSummaryCategoryAccumulator {
     return new Map()
 }
 
-function getSummaryEligibleOrders(orders: OrderListItem[], selectedDate: string): OrderListItem[] {
+function getSummaryEligibleOrders(orders: KitchenSummarySource[], selectedDate: string): OrderListItem[] {
     return orders.filter(
         (order) => ACTIVE_SUMMARY_STATUSES.has(order.status) && orderMatchesSelectedDate(order, selectedDate),
     )
@@ -141,7 +144,7 @@ function buildCategoryCards(
 }
 
 export function buildKitchenDailyCategorySummary(
-    orders: OrderListItem[],
+    orders: KitchenSummarySource[],
     orderItemsMap: Map<number, OrderDetailItem[]>,
     selectedDate: string,
 ): KitchenHourlySummaryCategoryCard[] {
@@ -155,7 +158,7 @@ export function buildKitchenDailyCategorySummary(
 }
 
 export function buildKitchenHourlySummary(
-    orders: OrderListItem[],
+    orders: KitchenSummarySource[],
     orderItemsMap: Map<number, OrderDetailItem[]>,
     selectedDate: string,
     now: Date = new Date(),
