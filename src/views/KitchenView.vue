@@ -398,7 +398,7 @@ const loadKitchenPage = async () => {
         const first = await orderApi.getOrders(filters)
         const byId = new Map<number, OrderListItem>()
         const addPage = (items: typeof first.items) => {
-            for (const order of items) byId.set(order.id, order as OrderListItem)
+            for (const order of items) byId.set(order.id, order as unknown as OrderListItem)
         }
         addPage(first.items)
         const totalPages = Math.max(1, first.totalPages ?? Math.ceil(first.totalCount / KITCHEN_PAGE_SIZE))
