@@ -542,39 +542,52 @@ const notifyOrderShownInKitchen = async (orderData: any, isReservation: boolean)
     if (!order || order.status !== 'taken') return
 
     try {
-        await ordersStore.fetchById(order.id)
-        if (!ordersStore.current) return
-
-        const products = ordersStore.current.orderDetails.map(item => ({
-            name: item.productName,
-            quantity: item.quantity
+        let details = orderItemsMap.value.get(order.id)
+        let notes = order.notes
+        if (!details) {
+            // Legacy response or an exceptional incomplete page.
+            await ordersStore.fetchById(order.id)
+            if (!ordersStore.current) return
+            details = [...ordersStore.current.orderDetails]
+            notes = ordersStore.current.notes ?? null
+            orderItemsMap.value.set(order.id, details)
+        }
+        const products = details.map(item => ({
+            name: item.productName, quantity: item.quantity,
         }))
         const title = isReservation ? `Reserva #${order.id} en cocina` : `Nuevo pedido #${order.id}`
         const bodyText = KitchenService.generateOrderNotificationText(order, products)
-        const speechText = KitchenService.generateOrderSpeechText(
-            order,
-            products,
-            ordersStore.current.notes ?? null
-        )
+        const speechText = KitchenService.generateOrderSpeechText(order, products, notes)
 
         if (soundEnabled.value) {
-            if (permission.value === 'granted') {
-                notify(title, { body: bodyText, tag: `order-${order.id}` })
-            }
+            if (permission.value === 'granted') notify(title, { body: bodyText, tag: `order-${order.id}` })
             speak(speechText)
         }
     } catch (err) {
-        console.error('Error loading order details for notification/TTS:', err)
+        console.error('Error loading kitchen notification details:', err)
     }
 }
 
+// Combine events received in the same JavaScript turn before beginning an HTTP refresh.
+let scheduledEventRefresh: Promise<void> | null = null
+const refreshAfterKitchenEvent = (): Promise<void> => {
+    if (scheduledEventRefresh) return scheduledEventRefresh
+    const pending = Promise.resolve().then(() => loadOrders())
+    scheduledEventRefresh = pending
+    void pending.then(
+        () => { if (scheduledEventRefresh === pending) scheduledEventRefresh = null },
+        () => { if (scheduledEventRefresh === pending) scheduledEventRefresh = null },
+    )
+    return pending
+}
+
 const handleNewOrder = async (orderData: any) => {
-    await loadOrders()
+    await refreshAfterKitchenEvent()
     await notifyOrderShownInKitchen(orderData, false)
 }
 
 const handleReservationReady = async (orderData: any) => {
-    await loadOrders()
+    await refreshAfterKitchenEvent()
     const oid = typeof orderData?.id === 'number' ? orderData.id : Number(orderData?.id)
     if (Number.isFinite(oid)) {
         reservationServerDue.value = new Set([...reservationServerDue.value, oid as number])
@@ -586,10 +599,11 @@ const handleReservationReady = async (orderData: any) => {
 const notifyKitchenOrderModified = async (
     orderData: any,
     modificationKind: string,
-    kitchenChanges: KitchenOrderModificationSummary | undefined
+    kitchenChanges: KitchenOrderModificationSummary | undefined,
+    previousOrder?: OrderListItem,
 ) => {
     const oid = orderData?.id
-    const prev = oid ? allOrders.value.find((o) => o.id === oid) : undefined
+    const prev = previousOrder ?? (oid ? allOrders.value.find((o) => o.id === oid) : undefined)
     const scheduleAnnouncement = kitchenChanges?.scheduleChanged === true
     let skip = ''
     if (!oid) skip = 'no_order_id'
@@ -599,12 +613,16 @@ const notifyKitchenOrderModified = async (
     if (skip || !prev) return
 
     try {
-        await ordersStore.fetchById(orderData.id)
-        if (!ordersStore.current) return
-
-        orderItemsMap.value.set(orderData.id, [...(ordersStore.current.orderDetails || [])])
-
-        const orderNotes = ordersStore.current.notes ?? null
+        // A refreshed kitchen page already contains current notes, product lines
+        // and quantities; do not issue another full /orders/{id}/details request.
+        const current = allOrders.value.find(o => o.id === orderData.id)
+        let orderNotes = current?.notes ?? null
+        if (!current || !orderItemsMap.value.has(orderData.id)) {
+            await ordersStore.fetchById(orderData.id)
+            if (!ordersStore.current) return
+            orderItemsMap.value.set(orderData.id, [...(ordersStore.current.orderDetails || [])])
+            orderNotes = ordersStore.current.notes ?? null
+        }
         const title = KitchenService.buildOrderModifiedNotificationTitle(prev.id)
         const { body: bodyText } = KitchenService.buildOrderModifiedNotificationBody(
             prev.id,
@@ -637,10 +655,9 @@ const handleOrderModified = async (payload: any) => {
     const prev = data?.id ? allOrders.value.find((o) => o.id === data.id) : undefined
     const visible = prev ? KitchenService.isVisibleToActiveKitchenForAlerts(prev) : false
     if (!data?.id) return
-    if ((prev && visible) || kitchenChanges?.scheduleChanged) {
-        await notifyKitchenOrderModified(data, kind, kitchenChanges)
-    }
-    await loadOrders()
+    await refreshAfterKitchenEvent()
+    if ((prev && visible) || kitchenChanges?.scheduleChanged)
+        await notifyKitchenOrderModified(data, kind, kitchenChanges, prev)
 }
 
 const handleOrderCancelled = async (payload: any) => {
@@ -658,7 +675,7 @@ const handleOrderCancelled = async (payload: any) => {
     if (soundEnabled.value) {
         speak(`Pedido nÃºmero ${orderId} cancelado.`)
     }
-    await loadOrders()
+    await refreshAfterKitchenEvent()
 }
 
 const handleChangeStatus = (orderIds: number[], newStatus: OrderStatus) => {
