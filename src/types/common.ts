@@ -65,6 +65,7 @@ export interface BranchUserSummary {
   branchId: number
   active: boolean
   webAccessEnabled: boolean
+  deliveryAppEnabled?: boolean
   lastLogin?: string
   payrollExpenseId?: number | null
   payrollExpenseName?: string | null

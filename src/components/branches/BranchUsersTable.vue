@@ -87,9 +87,14 @@
 
                         <!-- Role -->
                         <td class="px-6 py-4 whitespace-nowrap">
-                            <BaseBadge :variant="getRoleVariant(user.role)">
-                                {{ getRoleLabel(user.role) }}
-                            </BaseBadge>
+                            <div class="flex flex-wrap items-center gap-1.5">
+                                <BaseBadge :variant="getRoleVariant(user.role)">
+                                    {{ getRoleLabel(user.role) }}
+                                </BaseBadge>
+                                <BaseBadge v-if="user.deliveryAppEnabled" variant="success">
+                                    + Domicilios
+                                </BaseBadge>
+                            </div>
                         </td>
 
                         <!-- Status -->
