@@ -105,6 +105,8 @@ export interface OrderAppPayment {
 // ===== TIPOS DE PEDIDOS EN BORRADOR (Sistema Nuevo) =====
 export interface DraftOrder {
     tabId: string
+    /** UUID estable por intento de creación, persistido para reintentos tras errores de red. */
+    posCreationKey?: string
     tabName: string
     workspaceBranchId?: number | null
     branchId?: number | null
@@ -468,6 +470,7 @@ export interface OrderAppPaymentDetail {
 // ===== TIPOS PARA CREACIÓN/ACTUALIZACIÓN =====
 export interface CreateOrderDto {
     branchId: number
+    posCreationKey?: string
     whatsappConversationId?: number
     takenById: number
     customerId?: number
