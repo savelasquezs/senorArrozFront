@@ -287,6 +287,7 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/store/auth'
 import { useOrdersDataStore } from '@/store/ordersData'
+import { syncKitchenPageDetails } from '@/helpers/kitchenPageDetails'
 import { useSignalR } from '@/composables/useSignalR'
 import { ORDERS_SIGNALR_HUB_URL } from '@/config/signalr'
 import { useTextToSpeech } from '@/composables/useTextToSpeech'
@@ -378,32 +379,69 @@ const selectedSummaryGroups = computed(
     () => hourlySummary.value.groupedByHour[selectedSummaryHourKey.value] ?? [],
 )
 
-const loadOrders = async () => {
+// Kitchen must load every eligible order, not silently truncate the last 100.
+const KITCHEN_PAGE_SIZE = 100
+let kitchenLoadInFlight: Promise<void> | null = null
+let kitchenReloadRequested = false
+
+const loadKitchenPage = async () => {
     try {
         isLoading.value = true
-        await ordersStore.fetch({
+        const filters = {
             branchId: authStore.user?.branchId,
             page: 1,
-            pageSize: 100,
-            forKitchen: true
-        })
+            pageSize: KITCHEN_PAGE_SIZE,
+            sortBy: 'id',
+            sortOrder: 'asc' as const,
+            forKitchen: true,
+        }
+        const first = await orderApi.getOrders(filters)
+        const byId = new Map<number, OrderListItem>()
+        const addPage = (items: typeof first.items) => {
+            for (const order of items) byId.set(order.id, order as OrderListItem)
+        }
+        addPage(first.items)
+        const totalPages = Math.max(1, first.totalPages ?? Math.ceil(first.totalCount / KITCHEN_PAGE_SIZE))
+        for (let page = 2; page <= totalPages; page++) {
+            const response = await orderApi.getOrders({ ...filters, page })
+            addPage(response.items)
+        }
+
+        // Publish one complete snapshot, rather than flashing a partial first page.
+        const complete = [...byId.values()]
+        ordersStore.list = { ...first, items: complete }
         await loadOrderDetails()
-        // Quitar override cuando el cliente ya considera vencida la hora de cocina (reloj alineado o usuario pasÃ³ a preparaciÃ³n).
         reservationServerDue.value = new Set(
             [...reservationServerDue.value].filter((id) => {
-                const o = allOrders.value.find((x) => x.id === id)
-                if (!o) return false
-                return KitchenService.isReservationTakenPendingKitchenTime(o)
-            })
+                const o = complete.find((x) => x.id === id)
+                return o != null && KitchenService.isReservationTakenPendingKitchenTime(o)
+            }),
         )
-        if (activeTab.value === 'hourly_summary') {
-            await loadSummaryOrders()
-        }
+        if (activeTab.value === 'hourly_summary') await loadSummaryOrders()
     } catch (err: any) {
         error('Error al cargar pedidos', err.message)
     } finally {
         isLoading.value = false
     }
+}
+
+// Serializes SignalR/refresh loads. Changes while fetching schedule exactly one
+// additional current snapshot; stale results cannot be the final displayed state.
+const loadOrders = (): Promise<void> => {
+    kitchenReloadRequested = true
+    if (kitchenLoadInFlight) return kitchenLoadInFlight
+    const running = (async () => {
+        while (kitchenReloadRequested) {
+            kitchenReloadRequested = false
+            await loadKitchenPage()
+        }
+    })()
+    kitchenLoadInFlight = running
+    void running.then(
+        () => { if (kitchenLoadInFlight === running) kitchenLoadInFlight = null },
+        () => { if (kitchenLoadInFlight === running) kitchenLoadInFlight = null },
+    )
+    return running
 }
 
 const ensureOrderDetails = async (orderIds: number[]) => {
@@ -422,7 +460,9 @@ const ensureOrderDetails = async (orderIds: number[]) => {
 }
 
 const loadOrderDetails = async () => {
-    await ensureOrderDetails(allOrders.value.map((order) => order.id))
+    // Missing field = older backend; empty array = legitimate order with no lines.
+    const missingIds = syncKitchenPageDetails(allOrders.value, orderItemsMap.value)
+    await ensureOrderDetails(missingIds)
 }
 
 const loadSummaryOrders = async () => {
