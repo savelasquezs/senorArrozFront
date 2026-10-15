@@ -99,7 +99,7 @@ function createCategoryAccumulator(): KitchenSummaryCategoryAccumulator {
     return new Map()
 }
 
-function getSummaryEligibleOrders(orders: KitchenSummarySource[], selectedDate: string): OrderListItem[] {
+function getSummaryEligibleOrders(orders: KitchenSummarySource[], selectedDate: string): KitchenSummarySource[] {
     return orders.filter(
         (order) => ACTIVE_SUMMARY_STATUSES.has(order.status) && orderMatchesSelectedDate(order, selectedDate),
     )
