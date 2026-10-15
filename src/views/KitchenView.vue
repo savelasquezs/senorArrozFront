@@ -298,7 +298,7 @@ import { KitchenService } from '@/services/domain/KitchenService'
 import { orderApi } from '@/services/MainAPI/orderApi'
 import type { KitchenOrderModificationSummary } from '@/types/kitchenModification'
 import { printJobsApi } from '@/services/MainAPI/printJobsApi'
-import type { OrderListItem, OrderDetailItem, OrderStatus } from '@/types/order'
+import type { OrderListItem, OrderDetailItem, OrderStatus, KitchenSummaryOrder } from '@/types/order'
 import { defaultBusinessCalendar } from '@/utils/datetime'
 import MainLayout from '@/components/layout/MainLayout.vue'
 import OrderCardGrid from '@/components/kitchen/OrderCardGrid.vue'
@@ -335,7 +335,7 @@ const ordersToConfirm = ref<OrderListItem[]>([])
 const confirmChainTakenToReady = ref(false)
 const orderItemsMap = ref(new Map<number, OrderDetailItem[]>())
 const cardGridRef = ref<InstanceType<typeof OrderCardGrid> | null>(null)
-const summaryOrders = ref<OrderListItem[]>([])
+const summaryOrders = ref<KitchenSummaryOrder[]>([])
 const summaryDate = ref(defaultBusinessCalendar.todayYmd())
 const selectedSummaryHourKey = ref('')
 const canViewDailyCategorySummary = computed(() => authStore.isAdmin || authStore.isSuperadmin)
@@ -465,49 +465,75 @@ const loadOrderDetails = async () => {
     await ensureOrderDetails(missingIds)
 }
 
+let latestSummaryRequest = 0
+const summaryInFlight = new Map<string, Promise<KitchenSummaryOrder[]>>()
+
+function kitchenSummaryOnce(date: string, branchId: number) {
+    const key = `${branchId}:${date}`
+    const previous = summaryInFlight.get(key)
+    if (previous) return previous
+    const pending = orderApi.getKitchenSummary(date, branchId)
+    summaryInFlight.set(key, pending)
+    const clear = () => { if (summaryInFlight.get(key) === pending) summaryInFlight.delete(key) }
+    void pending.then(clear, clear)
+    return pending
+}
+
 const loadSummaryOrders = async () => {
     const branchId = authStore.user?.branchId
+    const request = ++latestSummaryRequest
     if (!branchId) {
         summaryOrders.value = []
         selectedSummaryHourKey.value = ''
         return
     }
 
-    const merged = new Map<number, OrderListItem>()
-    const pageSize = 200
-
     try {
         summaryLoading.value = true
-
-        for (const status of ['taken', 'inPreparation']) {
-            let page = 1
-            let totalPages = 1
-
-            do {
-                const response = await orderApi.searchOrders({
-                    branchId,
-                    status,
-                    page,
-                    pageSize,
-                })
-
-                for (const order of response.items) {
-                    merged.set(order.id, order)
-                }
-
-                totalPages = response.totalPages || 1
-                page += 1
-            } while (page <= totalPages)
-        }
-
-        summaryOrders.value = [...merged.values()]
-        await ensureOrderDetails(summaryOrders.value.map((order) => order.id))
+        const page = await kitchenSummaryOnce(summaryDate.value, branchId)
+        if (request !== latestSummaryRequest) return
+        summaryOrders.value = page
+        const missing = syncKitchenPageDetails(page, orderItemsMap.value)
+        await ensureOrderDetails(missing)
     } catch (err: any) {
-        summaryOrders.value = []
-        selectedSummaryHourKey.value = ''
-        error('Error al cargar resumen cocina', err.message)
+        if (request !== latestSummaryRequest) return
+        if (err?.response?.status === 404) {
+            // While deploying backend first, preserve the previous summary flow
+            // until /orders/kitchen-summary becomes available.
+            try {
+                const merged = new Map<number, OrderListItem>()
+                const pageSize = 200
+                for (const status of ['taken', 'inPreparation']) {
+                    let page = 1
+                    let totalPages = 1
+                    do {
+                        const response = await orderApi.searchOrders({
+                            branchId, status, page, pageSize,
+                        })
+                        if (request !== latestSummaryRequest) return
+                        for (const order of response.items) merged.set(order.id, order)
+                        totalPages = response.totalPages || 1
+                        page += 1
+                    } while (page <= totalPages)
+                }
+                // The older endpoint does not embed line details.
+                const previous = [...merged.values()]
+                summaryOrders.value = previous.map(o => ({
+                    id: o.id, status: o.status, createdAt: o.createdAt,
+                    prepareAt: o.prepareAt, kitchenDetails: [],
+                }))
+                await ensureOrderDetails(previous.map(o => o.id))
+            } catch (legacyError: any) {
+                if (request === latestSummaryRequest)
+                    error('Error al cargar resumen cocina', legacyError.message)
+            }
+        } else {
+            summaryOrders.value = []
+            selectedSummaryHourKey.value = ''
+            error('Error al cargar resumen cocina', err.message)
+        }
     } finally {
-        summaryLoading.value = false
+        if (request === latestSummaryRequest) summaryLoading.value = false
     }
 }
 
