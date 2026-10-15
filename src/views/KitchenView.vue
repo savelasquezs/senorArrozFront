@@ -287,6 +287,7 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/store/auth'
 import { useOrdersDataStore } from '@/store/ordersData'
+import { syncKitchenPageDetails } from '@/helpers/kitchenPageDetails'
 import { useSignalR } from '@/composables/useSignalR'
 import { ORDERS_SIGNALR_HUB_URL } from '@/config/signalr'
 import { useTextToSpeech } from '@/composables/useTextToSpeech'
@@ -297,7 +298,7 @@ import { KitchenService } from '@/services/domain/KitchenService'
 import { orderApi } from '@/services/MainAPI/orderApi'
 import type { KitchenOrderModificationSummary } from '@/types/kitchenModification'
 import { printJobsApi } from '@/services/MainAPI/printJobsApi'
-import type { OrderListItem, OrderDetailItem, OrderStatus } from '@/types/order'
+import type { OrderListItem, OrderDetailItem, OrderStatus, KitchenSummaryOrder } from '@/types/order'
 import { defaultBusinessCalendar } from '@/utils/datetime'
 import MainLayout from '@/components/layout/MainLayout.vue'
 import OrderCardGrid from '@/components/kitchen/OrderCardGrid.vue'
@@ -334,7 +335,7 @@ const ordersToConfirm = ref<OrderListItem[]>([])
 const confirmChainTakenToReady = ref(false)
 const orderItemsMap = ref(new Map<number, OrderDetailItem[]>())
 const cardGridRef = ref<InstanceType<typeof OrderCardGrid> | null>(null)
-const summaryOrders = ref<OrderListItem[]>([])
+const summaryOrders = ref<KitchenSummaryOrder[]>([])
 const summaryDate = ref(defaultBusinessCalendar.todayYmd())
 const selectedSummaryHourKey = ref('')
 const canViewDailyCategorySummary = computed(() => authStore.isAdmin || authStore.isSuperadmin)
@@ -378,27 +379,45 @@ const selectedSummaryGroups = computed(
     () => hourlySummary.value.groupedByHour[selectedSummaryHourKey.value] ?? [],
 )
 
-const loadOrders = async () => {
+// Kitchen must load every eligible order, not silently truncate the last 100.
+const KITCHEN_PAGE_SIZE = 100
+let kitchenLoadInFlight: Promise<void> | null = null
+let kitchenReloadRequested = false
+
+const loadKitchenPage = async () => {
     try {
         isLoading.value = true
-        await ordersStore.fetch({
+        const filters = {
             branchId: authStore.user?.branchId,
             page: 1,
-            pageSize: 100,
-            forKitchen: true
-        })
+            pageSize: KITCHEN_PAGE_SIZE,
+            sortBy: 'id',
+            sortOrder: 'asc' as const,
+            forKitchen: true,
+        }
+        const first = await orderApi.getOrders(filters)
+        const byId = new Map<number, OrderListItem>()
+        const addPage = (items: typeof first.items) => {
+            for (const order of items) byId.set(order.id, order as unknown as OrderListItem)
+        }
+        addPage(first.items)
+        const totalPages = Math.max(1, first.totalPages ?? Math.ceil(first.totalCount / KITCHEN_PAGE_SIZE))
+        for (let page = 2; page <= totalPages; page++) {
+            const response = await orderApi.getOrders({ ...filters, page })
+            addPage(response.items)
+        }
+
+        // Publish one complete snapshot, rather than flashing a partial first page.
+        const complete = [...byId.values()]
+        ordersStore.list = { ...first, items: complete }
         await loadOrderDetails()
-        // Quitar override cuando el cliente ya considera vencida la hora de cocina (reloj alineado o usuario pasÃ³ a preparaciÃ³n).
         reservationServerDue.value = new Set(
             [...reservationServerDue.value].filter((id) => {
-                const o = allOrders.value.find((x) => x.id === id)
-                if (!o) return false
-                return KitchenService.isReservationTakenPendingKitchenTime(o)
-            })
+                const o = complete.find((x) => x.id === id)
+                return o != null && KitchenService.isReservationTakenPendingKitchenTime(o)
+            }),
         )
-        if (activeTab.value === 'hourly_summary') {
-            await loadSummaryOrders()
-        }
+        if (activeTab.value === 'hourly_summary') await loadSummaryOrders()
     } catch (err: any) {
         error('Error al cargar pedidos', err.message)
     } finally {
@@ -406,68 +425,120 @@ const loadOrders = async () => {
     }
 }
 
+// Serializes SignalR/refresh loads. Changes while fetching schedule exactly one
+// additional current snapshot; stale results cannot be the final displayed state.
+const loadOrders = (): Promise<void> => {
+    kitchenReloadRequested = true
+    if (kitchenLoadInFlight) return kitchenLoadInFlight
+    const running = (async () => {
+        while (kitchenReloadRequested) {
+            kitchenReloadRequested = false
+            await loadKitchenPage()
+        }
+    })()
+    kitchenLoadInFlight = running
+    void running.then(
+        () => { if (kitchenLoadInFlight === running) kitchenLoadInFlight = null },
+        () => { if (kitchenLoadInFlight === running) kitchenLoadInFlight = null },
+    )
+    return running
+}
+
 const ensureOrderDetails = async (orderIds: number[]) => {
     const uniqueIds = [...new Set(orderIds)]
     const idsToFetch = uniqueIds.filter((id) => !orderItemsMap.value.has(id))
     if (idsToFetch.length === 0) return
 
-    const results = await Promise.allSettled(idsToFetch.map((id) => orderApi.fetchDetail(id)))
-    results.forEach((result, index) => {
-        if (result.status === 'fulfilled') {
-            orderItemsMap.value.set(idsToFetch[index]!, [...(result.value.orderDetails || [])])
-        } else {
-            console.error(`Error loading details for order ${idsToFetch[index]}:`, result.reason)
-        }
-    })
+    // Only the legacy backend needs per-order fallback. Bound concurrent
+    // requests to avoid saturating the browser/backend during an old deployment.
+    for (let offset = 0; offset < idsToFetch.length; offset += 5) {
+        const batch = idsToFetch.slice(offset, offset + 5)
+        const results = await Promise.allSettled(batch.map((id) => orderApi.fetchDetail(id)))
+        results.forEach((result, index) => {
+            if (result.status === 'fulfilled') {
+                orderItemsMap.value.set(batch[index]!, [...(result.value.orderDetails || [])])
+            } else {
+                console.error(`Error loading details for order ${batch[index]}:`, result.reason)
+            }
+        })
+    }
 }
 
 const loadOrderDetails = async () => {
-    await ensureOrderDetails(allOrders.value.map((order) => order.id))
+    // Missing field = older backend; empty array = legitimate order with no lines.
+    const missingIds = syncKitchenPageDetails(allOrders.value, orderItemsMap.value)
+    await ensureOrderDetails(missingIds)
+}
+
+let latestSummaryRequest = 0
+const summaryInFlight = new Map<string, Promise<KitchenSummaryOrder[]>>()
+
+function kitchenSummaryOnce(date: string, branchId: number) {
+    const key = `${branchId}:${date}`
+    const previous = summaryInFlight.get(key)
+    if (previous) return previous
+    const pending = orderApi.getKitchenSummary(date, branchId)
+    summaryInFlight.set(key, pending)
+    const clear = () => { if (summaryInFlight.get(key) === pending) summaryInFlight.delete(key) }
+    void pending.then(clear, clear)
+    return pending
 }
 
 const loadSummaryOrders = async () => {
     const branchId = authStore.user?.branchId
+    const request = ++latestSummaryRequest
     if (!branchId) {
         summaryOrders.value = []
         selectedSummaryHourKey.value = ''
         return
     }
 
-    const merged = new Map<number, OrderListItem>()
-    const pageSize = 200
-
     try {
         summaryLoading.value = true
-
-        for (const status of ['taken', 'inPreparation']) {
-            let page = 1
-            let totalPages = 1
-
-            do {
-                const response = await orderApi.searchOrders({
-                    branchId,
-                    status,
-                    page,
-                    pageSize,
-                })
-
-                for (const order of response.items) {
-                    merged.set(order.id, order)
-                }
-
-                totalPages = response.totalPages || 1
-                page += 1
-            } while (page <= totalPages)
-        }
-
-        summaryOrders.value = [...merged.values()]
-        await ensureOrderDetails(summaryOrders.value.map((order) => order.id))
+        const page = await kitchenSummaryOnce(summaryDate.value, branchId)
+        if (request !== latestSummaryRequest) return
+        summaryOrders.value = page
+        const missing = syncKitchenPageDetails(page, orderItemsMap.value)
+        await ensureOrderDetails(missing)
     } catch (err: any) {
-        summaryOrders.value = []
-        selectedSummaryHourKey.value = ''
-        error('Error al cargar resumen cocina', err.message)
+        if (request !== latestSummaryRequest) return
+        if (err?.response?.status === 404) {
+            // While deploying backend first, preserve the previous summary flow
+            // until /orders/kitchen-summary becomes available.
+            try {
+                const merged = new Map<number, OrderListItem>()
+                const pageSize = 200
+                for (const status of ['taken', 'inPreparation']) {
+                    let page = 1
+                    let totalPages = 1
+                    do {
+                        const response = await orderApi.searchOrders({
+                            branchId, status, page, pageSize,
+                        })
+                        if (request !== latestSummaryRequest) return
+                        for (const order of response.items) merged.set(order.id, order)
+                        totalPages = response.totalPages || 1
+                        page += 1
+                    } while (page <= totalPages)
+                }
+                // The older endpoint does not embed line details.
+                const previous = [...merged.values()]
+                summaryOrders.value = previous.map(o => ({
+                    id: o.id, status: o.status, createdAt: o.createdAt,
+                    prepareAt: o.prepareAt, kitchenDetails: [],
+                }))
+                await ensureOrderDetails(previous.map(o => o.id))
+            } catch (legacyError: any) {
+                if (request === latestSummaryRequest)
+                    error('Error al cargar resumen cocina', legacyError.message)
+            }
+        } else {
+            summaryOrders.value = []
+            selectedSummaryHourKey.value = ''
+            error('Error al cargar resumen cocina', err.message)
+        }
     } finally {
-        summaryLoading.value = false
+        if (request === latestSummaryRequest) summaryLoading.value = false
     }
 }
 
@@ -476,39 +547,52 @@ const notifyOrderShownInKitchen = async (orderData: any, isReservation: boolean)
     if (!order || order.status !== 'taken') return
 
     try {
-        await ordersStore.fetchById(order.id)
-        if (!ordersStore.current) return
-
-        const products = ordersStore.current.orderDetails.map(item => ({
-            name: item.productName,
-            quantity: item.quantity
+        let details = orderItemsMap.value.get(order.id)
+        let notes = order.notes
+        if (!details) {
+            // Legacy response or an exceptional incomplete page.
+            await ordersStore.fetchById(order.id)
+            if (!ordersStore.current) return
+            details = [...ordersStore.current.orderDetails]
+            notes = ordersStore.current.notes ?? null
+            orderItemsMap.value.set(order.id, details)
+        }
+        const products = details.map(item => ({
+            name: item.productName, quantity: item.quantity,
         }))
         const title = isReservation ? `Reserva #${order.id} en cocina` : `Nuevo pedido #${order.id}`
         const bodyText = KitchenService.generateOrderNotificationText(order, products)
-        const speechText = KitchenService.generateOrderSpeechText(
-            order,
-            products,
-            ordersStore.current.notes ?? null
-        )
+        const speechText = KitchenService.generateOrderSpeechText(order, products, notes)
 
         if (soundEnabled.value) {
-            if (permission.value === 'granted') {
-                notify(title, { body: bodyText, tag: `order-${order.id}` })
-            }
+            if (permission.value === 'granted') notify(title, { body: bodyText, tag: `order-${order.id}` })
             speak(speechText)
         }
     } catch (err) {
-        console.error('Error loading order details for notification/TTS:', err)
+        console.error('Error loading kitchen notification details:', err)
     }
 }
 
+// Combine events received in the same JavaScript turn before beginning an HTTP refresh.
+let scheduledEventRefresh: Promise<void> | null = null
+const refreshAfterKitchenEvent = (): Promise<void> => {
+    if (scheduledEventRefresh) return scheduledEventRefresh
+    const pending = Promise.resolve().then(() => loadOrders())
+    scheduledEventRefresh = pending
+    void pending.then(
+        () => { if (scheduledEventRefresh === pending) scheduledEventRefresh = null },
+        () => { if (scheduledEventRefresh === pending) scheduledEventRefresh = null },
+    )
+    return pending
+}
+
 const handleNewOrder = async (orderData: any) => {
-    await loadOrders()
+    await refreshAfterKitchenEvent()
     await notifyOrderShownInKitchen(orderData, false)
 }
 
 const handleReservationReady = async (orderData: any) => {
-    await loadOrders()
+    await refreshAfterKitchenEvent()
     const oid = typeof orderData?.id === 'number' ? orderData.id : Number(orderData?.id)
     if (Number.isFinite(oid)) {
         reservationServerDue.value = new Set([...reservationServerDue.value, oid as number])
@@ -520,10 +604,11 @@ const handleReservationReady = async (orderData: any) => {
 const notifyKitchenOrderModified = async (
     orderData: any,
     modificationKind: string,
-    kitchenChanges: KitchenOrderModificationSummary | undefined
+    kitchenChanges: KitchenOrderModificationSummary | undefined,
+    previousOrder?: OrderListItem,
 ) => {
     const oid = orderData?.id
-    const prev = oid ? allOrders.value.find((o) => o.id === oid) : undefined
+    const prev = previousOrder ?? (oid ? allOrders.value.find((o) => o.id === oid) : undefined)
     const scheduleAnnouncement = kitchenChanges?.scheduleChanged === true
     let skip = ''
     if (!oid) skip = 'no_order_id'
@@ -533,12 +618,16 @@ const notifyKitchenOrderModified = async (
     if (skip || !prev) return
 
     try {
-        await ordersStore.fetchById(orderData.id)
-        if (!ordersStore.current) return
-
-        orderItemsMap.value.set(orderData.id, [...(ordersStore.current.orderDetails || [])])
-
-        const orderNotes = ordersStore.current.notes ?? null
+        // A refreshed kitchen page already contains current notes, product lines
+        // and quantities; do not issue another full /orders/{id}/details request.
+        const current = allOrders.value.find(o => o.id === orderData.id)
+        let orderNotes = current?.notes ?? null
+        if (!current || !orderItemsMap.value.has(orderData.id)) {
+            await ordersStore.fetchById(orderData.id)
+            if (!ordersStore.current) return
+            orderItemsMap.value.set(orderData.id, [...(ordersStore.current.orderDetails || [])])
+            orderNotes = ordersStore.current.notes ?? null
+        }
         const title = KitchenService.buildOrderModifiedNotificationTitle(prev.id)
         const { body: bodyText } = KitchenService.buildOrderModifiedNotificationBody(
             prev.id,
@@ -571,10 +660,9 @@ const handleOrderModified = async (payload: any) => {
     const prev = data?.id ? allOrders.value.find((o) => o.id === data.id) : undefined
     const visible = prev ? KitchenService.isVisibleToActiveKitchenForAlerts(prev) : false
     if (!data?.id) return
-    if ((prev && visible) || kitchenChanges?.scheduleChanged) {
-        await notifyKitchenOrderModified(data, kind, kitchenChanges)
-    }
-    await loadOrders()
+    await refreshAfterKitchenEvent()
+    if ((prev && visible) || kitchenChanges?.scheduleChanged)
+        await notifyKitchenOrderModified(data, kind, kitchenChanges, prev)
 }
 
 const handleOrderCancelled = async (payload: any) => {
@@ -592,7 +680,7 @@ const handleOrderCancelled = async (payload: any) => {
     if (soundEnabled.value) {
         speak(`Pedido nÃºmero ${orderId} cancelado.`)
     }
-    await loadOrders()
+    await refreshAfterKitchenEvent()
 }
 
 const handleChangeStatus = (orderIds: number[], newStatus: OrderStatus) => {

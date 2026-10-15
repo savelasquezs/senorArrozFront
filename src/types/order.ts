@@ -302,6 +302,8 @@ export interface DeliverymanHistoryNeighborhood {
 }
 
 export interface OrderListItem {
+    /** Complete lines supplied only by kitchen list, legacy backend omits field. */
+    kitchenDetails?: OrderDetailItem[] | null
     originBranchId?: number | null
     managementVersion?: number
     id: number
@@ -398,6 +400,15 @@ export interface OrderDetailView extends OrderListItem {
     orderDetails: OrderDetailItem[]
     bankPayments: OrderBankPaymentDetail[]
     appPayments: OrderAppPaymentDetail[]
+}
+
+/** Lightweight kitchen summary; only fields needed by the hourly/category aggregators. */
+export interface KitchenSummaryOrder {
+    id: number
+    status: OrderStatus
+    prepareAt: string | null
+    createdAt: string
+    kitchenDetails: OrderDetailItem[]
 }
 
 export interface OrderDetailItem {
