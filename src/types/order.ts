@@ -402,6 +402,15 @@ export interface OrderDetailView extends OrderListItem {
     appPayments: OrderAppPaymentDetail[]
 }
 
+/** Lightweight kitchen summary; only fields needed by the hourly/category aggregators. */
+export interface KitchenSummaryOrder {
+    id: number
+    status: OrderStatus
+    prepareAt: string | null
+    createdAt: string
+    kitchenDetails: OrderDetailItem[]
+}
+
 export interface OrderDetailItem {
     id: number
     orderId: number
