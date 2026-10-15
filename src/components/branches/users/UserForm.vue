@@ -36,6 +36,18 @@
             </BaseSelect>
         </div>
 
+        <label v-if="canUseDeliveryApp" class="flex items-start gap-3 rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 cursor-pointer">
+            <input v-model="form.deliveryAppEnabled" type="checkbox"
+                class="mt-1 h-4 w-4 accent-emerald-600" />
+            <span class="text-sm text-gray-800">
+                <span class="font-medium">Habilitar app de domicilios</span>
+                <span class="block text-xs text-gray-500 mt-1">
+                    Puede usar Flutter como domiciliario con su misma cuenta. Conserva su rol en caja/administración.
+                    Al iniciar sesión en una aplicación se cierra la anterior.
+                </span>
+            </span>
+        </label>
+
         <!-- Sucursal (solo superadmin al editar; mueve al usuario entre sedes) -->
         <div v-if="showBranchSelector" class="grid grid-cols-1 md:grid-cols-2 gap-4">
             <BaseSelect v-model="form.branchId" :options="branchOptionsNormalized" label="Sucursal"
@@ -181,6 +193,7 @@ const form = reactive({
     email: '',
     phone: '',
     role: '' as UserRole | '',
+    deliveryAppEnabled: false,
     branchId: 0,
     password: '',
     confirmPassword: '',
@@ -207,6 +220,7 @@ const passwordChecks = reactive({
 })
 
 const roleOptions = computed(() => usersStore.availableRoles)
+const canUseDeliveryApp = computed(() => form.role === 'Admin' || form.role === 'Cashier')
 
 const selectedRoleLabel = computed(() => {
     if (!form.role) return ''
@@ -397,7 +411,8 @@ const handleSubmit = () => {
         name: form.name.trim(),
         email: form.email.trim(),
         phone: form.phone.trim(),
-        role: form.role
+        role: form.role,
+        deliveryAppEnabled: canUseDeliveryApp.value && form.deliveryAppEnabled
     }
 
     if (!props.user) {
@@ -421,6 +436,7 @@ watch(() => props.user, (newUser) => {
         form.email = newUser.email
         form.phone = newUser.phone || ''
         form.role = newUser.role
+        form.deliveryAppEnabled = !!newUser.deliveryAppEnabled
         form.branchId = newUser.branchId
         form.password = ''
         form.confirmPassword = ''
@@ -431,6 +447,7 @@ watch(() => props.user, (newUser) => {
         form.email = ''
         form.phone = ''
         form.role = '' as UserRole | ''
+        form.deliveryAppEnabled = false
         form.branchId = props.branchId
         form.password = ''
         form.confirmPassword = ''

@@ -11,6 +11,7 @@ export interface User {
     phone: string
     active: boolean
     webAccessEnabled: boolean
+    deliveryAppEnabled?: boolean
     lastLogin?: string
     createdAt: string
     updatedAt: string
@@ -26,6 +27,7 @@ export interface CreateUserRequest {
     email: string
     phone: string
     password: string
+    deliveryAppEnabled?: boolean
     payrollExpenseId?: number | null
 }
 
@@ -35,6 +37,7 @@ export interface UpdateUserRequest {
     phone?: string
     role?: UserRole
     active?: boolean
+    deliveryAppEnabled?: boolean
     /** Solo superadmin; cambia la sucursal del usuario */
     branchId?: number
     payrollExpenseId?: number | null
