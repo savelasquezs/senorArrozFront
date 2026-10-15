@@ -54,6 +54,7 @@ export function useOrderSubmission() {
         // Build the DTO
         const dto: CreateOrderDto = {
             branchId,
+            posCreationKey: draft.posCreationKey ?? undefined,
             whatsappConversationId: draft.whatsappConversationId ?? undefined,
             takenById,
             type: draft.type,
@@ -136,7 +137,9 @@ export function useOrderSubmission() {
      * Submit the current draft order
      */
     const submitOrder = async (draft: DraftOrder) => {
-        const dto = transformDraftToCreateDto(draft)
+        // Persist before network I/O so timeouts/reloads reuse the SAME UUID.
+        const key = ordersStore.ensurePosCreationKey(draft.tabId)
+        const dto = { ...transformDraftToCreateDto(draft), posCreationKey: key }
         const createdOrder = await ordersStore.create(dto)
         return createdOrder
     }
