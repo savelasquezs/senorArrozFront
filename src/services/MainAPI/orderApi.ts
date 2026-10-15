@@ -12,12 +12,13 @@ import type {
     OrderListItem,
     OrderDetailView,
     OrderStatus,
+    KitchenSummaryOrder,
     DeliverymanHistoryBranchSummary,
     DeliverymanHistoryNeighborhood,
 } from '@/types/order';
 import { buildQueryParams, type QueryParamMapper } from './queryParams';
 
-/** Mapeo GET /orders (camelCase filtros → query PascalCase). No incluye sortBy/sortOrder: el endpoint no los usaba antes. */
+/** Mapeo GET /orders (camelCase filtros → query PascalCase). */
 export const orderGetOrdersQueryMapper: QueryParamMapper<OrderFilters> = {
     BranchId: 'branchId',
     CustomerId: 'customerId',
@@ -26,6 +27,8 @@ export const orderGetOrdersQueryMapper: QueryParamMapper<OrderFilters> = {
     FromDate: 'fromDate',
     ToDate: 'toDate',
     ForKitchen: 'forKitchen',
+    SortBy: 'sortBy',
+    SortOrder: 'sortOrder',
     Page: (f) => f.page ?? 1,
     PageSize: (f) => f.pageSize ?? 10,
 };
@@ -41,6 +44,13 @@ class OrderApi extends BaseApi {
 
         return this.get<PagedResult<Order>>('/orders', {
             params,
+        });
+    }
+
+    /** Query only the selected Colombia day and return full kitchen lines in one response. */
+    async getKitchenSummary(date: string, branchId?: number): Promise<KitchenSummaryOrder[]> {
+        return this.get<KitchenSummaryOrder[]>('/orders/kitchen-summary', {
+            params: { date, ...(branchId ? { branchId } : {}) },
         });
     }
 
