@@ -30,6 +30,7 @@ import {
 } from '@/config/orderPosCategories'
 import { useBranchPosSettingsStore } from '@/store/branchPosSettings'
 import { useAuthStore } from '@/store/auth'
+import { generatePosCreationKey } from '@/utils/posCreationKey'
 import { useBranchContextStore } from '@/store/branchContext'
 import type { WhatsAppOrderDraft } from '@/types/whatsapp'
 import { useDailyPromotionStore } from '@/store/dailyPromotion'
@@ -1738,6 +1739,17 @@ export const useOrdersDraftsStore = defineStore('ordersDrafts', () => {
         saveToLocalStorage()
     }
 
+    /** Stable key survives ambiguous HTTP errors, reloads and manual retries. */
+    const ensurePosCreationKey = (tabId: string): string => {
+        const draft = draftOrders.value.get(tabId)
+        if (!draft) throw new Error('El borrador del pedido ya no está disponible.')
+        if (!draft.posCreationKey) {
+            draft.posCreationKey = generatePosCreationKey()
+            saveToLocalStorage()
+        }
+        return draft.posCreationKey
+    }
+
     // Create order - MOVIDO desde ordersData
     const create = async (payload: CreateOrderDto) => {
         isLoading.value = true
@@ -1818,6 +1830,7 @@ export const useOrdersDraftsStore = defineStore('ordersDrafts', () => {
         setSelectedCategory,
         clear,
         activateBranch,
+        ensurePosCreationKey,
         create
     }
 })
