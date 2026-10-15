@@ -1,7 +1,8 @@
-import { describe, it, expect, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { setActivePinia, createPinia } from 'pinia'
 import { useOrderSubmission } from '@/composables/useOrderSubmission'
 import { useAuthStore } from '@/store/auth'
+import { useOrdersDraftsStore } from '@/store/ordersDrafts'
 import { UserRole } from '@/types/auth'
 import type { DraftOrder } from '@/types/order'
 
@@ -134,4 +135,38 @@ describe('useOrderSubmission', () => {
         )
         expect(dto.orderDetails[0]?.discount).toBe(2000)
     })
+
+    it('reuses the same persisted POS UUID after ambiguous failed HTTP response', async () => {
+        const store = useOrdersDraftsStore()
+        const draft = minimalDraft({ posCreationKey: undefined })
+        store.draftOrders.set(draft.tabId, draft)
+        const send = vi.spyOn(store, 'create')
+            .mockRejectedValueOnce(new Error('HTTP 409'))
+            .mockResolvedValueOnce({ id: 700 } as any)
+        const { submitOrder } = useOrderSubmission()
+
+        await expect(submitOrder(draft)).rejects.toThrow('HTTP 409')
+        const key = draft.posCreationKey
+        expect(key).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/)
+        expect(localStorage.getItem('senor-arroz-draft-orders')).toContain(key)
+
+        await submitOrder(draft)
+        expect(send).toHaveBeenCalledTimes(2)
+        expect(send.mock.calls[0]![0].posCreationKey).toBe(key)
+        expect(send.mock.calls[1]![0].posCreationKey).toBe(key)
+        expect(store.ensurePosCreationKey(draft.tabId)).toBe(key)
+    })
+
+    it('assigns independent UUIDs to separate drafts and preserves an existing UUID', () => {
+        const store = useOrdersDraftsStore()
+        store.draftOrders.set('t1', minimalDraft({ tabId: 't1' }))
+        store.draftOrders.set('t2', minimalDraft({ tabId: 't2' }))
+        const first = store.ensurePosCreationKey('t1')
+        const second = store.ensurePosCreationKey('t2')
+        expect(first).not.toBe(second)
+        expect(store.ensurePosCreationKey('t1')).toBe(first)
+        const { transformDraftToCreateDto } = useOrderSubmission()
+        expect(transformDraftToCreateDto(store.draftOrders.get('t1')!).posCreationKey).toBe(first)
+    })
+
 })
