@@ -167,7 +167,7 @@ describe('KitchenView batched requests and event refresh', () => {
         const enable = wrapper.findAll('button').find(b => b.text().includes('Activar voz'))
         await enable!.trigger('click')
         await flushPromises()
-        expect(localStorage.getItem(`senor-arroz:kitchen-voice:10:1:${defaultBusinessCalendar.todayYmd()}`)).toBeNull()
+        expect(localStorage.getItem(`senor-arroz:kitchen-voice:10:1:${defaultBusinessCalendar.todayYmd()}`)).toBe('21') // bootstrap cursor retained; failed utterance 22 remains pending
         expect(wrapper.text()).toContain('No se pudo reproducir el anuncio')
     })
 
