@@ -107,6 +107,7 @@ const mountForm = (branchId: number, extraProps: Record<string, unknown> = {}) =
         stubs: {
             GoogleMapsSelector: GoogleMapsSelectorStub,
             NeighborhoodSearch: {
+                name: 'NeighborhoodSearch',
                 props: ['modelValue', 'branchId', 'forOrderAddress'],
                 template: '<div></div>',
             },
