@@ -30,6 +30,20 @@ describe('CustomerSection cross-branch customer creation', () => {
     dependencies.drafts.changeOperationalBranch.mockResolvedValue(true)
   })
 
+  it('keeps the customer in the session branch while setting the address branch for any destination', () => {
+    const wrapper = shallowMount(CustomerSection, {
+      props: {
+        orderType: 'delivery', mode: 'draft', selectedCustomer: null,
+        operationBranchId: 17, // Works for newly added branches, not only branch 2
+      },
+    })
+    const selector = wrapper.getComponent(CustomerSelector)
+    expect(selector.props('initialBranchId')).toBeUndefined()
+    expect(selector.props('initialAddressBranchId')).toBe(17)
+    expect(selector.props('forOrderAddress')).toBe(true)
+    expect(selector.props('allowAddressBranchSelection')).toBe(false)
+  })
+
   it('moves a new-customer draft to the service branch using the exact created address', async () => {
     const createdAddress = {
       id: 99,
