@@ -60,7 +60,11 @@ class OrderApi extends BaseApi {
         hasMore: boolean
         events: Array<{ id: number; orderId: number; branchId: number; kind: 'new' | 'reservation' }>
     }> {
-        return this.get('/orders/kitchen/voice-events', {
+        return this.get<{
+            cursor: number
+            hasMore: boolean
+            events: Array<{ id: number; orderId: number; branchId: number; kind: 'new' | 'reservation' }>
+        }>('/orders/kitchen/voice-events', {
             params: { ...(after !== undefined ? { after } : {}), ...(branchId ? { branchId } : {}) },
         });
     }
