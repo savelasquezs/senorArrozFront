@@ -569,24 +569,47 @@ const readCursor = (key: string): number | undefined => {
     return Number.isSafeInteger(value) && value >= 0 ? value : undefined
 }
 
+// Seed the first visit immediately, even while the browser awaits a user gesture.
+// Otherwise a user who enables sound minutes later loses earlier orders.
+const bootstrapVoiceCursor = async () => {
+    const key = cursorKey()
+    if (readCursor(key) !== undefined || !kitchenBranchId.value || !navigator.onLine) return
+    try {
+        const feed = await orderApi.getKitchenVoiceEvents(undefined, kitchenBranchId.value)
+        const from = feed.events.length ? feed.events[0]!.id - 1 : feed.cursor
+        if (key === cursorKey() && readCursor(key) === undefined)
+            localStorage.setItem(key, String(Math.max(0, from)))
+    } catch (cause) {
+        console.warn('No se pudo inicializar la bandeja de voz de cocina:', cause)
+    }
+}
+
 const announceVoiceEvent = async (event: VoiceEvent): Promise<boolean> => {
     // Reuse kitchen's batched details; only ask for one order when absent.
     const order = allOrders.value.find(o => o.id === event.orderId)
     let details = orderItemsMap.value.get(event.orderId)
     let notes = order?.notes ?? null
     if (!details) {
-        const full = await orderApi.fetchDetail(event.orderId)
-        details = full.orderDetails ?? []
-        notes = full.notes ?? null
-        orderItemsMap.value.set(event.orderId, details)
+        try {
+            const full = await orderApi.fetchDetail(event.orderId)
+            details = full.orderDetails ?? []
+            notes = full.notes ?? null
+            orderItemsMap.value.set(event.orderId, details)
+        } catch (cause) {
+            // Still announce the order number if its details can no longer be fetched.
+            console.warn('No se pudieron recuperar las líneas del pedido para voz:', event.orderId, cause)
+            details = []
+        }
     }
     const products = details.map(item => ({ name: item.productName, quantity: item.quantity }))
     const baseText = KitchenService.generateOrderSpeechText(
         (order ?? { id: event.orderId }) as OrderListItem, products, notes,
     )
-    const text = event.kind === 'reservation'
-        ? baseText.replace(/^Nuevo pedido/, 'Reserva lista para cocina')
-        : baseText
+    const text = products.length
+        ? event.kind === 'reservation'
+            ? baseText.replace(/^Nuevo pedido/, 'Reserva lista para cocina')
+            : baseText
+        : `${event.kind === 'reservation' ? 'Reserva' : 'Nuevo pedido'} número ${event.orderId} en cocina`
     const played = await speak(text)
     if (played && permission.value === 'granted') {
         notify(event.kind === 'reservation' ? `Reserva #${event.orderId}` : `Nuevo pedido #${event.orderId}`, {
@@ -869,9 +892,13 @@ onMounted(async () => {
     on('ReservationReady', handleReservationReady)
     on('OrderModified', handleOrderModified)
     on('OrderCancelled', handleOrderCancelled)
-    voiceCheckTimer = window.setInterval(() => { void syncVoiceEvents() }, 60_000)
+    voiceCheckTimer = window.setInterval(() => {
+        if (soundReady.value) void syncVoiceEvents()
+        else void bootstrapVoiceCursor()
+    }, 60_000)
     window.addEventListener('online', resumeKitchenAlerts)
     document.addEventListener('visibilitychange', resumeKitchenAlerts)
+    void bootstrapVoiceCursor()
     await loadOrders()
     initialKitchenLoadDone = true
 })
@@ -896,6 +923,7 @@ watch(() => branchStore.revision, async () => {
     soundEnabled.value = false
     await disconnect()
     await connect()
+    void bootstrapVoiceCursor()
     await loadOrders()
 })
 
