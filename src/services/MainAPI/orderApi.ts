@@ -54,6 +54,17 @@ class OrderApi extends BaseApi {
         });
     }
 
+    /** Durable, branch-scoped kitchen voice inbox. */
+    async getKitchenVoiceEvents(after?: number, branchId?: number): Promise<{
+        cursor: number
+        hasMore: boolean
+        events: Array<{ id: number; orderId: number; branchId: number; kind: 'new' | 'reservation' }>
+    }> {
+        return this.get('/orders/kitchen/voice-events', {
+            params: { ...(after !== undefined ? { after } : {}), ...(branchId ? { branchId } : {}) },
+        });
+    }
+
     // 2. Obtener pedido por ID
     async getOrderById(id: number): Promise<Order> {
         return this.get<Order>(`/orders/${id}`);
