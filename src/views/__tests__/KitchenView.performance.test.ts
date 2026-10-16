@@ -3,9 +3,10 @@ import { shallowMount, flushPromises, type VueWrapper } from '@vue/test-utils'
 import { reactive, ref } from 'vue'
 import KitchenView from '@/views/KitchenView.vue'
 import OrderCardGrid from '@/components/kitchen/OrderCardGrid.vue'
+import { defaultBusinessCalendar } from '@/utils/datetime'
 
 const mocks = vi.hoisted(() => ({
-    getOrders: vi.fn(), fetchDetail: vi.fn(), searchOrders: vi.fn(), summary: vi.fn(),
+    getOrders: vi.fn(), fetchDetail: vi.fn(), searchOrders: vi.fn(), summary: vi.fn(), voiceEvents: vi.fn(),
     speak: vi.fn(), notify: vi.fn(), error: vi.fn(), push: vi.fn(),
     callbacks: {} as Record<string, (...args: any[]) => Promise<void>>,
 }))
@@ -18,13 +19,15 @@ const store = reactive({
 
 vi.mock('vue-router', () => ({ useRouter: () => ({ push: mocks.push }) }))
 vi.mock('@/store/auth', () => ({ useAuthStore: () => ({
-    user: { branchId: 1 }, userRole: 'Kitchen', isKitchen: true,
+    user: { id: 10, branchId: 1 }, userRole: 'Kitchen', isKitchen: true,
     isAdmin: false, isSuperadmin: false,
 }) }))
+vi.mock('@/store/branchContext', () => ({ useBranchContextStore: () => ({ selectedBranchId: 1, revision: 0 }) }))
 vi.mock('@/store/ordersData', () => ({ useOrdersDataStore: () => store }))
 vi.mock('@/services/MainAPI/orderApi', () => ({ orderApi: {
     getOrders: mocks.getOrders, fetchDetail: mocks.fetchDetail,
     searchOrders: mocks.searchOrders, getKitchenSummary: mocks.summary,
+    getKitchenVoiceEvents: mocks.voiceEvents,
 } }))
 vi.mock('@/composables/useSignalR', () => ({ useSignalR: () => ({
     isConnected: ref(true),
@@ -32,7 +35,7 @@ vi.mock('@/composables/useSignalR', () => ({ useSignalR: () => ({
     off: vi.fn(),
 }) }))
 vi.mock('@/composables/useTextToSpeech', () => ({ useTextToSpeech: () => ({
-    speak: mocks.speak, cancel: vi.fn(),
+    speak: mocks.speak, cancel: vi.fn(), lastError: ref(null),
 }) }))
 vi.mock('@/composables/useNotifications', () => ({ useNotifications: () => ({
     permission: ref('granted'), requestPermission: vi.fn(),
@@ -75,6 +78,9 @@ beforeEach(() => {
     store.list = null
     store.current = null
     mocks.summary.mockResolvedValue([])
+    mocks.speak.mockResolvedValue(true)
+    mocks.voiceEvents.mockResolvedValue({ cursor: 0, hasMore: false, events: [] })
+    localStorage.clear()
     mocks.getOrders.mockImplementation(async () => paged([order(1)], 1))
 })
 afterEach(() => { wrapper?.unmount() })
@@ -130,4 +136,55 @@ describe('KitchenView batched requests and event refresh', () => {
         expect(mocks.searchOrders).not.toHaveBeenCalled()
         expect(mocks.fetchDetail).not.toHaveBeenCalled()
     })
+    it('recovers a missed order from the cursor and only announces it once', async () => {
+        mocks.voiceEvents.mockResolvedValue({
+            cursor: 19, hasMore: false,
+            events: [{ id: 19, orderId: 1, branchId: 1, kind: 'new' }],
+        })
+        mount()
+        await flushPromises()
+        const enable = wrapper.findAll('button').find(b => b.text().includes('Activar voz'))
+        expect(enable).toBeTruthy()
+        await enable!.trigger('click')
+        await flushPromises()
+        expect(mocks.voiceEvents).toHaveBeenCalled()
+        expect(mocks.speak).toHaveBeenCalledWith('Listo')
+        expect(mocks.speak).toHaveBeenCalledWith(expect.stringContaining('Nuevo pedido'))
+        expect(localStorage.getItem(`senor-arroz:kitchen-voice:10:1:${defaultBusinessCalendar.todayYmd()}`)).toBe('19')
+        await mocks.callbacks.NewOrder!({ id: 1 })
+        await flushPromises()
+        expect(mocks.speak).toHaveBeenCalledTimes(2)
+    })
+
+    it('does not acknowledge a browser-rejected voice alert', async () => {
+        mocks.speak.mockResolvedValueOnce(true).mockResolvedValueOnce(false)
+        mocks.voiceEvents.mockResolvedValue({
+            cursor: 22, hasMore: false,
+            events: [{ id: 22, orderId: 1, branchId: 1, kind: 'new' }],
+        })
+        mount()
+        await flushPromises()
+        const enable = wrapper.findAll('button').find(b => b.text().includes('Activar voz'))
+        await enable!.trigger('click')
+        await flushPromises()
+        expect(localStorage.getItem(`senor-arroz:kitchen-voice:10:1:${defaultBusinessCalendar.todayYmd()}`)).toBe('21') // bootstrap cursor retained; failed utterance 22 remains pending
+        expect(wrapper.text()).toContain('No se pudo reproducir el anuncio')
+    })
+
+    it('retains arrivals while the operator has not enabled browser audio', async () => {
+        mocks.voiceEvents.mockResolvedValue({
+            cursor: 41, hasMore: false,
+            events: [{ id: 41, orderId: 1, branchId: 1, kind: 'new' }],
+        })
+        mount()
+        await flushPromises()
+        expect(mocks.speak).not.toHaveBeenCalled()
+        expect(localStorage.getItem(`senor-arroz:kitchen-voice:10:1:${defaultBusinessCalendar.todayYmd()}`)).toBe('40')
+        const enable = wrapper.findAll('button').find(b => b.text().includes('Activar voz'))
+        await enable!.trigger('click')
+        await flushPromises()
+        expect(mocks.speak).toHaveBeenCalledWith(expect.stringContaining('Nuevo pedido'))
+        expect(localStorage.getItem(`senor-arroz:kitchen-voice:10:1:${defaultBusinessCalendar.todayYmd()}`)).toBe('41')
+    })
+
 })

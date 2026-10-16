@@ -1,6 +1,11 @@
 ﻿<template>
     <MainLayout>
         <div class="p-3 sm:p-4 md:p-5 space-y-3 sm:space-y-4">
+            <div v-if="(authStore.isKitchen || authStore.isAdmin || authStore.isSuperadmin) && !soundReady"
+                class="flex items-center justify-between gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+                <span>{{ voiceError || 'La voz no está activa. Chrome requiere un clic para anunciar los pedidos.' }}</span>
+                <button type="button" class="font-semibold underline whitespace-nowrap" :disabled="soundActivating" @click="toggleSound">Activar voz</button>
+            </div>
             <!-- PestaÃ±as + barra de cocina (solo rol Kitchen) en la misma franja -->
             <div
                 class="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between sm:gap-3 border-b border-gray-200 -mx-3 px-3 sm:mx-0 sm:px-0"
@@ -74,7 +79,7 @@
                     </div>
                 </div>
 
-                <div v-if="authStore.isKitchen"
+                <div v-if="authStore.isKitchen || authStore.isAdmin || authStore.isSuperadmin"
                     class="flex flex-wrap items-center justify-end gap-1.5 sm:gap-2 sm:pb-0.5 sm:flex-shrink-0">
                     <div :class="[
                         'flex items-center gap-1 px-1.5 sm:px-2 py-0.5 rounded-md text-[11px] sm:text-xs',
@@ -97,11 +102,12 @@
                         <BellIcon class="w-3.5 h-3.5 flex-shrink-0" />
                         <span class="hidden sm:inline">{{ permission === 'granted' ? 'Notif. OK' : 'No' }}</span>
                     </div>
-                    <button type="button" @click="toggleSound" :class="[
-                        'p-1 rounded-md transition-colors',
-                        soundEnabled ? 'bg-emerald-100 text-emerald-600' : 'bg-gray-100 text-gray-400'
-                    ]" :title="soundEnabled ? 'Desactivar sonido' : 'Activar sonido'">
-                        <component :is="soundEnabled ? SpeakerWaveIcon : SpeakerXMarkIcon" class="w-4 h-4 sm:w-5 sm:h-5" />
+                    <button type="button" @click="toggleSound" :disabled="soundActivating" :class="[
+                        'flex items-center gap-1 p-1 rounded-md transition-colors',
+                        soundReady ? 'bg-emerald-100 text-emerald-600' : 'bg-amber-100 text-amber-700'
+                    ]" :title="soundReady ? 'Desactivar sonido' : 'Activar sonido y probar voz'">
+                        <component :is="soundReady ? SpeakerWaveIcon : SpeakerXMarkIcon" class="w-4 h-4 sm:w-5 sm:h-5" />
+                        <span class="text-[11px]">{{ soundReady ? 'Voz lista' : 'Activar voz' }}</span>
                     </button>
 
                     <BaseButton @click="refreshOrders" variant="outline" size="sm" :loading="isLoading">
@@ -283,10 +289,11 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/store/auth'
 import { useOrdersDataStore } from '@/store/ordersData'
+import { useBranchContextStore } from '@/store/branchContext'
 import { syncKitchenPageDetails } from '@/helpers/kitchenPageDetails'
 import { useSignalR } from '@/composables/useSignalR'
 import { ORDERS_SIGNALR_HUB_URL } from '@/config/signalr'
@@ -311,11 +318,13 @@ import { ArrowPathIcon, SpeakerWaveIcon, SpeakerXMarkIcon, BellIcon } from '@her
 const router = useRouter()
 const authStore = useAuthStore()
 const ordersStore = useOrdersDataStore()
+const branchStore = useBranchContextStore()
 const { success, error } = useToast()
-const { speak, cancel } = useTextToSpeech()
+const { speak, cancel, lastError: ttsError } = useTextToSpeech()
 const { permission, requestPermission, notify } = useNotifications()
 
-const { isConnected, on, off } = useSignalR(ORDERS_SIGNALR_HUB_URL)
+const { isConnected, on, off, connect, disconnect } = useSignalR(ORDERS_SIGNALR_HUB_URL)
+const kitchenBranchId = computed(() => branchStore.selectedBranchId || authStore.user?.branchId || 0)
 
 const KITCHEN_COMBINED_MODE_KEY = 'senorarroz.kitchen.combinedMode'
 const combinedKitchenMode = ref(
@@ -326,7 +335,10 @@ watch(combinedKitchenMode, (v) => {
 })
 
 const activeTab = ref<'scheduled' | 'active' | 'ready' | 'hourly_summary'>('active')
-const soundEnabled = ref(true)
+const soundEnabled = ref(false)
+const soundReady = ref(false)
+const soundActivating = ref(false)
+const voiceError = ref<string | null>(null)
 const isLoading = ref(false)
 const summaryLoading = ref(false)
 const showConfirmModal = ref(false)
@@ -388,7 +400,7 @@ const loadKitchenPage = async () => {
     try {
         isLoading.value = true
         const filters = {
-            branchId: authStore.user?.branchId,
+            branchId: kitchenBranchId.value,
             page: 1,
             pageSize: KITCHEN_PAGE_SIZE,
             sortBy: 'id',
@@ -485,7 +497,7 @@ function kitchenSummaryOnce(date: string, branchId: number) {
 }
 
 const loadSummaryOrders = async () => {
-    const branchId = authStore.user?.branchId
+    const branchId = kitchenBranchId.value
     const request = ++latestSummaryRequest
     if (!branchId) {
         summaryOrders.value = []
@@ -542,35 +554,120 @@ const loadSummaryOrders = async () => {
     }
 }
 
-const notifyOrderShownInKitchen = async (orderData: any, isReservation: boolean) => {
-    const order = allOrders.value.find(o => o.id === orderData.id)
-    if (!order || order.status !== 'taken') return
+type VoiceEvent = { id: number; orderId: number; branchId: number; kind: 'new' | 'reservation' }
+let voiceSyncInFlight: Promise<void> | null = null
+let voiceSyncRequested = false
+let kitchenMounted = false
+let voiceCheckTimer: number | undefined
+let initialKitchenLoadDone = false
 
+const cursorKey = () => `senor-arroz:kitchen-voice:${authStore.user?.id ?? 0}:${kitchenBranchId.value}:${defaultBusinessCalendar.todayYmd()}`
+const readCursor = (key: string): number | undefined => {
+    const stored = localStorage.getItem(key)
+    if (stored === null) return undefined
+    const value = Number(stored)
+    return Number.isSafeInteger(value) && value >= 0 ? value : undefined
+}
+
+// Seed the first visit immediately, even while the browser awaits a user gesture.
+// Otherwise a user who enables sound minutes later loses earlier orders.
+const bootstrapVoiceCursor = async () => {
+    const key = cursorKey()
+    if (readCursor(key) !== undefined || !kitchenBranchId.value || !navigator.onLine) return
     try {
-        let details = orderItemsMap.value.get(order.id)
-        let notes = order.notes
-        if (!details) {
-            // Legacy response or an exceptional incomplete page.
-            await ordersStore.fetchById(order.id)
-            if (!ordersStore.current) return
-            details = [...ordersStore.current.orderDetails]
-            notes = ordersStore.current.notes ?? null
-            orderItemsMap.value.set(order.id, details)
-        }
-        const products = details.map(item => ({
-            name: item.productName, quantity: item.quantity,
-        }))
-        const title = isReservation ? `Reserva #${order.id} en cocina` : `Nuevo pedido #${order.id}`
-        const bodyText = KitchenService.generateOrderNotificationText(order, products)
-        const speechText = KitchenService.generateOrderSpeechText(order, products, notes)
-
-        if (soundEnabled.value) {
-            if (permission.value === 'granted') notify(title, { body: bodyText, tag: `order-${order.id}` })
-            speak(speechText)
-        }
-    } catch (err) {
-        console.error('Error loading kitchen notification details:', err)
+        const feed = await orderApi.getKitchenVoiceEvents(undefined, kitchenBranchId.value)
+        const from = feed.events.length ? feed.events[0]!.id - 1 : feed.cursor
+        if (key === cursorKey() && readCursor(key) === undefined)
+            localStorage.setItem(key, String(Math.max(0, from)))
+    } catch (cause) {
+        console.warn('No se pudo inicializar la bandeja de voz de cocina:', cause)
     }
+}
+
+const announceVoiceEvent = async (event: VoiceEvent): Promise<boolean> => {
+    // Reuse kitchen's batched details; only ask for one order when absent.
+    const order = allOrders.value.find(o => o.id === event.orderId)
+    let details = orderItemsMap.value.get(event.orderId)
+    let notes = order?.notes ?? null
+    if (!details) {
+        try {
+            const full = await orderApi.fetchDetail(event.orderId)
+            details = full.orderDetails ?? []
+            notes = full.notes ?? null
+            orderItemsMap.value.set(event.orderId, details)
+        } catch (cause) {
+            // Still announce the order number if its details can no longer be fetched.
+            console.warn('No se pudieron recuperar las líneas del pedido para voz:', event.orderId, cause)
+            details = []
+        }
+    }
+    const products = details.map(item => ({ name: item.productName, quantity: item.quantity }))
+    const baseText = KitchenService.generateOrderSpeechText(
+        (order ?? { id: event.orderId }) as OrderListItem, products, notes,
+    )
+    const text = products.length
+        ? event.kind === 'reservation'
+            ? baseText.replace(/^Nuevo pedido/, 'Reserva lista para cocina')
+            : baseText
+        : `${event.kind === 'reservation' ? 'Reserva' : 'Nuevo pedido'} número ${event.orderId} en cocina`
+    const played = await speak(text)
+    if (played && permission.value === 'granted') {
+        notify(event.kind === 'reservation' ? `Reserva #${event.orderId}` : `Nuevo pedido #${event.orderId}`, {
+            body: products.map(p => `${p.quantity}x ${p.name}`).join(', '),
+            tag: `kitchen-voice-${event.id}`,
+        })
+    }
+    return played
+}
+
+// WebSocket events are hints. Durable event IDs and local cursor prevent loss and duplication.
+const syncVoiceEvents = (): Promise<void> => {
+    voiceSyncRequested = true
+    if (voiceSyncInFlight) return voiceSyncInFlight
+    const run = (async () => {
+        while (voiceSyncRequested && kitchenMounted && soundEnabled.value && soundReady.value) {
+            voiceSyncRequested = false
+            const key = cursorKey()
+            const branchId = kitchenBranchId.value
+            if (!branchId || !navigator.onLine) return
+            try {
+                let after = readCursor(key)
+                let more: boolean
+                do {
+                    const feed = await orderApi.getKitchenVoiceEvents(after, branchId)
+                    for (const event of feed.events) {
+                        if (!kitchenMounted || !soundEnabled.value || !soundReady.value) return
+                        if (event.branchId !== branchId || cursorKey() !== key) return
+                        if (event.id <= (readCursor(key) ?? 0)) continue
+                        const played = await announceVoiceEvent(event)
+                        if (!played) {
+                            if (soundEnabled.value) {
+                                soundReady.value = false
+                                voiceError.value = `No se pudo reproducir el anuncio. ${ttsError.value ?? 'Activa la voz de nuevo.'}`
+                            }
+                            return
+                        }
+                        localStorage.setItem(key, String(event.id))
+                    }
+                    if (feed.cursor > (readCursor(key) ?? 0))
+                        localStorage.setItem(key, String(feed.cursor))
+                    after = readCursor(key)
+                    more = feed.hasMore
+                } while (more && kitchenMounted && soundReady.value)
+                voiceError.value = null
+            } catch (cause) {
+                console.error('Error recuperando avisos de cocina:', cause)
+                voiceError.value = 'No se pudieron sincronizar los avisos; se reintentará automáticamente.'
+            }
+        }
+    })()
+    voiceSyncInFlight = run
+    void run.finally(() => {
+        if (voiceSyncInFlight === run) voiceSyncInFlight = null
+        if (voiceSyncRequested && kitchenMounted && soundEnabled.value && soundReady.value)
+            void syncVoiceEvents()
+    })
+    return run
 }
 
 // Combine events received in the same JavaScript turn before beginning an HTTP refresh.
@@ -586,18 +683,17 @@ const refreshAfterKitchenEvent = (): Promise<void> => {
     return pending
 }
 
-const handleNewOrder = async (orderData: any) => {
+const handleNewOrder = async (_orderData: any) => {
+    void syncVoiceEvents()
     await refreshAfterKitchenEvent()
-    await notifyOrderShownInKitchen(orderData, false)
 }
 
 const handleReservationReady = async (orderData: any) => {
+    const oid = Number(orderData?.id)
+    if (Number.isSafeInteger(oid))
+        reservationServerDue.value = new Set([...reservationServerDue.value, oid])
+    void syncVoiceEvents()
     await refreshAfterKitchenEvent()
-    const oid = typeof orderData?.id === 'number' ? orderData.id : Number(orderData?.id)
-    if (Number.isFinite(oid)) {
-        reservationServerDue.value = new Set([...reservationServerDue.value, oid as number])
-    }
-    await notifyOrderShownInKitchen(orderData, true)
 }
 
 /** NotificaciÃ³n TTS + navegador; actualiza Ã­tems en mapa desde API. */
@@ -642,7 +738,7 @@ const notifyKitchenOrderModified = async (
             orderNotes
         )
 
-        if (soundEnabled.value) {
+        if (soundEnabled.value && soundReady.value) {
             if (permission.value === 'granted') {
                 notify(title, { body: bodyText, tag: `order-mod-${prev.id}-${Date.now()}` })
             }
@@ -677,8 +773,8 @@ const handleOrderCancelled = async (payload: any) => {
             : 'El pedido fue cancelado.',
         8000
     )
-    if (soundEnabled.value) {
-        speak(`Pedido nÃºmero ${orderId} cancelado.`)
+    if (soundEnabled.value && soundReady.value) {
+        void speak(`Pedido nÃºmero ${orderId} cancelado.`)
     }
     await refreshAfterKitchenEvent()
 }
@@ -733,17 +829,29 @@ const refreshOrders = async () => {
     await loadOrders()
 }
 
-const toggleSound = () => {
-    soundEnabled.value = !soundEnabled.value
-    if (soundEnabled.value) {
-        speak('Listo')
-    } else {
+const toggleSound = async () => {
+    if (soundReady.value) {
+        soundEnabled.value = false
+        soundReady.value = false
         cancel()
+        return
+    }
+    soundActivating.value = true
+    voiceError.value = null
+    try {
+        // Only a real click can unlock browser speech autoplay.
+        const audible = await speak('Listo')
+        soundEnabled.value = audible
+        soundReady.value = audible
+        if (!audible) voiceError.value = `Chrome no permitió la voz: ${ttsError.value ?? 'revisa el volumen.'}`
+        else void syncVoiceEvents()
+    } finally {
+        soundActivating.value = false
     }
 }
 
 const handleReprint = async (orderId: number) => {
-    const branchId = authStore.user?.branchId
+    const branchId = kitchenBranchId.value
     if (!branchId) {
         error('Sin sucursal', 'Tu usuario no tiene sucursal asignada.')
         return
@@ -774,14 +882,8 @@ onMounted(async () => {
         router.push('/')
         return
     }
-
-    if (permission.value === 'default') {
-        await requestPermission()
-    }
-
-    await loadOrders()
-
-    // Evita handlers duplicados (p. ej. HMR o remount) que disparen TTS varias veces por el mismo evento.
+    kitchenMounted = true
+    // Attach events before permission prompts or slow HTTP loads.
     off('NewOrder')
     off('ReservationReady')
     off('OrderModified')
@@ -790,7 +892,53 @@ onMounted(async () => {
     on('ReservationReady', handleReservationReady)
     on('OrderModified', handleOrderModified)
     on('OrderCancelled', handleOrderCancelled)
+    voiceCheckTimer = window.setInterval(() => {
+        if (soundReady.value) void syncVoiceEvents()
+        else void bootstrapVoiceCursor()
+    }, 60_000)
+    window.addEventListener('online', resumeKitchenAlerts)
+    document.addEventListener('visibilitychange', resumeKitchenAlerts)
+    void bootstrapVoiceCursor()
+    await loadOrders()
+    initialKitchenLoadDone = true
 })
+
+const resumeKitchenAlerts = () => {
+    if (!kitchenMounted || !navigator.onLine || document.visibilityState === 'hidden') return
+    void syncVoiceEvents()
+    void refreshAfterKitchenEvent()
+}
+
+watch(isConnected, connected => {
+    if (!connected || !kitchenMounted) return
+    void syncVoiceEvents()
+    if (initialKitchenLoadDone) void refreshAfterKitchenEvent()
+})
+
+// The shared websocket must join the new branch group after Superadmin switches.
+watch(() => branchStore.revision, async () => {
+    if (!kitchenMounted || !authStore.isSuperadmin) return
+    cancel()
+    soundReady.value = false
+    soundEnabled.value = false
+    await disconnect()
+    await connect()
+    void bootstrapVoiceCursor()
+    await loadOrders()
+})
+
+onUnmounted(() => {
+    kitchenMounted = false
+    if (voiceCheckTimer !== undefined) window.clearInterval(voiceCheckTimer)
+    window.removeEventListener('online', resumeKitchenAlerts)
+    document.removeEventListener('visibilitychange', resumeKitchenAlerts)
+    off('NewOrder', handleNewOrder)
+    off('ReservationReady', handleReservationReady)
+    off('OrderModified', handleOrderModified)
+    off('OrderCancelled', handleOrderCancelled)
+    cancel()
+})
+
 watch(
     () => hourlySummary.value.defaultHourKey,
     (defaultHourKey) => {
