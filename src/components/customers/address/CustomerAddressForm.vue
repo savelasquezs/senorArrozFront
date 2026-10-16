@@ -95,7 +95,7 @@
                 Cancelar
             </BaseButton>
 
-            <BaseButton type="submit" variant="primary" :disabled="!isFormValid">
+            <BaseButton type="submit" variant="primary" :loading="loading" :disabled="loading || !isFormValid">
                 {{ props.addressId ? 'Actualizar' : 'Crear' }} Dirección
             </BaseButton>
         </div>
