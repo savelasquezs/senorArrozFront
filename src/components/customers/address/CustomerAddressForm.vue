@@ -21,7 +21,7 @@
         <!-- Step 1: Neighborhood Selection -->
         <NeighborhoodSearch v-if="effectiveServiceBranchId" v-model="localForm.neighborhoodId"
             :required="true" :error="errors.neighborhoodId"
-            :branch-id="effectiveServiceBranchId" :for-order-address="canSelectServiceBranch"
+            :branch-id="effectiveServiceBranchId" :for-order-address="canUseCrossBranchNeighborhoods"
             :allow-create="effectiveServiceBranchId === sessionBranchId"
             @update:model-value="validateNeighborhood" />
         <p v-else-if="useAlternativeBranch" class="rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm text-blue-700">
@@ -95,7 +95,7 @@
                 Cancelar
             </BaseButton>
 
-            <BaseButton type="submit" variant="primary" :disabled="!isFormValid">
+            <BaseButton type="submit" variant="primary" :loading="loading" :disabled="loading || !isFormValid">
                 {{ props.addressId ? 'Actualizar' : 'Crear' }} Dirección
             </BaseButton>
         </div>
@@ -137,6 +137,7 @@ interface Props {
     branchId?: number
     defaultServiceBranchId?: number
     allowBranchSelection?: boolean
+    forOrderAddress?: boolean
 }
 
 const props = defineProps<Props>()
@@ -160,6 +161,7 @@ const defaultServiceBranchId = computed(() =>
     ?? null,
 )
 const canSelectServiceBranch = computed(() => props.allowBranchSelection === true && !props.addressId)
+const canUseCrossBranchNeighborhoods = computed(() => props.forOrderAddress === true || canSelectServiceBranch.value)
 const sessionBranchId = computed(() => branchContext.selectedBranchId ?? authStore.branchId ?? null)
 const branchOptions = ref<Array<{ id: number; name: string }>>([])
 const initialServiceBranchId = props.modelValue.serviceBranchId
@@ -303,7 +305,7 @@ const resolveRouteOrigin = async () => {
     }
 
     try {
-        const response = await branchApi.getBranchById(branchId, canSelectServiceBranch.value)
+        const response = await branchApi.getBranchById(branchId, canUseCrossBranchNeighborhoods.value)
         if (requestId !== routeOriginRequestId) return
         routeOrigin.value = buildRouteOrigin(
             response.data.name,
@@ -562,11 +564,7 @@ onMounted(async () => {
             }
         }
 
-        // Load neighborhoods
-        await customersStore.ensureNeighborhoodsLoaded(
-            effectiveServiceBranchId.value,
-            canSelectServiceBranch.value,
-        )
+        // NeighborhoodSearch loads the neighborhoods when the operational branch changes.
 
     } catch (error) {
         console.error("Error loading neighborhoods:", error)
@@ -574,7 +572,7 @@ onMounted(async () => {
     }
 })
 
-watch(effectiveServiceBranchId, async (branchId, previousBranchId) => {
+watch(effectiveServiceBranchId, (branchId, previousBranchId) => {
     if (branchId === previousBranchId) return
     localForm.neighborhoodId = 0
     localForm.deliveryFee = 0
@@ -585,7 +583,6 @@ watch(effectiveServiceBranchId, async (branchId, previousBranchId) => {
     // En el estado intermedio (varias alternativas, ninguna elegida) conservamos
     // el valor anterior para que el padre no desmonte el flujo remoto.
     localForm.serviceBranchId = branchId
-    await customersStore.ensureNeighborhoodsLoaded(branchId, canSelectServiceBranch.value)
 })
 
 watch(useAlternativeBranch, enabled => {

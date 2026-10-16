@@ -26,10 +26,18 @@ class AddressBranchApi extends BaseApi {
         customerId: number,
         addressId: number,
         payload: UpsertAddressBranchServicePayload,
+        branchId?: number,
+        forOrderCreation = false,
     ): Promise<ApiResponse<AddressBranchService>> {
         return this.put<ApiResponse<AddressBranchService>>(
             `/customers/${customerId}/addresses/${addressId}/branch-service`,
             payload,
+            {
+                params: {
+                    ...(branchId ? { branchId } : {}),
+                    ...(forOrderCreation ? { forOrderCreation: true } : {}),
+                },
+            },
         )
     }
 }

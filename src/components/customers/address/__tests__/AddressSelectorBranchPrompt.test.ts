@@ -46,8 +46,9 @@ vi.mock('@/composables/useToast', () => ({
 
 import AddressSelector from '@/components/customers/address/AddressSelector.vue'
 import CustomerAddressForm from '@/components/customers/address/CustomerAddressForm.vue'
+import AddressDeliveryFeeDialog from '@/components/customers/address/AddressDeliveryFeeDialog.vue'
 
-describe('AddressSelector branch prompt', () => {
+describe('AddressSelector branch coverage', () => {
     beforeEach(() => {
         dependencies.customersStore.addresses = [
             {
@@ -89,6 +90,7 @@ describe('AddressSelector branch prompt', () => {
                 }],
             },
         ]
+        dependencies.draftStore.currentOrder.branchId = 1
         dependencies.customersStore.fetchAddresses.mockClear()
         dependencies.draftStore.changeOperationalBranch.mockClear()
         dependencies.showError.mockClear()
@@ -102,34 +104,38 @@ describe('AddressSelector branch prompt', () => {
         })
         await flushPromises()
         expect(wrapper.getComponent(CustomerAddressForm).props('allowBranchSelection')).toBe(false)
+        expect(wrapper.getComponent(CustomerAddressForm).props('forOrderAddress')).toBe(true)
     })
 
-    it('asks for a single branch selection in the OrderSidebar', async () => {
+    it('calculates coverage for whichever operational branch is selected, without switching the order', async () => {
+        dependencies.draftStore.currentOrder.branchId = 3 // A future third branch
         const wrapper = shallowMount(AddressSelector, {
-            props: { customerId: 7, mode: 'draft' },
+            props: { customerId: 7, mode: 'draft', operationBranchId: 3 },
+            global: { stubs: { BaseDialog: { template: '<div><slot /></div>' } } },
         })
         await flushPromises()
-        expect(wrapper.emitted('addressSelected')).toBeUndefined()
         await wrapper.findAll('.cursor-pointer')[0].trigger('click')
         await flushPromises()
-        expect(dependencies.showError).toHaveBeenCalledWith(
-            'Sucursal que atiende', expect.stringContaining('panel del pedido'),
-        )
+
+        expect(dependencies.showError).not.toHaveBeenCalled()
         expect(dependencies.draftStore.changeOperationalBranch).not.toHaveBeenCalled()
+        expect(wrapper.getComponent(AddressDeliveryFeeDialog).props()).toMatchObject({
+            branchId: 3,
+            forOrderCreation: true,
+        })
     })
 
-    it('does not change branches just because a customer has one address', async () => {
+    it('does not auto-select an address only covered by another branch', async () => {
         dependencies.customersStore.addresses = [dependencies.customersStore.addresses[0]]
         const wrapper = shallowMount(AddressSelector, {
             props: { customerId: 7, mode: 'draft' },
         })
         await flushPromises()
-        expect(dependencies.showError).toHaveBeenCalledWith(
-            'Sucursal que atiende', expect.stringContaining('panel del pedido'),
-        )
+        expect(dependencies.showError).not.toHaveBeenCalled()
         expect(dependencies.draftStore.changeOperationalBranch).not.toHaveBeenCalled()
         expect(wrapper.emitted('addressSelected')).toBeUndefined()
     })
+
     it('keeps a shared covered address selectable without switching branches', async () => {
         const shared = dependencies.customersStore.addresses[1]
         shared.branchServices.push({

@@ -107,7 +107,8 @@ const mountForm = (branchId: number, extraProps: Record<string, unknown> = {}) =
         stubs: {
             GoogleMapsSelector: GoogleMapsSelectorStub,
             NeighborhoodSearch: {
-                props: ['modelValue'],
+                name: 'NeighborhoodSearch',
+                props: ['modelValue', 'branchId', 'forOrderAddress'],
                 template: '<div></div>',
             },
             BaseInput: BaseInputStub,
@@ -232,7 +233,8 @@ describe('CustomerAddressForm route origin', () => {
         await wrapper.get('[data-testid="branch-select"]').setValue('9')
         await flushPromises()
 
-        expect(dependencies.customersStore.ensureNeighborhoodsLoaded).toHaveBeenCalledWith(9, true)
+        expect(wrapper.getComponent({ name: 'NeighborhoodSearch' }).props('branchId')).toBe(9)
+        expect(wrapper.getComponent({ name: 'NeighborhoodSearch' }).props('forOrderAddress')).toBe(true)
         expect(dependencies.getBranchById).toHaveBeenCalledWith(9, true)
         expect((wrapper.vm as any).routeOrigin).toEqual({
             label: 'Manrique',
@@ -270,15 +272,35 @@ describe('CustomerAddressForm route origin', () => {
         expect(wrapper.find('[data-testid="branch-select"]').exists()).toBe(false)
         expect(wrapper.text()).toContain('Se atenderá desde Manrique')
         expect((wrapper.vm as any).effectiveServiceBranchId).toBe(9)
-        expect(dependencies.customersStore.ensureNeighborhoodsLoaded).toHaveBeenCalledWith(9, true)
+        expect(wrapper.getComponent({ name: 'NeighborhoodSearch' }).props('branchId')).toBe(9)
         expect((wrapper.emitted('update:modelValue')?.at(-1)?.[0] as any).serviceBranchId).toBe(9)
 
         await checkbox.setValue(false)
         await flushPromises()
 
         expect((wrapper.vm as any).effectiveServiceBranchId).toBe(4)
-        expect(dependencies.customersStore.ensureNeighborhoodsLoaded).toHaveBeenCalledWith(4, true)
+        expect(wrapper.getComponent({ name: 'NeighborhoodSearch' }).props('branchId')).toBe(4)
         expect((wrapper.emitted('update:modelValue')?.at(-1)?.[0] as any).serviceBranchId).toBe(4)
+    })
+
+    it('uses the selected remote order branch without exposing a second branch selector', async () => {
+        dependencies.getBranchById.mockResolvedValue({
+            data: { id: 10, name: 'Laureles', latitude: 6.25, longitude: -75.60 },
+        })
+        const wrapper = mountForm(4, {
+            defaultServiceBranchId: 10,
+            allowBranchSelection: false,
+            forOrderAddress: true,
+        })
+        await openMap(wrapper)
+
+        expect(wrapper.find('input[type="checkbox"]').exists()).toBe(true) // primary address only
+        expect(wrapper.find('[data-testid="branch-select"]').exists()).toBe(false)
+        expect(wrapper.getComponent({ name: 'NeighborhoodSearch' }).props()).toMatchObject({
+            branchId: 10,
+            forOrderAddress: true,
+        })
+        expect(dependencies.getBranchById).toHaveBeenCalledWith(10, true)
     })
 
     it('keeps remote mode open while one of several alternative branches is being chosen', async () => {

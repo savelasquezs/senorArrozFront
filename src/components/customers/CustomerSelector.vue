@@ -53,6 +53,8 @@
                 <CustomerForm @submit="createCustomerWrapper" @cancel="closeCreateModal" :loading="isCreating"
                     :initial-phone="initialPhone" :initial-username="initialUsername"
                     :initial-branch-id="initialBranchId ?? branchId"
+                    :initial-address-branch-id="initialAddressBranchId"
+                    :for-order-address="forOrderAddress"
                     :allow-address-branch-selection="allowAddressBranchSelection"
                     submit-button-text="Crear Cliente" />
             </div>
@@ -110,6 +112,8 @@ interface Props {
     label?: string
     allowCreate?: boolean
     initialBranchId?: number
+    initialAddressBranchId?: number
+    forOrderAddress?: boolean
     allowAddressBranchSelection?: boolean
 }
 

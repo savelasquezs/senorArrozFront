@@ -13,7 +13,8 @@
 
 
             <CustomerSelector :required="orderType === 'delivery'"
-                :initial-branch-id="props.mode === 'draft' ? props.operationBranchId : undefined"
+                :initial-address-branch-id="props.mode === 'draft' ? props.operationBranchId : undefined"
+                :for-order-address="props.mode === 'draft'"
                 :allow-address-branch-selection="props.mode !== 'draft'"
                 @customer-selected="handleCustomerSelected" />
         </div>
