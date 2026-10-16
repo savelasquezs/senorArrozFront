@@ -3,6 +3,7 @@ import { shallowMount, flushPromises, type VueWrapper } from '@vue/test-utils'
 import { reactive, ref } from 'vue'
 import KitchenView from '@/views/KitchenView.vue'
 import OrderCardGrid from '@/components/kitchen/OrderCardGrid.vue'
+import { defaultBusinessCalendar } from '@/utils/datetime'
 
 const mocks = vi.hoisted(() => ({
     getOrders: vi.fn(), fetchDetail: vi.fn(), searchOrders: vi.fn(), summary: vi.fn(), voiceEvents: vi.fn(),
@@ -149,7 +150,7 @@ describe('KitchenView batched requests and event refresh', () => {
         expect(mocks.voiceEvents).toHaveBeenCalled()
         expect(mocks.speak).toHaveBeenCalledWith('Listo')
         expect(mocks.speak).toHaveBeenCalledWith(expect.stringContaining('Nuevo pedido'))
-        expect(localStorage.getItem('senor-arroz:kitchen-voice:10:1')).toBe('19')
+        expect(localStorage.getItem(`senor-arroz:kitchen-voice:10:1:${defaultBusinessCalendar.todayYmd()}`)).toBe('19')
         await mocks.callbacks.NewOrder!({ id: 1 })
         await flushPromises()
         expect(mocks.speak).toHaveBeenCalledTimes(2)
@@ -166,7 +167,7 @@ describe('KitchenView batched requests and event refresh', () => {
         const enable = wrapper.findAll('button').find(b => b.text().includes('Activar voz'))
         await enable!.trigger('click')
         await flushPromises()
-        expect(localStorage.getItem('senor-arroz:kitchen-voice:10:1')).toBeNull()
+        expect(localStorage.getItem(`senor-arroz:kitchen-voice:10:1:${defaultBusinessCalendar.todayYmd()}`)).toBeNull()
         expect(wrapper.text()).toContain('No se pudo reproducir el anuncio')
     })
 
