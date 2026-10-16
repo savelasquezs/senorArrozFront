@@ -561,7 +561,7 @@ let kitchenMounted = false
 let voiceCheckTimer: number | undefined
 let initialKitchenLoadDone = false
 
-const cursorKey = () => `senor-arroz:kitchen-voice:${authStore.user?.id ?? 0}:${kitchenBranchId.value}`
+const cursorKey = () => `senor-arroz:kitchen-voice:${authStore.user?.id ?? 0}:${kitchenBranchId.value}:${defaultBusinessCalendar.todayYmd()}`
 const readCursor = (key: string): number | undefined => {
     const stored = localStorage.getItem(key)
     if (stored === null) return undefined
