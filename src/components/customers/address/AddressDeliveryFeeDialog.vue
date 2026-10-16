@@ -66,6 +66,7 @@ import type { CustomerAddress } from '@/types/customer'
 interface Props {
     address: CustomerAddress
     branchId: number
+    forOrderCreation?: boolean
 }
 
 const props = defineProps<Props>()
@@ -122,7 +123,7 @@ const estimateDeliveryFee = (meters: number) =>
         : 3000 + Math.ceil((meters - 2000) / 1000) * 1000
 
 const resolveBranch = async () => {
-    const response = await branchApi.getBranchById(props.branchId)
+    const response = await branchApi.getBranchById(props.branchId, props.forOrderCreation === true)
     const branch = response.data
     const lat = Number(branch.latitude)
     const lng = Number(branch.longitude)
@@ -223,7 +224,7 @@ const save = async () => {
             deliveryFee: Number(deliveryFee.value),
             latitude: Number(props.address.latitude),
             longitude: Number(props.address.longitude),
-        })
+        }, props.branchId, props.forOrderCreation === true)
         emit('saved', response.data)
     } catch (error: any) {
         errorMessage.value = error?.message || 'No se pudo guardar el domicilio'
