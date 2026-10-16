@@ -171,4 +171,20 @@ describe('KitchenView batched requests and event refresh', () => {
         expect(wrapper.text()).toContain('No se pudo reproducir el anuncio')
     })
 
+    it('retains arrivals while the operator has not enabled browser audio', async () => {
+        mocks.voiceEvents.mockResolvedValue({
+            cursor: 41, hasMore: false,
+            events: [{ id: 41, orderId: 1, branchId: 1, kind: 'new' }],
+        })
+        mount()
+        await flushPromises()
+        expect(mocks.speak).not.toHaveBeenCalled()
+        expect(localStorage.getItem(`senor-arroz:kitchen-voice:10:1:${defaultBusinessCalendar.todayYmd()}`)).toBe('40')
+        const enable = wrapper.findAll('button').find(b => b.text().includes('Activar voz'))
+        await enable!.trigger('click')
+        await flushPromises()
+        expect(mocks.speak).toHaveBeenCalledWith(expect.stringContaining('Nuevo pedido'))
+        expect(localStorage.getItem(`senor-arroz:kitchen-voice:10:1:${defaultBusinessCalendar.todayYmd()}`)).toBe('41')
+    })
+
 })
