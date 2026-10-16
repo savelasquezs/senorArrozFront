@@ -128,12 +128,14 @@
         <BaseDialog v-model="showCreateModal" title="Agregar Nueva Dirección" size="lg">
             <CustomerAddressForm v-model="addressFormData" :branch-id="effectiveBranchId || undefined"
                 :default-service-branch-id="effectiveBranchId || undefined" :allow-branch-selection="false"
-                :can-edit-delivery-fee="true" @submit="createAddress" @cancel="closeCreateModal" />
+                :for-order-address="props.mode === 'draft'" :can-edit-delivery-fee="true" :loading="isCreating"
+                @submit="createAddress" @cancel="closeCreateModal" />
         </BaseDialog>
 
         <BaseDialog v-model="showEditModal" title="Editar Dirección" size="lg">
             <CustomerAddressForm v-if="editingAddress" v-model="editFormData" :addressId="editingAddress.id"
-                :branch-id="effectiveBranchId || undefined" :can-edit-delivery-fee="true" @submit="updateAddress"
+                :branch-id="effectiveBranchId || undefined" :for-order-address="props.mode === 'draft'"
+                :can-edit-delivery-fee="true" @submit="updateAddress"
                 @cancel="closeEditModal" />
         </BaseDialog>
 
@@ -141,7 +143,7 @@
             <AddressDeliveryFeeDialog
                 v-if="deliveryFeeAddress && effectiveBranchId"
                 :address="deliveryFeeAddress"
-                :branch-id="effectiveBranchId"
+                :branch-id="effectiveBranchId" :for-order-creation="props.mode === 'draft'"
                 @saved="handleDeliveryFeeSaved"
             />
         </BaseDialog>
@@ -306,6 +308,7 @@ const loadCustomerAddresses = async () => {
             && draftStore.currentOrder?.type !== 'reservation'
             && customerAddresses.value.length === 1
             && !props.selectedAddress
+            && branchDeliveryFee(customerAddresses.value[0]) != null
         ) {
             await selectAddress(customerAddresses.value[0])
         }
@@ -319,13 +322,8 @@ const loadCustomerAddresses = async () => {
 }
 
 const selectAddress = async (address: CustomerAddress) => {
-    const branchOptions = coveredOrderBranchOptions(address, effectiveBranchId.value)
-    // An address covered by both branches remains selectable in the chosen
-    // destination. Only ask to change branch when coverage is exclusively remote.
-    if (props.mode === 'draft' && branchDeliveryFee(address) == null && branchOptions.length > 0) {
-        showError('Sucursal que atiende', 'Selecciona primero la sucursal que prepara el pedido en el panel del pedido.')
-        return
-    }
+    // An address may be covered elsewhere but still needs a fee for the chosen branch.
+    // Do not switch the order branch just because another branch already covers it.
     if (branchDeliveryFee(address) == null) {
         openDeliveryFee(address)
         return
@@ -380,7 +378,7 @@ const showCreateAddress = () => {
 }
 
 const createAddress = async (addressData: CustomerAddressFormData) => {
-    if (!props.customerId) return
+    if (!props.customerId || isCreating.value) return
 
     isCreating.value = true
     try {
@@ -391,11 +389,11 @@ const createAddress = async (addressData: CustomerAddressFormData) => {
         const createdAddress = customerAddresses.value.find(item => item.id === address.id) ?? address
         emit('addressSelected', createdAddress)
         success('Dirección creada', 3000, 'La dirección ha sido creada correctamente')
+        showCreateModal.value = false
     } catch (error: any) {
         showError('Error al crear dirección', error.message || 'No se pudo crear la dirección')
     } finally {
         isCreating.value = false
-        showCreateModal.value = false
     }
 }
 
