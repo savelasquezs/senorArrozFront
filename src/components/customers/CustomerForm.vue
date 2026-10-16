@@ -114,7 +114,8 @@
     <!-- Address Modal (Dual: Create or Edit) -->
     <BaseDialog v-model="showAddressModal" title="Dirección Inicial" size="lg">
         <CustomerAddressForm v-model="addressFormData" :branch-id="form.branchId"
-            :default-service-branch-id="form.branchId" :allow-branch-selection="allowAddressBranchSelection" :can-edit-delivery-fee="true"
+            :default-service-branch-id="initialAddressBranchId ?? form.branchId" :allow-branch-selection="allowAddressBranchSelection"
+            :for-order-address="forOrderAddress" :can-edit-delivery-fee="true"
             @submit="handleAddressSubmit" @cancel="closeAddressModal" />
     </BaseDialog>
 </template>
@@ -145,6 +146,8 @@ interface Props {
     initialPhone?: string
     initialUsername?: string
     initialBranchId?: number
+    initialAddressBranchId?: number
+    forOrderAddress?: boolean
     /** Texto del botón de envío (ej. "Crear Cliente"). Si no se pasa, se usa "Actualizar"/"Crear" según haya customer. */
     submitButtonText?: string
 }
