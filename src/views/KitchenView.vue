@@ -761,6 +761,11 @@ const handleOrderModified = async (payload: any) => {
         await notifyKitchenOrderModified(data, kind, kitchenChanges, prev)
 }
 
+const handleOrderTransferred = async () => {
+    // Refresh both origin and destination without announcing a cancellation.
+    await refreshAfterKitchenEvent()
+}
+
 const handleOrderCancelled = async (payload: any) => {
     const orderId = typeof payload?.orderId === 'number' ? payload.orderId : Number(payload?.orderId)
     if (!Number.isFinite(orderId)) return
@@ -888,10 +893,12 @@ onMounted(async () => {
     off('ReservationReady')
     off('OrderModified')
     off('OrderCancelled')
+    off('OrderTransferred')
     on('NewOrder', handleNewOrder)
     on('ReservationReady', handleReservationReady)
     on('OrderModified', handleOrderModified)
     on('OrderCancelled', handleOrderCancelled)
+    on('OrderTransferred', handleOrderTransferred)
     voiceCheckTimer = window.setInterval(() => {
         if (soundReady.value) void syncVoiceEvents()
         else void bootstrapVoiceCursor()
@@ -936,6 +943,7 @@ onUnmounted(() => {
     off('ReservationReady', handleReservationReady)
     off('OrderModified', handleOrderModified)
     off('OrderCancelled', handleOrderCancelled)
+    off('OrderTransferred', handleOrderTransferred)
     cancel()
 })
 
