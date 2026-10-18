@@ -761,9 +761,25 @@ const handleOrderModified = async (payload: any) => {
         await notifyKitchenOrderModified(data, kind, kitchenChanges, prev)
 }
 
-const handleOrderTransferred = async () => {
-    // Refresh both origin and destination without announcing a cancellation.
+const handleOrderTransferred = async (payload: {
+    orderId?: number; targetBranchId?: number; announceKitchen?: boolean
+}) => {
     await refreshAfterKitchenEvent()
+    const orderId = Number(payload?.orderId)
+    if (payload?.targetBranchId !== kitchenBranchId.value || !payload.announceKitchen
+        || !Number.isSafeInteger(orderId) || !soundEnabled.value || !soundReady.value) return
+    const order = allOrders.value.find(o => o.id === orderId)
+    if (!order || !KitchenService.isVisibleToActiveKitchenForAlerts(order)) return
+    const products = (orderItemsMap.value.get(orderId) ?? [])
+        .map(item => ({ name: item.productName, quantity: item.quantity }))
+    const announcement = KitchenService.generateOrderSpeechText(order, products, order.notes)
+        .replace(/^Nuevo pedido/i, 'Pedido trasladado')
+    if (permission.value === 'granted')
+        notify(`Pedido trasladado #${orderId}`, {
+            body: products.map(p => `${p.quantity}x ${p.name}`).join(', '),
+            tag: `order-transferred-${orderId}`,
+        })
+    void speak(announcement)
 }
 
 const handleOrderCancelled = async (payload: any) => {
