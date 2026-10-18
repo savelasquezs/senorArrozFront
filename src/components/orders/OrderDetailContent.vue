@@ -2,7 +2,7 @@
 	<div class="space-y-4 md:space-y-6" v-if="order">
         <div v-if="isRemoteOrder" class="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-900">
             Pedido tomado desde esta sede · prepara y despacha <strong>{{ order.branchName }}</strong>.
-            Los cobros registrados corresponden a esa sucursal.
+            Los pagos ya registrados conservan sus bancos y aplicaciones originales.
         </div>
         <div v-if="staleSnapshot" role="status" class="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
             El pedido pudo cambiar en otra pantalla. Actualiza antes de continuar; se descartarán los cambios sin guardar.
