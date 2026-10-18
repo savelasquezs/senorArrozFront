@@ -214,7 +214,7 @@ export const useWhatsAppStore = defineStore('whatsapp', () => {
     const conversation = conversations.value.find(x => x.id === conversationId)
     if (conversation && res.data) Object.assign(conversation, res.data)
     messages.value[conversationId] = []
-    delete aiDiagnosticsByConversation[conversationId]
+    delete aiDiagnosticsByConversation.value[conversationId]
     return res.data
   }
 
