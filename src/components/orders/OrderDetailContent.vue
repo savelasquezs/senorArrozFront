@@ -79,6 +79,11 @@
 						Ticket domicilio
 					</BaseButton>
 				</template>
+				<BaseButton v-if="authStore.isSuperadmin && order.status === 'taken'"
+                    variant="outline" size="sm" class="w-full sm:w-auto"
+                    @click="showTransferBranchDialog = true">
+                    Cambiar sucursal
+                </BaseButton>
 				<BaseButton
 					v-if="permissions.canCancel(order)"
 					variant="danger"
@@ -649,6 +654,13 @@
 	</div>
 
 	<!-- Modales -->
+    <TransferOrderBranchDialog
+        v-if="showTransferBranchDialog && order"
+        :open="showTransferBranchDialog"
+        :order="order"
+        @close="showTransferBranchDialog = false"
+        @transferred="handleBranchTransferred"
+    />
 	<EditCustomerModal
 		v-if="showEditCustomerModal && order"
 		:open="showEditCustomerModal"
@@ -867,6 +879,7 @@ import PaidInStoreCashPanel from '@/components/orders/PaidInStoreCashPanel.vue';
 import EditCustomerModal from '@/components/orders/EditCustomerModal.vue';
 import AssignDeliveryModal from '@/components/orders/AssignDeliveryModal.vue';
 import CancelOrderModal from '@/components/orders/CancelOrderModal.vue';
+import TransferOrderBranchDialog from '@/components/orders/TransferOrderBranchDialog.vue';
 import EditOrderTypeModal from '@/components/orders/EditOrderTypeModal.vue';
 import OrderBankPaymentSyncDialog from '@/components/orders/OrderBankPaymentSyncDialog.vue';
 import BaseDialog from '@/components/ui/BaseDialog.vue';
@@ -948,6 +961,7 @@ const maxFreeDeliveryDiscount = computed(() => operationOptions.value?.maxFreeDe
 const staleSnapshot = ref(false);
 const refreshingOrder = ref(false);
 const showTracking = ref(false);
+const showTransferBranchDialog = ref(false);
 const isDeliveryman = computed(() => authStore.userRole === 'Deliveryman');
 const pendingOrderType = ref<'onsite' | 'delivery' | 'reservation' | null>(
 	null,
@@ -1678,6 +1692,19 @@ const isRemoteOrder = computed(() => {
 });
 const orderReturnQuery = computed<Record<string, string>>((): Record<string, string> => isRemoteOrder.value && order.value
     ? { remoteBranchId: String(order.value.branchId) } : {});
+async function handleBranchTransferred(targetBranchId: number) {
+    showTransferBranchDialog.value = false;
+    // A second transfer may leave the current workspace outside both the
+    // immutable origin and the new dispatch branch.
+    if (branchContext.selectedBranchId !== order.value?.originBranchId
+        && branchContext.selectedBranchId !== targetBranchId
+        && authStore.user) {
+        await branchContext.selectBranch(authStore.user, targetBranchId, { force: true });
+    }
+    await reloadOrder();
+    success('Pedido trasladado', 4000, 'El pedido conserva su número e historial.');
+}
+
 async function reloadOrder() {
     if (!order.value) return;
     refreshingOrder.value = true;
