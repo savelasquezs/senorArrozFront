@@ -761,6 +761,27 @@ const handleOrderModified = async (payload: any) => {
         await notifyKitchenOrderModified(data, kind, kitchenChanges, prev)
 }
 
+const handleOrderTransferred = async (payload: {
+    orderId?: number; targetBranchId?: number; announceKitchen?: boolean
+}) => {
+    await refreshAfterKitchenEvent()
+    const orderId = Number(payload?.orderId)
+    if (payload?.targetBranchId !== kitchenBranchId.value || !payload.announceKitchen
+        || !Number.isSafeInteger(orderId) || !soundEnabled.value || !soundReady.value) return
+    const order = allOrders.value.find(o => o.id === orderId)
+    if (!order || !KitchenService.isVisibleToActiveKitchenForAlerts(order)) return
+    const products = (orderItemsMap.value.get(orderId) ?? [])
+        .map(item => ({ name: item.productName, quantity: item.quantity }))
+    const announcement = KitchenService.generateOrderSpeechText(order, products, order.notes)
+        .replace(/^Nuevo pedido/i, 'Pedido trasladado')
+    if (permission.value === 'granted')
+        notify(`Pedido trasladado #${orderId}`, {
+            body: products.map(p => `${p.quantity}x ${p.name}`).join(', '),
+            tag: `order-transferred-${orderId}`,
+        })
+    void speak(announcement)
+}
+
 const handleOrderCancelled = async (payload: any) => {
     const orderId = typeof payload?.orderId === 'number' ? payload.orderId : Number(payload?.orderId)
     if (!Number.isFinite(orderId)) return
@@ -888,10 +909,12 @@ onMounted(async () => {
     off('ReservationReady')
     off('OrderModified')
     off('OrderCancelled')
+    off('OrderTransferred')
     on('NewOrder', handleNewOrder)
     on('ReservationReady', handleReservationReady)
     on('OrderModified', handleOrderModified)
     on('OrderCancelled', handleOrderCancelled)
+    on('OrderTransferred', handleOrderTransferred)
     voiceCheckTimer = window.setInterval(() => {
         if (soundReady.value) void syncVoiceEvents()
         else void bootstrapVoiceCursor()
@@ -936,6 +959,7 @@ onUnmounted(() => {
     off('ReservationReady', handleReservationReady)
     off('OrderModified', handleOrderModified)
     off('OrderCancelled', handleOrderCancelled)
+    off('OrderTransferred', handleOrderTransferred)
     cancel()
 })
 

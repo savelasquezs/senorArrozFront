@@ -2,7 +2,7 @@
 	<div class="space-y-4 md:space-y-6" v-if="order">
         <div v-if="isRemoteOrder" class="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-900">
             Pedido tomado desde esta sede · prepara y despacha <strong>{{ order.branchName }}</strong>.
-            Los cobros registrados corresponden a esa sucursal.
+            Los pagos ya registrados conservan sus bancos y aplicaciones originales.
         </div>
         <div v-if="staleSnapshot" role="status" class="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
             El pedido pudo cambiar en otra pantalla. Actualiza antes de continuar; se descartarán los cambios sin guardar.
@@ -79,6 +79,11 @@
 						Ticket domicilio
 					</BaseButton>
 				</template>
+				<BaseButton v-if="authStore.isSuperadmin"
+                    variant="outline" size="sm" class="w-full sm:w-auto"
+                    @click="showTransferBranchDialog = true">
+                    Cambiar sucursal
+                </BaseButton>
 				<BaseButton
 					v-if="permissions.canCancel(order)"
 					variant="danger"
@@ -649,6 +654,13 @@
 	</div>
 
 	<!-- Modales -->
+    <TransferOrderBranchDialog
+        v-if="showTransferBranchDialog && order"
+        :open="showTransferBranchDialog"
+        :order="order"
+        @close="showTransferBranchDialog = false"
+        @transferred="handleBranchTransferred"
+    />
 	<EditCustomerModal
 		v-if="showEditCustomerModal && order"
 		:open="showEditCustomerModal"
@@ -867,6 +879,7 @@ import PaidInStoreCashPanel from '@/components/orders/PaidInStoreCashPanel.vue';
 import EditCustomerModal from '@/components/orders/EditCustomerModal.vue';
 import AssignDeliveryModal from '@/components/orders/AssignDeliveryModal.vue';
 import CancelOrderModal from '@/components/orders/CancelOrderModal.vue';
+import TransferOrderBranchDialog from '@/components/orders/TransferOrderBranchDialog.vue';
 import EditOrderTypeModal from '@/components/orders/EditOrderTypeModal.vue';
 import OrderBankPaymentSyncDialog from '@/components/orders/OrderBankPaymentSyncDialog.vue';
 import BaseDialog from '@/components/ui/BaseDialog.vue';
@@ -948,6 +961,7 @@ const maxFreeDeliveryDiscount = computed(() => operationOptions.value?.maxFreeDe
 const staleSnapshot = ref(false);
 const refreshingOrder = ref(false);
 const showTracking = ref(false);
+const showTransferBranchDialog = ref(false);
 const isDeliveryman = computed(() => authStore.userRole === 'Deliveryman');
 const pendingOrderType = ref<'onsite' | 'delivery' | 'reservation' | null>(
 	null,
@@ -1678,6 +1692,19 @@ const isRemoteOrder = computed(() => {
 });
 const orderReturnQuery = computed<Record<string, string>>((): Record<string, string> => isRemoteOrder.value && order.value
     ? { remoteBranchId: String(order.value.branchId) } : {});
+async function handleBranchTransferred(targetBranchId: number) {
+    showTransferBranchDialog.value = false;
+    // A second transfer may leave the current workspace outside both the
+    // immutable origin and the new dispatch branch.
+    if (branchContext.selectedBranchId !== order.value?.originBranchId
+        && branchContext.selectedBranchId !== targetBranchId
+        && authStore.user) {
+        await branchContext.selectBranch(authStore.user, targetBranchId, { force: true });
+    }
+    await reloadOrder();
+    success('Pedido trasladado', 4000, 'El pedido conserva su número e historial.');
+}
+
 async function reloadOrder() {
     if (!order.value) return;
     refreshingOrder.value = true;
