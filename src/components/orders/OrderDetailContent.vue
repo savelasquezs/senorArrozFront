@@ -79,7 +79,7 @@
 						Ticket domicilio
 					</BaseButton>
 				</template>
-				<BaseButton v-if="authStore.isSuperadmin && order.status === 'taken'"
+				<BaseButton v-if="authStore.isSuperadmin"
                     variant="outline" size="sm" class="w-full sm:w-auto"
                     @click="showTransferBranchDialog = true">
                     Cambiar sucursal
