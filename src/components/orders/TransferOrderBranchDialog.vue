@@ -117,7 +117,7 @@ watch(() => props.open, open => {
 
 watch(targetBranchId, async (id) => {
     const request = ++latestBanksRequest
-    paymentTargets.value = {}
+    paymentTargets.value = Object.fromEntries(props.order.bankPayments.map(payment => [payment.id, 0]))
     destinationBanks.value = []
     banksError.value = ''
     banksLoading.value = !!id && !!props.order.bankPayments.length
