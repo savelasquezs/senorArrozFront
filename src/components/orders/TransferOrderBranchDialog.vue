@@ -19,9 +19,10 @@
                 No hay otra sucursal disponible.
             </p>
             <p class="rounded-lg bg-gray-50 p-3">
-                Se conservarán el número, los productos, el importe y el historial.
-                Solo se permitirá si el pedido no tiene pagos, rutas ni preparación iniciada,
-                y todos los productos existen en la sede seleccionada.
+                Se cambia únicamente la sucursal que atiende el pedido. Se conservan el número,
+                estado, pagos, productos, domiciliario, rutas e historial. No se modifica inventario.
+                Los pagos, productos y rutas que ya estaban vinculados a la sede anterior
+                conservarán esa vinculación.
             </p>
             <p v-if="failure" role="alert" class="text-red-700">{{ failure }}</p>
         </div>
