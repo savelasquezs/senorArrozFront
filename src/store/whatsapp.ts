@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
+import { useAuthStore } from '@/store/auth'
 import { whatsappApi } from '@/services/MainAPI/whatsappApi'
 import type {
   WhatsAppConversation,
@@ -40,26 +41,39 @@ export const useWhatsAppStore = defineStore('whatsapp', () => {
   const aiDiagnosticsError = ref<string | null>(null)
   const error = ref<string | null>(null)
   let statusLoadedAt = 0
+  let statusInFlight: Promise<WhatsAppStatus> | null = null
+  let unreadInFlight: Promise<WhatsAppUnreadSummary> | null = null
 
   const enabled = computed(() => status.value?.enabled === true)
   const enabledBranchIds = computed(() => status.value?.branchIds ?? [])
   const unreadTotal = computed(() => unreadSummary.value.totalUnread)
   const unreadConversationCount = computed(() => unreadSummary.value.unreadConversations)
 
-  async function refreshStatus() {
-    try {
-      isLoadingStatus.value = true
-      error.value = null
-      const res = await whatsappApi.getStatus()
-      status.value = res.data
-      statusLoadedAt = Date.now()
-      return res.data
-    } catch (err: any) {
-      error.value = err.message || 'No se pudo consultar el estado de WhatsApp'
+  function refreshStatus() {
+    if (statusInFlight) return statusInFlight
+    isLoadingStatus.value = true
+    error.value = null
+    const request: Promise<WhatsAppStatus> = whatsappApi.getStatus().then(res => {
+      if (statusInFlight === request) {
+        status.value = res.data
+        statusLoadedAt = Date.now()
+        if (!res.data.enabled) {
+          unreadInFlight = null
+          unreadSummary.value = { totalUnread: 0, unreadConversations: 0, latestMessageAt: null }
+        }
+      }
+      return status.value ?? { enabled: false, branchIds: [] }
+    }).catch((err: any) => {
+      if (statusInFlight === request) error.value = err.message || 'No se pudo consultar el estado de WhatsApp'
       throw err
-    } finally {
-      isLoadingStatus.value = false
-    }
+    }).finally(() => {
+      if (statusInFlight === request) {
+        statusInFlight = null
+        isLoadingStatus.value = false
+      }
+    })
+    statusInFlight = request
+    return request
   }
 
   async function fetchAiDiagnostics(branchId: number, conversationId?: number | null, take = 20) {
@@ -91,6 +105,7 @@ export const useWhatsAppStore = defineStore('whatsapp', () => {
   }
 
   async function ensureStatus(maxAgeMs = 60000) {
+    if (statusInFlight) return statusInFlight
     if (status.value && Date.now() - statusLoadedAt < maxAgeMs) return status.value
     return refreshStatus()
   }
@@ -100,10 +115,20 @@ export const useWhatsAppStore = defineStore('whatsapp', () => {
       unreadSummary.value = { totalUnread: 0, unreadConversations: 0, latestMessageAt: null }
       return unreadSummary.value
     }
+    if (unreadInFlight) return unreadInFlight
 
-    const res = await whatsappApi.getUnreadSummary()
-    unreadSummary.value = res.data ?? { totalUnread: 0, unreadConversations: 0, latestMessageAt: null }
-    return unreadSummary.value
+    const before = unreadSummary.value
+    const request: Promise<WhatsAppUnreadSummary> = whatsappApi.getUnreadSummary().then(res => {
+      // Do not overwrite a newer SignalR/read update or a different branch/session.
+      if (unreadInFlight === request && unreadSummary.value === before && enabled.value) {
+        unreadSummary.value = res.data ?? { totalUnread: 0, unreadConversations: 0, latestMessageAt: null }
+      }
+      return unreadSummary.value
+    }).finally(() => {
+      if (unreadInFlight === request) unreadInFlight = null
+    })
+    unreadInFlight = request
+    return request
   }
 
   async function fetchConversations(filters?: WhatsAppConversationFilters) {
@@ -473,6 +498,11 @@ export const useWhatsAppStore = defineStore('whatsapp', () => {
   }
 
   function clear() {
+    statusInFlight = null
+    unreadInFlight = null
+    statusLoadedAt = 0
+    status.value = null
+    isLoadingStatus.value = false
     conversations.value = []
     operationalBranches.value = []
     messages.value = {}
@@ -483,6 +513,9 @@ export const useWhatsAppStore = defineStore('whatsapp', () => {
     error.value = null
     aiDiagnosticsError.value = null
   }
+
+  const auth = useAuthStore()
+  watch(() => `${auth.user?.id ?? ''}:${auth.user?.role ?? ''}:${auth.user?.branchId ?? ''}`, clear, { flush: 'sync' })
 
   return {
     status,
