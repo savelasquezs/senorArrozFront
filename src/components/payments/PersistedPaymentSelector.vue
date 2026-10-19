@@ -92,10 +92,17 @@
                 No hay pagos bancarios
             </div>
 
+            <p v-if="bankPayments.some(payment => payment.branchId !== order.branchId)"
+                class="text-xs text-amber-700">
+                Algunos pagos pertenecen a bancos de otra sucursal. Conservan su contabilidad original;
+                solo el superadministrador puede verificar esos pagos, sin editar sus importes desde aquí.
+            </p>
             <!-- Existing Bank Payments -->
             <OrderBankPaymentRow v-for="payment in bankPayments" :key="payment.id" :payment="payment"
-                density="comfortable" variant="panel" :show-verify-action="canVerify"
-                :show-unverify-action="canUnverify" :show-edit-remove="canEdit"
+                density="comfortable" variant="panel"
+                :show-verify-action="canVerify && (payment.branchId === order.branchId || authStore.isSuperadmin)"
+                :show-unverify-action="canUnverify && (payment.branchId === order.branchId || authStore.isSuperadmin)"
+                :show-edit-remove="canEdit && payment.branchId === order.branchId"
                 :show-verification-badge="true" @verify="handleVerifyPayment" @unverify="handleUnverifyPayment"
                 @edit="handleEditBankPayment" @remove="onRemoveBankPaymentRow" />
         </div>
@@ -194,6 +201,7 @@ import { appPaymentApi } from '@/services/MainAPI/appPaymentApi'
 import { requestActualSettlementAmount } from '@/helpers/appPaymentSettlement'
 import { useToast } from '@/composables/useToast'
 import { useOrderPermissions } from '@/composables/useOrderPermissions'
+import { useAuthStore } from '@/store/auth'
 import type { OrderBankPaymentDetail, OrderAppPaymentDetail, OrderDetailView } from '@/types/order'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseSelect from '@/components/ui/BaseSelect.vue'
@@ -226,6 +234,7 @@ const emit = defineEmits<{
 const { formatCurrency, formatDateTime } = useFormatting()
 const { success, error } = useToast()
 const permissions = useOrderPermissions()
+const authStore = useAuthStore()
 
 // Computed para datos del pedido
 const bankPayments = computed(() => props.order.bankPayments)
