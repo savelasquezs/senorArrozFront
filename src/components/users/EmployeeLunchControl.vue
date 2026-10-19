@@ -50,12 +50,12 @@ import { ORDERS_SIGNALR_HUB_URL } from '@/config/signalr';
 import { employeeLunchApi, lunchDuration, type EmployeeLunchState } from '@/services/MainAPI/employeeLunchApi';
 
 const auth = useAuthStore(), branch = useBranchContextStore(), router = useRouter();
-const { self, error, busy, uncertain, offset, refresh, change } = useEmployeeLunch();
+const { self, error, busy, uncertain, needsReconciliation, offset, refresh, change } = useEmployeeLunch();
 const { on, off, connectionState } = useSignalR(ORDERS_SIGNALR_HUB_URL);
 const opened = ref(false), password = ref(''), selectedId = ref(0), people = ref<EmployeeLunchState[]>([]);
 const loading = ref(false), page = ref(1), pages = ref(1), now = ref(Date.now());
 const passwordInput = ref<HTMLInputElement>();
-const blocked = computed(() => !auth.isKitchen && (!!self.value?.activeLunch || uncertain.value));
+const blocked = computed(() => !auth.isKitchen && (!!self.value?.activeLunch || needsReconciliation.value));
 const selected = computed(() => auth.isKitchen ? people.value.find(p => p.userId === selectedId.value) : self.value);
 let timer: ReturnType<typeof setInterval>;
 async function loadPeople(next = page.value) {

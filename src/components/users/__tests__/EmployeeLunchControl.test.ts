@@ -32,6 +32,17 @@ const password = async () => {
 const submit = async () => { document.querySelector('form')!.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })); await flushPromises(); };
 
 describe('almuerzos', () => {
+  it('no bloquea la operación si falla la consulta inicial de almuerzo', async () => {
+    mocks.api.me.mockRejectedValue(new Error('Error interno del servidor'));
+    await show();
+    expect(document.getElementById('app')!.inert).not.toBe(true);
+    expect(document.querySelector('[role="dialog"]')).toBeNull();
+    await wrapper.get('button').trigger('click');
+    await flushPromises();
+    expect(document.body.textContent).toContain('Error interno del servidor');
+    expect(document.querySelector<HTMLButtonElement>('button[type="submit"]')!.disabled).toBe(true);
+  });
+
   it('recupera una salida guardada cuando se pierde su respuesta y mantiene el bloqueo', async () => {
     let server = idle();
     mocks.api.me.mockImplementation(async () => server);
@@ -53,6 +64,7 @@ describe('almuerzos', () => {
     await password(); await submit();
     expect(document.querySelector<HTMLButtonElement>('button[type="submit"]')!.disabled).toBe(true);
     expect(mocks.api.change).toHaveBeenCalledTimes(1);
+    expect(document.getElementById('app')!.inert).toBe(true);
   });
 
   it('permite seleccionar cocineros individuales sin bloquear la pantalla compartida', async () => {
