@@ -81,6 +81,16 @@ const routes: RouteRecordRaw[] = [
         }
     },
     {
+        path: '/almuerzos',
+        name: 'EmployeeLunches',
+        component: () => import('@/views/EmployeeLunchesView.vue'),
+        meta: {
+            requiresAuth: true,
+            requiresRole: [UserRole.SUPERADMIN, UserRole.ADMIN, UserRole.CASHIER],
+            title: 'Almuerzos'
+        }
+    },
+    {
         path: '/customers',
         name: 'CustomersList',
         component: () => import('@/views/CustomersList.vue'),
