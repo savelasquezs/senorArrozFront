@@ -21,6 +21,7 @@ export interface User {
 }
 
 export interface CreateUserRequest {
+    webAccessEnabled?: boolean
     branchId: number
     role: UserRole
     name: string
@@ -32,6 +33,7 @@ export interface CreateUserRequest {
 }
 
 export interface UpdateUserRequest {
+    webAccessEnabled?: boolean
     name?: string
     email?: string
     phone?: string

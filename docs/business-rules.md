@@ -104,7 +104,7 @@ enum UserRole {
 #### Deliveryman
 
 - El acceso al portal web está bloqueado por defecto. Solo Superadmin puede habilitarlo o revocarlo individualmente desde la tabla de usuarios; una revocación se aplica en la siguiente solicitud web.
-- Superadmin, Admin, Cashier y Kitchen conservan siempre su acceso web. Esta autorización excepcional no sustituye el control de versión de la app Flutter.
+- Superadmin, Admin y Cashier conservan su acceso web; Kitchen requiere WebAccessEnabled. Esta autorización excepcional no sustituye el control de versión de la app Flutter.
 - **Pedidos listos**: Solo ve pedidos en estado "Ready" y los suyos propios
 - **Estados**: Puede cambiar a "OnTheWay" o revertir entrega (máximo 3 horas)
 - **Historial**: Ve historial de sus pedidos entregados y abonos
@@ -328,7 +328,7 @@ Admin y Superadmin pueden cambiar un pedido desde cualquier estado hacia cualqui
 ## 🏪 Gestión de Sucursales
 
 ### Configuración de Sucursal
-- **Única por sucursal**: Solo 1 admin y 1 cocina por sucursal
+- **Única por sucursal**: Solo 1 admin por sucursal; cocina admite empleados personales y pantalla compartida
 - **Impresoras**: Configuración inicial incluye impresoras
 - **Reglas de fidelización**: Configurables por sucursal
 - **Acceso**: Usuarios solo ven datos de su sucursal (excepto superadmin)
@@ -496,3 +496,13 @@ Validaciones implementadas antes de enviar un pedido al backend:
 ---
 
 **Próximos pasos**: Ver [API Reference](./api-reference.md) para implementación técnica de estas reglas.
+
+## Almuerzos del personal
+
+- Cada empleado registra salida y regreso con su contraseña personal; las horas oficiales son UTC del servidor. Un intervalo abierto determina el descanso, persiste entre sesiones y no se cierra automáticamente.
+- Cocina admite varios empleados activos sin acceso web y cuentas de pantalla compartida con acceso web. Solo las primeras registran almuerzos, desde la pantalla de su sucursal. Se conservan IDs, gastos y nómina; no se reactivan ni convierten cuentas automáticamente.
+- Una cuenta personal almorzando no puede realizar mutaciones operativas. Puede consultar, finalizar el almuerzo, mantener seguimiento/dispositivo/jornada y cerrar sesión. Admin/Superadmin no corrigen registros mientras su propio almuerzo esté abierto.
+- Un domiciliario no puede iniciar almuerzo con pedidos pendientes ni recibir pedidos mientras almuerza. La disponibilidad y los avisos de pedidos lo excluyen; PostgreSQL serializa almuerzo/asignación por empleado incluso ante propuestas antiguas.
+- El almuerzo no cierra la jornada ni suspende GPS: los puntos se conservan y sincronizan. Su intervalo se excluye del análisis de permanencias y no cuenta como silencio de comunicación. Al regresar rigen los requisitos GPS existentes de disponibilidad.
+- Historial por fecha Colombia y sucursal dentro del tenant. Cocina solo consulta sus empleados personales de hoy. Correcciones Admin/Superadmin exigen motivo, versión vigente y auditoría antes/después, sin solapamientos ni fechas futuras.
+- Script aditivo e idempotente: SenorArroz.Infrastructure/Scripts/add_employee_lunch.sql, antes del backend y las interfaces. Sin cambios automáticos de nómina ni dependencia de facturación electrónica.

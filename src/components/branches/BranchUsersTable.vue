@@ -1,6 +1,7 @@
 <!-- src/components/BranchUsersTable.vue -->
 <template>
     <div class="space-y-4">
+        <EmployeeLunchHistory v-if="canManageUsers" :branch-id="branchId" />
         <!-- Header with Create Button -->
         <div class="flex justify-between items-center">
             <h3 class="text-lg font-semibold text-gray-900">
@@ -106,11 +107,11 @@
 
                         <td class="px-6 py-4 whitespace-nowrap">
                             <div class="flex items-center gap-2">
-                                <BaseBadge :variant="user.role !== 'Deliveryman' || user.webAccessEnabled ? 'success' : 'danger'">
-                                    {{ user.role !== 'Deliveryman' || user.webAccessEnabled ? 'Activo' : 'Bloqueado' }}
+                                <BaseBadge :variant="!['Deliveryman', 'Kitchen'].includes(user.role) || user.webAccessEnabled ? 'success' : 'danger'">
+                                    {{ !['Deliveryman', 'Kitchen'].includes(user.role) || user.webAccessEnabled ? 'Activo' : 'Bloqueado' }}
                                 </BaseBadge>
                                 <BaseButton
-                                    v-if="isSuperadmin && user.role === 'Deliveryman'"
+                                    v-if="isSuperadmin && ['Deliveryman', 'Kitchen'].includes(user.role)"
                                     @click="toggleWebAccess(user)"
                                     variant="outline"
                                     size="sm"
@@ -178,6 +179,7 @@ import BaseDialog from '@/components/ui/BaseDialog.vue'
 import BaseBadge from '@/components/ui/BaseBadge.vue'
 import UserForm from '@/components/branches/users/UserForm.vue'
 import UserPayrollInsightsPanel from '@/components/users/UserPayrollInsightsPanel.vue'
+import EmployeeLunchHistory from '@/components/users/EmployeeLunchHistory.vue'
 import {
     PlusIcon,
     UserGroupIcon,

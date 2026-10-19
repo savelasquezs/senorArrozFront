@@ -88,7 +88,7 @@ export class BaseApi {
 			async (error) => {
 				const originalRequest = error.config;
                 const url = String(originalRequest?.url ?? '');
-                if (error.response?.status === 409) {
+                if (error.response?.status === 409 && !String(error.response?.data?.code).startsWith('EMPLOYEE_')) {
                     notifyOrderConflict(Number(originalRequest?.headers?.['X-Order-Id']));
                 }
 

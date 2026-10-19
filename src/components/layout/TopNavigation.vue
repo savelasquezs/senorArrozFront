@@ -50,6 +50,7 @@
 					<span class="whitespace-nowrap">Nuevo pedido</span>
 				</RouterLink>
 			</template>
+			<EmployeeLunchControl />
 			<UserMenu />
 		</div>
 		<DailyPromotionModal
@@ -69,6 +70,7 @@ import MobileMenuButton from './MobileMenuButton.vue';
 import Breadcrumbs from './Breadcrumbs.vue';
 import BranchSelector from './BranchSelector.vue';
 import UserMenu from './UserMenu.vue';
+import EmployeeLunchControl from '@/components/users/EmployeeLunchControl.vue';
 import DailyPromotionModal from '@/components/dailyPromotion/DailyPromotionModal.vue';
 import { useAuthStore } from '@/store/auth';
 import { useWhatsAppStore } from '@/store/whatsapp';
