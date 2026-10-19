@@ -70,6 +70,10 @@
         </div>
 
         <!-- Role Constraints Alert -->
+        <label v-if="form.role === 'Kitchen'" class="flex items-start gap-3 text-sm">
+            <input v-model="form.webAccessEnabled" type="checkbox" class="mt-1" />
+            <span>Cuenta de pantalla compartida (acceso web). Déjalo desmarcado para un cocinero personal.</span>
+        </label>
         <BaseAlert v-if="roleConstraintMessage" variant="warning">
             {{ roleConstraintMessage }}
         </BaseAlert>
@@ -194,6 +198,7 @@ const form = reactive({
     phone: '',
     role: '' as UserRole | '',
     deliveryAppEnabled: false,
+    webAccessEnabled: false,
     branchId: 0,
     password: '',
     confirmPassword: '',
@@ -412,7 +417,8 @@ const handleSubmit = () => {
         email: form.email.trim(),
         phone: form.phone.trim(),
         role: form.role,
-        deliveryAppEnabled: canUseDeliveryApp.value && form.deliveryAppEnabled
+        deliveryAppEnabled: canUseDeliveryApp.value && form.deliveryAppEnabled,
+        ...(form.role === 'Kitchen' ? { webAccessEnabled: form.webAccessEnabled } : {})
     }
 
     if (!props.user) {
@@ -433,6 +439,7 @@ const handleSubmit = () => {
 watch(() => props.user, (newUser) => {
     if (newUser) {
         form.name = newUser.name
+        form.webAccessEnabled = newUser.webAccessEnabled
         form.email = newUser.email
         form.phone = newUser.phone || ''
         form.role = newUser.role
@@ -448,6 +455,7 @@ watch(() => props.user, (newUser) => {
         form.phone = ''
         form.role = '' as UserRole | ''
         form.deliveryAppEnabled = false
+        form.webAccessEnabled = false
         form.branchId = props.branchId
         form.password = ''
         form.confirmPassword = ''
