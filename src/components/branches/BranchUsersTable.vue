@@ -1,7 +1,6 @@
 <!-- src/components/BranchUsersTable.vue -->
 <template>
     <div class="space-y-4">
-        <EmployeeLunchHistory v-if="canManageUsers" :branch-id="branchId" />
         <!-- Header with Create Button -->
         <div class="flex justify-between items-center">
             <h3 class="text-lg font-semibold text-gray-900">
@@ -179,7 +178,6 @@ import BaseDialog from '@/components/ui/BaseDialog.vue'
 import BaseBadge from '@/components/ui/BaseBadge.vue'
 import UserForm from '@/components/branches/users/UserForm.vue'
 import UserPayrollInsightsPanel from '@/components/users/UserPayrollInsightsPanel.vue'
-import EmployeeLunchHistory from '@/components/users/EmployeeLunchHistory.vue'
 import {
     PlusIcon,
     UserGroupIcon,

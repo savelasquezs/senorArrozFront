@@ -124,6 +124,7 @@ import {
 	ShoppingBagIcon,
 	BanknotesIcon,
 	ClipboardDocumentListIcon,
+	ClockIcon,
 	DocumentTextIcon,
 	ChatBubbleLeftRightIcon,
 	ChevronDownIcon,
@@ -287,6 +288,7 @@ const navigationItems = computed((): NavItem[] => [
 		icon: ShoppingBagIcon,
 		roles: ['Superadmin', 'Admin', 'Cashier'],
 	},
+	{ name: 'Almuerzos', to: '/almuerzos', icon: ClockIcon, roles: ['Superadmin', 'Admin', 'Cashier'] },
 	{ name: 'Cocina', to: '/kitchen', icon: CogIcon, roles: ['Kitchen'] },
 	{
 		name: 'Domicilios',
