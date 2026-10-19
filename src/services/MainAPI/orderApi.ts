@@ -91,8 +91,10 @@ class OrderApi extends BaseApi {
     }
 
     /** Restricted server-side to Superadmin; requires the displayed management version. */
-    async transferBranch(id: number, targetBranchId: number, snapshot: OrderMutationSnapshot): Promise<Order> {
-        return this.put<Order>(`/orders/${id}/transfer-branch`, { targetBranchId }, orderMutationConfig(snapshot));
+    async transferBranch(id: number, targetBranchId: number, snapshot: OrderMutationSnapshot,
+        bankPaymentChanges: Array<{ paymentId: number; targetBankId: number }> = []): Promise<Order> {
+        return this.put<Order>(`/orders/${id}/transfer-branch`,
+            { targetBranchId, bankPaymentChanges }, orderMutationConfig(snapshot));
     }
 
     // 5. Cancelar pedido

@@ -435,6 +435,8 @@ export interface OrderBankPaymentDetail {
     id: number
     orderId: number
     bankId: number
+    sourceReservationDepositId?: number | null
+    isAppSettlement?: boolean
     bankName: string
     branchId: number
     branchName: string
