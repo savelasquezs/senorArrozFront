@@ -7,7 +7,7 @@ import { defaultBusinessCalendar } from '@/utils/datetime'
 vi.mock('@vuepic/vue-datepicker', () => ({
     VueDatePicker: {
         name: 'VueDatePicker',
-        props: ['modelValue', 'range'],
+        props: ['modelValue', 'range', 'formats'],
         emits: ['update:modelValue'],
         template: '<button type="button" />',
     },
@@ -26,6 +26,7 @@ describe('BaseDatePicker', () => {
     it('emite la fecha elegida como YYYY-MM-DD del calendario de negocio', async () => {
         const wrapper = mount(BaseDatePicker, { props: { modelValue: '2026-08-20' } })
         const picker = wrapper.findComponent({ name: 'VueDatePicker' })
+        expect(picker.props('formats')).toEqual({ input: 'dd/MM/yyyy' })
 
         await picker.vm.$emit('update:modelValue', new Date(2026, 7, 21))
 
