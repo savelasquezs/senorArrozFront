@@ -1,0 +1,45 @@
+name: Employee leaves visual review
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'src/components/users/*Leave*'
+      - 'src/components/auth/PasswordConfirmation.vue'
+      - 'src/components/ui/BaseDialog.vue'
+      - 'src/components/ui/BaseDate*'
+      - 'src/views/EmployeeLeave*'
+      - 'src/types/employeeLeave.ts'
+      - 'src/assets/employee-leaves.css'
+      - 'scripts/check_employee_leaves_visual.mjs'
+      - '.github/workflows/employee-leaves-visual.yml'
+permissions:
+  contents: read
+concurrency:
+  group: employee-leaves-visual-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+jobs:
+  chromium:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - name: Install isolated rendering tools (not application dependencies)
+        run: |
+          npm install --no-save --package-lock=false playwright@1.56.1
+          npx playwright install --with-deps chromium
+      - name: Render real leave views with synthetic fixtures
+        run: node scripts/check_employee_leaves_visual.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: employee-leaves-visual-review
+          path: test-results/leave-visual
+          if-no-files-found: error
+          retention-days: 14
