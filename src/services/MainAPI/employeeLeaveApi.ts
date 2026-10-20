@@ -1,11 +1,10 @@
 import type { AxiosRequestConfig } from 'axios';
 import { BaseApi } from './baseApi';
 import type { PagedResult } from '@/types/common';
-import type { LeaveAction, LeaveAttachment, LeaveDetail, LeaveHistory, LeaveInput, LeaveItem, LeaveKind, LeaveSummary } from '@/types/employeeLeave';
-
+import type { LeaveAction, LeaveAttachment, LeaveDetail, LeaveHistory, LeaveInput, LeaveItem, LeaveKind, LeavePendingFile, LeaveSummary } from '@/types/employeeLeave';
 const root = '/employee-leaves';
 class EmployeeLeaveApi extends BaseApi {
-  list(params: { review?: boolean; status?: string; search?: string; branchId?: number; from?: string; to?: string; page?: number }) {
+  list(params: { review?: boolean; status?: string; search?: string; branchId?: number; from?: string; to?: string; page?: number; remunerated?: boolean; support?: string }) {
     return this.get<PagedResult<LeaveItem>>(root, { params, branchScope: 'none' });
   }
   detail(id: string) { return this.get<LeaveDetail>(`${root}/${id}`, { branchScope: 'none' }); }
@@ -13,16 +12,27 @@ class EmployeeLeaveApi extends BaseApi {
   catalog() { return this.get<LeaveKind[]>(`${root}/catalog`, { branchScope: 'none' }); }
   summary() { return this.get<LeaveSummary>(`${root}/summary`, { branchScope: 'none' }); }
   read(id: string, version: number) { return this.send<void>({ method: 'POST', url: `${root}/${id}/read`, data: { version } }); }
-  save(id: string | undefined, data: LeaveInput) {
-    return this.send<{ publicId: string }>({ method: id ? 'PUT' : 'POST', url: id ? `${root}/${id}` : root, data });
+  save(id: string | undefined, input: LeaveInput, files: LeavePendingFile[] = [], progress?: (percent: number) => void) {
+    const data = new FormData();
+    const { password, ...payload } = input;
+    data.set('payload', JSON.stringify(payload));
+    data.set('password', password);
+    if (id) data.set('publicId', id);
+    data.set('evidence', JSON.stringify(files.map(x => ({ uploadKey: x.uploadKey, evidenceCode: x.evidenceCode }))));
+    for (const item of files) data.append('files', item.file, item.file.name);
+    input.password = '';
+    return this.send<{ publicId: string }>({ method: 'POST', url: `${root}/submit`, data, timeout: 120000,
+      headers: { 'Content-Type': undefined }, onUploadProgress: event => { if (event.total) progress?.(Math.min(100, Math.round(event.loaded / event.total * 100))); } });
   }
   change(id: string, action: 'decision' | 'cancel' | 'return' | 'verify', data: LeaveAction) {
     return this.send<{ publicId: string }>({ method: 'POST', url: `${root}/${id}/${action}`, data });
   }
-  upload(id: string, version: number, uploadKey: string, file: File, password: string) {
+  upload(id: string, version: number, uploadKey: string, file: File, password: string, evidenceCode = 'additional', replacesAttachmentId?: number) {
     const data = new FormData();
     data.set('file', file); data.set('version', String(version)); data.set('uploadKey', uploadKey); data.set('password', password);
-    return this.send<{ publicId: string }>({ method: 'POST', url: `${root}/${id}/attachments`, data, timeout: 60000 });
+    data.set('evidenceCode', evidenceCode);
+    if (replacesAttachmentId) data.set('replacesAttachmentId', String(replacesAttachmentId));
+    return this.send<{ publicId: string }>({ method: 'POST', url: `${root}/${id}/attachments`, data, timeout: 60000, headers: { 'Content-Type': undefined } });
   }
   removeAttachment(id: string, attachmentId: number, data: LeaveAction) {
     return this.send<{ publicId: string }>({ method: 'DELETE', url: `${root}/${id}/attachments/${attachmentId}`, data });
@@ -42,7 +52,7 @@ class EmployeeLeaveApi extends BaseApi {
       throw mapped;
     }
     finally {
-      if (config.data instanceof FormData) config.data.delete('password');
+      if (config.data instanceof FormData) { config.data.delete('password'); config.data.delete('payload'); }
       else if (config.data && typeof config.data === 'object' && 'password' in config.data) config.data.password = '';
     }
   }
