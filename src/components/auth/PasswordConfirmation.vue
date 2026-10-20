@@ -23,15 +23,21 @@ const props = defineProps<{ modelValue: boolean; description: string; action: (p
 const emit = defineEmits<{ 'update:modelValue': [boolean] }>();
 const auth = useAuthStore();
 const password = ref(''), error = ref(''), busy = ref(false), input = ref<HTMLInputElement>();
+let ownerId = auth.user?.id;
 function close() { if (!busy.value) { password.value = ''; emit('update:modelValue', false); } }
 async function submit() {
-  if (busy.value || !password.value) return;
+  if (busy.value || !password.value || password.value.length > 256 || !props.modelValue) return;
+  if (!ownerId || auth.user?.id !== ownerId) { password.value = ''; emit('update:modelValue', false); return; }
   busy.value = true; error.value = '';
   const value = password.value; password.value = '';
   try { await props.action(value); emit('update:modelValue', false); }
   catch (e) { error.value = e instanceof Error ? e.message : 'No se pudo confirmar la operación.'; }
   finally { busy.value = false; await nextTick(); input.value?.focus(); }
 }
-watch(() => props.modelValue, async value => { password.value = ''; error.value = ''; if (value) { await nextTick(); input.value?.focus(); } });
+watch(() => props.modelValue, async value => {
+  password.value = ''; error.value = '';
+  if (value) { ownerId = auth.user?.id; await nextTick(); input.value?.focus(); }
+}, { immediate: true });
+watch(() => auth.user?.id, () => { password.value = ''; error.value = ''; emit('update:modelValue', false); });
 onBeforeUnmount(() => { password.value = ''; });
 </script>
