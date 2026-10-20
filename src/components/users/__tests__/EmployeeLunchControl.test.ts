@@ -5,12 +5,12 @@ import type { EmployeeLunchState } from '@/services/MainAPI/employeeLunchApi';
 
 const mocks = vi.hoisted(() => ({
   api: { me: vi.fn(), branch: vi.fn(), change: vi.fn() },
-  auth: { isKitchen: false, user: { id: 1 }, logout: vi.fn() },
-  push: vi.fn(),
+  auth: { isKitchen: false, user: { id: 1, role: 'Cashier', accountType: 'personal' }, logout: vi.fn() },
+  route: { path: '/orders' }, push: vi.fn(),
 }));
 vi.mock('@/store/auth', () => ({ useAuthStore: () => mocks.auth }));
 vi.mock('@/store/branchContext', () => ({ useBranchContextStore: () => ({ selectedBranchId: 1 }) }));
-vi.mock('vue-router', () => ({ useRouter: () => ({ push: mocks.push }) }));
+vi.mock('vue-router', () => ({ useRouter: () => ({ push: mocks.push }), useRoute: () => mocks.route }));
 vi.mock('@/composables/useSignalR', () => ({ useSignalR: () => ({ on: vi.fn(), off: vi.fn(), connectionState: { value: 'disconnected' } }) }));
 vi.mock('@/services/MainAPI/employeeLunchApi', async importOriginal => ({
   ...await importOriginal<object>(), employeeLunchApi: mocks.api,
@@ -21,7 +21,11 @@ const idle = (id = 1): EmployeeLunchState => ({
 });
 const lunch = { id: 7, startedAt: '2026-10-19T17:00:00Z', endedAt: null, updatedAt: '2026-10-19T17:00:00Z' };
 let wrapper: VueWrapper;
-beforeEach(() => { vi.clearAllMocks(); mocks.auth.isKitchen = false; document.body.innerHTML = '<div id="app"></div>'; });
+beforeEach(() => {
+  vi.clearAllMocks(); mocks.auth.isKitchen = false;
+  mocks.auth.user = { id: 1, role: 'Cashier', accountType: 'personal' };
+  mocks.route.path = '/orders'; document.body.innerHTML = '<div id="app"></div>';
+});
 afterEach(() => { wrapper?.unmount(); document.body.innerHTML = ''; });
 const show = async () => { wrapper = mount(EmployeeLunchControl, { attachTo: '#app' }); await flushPromises(); };
 const password = async () => {
@@ -37,15 +41,12 @@ describe('almuerzos', () => {
     await show();
     expect(document.getElementById('app')!.inert).not.toBe(true);
     expect(document.querySelector('[role="dialog"]')).toBeNull();
-    await wrapper.get('button').trigger('click');
-    await flushPromises();
+    await wrapper.get('button').trigger('click'); await flushPromises();
     expect(document.body.textContent).toContain('Error interno del servidor');
     expect(document.querySelector<HTMLButtonElement>('button[type="submit"]')!.disabled).toBe(true);
   });
-
   it('recupera una salida guardada cuando se pierde su respuesta y mantiene el bloqueo', async () => {
-    let server = idle();
-    mocks.api.me.mockImplementation(async () => server);
+    let server = idle(); mocks.api.me.mockImplementation(async () => server);
     mocks.api.change.mockImplementation(async () => { server = { ...server, activeLunch: lunch }; throw new Error('Se perdió la conexión'); });
     await show(); await wrapper.get('button').trigger('click'); await flushPromises();
     await password(); await submit();
@@ -55,21 +56,17 @@ describe('almuerzos', () => {
     expect(document.getElementById('app')!.inert).toBe(true);
     expect(mocks.api.change).toHaveBeenCalledTimes(1);
   });
-
   it('exige consultar de nuevo cuando falla la recuperación y no repite la escritura', async () => {
     mocks.api.me.mockResolvedValue(idle());
     await show(); await wrapper.get('button').trigger('click'); await flushPromises();
-    mocks.api.change.mockRejectedValue(new Error('Error de red'));
-    mocks.api.me.mockRejectedValue(new Error('Sin conexión'));
+    mocks.api.change.mockRejectedValue(new Error('Error de red')); mocks.api.me.mockRejectedValue(new Error('Sin conexión'));
     await password(); await submit();
     expect(document.querySelector<HTMLButtonElement>('button[type="submit"]')!.disabled).toBe(true);
     expect(mocks.api.change).toHaveBeenCalledTimes(1);
     expect(document.getElementById('app')!.inert).toBe(true);
   });
-
   it('permite seleccionar cocineros individuales sin bloquear la pantalla compartida', async () => {
-    mocks.auth.isKitchen = true;
-    mocks.api.me.mockResolvedValue({ ...idle(), role: 'Kitchen' });
+    mocks.auth.isKitchen = true; mocks.auth.user = { id: 10, role: 'Kitchen', accountType: 'terminal' };
     mocks.api.branch.mockResolvedValue({ items: [idle(2), idle(3), idle(4)], totalCount: 3, page: 1, totalPages: 1 });
     mocks.api.change.mockResolvedValue(lunch);
     await show(); await wrapper.get('button').trigger('click'); await flushPromises();
@@ -78,5 +75,17 @@ describe('almuerzos', () => {
     await password(); await submit();
     expect(mocks.api.change).toHaveBeenCalledWith(expect.objectContaining({ userId: 3 }), 'personal-password', true);
     expect(document.getElementById('app')!.inert).not.toBe(true);
+    expect(mocks.api.me).not.toHaveBeenCalled();
+  });
+  it('la cuenta personal de cocina consulta solo su almuerzo', async () => {
+    mocks.auth.isKitchen = true; mocks.auth.user = { id: 1, role: 'Kitchen', accountType: 'personal' };
+    mocks.api.me.mockResolvedValue({ ...idle(), role: 'Kitchen' });
+    await show(); await wrapper.get('button').trigger('click'); await flushPromises();
+    expect(mocks.api.me).toHaveBeenCalled(); expect(mocks.api.branch).not.toHaveBeenCalled();
+    expect(document.querySelector('#lunch-employee')).toBeNull();
+  });
+  it('mantiene accesibles los permisos personales durante el almuerzo', async () => {
+    mocks.route.path = '/permisos'; mocks.api.me.mockResolvedValue({ ...idle(), activeLunch: lunch });
+    await show(); expect(document.getElementById('app')!.inert).not.toBe(true);
   });
 });

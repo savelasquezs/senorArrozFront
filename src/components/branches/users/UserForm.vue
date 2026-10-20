@@ -1,489 +1,144 @@
 <template>
-    <form @submit.prevent="handleSubmit" class="space-y-6">
+  <form @submit.prevent="handleSubmit" class="space-y-5">
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <BaseInput v-model="form.name" label="Nombre completo" required :maxlength="150" />
+      <BaseInput v-model="form.email" label="Correo" type="email" required :maxlength="100" />
+      <BaseInput v-model="form.phone" label="Teléfono" type="tel" required :maxlength="10"
+        placeholder="3001234567" :error="form.phone && !phoneValid ? 'Ingresa 10 dígitos; debe comenzar por 3 o 6.' : ''" />
+      <BaseSelect v-model="form.role" :options="roleOptions" label="Rol" required
+        value-key="value" display-key="label" :disabled="terminal" />
+    </div>
 
-        <!-- Personal Information -->
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+    <fieldset v-if="form.role === 'Kitchen'" class="rounded-lg border border-gray-200 p-4 space-y-3">
+      <legend class="px-1 text-sm font-medium">Tipo de cuenta de cocina</legend>
+      <template v-if="!user">
+        <label class="flex gap-2 text-sm"><input v-model="form.accountType" type="radio" value="personal" name="account-type" />
+          Persona: sus permisos, documentos, perfil y almuerzo.</label>
+        <label class="flex gap-2 text-sm"><input v-model="form.accountType" type="radio" value="terminal" name="account-type" />
+          Terminal: pantalla compartida de pedidos y almuerzos de los cocineros.</label>
+      </template>
+      <p v-else class="text-sm" data-testid="account-type">{{ terminal ? 'Terminal compartida' : 'Cuenta personal' }}.
+        El tipo no se cambia al editar; crea una cuenta separada para la pantalla.</p>
+      <label class="flex gap-2 text-sm"><input v-model="form.webAccessEnabled" type="checkbox" name="web-access" />
+        Habilitar acceso web a esta cuenta.</label>
+      <p class="text-xs text-gray-500">El acceso web no convierte una persona en terminal. No modifica su estado laboral ni su historial.</p>
+      <PasswordInput v-if="terminal && !user" v-model="form.confirmationPassword" label="Tu contraseña de administrador"
+        placeholder="Confirma quién crea la terminal" required autocomplete="current-password" :maxlength="256" />
+    </fieldset>
 
-            <BaseInput v-model="form.name" label="Nombre Completo" placeholder="Ej: Juan Pérez González" required
-                :error="errors.name" :maxlength="150">
-                <template #icon>
-                    <UserIcon class="w-4 h-4" />
-                </template>
-            </BaseInput>
+    <label v-if="canUseDeliveryApp" class="flex items-start gap-3 rounded-lg border border-gray-200 px-4 py-3 text-sm">
+      <input v-model="form.deliveryAppEnabled" type="checkbox" class="mt-1" />
+      <span>Habilitar app de domicilios<span class="block text-xs text-gray-500 mt-1">
+        Conserva su rol en la web. Iniciar sesión en una aplicación cierra la anterior.</span></span>
+    </label>
+    <div v-if="showBranchSelector" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <BaseSelect v-model="form.branchId" :options="branchOptions ?? []" label="Sucursal" required
+        value-key="value" display-key="label" />
+    </div>
+    <div v-if="!terminal" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <BaseSelect v-model="form.payrollExpenseId" :options="payrollExpenseOptions" label="Gasto de nómina (catálogo)"
+        placeholder="Sin asignar" value-key="value" display-key="label" />
+    </div>
+    <BaseAlert v-else variant="info">La terminal no tiene nómina, permisos propios ni acceso a domicilios.</BaseAlert>
 
-            <BaseInput v-model="form.email" label="Email" type="email" placeholder="usuario@ejemplo.com" required
-                :error="errors.email" :maxlength="100" @blur="validateEmail">
-                <template #icon>
-                    <AtSymbolIcon class="w-4 h-4" />
-                </template>
-            </BaseInput>
-        </div>
-
-        <!-- Contact and Role -->
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <BaseInput v-model="form.phone" label="Teléfono" type="tel" placeholder="3001234567" required
-                :error="errors.phone" :maxlength="10" @input="validatePhone">
-                <template #icon>
-                    <PhoneIcon class="w-4 h-4" />
-                </template>
-            </BaseInput>
-
-            <BaseSelect v-model="form.role" :options="roleOptions" label="Rol" placeholder="Seleccionar rol..." required
-                :error="errors.role" @change="validateRole" value-key="value" display-key="label">
-                <template #icon>
-                    <ShieldCheckIcon class="w-4 h-4" />
-                </template>
-            </BaseSelect>
-        </div>
-
-        <label v-if="canUseDeliveryApp" class="flex items-start gap-3 rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 cursor-pointer">
-            <input v-model="form.deliveryAppEnabled" type="checkbox"
-                class="mt-1 h-4 w-4 accent-emerald-600" />
-            <span class="text-sm text-gray-800">
-                <span class="font-medium">Habilitar app de domicilios</span>
-                <span class="block text-xs text-gray-500 mt-1">
-                    Puede usar Flutter como domiciliario con su misma cuenta. Conserva su rol en caja/administración.
-                    Al iniciar sesión en una aplicación se cierra la anterior.
-                </span>
-            </span>
-        </label>
-
-        <!-- Sucursal (solo superadmin al editar; mueve al usuario entre sedes) -->
-        <div v-if="showBranchSelector" class="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <BaseSelect v-model="form.branchId" :options="branchOptionsNormalized" label="Sucursal"
-                placeholder="Seleccionar sucursal..." required :error="errors.branchId" value-key="value"
-                display-key="label" @change="errors.branchId = ''">
-                <template #icon>
-                    <BuildingOffice2Icon class="w-4 h-4" />
-                </template>
-            </BaseSelect>
-        </div>
-
-        <!-- Gasto de nómina (catálogo): préstamos / quincena -->
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <BaseSelect v-model="form.payrollExpenseId" :options="payrollExpenseOptions" label="Gasto de nómina (catálogo)"
-                placeholder="Sin asignar…" value-key="value" display-key="label">
-                <template #icon>
-                    <BanknotesIcon class="w-4 h-4" />
-                </template>
-            </BaseSelect>
-        </div>
-
-        <!-- Role Constraints Alert -->
-        <label v-if="form.role === 'Kitchen'" class="flex items-start gap-3 text-sm">
-            <input v-model="form.webAccessEnabled" type="checkbox" class="mt-1" />
-            <span>Cuenta de pantalla compartida (acceso web). Déjalo desmarcado para un cocinero personal.</span>
-        </label>
-        <BaseAlert v-if="roleConstraintMessage" variant="warning">
-            {{ roleConstraintMessage }}
-        </BaseAlert>
-
-        <!-- Role Description -->
-        <BaseAlert v-if="selectedRoleDescription" variant="info">
-            <strong>{{ selectedRoleLabel }}:</strong>
-            {{ selectedRoleDescription }}
-        </BaseAlert>
-
-        <!-- Password fields (only for new users) -->
-        <div v-if="!user" class="space-y-4">
-            <div class="border-t border-gray-200 pt-6">
-                <h4 class="text-sm font-medium text-gray-900 mb-4">Configuración de Acceso</h4>
-
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <PasswordInput v-model="form.password" label="Contraseña"
-                        placeholder="Mínimo 8 caracteres" required :error="errors.password"
-                        @blur="validatePassword" />
-
-                    <PasswordInput v-model="form.confirmPassword" label="Confirmar Contraseña"
-                        placeholder="Repetir contraseña" required :error="errors.confirmPassword"
-                        @blur="validateConfirmPassword" />
-                </div>
-
-                <!-- Password Requirements -->
-                <div class="mt-4 bg-gray-50 rounded-lg p-4">
-                    <h5 class="text-sm font-medium text-gray-900 mb-2">Requisitos de la contraseña:</h5>
-                    <div class="grid grid-cols-2 gap-2 text-sm">
-                        <div class="flex items-center">
-                            <CheckIcon v-if="passwordChecks.length" class="w-4 h-4 text-green-500 mr-2" />
-                            <XMarkIcon v-else class="w-4 h-4 text-gray-400 mr-2" />
-                            <span :class="passwordChecks.length ? 'text-green-700' : 'text-gray-500'">
-                                Mínimo 8 caracteres
-                            </span>
-                        </div>
-                        <div class="flex items-center">
-                            <CheckIcon v-if="passwordChecks.uppercase" class="w-4 h-4 text-green-500 mr-2" />
-                            <XMarkIcon v-else class="w-4 h-4 text-gray-400 mr-2" />
-                            <span :class="passwordChecks.uppercase ? 'text-green-700' : 'text-gray-500'">
-                                Una mayúscula
-                            </span>
-                        </div>
-                        <div class="flex items-center">
-                            <CheckIcon v-if="passwordChecks.lowercase" class="w-4 h-4 text-green-500 mr-2" />
-                            <XMarkIcon v-else class="w-4 h-4 text-gray-400 mr-2" />
-                            <span :class="passwordChecks.lowercase ? 'text-green-700' : 'text-gray-500'">
-                                Una minúscula
-                            </span>
-                        </div>
-                        <div class="flex items-center">
-                            <CheckIcon v-if="passwordChecks.number" class="w-4 h-4 text-green-500 mr-2" />
-                            <XMarkIcon v-else class="w-4 h-4 text-gray-400 mr-2" />
-                            <span :class="passwordChecks.number ? 'text-green-700' : 'text-gray-500'">
-                                Un número
-                            </span>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Form Actions -->
-        <div class="flex justify-end space-x-3 pt-6 border-t border-gray-200">
-            <BaseButton @click="$emit('cancel')" variant="secondary" type="button">
-                Cancelar
-            </BaseButton>
-
-            <BaseButton type="submit" variant="primary" :loading="loading" :disabled="!isFormValid">
-                {{ user ? 'Actualizar' : 'Crear' }} Usuario
-            </BaseButton>
-        </div>
-    </form>
+    <div v-if="!user" class="border-t border-gray-200 pt-4 space-y-3">
+      <h4 class="text-sm font-medium">Credenciales de la nueva cuenta</h4>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <PasswordInput v-model="form.password" label="Contraseña de la nueva cuenta" required autocomplete="new-password" :maxlength="256" />
+        <PasswordInput v-model="form.confirmPassword" label="Repetir contraseña de la nueva cuenta" required autocomplete="new-password" :maxlength="256"
+          :error="form.confirmPassword && form.password !== form.confirmPassword ? 'Las contraseñas no coinciden.' : ''" />
+      </div>
+      <p class="text-xs text-gray-500">Mínimo 8 caracteres, una mayúscula, una minúscula y un número.</p>
+    </div>
+    <div class="flex justify-end gap-3 border-t border-gray-200 pt-4">
+      <BaseButton type="button" variant="secondary" :disabled="loading" @click="cancel">Cancelar</BaseButton>
+      <BaseButton type="submit" variant="primary" :loading="loading" :disabled="!valid || loading">
+        {{ user ? 'Actualizar usuario' : terminal ? 'Crear terminal' : 'Crear usuario' }}
+      </BaseButton>
+    </div>
+  </form>
 </template>
 
 <script setup lang="ts">
-import { reactive, computed, watch, onMounted, ref } from 'vue'
-import { useUsersStore } from '@/store/users'
-import { useAuthStore } from '@/store/auth'
-import type { UserRole } from '@/types/user'
-import BaseInput from '@/components/ui/BaseInput.vue'
-import BaseSelect from '@/components/ui/BaseSelect.vue'
-import BaseButton from '@/components/ui/BaseButton.vue'
-import BaseAlert from '@/components/ui/BaseAlert.vue'
-import PasswordInput from '@/components/ui/PasswordInput.vue'
-import {
-    UserIcon,
-    AtSymbolIcon,
-    PhoneIcon,
-    ShieldCheckIcon,
-    CheckIcon,
-    XMarkIcon,
-    BuildingOffice2Icon,
-    BanknotesIcon
-} from '@heroicons/vue/24/outline'
-import { expenseApi } from '@/services/MainAPI/expenseApi'
-import type { BranchUserSummary } from '@/types/common'
+import { reactive, computed, watch, onMounted, onBeforeUnmount, ref } from 'vue';
+import { useUsersStore } from '@/store/users';
+import { useAuthStore } from '@/store/auth';
+import type { UserRole } from '@/types/user';
+import type { AccountType } from '@/types/employeeLeave';
+import type { BranchUserSummary } from '@/types/common';
+import { expenseApi } from '@/services/MainAPI/expenseApi';
+import BaseInput from '@/components/ui/BaseInput.vue';
+import BaseSelect from '@/components/ui/BaseSelect.vue';
+import BaseButton from '@/components/ui/BaseButton.vue';
+import BaseAlert from '@/components/ui/BaseAlert.vue';
+import PasswordInput from '@/components/ui/PasswordInput.vue';
 
-interface Props {
-    user?: BranchUserSummary | null
-    branchId: number
-    /** Lista de sucursales para selector (superadmin al editar) */
-    branchOptions?: Array<{ value: number; label: string }>
-    loading?: boolean
+type AccountUser = BranchUserSummary & { accountType?: AccountType };
+const props = withDefaults(defineProps<{
+  user?: AccountUser | null; branchId: number;
+  branchOptions?: Array<{ value: number; label: string }>; loading?: boolean;
+}>(), { loading: false });
+const emit = defineEmits<{ submit: [data: Record<string, unknown>]; cancel: [] }>();
+const users = useUsersStore(), auth = useAuthStore();
+const form = reactive({ name: '', email: '', phone: '', role: '' as UserRole | '',
+  accountType: 'personal' as AccountType, webAccessEnabled: true, deliveryAppEnabled: false,
+  branchId: 0, payrollExpenseId: 0, password: '', confirmPassword: '', confirmationPassword: '' });
+const payrollExpenseOptions = ref<Array<{ value: number; label: string }>>([{ value: 0, label: 'Sin asignar' }]);
+const terminal = computed(() => form.accountType === 'terminal');
+const roleOptions = computed(() => users.availableRoles);
+const canUseDeliveryApp = computed(() => !terminal.value && (form.role === 'Admin' || form.role === 'Cashier'));
+const showBranchSelector = computed(() => auth.isSuperadmin && !!props.user && !!props.branchOptions?.length);
+const phoneValid = computed(() => /^[36]\d{9}$/.test(form.phone.trim()));
+const passwordValid = computed(() => form.password.length >= 8 && form.password.length <= 256
+  && /[A-Z]/.test(form.password) && /[a-z]/.test(form.password) && /\d/.test(form.password)
+  && form.password === form.confirmPassword);
+const valid = computed(() => !!form.name.trim() && form.name.length <= 150
+  && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim()) && form.email.length <= 100
+  && phoneValid.value && !!form.role && (!showBranchSelector.value || form.branchId > 0)
+  && (props.user || passwordValid.value)
+  && (!terminal.value || form.role === 'Kitchen' && (props.user || !!form.confirmationPassword && form.confirmationPassword.length <= 256)));
+
+function clearPasswords() { form.password = ''; form.confirmPassword = ''; form.confirmationPassword = ''; }
+function cancel() { clearPasswords(); emit('cancel'); }
+function handleSubmit() {
+  if (!valid.value || props.loading) return;
+  const payload: Record<string, unknown> = {
+    name: form.name.trim(), email: form.email.trim(), phone: form.phone.trim(), role: form.role,
+    deliveryAppEnabled: canUseDeliveryApp.value && form.deliveryAppEnabled,
+    payrollExpenseId: !terminal.value && form.payrollExpenseId > 0 ? form.payrollExpenseId : null,
+    ...(form.role === 'Kitchen' ? { webAccessEnabled: form.webAccessEnabled } : {})
+  };
+  if (props.user) {
+    payload.active = props.user.active;
+    if (showBranchSelector.value) payload.branchId = form.branchId;
+  } else {
+    payload.password = form.password;
+    payload.accountType = form.accountType;
+    if (terminal.value) payload.confirmationPassword = form.confirmationPassword;
+  }
+  clearPasswords();
+  emit('submit', payload);
 }
-
-const props = withDefaults(defineProps<Props>(), {
-    loading: false
-})
-
-const emit = defineEmits<{
-    submit: [data: any]
-    cancel: []
-}>()
-
-const usersStore = useUsersStore()
-const authStore = useAuthStore()
-
-const form = reactive({
-    name: '',
-    email: '',
-    phone: '',
-    role: '' as UserRole | '',
-    deliveryAppEnabled: false,
-    webAccessEnabled: false,
-    branchId: 0,
-    password: '',
-    confirmPassword: '',
-    payrollExpenseId: 0,
-})
-
-const payrollExpenseOptions = ref<Array<{ value: number; label: string }>>([{ value: 0, label: 'Sin asignar' }])
-
-const errors = reactive({
-    name: '',
-    email: '',
-    phone: '',
-    role: '',
-    branchId: '',
-    password: '',
-    confirmPassword: ''
-})
-
-const passwordChecks = reactive({
-    length: false,
-    uppercase: false,
-    lowercase: false,
-    number: false
-})
-
-const roleOptions = computed(() => usersStore.availableRoles)
-const canUseDeliveryApp = computed(() => form.role === 'Admin' || form.role === 'Cashier')
-
-const selectedRoleLabel = computed(() => {
-    if (!form.role) return ''
-    const option = roleOptions.value.find(r => r.value === form.role)
-    return option?.label || ''
-})
-
-const selectedRoleDescription = computed(() => {
-    const descriptions = {
-        admin: 'Gestión completa de la sucursal asignada',
-        cashier: 'Gestión de pedidos, clientes y caja',
-        kitchen: 'Visualización y gestión de pedidos en preparación',
-        deliveryman: 'Gestión de entregas y pedidos asignados'
-    } as Record<string, string>
-
-    return form.role ? descriptions[form.role] : ''
-})
-
-const roleConstraintMessage = computed(() => {
-    if (!form.role || !props.branchId) return ''
-
-
-
-    return ''
-})
-
-const showBranchSelector = computed(
-    () =>
-        authStore.isSuperadmin &&
-        !!props.user &&
-        (props.branchOptions?.length ?? 0) > 0
-)
-
-const branchOptionsNormalized = computed(() => props.branchOptions ?? [])
-
-const isFormValid = computed(() => {
-    const branchOk = !showBranchSelector.value || form.branchId > 0
-
-    const basicValidation = form.name.trim() &&
-        form.email.trim() &&
-        form.phone.trim() &&
-        form.role &&
-        branchOk &&
-        !errors.name &&
-        !errors.email &&
-        !errors.phone &&
-        !errors.role &&
-        !errors.branchId &&
-        !roleConstraintMessage.value
-
-    if (!props.user) {
-        // For new users, validate passwords
-        return basicValidation &&
-            form.password &&
-            form.confirmPassword &&
-            !errors.password &&
-            !errors.confirmPassword &&
-            passwordChecks.length &&
-            passwordChecks.uppercase &&
-            passwordChecks.lowercase &&
-            passwordChecks.number
-    }
-
-    return basicValidation
-})
-
-const validateEmail = () => {
-    const email = form.email.trim()
-
-    if (!email) {
-        errors.email = 'El email es requerido'
-        return
-    }
-
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-    if (!emailRegex.test(email)) {
-        errors.email = 'Ingresa un email válido'
-        return
-    }
-
-    errors.email = ''
-}
-
-const validatePhone = () => {
-    const phone = form.phone.trim()
-
-    if (!phone) {
-        errors.phone = 'El teléfono es requerido'
-        return
-    }
-
-    if (!/^[36]\d{9}$/.test(phone)) {
-        errors.phone = 'Debe ser un número válido (10 dígitos, celular con 3 o fijo con 6)'
-        return
-    }
-
-    errors.phone = ''
-}
-
-const validateRole = () => {
-    if (!form.role) {
-        errors.role = 'Selecciona un rol'
-        return
-    }
-
-    errors.role = ''
-}
-
-const validatePassword = () => {
-    const password = form.password
-
-    passwordChecks.length = password.length >= 8
-    passwordChecks.uppercase = /[A-Z]/.test(password)
-    passwordChecks.lowercase = /[a-z]/.test(password)
-    passwordChecks.number = /\d/.test(password)
-
-    if (!password) {
-        errors.password = 'La contraseña es requerida'
-        return
-    }
-
-    if (!passwordChecks.length || !passwordChecks.uppercase ||
-        !passwordChecks.lowercase || !passwordChecks.number) {
-        errors.password = 'La contraseña no cumple con los requisitos'
-        return
-    }
-
-    errors.password = ''
-
-    // Revalidate confirm password if it exists
-    if (form.confirmPassword) {
-        validateConfirmPassword()
-    }
-}
-
-const validateConfirmPassword = () => {
-    if (!form.confirmPassword) {
-        errors.confirmPassword = 'Confirma la contraseña'
-        return
-    }
-
-    if (form.password !== form.confirmPassword) {
-        errors.confirmPassword = 'Las contraseñas no coinciden'
-        return
-    }
-
-    errors.confirmPassword = ''
-}
-
-const validateForm = () => {
-    // Validate name
-    if (!form.name.trim()) {
-        errors.name = 'El nombre es requerido'
-    } else if (form.name.length > 150) {
-        errors.name = 'El nombre no puede tener más de 150 caracteres'
-    } else {
-        errors.name = ''
-    }
-
-    // Validate other fields
-    validateEmail()
-    validatePhone()
-    validateRole()
-
-    if (showBranchSelector.value) {
-        if (!form.branchId || form.branchId <= 0) {
-            errors.branchId = 'Selecciona una sucursal'
-        } else {
-            errors.branchId = ''
-        }
-    }
-
-    // Validate passwords for new users
-    if (!props.user) {
-        validatePassword()
-        validateConfirmPassword()
-    }
-}
-
-const handleSubmit = () => {
-    validateForm()
-
-    if (!isFormValid.value) {
-        return
-    }
-
-    const formData: Record<string, unknown> = {
-        name: form.name.trim(),
-        email: form.email.trim(),
-        phone: form.phone.trim(),
-        role: form.role,
-        deliveryAppEnabled: canUseDeliveryApp.value && form.deliveryAppEnabled,
-        ...(form.role === 'Kitchen' ? { webAccessEnabled: form.webAccessEnabled } : {})
-    }
-
-    if (!props.user) {
-        (formData as any).password = form.password
-    } else {
-        formData.active = props.user.active
-        if (showBranchSelector.value && form.branchId > 0) {
-            formData.branchId = form.branchId
-        }
-    }
-
-    formData.payrollExpenseId = form.payrollExpenseId > 0 ? form.payrollExpenseId : null
-
-    emit('submit', formData)
-}
-
-// Watch for user prop changes to populate form
-watch(() => props.user, (newUser) => {
-    if (newUser) {
-        form.name = newUser.name
-        form.webAccessEnabled = newUser.webAccessEnabled
-        form.email = newUser.email
-        form.phone = newUser.phone || ''
-        form.role = newUser.role
-        form.deliveryAppEnabled = !!newUser.deliveryAppEnabled
-        form.branchId = newUser.branchId
-        form.password = ''
-        form.confirmPassword = ''
-        form.payrollExpenseId = newUser.payrollExpenseId && newUser.payrollExpenseId > 0 ? newUser.payrollExpenseId : 0
-    } else {
-        // Reset form for new user
-        form.name = ''
-        form.email = ''
-        form.phone = ''
-        form.role = '' as UserRole | ''
-        form.deliveryAppEnabled = false
-        form.webAccessEnabled = false
-        form.branchId = props.branchId
-        form.password = ''
-        form.confirmPassword = ''
-        form.payrollExpenseId = 0
-    }
-
-    // Clear errors
-    Object.keys(errors).forEach(key => {
-        errors[key as keyof typeof errors] = ''
-    })
-
-    // Reset password validation
-    passwordChecks.length = false
-    passwordChecks.uppercase = false
-    passwordChecks.lowercase = false
-    passwordChecks.number = false
-}, { immediate: true })
-
+watch(() => form.accountType, () => {
+  form.confirmationPassword = '';
+  if (terminal.value) { form.role = 'Kitchen'; form.payrollExpenseId = 0; form.deliveryAppEnabled = false; }
+});
+watch(() => form.role, role => { if (role !== 'Kitchen') form.accountType = 'personal'; });
+watch(() => props.user, user => {
+  Object.assign(form, {
+    name: user?.name ?? '', email: user?.email ?? '', phone: user?.phone ?? '', role: user?.role ?? '',
+    accountType: user?.accountType ?? 'personal', webAccessEnabled: user?.webAccessEnabled ?? true,
+    deliveryAppEnabled: !!user?.deliveryAppEnabled, branchId: user?.branchId ?? props.branchId,
+    payrollExpenseId: user?.payrollExpenseId ?? 0
+  });
+  clearPasswords();
+}, { immediate: true });
+onBeforeUnmount(clearPasswords);
 onMounted(async () => {
-    try {
-        const res = await expenseApi.getAllExpenses()
-        const list = res.data ?? []
-        payrollExpenseOptions.value = [
-            { value: 0, label: 'Sin asignar' },
-            ...list.map((ex) => ({ value: ex.id, label: ex.name })),
-        ]
-    } catch {
-        /* catálogo opcional */
-    }
-})
+  try {
+    const response = await expenseApi.getAllExpenses();
+    payrollExpenseOptions.value = [{ value: 0, label: 'Sin asignar' },
+      ...(response.data ?? []).map(item => ({ value: item.id, label: item.name }))];
+  } catch { /* El catálogo de nómina es opcional; no impide gestionar accesos. */ }
+});
 </script>
