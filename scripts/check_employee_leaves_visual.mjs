@@ -94,7 +94,7 @@ try {
   await page.locator('.dp__menu').first().waitFor(); await capture('03-datepicker-over-dialog');
   await page.keyboard.press('Escape');
   if (!await page.getByRole('dialog').isVisible()) await openForm();
-  await page.locator('input[type=radio][value=days]').check();
+  await page.getByRole('radiogroup', { name: 'Duración' }).getByText('Días completos', { exact: true }).click();
   await capture('04-desktop-complete-days');
   await page.getByRole('button', { name: 'Revisar y enviar', exact: true }).click();
   await page.getByRole('heading', { name: 'Confirmar contraseña', exact: true }).waitFor();
