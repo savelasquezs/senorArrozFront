@@ -64,14 +64,13 @@ const aliases = ['@/store/auth', '@/store/employeeLeaves', '@/store/branchContex
   .map(find => ({ find, replacement: resolve(temp, 'fixtures.ts') }));
 aliases.push({ find: '@/components/layout/MainLayout.vue', replacement: resolve(temp, 'Layout.vue') }, { find: '@', replacement: resolve(root, 'src') });
 const server = await createServer({ configFile: false, root, plugins: [vue(), tailwindcss()], resolve: { alias: aliases }, server: { host: '127.0.0.1', port: 4173, strictPort: true } });
-let browser;
+let browser, page;
 const errors = [];
 try {
   await server.listen(); browser = await chromium.launch();
   const context = await browser.newContext({ viewport: { width: 1440, height: 1000 }, locale: 'es-CO', timezoneId: 'America/Bogota', reducedMotion: 'reduce' });
-  // The renderer has no permission to reach a real API, telemetry endpoint, or external host.
   await context.route('**/*', route => new URL(route.request().url()).hostname === '127.0.0.1' ? route.continue() : route.abort());
-  const page = await context.newPage(); page.on('pageerror', error => errors.push(error.message));
+  page = await context.newPage(); page.on('pageerror', error => errors.push(error.message));
   page.setDefaultTimeout(15000);
   const url = 'http://127.0.0.1:4173/.leave-visual-tmp/index.html';
   async function capture(name, fullPage = false) {
@@ -82,7 +81,8 @@ try {
   async function openForm() {
     await page.getByRole('button', { name: 'Solicitar permiso', exact: true }).click();
     await page.locator('input[type=radio][value=paid]').check();
-    await page.getByRole('button', { name: 'Selecciona el motivo', exact: true }).click();
+    // The shared select's associated label is its accessible name, not the placeholder text.
+    await page.getByRole('button', { name: /Motivo del permiso/ }).click();
     await page.locator('body > div').getByText('Cita médica', { exact: true }).last().click();
     await page.locator('textarea').fill('Necesito asistir a una cita médica programada. Regresaré cuando finalice.');
     await page.locator('input[type=file]').setInputFiles({ name: 'confirmacion-cita.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-1.7\nVisual fixture only') });
@@ -118,6 +118,7 @@ try {
   console.log('Employee leave visual smoke passed; screenshots contain synthetic fixtures only.');
 } catch (error) {
   console.error(error);
+  if (page) await page.screenshot({ path: resolve(output, 'failed-screen.png'), fullPage: true }).catch(() => {});
   await writeFile(resolve(output, 'errors.json'), JSON.stringify({ error: String(error), browserErrors: errors }, null, 2));
   throw error;
 } finally { await browser?.close(); await server.close(); await rm(temp, { recursive: true, force: true }); }
