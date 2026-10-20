@@ -98,7 +98,7 @@ try {
   await page.getByRole('radiogroup', { name: 'Duración' }).getByText('Días completos', { exact: true }).click();
   await capture('04-desktop-complete-days');
   await page.getByRole('button', { name: 'Revisar y enviar', exact: true }).click();
-  await page.getByRole('heading', { name: 'Confirmar contraseña', exact: true }).waitFor();
+  await page.getByRole('heading', { name: 'Confirmar operación', exact: true }).waitFor();
   await capture('05-password-confirmation');
   await page.goto(url + '?detail=1'); await page.getByRole('heading', { name: 'Datos de la solicitud', exact: true }).waitFor();
   await capture('06-desktop-detail', true);
