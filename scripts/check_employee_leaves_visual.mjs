@@ -91,7 +91,7 @@ try {
   await capture('01-desktop-inbox', true);
   await openForm();
   const shownDate = await page.locator('.leave-datetime .dp__input').first().inputValue();
-  assert.match(shownDate, /^\\d{2}\\/\\d{2}\\/\\d{4}$/, 'Colombia dates must use dd/MM/yyyy without midnight');
+  assert.match(shownDate, /^\d{2}\/\d{2}\/\d{4}$/, 'Colombia dates must use dd/MM/yyyy without midnight');
   await capture('02-desktop-request-hours');
   await page.locator('.leave-datetime .dp__input').first().click();
   await page.locator('.dp__menu').first().waitFor(); await capture('03-datepicker-over-dialog');
