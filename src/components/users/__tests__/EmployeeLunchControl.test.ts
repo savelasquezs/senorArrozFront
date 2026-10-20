@@ -7,11 +7,12 @@ const mocks = vi.hoisted(() => ({
   api: { me: vi.fn(), branch: vi.fn(), change: vi.fn() },
   auth: { isKitchen: false, user: { id: 1, role: 'Cashier', accountType: 'personal' }, logout: vi.fn() },
   route: { path: '/orders' }, push: vi.fn(),
+  signalR: { on: vi.fn(), off: vi.fn() },
 }));
 vi.mock('@/store/auth', () => ({ useAuthStore: () => mocks.auth }));
 vi.mock('@/store/branchContext', () => ({ useBranchContextStore: () => ({ selectedBranchId: 1 }) }));
 vi.mock('vue-router', () => ({ useRouter: () => ({ push: mocks.push }), useRoute: () => mocks.route }));
-vi.mock('@/composables/useSignalR', () => ({ useSignalR: () => ({ on: vi.fn(), off: vi.fn(), connectionState: { value: 'disconnected' } }) }));
+vi.mock('@/composables/useSignalR', () => ({ useSignalR: () => ({ on: mocks.signalR.on, off: mocks.signalR.off, connectionState: { value: 'disconnected' } }) }));
 vi.mock('@/services/MainAPI/employeeLunchApi', async importOriginal => ({
   ...await importOriginal<object>(), employeeLunchApi: mocks.api,
 }));
@@ -22,7 +23,7 @@ const idle = (id = 1): EmployeeLunchState => ({
 const lunch = { id: 7, startedAt: '2026-10-19T17:00:00Z', endedAt: null, updatedAt: '2026-10-19T17:00:00Z' };
 let wrapper: VueWrapper;
 beforeEach(() => {
-  vi.clearAllMocks(); mocks.auth.isKitchen = false;
+  vi.clearAllMocks(); mocks.api.me.mockReset(); mocks.api.branch.mockReset(); mocks.api.change.mockReset(); mocks.auth.isKitchen = false;
   mocks.auth.user = { id: 1, role: 'Cashier', accountType: 'personal' };
   mocks.route.path = '/orders'; document.body.innerHTML = '<div id="app"></div>';
 });
@@ -87,5 +88,57 @@ describe('almuerzos', () => {
   it('mantiene accesibles los permisos personales durante el almuerzo', async () => {
     mocks.route.path = '/permisos'; mocks.api.me.mockResolvedValue({ ...idle(), activeLunch: lunch });
     await show(); expect(document.getElementById('app')!.inert).not.toBe(true);
+  });
+
+  it('oculta el indicador del navbar cuando nadie está almorzando', async () => {
+    mocks.auth.isKitchen = true; mocks.auth.user = { id: 10, role: 'Kitchen', accountType: 'terminal' };
+    mocks.api.branch.mockResolvedValue({ items: [idle(2)], totalCount: 1, page: 1, totalPages: 1 });
+    await show();
+    expect(wrapper.text()).toContain('Almuerzos');
+    expect(wrapper.find('[aria-controls="kitchen-lunch-active-list"]').exists()).toBe(false);
+    expect(wrapper.text()).not.toContain('Empleado 2');
+    expect(mocks.api.branch).toHaveBeenCalledWith(undefined, 1, 100);
+  });
+
+  it('muestra directamente el nombre y tiempo de un único cocinero en almuerzo', async () => {
+    mocks.auth.isKitchen = true; mocks.auth.user = { id: 10, role: 'Kitchen', accountType: 'terminal' };
+    mocks.api.branch.mockResolvedValue({ items: [{ ...idle(2), name: 'Carlos Ramírez', activeLunch: lunch }], totalCount: 1, page: 1, totalPages: 1 });
+    await show();
+    expect(wrapper.text()).toContain('Carlos Ramírez');
+    expect(wrapper.find('[aria-controls="kitchen-lunch-active-list"]').exists()).toBe(false);
+    expect(wrapper.find('[title="Carlos Ramírez está almorzando"]').exists()).toBe(true);
+  });
+
+  it('despliega una lista compacta cuando varios cocineros están almorzando', async () => {
+    mocks.auth.isKitchen = true; mocks.auth.user = { id: 10, role: 'Kitchen', accountType: 'terminal' };
+    mocks.api.branch.mockResolvedValue({
+      items: [{ ...idle(2), name: 'Carlos Ramírez', activeLunch: lunch }, { ...idle(3), name: 'María López', activeLunch: { ...lunch, id: 8 } }],
+      totalCount: 2, page: 1, totalPages: 1,
+    });
+    await show();
+    const trigger = wrapper.get('[aria-controls="kitchen-lunch-active-list"]');
+    expect(trigger.text()).toContain('2 almorzando');
+    expect(wrapper.find('#kitchen-lunch-active-list').exists()).toBe(false);
+    await trigger.trigger('click');
+    expect(wrapper.get('#kitchen-lunch-active-list').text()).toContain('Carlos Ramírez');
+    expect(wrapper.get('#kitchen-lunch-active-list').text()).toContain('María López');
+    document.body.dispatchEvent(new Event('pointerdown', { bubbles: true }));
+    await flushPromises();
+    expect(wrapper.find('#kitchen-lunch-active-list').exists()).toBe(false);
+  });
+
+  it('actualiza el navbar con SignalR y recoge empleados de todas las páginas', async () => {
+    mocks.auth.isKitchen = true; mocks.auth.user = { id: 10, role: 'Kitchen', accountType: 'terminal' };
+    mocks.api.branch.mockImplementation(async (_date: string | undefined, page: number) => ({
+      items: page === 1 ? [idle(2)] : [{ ...idle(3), name: 'Andrés Rojas', activeLunch: lunch }],
+      totalCount: 2, page, totalPages: 2,
+    }));
+    await show();
+    expect(mocks.api.branch).toHaveBeenCalledWith(undefined, 2, 100);
+    expect(wrapper.text()).toContain('Andrés Rojas');
+    const listener = mocks.signalR.on.mock.calls.find(([event]) => event === 'EmployeeLunchChanged')![1];
+    mocks.api.branch.mockResolvedValue({ items: [idle(2)], totalCount: 1, page: 1, totalPages: 1 });
+    await listener(); await flushPromises();
+    expect(wrapper.text()).not.toContain('Andrés Rojas');
   });
 });
