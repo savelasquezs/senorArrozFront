@@ -92,8 +92,9 @@ try {
   await openForm(); await capture('02-desktop-request-hours');
   await page.locator('.leave-datetime .dp__input').first().click();
   await page.locator('.dp__menu').first().waitFor(); await capture('03-datepicker-over-dialog');
-  await page.keyboard.press('Escape');
-  if (!await page.getByRole('dialog').isVisible()) await openForm();
+  await page.goto(url);
+  await page.getByRole('heading', { name: 'Permisos laborales', exact: true }).waitFor();
+  await openForm();
   await page.getByRole('radiogroup', { name: 'Duración' }).getByText('Días completos', { exact: true }).click();
   await capture('04-desktop-complete-days');
   await page.getByRole('button', { name: 'Revisar y enviar', exact: true }).click();
