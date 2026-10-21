@@ -50,7 +50,6 @@ import { useProductsStore } from '@/store/products'
 import { useProductCategoriesStore } from '@/store/productCategories'
 import { useAuthStore } from '@/store/auth'
 import { bootstrapOrderCatalog } from '@/utils/orderCatalogBootstrap'
-import { useBranchPosSettingsStore } from '@/store/branchPosSettings'
 import { buildOrderPosTabs } from '@/config/orderPosCategories'
 // Components
 import MainLayout from '@/components/layout/MainLayout.vue'
@@ -66,7 +65,6 @@ const ordersStore = useOrdersDraftsStore()
 const productsStore = useProductsStore()
 const productCategoriesStore = useProductCategoriesStore()
 const authStore = useAuthStore()
-const branchPosSettings = useBranchPosSettingsStore()
 const router = useRouter()
 const whatsappReturnConversationId = ref<number | null>(null)
 
@@ -115,7 +113,6 @@ const refreshTotals = () => {
 
 const initializeData = async () => {
     await ensureOrderPageData()
-    await branchPosSettings.ensureForBranch(ordersStore.activeBranchId ?? undefined)
     const conversationId = Number(localStorage.getItem('senor-arroz-whatsapp-conversation-tab') || 0)
     whatsappReturnConversationId.value = conversationId > 0 ? conversationId : null
 }
