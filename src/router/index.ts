@@ -13,6 +13,7 @@ function page(path: string, name: string, component: RouteRecordSingleView['comp
   return { path, name, component, meta: { requiresAuth, requiresRole: roles, title } };
 }
 const routes: RouteRecordRaw[] = [
+  page('/settings/electronic-invoicing', 'BusinessInvoicing', () => import('@/views/BusinessInvoicing.vue'), 'Facturación electrónica', ['Superadmin']),
   { path: '/', redirect: '/login' },
   page('/login', 'Login', Login, 'Iniciar Sesión', undefined, false),
   page('/forgot-password', 'ForgotPassword', () => import('@/views/ForgotPassword.vue'), 'Recuperar Contraseña', undefined, false),

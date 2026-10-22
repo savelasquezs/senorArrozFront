@@ -497,6 +497,22 @@ Validaciones implementadas antes de enviar un pedido al backend:
 
 **Próximos pasos**: Ver [API Reference](./api-reference.md) para implementación técnica de estas reglas.
 
+## Facturación electrónica
+
+- Si Plemsi devuelve el último consecutivo nulo, Superadmin puede confirmar expresamente un número disponible tras verificar DIAN y el proveedor anterior. La activación registra actor, fecha y respuesta. No permite reutilizar números conocidos ni omitir rango o vigencia; la numeración debe dedicarse al sistema.
+
+- La indisponibilidad de facturación ofrece continuar con Solo pedido, sin emisión silenciosa. La activación vuelve a consultar Plemsi y valida resolución, prefijo, rango, vigencia y un consecutivo confirmado; no se infiere desde el inicio del rango.
+- La emisión real requiere además ElectronicInvoicing__ProductionEnabled=true en el servidor; el valor por defecto es false. El detalle fiscal muestra el destinatario histórico del documento y el reenvío conserva ese correo.
+
+- Configuración y correo empresarial pertenecen al tenant, compartidos por sucursales y administrados por Superadmin. Plemsi es el primer proveedor; emisión real desactivada hasta completar y validar la cuenta.
+- El cliente admite varios destinatarios fiscales y un predeterminado. El modal compartido se abre desde el cliente, OrderSidebar y detalle del pedido. Guardar datos no emite facturas ni modifica documentos históricos.
+- Sin datos fiscales completos, Enviar pedido conserva el flujo actual; con datos se sugiere y exige confirmación explícita. No hay emisión automática a consumidor final.
+- Pedido y solicitud se guardan atómicamente. Las llamadas a Plemsi ocurren después del commit. Una falla fiscal no revierte un pedido creado. Reservas/programados emiten al entregarse.
+- Emitida exige validación DIAN y CUFE/CUDE. Un timeout se reconcilia consultando el mismo consecutivo, nunca generando otro documento. El estado del correo es independiente.
+- Solo Admin/Superadmin autorizan nota crédito total. La cancelación operativa puede dejar anulación fiscal pendiente. Una factura aceptada necesita nota crédito antes de corregir importes; los documentos impiden eliminar definitivamente el pedido.
+- Se conserva tratamiento inicial sin IVA ni INC, importes persistidos y descuentos/domicilio. Los archivos fiscales se guardan privados bajo aislamiento tenant y se descargan con autorización de pedido.
+- El correo del emisor es configurable y se sincroniza con Plemsi conservando otras direcciones; no se promete un remitente personalizado sin validación del proveedor.
+- Detalles de instalación, endpoints y pruebas: docs/ELECTRONIC_INVOICING.md del backend.
 ## Almuerzos del personal
 
 - Cada empleado registra salida y regreso con su contraseña personal; las horas oficiales son UTC del servidor. Un intervalo abierto determina el descanso, persiste entre sesiones y no se cierra automáticamente.

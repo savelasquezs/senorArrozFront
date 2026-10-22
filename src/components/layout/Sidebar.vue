@@ -93,6 +93,7 @@ const roleIcon = computed(() => {
 });
 const office = ['Superadmin', 'Admin', 'Cashier'], admins = ['Superadmin', 'Admin'];
 const navigationItems = computed((): NavItem[] => [
+  { name: 'Facturación electrónica', to: '/settings/electronic-invoicing', icon: CogIcon, roles: ['Superadmin'] },
   { name: 'Dashboard', to: '/dashboard', icon: HomeIcon, roles: admins },
   { name: 'Sucursales', to: '/branches', icon: BriefcaseIcon, roles: ['Superadmin'], children: branchSectionChildren.value },
   { name: 'Mi sucursal', to: `/branches/${authStore.user?.branchId}`, icon: BriefcaseIcon, roles: ['Admin'], children: branchSectionChildren.value },

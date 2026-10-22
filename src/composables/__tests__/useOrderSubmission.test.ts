@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { setActivePinia, createPinia } from 'pinia'
+import { nextTick } from 'vue'
 import { useOrderSubmission } from '@/composables/useOrderSubmission'
 import { useAuthStore } from '@/store/auth'
 import { useOrdersDraftsStore } from '@/store/ordersDrafts'
@@ -50,6 +51,27 @@ function minimalDraft(overrides: Partial<DraftOrder>): DraftOrder {
 }
 
 describe('useOrderSubmission', () => {
+    it('no rehidrata datos tributarios guardados por otro usuario', async () => {
+        const auth = useAuthStore(), store = useOrdersDraftsStore()
+        store.draftOrders.set('t1', minimalDraft({ billingOwnerUserId: 999, billingRecipient: { documentType: 6, identification: '123', name: 'Otra empresa' }, requestElectronicInvoice: true }))
+        store.saveToLocalStorage()
+        store.draftOrders.clear()
+        store.loadFromLocalStorage()
+        expect(store.draftOrders.get('t1')?.billingRecipient).toBeNull()
+        expect(store.draftOrders.get('t1')?.requestElectronicInvoice).toBeUndefined()
+        if (auth.user) auth.user = { ...auth.user, id: 100 }
+        await nextTick()
+    })
+    it('solo adjunta datos fiscales cuando se confirmó la emisión', () => {
+        setActivePinia(createPinia())
+        const auth = useAuthStore()
+        auth.user = { id: 99, name: 'Test', email: 'test@test.com', phone: '', active: true, role: UserRole.CASHIER, branchId: 5, branchName: 'S1' }
+        const billingRecipient = { documentType: 6, identification: '900123456', name: 'Empresa' }
+        const { transformDraftToCreateDto } = useOrderSubmission()
+        expect(transformDraftToCreateDto(minimalDraft({ billingRecipient })).electronicInvoice).toBeUndefined()
+        expect(transformDraftToCreateDto(minimalDraft({ billingRecipient, requestElectronicInvoice: false })).electronicInvoice).toBeUndefined()
+        expect(transformDraftToCreateDto(minimalDraft({ billingRecipient, requestElectronicInvoice: true })).electronicInvoice).toEqual(billingRecipient)
+    })
     beforeEach(() => {
         setActivePinia(createPinia())
         const auth = useAuthStore()

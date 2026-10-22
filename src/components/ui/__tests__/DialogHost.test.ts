@@ -94,7 +94,7 @@ describe('DialogHost', () => {
     const result = promptDialog({ title: 'Valor', message: 'Ingresa un valor' })
     await flushPromises()
 
-    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
     await expect(result).resolves.toBeNull()
     wrapper.unmount()
   })

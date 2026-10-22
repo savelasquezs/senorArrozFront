@@ -34,6 +34,7 @@
 
 
                 <!-- Estadísticas a ancho completo del modal -->
+                <BillingRecipientAccess :customer-id="currentCustomer.id" />
                 <CustomerStatsCard
                     :customer="currentCustomer"
                     :show-actions="showActions"
@@ -100,6 +101,7 @@
 </template>
 
 <script setup lang="ts">
+import BillingRecipientAccess from './BillingRecipientAccess.vue'
 import { ref, watch, computed } from 'vue'
 import type { Customer } from '@/types/customer'
 import { useToast } from '@/composables/useToast'

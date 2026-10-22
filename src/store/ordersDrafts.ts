@@ -1,6 +1,6 @@
 // src/store/ordersDrafts.ts
 import { defineStore } from 'pinia'
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { useProductsStore } from './products'
 import { useCustomersStore } from './customers'
 import { useBanksStore } from './banks'
@@ -95,6 +95,15 @@ function buildFallbackCustomerForDraft(customerId: number, drafts: DraftOrder[])
 export const useOrdersDraftsStore = defineStore('ordersDrafts', () => {
     // ===== Estado =====
     const draftOrders = ref(new Map<string, DraftOrder>())
+    watch(() => useAuthStore().user?.id, (id) => {
+        for (const draft of draftOrders.value.values()) {
+            if (draft.billingOwnerUserId !== id) {
+                draft.billingRecipient = null
+                draft.requestElectronicInvoice = undefined
+                draft.billingOwnerUserId = undefined
+            }
+        }
+    })
     const currentTabId = ref<string | null>(null)
     const maxTabs = ref(5)
     const nextTabNumber = ref(1)
@@ -1386,6 +1395,8 @@ export const useOrdersDraftsStore = defineStore('ordersDrafts', () => {
             const legacyBranchId = authStore.branchId ?? null
             const migratedDrafts = data.draftOrders.map((order: any) => ({
                 ...order,
+                billingRecipient: order.billingOwnerUserId === authStore.user?.id ? order.billingRecipient : null,
+                requestElectronicInvoice: order.billingOwnerUserId === authStore.user?.id ? order.requestElectronicInvoice : undefined,
                 branchId: order.branchId ?? legacyBranchId,
                 workspaceBranchId: order.workspaceBranchId ?? order.branchId ?? legacyBranchId,
                 source: order.source ?? null,
