@@ -6,12 +6,13 @@ import { electronicInvoicingApi as api } from '@/services/MainAPI/electronicInvo
 import { useAuthStore } from '@/store/auth'
 import type { User } from '@/types/auth'
 
-vi.mock('@/services/MainAPI/electronicInvoicingApi', () => ({ electronicInvoicingApi: { integrations: vi.fn(), integrationAction: vi.fn(), saveIntegration: vi.fn() } }))
+vi.mock('@/services/MainAPI/electronicInvoicingApi', () => ({ electronicInvoicingApi: { availability: vi.fn(), integrations: vi.fn(), integrationAction: vi.fn(), saveIntegration: vi.fn() } }))
 const integration = { id: 1, name: 'Plemsi', environment: 'sandbox', isActive: false, hasToken: true, taxId: '123', legalName: 'Restaurante', billingEmail: 'emisor@example.com', resolution: '18760000001', prefix: 'SETT', nextNumber: 1, lastNumber: 100, validUntil: '2030-01-01T23:59:59Z', creditPrefix: 'NC', nextCreditNumber: 1, productionReady: false, productionEnabled: false, testedAt: '2026-10-20T15:00:00Z' }
 describe('Configuración empresarial de facturación', () => {
     beforeEach(() => {
         const pinia = createPinia(); setActivePinia(pinia); config.global.plugins = [pinia]; vi.resetAllMocks()
         useAuthStore().user = { id: 1, role: 'Superadmin' } as User
+        vi.mocked(api.availability).mockResolvedValue({ data: { enabled: false, productionEnabled: false } } as never)
         vi.mocked(api.integrations).mockResolvedValue({ data: [{ ...integration }] } as never)
     })
     it('bloquea producción e impide consultar con cambios sin guardar', async () => {
@@ -41,6 +42,26 @@ describe('Configuración empresarial de facturación', () => {
         const wrapper = mount(TenantElectronicInvoicing); await flushPromises()
         expect(wrapper.find('form').exists()).toBe(false)
         expect(api.integrations).not.toHaveBeenCalled()
+        wrapper.unmount()
+    })
+    it('permite registrar producción desde la primera integración cuando el servidor lo habilita', async () => {
+        vi.mocked(api.integrations).mockResolvedValue({ data: [] } as never)
+        vi.mocked(api.availability).mockResolvedValue({ data: { enabled: false, productionEnabled: true } } as never)
+        const wrapper = mount(TenantElectronicInvoicing); await flushPromises()
+        expect(wrapper.get('option[value="production"]').attributes('disabled')).toBeUndefined()
+        expect(wrapper.text()).not.toContain('La emisión real está bloqueada')
+        wrapper.unmount()
+    })
+    it('exige confirmar el consecutivo dedicado y envía esa confirmación al activar', async () => {
+        const wrapper = mount(TenantElectronicInvoicing, { global: { stubs: { Teleport: true } } }); await flushPromises()
+        await wrapper.findAll('button').find(b => b.text() === 'Activar pruebas')!.trigger('click'); await flushPromises()
+        const confirm = wrapper.findAll('button').find(b => b.text() === 'Confirmar')!
+        expect(confirm.attributes('disabled')).toBeDefined()
+        expect(wrapper.text()).toContain('Próximo documento: SETT1')
+        await wrapper.get('[role="dialog"] input[type="checkbox"]').setValue(true)
+        vi.mocked(api.integrationAction).mockResolvedValue({ data: {} } as never)
+        await confirm.trigger('click'); await flushPromises()
+        expect(api.integrationAction).toHaveBeenCalledWith(1, 'activation', { enabled: true, numberingConfirmed: true })
         wrapper.unmount()
     })
 })

@@ -10,7 +10,7 @@
             <ol class="grid grid-cols-2 gap-2 lg:grid-cols-4" aria-label="Preparación de facturación"><li v-for="step in readiness" :key="step.label" :class="step.ready ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-slate-200 bg-white text-slate-500'" class="rounded-xl border p-3 text-sm"><span class="font-semibold">{{ step.ready ? '✓' : '○' }} {{ step.label }}</span><p class="mt-1 text-xs">{{ step.detail }}</p></li></ol>
             <p v-if="dirty && form.id" role="status" class="rounded-xl bg-amber-50 p-3 text-sm text-amber-900">Hay cambios sin guardar. Guarda antes de consultar o activar.</p>
             <form class="space-y-5" @submit.prevent="save">
-                <fieldset class="rounded-2xl border border-slate-200 p-4 sm:p-5"><legend class="px-2 font-semibold text-slate-900">1. Conexión con Plemsi</legend><p class="mb-4 text-sm text-slate-500">Usa el token que soporte entregue para esta empresa y este ambiente.</p><div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <fieldset class="rounded-2xl border border-slate-200 p-4 sm:p-5"><legend class="px-2 font-semibold text-slate-900">1. Conexión con Plemsi</legend><p class="mb-4 text-sm text-slate-500">Usa la API key de esta empresa autorizada por Plemsi para el ambiente seleccionado.</p><div class="grid grid-cols-1 gap-4 md:grid-cols-2">
                     <label class="text-sm">Nombre de integración<input v-model.trim="form.name" required maxlength="100" class="mt-1 min-h-11 w-full rounded-xl border border-slate-300 bg-white p-3 focus:border-emerald-500 focus:outline-emerald-500" :disabled="form.isActive || busy" /></label>
                     <label class="text-sm">Ambiente<select v-model="form.environment" class="mt-1 min-h-11 w-full rounded-xl border border-slate-300 bg-white p-3 focus:border-emerald-500 focus:outline-emerald-500" :disabled="form.isActive || busy"><option value="sandbox">Pruebas</option><option value="production" :disabled="!form.productionEnabled">Producción</option></select></label>
                     <label class="text-sm">Token API de Plemsi<input v-model.trim="form.token" type="password" autocomplete="new-password" :placeholder="form.hasToken ? 'Guardado; dejar vacío para conservar' : 'Token de esta empresa'" class="mt-1 min-h-11 w-full rounded-xl border border-slate-300 bg-white p-3 focus:border-emerald-500 focus:outline-emerald-500" :disabled="form.isActive || busy" /></label>
@@ -34,15 +34,15 @@
                 <p v-if="remainingNumbers" class="text-sm text-slate-600">Folios disponibles: {{ remainingNumbers }}</p>
                 <p class="text-xs text-slate-500">Una integración con documentos conserva emisor, ambiente y consecutivos. Para otra numeración registra una nueva integración.</p></fieldset>
                 <fieldset class="rounded-2xl border border-slate-200 p-4 sm:p-5"><legend class="px-2 font-semibold text-slate-900">4. Guardado y activación</legend>
-                    <label v-if="form.environment === 'production'" class="mb-4 flex items-start gap-2 text-sm"><input v-model="form.productionReady" type="checkbox" :disabled="form.isActive || !form.productionEnabled" />Confirmo habilitación DIAN, firma digital, numeración vigente y pruebas de factura/nota crédito completadas.</label>
+                    <label v-if="form.environment === 'production'" class="mb-4 flex items-start gap-2 text-sm"><input v-model="form.productionReady" type="checkbox" :disabled="form.isActive || !form.productionEnabled" />Confirmo que Plemsi y DIAN habilitaron al emisor, la firma digital y la resolución para producción.</label>
                     <p class="mb-4 text-sm text-slate-500">Guardar no activa la emisión. Al activar verificaremos nuevamente la resolución, el prefijo, el rango y el consecutivo con Plemsi.</p>
-                    <div class="flex flex-wrap gap-3"><BaseButton type="submit" class="min-h-11" :loading="busy" :disabled="form.isActive || busy">Guardar configuración</BaseButton><BaseButton v-if="form.id" type="button" class="min-h-11" :variant="form.isActive ? 'outline' : 'primary'" :disabled="busy || dirty || !form.isActive && !readyToActivate" @click="confirmActivation = true">{{ form.isActive ? 'Desactivar integración' : form.environment === 'sandbox' ? 'Activar pruebas' : 'Activar producción' }}</BaseButton></div>
+                    <div class="flex flex-wrap gap-3"><BaseButton type="submit" class="min-h-11" :loading="busy" :disabled="form.isActive || busy">Guardar configuración</BaseButton><BaseButton v-if="form.id" type="button" class="min-h-11" :variant="form.isActive ? 'outline' : 'primary'" :disabled="busy || dirty || !form.isActive && !readyToActivate" @click="numberingConfirmed = false; confirmActivation = true">{{ form.isActive ? 'Desactivar integración' : form.environment === 'sandbox' ? 'Activar pruebas' : 'Activar producción' }}</BaseButton></div>
                     <p v-if="!form.isActive && !readyToActivate" class="mt-3 text-xs text-amber-800">Completa conexión, emisor y numeración antes de activar. Producción requiere además habilitación en el servidor.</p>
                     <a href="https://ayuda.plemsi.com/para-empezar/habilitar-documentos-electronicos-dian" target="_blank" rel="noopener noreferrer" class="mt-4 inline-block text-sm text-emerald-700 underline">Guía Plemsi / DIAN</a>
                 </fieldset>
             </form>
         </template>
-        <BaseDialog v-model="confirmActivation" :dismissible="!busy" :title="form.isActive ? 'Desactivar facturación' : 'Activar facturación en ' + (form.environment === 'sandbox' ? 'pruebas' : 'producción')"><div class="space-y-4 text-sm"><p>{{ form.isActive ? 'No se aceptarán nuevas solicitudes con esta integración. Los documentos pendientes conservan su historial y procesamiento.' : 'Las solicitudes confirmadas por el cajero se enviarán a Plemsi en el ambiente seleccionado.' }}</p><p class="font-medium">{{ form.legalName }} · {{ form.taxId }} · {{ form.prefix }}</p><p v-if="error" role="alert" class="text-red-700">{{ error }}</p><div class="flex justify-end gap-2"><BaseButton variant="outline" :disabled="busy" @click="confirmActivation = false">Cancelar</BaseButton><BaseButton :loading="busy" @click="activate">Confirmar</BaseButton></div></div></BaseDialog>
+        <BaseDialog v-model="confirmActivation" :dismissible="!busy" :title="form.isActive ? 'Desactivar facturación' : 'Activar facturación en ' + (form.environment === 'sandbox' ? 'pruebas' : 'producción')"><div class="space-y-4 text-sm"><p>{{ form.isActive ? 'No se aceptarán nuevas solicitudes con esta integración. Los documentos pendientes conservan su historial y procesamiento.' : 'Las solicitudes confirmadas por el cajero se enviarán a Plemsi en el ambiente seleccionado.' }}</p><p class="font-medium">{{ form.legalName }} · {{ form.taxId }} · {{ form.prefix }}</p><p v-if="!form.isActive" class="rounded-xl bg-amber-50 p-3 text-amber-950">Próximo documento: {{ form.prefix }}{{ form.nextNumber }} · Resolución {{ form.resolution }}.</p><label v-if="!form.isActive" class="flex items-start gap-2"><input v-model="numberingConfirmed" type="checkbox" :disabled="busy" />Verifiqué el último consecutivo en DIAN y en el proveedor anterior. Este número está disponible y esta numeración será exclusiva de este sistema.</label><p v-if="error" role="alert" class="text-red-700">{{ error }}</p><div class="flex justify-end gap-2"><BaseButton variant="outline" :disabled="busy" @click="confirmActivation = false">Cancelar</BaseButton><BaseButton :loading="busy" :disabled="!form.isActive && !numberingConfirmed" @click="activate">Confirmar</BaseButton></div></div></BaseDialog>
     </section>
 </template>
 
@@ -54,7 +54,7 @@ import { useInvoiceResources } from '@/composables/useInvoiceResources'
 import { useAuthStore } from '@/store/auth'
 import { electronicInvoicingApi as api } from '@/services/MainAPI/electronicInvoicingApi'
 import type { InvoiceIntegration, InvoiceNumbering } from '@/types/electronicInvoicing'
-const auth = useAuthStore(), integrations = ref<InvoiceIntegration[]>([])
+const auth = useAuthStore(), integrations = ref<InvoiceIntegration[]>([]), productionEnabled = ref(false), numberingConfirmed = ref(false)
 const empty = (): InvoiceIntegration => ({ name: 'Plemsi', environment: 'sandbox', token: '', taxId: '', legalName: '', billingEmail: '', resolution: '', prefix: '', nextNumber: 1, lastNumber: 0, creditPrefix: 'NC', nextCreditNumber: 1, productionReady: false })
 const form = reactive<InvoiceIntegration>(empty()), expiry = ref(''), busy = ref(false), error = ref(''), message = ref('')
 const resolutions = ref<InvoiceNumbering[]>([])
@@ -62,7 +62,7 @@ const resources = useInvoiceResources(), numberingLoaded = ref(false), confirmAc
 const fingerprint = () => JSON.stringify({ ...form, validUntil: expiry.value })
 const dirty = computed(() => fingerprint() !== savedState.value)
 const readiness = computed(() => [
-    { label: 'Conexión', ready: !!form.hasToken && !!form.testedAt, detail: form.testedAt ? 'Token y NIT verificados' : 'Token de soporte y validación' },
+    { label: 'Conexión', ready: !!form.hasToken && !!form.testedAt, detail: form.testedAt ? 'Token y NIT verificados' : 'Token de empresa y validación' },
     { label: 'Emisor', ready: !!form.taxId && !!form.legalName && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.billingEmail), detail: 'Identidad y correo empresarial' },
     { label: 'Numeración', ready: !!form.resolution && !!form.prefix && form.nextNumber > 0 && form.nextNumber <= form.lastNumber && !!expiry.value && expiry.value >= new Date().toISOString().slice(0, 10), detail: 'Rango y vigencia por verificar al activar' },
     { label: 'Activación', ready: !!form.isActive, detail: form.isActive ? 'Solicitudes habilitadas' : 'Requiere confirmación' },
@@ -70,8 +70,8 @@ const readiness = computed(() => [
 const readyToActivate = computed(() => readiness.value.slice(0, 3).every(s => s.ready) && (form.environment === 'sandbox' || form.productionEnabled && form.productionReady))
 const formatDate = (value: string) => new Date(value).toLocaleString('es-CO', { timeZone: 'America/Bogota' })
 const remainingNumbers = ref('')
-function edit(i?: InvoiceIntegration) { for (const key of Object.keys(form)) delete (form as unknown as Record<string, unknown>)[key]; Object.assign(form, empty(), i ?? {}, { token: '' }); expiry.value = i?.validUntil?.slice(0, 10) || ''; resolutions.value = []; numberingLoaded.value = false; remainingNumbers.value = ''; savedState.value = fingerprint() }
-async function load() { integrations.value = (await api.integrations()).data ?? [] }
+function edit(i?: InvoiceIntegration) { for (const key of Object.keys(form)) delete (form as unknown as Record<string, unknown>)[key]; Object.assign(form, empty(), { productionEnabled: productionEnabled.value }, i ?? {}, { token: '' }); expiry.value = i?.validUntil?.slice(0, 10) || ''; resolutions.value = []; numberingLoaded.value = false; remainingNumbers.value = ''; savedState.value = fingerprint() }
+async function load() { const [list, availability] = await Promise.all([api.integrations(), api.availability()]); integrations.value = list.data ?? []; productionEnabled.value = availability.data?.productionEnabled === true }
 async function save() {
     if (busy.value) return
     busy.value = true; error.value = ''; message.value = ''
@@ -111,8 +111,8 @@ function chooseResolution(r: InvoiceNumbering) {
     form.resolution = r.resolution; form.prefix = r.prefix; form.lastNumber = r.to
     form.nextNumber = r.nextNumber ?? 0
     expiry.value = r.validUntil?.slice(0, 10) || ''
-    message.value = r.nextNumber == null ? 'El consecutivo sigue sin confirmar. Consulta con Plemsi antes de activar.' : 'Numeración seleccionada. Guarda y vuelve a consultar antes de activar.'
+    message.value = r.nextNumber == null ? 'Plemsi no informa el último consecutivo. Verifícalo en DIAN y en el proveedor anterior; escribe el próximo disponible antes de activar.' : 'Numeración seleccionada. Guarda y vuelve a consultar antes de activar.'
 }
-async function activate() { await action('activation', { enabled: !form.isActive }); if (!error.value) confirmActivation.value = false }
+async function activate() { await action('activation', { enabled: !form.isActive, numberingConfirmed: numberingConfirmed.value }); if (!error.value) confirmActivation.value = false }
 onMounted(async () => { if (auth.isSuperadmin) { try { await load(); edit(integrations.value[0]) } catch (e) { error.value = (e as Error).message } } })
 </script>
