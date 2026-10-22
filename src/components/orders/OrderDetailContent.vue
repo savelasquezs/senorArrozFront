@@ -1,6 +1,6 @@
 <template>
 	<div class="space-y-4 md:space-y-6" v-if="order">
-        <OrderElectronicInvoicing v-if="['Admin', 'Superadmin', 'Cashier'].includes(authStore.userRole ?? '')" :order-id="order.id" :customer-id="order.customerId" :status="order.status" />
+        <OrderElectronicInvoicing v-if="['Admin', 'Superadmin', 'Cashier'].includes(authStore.userRole ?? '')" :order-id="order.id" :customer-id="order.customerId" :status="order.status" :order="order" :stale="staleSnapshot" />
         <div v-if="isRemoteOrder" class="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-900">
             Pedido tomado desde esta sede · prepara y despacha <strong>{{ order.branchName }}</strong>.
             Los pagos ya registrados conservan sus bancos y aplicaciones originales.

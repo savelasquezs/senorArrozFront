@@ -51,6 +51,9 @@ export interface InvoiceDocument {
     creditRequested: boolean
     lastError?: string
     issuedAt?: string
+    createdAt?: string
+    submittedAt?: string
+    snapshotJson?: string
     recipientJson: string
     hasPdf: boolean
     hasXml: boolean
