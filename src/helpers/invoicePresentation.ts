@@ -23,7 +23,7 @@ export function invoiceProgress(d: InvoiceDocument) {
         { label: 'Solicitud guardada', state: d.status === 'cancelled' ? 'muted' : 'done', date: d.createdAt },
         { label: 'Transmisión a Plemsi', state: validated || d.dianRejected ? 'done' : d.status === 'rejected' ? 'error' : d.submittedAt || ['processing', 'verifying'].includes(d.status) ? 'active' : 'pending', date: d.submittedAt },
         { label: 'Validada DIAN', state: validated ? 'done' : d.dianRejected ? 'error' : 'pending', date: d.issuedAt },
-        { label: hasEmail ? d.emailStatus === 'accepted' ? 'Correo aceptado por Plemsi' : 'Envío de correo' : 'Sin correo', state: !hasEmail ? 'muted' : d.emailStatus === 'accepted' ? 'done' : validated ? 'active' : 'pending', date: undefined },
+        { label: hasEmail ? d.emailStatus === 'accepted' ? 'Correo aceptado por Plemsi' : d.emailStatus === 'sent' ? 'Correo aceptado para envío' : d.emailStatus === 'verifying' ? 'Correo por verificar' : d.emailStatus === 'failed' ? 'Error de correo' : 'Envío de correo' : 'Sin correo', state: !hasEmail ? 'muted' : ['accepted', 'sent'].includes(d.emailStatus) ? 'done' : ['failed', 'verifying'].includes(d.emailStatus) ? 'error' : validated ? 'active' : 'pending', date: d.emailSentAt ?? undefined },
     ]
 }
 
@@ -31,7 +31,7 @@ export interface InvoiceOrderSummary {
     id: number
     total: number
     delivery: number
-    lines: { name: string; quantity: number; unitPrice: number; discount: number; notes?: string | null }[]
+    lines: { name: string; quantity: number; unitPrice: number; discount: number; total?: number; notes?: string | null }[]
     payments: { label: string; amount: number }[]
     balance: number
     notes?: string | null
@@ -58,7 +58,8 @@ export function invoiceOrderSummary(order: OrderDetailView): InvoiceOrderSummary
 
 export function invoiceSnapshotSummary(snapshot?: string): InvoiceOrderSummary | null {
     try {
-        const data = JSON.parse(snapshot ?? '{}').order
+        const root = JSON.parse(snapshot ?? '{}')
+        const data = root.order
         if (!data?.lines || !Number.isFinite(data.Total)) return null
         const payments = [
             ...(data.bankPayments ?? []).filter((p: { SourceReservationDepositId?: number }) => !p.SourceReservationDepositId).map((p: { Amount: number }) => ({ label: 'Transferencia bancaria', amount: p.Amount })),
@@ -67,7 +68,7 @@ export function invoiceSnapshotSummary(snapshot?: string): InvoiceOrderSummary |
         ]
         if (data.PaidInStoreCashAmount > 0) payments.push({ label: 'Efectivo en caja', amount: data.PaidInStoreCashAmount })
         return { id: data.Id, total: data.Total, delivery: data.DeliveryFee ?? 0,
-            lines: data.lines.map((p: { name: string; Quantity: number; UnitPrice: number; Discount: number }) => ({ name: p.name, quantity: p.Quantity, unitPrice: p.UnitPrice, discount: p.Discount })),
+            lines: (root.fiscalLines ?? data.lines).map((p: { name: string; Quantity: number; UnitPrice: number; Discount: number; Net?: number }) => ({ name: p.name, quantity: p.Quantity, unitPrice: p.UnitPrice, discount: p.Discount, total: p.Net })),
             payments, balance: Math.max(0, data.Total - payments.reduce((sum: number, p: { amount: number }) => sum + p.amount, 0)) }
     } catch { return null }
 }

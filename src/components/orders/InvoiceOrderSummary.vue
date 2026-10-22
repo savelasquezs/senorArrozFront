@@ -8,7 +8,7 @@
             <thead class="border-b border-slate-100 text-xs text-slate-500"><tr><th class="px-4 py-3 text-left">Producto / valor unitario</th><th class="w-12 py-3 text-center">Cant.</th><th class="w-28 px-4 py-3 text-right">Importe</th></tr></thead>
             <tbody class="divide-y divide-slate-100"><tr v-for="(line, index) in summary.lines" :key="index">
                 <td class="break-words px-4 py-3"><p class="font-medium text-slate-800">{{ line.name }}</p><p class="mt-0.5 text-xs text-slate-500">{{ money(line.unitPrice) }} c/u<span v-if="line.discount"> · Descuento {{ money(line.discount) }}</span></p><p v-if="line.notes" class="text-xs text-slate-500">{{ line.notes }}</p></td>
-                <td class="text-center tabular-nums">{{ line.quantity }}</td><td class="px-4 text-right tabular-nums">{{ money(line.quantity * line.unitPrice - line.discount) }}</td>
+                <td class="text-center tabular-nums">{{ line.quantity }}</td><td class="px-4 text-right tabular-nums">{{ money(line.total ?? line.quantity * line.unitPrice - line.discount) }}</td>
             </tr></tbody>
         </table>
         <div class="grid gap-4 border-t border-slate-200 p-4 sm:grid-cols-2">

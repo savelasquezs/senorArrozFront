@@ -48,6 +48,10 @@ export interface InvoiceDocument {
     number?: number
     cufe?: string
     emailStatus: string
+    emailChannel?: 'plemsi' | 'application'
+    emailError?: string | null
+    emailSentAt?: string | null
+    pdfVersion?: number
     creditRequested: boolean
     lastError?: string
     dianRejected?: boolean

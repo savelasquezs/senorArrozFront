@@ -24,6 +24,33 @@ describe('Detalle fiscal del pedido', () => {
         vi.mocked(api.documents).mockResolvedValue({ data: [documentRow] } as never)
     })
     afterEach(() => vi.useRealTimers())
+    it('confirma un reenvío propio y advierte sobre la copia histórica de Plemsi', async () => {
+        vi.mocked(api.documentAction).mockResolvedValue({ data: {} } as never)
+        const wrapper = mount(OrderElectronicInvoicing, { props: { orderId: 1, customerId: 10, status: 'delivered' } })
+        await flushPromises()
+        const history = await openHistory(wrapper)
+        ;[...history.querySelectorAll('button')].find(b => b.textContent === 'Reenviar correo')!.click()
+        await flushPromises()
+        expect(api.documentAction).not.toHaveBeenCalled()
+        const confirm = [...document.querySelectorAll('[role="dialog"]')].find(d => d.textContent?.includes('Confirmar reenvío'))!
+        expect(confirm.textContent).toContain('historico@example.com')
+        expect(confirm.textContent).toContain('Plemsi ya envió una copia')
+        ;[...confirm.querySelectorAll('button')].find(b => b.textContent === 'Confirmar reenvío')!.click()
+        await flushPromises()
+        expect(api.documentAction).toHaveBeenCalledWith(1, 'email')
+        expect(api.request).not.toHaveBeenCalled()
+        wrapper.unmount()
+    })
+    it.each(['queued', 'verifying'])('impide otro correo mientras está %s', async emailStatus => {
+        vi.mocked(api.documents).mockResolvedValue({ data: [{ ...documentRow, emailChannel: 'application', emailStatus }] } as never)
+        const wrapper = mount(OrderElectronicInvoicing, { props: { orderId: 1, status: 'delivered' } })
+        await flushPromises()
+        const history = await openHistory(wrapper)
+        const email = [...history.querySelectorAll('button')].find(b => /Correo en cola|Envío por verificar/.test(b.textContent ?? ''))!
+        expect(email.disabled).toBe(true)
+        expect(api.documentAction).not.toHaveBeenCalled()
+        wrapper.unmount()
+    })
     it('muestra el destinatario histórico y oculta reenvío si ese documento no tiene correo', async () => {
         const wrapper = mount(OrderElectronicInvoicing, { props: { orderId: 1, customerId: 10, status: 'taken' } })
         await flushPromises()

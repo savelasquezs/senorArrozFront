@@ -518,8 +518,11 @@ Validaciones implementadas antes de enviar un pedido al backend:
 - Emitida exige validación DIAN y CUFE/CUDE. Un timeout se reconcilia consultando el mismo consecutivo, nunca generando otro documento. El estado del correo es independiente.
 - Solo Admin/Superadmin autorizan nota crédito total. La cancelación operativa puede dejar anulación fiscal pendiente. Una factura aceptada necesita nota crédito antes de corregir importes; los documentos impiden eliminar definitivamente el pedido.
 - Se conserva tratamiento inicial sin IVA ni INC, importes persistidos y descuentos/domicilio. Los archivos fiscales se guardan privados bajo aislamiento tenant y se descargan con autorización de pedido.
-- El correo del emisor es configurable y se sincroniza con Plemsi conservando otras direcciones; no se promete un remitente personalizado sin validación del proveedor.
+- La aplicación entrega PDF personalizado y XML validado mediante Resend; Plemsi no envía correos. El correo del tenant recibe respuestas (Reply-To) y el remitente usa una dirección verificada del sistema. Se conserva la entrega histórica de Plemsi sin reenviarla automáticamente. El reenvío exige confirmación y se bloquea mientras esté en cola o por verificar.
 - Detalles de instalación, endpoints y pruebas: docs/ELECTRONIC_INVOICING.md del backend.
+- El PDF se representa desde el XML validado, con CUFE/CUDE y QR en todas sus páginas. Los documentos nuevos incorporan los descuentos en precios finales; el domicilio y regalos se conservan. Los documentos históricos mantienen sus importes y medio de pago del XML. El historial nuevo dispone de líneas fiscales congeladas; la vista previa del pedido sigue mostrando el descuento operativo antes de confirmar.
+- El correo distingue en cola, aceptado para envío, fallido y por verificar. La aceptación de Resend no confirma entrega al buzón. Un resultado desconocido bloquea un nuevo mensaje para evitar duplicados.
+
 ## Almuerzos del personal
 
 - Cada empleado registra salida y regreso con su contraseña personal; las horas oficiales son UTC del servidor. Un intervalo abierto determina el descanso, persiste entre sesiones y no se cierra automáticamente.
