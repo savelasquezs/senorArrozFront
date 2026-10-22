@@ -8,7 +8,7 @@
 			:max-date="maxDate"
 			:min-date="minDate"
 			:enable-time-picker="false"
-			:format="format"
+			:formats="{ input: format }"
 			:auto-apply="autoApply"
 			:clearable="clearable"
 			:teleport="teleport"

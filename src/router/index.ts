@@ -1,480 +1,84 @@
-// src/router/index.ts
-import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router'
-import { useAuthStore } from '@/store/auth'
-import { useBranchContextStore } from '@/store/branchContext'
-import { hasAccessToken } from '@/services/auth/authSession'
-import { UserRole } from '@/types/auth'
+import { createRouter, createWebHistory, type RouteRecordRaw, type RouteRecordSingleView } from 'vue-router';
+import { useAuthStore } from '@/store/auth';
+import { useBranchContextStore } from '@/store/branchContext';
+import { hasAccessToken } from '@/services/auth/authSession';
+import { accountCanVisit, accountHome, safeReturnPath } from '@/helpers/employeeAccountAccess';
+import Login from '@/views/Login.vue';
 
-// Import views
-import Login from '@/views/Login.vue'
-// import Dashboard from '@/views/Dashboard.vue'
-
-const routes: RouteRecordRaw[] = [
-    {
-        path: '/settings/electronic-invoicing',
-        name: 'BusinessInvoicing',
-        component: () => import('@/views/BusinessInvoicing.vue'),
-        meta: { requiresAuth: true, requiresRole: [UserRole.SUPERADMIN], title: 'Facturación electrónica' }
-    },
-    {
-        path: '/',
-        redirect: '/login'
-    },
-    {
-        path: '/login',
-        name: 'Login',
-        component: Login,
-        meta: {
-            requiresAuth: false,
-            title: 'Iniciar Sesión'
-        }
-    },
-    {
-        path: '/forgot-password',
-        name: 'ForgotPassword',
-        component: () => import('@/views/ForgotPassword.vue'),
-        meta: {
-            requiresAuth: false,
-            title: 'Recuperar Contraseña'
-        }
-    },
-    {
-        path: '/reset-password',
-        name: 'ResetPassword',
-        component: () => import('@/views/ResetPassword.vue'),
-        meta: {
-            requiresAuth: false,
-            title: 'Restablecer Contraseña'
-        }
-    },
-    {
-        path: '/change-password',
-        name: 'ChangePassword',
-        component: () => import('@/views/ChangePassword.vue'),
-        meta: {
-            requiresAuth: true,
-            title: 'Cambiar Contraseña'
-        }
-    },
-    {
-        path: '/dashboard',
-        name: 'Dashboard',
-        component: () => import('@/views/Dashboard.vue'),
-        meta: {
-            requiresAuth: true,
-            requiresRole: [UserRole.SUPERADMIN, UserRole.ADMIN],
-            title: 'Dashboard'
-        }
-    },
-    {
-        path: '/branches',
-        name: 'BranchesList',
-        component: () => import('@/views/BranchesList.vue'),
-        meta: {
-            requiresAuth: true,
-            requiresRole: [UserRole.SUPERADMIN],
-            title: 'Sucursales'
-        }
-    },
-    {
-        path: '/branches/:id',
-        name: 'BranchDetail',
-        component: () => import('@/views/BranchDetail.vue'),
-        meta: {
-            requiresAuth: true,
-            requiresRole: [UserRole.SUPERADMIN, UserRole.ADMIN],
-            title: 'Detalle Sucursal'
-        }
-    },
-    {
-        path: '/customers',
-        name: 'CustomersList',
-        component: () => import('@/views/CustomersList.vue'),
-        meta: {
-            requiresAuth: true,
-            requiresRole: [UserRole.SUPERADMIN, UserRole.ADMIN, UserRole.CASHIER],
-            title: 'Clientes'
-        }
-    },
-    {
-        path: '/customers/:id(\\d+)',
-        redirect: to => ({
-            path: '/customers',
-            query: { ...to.query, detail: String(to.params.id) }
-        })
-    },
-    {
-        path: '/products',
-        name: 'ProductsList',
-        component: () => import('@/views/ProductsList.vue'),
-        meta: {
-            requiresAuth: true,
-            requiresRole: [UserRole.SUPERADMIN, UserRole.ADMIN],
-            title: 'Productos'
-        }
-    },
-    {
-        path: '/products/:id(\\d+)',
-        redirect: to => ({
-            path: '/products',
-            query: { detail: String(to.params.id) }
-        })
-    },
-    {
-        path: '/product-categories',
-        name: 'ProductCategoriesList',
-        component: () => import('@/views/ProductCategoriesList.vue'),
-        meta: {
-            requiresAuth: true,
-            requiresRole: [UserRole.SUPERADMIN, UserRole.ADMIN],
-            title: 'Categorías de Productos'
-        }
-    },
-    {
-        path: '/banks/:id',
-        name: 'BankDetail',
-        component: () => import('@/views/BankDetail.vue'),
-        meta: {
-            requiresAuth: true,
-            requiresRole: [UserRole.SUPERADMIN, UserRole.ADMIN],
-            title: 'Detalle Banco'
-        }
-    },
-    {
-        path: '/apps/:id',
-        name: 'AppDetail',
-        component: () => import('@/views/AppDetail.vue'),
-        meta: {
-            requiresAuth: true,
-            requiresRole: [UserRole.SUPERADMIN, UserRole.ADMIN],
-            title: 'Detalle App'
-        }
-    },
-    {
-        path: '/orders',
-        name: 'OrdersList',
-        component: () => import('@/views/OrdersList.vue'),
-        meta: {
-            requiresAuth: true,
-            requiresRole: [UserRole.SUPERADMIN, UserRole.ADMIN, UserRole.CASHIER],
-            title: 'Lista de Pedidos'
-        }
-    },
-    {
-        path: '/orders/new',
-        name: 'OrdersNew',
-        component: () => import('@/views/Orders.vue'),
-        meta: {
-            requiresAuth: true,
-            requiresRole: [UserRole.SUPERADMIN, UserRole.ADMIN, UserRole.CASHIER],
-            title: 'Nuevo Pedido'
-        }
-    },
-    {
-        path: '/orders/:id',
-        name: 'OrderDetail',
-        component: () => import('@/views/OrderDetail.vue'),
-        meta: {
-            requiresAuth: true,
-            requiresRole: [UserRole.SUPERADMIN, UserRole.ADMIN, UserRole.CASHIER],
-            title: 'Detalle del Pedido'
-        }
-    },
-    // {
-    //     path: '/delivery',
-    //     name: 'Delivery',
-    //     component: () => import('@/views/DeliveryView.vue'),
-    //     meta: {
-    //         requiresAuth: true,
-    //         requiresRole: [UserRole.SUPERADMIN, UserRole.ADMIN, UserRole.DELIVERYMAN],
-    //         title: 'Módulo de Domicilios'
-    //     }
-    // },
-
-
-    //   {
-    //     path: '/orders',
-    //     name: 'Orders',
-    //     component: () => import('@/views/Orders.vue'),
-    //     meta: {
-    //       requiresAuth: true,
-    //       requiresRole: ['Superadmin', 'Admin', 'Cashier'],
-    //       title: 'Pedidos'
-    //     }
-    //   },
-    {
-        path: '/kitchen',
-        name: 'Kitchen',
-        component: () => import('@/views/KitchenView.vue'),
-        meta: {
-            requiresAuth: true,
-            requiresRole: [UserRole.KITCHEN, UserRole.ADMIN, UserRole.SUPERADMIN],
-            title: 'Cocina'
-        }
-    },
-    {
-        path: '/delivery',
-        name: 'Delivery',
-        component: () => import('@/views/DeliveryView.vue'),
-        meta: {
-            requiresAuth: true,
-            requiresRole: [UserRole.DELIVERYMAN, UserRole.ADMIN, UserRole.SUPERADMIN],
-            title: 'Domicilios'
-        }
-    },
-    {
-        path: '/deliverymen',
-        name: 'DeliverymenManagement',
-        component: () => import('@/views/DeliverymenManagementView.vue'),
-        meta: {
-            requiresAuth: true,
-            requiresRole: [UserRole.SUPERADMIN, UserRole.ADMIN, UserRole.CASHIER],
-            title: 'Gestión de Domiciliarios'
-        }
-    },
-    //   {
-    //     path: '/customers',
-    //     name: 'Customers',
-    //     component: () => import('@/views/Customers.vue'),
-    //     meta: {
-    //       requiresAuth: true,
-    //       requiresRole: ['Superadmin', 'Admin', 'Cashier'],
-    //       title: 'Clientes'
-    //     }
-    //   },
-    //   {
-    //     path: '/products',
-    //     name: 'Products',
-    //     component: () => import('@/views/Products.vue'),
-    //     meta: {
-    //       requiresAuth: true,
-    //       requiresRole: ['Superadmin', 'Admin'],
-    //       title: 'Productos'
-    //     }
-    //   },
-    {
-        path: '/expenses',
-        name: 'Expenses',
-        component: () => import('@/views/ExpensesView.vue'),
-        meta: {
-            requiresAuth: true,
-            requiresRole: [UserRole.SUPERADMIN, UserRole.ADMIN, UserRole.CASHIER],
-            title: 'Gastos'
-        }
-    },
-    {
-        path: '/inventory',
-        name: 'Inventario',
-        component: () => import('@/views/InventoryView.vue'),
-        meta: {
-            requiresAuth: true,
-            requiresRole: [UserRole.SUPERADMIN, UserRole.ADMIN],
-            title: 'Inventario'
-        }
-    },
-    {
-        path: '/expenses/menu-attribution',
-        name: 'ExpenseMenuAttribution',
-        component: () => import('@/views/ExpenseMenuAttributionView.vue'),
-        meta: {
-            requiresAuth: true,
-            requiresRole: [UserRole.SUPERADMIN, UserRole.ADMIN],
-            title: 'Imputación gastos — menú'
-        }
-    },
-    {
-        path: '/cash-register',
-        name: 'CashRegister',
-        component: () => import('@/views/CashRegisterView.vue'),
-        meta: {
-            requiresAuth: true,
-            requiresRole: [UserRole.SUPERADMIN, UserRole.ADMIN, UserRole.CASHIER],
-            title: 'Cuadre de Caja'
-        }
-    },
-    {
-        path: '/delivery-incidents',
-        name: 'DeliveryTrackingIncidents',
-        component: () => import('@/views/DeliveryTrackingIncidentsView.vue'),
-        meta: {
-            requiresAuth: true,
-            requiresRole: [UserRole.SUPERADMIN, UserRole.ADMIN],
-            title: 'Revisión de seguimiento'
-        }
-    },
-    {
-        path: '/delivery-alerts',
-        name: 'DeliveryTrackingAlerts',
-        component: () => import('@/views/DeliveryTrackingAlertsView.vue'),
-        meta: {
-            requiresAuth: true,
-            requiresRole: [UserRole.SUPERADMIN, UserRole.ADMIN],
-            title: 'Alertas de seguimiento'
-        }
-    },
-    {
-        path: '/integrations/apps/rappi',
-        name: 'RappiOrders',
-        component: () => import('@/views/RappiOrdersView.vue'),
-        meta: {
-            requiresAuth: true,
-            requiresRole: [UserRole.SUPERADMIN, UserRole.ADMIN, UserRole.CASHIER],
-            title: 'Pedidos Rappi'
-        }
-    },
-    {
-        path: '/whatsapp',
-        name: 'WhatsApp',
-        component: () => import('@/views/WhatsAppView.vue'),
-        meta: {
-            requiresAuth: true,
-            requiresRole: [UserRole.SUPERADMIN, UserRole.ADMIN, UserRole.CASHIER],
-            title: 'WhatsApp'
-        }
-    },
-    {
-        path: '/whatsapp/templates',
-        name: 'WhatsAppTemplates',
-        component: () => import('@/views/WhatsAppTemplatesView.vue'),
-        meta: {
-            requiresAuth: true,
-            requiresRole: [UserRole.SUPERADMIN, UserRole.ADMIN, UserRole.CASHIER],
-            title: 'Plantillas WhatsApp'
-        }
-    },
-    {
-        path: '/whatsapp/settings',
-        name: 'WhatsAppChannelSettings',
-        component: () => import('@/views/WhatsAppChannelSettingsView.vue'),
-        meta: {
-            requiresAuth: true,
-            requiresRole: [UserRole.SUPERADMIN, UserRole.ADMIN],
-            title: 'Canal central de WhatsApp'
-        }
-    },
-    {
-        path: '/profile',
-        name: 'Profile',
-        component: () => import('@/views/Profile.vue'),
-        meta: {
-            requiresAuth: true,
-            title: 'Perfil'
-        }
-    },
-    {
-        path: '/documents',
-        name: 'BusinessDocuments',
-        component: () => import('@/views/BusinessDocumentsView.vue'),
-        meta: {
-            requiresAuth: true,
-            requiresRole: [
-                UserRole.SUPERADMIN,
-                UserRole.ADMIN,
-                UserRole.CASHIER,
-                UserRole.KITCHEN,
-                UserRole.DELIVERYMAN
-            ],
-            title: 'Documentos corporativos'
-        }
-    },
-    //   // 404 page
-    //   {
-    //     path: '/:pathMatch(.*)*',
-    //     name: 'NotFound',
-    //     component: () => import('@/views/NotFound.vue'),
-    //     meta: {
-    //       title: 'Página no encontrada'
-    //     }
-    //   }
-]
-
-const router = createRouter({
-    history: createWebHistory(),
-    routes,
-    scrollBehavior(_to, _from, savedPosition) {
-        if (savedPosition) {
-            return savedPosition
-        }
-        return { top: 0 }
-    }
-})
-
-// Navigation guards. Keep this guard limited to auth/authorization/context only:
-// route changes must never wait for page catalog/data prefetches.
-router.beforeEach(async (to, _from, next) => {
-    const authStore = useAuthStore()
-    const branchContext = useBranchContextStore()
-
-    // Initialize auth state if not already done
-    if (!authStore.isAuthenticated && hasAccessToken()) {
-        authStore.initializeAuth()
-    }
-
-    // Set page title
-    document.title = to.meta.title ? `${to.meta.title} - Señor Arroz` : 'Señor Arroz'
-
-    // Check if route requires authentication
-    if (to.meta.requiresAuth && !authStore.isAuthenticated) {
-        branchContext.reset()
-        return next('/login')
-    }
-
-    if (authStore.isAuthenticated && authStore.user) {
-        try {
-            await branchContext.initializeForUser(authStore.user)
-        } catch (error) {
-            // A temporary branch-options failure must not freeze navigation or poison the store.
-            // The context store remains uninitialized so a later navigation can retry.
-            console.error('No se pudo inicializar el contexto de sucursal:', error)
-        }
-    }
-
-    if (
-        authStore.isSuperadmin
-        && branchContext.isInitialized
-        && !branchContext.hasBranches
-        && !to.path.startsWith('/branches')
-    ) {
-        return next('/branches')
-    }
-
-    // If authenticated user tries to access login, redirect to dashboard
-    if (to.path === '/login' && authStore.isAuthenticated) {
-        const redirectPath = getRedirectPath(authStore.userRole)
-        return next(redirectPath)
-    }
-
-    // Check role-based access
-    if (to.meta.requiresRole && Array.isArray(to.meta.requiresRole)) {
-        const userRole = authStore.userRole
-        const allowedRoles = to.meta.requiresRole as string[]
-
-        if (!userRole || !allowedRoles.includes(userRole)) {
-            // Redirect to appropriate dashboard based on user role
-            const redirectPath = getRedirectPath(userRole)
-            return next(redirectPath)
-        }
-    }
-
-    next()
-})
-
-// Helper function to get redirect path based on role
-function getRedirectPath(role: string | null): string {
-    switch (role) {
-        case 'Superadmin':
-            return '/dashboard'
-        case 'Admin':
-            return '/orders/new'
-        case 'Cashier':
-            return '/customers'
-        case 'Kitchen':
-            return '/kitchen'
-        case 'Deliveryman':
-            return '/delivery'
-        default:
-            return '/dashboard'
-    }
+const admin = ['Superadmin', 'Admin'];
+const office = [...admin, 'Cashier'];
+const everybody = [...office, 'Kitchen', 'Deliveryman'];
+function page(path: string, name: string, component: RouteRecordSingleView['component'], title: string,
+  roles?: string[], requiresAuth = true): RouteRecordRaw {
+  return { path, name, component, meta: { requiresAuth, requiresRole: roles, title } };
 }
-
-export default router
+const routes: RouteRecordRaw[] = [
+  page('/settings/electronic-invoicing', 'BusinessInvoicing', () => import('@/views/BusinessInvoicing.vue'), 'Facturación electrónica', ['Superadmin']),
+  { path: '/', redirect: '/login' },
+  page('/login', 'Login', Login, 'Iniciar Sesión', undefined, false),
+  page('/forgot-password', 'ForgotPassword', () => import('@/views/ForgotPassword.vue'), 'Recuperar Contraseña', undefined, false),
+  page('/reset-password', 'ResetPassword', () => import('@/views/ResetPassword.vue'), 'Restablecer Contraseña', undefined, false),
+  page('/change-password', 'ChangePassword', () => import('@/views/ChangePassword.vue'), 'Cambiar Contraseña'),
+  page('/dashboard', 'Dashboard', () => import('@/views/Dashboard.vue'), 'Dashboard', admin),
+  page('/branches', 'BranchesList', () => import('@/views/BranchesList.vue'), 'Sucursales', ['Superadmin']),
+  page('/branches/:id', 'BranchDetail', () => import('@/views/BranchDetail.vue'), 'Detalle Sucursal', admin),
+  page('/almuerzos', 'EmployeeLunches', () => import('@/views/EmployeeLunchesView.vue'), 'Almuerzos', office),
+  page('/permisos', 'EmployeeLeaves', () => import('@/views/EmployeeLeavesView.vue'), 'Permisos laborales', everybody),
+  page('/permisos/:publicId', 'EmployeeLeaveDetail', () => import('@/views/EmployeeLeaveDetailView.vue'), 'Detalle de permiso', everybody),
+  page('/customers', 'CustomersList', () => import('@/views/CustomersList.vue'), 'Clientes', office),
+  { path: '/customers/:id(\\d+)', redirect: to => ({ path: '/customers', query: { ...to.query, detail: String(to.params.id) } }) },
+  page('/products', 'ProductsList', () => import('@/views/ProductsList.vue'), 'Productos', admin),
+  { path: '/products/:id(\\d+)', redirect: to => ({ path: '/products', query: { detail: String(to.params.id) } }) },
+  page('/product-categories', 'ProductCategoriesList', () => import('@/views/ProductCategoriesList.vue'), 'Categorías de Productos', admin),
+  page('/banks/:id', 'BankDetail', () => import('@/views/BankDetail.vue'), 'Detalle Banco', admin),
+  page('/apps/:id', 'AppDetail', () => import('@/views/AppDetail.vue'), 'Detalle App', admin),
+  page('/orders', 'OrdersList', () => import('@/views/OrdersList.vue'), 'Lista de Pedidos', office),
+  page('/orders/new', 'OrdersNew', () => import('@/views/Orders.vue'), 'Nuevo Pedido', office),
+  page('/orders/:id', 'OrderDetail', () => import('@/views/OrderDetail.vue'), 'Detalle del Pedido', office),
+  page('/kitchen', 'Kitchen', () => import('@/views/KitchenView.vue'), 'Cocina', [...admin, 'Kitchen']),
+  page('/delivery', 'Delivery', () => import('@/views/DeliveryView.vue'), 'Domicilios', [...admin, 'Deliveryman']),
+  page('/deliverymen', 'DeliverymenManagement', () => import('@/views/DeliverymenManagementView.vue'), 'Gestión de Domiciliarios', office),
+  page('/expenses', 'Expenses', () => import('@/views/ExpensesView.vue'), 'Gastos', office),
+  page('/inventory', 'Inventario', () => import('@/views/InventoryView.vue'), 'Inventario', admin),
+  page('/expenses/menu-attribution', 'ExpenseMenuAttribution', () => import('@/views/ExpenseMenuAttributionView.vue'), 'Imputación gastos — menú', admin),
+  page('/cash-register', 'CashRegister', () => import('@/views/CashRegisterView.vue'), 'Cuadre de Caja', office),
+  page('/delivery-incidents', 'DeliveryTrackingIncidents', () => import('@/views/DeliveryTrackingIncidentsView.vue'), 'Revisión de seguimiento', admin),
+  page('/delivery-alerts', 'DeliveryTrackingAlerts', () => import('@/views/DeliveryTrackingAlertsView.vue'), 'Alertas de seguimiento', admin),
+  page('/integrations/apps/rappi', 'RappiOrders', () => import('@/views/RappiOrdersView.vue'), 'Pedidos Rappi', office),
+  page('/whatsapp', 'WhatsApp', () => import('@/views/WhatsAppView.vue'), 'WhatsApp', office),
+  page('/whatsapp/templates', 'WhatsAppTemplates', () => import('@/views/WhatsAppTemplatesView.vue'), 'Plantillas WhatsApp', office),
+  page('/whatsapp/settings', 'WhatsAppChannelSettings', () => import('@/views/WhatsAppChannelSettingsView.vue'), 'Canal central de WhatsApp', admin),
+  page('/profile', 'Profile', () => import('@/views/Profile.vue'), 'Perfil'),
+  page('/documents', 'BusinessDocuments', () => import('@/views/BusinessDocumentsView.vue'), 'Documentos corporativos', everybody),
+];
+const router = createRouter({ history: createWebHistory(), routes,
+  scrollBehavior(_to, _from, savedPosition) { return savedPosition ?? { top: 0 }; },
+});
+let accountRefresh: Promise<boolean> | undefined;
+router.beforeEach(async (to, _from, next) => {
+  const auth = useAuthStore(), branches = useBranchContextStore();
+  if (!auth.isAuthenticated && hasAccessToken()) auth.initializeAuth();
+  document.title = to.meta.title ? `${to.meta.title} - Señor Arroz` : 'Señor Arroz';
+  // La sesión anterior a la migración consulta el tipo real; no lo deduce del rol Kitchen.
+  if (auth.isAuthenticated && auth.isKitchen && !auth.user?.accountType) {
+    accountRefresh ??= auth.refreshAccessToken().finally(() => { accountRefresh = undefined; });
+    await accountRefresh;
+    if (auth.isAuthenticated && !auth.user?.accountType) await auth.logout();
+  }
+  if (to.meta.requiresAuth && !auth.isAuthenticated) {
+    branches.reset(); return next({ path: '/login', query: { redirect: to.fullPath } });
+  }
+  if (auth.isAuthenticated && auth.user) {
+    try { await branches.initializeForUser(auth.user); }
+    catch (error) { console.error('No se pudo inicializar el contexto de sucursal:', error); }
+  }
+  if (auth.isSuperadmin && branches.isInitialized && !branches.hasBranches && !to.path.startsWith('/branches') && !to.path.startsWith('/permisos')) return next('/branches');
+  if (to.path === '/login' && auth.isAuthenticated) {
+    const target = safeReturnPath(to.query.redirect);
+    return next(target && router.resolve(target).matched.length ? target : accountHome(auth.user));
+  }
+  if (to.meta.requiresAuth && auth.user && !accountCanVisit(auth.user, to.path)) return next(accountHome(auth.user));
+  if (Array.isArray(to.meta.requiresRole) && (!auth.userRole || !to.meta.requiresRole.includes(auth.userRole))) return next(accountHome(auth.user));
+  next();
+});
+export default router;

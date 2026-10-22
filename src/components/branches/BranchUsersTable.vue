@@ -106,11 +106,11 @@
 
                         <td class="px-6 py-4 whitespace-nowrap">
                             <div class="flex items-center gap-2">
-                                <BaseBadge :variant="user.role !== 'Deliveryman' || user.webAccessEnabled ? 'success' : 'danger'">
-                                    {{ user.role !== 'Deliveryman' || user.webAccessEnabled ? 'Activo' : 'Bloqueado' }}
+                                <BaseBadge :variant="!['Deliveryman', 'Kitchen'].includes(user.role) || user.webAccessEnabled ? 'success' : 'danger'">
+                                    {{ !['Deliveryman', 'Kitchen'].includes(user.role) || user.webAccessEnabled ? 'Activo' : 'Bloqueado' }}
                                 </BaseBadge>
                                 <BaseButton
-                                    v-if="isSuperadmin && user.role === 'Deliveryman'"
+                                    v-if="isSuperadmin && ['Deliveryman', 'Kitchen'].includes(user.role)"
                                     @click="toggleWebAccess(user)"
                                     variant="outline"
                                     size="sm"

@@ -1,0 +1,80 @@
+/* Leave module only: reuse application controls, with consistent density and hierarchy. */
+.leaves-page { max-width: 1280px; margin: 0 auto; color: #182522; }
+.leaves-page *,.leave-form-shell * { box-sizing: border-box; }
+.leave-header { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 24px; }
+.leave-eyebrow { font-size: 11px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: #6b7d76; margin: 0 0 6px; }
+.leave-title { font-size: 26px; line-height: 1.2; letter-spacing: -.03em; font-weight: 650; margin: 0; }
+.leave-subtitle { font-size: 13px; color: #6b7d76; margin: 7px 0 0; line-height: 1.5; }
+.leave-panel { background: white; border: 1px solid #e2e9e5; border-radius: 16px; box-shadow: 0 2px 5px #172e2203; overflow: hidden; }
+.leave-panel-body { padding: 24px; }
+.leave-panel-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 18px 24px; border-bottom: 1px solid #edf1ee; }
+.leave-panel-heading h2 { font-size: 14px; font-weight: 650; margin: 0; }
+.leave-section { display: grid; gap: 16px; }
+.leave-section + .leave-section { padding-top: 24px; border-top: 1px solid #e9efeb; margin-top: 24px; }
+.leave-section-title { display: flex; align-items: center; gap: 9px; font-size: 13px; font-weight: 650; margin: 0; }
+.leave-step { display: inline-grid; place-content: center; border-radius: 7px; width: 24px; height: 24px; background: #edf7f1; color: #15744c; font-size: 11px; }
+.leave-label { display: block; color: #43594f; font-size: 12px; font-weight: 600; margin-bottom: 6px; }
+.leave-input { display: block; width: 100%; border: 1px solid #d2ddd6; border-radius: 9px; padding: 10px 12px; color: #21382b; background: #fff; font: inherit; font-size: 14px; line-height: 1.5; outline: none; }
+.leave-input:focus { border-color: #19936a; box-shadow: 0 0 0 3px #19936a14; }
+.leave-input:disabled { background: #f5f7f5; }
+.leave-input[aria-invalid="true"] { border-color: #ce5b5b; }
+.leave-help { font-size: 12px; line-height: 1.6; color: #6b7d76; }
+.leave-error { font-size: 12px; color: #a32e37; line-height: 1.5; margin-top: 6px; }
+.leave-alert { border-radius: 10px; padding: 12px 14px; font-size: 12px; line-height: 1.6; background: #f3f8f5; color: #365b45; border: 1px solid #e0ece4; }
+.leave-alert--warning { background: #fff9ed; border-color: #f3e6c8; color: #805b15; }
+.leave-alert--error { background: #fff4f4; border-color: #f4d7d7; color: #9b3038; }
+.leave-choice-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.leave-choice { display: flex; gap: 12px; align-items: center; padding: 16px; border: 1px solid #dfe8e2; border-radius: 12px; cursor: pointer; background: white; transition: border-color .15s,background .15s; }
+.leave-choice:has(input:checked) { background: #f1faf4; border-color: #239263; box-shadow: 0 0 0 1px #239263; }
+.leave-choice:has(input:focus-visible) { outline: 3px solid #9fdbc0; outline-offset: 3px; }
+.leave-choice input { accent-color: #188c5d; width: 16px; height: 16px; flex: none; }
+.leave-choice strong { display: block; font-size: 14px; }
+.leave-choice small { color: #738179; font-size: 11px; display: block; margin-top: 4px; }
+.leave-form-columns { display: grid; grid-template-columns: minmax(0,1fr) 220px; gap: 28px; }
+.leave-summary { background: #f5f8f6; border: 1px solid #e5ece7; border-radius: 12px; padding: 18px; align-self: start; position: sticky; top: 0; }
+.leave-summary dl { display: grid; gap: 16px; font-size: 12px; }
+.leave-summary dt { color: #6b7d76; margin-bottom: 4px; }
+.leave-summary dd { margin: 0; font-weight: 600; line-height: 1.5; overflow-wrap: anywhere; }
+.leave-datetime-fields { display: grid; grid-template-columns: minmax(0,1fr) 116px; gap: 8px; }
+.leave-datetime-fields > div { min-width: 0; max-width: none; }
+.leave-time-picker .dp__input { min-height: 40px; border-radius: 12px; font-size: 14px; border-color: #d1d5db; }
+/* Datepicker teleports outside the dialog; its documented CSS variable preserves the dialog layering. */
+:root { --dp-menu-index: 10010; }
+.leave-dropzone { display: grid; place-items: center; gap: 6px; border: 1.5px dashed #c8dbce; background: #f8fbf9; border-radius: 12px; padding: 20px 14px; text-align: center; cursor: pointer; position: relative; }
+.leave-dropzone:focus-within,.leave-dropzone:hover { border-color: #26996c; background: #f1faf4; }
+.leave-dropzone input { position: absolute; opacity: 0; inset: 0; width: 100%; height: 100%; cursor: pointer; }
+.leave-file { border: 1px solid #e3eae5; border-radius: 10px; padding: 12px; background: white; }
+.leave-file-top { display: flex; align-items: center; gap: 10px; }
+.leave-file-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; font-size: 13px; font-weight: 500; }
+.leave-file-actions { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 10px; }
+.leave-text-button { border: 0; background: none; padding: 2px 0; cursor: pointer; color: #128153; font-size: 12px; font-weight: 600; }
+.leave-text-button:disabled { opacity: .45; cursor: not-allowed; }
+.leave-badge { display: inline-flex; align-items: center; gap: 6px; padding: 5px 9px; border-radius: 7px; font-size: 11px; font-weight: 600; line-height: 1.2; white-space: nowrap; background: #f0f3f1; color: #617368; }
+.leave-badge-dot { border-radius: 50%; width: 5px; height: 5px; background: currentColor; }
+.leave-badge--approved,.leave-badge--verified,.leave-badge--paid { color: #157449; background: #e9f6ed; }
+.leave-badge--pending,.leave-badge--missing { color: #8b631b; background: #fff5df; }
+.leave-badge--postponed,.leave-badge--submitted { color: #326e9d; background: #eaf3fb; }
+.leave-badge--denied,.leave-badge--rejected { color: #aa4049; background: #fdeef0; }
+.leave-tabs { display: flex; gap: 22px; border-bottom: 1px solid #e2e9e5; margin-bottom: 20px; }
+.leave-tab { display: inline-flex; align-items: center; gap: 8px; padding: 0 2px 13px; border-bottom: 2px solid transparent; color: #79867e; font-size: 13px; text-decoration: none; }
+.leave-tab--active { color: #137a4f; border-bottom-color: #198c5d; font-weight: 650; }
+.leave-filterbar { display: flex; flex-wrap: wrap; align-items: end; gap: 12px; padding: 16px; margin-bottom: 20px; background: #f7f9f7; border-radius: 12px; border: 1px solid #e8eee9; }
+.leave-filterbar > div { min-width: 130px; flex: 1 1 140px; }
+.leave-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.leave-table th { background: #f9fbf9; color: #839087; font-size: 10px; letter-spacing: .07em; text-transform: uppercase; text-align: left; font-weight: 600; padding: 13px 20px; }
+.leave-table td { padding: 17px 20px; border-top: 1px solid #edf1ee; vertical-align: middle; }
+.leave-table tr:hover td { background: #fafdfb; }
+.leave-empty { display: grid; place-items: center; padding: 52px 20px; gap: 12px; text-align: center; }
+.leave-detail-grid { display: grid; grid-template-columns: minmax(0,1fr) 300px; gap: 24px; align-items: start; }
+.leave-detail-stack { display: grid; gap: 20px; }
+.leave-data-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+.leave-data-grid dt { font-size: 11px; color: #829087; margin-bottom: 5px; }
+.leave-data-grid dd { font-size: 13px; margin: 0; font-weight: 550; line-height: 1.5; }
+.leave-timeline { border-left: 1px solid #dce9e1; margin: 0 0 0 5px; padding: 0 0 0 18px; }
+.leave-timeline-item { position: relative; padding-bottom: 24px; }
+.leave-timeline-item:last-child { padding-bottom: 0; }
+.leave-timeline-item::before { content: ''; position: absolute; left: -23px; top: 5px; width: 9px; height: 9px; background: #69b291; border: 2px solid white; border-radius: 50%; }
+.leave-mobile-list { display: none; }
+@media(max-width: 900px) { .leave-form-columns { grid-template-columns: 1fr; } .leave-summary { display: none; } .leave-detail-grid { grid-template-columns: 1fr; } }
+@media(max-width: 640px) { .leave-title { font-size: 23px; } .leave-panel-body { padding: 18px; } .leave-panel-heading { padding: 15px 18px; } .leave-choice { padding: 12px; gap: 8px; } .leave-choice small { line-height: 1.4; } .leave-filterbar { padding: 12px; gap: 10px; } .leave-desktop-table { display: none; } .leave-mobile-list { display: block; } .leave-mobile-card { display: block; padding: 18px; border-bottom: 1px solid #edf1ee; color: inherit; text-decoration: none; } .leave-input { font-size: 16px; } .leave-data-grid { gap: 16px; } }
+@media(prefers-reduced-motion: reduce) { .leave-choice { transition: none; } }

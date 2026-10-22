@@ -496,6 +496,7 @@ const mapOrderEvents = [
     'OrderModified',
     'OrderStatusChanged',
     'OrderCancelled',
+    'OrderTransferred',
     'DeliveryRoutingPlanChanged',
     'RouteProposalClaimed',
 ]

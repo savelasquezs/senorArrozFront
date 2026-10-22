@@ -3,8 +3,8 @@
 		<Transition name="dialog">
 			<div
 				v-if="modelValue"
-				class="fixed inset-0 flex items-center justify-center p-4"
-				:class="zClass"
+				class="fixed inset-0 flex items-center justify-center"
+				:class="[zClass, mobileFullScreen ? 'p-0 sm:p-4' : 'p-4']"
 			>
 				<!-- Backdrop -->
 					<div class="fixed inset-0 bg-black/50 backdrop-blur-[2px] transition-opacity" @click="closeOnBackdrop && closeDialog()" />
@@ -16,8 +16,8 @@
 					:aria-labelledby="title ? titleId : undefined"
 					tabindex="-1"
 					aria-modal="true"
-					class="relative flex w-full max-h-[90vh] flex-col overflow-hidden rounded-2xl bg-white shadow-xl"
-					:class="[sizeClasses, panelClass]"
+					class="relative flex w-full flex-col overflow-hidden bg-white shadow-xl"
+					:class="[sizeClasses, panelClass, mobileFullScreen ? 'h-[100dvh] max-h-[100dvh] rounded-none sm:h-auto sm:max-h-[90vh] sm:rounded-2xl' : 'max-h-[90vh] rounded-2xl']"
 					@click.stop
 				>
 					<!-- Header -->
@@ -37,7 +37,7 @@
 					</div>
 
 					<!-- Content -->
-					<div class="min-h-0 overflow-y-auto p-6">
+					<div class="min-h-0 overflow-y-auto overscroll-contain p-6" :class="scrollBody ? 'flex-1' : undefined">
 						<slot />
 					</div>
 
@@ -71,6 +71,8 @@ interface Props {
 	dismissible?: boolean;
 	initialFocus?: string;
 	focusKey?: string | number;
+	scrollBody?: boolean;
+	mobileFullScreen?: boolean;
 	/** Capa del overlay (p. ej. z-50 por defecto; z-[60] para diálogos anidados). */
 	zClass?: string;
 	/** Clase adicional para el panel del diálogo. */
