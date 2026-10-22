@@ -223,7 +223,6 @@ const branchSectionChildren = computed<NavChild[]>(() => {
 		{ name: 'WhatsApp e IA', to: `${base}?section=whatsapp-ai`, section: 'whatsapp-ai' },
 		{ name: 'Bancos y apps', to: `${base}?section=banks-apps`, section: 'banks-apps' },
 		{ name: 'Apps', to: `${base}?section=integration-apps`, section: 'integration-apps' },
-		{ name: 'Factura electrónica', to: `${base}?section=electronic-invoicing`, section: 'electronic-invoicing' },
 		{ name: 'Integraciones de pago', to: `${base}?section=payment-integrations`, section: 'payment-integrations' },
 		{ name: 'Gastos', to: `${base}?section=expenses`, section: 'expenses' },
 		{ name: 'Fidelizacion', to: `${base}?section=loyalty`, section: 'loyalty' },
@@ -261,6 +260,7 @@ const roleIcon = computed(() => {
 });
 
 const navigationItems = computed((): NavItem[] => [
+	{ name: 'Facturación electrónica', to: '/settings/electronic-invoicing', icon: CogIcon, roles: ['Superadmin'] },
 	{
 		name: 'Dashboard',
 		to: '/dashboard',

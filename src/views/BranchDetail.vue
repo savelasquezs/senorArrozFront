@@ -172,9 +172,7 @@
                     :branch-id="branchId"
                 />
 
-                <BaseCard v-if="canEditBranchProfile && activeBranchSection === 'electronic-invoicing'">
-                    <div class="py-10 text-center"><h3 class="text-lg font-semibold">Factura electrónica</h3><p class="mt-2 text-sm text-gray-500">Aquí podrás crear y configurar proveedores como Siigo.</p><BaseButton class="mt-4" disabled>Crear proveedor</BaseButton></div>
-                </BaseCard>
+                <section v-if="canEditBranchProfile && activeBranchSection === 'electronic-invoicing'" class="rounded-xl bg-slate-50 p-5"><h2 class="font-semibold">Configuración empresarial</h2><p class="mt-2 text-sm text-slate-600">El emisor y el proveedor son compartidos por todas las sucursales.</p><RouterLink v-if="authStore.isSuperadmin" to="/settings/electronic-invoicing" class="mt-3 inline-flex min-h-11 items-center text-emerald-700 underline">Abrir facturación del negocio</RouterLink><p v-else class="mt-3 text-sm text-slate-500">Solicita la configuración a Superadmin.</p></section>
 
                 <BranchWompiPaymentSection
                     v-if="canEditBranchProfile && activeBranchSection === 'payment-integrations'"

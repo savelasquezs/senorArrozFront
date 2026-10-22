@@ -53,6 +53,7 @@ export function useOrderSubmission() {
 
         // Build the DTO
         const dto: CreateOrderDto = {
+            ...(draft.requestElectronicInvoice && draft.billingRecipient ? { electronicInvoice: draft.billingRecipient } : {}),
             branchId,
             posCreationKey: draft.posCreationKey ?? undefined,
             whatsappConversationId: draft.whatsappConversationId ?? undefined,

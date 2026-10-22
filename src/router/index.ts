@@ -11,6 +11,12 @@ import Login from '@/views/Login.vue'
 
 const routes: RouteRecordRaw[] = [
     {
+        path: '/settings/electronic-invoicing',
+        name: 'BusinessInvoicing',
+        component: () => import('@/views/BusinessInvoicing.vue'),
+        meta: { requiresAuth: true, requiresRole: [UserRole.SUPERADMIN], title: 'Facturación electrónica' }
+    },
+    {
         path: '/',
         redirect: '/login'
     },

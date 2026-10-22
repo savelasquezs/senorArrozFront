@@ -34,6 +34,7 @@
                             <OrderFulfillmentBranchSelector :order="currentOrder" />
                         </template>
                     </CustomerSection>
+                    <BillingRecipientAccess :key="currentOrder.tabId" :customer-id="currentOrder.customerId" :model-value="currentOrder.billingRecipient" order-context @update:model-value="updateBillingRecipient" label="Factura electrónica" />
 
                     <div v-if="showCopyAddressesButton" class="py-1">
                         <BaseButton type="button" variant="outline" size="sm" class="w-full"
@@ -358,12 +359,34 @@
         </BaseDialog>
 
         <!-- Customer Detail Modal -->
+        <BaseDialog v-model="showInvoiceConfirm" title="¿Enviar también la factura electrónica?" z-class="z-[80]">
+            <div class="rounded-xl bg-slate-50 p-4 text-sm space-y-1">
+                <p class="font-semibold text-slate-900">{{ pendingInvoiceOrder?.billingRecipient?.name }}</p>
+                <p class="text-slate-600">{{ pendingInvoiceOrder?.billingRecipient?.identification }}</p>
+                <p class="text-slate-600">{{ pendingInvoiceOrder?.billingRecipient?.email || 'Sin correo: podrás descargar la factura desde el pedido.' }}</p>
+            </div>
+            <div v-if="invoiceAvailabilityError" role="alert" class="mt-3 rounded-xl bg-amber-50 p-3 text-sm text-amber-900">
+                <p>{{ invoiceAvailabilityError }}</p><p class="mt-1">Puedes continuar con solo el pedido y solicitar la factura después desde su detalle.</p>
+                <button type="button" class="mt-2 min-h-11 underline" :disabled="checkingInvoiceAvailability" @click="retryInvoiceAvailability">{{ checkingInvoiceAvailability ? 'Consultando…' : 'Reintentar consulta' }}</button>
+            </div>
+            <p v-if="pendingInvoiceOrder?.reservedFor || pendingInvoiceOrder?.type === 'reservation'" class="mt-2 text-sm">La factura se emitirá al entregar el pedido.</p>
+            <p v-else class="mt-2 text-sm">El pedido pasará al sistema y la factura se procesará con Plemsi.</p>
+            <div class="mt-4 flex flex-wrap justify-end gap-2">
+                <BaseButton variant="outline" @click="showInvoiceConfirm = false">Volver</BaseButton>
+                <BaseButton variant="outline" @click="confirmInvoiceSubmit(false)">Solo pedido</BaseButton>
+                <BaseButton :disabled="!!invoiceAvailabilityError || checkingInvoiceAvailability" @click="confirmInvoiceSubmit(true)">Enviar pedido y factura</BaseButton>
+            </div>
+        </BaseDialog>
         <CustomerDetailModal v-if="selectedCustomer" :show="showCustomerDetail" :customer="selectedCustomer"
             @close="closeCustomerDetail" @customer-updated="handleCustomerUpdated" />
     </div>
 </template>
 
 <script setup lang="ts">
+import BillingRecipientAccess from '@/components/customers/BillingRecipientAccess.vue'
+import { billingRecipientComplete } from '@/composables/useBillingRecipients'
+import { useInvoiceResources } from '@/composables/useInvoiceResources'
+import type { BillingRecipient } from '@/types/electronicInvoicing'
 import { computed, ref, watch } from 'vue'
 import { useOrderPersistence } from '@/composables/useOrderPersistence'
 import { useOrderValidation } from '@/composables/useOrderValidation'
@@ -921,7 +944,26 @@ async function loadDuplicateCustomerOrderDateConflicts(order: DraftOrder): Promi
 }
 
 async function performSubmitOrder(order: DraftOrder, tabToClose: string | null) {
-    if (isSubmittingOrder.value) return
+    if (isSubmittingOrder.value || checkingInvoiceAvailability.value) return
+    if (order.requestElectronicInvoice === undefined && billingRecipientComplete(order.billingRecipient)) {
+        checkingInvoiceAvailability.value = true
+        invoiceAvailabilityError.value = ''
+        try {
+            const availability = await invoiceResources.getAvailability(true)
+            if (availability.enabled) {
+                pendingInvoiceOrder.value = order
+                pendingInvoiceTabId.value = tabToClose
+                showInvoiceConfirm.value = true
+                return
+            }
+        } catch (error: any) {
+            pendingInvoiceOrder.value = order
+            pendingInvoiceTabId.value = tabToClose
+            invoiceAvailabilityError.value = error?.message || 'No pudimos comprobar la disponibilidad de facturación.'
+            showInvoiceConfirm.value = true
+            return
+        } finally { checkingInvoiceAvailability.value = false }
+    }
     isSubmittingOrder.value = true
     try {
         await submitOrder(order)
@@ -938,6 +980,35 @@ async function performSubmitOrder(order: DraftOrder, tabToClose: string | null) 
     } finally {
         isSubmittingOrder.value = false
     }
+}
+
+const showInvoiceConfirm = ref(false)
+const invoiceResources = useInvoiceResources()
+const invoiceAvailabilityError = ref(''), checkingInvoiceAvailability = ref(false)
+async function retryInvoiceAvailability() {
+    checkingInvoiceAvailability.value = true
+    try {
+        const availability = await invoiceResources.getAvailability(true)
+        invoiceAvailabilityError.value = availability.enabled ? '' : 'La facturación no está activada para este negocio.'
+    } catch (e) { invoiceAvailabilityError.value = (e as Error).message }
+    finally { checkingInvoiceAvailability.value = false }
+}
+function updateBillingRecipient(recipient: BillingRecipient | null) {
+    if (!currentOrder.value) return
+    currentOrder.value.billingRecipient = recipient
+    currentOrder.value.billingOwnerUserId = authStore.user?.id
+    if (!currentOrder.value.posCreationKey) currentOrder.value.requestElectronicInvoice = undefined
+    ordersStore.saveToLocalStorage()
+}
+const pendingInvoiceOrder = ref<DraftOrder | null>(null)
+const pendingInvoiceTabId = ref<string | null>(null)
+async function confirmInvoiceSubmit(emitInvoice: boolean) {
+    const order = pendingInvoiceOrder.value, tab = pendingInvoiceTabId.value
+    showInvoiceConfirm.value = false
+    if (!order) return
+    order.requestElectronicInvoice = emitInvoice
+    ordersStore.saveToLocalStorage()
+    await performSubmitOrder(order, tab)
 }
 
 async function confirmDuplicateOrderAndSubmit() {

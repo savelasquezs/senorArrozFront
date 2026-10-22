@@ -104,6 +104,9 @@ export interface OrderAppPayment {
 
 // ===== TIPOS DE PEDIDOS EN BORRADOR (Sistema Nuevo) =====
 export interface DraftOrder {
+    billingRecipient?: import('./electronicInvoicing').BillingRecipient | null
+    billingOwnerUserId?: number
+    requestElectronicInvoice?: boolean
     tabId: string
     /** UUID estable por intento de creación, persistido para reintentos tras errores de red. */
     posCreationKey?: string
@@ -469,6 +472,7 @@ export interface OrderAppPaymentDetail {
 
 // ===== TIPOS PARA CREACIÓN/ACTUALIZACIÓN =====
 export interface CreateOrderDto {
+    electronicInvoice?: import('./electronicInvoicing').BillingRecipient
     branchId: number
     posCreationKey?: string
     whatsappConversationId?: number

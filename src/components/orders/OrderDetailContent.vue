@@ -1,5 +1,6 @@
 <template>
 	<div class="space-y-4 md:space-y-6" v-if="order">
+        <OrderElectronicInvoicing v-if="['Admin', 'Superadmin', 'Cashier'].includes(authStore.userRole ?? '')" :order-id="order.id" :customer-id="order.customerId" :status="order.status" />
         <div v-if="isRemoteOrder" class="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-900">
             Pedido tomado desde esta sede · prepara y despacha <strong>{{ order.branchName }}</strong>.
             Los cobros registrados corresponden a esa sucursal.
@@ -859,6 +860,7 @@
 </template>
 
 <script setup lang="ts">
+import OrderElectronicInvoicing from './OrderElectronicInvoicing.vue'
 import OrderTypeBadge from '@/components/orders/OrderTypeBadge.vue';
 import OrderSourceBadge from '@/components/orders/OrderSourceBadge.vue';
 import OrderProgressBar from '@/components/orders/OrderProgressBar.vue';

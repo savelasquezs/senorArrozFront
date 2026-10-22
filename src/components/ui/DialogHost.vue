@@ -7,6 +7,8 @@
     size="sm"
     z-class="z-[11000]"
     panel-class="global-dialog-host-panel"
+    :initial-focus="activeDialog?.type === 'prompt' ? 'input' : '[data-dialog-cancel]'"
+    :focus-key="activeDialog?.id"
     @update:model-value="handleOpenChange"
   >
     <div v-if="activeDialog" class="space-y-4">
@@ -40,7 +42,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, ref, watch } from 'vue'
 import { ExclamationTriangleIcon, QuestionMarkCircleIcon } from '@heroicons/vue/24/outline'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseDialog from '@/components/ui/BaseDialog.vue'
@@ -86,7 +88,6 @@ watch(
     promptValue.value = activeDialog.value?.type === 'prompt'
       ? activeDialog.value.options.defaultValue ?? ''
       : ''
-    if (activeDialog.value) focusInitialControl()
   },
   { immediate: true },
 )
@@ -113,37 +114,4 @@ function submitDialog() {
   resolveDialog(promptValue.value)
 }
 
-function handleKeydown(event: KeyboardEvent) {
-  if (!activeDialog.value) return
-  if (event.key === 'Escape') {
-    event.preventDefault()
-    event.stopPropagation()
-    cancelDialog()
-    return
-  }
-  if (event.key !== 'Tab') return
-
-  const panel = dialogPanel()
-  if (!panel) return
-  const focusable = Array.from(panel.querySelectorAll<HTMLElement>(
-    'button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
-  )).filter(element => !element.hasAttribute('hidden'))
-  if (focusable.length === 0) {
-    event.preventDefault()
-    return
-  }
-
-  const first = focusable[0]
-  const last = focusable[focusable.length - 1]
-  if (event.shiftKey && document.activeElement === first) {
-    event.preventDefault()
-    last.focus()
-  } else if (!event.shiftKey && document.activeElement === last) {
-    event.preventDefault()
-    first.focus()
-  }
-}
-
-onMounted(() => window.addEventListener('keydown', handleKeydown, true))
-onBeforeUnmount(() => window.removeEventListener('keydown', handleKeydown, true))
 </script>
