@@ -1,9 +1,11 @@
 import { BaseApi } from './baseApi'
 import type { ApiResponse } from '@/types/common'
-import type { BillingRecipient, InvoiceDocument, InvoiceIntegration } from '@/types/electronicInvoicing'
+import type { BillingRecipient, InvoiceDocument, InvoiceIntegration, InvoiceBranding } from '@/types/electronicInvoicing'
 
 class ElectronicInvoicingApi extends BaseApi {
     private base = '/electronic-invoicing'
+    branding() { return this.get<ApiResponse<InvoiceBranding | null>>(`${this.base}/branding`, { branchScope: 'none' }) }
+    saveBranding(dto: InvoiceBranding) { return this.post<ApiResponse<InvoiceBranding>>(`${this.base}/branding`, dto, { branchScope: 'none' }) }
     availability() { return this.get<ApiResponse<{ enabled: boolean; productionEnabled?: boolean }>>(`${this.base}/availability`, { branchScope: 'none' }) }
     integrations() { return this.get<ApiResponse<InvoiceIntegration[]>>(`${this.base}/integrations`, { branchScope: 'none' }) }
     saveIntegration(dto: InvoiceIntegration) { return this.post<ApiResponse<InvoiceIntegration>>(`${this.base}/integrations`, dto, { branchScope: 'none' }) }

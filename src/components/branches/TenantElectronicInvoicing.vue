@@ -6,8 +6,14 @@
         <p v-if="error" role="alert" class="sticky top-0 z-10 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800 shadow-sm">{{ error }}</p>
         <p v-if="message" role="status" class="sticky top-0 z-10 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800 shadow-sm">{{ message }}</p>
         <template v-if="auth.isSuperadmin">
+            <form class="rounded-2xl border border-slate-200 bg-white p-4 sm:p-5" @submit.prevent="saveBranding">
+                <h3 class="font-semibold text-slate-900">Identidad del restaurante en PDF y correo</h3>
+                <p class="mt-1 text-sm text-slate-500">Compartida por todas las sucursales y proveedores de este negocio. La razón social y el NIT aparecerán también como datos fiscales.</p>
+                <div class="mt-4 flex flex-wrap items-start gap-5"><div class="flex h-28 w-28 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white p-2"><img v-if="brandingPreview" :src="brandingPreview" alt="Logo del restaurante para facturas" class="max-h-full max-w-full object-contain" /><span v-else class="text-center text-xs text-slate-400">Logo del restaurante</span></div><div class="min-w-0 flex-1 space-y-3"><label class="block text-sm">Nombre comercial del restaurante<input v-model.trim="branding.displayName" required maxlength="150" :disabled="busy" class="mt-1 min-h-11 w-full rounded-xl border border-slate-300 bg-white p-3 focus:outline-emerald-500" /></label><label class="block text-sm">Logo PNG o JPG<input type="file" accept="image/png,image/jpeg,.png,.jpg,.jpeg" :disabled="busy" class="mt-1 block min-h-11 w-full text-sm file:mr-3 file:rounded-lg file:border-0 file:bg-emerald-50 file:px-3 file:py-2 file:text-emerald-800" @change="selectLogo" /></label><p class="text-xs text-slate-500">Máximo 500 KB. Se conserva la proporción de la imagen y la versión usada en cada documento.</p></div></div>
+                <div class="mt-4 flex flex-wrap items-center gap-3"><BaseButton type="submit" class="min-h-11" :disabled="busy || !branding.displayName || !branding.logoBase64 || !brandingDirty" :loading="busy">Guardar identidad del restaurante</BaseButton><span v-if="!branding.id" class="text-sm text-amber-800">Configura nombre y logo antes de solicitar facturas.</span></div>
+            </form>
             <div class="flex flex-wrap gap-2"><BaseButton v-for="i in integrations" :key="i.id" variant="outline" size="sm" :disabled="busy" @click="edit(i)">{{ i.name }} · {{ i.isActive ? 'Activa' : 'Inactiva' }} · {{ i.environment === 'production' ? 'Producción' : 'Pruebas' }}</BaseButton><BaseButton size="sm" variant="outline" :disabled="busy" @click="edit()">Registrar proveedor Plemsi</BaseButton></div>
-            <ol class="grid grid-cols-2 gap-2 lg:grid-cols-4" aria-label="Preparación de facturación"><li v-for="step in readiness" :key="step.label" :class="step.ready ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-slate-200 bg-white text-slate-500'" class="rounded-xl border p-3 text-sm"><span class="font-semibold">{{ step.ready ? '✓' : '○' }} {{ step.label }}</span><p class="mt-1 text-xs">{{ step.detail }}</p></li></ol>
+            <ol class="grid grid-cols-2 gap-2 lg:grid-cols-5" aria-label="Preparación de facturación"><li v-for="step in readiness" :key="step.label" :class="step.ready ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-slate-200 bg-white text-slate-500'" class="rounded-xl border p-3 text-sm"><span class="font-semibold">{{ step.ready ? '✓' : '○' }} {{ step.label }}</span><p class="mt-1 text-xs">{{ step.detail }}</p></li></ol>
             <p v-if="dirty && form.id" role="status" class="rounded-xl bg-amber-50 p-3 text-sm text-amber-900">Hay cambios sin guardar. Guarda antes de consultar o activar.</p>
             <form class="space-y-5" @submit.prevent="save">
                 <fieldset class="rounded-2xl border border-slate-200 p-4 sm:p-5"><legend class="px-2 font-semibold text-slate-900">1. Conexión con Plemsi</legend><p class="mb-4 text-sm text-slate-500">Usa la API key de esta empresa autorizada por Plemsi para el ambiente seleccionado.</p><div class="grid grid-cols-1 gap-4 md:grid-cols-2">
@@ -53,10 +59,28 @@ import BaseDialog from '@/components/ui/BaseDialog.vue'
 import { useInvoiceResources } from '@/composables/useInvoiceResources'
 import { useAuthStore } from '@/store/auth'
 import { electronicInvoicingApi as api } from '@/services/MainAPI/electronicInvoicingApi'
-import type { InvoiceIntegration, InvoiceNumbering } from '@/types/electronicInvoicing'
+import type { InvoiceIntegration, InvoiceNumbering, InvoiceBranding } from '@/types/electronicInvoicing'
 const auth = useAuthStore(), integrations = ref<InvoiceIntegration[]>([]), productionEnabled = ref(false), numberingConfirmed = ref(false)
 const empty = (): InvoiceIntegration => ({ name: 'Plemsi', environment: 'sandbox', token: '', taxId: '', legalName: '', billingEmail: '', resolution: '', prefix: '', nextNumber: 1, lastNumber: 0, creditPrefix: 'NC', nextCreditNumber: 1, productionReady: false })
 const form = reactive<InvoiceIntegration>(empty()), expiry = ref(''), busy = ref(false), error = ref(''), message = ref('')
+const branding = reactive<InvoiceBranding>({ displayName: '', logoBase64: '' }), savedBranding = ref(':')
+const brandingDirty = computed(() => `${branding.displayName}:${branding.logoBase64}` !== savedBranding.value)
+const brandingPreview = computed(() => branding.logoBase64 ? `data:image/${branding.logoBase64.startsWith('iVBOR') ? 'png' : 'jpeg'};base64,${branding.logoBase64}` : '')
+function selectLogo(event: Event) {
+    const file = (event.target as HTMLInputElement).files?.[0]
+    if (!file) return
+    if (!['image/png', 'image/jpeg'].includes(file.type) || file.size > 500000) { error.value = 'Selecciona un logo PNG o JPG de máximo 500 KB.'; return }
+    const reader = new FileReader()
+    reader.onload = () => { branding.logoBase64 = String(reader.result).split(',')[1] ?? ''; error.value = '' }
+    reader.onerror = () => { error.value = 'No se pudo leer el logo. Selecciona la imagen de nuevo.' }
+    reader.readAsDataURL(file)
+}
+async function saveBranding() {
+    if (busy.value || !branding.displayName || !branding.logoBase64) return
+    busy.value = true; error.value = ''; message.value = ''
+    try { const result = await api.saveBranding({ ...branding }); if (result.data) Object.assign(branding, result.data); savedBranding.value = `${branding.displayName}:${branding.logoBase64}`; resources.invalidateAvailability(); message.value = 'Logo y nombre comercial guardados para las próximas facturas.' }
+    catch (e) { error.value = (e as Error).message } finally { busy.value = false }
+}
 const resolutions = ref<InvoiceNumbering[]>([])
 const resources = useInvoiceResources(), numberingLoaded = ref(false), confirmActivation = ref(false), savedState = ref('')
 const fingerprint = () => JSON.stringify({ ...form, validUntil: expiry.value })
@@ -65,13 +89,14 @@ const readiness = computed(() => [
     { label: 'Conexión', ready: !!form.hasToken && !!form.testedAt, detail: form.testedAt ? 'Token y NIT verificados' : 'Token de empresa y validación' },
     { label: 'Emisor', ready: !!form.taxId && !!form.legalName && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.billingEmail), detail: 'Identidad y correo empresarial' },
     { label: 'Numeración', ready: !!form.resolution && !!form.prefix && form.nextNumber > 0 && form.nextNumber <= form.lastNumber && !!expiry.value && expiry.value >= new Date().toISOString().slice(0, 10), detail: 'Rango y vigencia por verificar al activar' },
+    { label: 'Identidad visual', ready: !!branding.id && !brandingDirty.value, detail: 'Logo y nombre comercial guardados' },
     { label: 'Activación', ready: !!form.isActive, detail: form.isActive ? 'Solicitudes habilitadas' : 'Requiere confirmación' },
 ])
-const readyToActivate = computed(() => readiness.value.slice(0, 3).every(s => s.ready) && (form.environment === 'sandbox' || form.productionEnabled && form.productionReady))
+const readyToActivate = computed(() => readiness.value.slice(0, 4).every(s => s.ready) && (form.environment === 'sandbox' || form.productionEnabled && form.productionReady))
 const formatDate = (value: string) => new Date(value).toLocaleString('es-CO', { timeZone: 'America/Bogota' })
 const remainingNumbers = ref('')
 function edit(i?: InvoiceIntegration) { for (const key of Object.keys(form)) delete (form as unknown as Record<string, unknown>)[key]; Object.assign(form, empty(), { productionEnabled: productionEnabled.value }, i ?? {}, { token: '' }); expiry.value = i?.validUntil?.slice(0, 10) || ''; resolutions.value = []; numberingLoaded.value = false; remainingNumbers.value = ''; savedState.value = fingerprint() }
-async function load() { const [list, availability] = await Promise.all([api.integrations(), api.availability()]); integrations.value = list.data ?? []; productionEnabled.value = availability.data?.productionEnabled === true }
+async function load() { const [list, availability, identity] = await Promise.all([api.integrations(), api.availability(), api.branding()]); integrations.value = list.data ?? []; productionEnabled.value = availability.data?.productionEnabled === true; if (!brandingDirty.value || !savedBranding.value) { Object.assign(branding, identity.data ?? { displayName: '', logoBase64: '', id: undefined }); savedBranding.value = `${branding.displayName}:${branding.logoBase64}` } }
 async function save() {
     if (busy.value) return
     busy.value = true; error.value = ''; message.value = ''

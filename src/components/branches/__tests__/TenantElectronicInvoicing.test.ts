@@ -6,7 +6,7 @@ import { electronicInvoicingApi as api } from '@/services/MainAPI/electronicInvo
 import { useAuthStore } from '@/store/auth'
 import type { User } from '@/types/auth'
 
-vi.mock('@/services/MainAPI/electronicInvoicingApi', () => ({ electronicInvoicingApi: { availability: vi.fn(), integrations: vi.fn(), integrationAction: vi.fn(), saveIntegration: vi.fn() } }))
+vi.mock('@/services/MainAPI/electronicInvoicingApi', () => ({ electronicInvoicingApi: { availability: vi.fn(), integrations: vi.fn(), integrationAction: vi.fn(), saveIntegration: vi.fn(), branding: vi.fn(), saveBranding: vi.fn() } }))
 const integration = { id: 1, name: 'Plemsi', environment: 'sandbox', isActive: false, hasToken: true, taxId: '123', legalName: 'Restaurante', billingEmail: 'emisor@example.com', resolution: '18760000001', prefix: 'SETT', nextNumber: 1, lastNumber: 100, validUntil: '2030-01-01T23:59:59Z', creditPrefix: 'NC', nextCreditNumber: 1, productionReady: false, productionEnabled: false, testedAt: '2026-10-20T15:00:00Z' }
 describe('Configuración empresarial de facturación', () => {
     beforeEach(() => {
@@ -14,6 +14,20 @@ describe('Configuración empresarial de facturación', () => {
         useAuthStore().user = { id: 1, role: 'Superadmin' } as User
         vi.mocked(api.availability).mockResolvedValue({ data: { enabled: false, productionEnabled: false } } as never)
         vi.mocked(api.integrations).mockResolvedValue({ data: [{ ...integration }] } as never)
+        vi.mocked(api.branding).mockResolvedValue({ data: { id: 1, displayName: 'Mi restaurante', logoBase64: 'iVBORlogo' } } as never)
+    })
+    it('conserva la identidad propia del tenant y permite cambiarla sin desactivar al proveedor', async () => {
+        vi.mocked(api.integrations).mockResolvedValue({ data: [{ ...integration, isActive: true }] } as never)
+        vi.mocked(api.saveBranding).mockResolvedValue({ data: { id: 2, displayName: 'Restaurante nuevo', logoBase64: 'iVBORlogo' } } as never)
+        const wrapper = mount(TenantElectronicInvoicing); await flushPromises()
+        expect(wrapper.get('img[alt="Logo del restaurante para facturas"]').attributes('src')).toContain('iVBORlogo')
+        await wrapper.get('input[maxlength="150"]').setValue('Restaurante nuevo')
+        await wrapper.findAll('button').find(b => b.text() === 'Guardar identidad del restaurante')!.trigger('submit')
+        await flushPromises()
+        expect(api.saveBranding).toHaveBeenCalledWith({ id: 1, displayName: 'Restaurante nuevo', logoBase64: 'iVBORlogo' })
+        expect(api.saveIntegration).not.toHaveBeenCalled()
+        expect(api.integrationAction).not.toHaveBeenCalled()
+        wrapper.unmount()
     })
     it('bloquea producción e impide consultar con cambios sin guardar', async () => {
         const wrapper = mount(TenantElectronicInvoicing); await flushPromises()

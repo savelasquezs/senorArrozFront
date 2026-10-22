@@ -30,6 +30,12 @@ export interface InvoiceIntegration {
     productionEnabled?: boolean
 }
 
+export interface InvoiceBranding {
+    id?: number
+    displayName: string
+    logoBase64: string
+}
+
 export interface InvoiceNumbering {
     resolution: string
     prefix: string
