@@ -23,6 +23,9 @@
                 </label>
             </div>
             <BaseButton type="button" variant="outline" class="min-h-11" :loading="lookingUp" :disabled="!form.identification || busy" @click="lookup">Completar con datos DIAN</BaseButton>
+            <p v-if="lookingUp" role="status" class="text-sm text-slate-600">Consultando datos en DIAN…</p>
+            <p v-else-if="lookupError" role="alert" class="text-sm text-red-700">{{ lookupError }}</p>
+            <p v-else-if="lookupMessage" role="status" class="text-sm text-emerald-700">{{ lookupMessage }}</p>
             <p class="text-xs text-slate-500">La consulta requiere un proveedor activo. También puedes completar los datos manualmente.</p>
             <label class="block text-sm">Nombre o razón social *
                 <input v-model.trim="form.name" @blur="touched.name = true" :aria-invalid="touched.name && !!issues.name" required maxlength="200" autocomplete="organization" class="mt-1 min-h-11 w-full rounded-xl border border-slate-300 p-3" />
@@ -66,6 +69,7 @@ const { recipients, load, loading, error: loadError } = useBillingRecipients(() 
 const empty = (): BillingRecipient => ({ documentType: 3, identification: '', name: '', email: '', isDefault: false })
 const form = reactive<BillingRecipient>(empty())
 const saveToCustomer = ref(true), busy = ref(false), lookingUp = ref(false), error = ref('')
+const lookupError = ref(''), lookupMessage = ref('')
 const resources = useInvoiceResources(), scopeName = useId(), formId = useId()
 const touched = reactive({ identification: false, name: false, email: false })
 const issues = computed(() => ({ identification: /^[A-Za-z0-9-]+$/.test(form.identification) ? '' : 'Ingresa la identificación sin espacios ni puntos.', name: form.name.trim() ? '' : 'Ingresa el nombre o la razón social.', email: !form.email || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email) ? '' : 'Verifica el formato del correo.' }))
@@ -83,24 +87,29 @@ function selectRecipient(event: Event) {
     const selected = recipients.value.find(r => r.id === Number((event.target as HTMLSelectElement).value))
     Object.assign(form, empty(), selected ?? {}); form.id = selected?.id
 }
+watch(() => [props.modelValue, props.customerId, form.documentType, form.identification], () => {
+    lookupError.value = ''; lookupMessage.value = ''
+})
 function findValue(data: unknown, keys: string[]): string | undefined {
     if (!data || typeof data !== 'object') return
     const record = data as Record<string, unknown>
-    for (const key of keys) if (typeof record[key] === 'string') return record[key] as string
+    for (const key of keys) if (typeof record[key] === 'string' && record[key].trim()) return record[key].trim()
     for (const value of Object.values(record)) { const found = findValue(value, keys); if (found) return found }
 }
 async function lookup() {
     const requestedIdentification = form.identification, requestedType = form.documentType, requestedCustomer = props.customerId
-    lookingUp.value = true; error.value = ''
+    lookingUp.value = true; lookupError.value = ''; lookupMessage.value = ''
+    const isCurrent = () => props.modelValue && requestedCustomer === props.customerId && requestedIdentification === form.identification && requestedType === form.documentType
     try {
         const result = await electronicInvoicingApi.lookup(form.documentType, form.identification)
-        if (!props.modelValue || requestedCustomer !== props.customerId || requestedIdentification !== form.identification || requestedType !== form.documentType) return
-        const name = findValue(result.data, ['name', 'fullname', 'business_name'])
-        const email = findValue(result.data, ['email', 'billing_email'])
+        if (!isCurrent()) return
+        const name = findValue(result.data, ['customerName', 'name', 'fullname', 'business_name'])
+        const email = findValue(result.data, ['customerEmail', 'email', 'billing_email'])
         if (name) form.name = name
         if (email) form.email = email
-        if (!name) error.value = 'No se encontraron datos. Puedes completar nombre y correo manualmente.'
-    } catch (e) { error.value = (e as Error).message }
+        if (!name) lookupError.value = 'No se encontraron datos. Verifica el tipo y número de identificación o completa los datos manualmente.'
+        else lookupMessage.value = email ? 'Nombre y correo completados. Revisa los datos antes de guardar.' : 'Nombre completado. DIAN no devolvió un correo; puedes ingresarlo manualmente.'
+    } catch (e) { if (isCurrent()) lookupError.value = (e as Error).message }
     finally { lookingUp.value = false }
 }
 async function save() {

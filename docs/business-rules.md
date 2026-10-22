@@ -499,6 +499,8 @@ Validaciones implementadas antes de enviar un pedido al backend:
 
 ## Facturación electrónica
 
+- Completar con datos DIAN lee `customerName` y `customerEmail` de Plemsi según el tipo y número indicados. Muestra el resultado junto al botón, conserva los valores manuales si no hay datos y descarta respuestas de otra identificación o cliente. La consulta no guarda destinatarios ni emite documentos.
+
 - Si Plemsi devuelve el último consecutivo nulo, Superadmin puede confirmar expresamente un número disponible tras verificar DIAN y el proveedor anterior. La activación registra actor, fecha y respuesta. No permite reutilizar números conocidos ni omitir rango o vigencia; la numeración debe dedicarse al sistema.
 
 - La indisponibilidad de facturación ofrece continuar con Solo pedido, sin emisión silenciosa. La activación vuelve a consultar Plemsi y valida resolución, prefijo, rango, vigencia y un consecutivo confirmado; no se infiere desde el inicio del rango.
