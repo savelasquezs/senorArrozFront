@@ -499,6 +499,8 @@ Validaciones implementadas antes de enviar un pedido al backend:
 
 ## Facturación electrónica
 
+- El detalle presenta las reglas de rechazo DIAN en líneas separadas. Reintentar una factura rechazada confirma el envío de datos corregidos con el mismo consecutivo; consultar una pendiente solo solicita reconciliación. El backend calcula el DV del NIT sin agregar requisitos al formulario.
+
 - El detalle del pedido resume facturación en una barra compacta y abre productos, cantidades, descuentos, domicilio, pagos registrados y total antes de confirmar. Un pedido desactualizado bloquea la confirmación hasta recargarlo. El historial usa el snapshot fiscal, nunca importes actuales para representar documentos anteriores.
 - El avance distingue solicitud, transmisión a Plemsi, validación DIAN y correo aceptado por el proveedor. Transmitir no confirma recepción DIAN; aceptar correo no confirma entrega al buzón. PDF/XML se descargan cuando el archivo oficial está disponible; una falla de correo no invalida la factura.
 

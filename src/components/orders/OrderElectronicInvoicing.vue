@@ -24,11 +24,11 @@
             <div class="rounded-lg bg-slate-50 p-3 text-slate-600"><p class="font-medium text-slate-900">{{ invoiceRecipient(d.recipientJson)?.name || 'Destinatario del documento' }}</p><p>{{ invoiceRecipient(d.recipientJson)?.identification }}</p><p class="break-all">{{ invoiceRecipient(d.recipientJson)?.email || 'Sin correo · descarga al validarse' }}</p><p v-if="d.issuedAt" class="mt-1 text-xs">Validada {{ formatDate(d.issuedAt) }}</p></div>
             <p class="text-slate-600">{{ emailLabel(d) }}</p>
             <InvoiceProgress :document="d" />
-            <p v-if="d.submittedAt && !['issued', 'credited'].includes(d.status)" class="text-xs text-slate-500">La transmisión a Plemsi no confirma todavía la recepción ni la aceptación por DIAN.</p>
+            <p v-if="d.submittedAt && !d.dianRejected && !['issued', 'credited'].includes(d.status)" class="text-xs text-slate-500">La transmisión a Plemsi no confirma todavía la recepción ni la aceptación por DIAN.</p>
             <p v-if="d.status === 'scheduled'" class="text-amber-900">Se emitirá cuando el pedido figure como entregado.</p>
             <p v-if="d.status === 'verifying'" class="text-amber-900">Estamos comprobando el mismo consecutivo. No solicites otra factura.</p>
             <p v-if="d.creditRequested && d.status === 'issued'" class="text-amber-800">Anulación fiscal solicitada. Requiere nota crédito autorizada por administración.</p>
-            <p v-if="d.lastError" class="text-red-700">{{ d.lastError }}</p>
+            <p v-if="d.lastError" role="alert" class="whitespace-pre-line break-words text-red-700">{{ d.lastError }}</p>
             <div class="flex flex-wrap gap-2">
                 <BaseButton v-if="d.hasPdf" class="min-h-11" :disabled="busy" @click="download(d, 'pdf')">Descargar copia PDF</BaseButton>
                 <span v-else-if="['issued', 'credited'].includes(d.status) && d.kind === 'invoice'" role="status" class="py-3 text-slate-500">Preparando copia PDF…</span>
@@ -106,7 +106,7 @@ async function run(operation: () => Promise<unknown>, success: string, refresh =
     finally { busy.value = false }
 }
 async function request() { if (!props.stale && props.order && billingRecipientComplete(recipient.value) && await run(() => api.request(props.orderId, recipient.value!), 'Solicitud guardada. El documento se procesará en segundo plano.')) { requestConfirm.value = false; showHistory.value = true } }
-function action(d: InvoiceDocument, action: 'retry' | 'email', data: unknown = null) { void run(() => api.documentAction(d.id, action, data), action === 'email' ? 'Reenvío solicitado al correo del documento original.' : 'Consulta solicitada para el mismo documento.') }
+function action(d: InvoiceDocument, action: 'retry' | 'email', data: unknown = null) { void run(() => api.documentAction(d.id, action, data), action === 'email' ? 'Reenvío solicitado al correo del documento original.' : d.status === 'rejected' ? 'Reintento solicitado con los datos corregidos y el mismo consecutivo.' : 'Consulta solicitada para el mismo documento.') }
 function download(d: InvoiceDocument, format: 'pdf' | 'xml') { void run(() => api.download(d.id, format, `${d.prefix}${d.number}`), 'Archivo descargado.', false) }
 async function authorizeCredit() {
     if (creditDocument.value && await run(() => api.documentAction(creditDocument.value!.id, 'credit', { reason: creditReason.value }), 'Nota crédito solicitada. Espera su validación antes de corregir el pedido.')) creditDocument.value = null

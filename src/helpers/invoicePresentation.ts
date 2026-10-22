@@ -21,8 +21,8 @@ export function invoiceProgress(d: InvoiceDocument) {
     const hasEmail = !!invoiceRecipient(d.recipientJson)?.email
     return [
         { label: 'Solicitud guardada', state: d.status === 'cancelled' ? 'muted' : 'done', date: d.createdAt },
-        { label: 'Transmisión a Plemsi', state: validated ? 'done' : d.status === 'rejected' ? 'error' : d.submittedAt || ['processing', 'verifying'].includes(d.status) ? 'active' : 'pending', date: d.submittedAt },
-        { label: 'Validada DIAN', state: validated ? 'done' : 'pending', date: d.issuedAt },
+        { label: 'Transmisión a Plemsi', state: validated || d.dianRejected ? 'done' : d.status === 'rejected' ? 'error' : d.submittedAt || ['processing', 'verifying'].includes(d.status) ? 'active' : 'pending', date: d.submittedAt },
+        { label: 'Validada DIAN', state: validated ? 'done' : d.dianRejected ? 'error' : 'pending', date: d.issuedAt },
         { label: hasEmail ? d.emailStatus === 'accepted' ? 'Correo aceptado por Plemsi' : 'Envío de correo' : 'Sin correo', state: !hasEmail ? 'muted' : d.emailStatus === 'accepted' ? 'done' : validated ? 'active' : 'pending', date: undefined },
     ]
 }

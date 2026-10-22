@@ -50,6 +50,7 @@ export interface InvoiceDocument {
     emailStatus: string
     creditRequested: boolean
     lastError?: string
+    dianRejected?: boolean
     issuedAt?: string
     createdAt?: string
     submittedAt?: string
