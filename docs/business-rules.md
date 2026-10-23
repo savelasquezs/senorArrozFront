@@ -514,7 +514,7 @@ Validaciones implementadas antes de enviar un pedido al backend:
 - La emisión real requiere además ElectronicInvoicing__ProductionEnabled=true en el servidor; el valor por defecto es false. El detalle fiscal muestra el destinatario histórico del documento y el reenvío conserva ese correo.
 
 - Configuración y correo empresarial pertenecen al tenant, compartidos por sucursales y administrados por Superadmin. Plemsi es el primer proveedor; emisión real desactivada hasta completar y validar la cuenta.
-- El cliente admite varios destinatarios fiscales y un predeterminado. El modal compartido se abre desde el cliente, OrderSidebar y detalle del pedido. Guardar datos no emite facturas ni modifica documentos históricos.
+- El directorio fiscal pertenece al negocio y se comparte entre sucursales. Un destinatario puede asociarse a varios clientes; cada cliente admite varios y un predeterminado. El modal compartido se abre desde el cliente, OrderSidebar y detalle del pedido. Guardar datos no emite facturas ni modifica documentos históricos.
 - Sin datos fiscales completos, Enviar pedido conserva el flujo actual; con datos se sugiere y exige confirmación explícita. No hay emisión automática a consumidor final.
 - Pedido y solicitud se guardan atómicamente. Las llamadas a Plemsi ocurren después del commit. Una falla fiscal no revierte un pedido creado. Reservas/programados emiten al entregarse.
 - Emitida exige validación DIAN y CUFE/CUDE. Un timeout se reconcilia consultando el mismo consecutivo, nunca generando otro documento. El estado del correo es independiente.
@@ -537,3 +537,10 @@ Validaciones implementadas antes de enviar un pedido al backend:
 
 ## Identidad visual de facturación
 Superadmin configura logo y nombre comercial por tenant, compartidos entre sucursales y proveedores, sin desactivar la integración fiscal. PNG/JPG de máximo 500 KB, vista previa proporcional y confirmación de guardado. Cada versión se conserva para los documentos que la utilizaron. Las nuevas solicitudes requieren identidad. El PDF y correo muestran la identidad del restaurante y conservan razón social/NIT fiscales. Guardar identidad no emite ni reenvía documentos.
+
+## Empresas y destinatarios compartidos
+El modal busca por nombre comercial, razón social o identificación en el directorio del negocio. Un NIT nuevo se consulta en DIAN mediante Plemsi y completa los campos disponibles; se registra al guardar. No se inventa correo ni nombre comercial cuando el proveedor no los devuelve. Registros existentes se reutilizan sin consultar DIAN ni exigir proveedor activo. Buscar por NIT permite completar datos desde el mismo buscador; también se consulta al salir del campo NIT vacío de nombre, conservando la edición manual.
+
+Recordar para el cliente guarda el perfil compartido y su asociación/predeterminado. Guardar en el negocio lo registra sin asociarlo. Solo para este pedido no guarda ni modifica perfiles. El destinatario seleccionado pertenece al borrador actual y cambiar de cliente elimina la selección anterior. Ediciones compartidas exigen confirmación, conservan la identificación y detectan versiones obsoletas; actualizan accesos abiertos y cachés de otros clientes sin cambiar sus predeterminados ni documentos históricos. Datos anteriores distintos para un mismo NIT se muestran para revisión.
+
+El buscador de clientes y el listado admiten empresa/NIT y muestran las empresas asociadas, conservando el alcance de sucursal. El detalle compartido del cliente muestra Factura a junto a sus datos y permite reutilizar una empresa de otro empleado. Dirección fiscal y dirección de entrega son independientes. Las búsquedas paginadas usan espera de 250 ms y descartan respuestas antiguas, de modales cerrados o de otra sesión.

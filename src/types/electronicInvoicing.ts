@@ -1,8 +1,14 @@
 export interface BillingRecipient {
     id?: number
+    profileId?: number
+    profileVersion?: string
+    needsReview?: boolean
+    confirmSharedUpdate?: boolean
     documentType: number
     identification: string
     name: string
+    tradeName?: string | null
+    address?: string | null
     email?: string | null
     isDefault?: boolean
 }

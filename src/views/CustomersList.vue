@@ -9,7 +9,7 @@
                 @submit.prevent="runSearch">
                 <BaseInput
                     v-model="filters.search"
-                    placeholder="Nombre, teléfono o @usuario…"
+                    placeholder="Nombre, empresa, NIT, teléfono o @usuario…"
                     class="min-w-[14rem] flex-1 sm:max-w-[20rem] [&_input]:py-1.5 [&_input]:text-xs"
                     @enter="runSearch">
                     <template #icon>
@@ -107,6 +107,7 @@
                                                 {{ customer.name }}
                                             </div>
                                             <div class="text-[11px] text-gray-500">#{{ customer.id }}</div>
+                                            <div v-if="customer.billingCompanies?.length" class="max-w-[18rem] truncate text-[11px] text-emerald-700" :title="customer.billingCompanies.join(' · ')">Factura a: {{ customer.billingCompanies.join(' · ') }}</div>
                                         </div>
                                     </div>
                                 </td>

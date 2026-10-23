@@ -3,6 +3,7 @@
 export interface Customer {
     id: number;
     name: string;
+    billingCompanies?: string[];
     phone1?: string | null;
     phone2?: string | null;
     whatsAppUsername?: string | null;

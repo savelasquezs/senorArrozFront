@@ -34,7 +34,7 @@
 
 
                 <!-- Estadísticas a ancho completo del modal -->
-                <BillingRecipientAccess :customer-id="currentCustomer.id" />
+                <BillingRecipientAccess :customer-id="currentCustomer.id" label="Factura a" />
                 <CustomerStatsCard
                     :customer="currentCustomer"
                     :show-actions="showActions"

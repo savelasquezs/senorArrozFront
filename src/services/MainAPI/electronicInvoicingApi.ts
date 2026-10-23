@@ -1,5 +1,5 @@
 import { BaseApi } from './baseApi'
-import type { ApiResponse } from '@/types/common'
+import type { ApiResponse, PagedResult } from '@/types/common'
 import type { BillingRecipient, InvoiceDocument, InvoiceIntegration, InvoiceBranding } from '@/types/electronicInvoicing'
 
 class ElectronicInvoicingApi extends BaseApi {
@@ -13,6 +13,8 @@ class ElectronicInvoicingApi extends BaseApi {
         return this.post<ApiResponse<unknown>>(`${this.base}/integrations/${id}/${action}`, data, { branchScope: 'none', timeout: 35000 })
     }
     recipients(customerId: number) { return this.get<ApiResponse<BillingRecipient[]>>(`${this.base}/customers/${customerId}/recipients`, { branchScope: 'none' }) }
+    searchRecipients(search: string, page = 1) { return this.get<ApiResponse<PagedResult<BillingRecipient>>>(`${this.base}/recipients`, { params: { search, page }, branchScope: 'none' }) }
+    saveDirectoryRecipient(dto: BillingRecipient) { return this.post<ApiResponse<BillingRecipient>>(`${this.base}/recipients`, dto, { branchScope: 'none' }) }
     saveRecipient(customerId: number, dto: BillingRecipient) { return this.post<ApiResponse<BillingRecipient>>(`${this.base}/customers/${customerId}/recipients`, dto, { branchScope: 'none' }) }
     lookup(type: number, identification: string) {
         return this.get<ApiResponse<unknown>>(`${this.base}/recipient-lookup`, { params: { type, identification }, branchScope: 'none', timeout: 35000 })

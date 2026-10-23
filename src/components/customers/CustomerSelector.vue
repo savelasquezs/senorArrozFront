@@ -8,7 +8,7 @@
         <!-- Customer Search -->
         <div class="space-y-3">
             <!-- Search Input -->
-            <BaseInput v-model="searchQuery" placeholder="Buscar por nombre, teléfono o @usuario..."
+            <BaseInput v-model="searchQuery" placeholder="Buscar nombre, empresa, NIT, teléfono o @usuario..."
                 @paste="handlePaste" @input="handleSearch" size="sm">
                 <template #icon>
                     <MagnifyingGlassIcon class="w-4 h-4 text-gray-400" />
@@ -40,6 +40,7 @@
                             <div class="text-xs text-gray-500">
                                 {{ [customer.whatsAppUsername, customer.phone1, customer.phone2].filter(Boolean).join(' · ') }}
                             </div>
+                            <p v-if="customer.billingCompanies?.length" class="text-xs text-emerald-700">Factura a: {{ customer.billingCompanies.join(' · ') }}</p>
                         </div>
                         <ChevronRightIcon class="win-4 h-4 text-gray-400" />
                     </div>

@@ -7,6 +7,7 @@ import type { BillingRecipient } from '@/types/electronicInvoicing'
 export const useInvoiceResources = defineStore('invoiceResources', () => {
     const auth = useAuthStore()
     const recipients = ref<Record<number, BillingRecipient[]>>({})
+    const profiles = ref<Record<number, BillingRecipient>>({})
     const pending = new Map<number, Promise<BillingRecipient[]>>()
     const fetched = new Map<number, number>()
     const revisions = new Map<number, number>()
@@ -14,7 +15,7 @@ export const useInvoiceResources = defineStore('invoiceResources', () => {
     let availability: { enabled: boolean; productionEnabled?: boolean } | null = null
     let availabilityPending: Promise<{ enabled: boolean; productionEnabled?: boolean }> | null = null
     watch(() => [auth.user?.id, auth.token], () => {
-        generation++; recipients.value = {}; pending.clear(); fetched.clear(); revisions.clear()
+        generation++; recipients.value = {}; profiles.value = {}; pending.clear(); fetched.clear(); revisions.clear()
         availability = null; availabilityAt = 0; availabilityPending = null
     }, { flush: 'sync' })
     async function loadRecipients(id: number, force = false): Promise<BillingRecipient[]> {
@@ -31,10 +32,21 @@ export const useInvoiceResources = defineStore('invoiceResources', () => {
         return request
     }
     function updateRecipient(id: number, recipient: BillingRecipient) {
+        updateProfile(recipient)
         revisions.set(id, (revisions.get(id) ?? 0) + 1)
         const values = recipients.value[id] ?? []
         recipients.value[id] = [...values.filter(r => r.id !== recipient.id).map(r => recipient.isDefault ? { ...r, isDefault: false } : r), recipient]
         fetched.set(id, Date.now())
+    }
+    function updateProfile(recipient: BillingRecipient) {
+        if (!recipient.profileId) return
+        profiles.value[recipient.profileId] = { ...recipient, id: undefined, isDefault: false }
+        for (const [key, values] of Object.entries(recipients.value)) {
+            const id = Number(key)
+            if (!values.some(r => r.profileId === recipient.profileId)) continue
+            revisions.set(id, (revisions.get(id) ?? 0) + 1)
+            recipients.value[id] = values.map(r => r.profileId === recipient.profileId ? { ...r, ...recipient, id: r.id, isDefault: r.isDefault } : r)
+        }
     }
     async function getAvailability(force = false) {
         if (availabilityPending) return availabilityPending
@@ -49,5 +61,5 @@ export const useInvoiceResources = defineStore('invoiceResources', () => {
         return request
     }
     function invalidateAvailability() { availability = null; availabilityAt = 0 }
-    return { recipients, loadRecipients, updateRecipient, getAvailability, invalidateAvailability }
+    return { recipients, profiles, loadRecipients, updateRecipient, updateProfile, getAvailability, invalidateAvailability }
 })
