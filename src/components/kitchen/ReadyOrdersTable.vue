@@ -32,7 +32,12 @@
                                         {{ item.quantity }}x
                                     </span>
                                     <span v-else class="font-medium flex-shrink-0">{{ item.quantity }}x</span>
-                                    <span>{{ item.productName }}</span>
+                                    <div class="min-w-0">
+                                        <p class="break-words">{{ item.productName }}</p>
+                                        <p v-if="item.notes?.trim()" class="text-[10px] sm:text-xs text-gray-600 italic mt-0.5 whitespace-pre-wrap break-words">
+                                            Nota: {{ item.notes }}
+                                        </p>
+                                    </div>
                                 </div>
                                 <div v-if="orderNotes(order)"
                                     class="mt-1.5 sm:mt-2 pt-1.5 sm:pt-2 border-t border-amber-100 rounded-md bg-amber-50/80 px-2 py-1.5 text-[11px] sm:text-xs text-gray-800">
