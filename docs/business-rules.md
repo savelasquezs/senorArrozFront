@@ -155,6 +155,8 @@ enum UserRole {
 - **Status inicial**: `'taken'`
 
 #### Delivery (A domicilio)
+
+- **Tarifa en el detalle**: Admin y Superadmin pueden editar el domicilio de pedidos `delivery` y reservas con dirección desde Información o desde el resumen de Productos. Se guarda explícitamente, admite $0 y conserva horarios y abonos cuando solo cambia la tarifa. El modal de cliente conserva sus permisos existentes y también admite la tarifa de reservas con dirección. Las reservas sin dirección no muestran editor de domicilio. Los tabs mantienen la edición local al navegar entre secciones y cargan Productos/Pagos al visitarlos por primera vez.
 - **Cliente**: Obligatorio
 - **Dirección**: Obligatoria (seleccionar de las direcciones del cliente)
 - **guestName**: Obligatorio (auto-completado con nombre del cliente, editable)

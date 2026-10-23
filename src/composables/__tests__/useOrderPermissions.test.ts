@@ -44,6 +44,42 @@ function baseOrder(overrides: Partial<OrderListItem> = {}): OrderListItem {
     }
 }
 
+describe('useOrderPermissions — canEditDeliveryFee', () => {
+    beforeEach(() => {
+        setActivePinia(createPinia())
+        useAuthStore().user = {
+            id: 1, name: 'Admin', email: 'admin@test.com', phone: '', active: true,
+            role: UserRole.ADMIN, branchId: 1, branchName: 'B',
+        }
+    })
+
+    it.each([UserRole.ADMIN, UserRole.SUPERADMIN])('permite %s editar reservas futuras con dirección', role => {
+        const auth = useAuthStore()
+        auth.user = { ...auth.user!, role }
+        expect(useOrderPermissions().canEditDeliveryFee(baseOrder({ addressId: 12 }))).toBe(true)
+    })
+
+    it('mantiene delivery y excluye reservas sin dirección y pedidos locales', () => {
+        const { canEditDeliveryFee } = useOrderPermissions()
+        expect(canEditDeliveryFee(baseOrder({ type: 'delivery' }))).toBe(true)
+        expect(canEditDeliveryFee(baseOrder())).toBe(false)
+        expect(canEditDeliveryFee(baseOrder({ type: 'onsite' }))).toBe(false)
+    })
+
+    it.each([UserRole.CASHIER, UserRole.KITCHEN, UserRole.DELIVERYMAN])('mantiene restricción de %s en detalle', role => {
+        const auth = useAuthStore()
+        auth.user = { ...auth.user!, role }
+        expect(useOrderPermissions().canEditDeliveryFee(baseOrder({ addressId: 12 }))).toBe(false)
+    })
+
+    it('conserva restricciones de integración, cancelación e históricos', () => {
+        const { canEditDeliveryFee } = useOrderPermissions()
+        expect(canEditDeliveryFee(baseOrder({ addressId: 12, externalFulfillmentProvider: 'rappi' }))).toBe(false)
+        expect(canEditDeliveryFee(baseOrder({ addressId: 12, status: 'cancelled' }))).toBe(false)
+        expect(canEditDeliveryFee(baseOrder({ addressId: 12, status: 'delivered', createdAt: '2000-01-01T12:00:00Z' }))).toBe(false)
+    })
+})
+
 describe('useOrderPermissions — canEditPayments', () => {
     afterEach(() => {
         vi.useRealTimers()

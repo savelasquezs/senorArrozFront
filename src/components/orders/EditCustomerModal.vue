@@ -32,15 +32,16 @@
                     placeholder="Ej: Juan Pérez, María López..." :error="guestNameError" />
             </div>
 
-            <!-- Delivery Fee - SOLO SI TIPO ES DELIVERY -->
-            <div v-if="props.order.type === 'delivery'" class="py-3 border-b border-gray-200">
+            <!-- Domicilios inmediatos y reservas con dirección -->
+            <div v-if="hasDelivery" class="py-3 border-b border-gray-200">
                 <label class="block text-sm font-medium text-gray-700 mb-2">
                     Tarifa de domicilio
                     <span class="text-red-500">*</span>
                     <span v-if="isSuggestedValue" class="text-xs text-blue-600 ml-2">(sugerido por la dirección)</span>
                 </label>
-                <BaseInput v-model="deliveryFee" type="number" placeholder="0" :error="deliveryFeeError"
-                    @input="markAsManuallyEdited" />
+                <BaseInput :model-value="deliveryFee" type="number" placeholder="0" :error="deliveryFeeError"
+                    :min="0" :max="50000" :step="1" label="Valor en COP"
+                    @update:model-value="updateDeliveryFeeDraft" />
                 <p class="text-xs text-gray-500 mt-1">
                     Costo del domicilio para este pedido
                     <span v-if="isSuggestedValue" class="text-blue-600">• Valor sugerido por la dirección
@@ -73,7 +74,7 @@
 
     <BaseDialog v-model="showReservationAssociationsConfirm" title="Modificar reserva" size="sm">
         <p class="text-sm text-gray-600">
-            Esta reserva tiene abonos y/o transferencias asociadas. Al confirmar tambiÃ©n se eliminarÃ¡n las
+            Esta reserva tiene abonos y/o transferencias asociadas. Al confirmar también se eliminarán las
             transferencias y abonos asociados.
         </p>
         <template #footer>
@@ -96,6 +97,7 @@ import { useOrdersDataStore } from '@/store/ordersData'
 import { useCustomersStore } from '@/store/customers'
 import { useToast } from '@/composables/useToast'
 import { useDeliveryFee } from '@/composables/useDeliveryFee'
+import { deliveryFeeValidationMessage, hasOrderDelivery } from '@/helpers/orderDeliveryFee'
 import { useOrderPermissions } from '@/composables/useOrderPermissions'
 import BaseDialog from '@/components/ui/BaseDialog.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
@@ -131,7 +133,7 @@ const showReservationAssociationsConfirm = ref(false)
 const selectedCustomerId = ref<number | null>(props.order.customerId)
 const selectedAddressId = ref<number | null>(props.order.addressId)
 const selectedGuestName = ref<string | null>(props.order.guestName || props.order.customerName || null)
-const { deliveryFee, autoCompleteFromAddress, markAsManuallyEdited, isSuggestedValue } = useDeliveryFee(
+const { deliveryFee, autoCompleteFromAddress, markAsManuallyEdited, resetManualEdit, isSuggestedValue } = useDeliveryFee(
     props.order.deliveryFee == null ? 0 : Number(props.order.deliveryFee)
 )
 const showCustomerDetail = ref(false)
@@ -147,13 +149,21 @@ const selectedAddress = computed(() => {
 })
 
 const canEdit = computed(() => permissions.canEditOrder(props.order))
+const hasDelivery = computed(() => hasOrderDelivery({ type: props.order.type, addressId: selectedAddressId.value }))
+const hasCustomerChanges = computed(() => selectedCustomerId.value !== props.order.customerId
+    || selectedAddressId.value !== props.order.addressId
+    || selectedGuestName.value !== (props.order.guestName || props.order.customerName || null))
+
+function updateDeliveryFeeDraft(value: string | number | null) {
+    deliveryFee.value = value == null || value === '' ? NaN : Number(value)
+    markAsManuallyEdited()
+}
 
 const canSave = computed(() => {
     // Si no se puede editar, no se puede guardar
     if (!canEdit.value) return false
 
-    // Si es delivery, tarifa debe ser un número >= 0
-    if (props.order.type === 'delivery' && (deliveryFee.value == null || Number.isNaN(Number(deliveryFee.value)) || deliveryFee.value < 0)) {
+    if (deliveryFeeError.value) {
         return false
     }
 
@@ -162,8 +172,8 @@ const canSave = computed(() => {
         return false
     }
 
-    // Si es delivery/reservation y no hay dirección, no se puede guardar
-    if ((props.order.type === 'delivery' || props.order.type === 'reservation') && !selectedAddressId.value) {
+    // Delivery exige dirección; una reserva puede ser para recoger en el local.
+    if (props.order.type === 'delivery' && !selectedAddressId.value) {
         return false
     }
 
@@ -175,10 +185,10 @@ const canSave = computed(() => {
     // Verificar si hubo algún cambio
     const hasCustomerChange = selectedCustomerId.value !== props.order.customerId
     const hasAddressChange = selectedAddressId.value !== props.order.addressId
-    const hasGuestNameChange = selectedGuestName.value !== props.order.guestName
+    const hasGuestNameChange = selectedGuestName.value !== (props.order.guestName || props.order.customerName || null)
     const prevFee = props.order.deliveryFee == null ? 0 : Math.round(Number(props.order.deliveryFee))
     const hasDeliveryFeeChange =
-        props.order.type === 'delivery' && Math.round(Number(deliveryFee.value)) !== prevFee
+        hasDelivery.value && Math.round(Number(deliveryFee.value)) !== prevFee
 
     return hasCustomerChange || hasAddressChange || hasGuestNameChange || hasDeliveryFeeChange
 })
@@ -192,10 +202,7 @@ const guestNameError = computed(() => {
 })
 
 const deliveryFeeError = computed(() => {
-    if (props.order.type === 'delivery' && (deliveryFee.value == null || Number.isNaN(Number(deliveryFee.value)) || deliveryFee.value < 0)) {
-        return 'Indica una tarifa de domicilio válida (0 o más)'
-    }
-    return ''
+    return hasDelivery.value ? deliveryFeeValidationMessage(deliveryFee.value) : ''
 })
 
 const hasReservationAssociatedPayments = computed(() =>
@@ -246,6 +253,8 @@ watch(
     () => props.open,
     (open) => {
         if (open) {
+            deliveryFee.value = props.order.deliveryFee ?? 0
+            resetManualEdit()
             void loadCustomerProfileForModal()
         }
     },
@@ -296,7 +305,8 @@ const handleCloseCustomerDetail = () => {
 }
 
 const handleSave = async () => {
-    if (hasReservationAssociatedPayments.value) {
+    if (!canSave.value || saving.value) return
+    if (hasCustomerChanges.value && hasReservationAssociatedPayments.value) {
         showReservationAssociationsConfirm.value = true
         return
     }
@@ -319,21 +329,21 @@ const saveOrderChanges = async (deleteReservationAssociatedPayments: boolean) =>
         }
 
         // Incluir guestName si cambió
-        if (selectedGuestName.value !== props.order.guestName) {
+        if (selectedGuestName.value !== (props.order.guestName || props.order.customerName || null)) {
             updateData.guestName = selectedGuestName.value || undefined
         }
 
-        // Incluir deliveryFee si cambió y es delivery (0 es válido)
+        // Incluir deliveryFee si cambió y hay entrega (0 es válido).
         const prevFee = props.order.deliveryFee == null ? 0 : Math.round(Number(props.order.deliveryFee))
         const nextFee = Math.round(Number(deliveryFee.value))
-        if (props.order.type === 'delivery' && nextFee !== prevFee) {
+        if (hasDelivery.value && nextFee !== prevFee) {
             updateData.deliveryFee = nextFee
         }
 
         // Manejar addressId según el tipo
         if (props.order.type === 'delivery' || props.order.type === 'reservation') {
             // Incluir addressId si existe
-            if (selectedAddressId.value) {
+            if (selectedAddressId.value && selectedAddressId.value !== props.order.addressId) {
                 updateData.addressId = selectedAddressId.value
             }
         } else {

@@ -1,6 +1,5 @@
 <template>
-	<div class="space-y-4 md:space-y-6" v-if="order">
-        <OrderElectronicInvoicing v-if="['Admin', 'Superadmin', 'Cashier'].includes(authStore.userRole ?? '')" :order-id="order.id" :customer-id="order.customerId" :status="order.status" :order="order" :stale="staleSnapshot" />
+	<div class="space-y-4 text-gray-900 md:space-y-5" v-if="order">
         <div v-if="isRemoteOrder" class="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-900">
             Pedido tomado desde esta sede · prepara y despacha <strong>{{ order.branchName }}</strong>.
             Los pagos ya registrados conservan sus bancos y aplicaciones originales.
@@ -20,10 +19,12 @@
 			Alerta de inventario: {{ order.inventoryIssue }}
 		</div>
 		<!-- Header con ID y acciones -->
+		<section aria-label="Resumen del pedido" class="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm sm:p-6">
 		<div
-			class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-0"
+			class="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between"
 		>
 			<div>
+				<p class="mb-2 text-xs font-semibold uppercase tracking-wider text-gray-500">Detalle del pedido</p>
 				<div
 					class="flex flex-col sm:flex-row items-start sm:items-center space-y-2 sm:space-y-0 sm:space-x-3"
 				>
@@ -42,13 +43,13 @@
 			</div>
 
 			<div
-				class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto flex-wrap"
+				class="flex flex-wrap items-center gap-2 xl:max-w-xl xl:justify-end"
 			>
 				<BaseButton
 					v-if="!isDeliveryman"
 					variant="secondary"
 					size="sm"
-					class="w-full sm:w-auto"
+					class="min-h-10"
 					@click="$router.push({ name: 'OrdersList', query: orderReturnQuery })"
 				>
 					<ArrowLeftIcon class="w-4 h-4 mr-1" />
@@ -56,11 +57,12 @@
 				</BaseButton>
                 <BaseButton v-if="!isDeliveryman && order.type === 'delivery' && order.status === 'on_the_way'"
                     size="sm" variant="outline" @click="showTracking = true">Ver ubicación</BaseButton>
-				<template v-if="permissions.canReprintThermalTickets() && order">
+				<div v-if="permissions.canReprintThermalTickets() && order" role="group" aria-label="Impresión"
+                    class="flex flex-wrap gap-2 rounded-xl border border-gray-200 bg-gray-50 p-1">
 					<BaseButton
 						variant="outline"
 						size="sm"
-						class="w-full sm:w-auto"
+						class="min-h-10"
 						:loading="reprintKitchenLoading"
 						title="Reimprimir comanda de cocina"
 						@click="onReprintKitchen"
@@ -71,7 +73,7 @@
 					<BaseButton
 						variant="outline"
 						size="sm"
-						class="w-full sm:w-auto"
+						class="min-h-10"
 						:loading="reprintDeliveryLoading"
 						title="Reimprimir ticket de domicilio"
 						@click="onReprintDelivery"
@@ -79,7 +81,7 @@
 						<PrinterIcon class="w-4 h-4 mr-1" />
 						Ticket domicilio
 					</BaseButton>
-				</template>
+				</div>
 				<BaseButton v-if="authStore.isSuperadmin && order && ['awaiting_payment', 'taken', 'in_preparation', 'ready'].includes(order.status)"
                     variant="outline" size="sm" class="w-full sm:w-auto"
                     @click="showTransferBranchDialog = true">
@@ -87,9 +89,9 @@
                 </BaseButton>
 				<BaseButton
 					v-if="permissions.canCancel(order)"
-					variant="danger"
+					variant="ghost"
 					size="sm"
-					class="w-full sm:w-auto"
+					class="min-h-10 text-red-700 hover:bg-red-50"
 					@click="showCancelModal = true"
 				>
 					<XCircleIcon class="w-4 h-4 mr-1" />
@@ -107,6 +109,26 @@
 				</BaseButton>
 			</div>
 		</div>
+		<dl class="mt-5 grid grid-cols-2 gap-4 border-t border-gray-100 pt-5 lg:grid-cols-4">
+			<div>
+				<dt class="text-xs font-medium text-gray-500">Total del pedido</dt>
+				<dd class="mt-1 text-xl font-bold tabular-nums tracking-tight text-emerald-700 sm:text-2xl">{{ formatCurrency(order.total) }}</dd>
+			</div>
+			<div>
+				<dt class="text-xs font-medium text-gray-500">{{ hasOrderDelivery(order) ? 'Domicilio' : 'Modalidad' }}</dt>
+				<dd class="mt-1 text-sm font-semibold tabular-nums">{{ hasOrderDelivery(order) ? formatCurrency(order.deliveryFee ?? 0) : 'En el local' }}</dd>
+			</div>
+			<div>
+				<dt class="text-xs font-medium text-gray-500">{{ order.reservedFor ? 'Entrega programada' : 'Estado actual' }}</dt>
+				<dd class="mt-1 text-sm font-semibold">{{ order.reservedFor ? formatDateTime(order.reservedFor) : getOrderStatusDisplayName(order.status) }}</dd>
+			</div>
+			<div>
+				<dt class="text-xs font-medium text-gray-500">Sucursal que atiende</dt>
+				<dd class="mt-1 text-sm font-semibold">{{ order.branchName }}</dd>
+			</div>
+		</dl>
+		</section>
+		<OrderElectronicInvoicing v-if="['Admin', 'Superadmin', 'Cashier'].includes(authStore.userRole ?? '')" :order-id="order.id" :customer-id="order.customerId" :status="order.status" :order="order" :stale="staleSnapshot" />
 
 		<div
 			v-if="order.status === 'cancelled' && order.cancelledReason"
@@ -117,7 +139,11 @@
 		</div>
 
 		<!-- Barra de progreso -->
-		<div v-if="!isDeliveryman" class="bg-white rounded-lg shadow p-4 md:p-6">
+		<section v-if="!isDeliveryman" aria-label="Seguimiento del pedido" class="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm sm:p-6">
+			<div class="mb-4 flex flex-wrap items-center justify-between gap-2">
+				<h2 class="text-sm font-semibold">Estado del pedido</h2>
+				<span class="rounded-full bg-gray-100 px-3 py-1 text-xs font-medium text-gray-700">{{ getOrderStatusDisplayName(order.status) }}</span>
+			</div>
 			<OrderProgressBar
 				:current-status="order.status"
 				:status-times="order.statusTimes"
@@ -125,32 +151,36 @@
 				:clickable="order.status !== 'cancelled' || canSelectAnyOrderStatus"
 				@status-click="handleStatusChange"
 			/>
-		</div>
+		</section>
 
 		<!-- Tabs de contenido -->
-		<div class="bg-white rounded-lg shadow overflow-hidden">
+		<div class="min-w-0 rounded-2xl border border-gray-200 bg-white shadow-sm">
 			<!-- Tab headers -->
-			<div class="border-b border-gray-200 overflow-x-auto">
+			<div class="sticky top-0 z-10 rounded-t-2xl border-b border-gray-200 bg-white p-2 sm:px-4 sm:py-3">
 				<nav
-					class="-mb-px flex space-x-4 sm:space-x-8 px-3 sm:px-6 flex-nowrap"
-					aria-label="Tabs"
+					class="grid grid-cols-3 gap-1 rounded-xl bg-gray-100 p-1 sm:gap-2"
+					role="tablist" aria-label="Secciones del pedido"
 				>
 					<button
 						v-for="tab in visibleTabs"
 						:key="tab.id"
+						:id="`${detailId}-tab-${tab.id}`" type="button" role="tab"
+						:aria-selected="activeTab === tab.id" :aria-controls="`${detailId}-panel-${tab.id}`"
+						:tabindex="activeTab === tab.id ? 0 : -1"
 						:class="[
-							'whitespace-nowrap py-3 sm:py-4 px-2 sm:px-1 border-b-2 font-medium text-xs sm:text-sm flex items-center gap-1 sm:gap-2',
+							'flex min-h-11 min-w-0 items-center justify-center gap-1.5 rounded-lg px-2 py-2 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 focus-visible:ring-offset-2 sm:gap-2 sm:text-sm',
 							activeTab === tab.id
-								? 'border-emerald-500 text-emerald-600'
-								: 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300',
+								? 'bg-white text-emerald-700 shadow-sm ring-1 ring-gray-200/70'
+								: 'text-gray-600 hover:bg-white/60 hover:text-gray-900',
 						]"
 						@click="activeTab = tab.id"
+						@keydown="onTabKeydown($event, tab.id)"
 					>
 						<component
 							:is="tab.icon"
-							class="w-4 h-4 sm:w-5 sm:h-5 inline-block"
+							class="hidden h-4 w-4 shrink-0 min-[360px]:block" aria-hidden="true"
 						/>
-						<span class="hidden sm:inline">{{ tab.name }}</span>
+						<span>{{ tab.name }}</span>
 					</button>
 				</nav>
 			</div>
@@ -158,7 +188,11 @@
 			<!-- Tab content -->
 			<div class="p-4 sm:p-6">
 				<!-- Tab: Información General -->
-				<div v-if="activeTab === 'info'" class="space-y-6">
+				<div v-show="activeTab === 'info'" :id="`${detailId}-panel-info`" role="tabpanel" :aria-labelledby="`${detailId}-tab-info`" tabindex="0" class="space-y-6 focus:outline-none">
+					<div>
+						<h2 class="text-base font-semibold">Información del pedido</h2>
+						<p class="mt-1 text-sm text-gray-500">Cliente, entrega y horarios de preparación.</p>
+					</div>
 					<div
 						v-if="order.externalFulfillmentProvider === 'rappi'"
 						class="rounded-lg border border-orange-200 bg-orange-50 p-4"
@@ -177,7 +211,7 @@
 							<p>Cargos: <strong>{{ formatCurrency(order.externalCharges || 0) }}</strong></p>
 						</div>
 					</div>
-					<div class="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
+					<div class="order-info-grid grid grid-cols-1 gap-4 md:grid-cols-2">
 						<!-- Cliente -->
 						<div class="space-y-2">
 							<label class="text-xs sm:text-sm font-medium text-gray-700"
@@ -196,6 +230,7 @@
 										v-if="permissions.canEditOrder(order)"
 										size="sm"
 										variant="ghost"
+										aria-label="Editar cliente del pedido"
 										@click="showEditCustomerModal = true"
 									>
 										<PencilIcon class="w-4 h-4" />
@@ -238,10 +273,8 @@
 
 						<!-- Guest Name -->
 						<div class="space-y-2">
-							<label class="text-xs sm:text-sm font-medium text-gray-700"
-								>Nombre del invitado</label
-							>
 							<BaseInput
+								label="Nombre de quien recibe"
 								v-model="editableGuestName"
 								placeholder="Nombre de quien recibe"
 								:disabled="!permissions.canEditOrder(order)"
@@ -299,6 +332,7 @@
 									v-if="permissions.canEditOrder(order)"
 									size="sm"
 									variant="ghost"
+									aria-label="Editar dirección de entrega"
 									@click="showEditCustomerModal = true"
 								>
 									<PencilIcon class="w-4 h-4" />
@@ -331,49 +365,22 @@
 							</div>
 						</div>
 
-						<!-- Delivery Fee - SOLO SI DELIVERY -->
-						<div v-if="order.type === 'delivery'" class="space-y-2">
-							<label class="text-xs sm:text-sm font-medium text-gray-700"
-								>Tarifa de domicilio</label
-							>
-							<div
-								v-if="permissions.canEditDeliveryFee(order)"
-								class="flex flex-col sm:flex-row sm:items-end gap-2 bg-gray-50 rounded-lg p-2 sm:p-3"
-							>
-								<BaseInput
-									v-model="editableDeliveryFee"
-									type="number"
-									:min="0"
-									:max="50000"
-									:step="100"
-									class="flex-1 min-w-0"
-									placeholder="0"
-									:hint="`Actual: ${formatCurrency(order?.deliveryFee || 0)}`"
-									@blur="updateDeliveryFee"
-								/>
-								<BaseButton
-									size="sm"
-									variant="secondary"
-									class="shrink-0 w-full sm:w-auto"
-									:loading="savingDeliveryFee"
-									@click="updateDeliveryFee"
-								>
-									Guardar tarifa
-								</BaseButton>
-							</div>
-							<div v-else class="bg-gray-50 rounded-lg p-2 sm:p-3">
-								<p class="text-xs sm:text-sm text-gray-900">
-									{{ formatCurrency(order?.deliveryFee || 0) }}
-								</p>
-							</div>
+						<div v-if="hasOrderDelivery(order)" class="space-y-2 md:col-span-2">
+							<OrderDeliveryFeeEditor :key="order.id" :delivery-fee="order.deliveryFee ?? 0" :total="order.total"
+								:can-edit="permissions.canEditDeliveryFee(order)" :saving="savingDeliveryFee" :disabled="staleSnapshot || editingProducts || savingProducts"
+								:error="deliveryFeeSaveError" @edit="deliveryFeeSaveError = ''" @save="updateDeliveryFee" />
 						</div>
 
+					</div>
+					<section class="space-y-3" aria-label="Programación y atención">
+						<h3 class="text-sm font-semibold">Programación y atención</h3>
+						<div class="order-info-grid grid grid-cols-1 gap-4 md:grid-cols-2">
 						<!-- Horarios de reserva / programación (edición admin/cajero) -->
 						<div
 							v-if="showScheduleEditor"
-							class="space-y-3 rounded-lg border border-amber-100 bg-amber-50/40 p-3 sm:p-4"
+							class="grid gap-3 rounded-lg border border-amber-100 bg-amber-50/40 sm:grid-cols-2 md:col-span-2"
 						>
-							<p class="text-xs font-medium text-amber-900">
+							<p class="text-xs font-medium text-amber-900 sm:col-span-2">
 								Horarios de entrega y preparación
 							</p>
 							<div class="space-y-1.5">
@@ -406,7 +413,7 @@
 								/>
 							</div>
 
-							<div class="flex flex-col sm:flex-row gap-2 flex-wrap">
+							<div class="flex flex-col sm:flex-row gap-2 flex-wrap sm:col-span-2">
 								<BaseButton
 									size="sm"
 									variant="secondary"
@@ -481,7 +488,8 @@
 						</div>
 					</div>
 
-					<div v-if="order" class="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3">
+					</section>
+					<div v-if="order" class="rounded-xl border border-emerald-200 bg-emerald-50/60 px-4 py-4">
 						<div class="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
 							<div>
 								<p class="text-xs font-medium uppercase tracking-wide text-emerald-700">Beneficio aplicado</p>
@@ -544,11 +552,12 @@
 					</div>
 
 					<!-- Notas -->
-					<div class="space-y-2">
-						<label class="text-xs sm:text-sm font-medium text-gray-700"
+					<div class="space-y-2 rounded-xl border border-gray-200 p-4">
+						<label :for="`${detailId}-notes`" class="text-sm font-semibold text-gray-700"
 							>Notas del pedido</label
 						>
 						<textarea
+							:id="`${detailId}-notes`"
 							v-model="editableNotes"
 							rows="3"
 							class="w-full rounded-lg border-gray-300 shadow-sm focus:border-emerald-500 focus:ring-emerald-500 text-sm sm:text-base"
@@ -560,32 +569,38 @@
 				</div>
 
 				<!-- Tab: Productos -->
-				<div v-if="activeTab === 'products'">
+				<div v-show="activeTab === 'products'" :id="`${detailId}-panel-products`" role="tabpanel" :aria-labelledby="`${detailId}-tab-products`" tabindex="0" class="focus:outline-none">
 					<OrderDetailProductsList
-						v-if="order"
+						v-if="order && visitedTabs.has('products')"
 						:products="order?.orderDetails"
 						:delivery-fee="order?.deliveryFee ?? 0"
 						:order-type="order?.type"
 						:address-id="order?.addressId ?? null"
 						:max-free-delivery-discount="maxFreeDeliveryDiscount"
 						:free-delivery-requested="order?.freeDeliveryRequested === true"
-						:show-delivery-fee-line="
-							order.type === 'delivery' || order.type === 'reservation'
-						"
-						:can-edit="permissions.canEditProducts(order) && !!operationOptions && !optionsLoading"
+						:show-delivery-fee-line="hasOrderDelivery(order)"
+						:can-edit="permissions.canEditProducts(order) && !!operationOptions && !optionsLoading && !savingDeliveryFee"
 						:saving="savingProducts"
 						@save="handleProductsUpdate"
 						@request-cancel-order="handleRequestCancelOrderFromProducts"
-					/>
+						@editing-change="editingProducts = $event"
+					>
+						<template #delivery-fee="{ editingProducts }">
+							<OrderDeliveryFeeEditor :key="order.id" :delivery-fee="order.deliveryFee ?? 0" :total="order.total"
+								:can-edit="permissions.canEditDeliveryFee(order)" :saving="savingDeliveryFee"
+								:disabled="staleSnapshot || editingProducts || savingProducts" :error="deliveryFeeSaveError"
+								@edit="deliveryFeeSaveError = ''" @save="updateDeliveryFee" />
+						</template>
+					</OrderDetailProductsList>
 				</div>
 
 				<!-- Tab: Pagos -->
-				<div v-if="activeTab === 'payments'" ref="paymentsSectionRef">
-					<div class="mb-6">
+				<div v-show="activeTab === 'payments'" ref="paymentsSectionRef" :id="`${detailId}-panel-payments`" role="tabpanel" :aria-labelledby="`${detailId}-tab-payments`" tabindex="0" class="focus:outline-none">
+					<div v-if="visitedTabs.has('payments')" class="mb-6">
 						<h3
-							class="text-base sm:text-lg font-medium text-gray-900 mb-3 sm:mb-4"
+							class="text-base font-semibold text-gray-900 mb-2"
 						>
-							Gestión de Pagos
+							Pagos del pedido
 						</h3>
 						<p class="text-xs sm:text-sm text-gray-600 mb-3 sm:mb-4">
 							<span v-if="isDeliveryman"
@@ -877,6 +892,8 @@ import OrderTypeBadge from '@/components/orders/OrderTypeBadge.vue';
 import OrderSourceBadge from '@/components/orders/OrderSourceBadge.vue';
 import OrderProgressBar from '@/components/orders/OrderProgressBar.vue';
 import OrderDetailProductsList from '@/components/orders/OrderDetailProductsList.vue';
+import OrderDeliveryFeeEditor from '@/components/orders/OrderDeliveryFeeEditor.vue';
+import { deliveryFeeValidationMessage, hasOrderDelivery } from '@/helpers/orderDeliveryFee';
 import PaidInStoreCashPanel from '@/components/orders/PaidInStoreCashPanel.vue';
 import EditCustomerModal from '@/components/orders/EditCustomerModal.vue';
 import AssignDeliveryModal from '@/components/orders/AssignDeliveryModal.vue';
@@ -951,7 +968,8 @@ import {
 	CheckCircleIcon,
 	PrinterIcon,
 } from '@heroicons/vue/24/outline';
-import { ref, computed, watch, onMounted, nextTick } from 'vue';
+import { ref, computed, watch, onMounted, nextTick, useId } from 'vue';
+const detailId = useId();
 const permissions = useOrderPermissions();
 const authStore = useAuthStore();
 const productsStore = useProductsStore();
@@ -975,8 +993,9 @@ const pendingDeleteReservationAssociations = ref(false);
 // Estado local (solo lo que no está en el store)
 const editableGuestName = ref('');
 const editableNotes = ref('');
-const editableDeliveryFee = ref<number | null>(null);
 const savingDeliveryFee = ref(false);
+const editingProducts = ref(false);
+const deliveryFeeSaveError = ref('');
 const editableReservedForDate = ref<Date | null>(null);
 const editablePrepareAtDate = ref<Date | null>(null);
 const savingSchedule = ref(false);
@@ -1308,6 +1327,8 @@ const prepareNowTargetTypeLabel = computed(() =>
 
 const { formatDateTime, formatCurrency } = useFormatting();
 const activeTab = ref('info');
+const visitedTabs = ref(new Set(['info']));
+watch(activeTab, tab => { visitedTabs.value.add(tab); });
 
 const { success, error } = useToast();
 
@@ -1457,7 +1478,7 @@ async function onConfirmBankPaymentAdjust() {
 
 // Tabs
 const tabs = [
-	{ id: 'info', name: 'Información General', icon: InformationCircleIcon },
+	{ id: 'info', name: 'Información', icon: InformationCircleIcon },
 	{ id: 'products', name: 'Productos', icon: ShoppingBagIcon },
 	{ id: 'payments', name: 'Pagos', icon: CreditCardIcon },
 ];
@@ -1468,6 +1489,22 @@ const visibleTabs = computed(() => {
 	// Los permisos de edición se manejan dentro de cada componente
 	return tabs;
 });
+
+function onTabKeydown(event: KeyboardEvent, tabId: string) {
+    const index = visibleTabs.value.findIndex(tab => tab.id === tabId);
+    let next = index;
+    if (event.key === 'ArrowRight') next = (index + 1) % visibleTabs.value.length;
+    else if (event.key === 'ArrowLeft') next = (index - 1 + visibleTabs.value.length) % visibleTabs.value.length;
+    else if (event.key === 'Home') next = 0;
+    else if (event.key === 'End') next = visibleTabs.value.length - 1;
+    else return;
+    event.preventDefault();
+    const tab = visibleTabs.value[next];
+    if (!tab) return;
+    activeTab.value = tab.id;
+    const nav = (event.currentTarget as HTMLElement).closest('[role="tablist"]');
+    void nextTick(() => nav?.querySelector<HTMLButtonElement>(`[id="${detailId}-tab-${tab.id}"]`)?.focus());
+}
 const loadCustomer = async (customerId: number) => {
 	if (!customerId) return;
 
@@ -1644,10 +1681,6 @@ watch(
 			order.value = newOrder;
 			editableGuestName.value = newOrder.guestName || '';
 			editableNotes.value = newOrder.notes || '';
-			editableDeliveryFee.value =
-				newOrder.deliveryFee !== null && newOrder.deliveryFee !== undefined
-					? Number(newOrder.deliveryFee)
-					: 0;
 			editableReservedForDate.value = parseOrderDate(
 				newOrder.reservedFor as string | Date | undefined,
 			);
@@ -1893,25 +1926,15 @@ async function executePrepareNow() {
 	}
 }
 
-const updateDeliveryFee = async () => {
-	if (!order.value || !permissions.canEditDeliveryFee(order.value)) return;
-
-	const raw = editableDeliveryFee.value;
-	const next =
-		raw === null || raw === undefined || Number.isNaN(Number(raw))
-			? 0
-			: Math.max(0, Math.round(Number(raw)));
+const updateDeliveryFee = async (next: number) => {
+	if (!order.value || savingDeliveryFee.value || editingProducts.value || savingProducts.value || staleSnapshot.value || !permissions.canEditDeliveryFee(order.value)) return;
+	deliveryFeeSaveError.value = deliveryFeeValidationMessage(next);
+	if (deliveryFeeSaveError.value) return;
 	const current =
 		order.value.deliveryFee !== null && order.value.deliveryFee !== undefined
 			? Math.round(Number(order.value.deliveryFee))
 			: 0;
 	if (next === current) return;
-
-	if (next > 50000) {
-		error('Tarifa inválida', 'El valor no puede superar $50.000');
-		editableDeliveryFee.value = current;
-		return;
-	}
 
 	savingDeliveryFee.value = true;
 	const paymentSnapshotBefore = captureOrderPaymentSnapshot();
@@ -1920,8 +1943,8 @@ const updateDeliveryFee = async () => {
 		success('Tarifa actualizada', 4000, 'Se recalculó el total del pedido');
 		await promptBankSyncIfNeeded(paymentSnapshotBefore);
 	} catch (err: any) {
-		error('Error al guardar tarifa', err.message);
-		editableDeliveryFee.value = current;
+		deliveryFeeSaveError.value = err.message || 'No se pudo guardar la tarifa. Intenta nuevamente.';
+		error('Error al guardar tarifa', deliveryFeeSaveError.value);
 	} finally {
 		savingDeliveryFee.value = false;
 	}
@@ -2247,3 +2270,12 @@ const updateOrderCustomer = (updatedOrder: any) => {
 	});
 };
 </script>
+
+<style scoped>
+.order-info-grid > div {
+    min-width: 0;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.75rem;
+    padding: 1rem;
+}
+</style>

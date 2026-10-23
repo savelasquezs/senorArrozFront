@@ -1,8 +1,11 @@
 <template>
     <div class="space-y-4">
         <!-- Header con botón de edición -->
-        <div class="flex items-center justify-between">
-            <h3 class="text-lg font-medium text-gray-900">Productos del Pedido</h3>
+        <div class="flex flex-wrap items-center justify-between gap-3">
+            <div>
+                <h3 class="text-base font-semibold text-gray-900">Productos del pedido</h3>
+                <p class="mt-1 text-sm text-gray-500">Cantidades, precios y resumen del pedido.</p>
+            </div>
             <BaseButton v-if="!editing && canEdit" size="sm" variant="secondary" @click="enterEditMode">
                 <PencilIcon class="w-4 h-4 mr-1" />
                 Editar Productos
@@ -10,7 +13,7 @@
         </div>
 
         <!-- Tabla de productos -->
-        <div class="overflow-x-auto">
+        <div class="overflow-x-auto rounded-xl border border-gray-200">
             <table class="min-w-full divide-y divide-gray-200">
                 <thead class="bg-gray-50">
                     <tr>
@@ -95,7 +98,7 @@
         </div>
 
         <!-- Panel de totales -->
-        <div class="bg-gray-50 rounded-lg p-4 space-y-2">
+        <div class="rounded-xl border border-gray-200 bg-gray-50/80 p-4 space-y-3 sm:p-5">
             <div class="flex justify-between text-sm">
                 <span class="text-gray-600">Subtotal:</span>
                 <span class="font-medium text-gray-900">{{ formatCurrency(calculatedSubtotal) }}</span>
@@ -104,9 +107,13 @@
                 <span class="text-gray-600">Descuentos:</span>
                 <span class="font-medium text-red-600">-{{ formatCurrency(discountTotal) }}</span>
             </div>
-            <div v-if="showDeliveryFeeLine" class="flex justify-between text-sm">
-                <span class="text-gray-600">Domicilio:</span>
-                <span class="font-medium text-gray-900">{{ formatCurrency(deliveryFee) }}</span>
+            <div v-if="showDeliveryFeeLine">
+                <slot name="delivery-fee" :editing-products="editing">
+                    <div class="flex justify-between text-sm">
+                        <span class="text-gray-600">Domicilio:</span>
+                        <span class="font-medium text-gray-900">{{ formatCurrency(deliveryFee) }}</span>
+                    </div>
+                </slot>
             </div>
             <div v-if="false" class="flex items-start justify-between gap-3 text-sm">
                 <label class="flex items-center gap-2 cursor-pointer text-xs text-gray-700">
@@ -214,6 +221,7 @@ const props = withDefaults(defineProps<Props>(), {
 const emit = defineEmits<{
     save: [payload: { products: UpdateOrderDetailDto[]; freeDeliveryRequested: boolean }]
     requestCancelOrder: []
+    editingChange: [editing: boolean]
 }>()
 
 const { formatCurrency } = useFormatting()
@@ -221,6 +229,7 @@ const { error } = useToast()
 
 // Estado
 const editing = ref(false)
+watch(editing, value => emit('editingChange', value))
 const saving = ref(false)
 const showAddProductModal = ref(false)
 const showLastProductWarningModal = ref(false)
