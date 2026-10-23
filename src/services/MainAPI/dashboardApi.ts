@@ -108,7 +108,7 @@ export type DashboardMainQueryParams = {
 };
 
 class DashboardApi extends BaseApi {
-	async getMain(params: DashboardMainQueryParams): Promise<DashboardMainApiResponse> {
+	async getMain(params: DashboardMainQueryParams, signal?: AbortSignal): Promise<DashboardMainApiResponse> {
 		const q: Record<string, string | number> = {
 			activityLimit: params.activityLimit ?? 20,
 		};
@@ -118,6 +118,7 @@ class DashboardApi extends BaseApi {
 		return this.get<DashboardMainApiResponse>('/dashboard/main', {
 			params: q,
 			branchScope: 'all',
+			signal,
 		});
 	}
 
@@ -323,12 +324,13 @@ class DashboardApi extends BaseApi {
 		fromIso: string,
 		toIso: string,
 		granularity: 'day' | 'month' | 'year',
+		signal?: AbortSignal,
 	): Promise<DashboardPrincipalSalesVsExpensesApiResponse> {
 		const params: Record<string, string> = { from: fromIso, to: toIso, granularity };
 		if (branchId != null) params.branchId = String(branchId);
 		return this.get<DashboardPrincipalSalesVsExpensesApiResponse>(
 			'/dashboard/principal/sales-vs-expenses',
-			{ params, branchScope: 'all' },
+			{ params, branchScope: 'all', signal },
 		);
 	}
 }
