@@ -24,6 +24,38 @@ describe('Detalle fiscal del pedido', () => {
         vi.mocked(api.documents).mockResolvedValue({ data: [documentRow] } as never)
     })
     afterEach(() => vi.useRealTimers())
+    it.each([
+        ['delivered', 'Correo entregado', 'done'], ['bounced', 'Correo rebotado', 'error'],
+        ['delayed', 'Entrega demorada', 'active'], ['failed', 'Correo no entregado', 'error'],
+    ])('muestra confirmación %s sin cambiar validación DIAN', async (status, label, state) => {
+        vi.mocked(api.documents).mockResolvedValue({ data: [{ ...documentRow, emailChannel: 'application', emailStatus: 'sent', emailDelivery: { status, occurredAt: '2026-10-23T02:20:00Z', error: status === 'bounced' ? 'Mailbox unavailable' : null } }] } as never)
+        const wrapper = mount(OrderElectronicInvoicing, { props: { orderId: 1, status: 'delivered' } })
+        await flushPromises()
+        const steps = wrapper.findAll('[aria-label="Avance de la factura"] li')
+        expect(steps[2]!.attributes('data-state')).toBe('done')
+        expect(steps[3]!.text()).toContain(label)
+        expect(steps[3]!.attributes('data-state')).toBe(state)
+        const dialog = await openHistory(wrapper)
+        if (status === 'bounced') expect(dialog.textContent).toContain('Mailbox unavailable')
+        if (status === 'delayed') expect([...dialog.querySelectorAll('button')].find(b => b.textContent?.includes('Entrega en curso'))!.disabled).toBe(true)
+        expect(api.documentAction).not.toHaveBeenCalled()
+        expect(api.request).not.toHaveBeenCalled()
+        wrapper.unmount()
+    })
+    it('actualiza automáticamente el correo aceptado hasta confirmar entrega y detiene las consultas después', async () => {
+        vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] })
+        const row = { ...documentRow, emailStatus: 'sent', emailChannel: 'application', emailSentAt: new Date().toISOString() }
+        vi.mocked(api.documents).mockResolvedValueOnce({ data: [row] } as never)
+            .mockResolvedValue({ data: [{ ...row, emailDelivery: { status: 'delivered' } }] } as never)
+        const wrapper = mount(OrderElectronicInvoicing, { props: { orderId: 1, status: 'delivered' } })
+        await flushPromises()
+        expect(wrapper.text()).toContain('Correo aceptado para envío')
+        await vi.advanceTimersByTimeAsync(10000); await flushPromises()
+        expect(wrapper.text()).toContain('Correo entregado')
+        await vi.advanceTimersByTimeAsync(30000); await flushPromises()
+        expect(api.documents).toHaveBeenCalledTimes(2)
+        wrapper.unmount()
+    })
     it('confirma un reenvío propio y advierte sobre la copia histórica de Plemsi', async () => {
         vi.mocked(api.documentAction).mockResolvedValue({ data: {} } as never)
         const wrapper = mount(OrderElectronicInvoicing, { props: { orderId: 1, customerId: 10, status: 'delivered' } })

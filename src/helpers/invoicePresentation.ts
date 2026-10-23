@@ -19,12 +19,32 @@ export function invoiceStatusClass(status: string) {
 export function invoiceProgress(d: InvoiceDocument) {
     const validated = ['issued', 'credited'].includes(d.status)
     const hasEmail = !!invoiceRecipient(d.recipientJson)?.email
+    const email = invoiceEmailProgress(d)
     return [
         { label: 'Solicitud guardada', state: d.status === 'cancelled' ? 'muted' : 'done', date: d.createdAt },
         { label: 'Transmisión a Plemsi', state: validated || d.dianRejected ? 'done' : d.status === 'rejected' ? 'error' : d.submittedAt || ['processing', 'verifying'].includes(d.status) ? 'active' : 'pending', date: d.submittedAt },
         { label: 'Validada DIAN', state: validated ? 'done' : d.dianRejected ? 'error' : 'pending', date: d.issuedAt },
-        { label: hasEmail ? d.emailStatus === 'accepted' ? 'Correo aceptado por Plemsi' : d.emailStatus === 'sent' ? 'Correo aceptado para envío' : d.emailStatus === 'verifying' ? 'Correo por verificar' : d.emailStatus === 'failed' ? 'Error de correo' : 'Envío de correo' : 'Sin correo', state: !hasEmail ? 'muted' : ['accepted', 'sent'].includes(d.emailStatus) ? 'done' : ['failed', 'verifying'].includes(d.emailStatus) ? 'error' : validated ? 'active' : 'pending', date: d.emailSentAt ?? undefined },
+        { label: hasEmail ? email.label : 'Sin correo', state: !hasEmail ? 'muted' : email.state, date: d.emailDelivery?.status ? d.emailDelivery.occurredAt ?? undefined : d.emailSentAt ?? undefined },
     ]
+}
+
+export function invoiceEmailProgress(d: InvoiceDocument) {
+    const delivery = d.emailChannel === 'plemsi' ? null : d.emailDelivery?.status
+    if (delivery === 'delivered') return { label: 'Correo entregado', state: 'done', description: 'PDF y XML entregados al servidor de correo del cliente. No confirma lectura.' }
+    if (delivery === 'bounced') return { label: 'Correo rebotado', state: 'error', description: 'El servidor del cliente rechazó el correo. La factura conserva su validación DIAN.' }
+    if (delivery === 'delayed') return { label: 'Entrega demorada', state: 'active', description: 'Resend está reintentando la entrega por un problema temporal. No es necesario reenviar.' }
+    if (delivery === 'complained') return { label: 'Correo marcado como spam', state: 'error', description: 'El destinatario marcó el correo como spam. La factura conserva su validación DIAN.' }
+    if (['failed', 'suppressed'].includes(delivery ?? '')) return { label: 'Correo no entregado', state: 'error', description: 'Resend confirmó que el correo no pudo entregarse. La factura conserva su validación DIAN.' }
+    if (d.emailStatus === 'accepted') return { label: 'Correo aceptado por Plemsi', state: 'done', description: 'Correo aceptado por Plemsi; no confirma recepción en el buzón' }
+    if (d.emailStatus === 'sent') return { label: 'Correo aceptado para envío', state: 'active', description: 'PDF personalizado y XML aceptados para envío. Esperando confirmación de entrega.' }
+    if (d.emailStatus === 'failed') return { label: 'Error de correo', state: 'error', description: 'No se pudo enviar el correo. La factura conserva su validación DIAN.' }
+    if (d.emailStatus === 'verifying') return { label: 'Correo por verificar', state: 'error', description: 'Verifica el resultado del correo antes de reenviar para evitar duplicados.' }
+    return { label: 'Envío de correo', state: ['issued', 'credited'].includes(d.status) ? 'active' : 'pending', description: ['queued', 'processing'].includes(d.emailStatus) ? 'PDF personalizado y XML en cola de correo. Plemsi no enviará otro mensaje.' : 'Correo pendiente' }
+}
+
+export function invoiceEmailTrackingPending(d: InvoiceDocument) {
+    return d.emailChannel === 'application' && d.emailStatus === 'sent' && !['delivered', 'bounced', 'failed', 'suppressed', 'complained'].includes(d.emailDelivery?.status ?? '')
+        && !!d.emailSentAt && Date.now() - Date.parse(d.emailSentAt) < 72 * 3600000
 }
 
 export interface InvoiceOrderSummary {

@@ -63,6 +63,7 @@ export interface InvoiceDocument {
     emailChannel?: 'plemsi' | 'application'
     emailError?: string | null
     emailSentAt?: string | null
+    emailDelivery?: { status?: string | null; occurredAt?: string | null; error?: string | null } | null
     pdfVersion?: number
     creditRequested: boolean
     lastError?: string

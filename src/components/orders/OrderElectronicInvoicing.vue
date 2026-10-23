@@ -23,7 +23,7 @@
             <div class="flex flex-wrap items-center justify-between gap-2"><strong class="text-slate-900">{{ d.kind === 'credit' ? 'Nota crédito' : 'Factura' }} {{ d.number ? `${d.prefix}${d.number}` : 'por asignar' }}</strong><div class="flex flex-wrap gap-2"><span :class="invoiceStatusClass(d.status)" class="rounded-full px-2.5 py-1 text-xs font-medium ring-1 ring-inset">{{ invoiceStatusLabels[d.status] || d.status }}</span><span v-if="d.environment === 'sandbox'" class="rounded-full bg-sky-50 px-2.5 py-1 text-xs font-medium text-sky-800">Pruebas</span></div></div>
             <div class="rounded-lg bg-slate-50 p-3 text-slate-600"><p class="font-medium text-slate-900">{{ invoiceRecipient(d.recipientJson)?.name || 'Destinatario del documento' }}</p><p>{{ invoiceRecipient(d.recipientJson)?.identification }}</p><p class="break-all">{{ invoiceRecipient(d.recipientJson)?.email || 'Sin correo · descarga al validarse' }}</p><p v-if="d.issuedAt" class="mt-1 text-xs">Validada {{ formatDate(d.issuedAt) }}</p></div>
             <p class="text-slate-600">{{ emailLabel(d) }}</p>
-            <p v-if="d.emailError" role="alert" class="text-sm text-amber-900">{{ d.emailError }}</p>
+            <p v-if="d.emailDelivery?.error || d.emailError" role="alert" class="break-words text-sm text-amber-900">{{ d.emailDelivery?.error || d.emailError }}</p>
             <InvoiceProgress :document="d" />
             <p v-if="d.submittedAt && !d.dianRejected && !['issued', 'credited'].includes(d.status)" class="text-xs text-slate-500">La transmisión a Plemsi no confirma todavía la recepción ni la aceptación por DIAN.</p>
             <p v-if="d.status === 'scheduled'" class="text-amber-900">Se emitirá cuando el pedido figure como entregado.</p>
@@ -33,7 +33,7 @@
             <div class="flex flex-wrap gap-2">
                 <BaseButton v-if="d.hasPdf" class="min-h-11" :disabled="busy" @click="download(d, 'pdf')">Descargar copia PDF</BaseButton>
                 <span v-else-if="['issued', 'credited'].includes(d.status) && d.kind === 'invoice'" role="status" class="py-3 text-slate-500">Preparando copia PDF…</span>
-                <BaseButton v-if="['issued', 'credited'].includes(d.status) && invoiceRecipient(d.recipientJson)?.email" class="min-h-11" variant="outline" :disabled="busy || !d.hasPdf || !d.hasXml || ['queued', 'processing', 'verifying'].includes(d.emailStatus)" @click="emailDocument = d">{{ ['queued', 'processing'].includes(d.emailStatus) ? 'Correo en cola' : d.emailStatus === 'verifying' ? 'Envío por verificar' : 'Reenviar correo' }}</BaseButton>
+                <BaseButton v-if="['issued', 'credited'].includes(d.status) && invoiceRecipient(d.recipientJson)?.email" class="min-h-11" variant="outline" :disabled="busy || !d.hasPdf || !d.hasXml || ['queued', 'processing', 'verifying'].includes(d.emailStatus) || d.emailDelivery?.status === 'delayed'" @click="emailDocument = d">{{ d.emailDelivery?.status === 'delayed' ? 'Entrega en curso' : ['queued', 'processing'].includes(d.emailStatus) ? 'Correo en cola' : d.emailStatus === 'verifying' ? 'Envío por verificar' : 'Reenviar correo' }}</BaseButton>
                 <BaseButton v-if="['pending', 'processing', 'verifying'].includes(d.status)" class="min-h-11" variant="outline" :disabled="busy" @click="action(d, 'retry')">Consultar estado</BaseButton>
                 <BaseButton v-if="d.status === 'rejected'" class="min-h-11" variant="outline" :disabled="busy || d.kind === 'invoice' && !billingRecipientComplete(recipient)" @click="action(d, 'retry', d.kind === 'invoice' ? recipient : null)">{{ d.kind === 'credit' ? 'Reintentar nota crédito' : 'Reintentar con los datos seleccionados' }}</BaseButton>
             </div>
@@ -42,7 +42,7 @@
         </div><template #footer><BaseButton variant="outline" @click="showHistory = false">Cerrar detalle</BaseButton></template>
         </BaseDialog>
         <BaseDialog v-model="requestConfirm" :dismissible="!busy" title="Revisar y confirmar factura" size="3xl" scroll-body z-class="z-[80]">
-            <div class="space-y-4 text-sm"><div class="rounded-xl bg-slate-50 p-4"><p class="text-xs uppercase tracking-wide text-slate-500">Destinatario de la factura</p><p class="mt-1 font-semibold">{{ recipient?.name }} · {{ recipient?.identification }}</p><p class="break-all text-slate-600">{{ recipient?.email || 'Sin correo: podrás descargar el PDF al validarse.' }}</p></div><InvoiceOrderSummary v-if="order" :summary="invoiceOrderSummary(order)" /><p class="text-xs text-slate-500">Vista previa del pedido guardado. La fecha fiscal será la de emisión; los pedidos programados esperan a la entrega. Los descuentos se incorporan a los precios finales, conservando regalos y domicilio. El PDF personalizado con QR y CUFE estará disponible tras la validación DIAN.</p><p v-if="stale" role="alert" class="text-amber-800">El pedido cambió. Cierra esta vista y actualízalo antes de confirmar.</p><p v-if="error" role="alert" class="text-red-700">{{ error }}</p></div>
+            <div class="space-y-4 text-sm"><div class="rounded-xl bg-slate-50 p-4"><p class="text-xs uppercase tracking-wide text-slate-500">Destinatario de la factura</p><p class="mt-1 font-semibold">{{ recipient?.name }} · {{ recipient?.identification }}</p><p class="break-all text-slate-600">{{ recipient?.email || 'Sin correo: podrás descargar el PDF al validarse.' }}</p></div><InvoiceOrderSummary v-if="order" :summary="invoiceOrderSummary(order)" /><p class="text-xs text-slate-500">Vista previa del pedido guardado. La fecha fiscal será la de emisión; los pedidos programados esperan a la entrega. Los descuentos se incorporan a los precios finales y las líneas en $0 se omiten de la factura. El domicilio permanece separado. El PDF personalizado con QR y CUFE estará disponible tras la validación DIAN.</p><p v-if="stale" role="alert" class="text-amber-800">El pedido cambió. Cierra esta vista y actualízalo antes de confirmar.</p><p v-if="error" role="alert" class="text-red-700">{{ error }}</p></div>
             <template #footer><p v-if="order" class="mr-auto self-center text-sm text-slate-500">Total a facturar <strong class="ml-2 whitespace-nowrap text-lg text-slate-900">{{ new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(order.total) }}</strong></p><BaseButton variant="outline" :disabled="busy" @click="requestConfirm = false">Volver</BaseButton><BaseButton :loading="busy" :disabled="stale || !order" @click="request">Confirmar factura</BaseButton></template>
         </BaseDialog>
         <BaseDialog :model-value="!!creditDocument" @update:model-value="creditDocument = null" :dismissible="!busy" title="Autorizar nota crédito total" z-class="z-[90]">
@@ -70,7 +70,7 @@ import { electronicInvoicingApi as api } from '@/services/MainAPI/electronicInvo
 import { useAuthStore } from '@/store/auth'
 import { useInvoiceResources } from '@/composables/useInvoiceResources'
 import { billingRecipientComplete } from '@/composables/useBillingRecipients'
-import { invoiceRecipient, invoiceStatusClass, invoiceOrderSummary, invoiceSnapshotSummary } from '@/helpers/invoicePresentation'
+import { invoiceRecipient, invoiceStatusClass, invoiceOrderSummary, invoiceSnapshotSummary, invoiceEmailProgress, invoiceEmailTrackingPending } from '@/helpers/invoicePresentation'
 import type { OrderDetailView } from '@/types/order'
 import { invoiceStatusLabels, type BillingRecipient, type InvoiceDocument } from '@/types/electronicInvoicing'
 const props = defineProps<{ orderId: number; customerId?: number | null; status: string; order?: OrderDetailView; stale?: boolean }>()
@@ -88,12 +88,7 @@ let generation = 0, timer: ReturnType<typeof setInterval> | undefined
 const formatDate = (date: string) => new Date(date).toLocaleString('es-CO', { timeZone: 'America/Bogota', dateStyle: 'medium', timeStyle: 'short' })
 function emailLabel(d: InvoiceDocument) {
     if (!invoiceRecipient(d.recipientJson)?.email) return 'Sin envío por correo'
-    if (d.emailStatus === 'accepted') return 'Correo aceptado por Plemsi; no confirma recepción en el buzón'
-    if (d.emailStatus === 'sent') return 'PDF personalizado y XML aceptados para envío por correo; no confirma recepción en el buzón'
-    if (['queued', 'processing'].includes(d.emailStatus)) return 'PDF personalizado y XML en cola de correo. Plemsi no enviará otro mensaje.'
-    if (d.emailStatus === 'failed') return 'No se pudo enviar el correo. La factura conserva su validación DIAN.'
-    if (d.emailStatus === 'verifying') return 'Verifica el resultado del correo antes de reenviar para evitar duplicados.'
-    return d.lastError && d.emailStatus === 'pending' && ['issued', 'credited'].includes(d.status) ? 'Correo pendiente de reintento; la factura sigue validada' : 'Correo pendiente'
+    return d.lastError && d.emailStatus === 'pending' && ['issued', 'credited'].includes(d.status) ? 'Correo pendiente de reintento; la factura sigue validada' : invoiceEmailProgress(d).description
 }
 async function load() {
     const current = ++generation; loading.value = true; error.value = ''
@@ -123,6 +118,6 @@ async function authorizeCredit() {
 }
 function refreshVisible() { if (document.visibilityState !== 'hidden' && !busy.value && !loading.value) void load() }
 watch(() => props.orderId, () => { recipient.value = null; documents.value = []; message.value = ''; requestConfirm.value = false; showHistory.value = false; creditDocument.value = null; emailDocument.value = null; void load() }, { immediate: true })
-onMounted(() => { document.addEventListener('visibilitychange', refreshVisible); timer = setInterval(() => { if (documents.value.some(d => ['scheduled', 'pending', 'processing', 'verifying'].includes(d.status) || ['pending', 'queued', 'processing'].includes(d.emailStatus) || ['issued', 'credited'].includes(d.status) && (!d.hasXml || !d.hasPdf))) refreshVisible() }, 10000) })
+onMounted(() => { document.addEventListener('visibilitychange', refreshVisible); timer = setInterval(() => { if (documents.value.some(d => ['scheduled', 'pending', 'processing', 'verifying'].includes(d.status) || ['pending', 'queued', 'processing'].includes(d.emailStatus) || invoiceEmailTrackingPending(d) || ['issued', 'credited'].includes(d.status) && (!d.hasXml || !d.hasPdf))) refreshVisible() }, 10000) })
 onUnmounted(() => { generation++; clearInterval(timer); document.removeEventListener('visibilitychange', refreshVisible) })
 </script>
