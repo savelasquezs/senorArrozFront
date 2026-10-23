@@ -7,7 +7,7 @@
                 'has-items': tab.itemCount > 0
             }" :title="tabTitle(tab)" @click="switchTab(tab.tabId)">
                 <span class="tab-label">{{ tabLabel(tab) }}</span>
-                <BaseButton @click.stop="handleCloseTabClick(tab.tabId)" variant="ghost" size="sm" class="close-button"
+                <BaseButton @click.stop="handleCloseTabClick(tab.tabId)" variant="ghost" size="sm" icon-only class="close-button"
                     title="Cerrar pedido">
                     <XMarkIcon class="w-3 h-3" />
                 </BaseButton>
@@ -15,7 +15,7 @@
 
             <!-- New Tab Button -->
             <BaseButton @click="createNewTab" :disabled="!canAddNewTab" variant="primary" size="sm"
-                class="new-tab-button">
+                icon-only class="new-tab-button" aria-label="Nuevo pedido en pestaña" title="Nuevo pedido">
                 <PlusIcon class="w-4 h-4" />
             </BaseButton>
         </div>

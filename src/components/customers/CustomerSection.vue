@@ -1,13 +1,28 @@
 <template>
-    <div class="customer-section">
+    <div class="customer-section" :class="{ 'customer-section--compact': compact }">
         <!-- Order Type Selector - CONDICIONAL -->
         <div v-if="showTypeSelector" class="space-y-2">
 
-            <BaseRadioGroup :model-value="orderType" :options="orderTypeOptions" name="order-type"
+            <div v-if="compact" class="grid grid-cols-3 gap-1 rounded-xl bg-gray-100 p-1" role="radiogroup" aria-label="Tipo de pedido">
+                <label v-for="option in orderTypeOptions" :key="option.value" class="relative min-w-0 cursor-pointer">
+                    <input type="radio" :name="typeInputName" :value="option.value" :checked="orderType === option.value" class="peer sr-only"
+                        @change="handleOrderTypeChanged(option.value)" />
+                    <span class="flex min-h-8 items-center justify-center gap-1.5 rounded-lg px-2 text-xs font-medium text-gray-500 transition peer-checked:bg-white peer-checked:text-emerald-700 peer-checked:shadow-sm peer-focus-visible:outline peer-focus-visible:outline-2 peer-focus-visible:outline-emerald-600 hover:text-gray-900">
+                        <component :is="option.icon" class="h-4 w-4 shrink-0" />{{ option.label }}
+                    </span>
+                </label>
+            </div>
+            <BaseRadioGroup v-else :model-value="orderType" :options="orderTypeOptions" name="order-type"
                 @update:model-value="(value) => handleOrderTypeChanged(value as 'onsite' | 'delivery' | 'reservation')"
                 size="sm" />
         </div>
-        <slot name="order-branch-selector" />
+        <div v-if="compact" class="flex min-w-0 items-start gap-2">
+            <div class="min-w-0 flex-1"><slot name="order-branch-selector" /></div>
+            <span v-if="compactLoyaltySummary" class="mt-1.5 max-w-[48%] shrink-0 truncate text-right text-[11px] text-amber-700"
+                :class="{ 'font-semibold': loyaltyRewardDue }"
+                :title="props.selectedCustomer?.loyaltyNextRewardMessage || compactLoyaltySummary">{{ compactLoyaltySummary }}</span>
+        </div>
+        <slot v-else name="order-branch-selector" />
         <!-- No Customer Selected -->
         <div v-if="!props.selectedCustomer" class="space-y-3">
 
@@ -20,62 +35,54 @@
         </div>
 
         <!-- Customer Selected -->
-        <div v-else class="space-y-3">
+        <div v-else :class="compact ? 'space-y-2' : 'space-y-3'">
             <!-- Customer Info -->
-            <div class="bg-green-50 border border-green-200 rounded-lg p-3">
-                <div class="flex items-center justify-between">
-                    <div class="flex-1">
-                        <div class="flex items-center justify-between mb-2">
-                            <h4 class="font-medium text-green-900 capitalize">{{ props.selectedCustomer.name }}</h4>
-                            <div class="flex items-center gap-1">
-                                <BaseButton @click="$emit('view-customer-detail', props.selectedCustomer)"
-                                    variant="ghost" size="sm">
-                                    <EyeIcon class="w-4 h-4" />
-                                </BaseButton>
-                                <BaseButton @click="handleClearCustomer" variant="ghost" size="sm">
-                                    <ArrowPathIcon class="w-4 h-4" />
-                                </BaseButton>
-                            </div>
-                        </div>
-                        <div class="space-y-1">
-                            <p v-if="props.selectedCustomer.whatsAppUsername" class="text-sm font-medium text-emerald-700">{{ props.selectedCustomer.whatsAppUsername }}</p>
-                            <PhoneNumberItem v-if="props.selectedCustomer.phone1" :phone-number="props.selectedCustomer.phone1" />
-                            <PhoneNumberItem v-if="props.selectedCustomer.phone2"
-                                :phone-number="props.selectedCustomer.phone2" />
-                        </div>
+            <div class="border border-green-200 rounded-lg" :class="compact ? 'bg-emerald-50/50 px-2.5 py-2' : 'bg-green-50 p-3'">
+                <div class="flex min-w-0 items-center gap-2">
+                    <BaseButton @click="handleClearCustomer" variant="ghost" size="sm" icon-only class="text-gray-600"
+                        aria-label="Cambiar cliente" title="Cambiar cliente">
+                        <ArrowPathIcon class="h-4 w-4 shrink-0" />
+                    </BaseButton>
+                    <button type="button" class="min-w-0 flex-1 truncate text-left text-sm font-semibold capitalize text-emerald-900 underline-offset-2 hover:underline focus-visible:outline-emerald-600"
+                        :title="`Ver detalle de ${props.selectedCustomer.name}`" :aria-label="`Ver cliente ${props.selectedCustomer.name}`"
+                        @click="$emit('view-customer-detail', props.selectedCustomer)">{{ props.selectedCustomer.name }}</button>
+                    <div class="flex shrink-0 items-center gap-2">
+                        <PhoneNumberItem v-if="props.selectedCustomer.phone1" :phone-number="props.selectedCustomer.phone1" compact actions-on-hover :show-icon="false" />
+                        <PhoneNumberItem v-if="props.selectedCustomer.phone2" :phone-number="props.selectedCustomer.phone2" compact actions-on-hover :show-icon="false" />
                     </div>
                 </div>
+                <p v-if="props.selectedCustomer.whatsAppUsername" class="mt-0.5 truncate pl-10 text-xs text-emerald-700">{{ props.selectedCustomer.whatsAppUsername }}</p>
             </div>
 
-            <div v-if="loyaltyRewardDue"
-                class="relative overflow-hidden rounded-lg border-2 border-amber-300 bg-amber-50 px-3 py-3 text-amber-950 shadow-sm">
-                <div class="absolute right-2 top-2 text-amber-200">
+            <div v-if="!compact && loyaltyRewardDue"
+                class="relative overflow-hidden rounded-lg border border-amber-300 bg-amber-50 text-amber-950" :class="compact ? 'px-2.5 py-2' : 'px-3 py-3 shadow-sm'">
+                <div v-if="!compact" class="absolute right-2 top-2 text-amber-200">
                     <SparklesIcon class="h-10 w-10" />
                 </div>
                 <div class="relative flex items-start gap-3">
-                    <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-amber-500 text-white shadow-sm">
-                        <GiftIcon class="h-6 w-6" />
+                    <div class="flex shrink-0 items-center justify-center rounded-full bg-amber-500 text-white" :class="compact ? 'h-7 w-7' : 'h-10 w-10 shadow-sm'">
+                        <GiftIcon :class="compact ? 'h-4 w-4' : 'h-6 w-6'" />
                     </div>
                     <div class="min-w-0">
                         <p class="text-xs font-bold uppercase text-amber-700">Regalo disponible en este pedido</p>
-                        <p class="mt-1 text-base font-extrabold leading-tight text-amber-950">
+                        <p class="font-semibold leading-tight text-amber-950" :class="compact ? 'text-sm' : 'mt-1 text-base'">
                             {{ props.selectedCustomer.loyaltyNextRewardLabel || 'Premio de fidelidad' }}
                         </p>
-                        <p class="mt-1 text-xs font-medium text-amber-800">
+                        <p v-if="!compact" class="mt-1 text-xs font-medium text-amber-800">
                             Este cliente ya tiene {{ props.selectedCustomer.loyaltyDeliveredCount || 0 }} pedido(s) entregado(s). Aplica el regalo antes de cobrar.
                         </p>
                     </div>
                 </div>
             </div>
 
-            <div v-else-if="props.selectedCustomer.loyaltyNextRewardMessage"
-                class="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950">
-                {{ props.selectedCustomer.loyaltyNextRewardMessage }}
+            <div v-else-if="!compact && props.selectedCustomer.loyaltyNextRewardMessage"
+                class="rounded-lg border border-amber-200 bg-amber-50 text-amber-950" :class="compact ? 'px-2.5 py-1.5 text-xs' : 'px-3 py-2 text-sm'" :title="props.selectedCustomer.loyaltyNextRewardMessage">
+                {{ compact && props.selectedCustomer.loyaltyDeliveriesUntilNextReward != null ? `Fidelidad · faltan ${props.selectedCustomer.loyaltyDeliveriesUntilNextReward} entregas · ${props.selectedCustomer.loyaltyNextRewardLabel || 'próximo premio'}` : props.selectedCustomer.loyaltyNextRewardMessage }}
             </div>
 
             <!-- Address Selection (for delivery and reservation) -->
             <div v-if="orderType === 'delivery' || orderType === 'reservation'" class="space-y-2">
-                <div class="flex items-center justify-between mb-1">
+                <div v-if="!compact" class="flex items-center justify-between mb-1">
                     <span class="text-sm font-medium text-gray-700">
                         Dirección
                         <span v-if="orderType === 'delivery'" class="text-red-500">*</span>
@@ -84,7 +91,7 @@
                 </div>
                 <AddressSelector :customer-id="props.selectedCustomer.id"
                     :branch-id="props.selectedCustomer.branchId" :operation-branch-id="props.operationBranchId"
-                    :selected-address="props.selectedAddress?.id || undefined" :mode="props.mode"
+                    :selected-address="props.selectedAddress?.id || undefined" :mode="props.mode" :compact="compact"
                     @address-selected="handleAddressSelected" />
             </div>
         </div>
@@ -92,7 +99,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, useId } from 'vue'
 import type { Customer, CustomerAddress } from '@/types/customer'
 
 // Stores y composables (condicionales según modo)
@@ -109,9 +116,8 @@ import PhoneNumberItem from '@/components/customers/PhoneNumberItem.vue'
 // Icons
 import {
     GiftIcon,
-    EyeIcon,
     SparklesIcon,
-    ArrowPathIcon
+    ArrowPathIcon, BuildingStorefrontIcon, TruckIcon, CalendarDaysIcon
 } from '@heroicons/vue/24/outline'
 
 
@@ -122,6 +128,7 @@ interface Props {
     mode?: 'draft' | 'persisted'
     showTypeSelector?: boolean
     operationBranchId?: number
+    compact?: boolean
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -150,17 +157,29 @@ if (props.mode === 'draft') {
 
 
 
+const typeInputName = `order-type-${useId()}`
+
 // Options for order type selector
 const orderTypeOptions = [
-    { value: 'onsite', label: 'En el Local' },
-    { value: 'delivery', label: 'Domicilio' },
-    { value: 'reservation', label: 'Reserva' },
+    { value: 'onsite' as const, label: 'En el local', icon: BuildingStorefrontIcon },
+    { value: 'delivery' as const, label: 'Domicilio', icon: TruckIcon },
+    { value: 'reservation' as const, label: 'Reserva', icon: CalendarDaysIcon },
 ]
 
 const loyaltyRewardDue = computed(() =>
     props.selectedCustomer?.loyaltyRewardDueOnCurrentOrder === true ||
     props.selectedCustomer?.loyaltyDeliveriesUntilNextReward === 1,
 )
+
+const compactLoyaltySummary = computed(() => {
+    const customer = props.selectedCustomer
+    if (!customer) return ''
+    const reward = (customer.loyaltyNextRewardLabel || 'próximo premio').replace(/descuento/gi, 'dcto')
+    if (loyaltyRewardDue.value) return `Hoy → ${reward}`
+    if (!customer.loyaltyNextRewardMessage) return ''
+    const remaining = customer.loyaltyDeliveriesUntilNextReward
+    return remaining != null ? `${remaining} ${remaining === 1 ? 'entrega más' : 'entregas más'} → ${reward}` : customer.loyaltyNextRewardMessage
+})
 
 // Methods
 const handleCustomerSelected = async (customer: Customer, addressServiceBranchId?: number, createdAddressId?: number) => {
@@ -255,4 +274,5 @@ const handleOrderTypeChanged = (type: 'onsite' | 'delivery' | 'reservation') => 
     flex-direction: column;
     gap: 0.75rem;
 }
+.customer-section--compact { gap: 0.5rem; }
 </style>

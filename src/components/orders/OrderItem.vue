@@ -1,9 +1,9 @@
 <template>
     <div class="order-item-compact">
         <!-- Primera línea: Nombre del producto + precio base + acciones -->
-        <div class="flex items-center justify-between mb-2">
+        <div class="flex items-center justify-between mb-1">
             <div class="flex items-center gap-2 flex-1 min-w-0">
-                <h4 class="product-name text-sm font-medium text-gray-900">{{ item.productName }}</h4>
+                <h4 class="product-name text-sm font-medium text-gray-900" :title="item.productName">{{ item.productName }}</h4>
                 <span
                     v-if="item.isDailyPromotionGift"
                     class="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-800"
@@ -22,88 +22,71 @@
                 >
                     Codigo
                 </span>
-                <span class="text-xs text-gray-500 whitespace-nowrap">Precio base: {{ formatCurrency(item.productPrice)
-                }}</span>
+
             </div>
             <div class="flex shrink-0 items-center">
-                <button type="button" class="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-emerald-700 focus-visible:outline-emerald-600"
+                <button type="button" class="rounded p-1 text-gray-500 hover:bg-gray-100 hover:text-emerald-700 focus-visible:outline-emerald-600"
                     :class="{ 'text-emerald-700': item.notes }" :aria-label="`Editar nota de ${item.productName}`"
                     :title="item.notes || 'Agregar nota'" @click="showNoteDialog = true">
                     <PencilIcon class="h-4 w-4" />
                 </button>
-                <BaseButton @click="handleRemove" variant="ghost" size="sm" title="Eliminar">
+                <BaseButton @click="handleRemove" variant="ghost" size="xs" icon-only class="h-6 w-6 p-0 text-gray-500 hover:text-red-600" title="Eliminar" :aria-label="`Eliminar ${item.productName}`">
                     <TrashIcon class="w-4 h-4" />
                 </BaseButton>
             </div>
         </div>
 
         <!-- Segunda línea: Cantidad + Precio + Descuento + Total (todo en una fila) -->
-        <div class="flex items-center gap-2 text-sm">
+        <div class="grid grid-cols-[76px_minmax(44px,1fr)_auto_auto] items-center gap-1.5 text-sm">
             <!-- Controles de cantidad compactos -->
             <div class="flex items-center gap-1">
-                <BaseButton @click="decreaseQuantity" variant="outline" size="sm" :disabled="localQuantity <= 1"
+                <BaseButton @click="decreaseQuantity" variant="outline" size="xs" icon-only :disabled="localQuantity <= 1" :aria-label="`Reducir cantidad de ${item.productName}`"
                     class="h-6 w-6 p-0">
-                    <MinusIcon class="w-3 h-3" />
+                    <MinusIcon class="w-3.5 h-3.5 shrink-0" />
                 </BaseButton>
-                <span class="quantity-display font-medium text-gray-900 min-w-[2rem] text-center">
+                <span class="quantity-display font-medium text-gray-900 text-center">
                     {{ localQuantity }}
                 </span>
-                <BaseButton @click="increaseQuantity" variant="outline" size="sm" class="h-6 w-6 p-0"
+                <BaseButton @click="increaseQuantity" :aria-label="`Aumentar cantidad de ${item.productName}`" variant="outline" size="xs" icon-only class="h-6 w-6 p-0"
                     :disabled="item.isDailyPromotionGift || item.isLoyaltyGift || item.isDiscountCodeGift">
-                    <PlusIcon class="w-3 h-3" />
+                    <PlusIcon class="w-3.5 h-3.5 shrink-0" />
                 </BaseButton>
             </div>
 
             <!-- Separador visual -->
-            <span class="text-gray-300">│</span>
 
             <!-- Precio unitario (editable) -->
             <div class="flex items-center gap-1">
-                <input v-model.number="localUnitPrice" type="number" min="0" step="100" @input="handlePriceChange"
+                <input v-model.number="localUnitPrice" type="number" min="0" step="100" @input="handlePriceChange" :aria-label="`Precio de ${item.productName}`" :title="`Precio base: ${formatCurrency(item.productPrice)}`"
                     :disabled="item.isDailyPromotionGift || item.isLoyaltyGift || item.isDiscountCodeGift"
-                    class="w-20 px-1 py-0.5 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500" />
+                    class="w-full min-w-0 px-1.5 py-1 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500" />
             </div>
 
             <!-- Separador visual -->
-            <span class="text-gray-300">│</span>
 
             <!-- Descuento (editable inline) -->
             <div class="flex items-center gap-1">
-                <span class="text-gray-500 text-xs">Desc:</span>
-                <input v-model.number="discountPercentage" type="number" min="0" max="100" step="0.1"
+                <input v-model.number="discountPercentage" type="number" min="0" max="100" step="0.1" :aria-label="`Descuento en porcentaje de ${item.productName}`"
                     @input="updateDiscountFromPercentage"
                     :disabled="item.isDailyPromotionGift || item.isLoyaltyGift || item.isDiscountCodeGift"
-                    class="w-12 px-1 py-0.5 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500" />
+                    class="w-10 min-w-0 px-1 py-1 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500" />
                 <span class="text-xs">%</span>
+                <span v-if="discountAmount > 0" class="whitespace-nowrap text-[11px] tabular-nums text-gray-500">{{ formatCurrency(discountAmount) }}</span>
             </div>
 
             <!-- Separador visual -->
-            <span class="text-gray-300">│</span>
 
             <!-- Total (destacado) -->
-            <div class="flex items-center gap-1 ml-auto">
-                <span class="text-gray-500 text-xs">Total:</span>
+            <div class="text-right tabular-nums">
                 <span class="font-bold text-emerald-600">{{ formatCurrency(calculatedSubtotal) }}</span>
             </div>
         </div>
 
-        <!-- Mostrar ahorro si hay descuento (opcional, tercera línea pequeña) -->
-        <div v-if="discountAmount > 0 || dailyPromotionCop > 0 || loyaltyCop > 0 || discountCodeCop > 0 || freeDeliveryCop > 0" class="mt-1 text-xs text-right space-y-0.5">
-            <div v-if="discountAmount > 0" class="text-green-600">
-                Ahorro: {{ formatCurrency(discountAmount) }}
-            </div>
-            <div v-if="dailyPromotionCop > 0" class="text-amber-700">
-                Promo del dia: -{{ formatCurrency(dailyPromotionCop) }}
-            </div>
-            <div v-if="loyaltyCop > 0" class="text-emerald-700">
-                Fidelizacion: -{{ formatCurrency(loyaltyCop) }}
-            </div>
-            <div v-if="discountCodeCop > 0" class="text-indigo-700">
-                Codigo promocional: -{{ formatCurrency(discountCodeCop) }}
-            </div>
-            <div v-if="freeDeliveryCop > 0" class="text-emerald-700">
-                Domicilio gratis: −{{ formatCurrency(freeDeliveryCop) }}
-            </div>
+        <div v-if="dailyPromotionCop > 0 || loyaltyCop > 0 || discountCodeCop > 0 || freeDeliveryCop > 0" class="mt-1 flex flex-wrap justify-end gap-x-2 gap-y-0.5 text-[11px] tabular-nums">
+            <span v-if="dailyPromotionCop > 0" class="text-amber-700">Promo −{{ formatCurrency(dailyPromotionCop) }}</span>
+            <span v-if="loyaltyCop > 0" class="text-emerald-700">Fidelización −{{ formatCurrency(loyaltyCop) }}</span>
+            <span v-if="discountCodeCop > 0" class="text-indigo-700">Código −{{ formatCurrency(discountCodeCop) }}</span>
+            <span v-if="freeDeliveryCop > 0" class="text-emerald-700">Domi gratis −{{ formatCurrency(freeDeliveryCop) }}</span>
         </div>
         <OrderNoteDialog v-model="showNoteDialog" :notes="item.notes" :title="`Notas · ${item.productName}`" :save="saveNotes" />
     </div>
@@ -239,7 +222,7 @@ watch(() => props.item.discount, () => {
     background-color: white;
     border: 1px solid #e5e7eb;
     border-radius: 0.5rem;
-    padding: 0.75rem;
+    padding: 0.5rem 0.625rem;
     transition: all 0.2s;
 }
 
@@ -257,7 +240,7 @@ watch(() => props.item.discount, () => {
 
 .quantity-display {
     display: inline-block;
-    min-width: 2rem;
+    min-width: 1.25rem;
     text-align: center;
 }
 

@@ -1,5 +1,5 @@
 <template>
-    <div v-if="workspaceBranchId" class="mt-3 rounded-lg border border-gray-200 bg-gray-50 p-3"
+    <div v-if="workspaceBranchId" class="text-xs"
         data-test="order-fulfillment-branch">
         <div v-if="loading" class="text-xs text-gray-500">Cargando sucursales...</div>
         <div v-else-if="loadError" class="text-sm text-red-700" role="alert">
@@ -7,23 +7,17 @@
             <button type="button" class="ml-2 underline" @click="loadBranches">Reintentar</button>
         </div>
         <template v-else-if="otherBranches.length">
-            <label class="flex cursor-pointer items-center gap-2 text-sm font-medium text-gray-700">
-                <input type="checkbox" :checked="alternativeEnabled" :disabled="changingBranch"
-                    class="h-4 w-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500"
-                    data-test="remote-branch-toggle" @change="onToggle" />
-                Atender desde otra sucursal
-            </label>
-            <div v-if="alternativeEnabled" class="mt-3">
+            <button type="button" class="inline-flex min-h-7 items-center gap-1 text-left text-xs text-gray-500 underline-offset-2 hover:text-emerald-700 hover:underline disabled:opacity-50"
+                :class="{ 'font-medium text-emerald-700': isRemote }" :disabled="changingBranch" :aria-expanded="alternativeEnabled"
+                data-test="remote-branch-toggle" @click="onToggle(!alternativeEnabled)">
+                {{ isRemote ? `Atiende ${selectedBranchName} · Volver a ${workspaceBranchName}` : 'Atender desde otra sucursal' }}
+            </button>
+            <div v-if="alternativeEnabled" class="mt-1.5 rounded-lg border border-gray-200 bg-gray-50 p-2">
                 <BaseSelect :model-value="selectedRemoteBranchId" :options="otherBranches"
                     :label="order.type === 'onsite' ? 'Sucursal donde se recoge' : 'Sucursal que prepara y entrega'"
                     size="sm" value-key="id" display-key="name"
                     placeholder="Selecciona la sucursal" :disabled="changingBranch"
                     @update:model-value="selectBranch" />
-                <p class="mt-2 text-xs text-gray-600">
-                    {{ order.type === 'onsite'
-                        ? 'La preparación, los pagos y la recogida corresponden a la sucursal seleccionada.'
-                        : 'Los pagos y el despacho corresponden a la sucursal que atiende el pedido.' }}
-                </p>
                 <p v-if="hasPayments" class="mt-1 text-xs text-amber-700">
                     Cambiar de sucursal reinicia los pagos y beneficios de este borrador.
                 </p>
@@ -56,6 +50,8 @@ const workspaceBranchId = computed(() => props.order.workspaceBranchId ?? drafts
 const otherBranches = computed(() => branches.value.filter(branch => branch.id !== workspaceBranchId.value))
 const isRemote = computed(() => props.order.branchId != null
     && props.order.branchId !== workspaceBranchId.value)
+const selectedBranchName = computed(() => branches.value.find(branch => branch.id === props.order.branchId)?.name ?? 'otra sucursal')
+const workspaceBranchName = computed(() => branches.value.find(branch => branch.id === workspaceBranchId.value)?.name ?? 'la sucursal actual')
 const selectedRemoteBranchId = computed(() => isRemote.value ? props.order.branchId : null)
 const hasPayments = computed(() => props.order.bankPayments.length > 0
     || props.order.appPayment != null || props.order.paidInStoreCash === true)
@@ -119,8 +115,7 @@ async function applyBranch(branchId: number) {
     }
 }
 
-async function onToggle(event: Event) {
-    const enabled = (event.target as HTMLInputElement).checked
+async function onToggle(enabled: boolean) {
     if (!enabled) {
         if (isRemote.value && workspaceBranchId.value) {
             await applyBranch(workspaceBranchId.value)

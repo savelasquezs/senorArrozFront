@@ -2,9 +2,9 @@
     <MainLayout :no-card="true">
         <div class="orders-view h-full bg-gray-50 flex flex-col">
             <!-- Main Content -->
-            <div class="flex flex-1 min-h-0">
+            <div class="flex flex-1 min-h-0 flex-col lg:flex-row">
                 <!-- Left Panel - Products and Categories -->
-                <div class="flex-1 bg-white border-r border-gray-200 overflow-hidden flex flex-col min-h-0">
+                <div class="h-[35dvh] shrink-0 bg-white border-r border-gray-200 overflow-hidden flex flex-col min-h-0 lg:h-auto lg:flex-1">
                     <!-- Categories Bar -->
                     <div class="px-4 border-b border-gray-200 bg-gray-50">
                         <CategoriesBar :rice-tabs="posTabs.rice" :other-tabs="posTabs.other"

@@ -1,89 +1,31 @@
 <template>
-    <div class="payment-selector px-4 py-3 border-b border-gray-200">
-        <h4 class="text-sm font-semibold text-gray-900 mb-3">Métodos de Pago</h4>
-
-        <!-- App Payment Section -->
-        <div class="space-y-2">
-            <label class="text-xs font-medium text-gray-700 uppercase tracking-wide">Pago por APP (máx. 1)</label>
-
-            <div v-if="!order.appPayment">
-                <BaseSelect v-model="selectedAppId" :options="appOptions" placeholder="Seleccionar app..." size="sm"
-                    class="text-xs" value-key="value" display-key="label" :disabled="!canAddElectronicPayments"
-                    @update:model-value="handleAppSelected" />
-            </div>
-
-            <!-- Existing App Payment -->
-            <div v-else class="flex items-center justify-between p-2 bg-blue-50 rounded-md border border-blue-200">
-                <div class="flex items-center gap-2">
-                    <DevicePhoneMobileIcon class="w-3.5 h-3.5 text-blue-600" />
-                    <div>
-                        <div class="text-xs font-medium text-blue-900">{{ order.appPayment.appName }}</div>
-                        <div class="text-xs text-blue-600">{{ formatCurrency(order.appPayment.amount) }}</div>
-                    </div>
-                </div>
-                <div class="flex gap-1">
-                    <BaseButton @click="handleUpdateAppPayment" variant="ghost" size="sm" class="h-7 px-2">
-                        <PencilIcon class="w-3 h-3" />
-                    </BaseButton>
-                    <BaseButton @click="handleRemoveAppPayment" variant="ghost" size="sm" class="h-7 px-2 text-red-600">
-                        <TrashIcon class="w-3 h-3" />
-                    </BaseButton>
-                </div>
-            </div>
+    <div class="payment-selector">
+        <div class="grid grid-cols-2 gap-2">
+            <BaseSelect v-if="!order.appPayment" v-model="selectedAppId" :options="appOptions" label="App"
+                placeholder="Agregar app…" size="sm" value-key="value" display-key="label" :disabled="!canAddElectronicPayments"
+                @update:model-value="handleAppSelected" />
+            <div v-else class="self-end py-2 text-xs text-gray-400">Una app por pedido</div>
+            <BaseSelect v-model="selectedBankId" :options="bankOptions" label="Banco" placeholder="Agregar banco…" size="sm"
+                value-key="value" display-key="label" :disabled="!canAddElectronicPayments" @update:model-value="handleBankSelected" />
         </div>
-
-        <!-- Bank Payment Section -->
-        <div class="mt-4 space-y-2">
-            <label class="text-xs font-medium text-gray-700 uppercase tracking-wide">Pagos Bancarios (múltiples)</label>
-
-            <div>
-                <BaseSelect v-model="selectedBankId" :options="bankOptions" placeholder="Seleccionar banco..." size="sm"
-                    class="text-xs" value-key="value" display-key="label" :disabled="!canAddElectronicPayments"
-                    @update:model-value="handleBankSelected" />
-            </div>
-
-            <!-- Existing Bank Payments -->
-            <div v-for="payment in order.bankPayments" :key="payment.tempId"
-                class="flex items-center justify-between p-2 bg-green-50 rounded-md border border-green-200">
-                <div class="flex items-center gap-2">
-                    <BuildingLibraryIcon class="w-3.5 h-3.5 text-green-600" />
-                    <div>
-                        <div class="text-xs font-medium text-green-900">{{ payment.bankName }}</div>
-                        <div class="text-xs text-green-600">{{ formatCurrency(payment.amount) }}</div>
-                    </div>
-                </div>
-                <div class="flex gap-1">
-                    <BaseButton @click="handleUpdateBankPayment(payment.tempId)" variant="ghost" size="sm"
-                        class="h-7 px-2">
-                        <PencilIcon class="w-3 h-3" />
-                    </BaseButton>
-                    <BaseButton @click="handleRemoveBankPayment(payment.tempId)" variant="ghost" size="sm"
-                        class="h-7 px-2 text-red-600">
-                        <TrashIcon class="w-3 h-3" />
-                    </BaseButton>
-                </div>
-            </div>
+        <div v-if="order.appPayment" class="mt-2 flex items-center gap-2 rounded-lg border border-blue-100 bg-blue-50 px-2 py-1.5 text-xs">
+            <DevicePhoneMobileIcon class="h-4 w-4 shrink-0 text-blue-600" />
+            <span class="min-w-0 flex-1 truncate font-medium text-blue-900">{{ order.appPayment.appName }}</span>
+            <strong class="tabular-nums text-blue-800">{{ formatCurrency(order.appPayment.amount) }}</strong>
+            <BaseButton @click="handleUpdateAppPayment" variant="ghost" size="sm" icon-only class="h-7 w-7 p-0" aria-label="Editar pago de app"><PencilIcon class="h-3.5 w-3.5" /></BaseButton>
+            <BaseButton @click="handleRemoveAppPayment" variant="ghost" size="sm" icon-only class="h-7 w-7 p-0 text-gray-400 hover:text-red-600" aria-label="Quitar pago de app"><TrashIcon class="h-3.5 w-3.5" /></BaseButton>
         </div>
-
-        <!-- Payment Summary -->
-        <div v-if="hasPayments" class="mt-3 p-2.5 rounded-lg text-xs space-y-1"
-            :class="hasOverpayment ? 'bg-red-50 border border-red-200' : 'bg-gray-50'">
-            <div class="flex justify-between">
-                <span class="text-gray-600">Total Pagos:</span>
-                <span class="font-medium" :class="hasOverpayment ? 'text-red-600' : ''">
-                    {{ formatCurrency(totalPayments) }}
-                </span>
-            </div>
-            <div class="flex justify-between">
-                <span class="text-gray-600">Total Pedido:</span>
-                <span class="font-medium">{{ formatCurrency(order.total) }}</span>
-            </div>
-            <div class="flex justify-between font-semibold pt-1.5 border-t border-gray-200">
-                <span>Efectivo:</span>
-                <span class="text-emerald-600">{{ formatCurrency(cashAmount) }}</span>
-            </div>
+        <div v-for="payment in order.bankPayments" :key="payment.tempId" class="mt-2 flex items-center gap-2 rounded-lg border border-emerald-100 bg-emerald-50 px-2 py-1.5 text-xs">
+            <BuildingLibraryIcon class="h-4 w-4 shrink-0 text-emerald-600" />
+            <span class="min-w-0 flex-1 truncate font-medium text-emerald-900">{{ payment.bankName }}</span>
+            <strong class="tabular-nums text-emerald-800">{{ formatCurrency(payment.amount) }}</strong>
+            <BaseButton @click="handleUpdateBankPayment(payment.tempId)" variant="ghost" size="sm" icon-only class="h-7 w-7 p-0" :aria-label="`Editar pago de ${payment.bankName}`"><PencilIcon class="h-3.5 w-3.5" /></BaseButton>
+            <BaseButton @click="handleRemoveBankPayment(payment.tempId)" variant="ghost" size="sm" icon-only class="h-7 w-7 p-0 text-gray-400 hover:text-red-600" :aria-label="`Quitar pago de ${payment.bankName}`"><TrashIcon class="h-3.5 w-3.5" /></BaseButton>
         </div>
-
+        <div v-if="hasPayments" class="mt-2 flex flex-wrap justify-between gap-2 rounded-lg bg-gray-50 px-2 py-2 text-xs tabular-nums" :class="{ 'text-red-700': hasOverpayment }">
+            <span>Registrado <strong>{{ formatCurrency(totalPayments) }}</strong></span>
+            <span>Efectivo <strong class="text-emerald-700">{{ formatCurrency(cashAmount) }}</strong></span>
+        </div>
         <!-- Total Covered Indicator -->
         <div v-if="!canAddPayments && hasPayments" class="mt-2 text-xs text-emerald-600 font-medium text-center">
             ✓ Total cubierto

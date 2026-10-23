@@ -152,4 +152,31 @@ describe('AddressSelector branch coverage', () => {
         expect(dependencies.draftStore.changeOperationalBranch).not.toHaveBeenCalled()
     })
 
+    it('opens editing from the shared address text and clears only the selection', async () => {
+        const wrapper = shallowMount(AddressSelector, {
+            props: { customerId: 7, selectedAddress: 11, mode: 'persisted', operationBranchId: 1 },
+            global: { stubs: { BaseDialog: { props: ['modelValue'], template: '<div v-if="modelValue"><slot /></div>' } } },
+        })
+        await flushPromises()
+        expect(wrapper.get('[aria-label="Cambiar dirección"]').exists()).toBe(true)
+        const address = wrapper.get('[aria-label="Editar dirección"]')
+        expect(address.element.tagName).toBe('BUTTON')
+        expect(address.text()).toContain('Calle 1 # 2-03')
+        await address.trigger('click')
+        expect(wrapper.getComponent(CustomerAddressForm).props('addressId')).toBe(11)
+        await wrapper.get('[aria-label="Quitar dirección"]').trigger('click')
+        expect(wrapper.emitted('addressSelected')?.at(-1)).toEqual([undefined])
+        expect(dependencies.customersStore.addresses).toHaveLength(2)
+        wrapper.unmount()
+    })
+
+    it('hides the change action when the customer has only one address', async () => {
+        dependencies.customersStore.addresses = [dependencies.customersStore.addresses[1]]
+        const wrapper = shallowMount(AddressSelector, { props: { customerId: 7, selectedAddress: 11, compact: true } })
+        await flushPromises()
+        expect(wrapper.find('[aria-label="Cambiar dirección"]').exists()).toBe(false)
+        expect(wrapper.find('[aria-label="Editar dirección"]').exists()).toBe(true)
+        wrapper.unmount()
+    })
+
 })

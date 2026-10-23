@@ -13,8 +13,12 @@
           
         </div>
 
+        <div v-if="!compact && !loading && items.length" class="flex items-center justify-between">
+            <h3 class="text-xs font-semibold text-gray-600">Productos · {{ itemsCount }} uds.</h3>
+            <button type="button" class="flex items-center gap-1 text-xs text-gray-400 hover:text-red-600" @click="handleClearAll"><TrashIcon class="h-3 w-3" />Limpiar</button>
+        </div>
         <!-- Items List -->
-        <div v-else class="items-section">
+        <div v-if="!loading && items.length > 0" class="items-section">
             <!-- Items List with Animations -->
             <TransitionGroup name="item-list" tag="div" class="items-list">
                 <OrderItem v-for="item in items" :key="item.tempId" :item="item" :tab-id="tabId"
@@ -23,30 +27,15 @@
                     @discount-change="handleDiscountChange" @remove="handleRemoveItem" />
             </TransitionGroup>
 
-            <!-- Clear All Button -->
-            <div v-if="items.length > 0" class="clear-all-section">
-                <BaseButton @click="handleClearAll" variant="ghost" size="sm" class="text-red-600 hover:bg-red-50">
-                    <div class="flex items-center">
-                        <TrashIcon class="w-3 h-3 mr-1" />
-                        Limpiar
-                    </div>
-                </BaseButton>
-
-            </div>
-
             <!-- Totals Summary -->
             <div class="totals-summary">
                 <div class="summary-line">
-                    <span class="text-xs text-gray-600">Items:</span>
-                    <span class="text-xs font-medium">{{ itemsCount }}</span>
-                </div>
-                <div class="summary-line">
-                    <span class="text-xs text-gray-600">Subtotal:</span>
+                    <span class="text-xs text-gray-600">Productos:</span>
                     <span class="text-xs font-medium">{{ formatCurrency(subtotal) }}</span>
                 </div>
-                <div v-if="discountTotal > 0" class="summary-line text-green-600">
-                    <span class="text-xs">Desc:</span>
-                    <span class="text-xs">-{{ formatCurrency(discountTotal) }}</span>
+                <div v-if="discountTotal > 0" class="flex flex-wrap items-baseline justify-between gap-x-2 text-xs">
+                    <span class="text-gray-500">Descuentos incluidos:</span>
+                    <span class="text-emerald-700 tabular-nums">−{{ formatCurrency(discountTotal) }}<span v-if="freeDeliveryAppliedTotal > 0" class="ml-1 text-[11px] text-gray-500">({{ formatCurrency(freeDeliveryAppliedTotal) }} domi gratis)</span></span>
                 </div>
                 <div class="summary-line">
                     <span class="text-xs text-gray-600">Envío:</span>
@@ -67,15 +56,11 @@
                         Hasta {{ formatCurrency(freeDeliveryBudgetCap) }} sobre el envío
                     </span>
                 </div>
-                <div v-if="freeDeliveryAppliedTotal > 0" class="summary-line text-xs text-emerald-700">
-                    <span>Domicilio gratis aplicado</span>
-                    <span>−{{ formatCurrency(freeDeliveryAppliedTotal) }}</span>
-                </div>
-                <div class="summary-line total-line">
+                <div v-if="!compact" class="summary-line total-line">
                     <span class="text-sm font-bold">Total:</span>
                     <span class="text-sm font-bold text-emerald-600">{{ formatCurrency(total) }}</span>
                 </div>
-                <BaseButton type="button" variant="outline" size="sm" class="w-full mt-1.5 justify-center"
+                <BaseButton v-if="!compact" type="button" variant="outline" size="sm" class="w-full mt-1.5 justify-center"
                     @click="copyOrderSummaryToClipboard">
                     <span class="flex items-center justify-center gap-1.5">
                         <ClipboardDocumentIcon class="w-4 h-4" />
@@ -113,6 +98,7 @@ import {
 interface Props {
     tabId: string
     loading?: boolean
+    compact?: boolean
 }
 
 withDefaults(defineProps<Props>(), {
@@ -280,6 +266,7 @@ const handleClearAll = async () => {
 }
 
 
+defineExpose({ copyOrderSummaryToClipboard })
 </script>
 
 <style scoped>
@@ -298,7 +285,7 @@ const handleClearAll = async () => {
 
 .empty-state {
     text-align: center;
-    padding: 1rem;
+    padding: 0.75rem;
 }
 
 .items-section {
@@ -310,7 +297,7 @@ const handleClearAll = async () => {
 .items-list {
     display: flex;
     flex-direction: column;
-    gap: 0.5rem;
+    gap: 0.375rem;
 }
 
 .clear-all-section {
@@ -323,7 +310,7 @@ const handleClearAll = async () => {
 .totals-summary {
     background-color: #f9fafb;
     border-radius: 0.5rem;
-    padding: 0.75rem;
+    padding: 0.5rem 0.625rem;
     display: flex;
     flex-direction: column;
     gap: 0.25rem;
