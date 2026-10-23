@@ -37,7 +37,7 @@ function deferred<T>(): Deferred<T> {
 }
 
 function principal(totalSales: number): PrincipalDashboardPayload {
-	return { kpis: { totalSales } } as PrincipalDashboardPayload;
+	return { kpis: { totalSales } } as unknown as PrincipalDashboardPayload;
 }
 
 function salesVsExpenses(marker: number): DashboardPrincipalSalesVsExpensesApiResponse {
