@@ -180,4 +180,13 @@ describe('Datos de facturación reutilizables', () => {
             expect(wrapper.find('ul[aria-label="Destinatarios encontrados"]').exists()).toBe(false); wrapper.unmount()
         } finally { vi.useRealTimers() }
     })
+    it('permite una copia editada solo para el pedido sin modificar el perfil compartido', async () => {
+        const profile = { ...recipient, profileId: 22, profileVersion: '2026-10-22T19:00:00Z' }
+        const wrapper = mount(BillingRecipientModal, { props: { modelValue: true, customerId: 10, recipient: profile, orderContext: true }, global: { stubs: { BaseDialog: { template: '<div><slot /></div>' } } } })
+        await flushPromises(); await wrapper.get('input[type="radio"][value="order"]').setValue(true)
+        await wrapper.findAll('button').find(b => b.text() === 'Editar para este pedido')!.trigger('click')
+        await wrapper.get('input[type="email"]').setValue('solo-pedido@example.com'); await wrapper.get('form').trigger('submit'); await flushPromises()
+        expect(api.saveRecipient).not.toHaveBeenCalled(); expect(api.saveDirectoryRecipient).not.toHaveBeenCalled()
+        expect(wrapper.emitted('saved')?.[0]?.[0]).toMatchObject({ profileId: undefined, id: undefined, email: 'solo-pedido@example.com', isDefault: false }); wrapper.unmount()
+    })
 })

@@ -20,8 +20,10 @@
                     <option v-for="r in recipients" :key="r.id" :value="r.id">{{ r.name }} · {{ r.identification }}{{ r.isDefault ? ' · Predeterminado' : '' }}</option>
                 </select>
             </label>
-            <div class="flex items-center justify-between gap-2"><h4 class="text-sm font-semibold text-slate-800">{{ form.profileId || form.id ? 'Destinatario seleccionado' : 'Nuevo destinatario' }}</h4><button v-if="form.profileId || form.id" type="button" class="min-h-11 text-sm font-medium text-emerald-700 underline" @click="newRecipient">Crear otro</button></div>
-            <div v-if="form.profileId" class="rounded-xl bg-slate-50 p-3 text-sm text-slate-600"><p>{{ form.needsReview ? 'Encontramos datos anteriores distintos para esta identificación. Revisa y confirma el nombre y correo correctos antes de reutilizarlos.' : 'Este registro se comparte con otros clientes del negocio.' }}</p><button type="button" class="min-h-11 font-medium text-emerald-700 underline" @click="editingShared = !editingShared">{{ editingShared ? 'Cancelar edición compartida' : 'Editar datos compartidos' }}</button></div>
+            <div class="flex items-center justify-between gap-2"><h4 ref="recipientHeading" tabindex="-1" class="rounded text-sm font-semibold text-slate-800 focus:outline-emerald-600">{{ form.profileId || form.id ? 'Destinatario seleccionado' : 'Nuevo destinatario' }}</h4><button v-if="form.profileId || form.id" type="button" class="min-h-11 text-sm font-medium text-emerald-700 underline" @click="newRecipient">Crear otro</button></div>
+            <div v-if="form.profileId" class="rounded-xl bg-slate-50 p-3 text-sm text-slate-600"><p>{{ form.needsReview ? 'Encontramos datos anteriores distintos para esta identificación. Revisa y confirma el nombre y correo correctos antes de reutilizarlos.' : saveScope === 'order' ? 'Este pedido usará una copia de los datos. El registro del negocio se conservará.' : 'Este registro se comparte con otros clientes del negocio.' }}</p><button type="button" class="min-h-11 font-medium text-emerald-700 underline" @click="editingShared = !editingShared">{{ editingShared ? 'Cancelar edición' : saveScope === 'order' ? 'Editar para este pedido' : 'Editar datos compartidos' }}</button></div>
+            <div v-if="sharedReadOnly" class="rounded-xl border border-emerald-100 bg-emerald-50 p-4 text-sm text-slate-700 break-words"><p class="font-semibold text-slate-900">{{ form.tradeName || form.name }}</p><p v-if="form.tradeName">{{ form.name }}</p><p>{{ form.documentType === 6 ? 'NIT' : 'Identificación' }} {{ form.identification }}</p><p v-if="form.email">{{ form.email }}</p><p v-if="form.address">{{ form.address }}</p></div>
+            <div v-show="!sharedReadOnly" class="space-y-4">
             <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <label class="text-sm">Tipo de identificación *
                     <select v-model.number="form.documentType" :disabled="!!form.profileId || busy" class="mt-1 min-h-11 w-full rounded-xl border border-slate-300 bg-white p-3" required>
@@ -46,10 +48,11 @@
                 <input v-model.trim="form.email" :readonly="sharedReadOnly" @blur="touched.email = true" :aria-invalid="touched.email && !!issues.email" type="email" maxlength="254" autocomplete="email" inputmode="email" class="mt-1 min-h-11 w-full rounded-xl border border-slate-300 p-3" />
             </label>
             <label class="block text-sm">Dirección fiscal <span class="text-slate-500">(opcional)</span><input v-model.trim="form.address" :readonly="sharedReadOnly" maxlength="300" class="mt-1 min-h-11 w-full rounded-xl border border-slate-300 p-3" /><span class="text-xs text-slate-500">Se conserva en el directorio; la dirección de entrega se elige en el pedido.</span></label>
-            <label v-if="editingShared && form.profileId" class="flex min-h-11 items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900"><input v-model="form.confirmSharedUpdate" type="checkbox" class="mt-1" />Confirmo los datos compartidos para próximos pedidos de los clientes asociados. Las facturas emitidas conservan sus datos.</label>
+            <label v-if="editingShared && form.profileId && saveScope !== 'order'" class="flex min-h-11 items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900"><input v-model="form.confirmSharedUpdate" type="checkbox" class="mt-1" />Confirmo los datos compartidos para próximos pedidos de los clientes asociados. Las facturas emitidas conservan sus datos.</label>
             <p v-if="touched.identification && issues.identification" class="text-sm text-red-700">{{ issues.identification }}</p>
             <p v-if="touched.name && issues.name" class="text-sm text-red-700">{{ issues.name }}</p>
             <p v-if="touched.email && issues.email" class="text-sm text-red-700">{{ issues.email }}</p>
+            </div>
             <p v-if="!form.email" class="text-sm text-gray-600">Sin correo podrás descargar e imprimir la factura desde el pedido.</p>
             <fieldset v-if="orderContext || !customerId" class="rounded-xl bg-slate-50 p-3 text-sm space-y-2"><legend class="font-medium">Dónde guardar</legend>
                 <label v-if="customerId" class="flex min-h-11 items-center gap-2"><input v-model="saveScope" :name="scopeName" type="radio" value="customer" />Recordar este destinatario para el cliente y el negocio</label>
@@ -83,6 +86,7 @@ const emit = defineEmits<{ 'update:modelValue': [boolean]; saved: [BillingRecipi
 const { recipients, load, loading, error: loadError } = useBillingRecipients(() => props.modelValue ? props.customerId : null)
 const empty = (): BillingRecipient => ({ id: undefined, profileId: undefined, profileVersion: undefined, needsReview: false, confirmSharedUpdate: false, documentType: 3, identification: '', name: '', tradeName: '', address: '', email: '', isDefault: false })
 const form = reactive<BillingRecipient>(empty())
+const recipientHeading = ref<HTMLElement | null>(null)
 const saveScope = ref<'customer' | 'directory' | 'order'>('customer'), busy = ref(false), lookingUp = ref(false), error = ref(''), editingShared = ref(false)
 const selectedProfile = ref<BillingRecipient | null>(null)
 const sharedReadOnly = computed(() => !!form.profileId && !editingShared.value)
@@ -102,7 +106,8 @@ watch(recipients, values => {
         if (linked) { form.id = linked.id; form.isDefault = form.isDefault || linked.isDefault }
     }
 })
-function newRecipient() { resetLookup(); Object.assign(form, empty()); editingShared.value = false; selectedProfile.value = null; error.value = '' }
+function focusRecipient() { void nextTick(() => { if (props.modelValue) recipientHeading.value?.focus() }) }
+function newRecipient() { resetLookup(); Object.assign(form, empty()); editingShared.value = false; selectedProfile.value = null; error.value = ''; focusRecipient() }
 watch(() => [props.modelValue, props.customerId], () => {
     if (props.modelValue) { Object.assign(form, empty(), props.recipient ?? {}); selectedProfile.value = { ...form }; editingShared.value = false; directoryQuery.value = ''; error.value = ''; saveScope.value = props.customerId ? 'customer' : 'directory'; Object.assign(touched, { identification: false, name: false, email: false }) }
 }, { immediate: true })
@@ -111,6 +116,7 @@ function selectDirectory(recipient: BillingRecipient) {
     const linked = recipients.value.find(r => r.profileId === recipient.profileId)
     Object.assign(form, empty(), recipient, { id: linked?.id, isDefault: linked?.isDefault ?? false })
     selectedProfile.value = { ...form }; editingShared.value = !!form.needsReview; error.value = ''; directoryQuery.value = ''
+    focusRecipient()
 }
 function selectRecipient(event: Event) {
     resetLookup()
@@ -164,7 +170,7 @@ async function lookup() {
 async function save() {
     if (loading.value || lookingUp.value) return
     if (busy.value || !billingRecipientComplete({ ...form, needsReview: false })) { error.value = 'Completa los datos obligatorios y verifica el correo.'; return }
-    if (form.needsReview && !form.confirmSharedUpdate || editingShared.value && form.profileId && saveScope.value !== 'order' && !form.confirmSharedUpdate) { error.value = 'Revisa y confirma los datos compartidos antes de guardar.'; return }
+    if ((form.needsReview || editingShared.value && form.profileId) && saveScope.value !== 'order' && !form.confirmSharedUpdate) { error.value = 'Revisa y confirma los datos compartidos antes de guardar.'; return }
     busy.value = true; error.value = ''
     const customerId = props.customerId, token = auth.token
     const isCurrent = () => token === auth.token && customerId === props.customerId && props.modelValue
