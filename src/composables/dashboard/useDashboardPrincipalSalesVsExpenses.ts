@@ -1,4 +1,4 @@
-import { ref, watch, computed, type Ref } from 'vue';
+import { ref, watch, computed, onScopeDispose, type Ref } from 'vue';
 import { dashboardApi, type DashboardPrincipalSalesVsExpensesApiResponse } from '@/services/MainAPI/dashboardApi';
 import { encodeDashboardRangeToApi } from '@/services/MainAPI/dashboardSectionApi';
 import type { DashboardSectionId } from '@/views/dashboard/dashboardSectionIds';
@@ -28,6 +28,16 @@ export function useDashboardPrincipalSalesVsExpenses(
 	const error = ref<string | null>(null);
 
 	const isActive = computed(() => activeSection.value === 'principal');
+	let requestVersion = 0;
+	let currentController: AbortController | null = null;
+
+	function invalidatePending() {
+		requestVersion += 1;
+		currentController?.abort();
+		currentController = null;
+	}
+
+	onScopeDispose(invalidatePending);
 
 	const data = computed((): DashboardPrincipalSalesVsExpensesApiResponse | null => {
 		const r = rawData.value;
@@ -40,23 +50,41 @@ export function useDashboardPrincipalSalesVsExpenses(
 
 	async function load() {
 		if (!isActive.value) return;
+		currentController?.abort();
+		const controller = new AbortController();
+		currentController = controller;
+		const version = ++requestVersion;
 		loading.value = true;
 		error.value = null;
 		try {
 			const { from, to } = encodeDashboardRangeToApi(dateRange.value);
 			const gran = principalSalesVsExpensesGranularity(timeGranularity.value);
-			rawData.value = await dashboardApi.getPrincipalSalesVsExpenses(branchId.value, from, to, gran);
+			const nextData = await dashboardApi.getPrincipalSalesVsExpenses(
+				branchId.value, from, to, gran, controller.signal,
+			);
+			if (version !== requestVersion || !isActive.value) return;
+			rawData.value = nextData;
 		} catch (e) {
+			if (version !== requestVersion || !isActive.value) return;
 			error.value = e instanceof Error ? e.message : 'Error al cargar ventas vs gastos';
 			rawData.value = null;
 		} finally {
-			loading.value = false;
+			if (version === requestVersion) {
+				currentController = null;
+				loading.value = false;
+			}
 		}
 	}
 
 	watch(
 		[isActive, branchId, () => rangeKey(dateRange.value), timeGranularity],
-		() => void load(),
+		() => {
+			if (isActive.value) void load();
+			else {
+				invalidatePending();
+				loading.value = false;
+			}
+		},
 		{ immediate: true },
 	);
 
