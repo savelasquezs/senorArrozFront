@@ -1,6 +1,6 @@
 <template>
 	<div :class="wrapperClass">
-		<label v-if="label" class="mb-1 block text-xs font-medium text-gray-600">
+		<label v-if="label" :for="inputId" class="mb-1 block text-xs font-medium text-gray-600">
 			{{ label }}
 		</label>
 		<VueDatePicker
@@ -8,12 +8,13 @@
 			range
 			:max-date="maxDate"
 			:min-date="minDate"
-			:enable-time-picker="false"
-			:format="format"
+			:time-config="{ enableTimePicker: false }"
+			:formats="{ input: format }"
 			:auto-apply="autoApply"
-			:clearable="clearable"
+			:input-attrs="{ clearable, id: inputId }"
 			:teleport="teleport"
 			:locale="esLocale"
+            :aria-labels="{ input: ariaLabel || label || 'Rango de fechas' }"
 			:class="['w-full base-date-range', `base-date-range--${variant}`]"
 			@update:model-value="onUpdate"
 		/>
@@ -21,18 +22,20 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, useId } from 'vue'
 import { VueDatePicker } from '@vuepic/vue-datepicker'
 import { es } from 'date-fns/locale'
 import '@vuepic/vue-datepicker/dist/main.css'
 import { zonedDayFromPickerLocalDate } from '@/utils/datetime'
 
 const esLocale = es
+const inputId = useId()
 
 const props = withDefaults(
 	defineProps<{
 		modelValue: [Date, Date] | null
 		label?: string
+        ariaLabel?: string
 		maxDate?: Date
 		minDate?: Date
 		teleport?: string | boolean | HTMLElement

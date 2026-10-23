@@ -7,7 +7,7 @@ import { defaultBusinessCalendar } from '@/utils/datetime'
 vi.mock('@vuepic/vue-datepicker', () => ({
     VueDatePicker: {
         name: 'VueDatePicker',
-        props: ['modelValue', 'range', 'formats'],
+        props: ['modelValue', 'range', 'formats', 'timeConfig', 'inputAttrs', 'ariaLabels'],
         emits: ['update:modelValue'],
         template: '<button type="button" />',
     },
@@ -32,6 +32,25 @@ describe('BaseDatePicker', () => {
 
         expect(wrapper.emitted('update:modelValue')).toEqual([['2026-08-21']])
         expect(wrapper.emitted('change')).toEqual([['2026-08-21']])
+    })
+})
+
+describe('BaseDateRangePicker', () => {
+    it('uses a date-only Colombian format and emits only complete ordered ranges', async () => {
+        const { default: RangePicker } = await vi.importActual<typeof import('@/components/ui/BaseDateRangePicker.vue')>('@/components/ui/BaseDateRangePicker.vue')
+        const wrapper = mount(RangePicker, { props: { modelValue: null, ariaLabel: 'Periodo del dashboard' } })
+        const picker = wrapper.findComponent({ name: 'VueDatePicker' })
+        expect(picker.props('formats')).toEqual({ input: 'dd/MM/yyyy' })
+        expect(picker.props('timeConfig')).toEqual({ enableTimePicker: false })
+        expect(picker.props('inputAttrs').clearable).toBe(false)
+        expect(picker.props('ariaLabels').input).toBe('Periodo del dashboard')
+        const from = new Date(2026, 9, 20), to = new Date(2026, 9, 22)
+        await picker.vm.$emit('update:modelValue', [from, null])
+        expect(wrapper.emitted('update:modelValue')).toBeUndefined()
+        await picker.vm.$emit('update:modelValue', [to, from])
+        expect(wrapper.emitted('update:modelValue')).toEqual([[[
+            defaultBusinessCalendar.zonedDayFromPickerLocalDate(from), defaultBusinessCalendar.zonedDayFromPickerLocalDate(to),
+        ]]])
     })
 })
 

@@ -1,5 +1,5 @@
 /**
- * Reuse the orders view while changing only its query parameters
+ * Reuse orders and dashboard views while changing only their query parameters
  * (notably remoteBranchId). Its tabs and URL are synchronized in-place.
  *
  * Before this, `route.fullPath` keyed <RouterView> and recreated OrdersList,
@@ -10,7 +10,7 @@
  * branch-context revision so changing the authenticated workspace resets data.
  */
 export function getRouteViewKey(path: string, fullPath: string, branchRevision: number): string {
-    if (path === '/orders') return `${path}:${branchRevision}`
+    if (path === '/orders' || path === '/dashboard') return `${path}:${branchRevision}`
     return path.startsWith('/branches/')
         ? fullPath
         : `${fullPath}:${branchRevision}`

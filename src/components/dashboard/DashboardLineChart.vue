@@ -1,5 +1,5 @@
 <template>
-	<div class="relative w-full min-h-[200px] h-52 sm:h-60 md:h-80">
+	<div class="relative w-full" :class="expanded ? 'h-[55dvh] min-h-72 max-h-[640px]' : compact ? 'h-40 min-h-40 min-[56.25rem]:h-[90px] min-[56.25rem]:min-h-[90px]' : 'min-h-[200px] h-52 sm:h-60 md:h-80'">
 		<Line :data="chartData" :options="chartOptions" />
 	</div>
 </template>
@@ -26,11 +26,15 @@ const props = withDefaults(
 		 */
 		variant?: 'line' | 'area';
 		curveTension?: number;
+        spanGaps?: boolean;
+        compact?: boolean;
+        expanded?: boolean;
 	}>(),
 	{
 		yFormat: 'number',
 		variant: 'line',
 		curveTension: 0.35,
+        spanGaps: true,
 	},
 );
 
@@ -47,9 +51,10 @@ const chartData = computed<ChartData<'line'>>(() => ({
 			backgroundColor: props.variant === 'area' ? fillBg : 'rgba(0,0,0,0)',
 			fill: props.variant === 'area',
 			tension: props.curveTension,
-			spanGaps: true,
+			spanGaps: props.spanGaps,
 			pointBackgroundColor: border,
-			pointRadius: props.variant === 'area' ? 2 : 3,
+			pointRadius: ds.pointRadius ?? (props.variant === 'area' ? 2 : 3),
+            borderDash: ds.borderDash,
 			pointHoverRadius: 5,
 			borderWidth: 2,
 		};
@@ -66,7 +71,7 @@ const chartOptions = computed<ChartOptions<'line'>>(() => {
 			legend: {
 				display: props.datasets.length > 1,
 				position: 'bottom',
-				labels: { boxWidth: 12, usePointStyle: true },
+				labels: { boxWidth: 12, usePointStyle: true, font: { size: props.compact ? 9 : 12 }, padding: props.compact ? 5 : 10 },
 			},
 			tooltip: {
 				callbacks: {
@@ -86,12 +91,14 @@ const chartOptions = computed<ChartOptions<'line'>>(() => {
 		scales: {
 			x: {
 				grid: { display: false },
-				ticks: { maxRotation: 45, minRotation: 0, autoSkip: true },
+				ticks: { maxRotation: props.compact ? 0 : 45, minRotation: 0, autoSkip: true, maxTicksLimit: props.compact ? 4 : undefined, font: { size: props.compact ? 9 : 12 } },
 			},
 			y: {
 				beginAtZero: true,
 				grid: { color: 'rgba(0,0,0,0.06)' },
 				ticks: {
+                    maxTicksLimit: props.compact ? 4 : undefined,
+                    font: { size: props.compact ? 9 : 12 },
 					callback: (val) => {
 						const n = Number(val);
 						if (yFormat === 'currency') return formatAxisCurrency(n);
