@@ -1,35 +1,42 @@
 <template>
-    <div class="flex items-center gap-3">
-        <PhoneIcon class="w-4 h-4 text-green-600" />
-        <span class="text-sm text-green-800">{{ phoneNumber }}</span>
+    <div class="relative flex items-center" :class="compact ? 'gap-2' : 'gap-3'"
+        @mouseenter="phoneHovered = true; phoneDismissed = false" @mouseleave="phoneHovered = false"
+        @focusin="phoneFocused = true; phoneDismissed = false" @focusout="onPhoneFocusOut" @keydown.esc.stop="closePhoneActions">
+        <PhoneIcon v-if="showIcon" class="w-4 h-4 shrink-0 text-green-600" />
+        <button v-if="actionsOnHover" ref="phoneTrigger" type="button" class="min-h-7 whitespace-nowrap rounded text-sm tabular-nums text-emerald-800 underline-offset-2 hover:underline focus-visible:outline-emerald-600"
+            :aria-label="`Acciones del teléfono ${phoneNumber}`" :aria-expanded="phoneActionsOpen" :aria-controls="phoneActionsId"
+            @click="togglePhoneActions">{{ phoneNumber }}</button>
+        <span v-else class="text-sm text-green-800">{{ phoneNumber }}</span>
 
         <!-- Action Buttons -->
-        <div class="flex items-center gap-1 ml-auto">
+        <div v-if="!actionsOnHover || phoneActionsOpen" :id="phoneActionsId" :class="actionsOnHover ? 'absolute right-0 top-full z-30 pt-1' : 'ml-auto'">
+            <div class="flex items-center gap-1" :class="actionsOnHover ? 'rounded-lg border border-gray-200 bg-white p-1 shadow-lg' : ''">
             <!-- Call Button -->
-            <BaseButton @click="makeCall" variant="ghost" size="sm"
-                class="text-green-600 hover:text-green-700 hover:bg-green-100" title="Llamar">
-                <PhoneIcon class="w-3 h-3" />
+            <BaseButton @click="makeCall" variant="ghost" size="sm" :icon-only="compact || actionsOnHover" :class="compact ? 'h-7 w-7 p-0' : ''"
+                class="text-green-600 hover:text-green-700 hover:bg-green-100" :aria-label="`Llamar a ${phoneNumber}`" title="Llamar">
+                <PhoneIcon class="w-4 h-4 shrink-0" />
             </BaseButton>
 
             <!-- Copy Button -->
-            <BaseButton @click="copyToClipboard" variant="ghost" size="sm"
+            <BaseButton @click="copyToClipboard" variant="ghost" size="sm" :icon-only="compact || actionsOnHover" :class="compact ? 'h-7 w-7 p-0' : ''"
                 class="text-green-600 hover:text-green-700 hover:bg-green-100" :disabled="copyLoading"
-                title="Copiar número">
-                <ClipboardDocumentIcon v-if="!copyLoading" class="w-3 h-3" />
+                :aria-label="`Copiar número ${phoneNumber}`" title="Copiar número">
+                <ClipboardDocumentIcon v-if="!copyLoading" class="w-4 h-4 shrink-0" />
                 <BaseLoading v-else size="sm" />
             </BaseButton>
 
             <!-- WhatsApp Button -->
-            <BaseButton v-if="isValidWhatsAppNumber" @click="openWhatsApp" variant="ghost" size="sm"
-                class="text-green-600 hover:text-green-700 hover:bg-green-100" title="Abrir WhatsApp">
-                <ChatBubbleLeftRightIcon class="w-3 h-3" />
+            <BaseButton v-if="isValidWhatsAppNumber" @click="openWhatsApp" variant="ghost" size="sm" :icon-only="compact || actionsOnHover" :class="compact ? 'h-7 w-7 p-0' : ''"
+                class="text-green-600 hover:text-green-700 hover:bg-green-100" :aria-label="`Abrir WhatsApp de ${phoneNumber}`" title="Abrir WhatsApp">
+                <ChatBubbleLeftRightIcon class="w-4 h-4 shrink-0" />
             </BaseButton>
+            </div>
         </div>
     </div>
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, useId } from 'vue'
 import { useToast } from '@/composables/useToast'
 
 // Components
@@ -46,9 +53,33 @@ import {
 // Props
 interface Props {
     phoneNumber: string
+    compact?: boolean
+    actionsOnHover?: boolean
+    showIcon?: boolean
 }
 
-const props = defineProps<Props>()
+const props = withDefaults(defineProps<Props>(), { showIcon: true })
+const phoneTrigger = ref<HTMLButtonElement | null>(null)
+const phoneActionsId = `phone-actions-${useId()}`
+const phoneHovered = ref(false)
+const phoneFocused = ref(false)
+const phonePinned = ref(false)
+const phoneDismissed = ref(false)
+const phoneActionsOpen = computed(() => !phoneDismissed.value && (phoneHovered.value || phoneFocused.value || phonePinned.value))
+function togglePhoneActions() {
+    if (phonePinned.value) closePhoneActions()
+    else { phonePinned.value = true; phoneDismissed.value = false }
+}
+function onPhoneFocusOut(event: FocusEvent) {
+    if ((event.currentTarget as HTMLElement).contains(event.relatedTarget as Node | null)) return
+    phoneFocused.value = false
+    phonePinned.value = false
+}
+function closePhoneActions() {
+    phoneTrigger.value?.focus()
+    phonePinned.value = false
+    phoneDismissed.value = true
+}
 
 // Composables
 const { success, error } = useToast()

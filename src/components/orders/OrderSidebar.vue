@@ -1,89 +1,40 @@
 <template>
     <div class="order-sidebar bg-white border-l border-gray-200 h-full flex flex-col min-h-0">
         <!-- Header -->
-        <div class="p-4 border-b border-gray-200 flex-shrink-0">
+        <div class="px-2 py-1 border-b border-gray-200 flex-shrink-0">
             <!-- Order Tabs -->
             <OrderTabs />
         </div>
 
-        <!-- Order Content -->
-        <div class="flex-1 overflow-y-auto min-h-0">
-            <!-- No Order State -->
+        <div class="flex-1 overflow-y-auto min-h-0 overscroll-contain" data-test="sidebar-scroll">
             <div v-if="!currentOrder" class="flex items-center justify-center h-full p-6">
                 <div class="text-center">
-                    <ShoppingCartIcon class="w-16 h-16 text-gray-400 mx-auto mb-4" />
-                    <p class="text-gray-500 mb-4">Crea un nuevo pedido para comenzar</p>
-                    <BaseButton @click="createNewOrder" variant="primary">
-                        <span class="flex items-center">
-                            <PlusIcon class="w-4 h-4 mr-2" />
-                            Crear Nuevo Pedido
-                        </span>
-                    </BaseButton>
+                    <ShoppingCartIcon class="w-10 h-10 text-gray-300 mx-auto mb-3" />
+                    <p class="text-sm text-gray-500 mb-3">Crea un pedido para comenzar</p>
+                    <BaseButton @click="createNewOrder" variant="primary" size="sm">Crear pedido</BaseButton>
                 </div>
             </div>
+            <div v-else class="space-y-3 p-3">
+                <CustomerSection compact :selected-customer="getCustomer(currentOrder.customerId)"
+                    :selected-address="getAddress(currentOrder.addressId, getCustomer(currentOrder.customerId))"
+                    :order-type="currentOrder.type" :operation-branch-id="currentOrder.branchId ?? undefined" mode="draft"
+                    @view-customer-detail="handleViewCustomerDetail">
+                    <template #order-branch-selector>
+                        <OrderFulfillmentBranchSelector :order="currentOrder" />
+                    </template>
+                </CustomerSection>
+                <BaseInput :model-value="currentOrder.guestName || ''" size="sm" label-position="left"
+                    :label="currentOrder.type === 'onsite' ? 'Recoge' : 'Recibe'"
+                    :aria-label="currentOrder.type === 'onsite' ? 'Nombre de quien recoge' : 'Nombre de quien recibe'"
+                    :required="currentOrder.type !== 'onsite' || currentOrder.branchId !== (currentOrder.workspaceBranchId ?? ordersStore.activeBranchId)"
+                    placeholder="Nombre de quien recibe o recoge"
+                    :error="guestNameTouched ? guestNameError : ''" @blur="guestNameTouched = true"
+                    @update:model-value="value => updateGuestName(String(value || ''))" />
 
-            <!-- Order Content -->
-            <div v-else class="space-y-4 pb-4">
-                <!-- Order Items -->
-                <div class="px-4">
-                    <CustomerSection :selected-customer="getCustomer(currentOrder.customerId)"
-                        :selected-address="getAddress(currentOrder.addressId, getCustomer(currentOrder.customerId))"
-                        :order-type="currentOrder.type" :operation-branch-id="currentOrder.branchId ?? undefined" mode="draft"
-                        @view-customer-detail="handleViewCustomerDetail">
-                        <template #order-branch-selector>
-                            <OrderFulfillmentBranchSelector :order="currentOrder" />
-                        </template>
-                    </CustomerSection>
-                    <BillingRecipientAccess :key="currentOrder.tabId" :customer-id="currentOrder.customerId" :model-value="currentOrder.billingRecipient" order-context @update:model-value="updateBillingRecipient" label="Factura electrónica" />
-
-                    <div v-if="showCopyAddressesButton" class="py-1">
-                        <BaseButton type="button" variant="outline" size="sm" class="w-full"
-                            @click="copyDeliveryAddressesText">
-                            <span class="flex items-center justify-center gap-1.5">
-                                <ClipboardDocumentIcon class="w-4 h-4" />
-                                Copiar direcciones
-                            </span>
-                        </BaseButton>
-                    </div>
-
-                    <!-- Guest Name / Recipient Name -->
-                    <div class="py-3 border-b border-gray-200">
-                        <label class="block text-sm font-medium text-gray-700 mb-2">
-                            {{ currentOrder.type === 'onsite' ? 'Nombre de quien recoge' : 'Nombre de quien recibe' }}
-                            <span v-if="currentOrder.type !== 'onsite' || (currentOrder.branchId !== (currentOrder.workspaceBranchId ?? ordersStore.activeBranchId))" class="text-red-500">*</span>
-                        </label>
-                        <BaseInput :model-value="currentOrder.guestName || ''"
-                            @update:model-value="(value) => updateGuestName(String(value || ''))"
-                            placeholder="Ej: Juan Pérez, María López..." :error="guestNameError" />
-                        <p class="text-xs text-gray-500 mt-1">
-                            {{ currentOrder.type === 'onsite' ? 'Persona que recogerá en la sucursal seleccionada.' : 'Nombre de quien recibirá el pedido (editable)' }}
-                        </p>
-                    </div>
-                    <!-- "Para más tarde" solo para onsite/delivery -->
-                    <div v-if="currentOrder.type !== 'reservation'" class="space-y-2 flex px-4">
-                        <label class="block text-sm font-medium text-gray-700 mr-2">Para más tarde?</label>
-                        <input type="checkbox" :checked="currentOrder.isLater"
-                            @change="(e) => updateIsLater((e.target as HTMLInputElement).checked)"
-                            class="form-checkbox h-5 w-5 text-blue-600">
-                    </div>
-                    <!-- Hora de preparación/entrega para onsite y delivery (mismo día) -->
-                    <div class="py-3 border-b border-gray-200 space-y-4"
-                        v-if="currentOrder.type !== 'reservation' && currentOrder.isLater">
-                        <label class="block text-sm font-medium text-gray-700">Hora preparación</label>
-                        <VueDatePicker v-model="prepareAtLocal" time-picker placeholder="Hora preparación"
-                            @update:model-value="onPrepareAtInput" />
-                        <label class="block text-sm font-medium text-gray-700">Hora entrega</label>
-                        <VueDatePicker v-model="reservedForLocal" time-picker placeholder="Hora entrega"
-                            @update:model-value="onReservedForInput" />
-                    </div>
-                    <OrderScheduleFields v-if="currentOrder.type === 'reservation'" :key="currentOrder.tabId"
-                        class="border-b border-gray-200 py-3" :prepare-at="prepareAtDateLocal" :reserved-for="reservedForDateLocal"
-                        @change="updateReservationSchedule" />
-
-                    <OrderItemList :tab-id="currentTabId || ''" @add-products="handleAddProducts" />
+                <OrderItemList ref="itemList" compact :tab-id="currentTabId || ''" @add-products="handleAddProducts" />
                     <div
                         v-if="hasAppliedBenefit"
-                        class="mx-4 mb-3 rounded-md border border-emerald-200 bg-emerald-50 p-3 text-xs text-emerald-800"
+                        class="rounded-md border border-emerald-200 bg-emerald-50 px-2.5 py-2 text-xs text-emerald-800"
                     >
                         <div class="flex items-center justify-between gap-3">
                             <span class="font-medium">{{ appliedBenefitText }}</span>
@@ -94,7 +45,7 @@
                     </div>
                     <div
                         v-else-if="benefitConflictExists"
-                        class="mx-4 mb-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900"
+                        class="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900"
                     >
                         <div class="flex items-center justify-between gap-3">
                             <span class="font-medium">Beneficio pendiente por resolver</span>
@@ -105,15 +56,15 @@
                     </div>
                     <div
                         v-else
-                        class="mx-4 mb-3 rounded-md border border-gray-200 bg-white p-3 text-xs text-gray-700"
+                        class="rounded-md border border-gray-200 bg-white px-2.5 py-2 text-xs text-gray-700"
                     >
                         <div class="flex items-center justify-between gap-3">
                             <div>
-                                <p class="font-medium text-gray-800">Sin beneficio aplicado</p>
-                                <p class="mt-0.5 text-gray-500">Puedes agregar promo, fidelizacion o codigo.</p>
+                                <p class="font-medium text-gray-800">Beneficio</p>
+
                             </div>
                             <BaseButton variant="outline" size="sm" @click="toggleDraftBenefitForm">
-                                {{ showDraftBenefitForm ? 'Cerrar' : 'Agregar beneficio' }}
+                                {{ showDraftBenefitForm ? 'Cerrar' : 'Agregar' }}
                             </BaseButton>
                         </div>
 
@@ -190,6 +141,48 @@
                             </div>
                         </div>
                     </div>
+
+                <details :key="`schedule-${currentTabId}`" class="sidebar-disclosure" :open="scheduleExpanded"
+                    @toggle="scheduleExpanded = ($event.target as HTMLDetailsElement).open">
+                    <summary class="sidebar-summary">
+                        <CalendarDaysIcon class="h-4 w-4 shrink-0 text-gray-400" />
+                        <span>Programación</span>
+                        <span class="ml-auto min-w-0 truncate text-xs font-normal" :class="scheduleIncomplete ? 'text-amber-700' : 'text-gray-500'">{{ scheduleSummary }}</span>
+                        <ChevronDownIcon class="disclosure-chevron h-3.5 w-3.5 shrink-0 text-gray-400" />
+                    </summary>
+                    <div class="pt-2 pb-1">
+                        <label v-if="currentOrder.type !== 'reservation'" class="mb-2 flex cursor-pointer items-center gap-2 text-sm text-gray-600">
+                            <input type="checkbox" :checked="currentOrder.isLater" class="h-4 w-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500"
+                                @change="e => updateIsLater((e.target as HTMLInputElement).checked)" />
+                            Para más tarde
+                        </label>
+                        <div v-if="currentOrder.type !== 'reservation' && currentOrder.isLater" class="grid grid-cols-2 gap-2">
+                            <div>
+                                <label class="mb-1 block text-xs text-gray-600">Preparar</label>
+                                <VueDatePicker v-model="prepareAtLocal" time-picker :auto-apply="true" :input-attrs="{ clearable: false }"
+                                    :teleport="true" :floating="{ strategy: 'fixed' }" :aria-labels="{ input: 'Hora de preparación' }"
+                                    placeholder="Hora preparación" @update:model-value="onPrepareAtInput" />
+                            </div>
+                            <div>
+                                <label class="mb-1 block text-xs text-gray-600">Entregar</label>
+                                <VueDatePicker v-model="reservedForLocal" time-picker :auto-apply="true" :input-attrs="{ clearable: false }"
+                                    :teleport="true" :floating="{ strategy: 'fixed' }" :aria-labels="{ input: 'Hora de entrega' }"
+                                    placeholder="Hora entrega" @update:model-value="onReservedForInput" />
+                            </div>
+                        </div>
+                        <OrderScheduleFields v-if="currentOrder.type === 'reservation'" :key="currentOrder.tabId"
+                            :prepare-at="prepareAtDateLocal" :reserved-for="reservedForDateLocal" @change="updateReservationSchedule" />
+                    </div>
+                </details>
+
+                <details :key="`payments-${currentTabId}`" class="sidebar-disclosure" data-test="sidebar-payments">
+                    <summary class="sidebar-summary">
+                        <CreditCardIcon class="h-4 w-4 shrink-0 text-gray-400" />
+                        <span>Pagos</span>
+                        <span class="ml-auto text-xs font-normal text-gray-500">{{ draftPaymentSummary }}</span>
+                        <ChevronDownIcon class="disclosure-chevron h-3.5 w-3.5 shrink-0 text-gray-400" />
+                    </summary>
+                    <div class="pt-2">
                     <PaidInStoreCashPanel
                         v-if="showPaidInStoreInDraft && currentOrder"
                         :input-id="'draft-paid-store-' + currentOrder.tabId"
@@ -198,51 +191,64 @@
                         :max-paid-in-store-amount="draftPaidInStoreCap"
                         editable
                         density="compact"
-                        extra-class="mx-4 mb-3"
-                        helper-text="Quedará registrado al enviar el pedido. El domiciliario no cobra en la entrega."
+                        extra-class="mb-2"
+                        helper-text="Se registra al enviar el pedido."
                         @update:paid-in-store-cash="onPaidInStoreDraftChange"
                         @edit-paid-in-store-cash="openDraftEditPaidInStore"
                         @remove-paid-in-store-cash="openDraftRemovePaidInStore" />
                     <PaymentSelector :order="currentOrder" @payment-updated="handlePaymentUpdated" />
-                </div>
 
-                <!-- Order Actions -->
-                <div class="px-4 py-3 border-t border-gray-200 bg-gray-50 space-y-3">
-                    <!-- Order Notes -->
-                    <div class="space-y-2">
-                        <label class="block text-sm font-medium text-gray-700">Notas del Pedido</label>
-                        <BaseInput :model-value="currentOrder.notes || ''"
-                            @update:model-value="(value) => updateOrderNotes(String(value || ''))"
-                            placeholder="Agregar notas especiales..." type="textarea" rows="2" />
                     </div>
+                </details>
 
-                    <!-- Action Buttons -->
-                    <div v-if="currentOrder.whatsappConversationId" class="flex gap-2">
-                        <BaseButton
-                            @click="sendWhatsAppConfirmation"
-                            variant="outline"
-                            size="sm"
-                            class="w-full"
-                            :loading="isSendingWhatsAppConfirmation"
-                        >
-                            Enviar confirmación por WhatsApp
-                        </BaseButton>
-                    </div>
-
-                    <div class="flex gap-2">
-                        <BaseButton @click="handleSubmitOrder" variant="primary" size="sm" class="w-full"
-                            :disabled="submitButtonDisabled" :title="submitButtonTooltip">
-                            <span class="flex items-center justify-center">
-                                <PaperAirplaneIcon class="w-4 h-4 mr-2" />
-                                Enviar Pedido
+                <BillingRecipientAccess :key="currentOrder.tabId" :customer-id="currentOrder.customerId" :model-value="currentOrder.billingRecipient"
+                    order-context @update:model-value="updateBillingRecipient">
+                    <template #trigger="{ open, recipient, complete }">
+                        <button type="button" class="sidebar-summary w-full border-t border-gray-100 pt-3 text-left" @click="open">
+                            <DocumentTextIcon class="h-4 w-4 shrink-0 text-gray-400" />
+                            <span>Factura electrónica</span>
+                            <span class="ml-auto max-w-[45%] truncate text-xs font-normal" :class="complete ? 'text-emerald-700' : 'text-gray-400'">
+                                {{ complete ? recipient?.name : 'Configurar datos' }}
                             </span>
-                        </BaseButton>
-                    </div>
-                </div>
+                            <PencilIcon class="h-3.5 w-3.5 shrink-0 text-gray-400" />
+                        </button>
+                    </template>
+                </BillingRecipientAccess>
+                <button type="button" class="sidebar-summary w-full min-w-0 text-left" aria-label="Editar notas del pedido" @click="showNoteDialog = true">
+                    <ChatBubbleLeftEllipsisIcon class="h-4 w-4 shrink-0 text-gray-400" />
+                    <span>Nota</span>
+                    <span class="ml-auto min-w-0 truncate text-xs font-normal text-gray-500">{{ currentOrder.notes || 'Agregar indicaciones' }}</span>
+                    <PencilIcon class="h-3.5 w-3.5 shrink-0 text-gray-400" />
+                </button>
             </div>
         </div>
+        <footer v-if="currentOrder" class="shrink-0 border-t border-gray-200 bg-white px-3 py-3" data-test="sidebar-footer">
+            <BaseButton v-if="currentOrder.whatsappConversationId" @click="sendWhatsAppConfirmation" variant="outline" size="sm"
+                class="mb-2 w-full" :loading="isSendingWhatsAppConfirmation">Enviar confirmación por WhatsApp</BaseButton>
+            <div class="flex items-center gap-2">
+                <div class="mr-auto min-w-0 tabular-nums">
+                    <span class="block text-xs text-gray-500">Total · {{ currentOrder.orderItems.reduce((sum, item) => sum + item.quantity, 0) }} uds.</span>
+                    <strong class="text-xl font-semibold text-emerald-700">{{ formatCurrency(currentOrder.total) }}</strong>
+                </div>
+                <button v-if="showCopyAddressesButton" type="button" class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50 hover:text-emerald-700"
+                    aria-label="Copiar direcciones" title="Copiar direcciones" @click="copyDeliveryAddressesText">
+                    <MapPinIcon class="h-4 w-4" />
+                </button>
+                <button type="button" class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50 hover:text-emerald-700 disabled:opacity-40"
+                    aria-label="Copiar mensaje del pedido" title="Copiar mensaje" :disabled="!currentOrder.orderItems.length" @click="itemList?.copyOrderSummaryToClipboard()">
+                    <ClipboardDocumentIcon class="h-4 w-4" />
+                </button>
+                <BaseButton @click="handleSubmitOrder" variant="primary" size="sm" class="h-10 shrink-0"
+                    :loading="isSubmittingOrder || checkingInvoiceAvailability || isCheckingDuplicateOrderDate"
+                    :disabled="submitButtonDisabled" :title="submitButtonTooltip">
+                    <PaperAirplaneIcon class="h-4 w-4" />Enviar Pedido
+                </BaseButton>
+            </div>
+        </footer>
+        <OrderNoteDialog v-model="showNoteDialog" :notes="currentOrder?.notes" title="Notas del pedido"
+            label="Indicaciones para preparar o entregar este pedido" :save="saveDraftNotes" />
 
-        <BaseDialog v-model="showDraftRemovePaidInStoreDialog" title="Quitar cobro en tienda (borrador)" size="sm"> 
+        <BaseDialog v-model="showDraftRemovePaidInStoreDialog" title="Quitar cobro en tienda (borrador)" size="sm">
             <p v-if="currentOrder" class="text-sm text-gray-600">
                 Se quitará el marcador de efectivo en tienda
                 (<span class="font-medium tabular-nums">{{ formatCurrency(draftPaidInStoreDisplayAmount) }}</span>).
@@ -403,6 +409,7 @@ import type { DraftOrder } from '@/types/order'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseDialog from '@/components/ui/BaseDialog.vue'
 import BaseInput from '@/components/ui/BaseInput.vue'
+import OrderNoteDialog from './OrderNoteDialog.vue'
 import OrderTabs from '@/components/orders/OrderTabs.vue'
 import OrderItemList from '@/components/orders/OrderItemList.vue'
 import CustomerSection from '@/components/customers/CustomerSection.vue'
@@ -417,6 +424,8 @@ import {
     PlusIcon,
     PaperAirplaneIcon,
     ClipboardDocumentIcon,
+    MapPinIcon,
+    CalendarDaysIcon, CreditCardIcon, DocumentTextIcon, ChevronDownIcon, PencilIcon, ChatBubbleLeftEllipsisIcon,
 } from '@heroicons/vue/24/outline'
 import type { LocalHour } from '@/types/common'
 import { DateTimeService } from '@/services/domain/DateTimeService'
@@ -431,7 +440,7 @@ const { ordersStore } = useOrderPersistence()
 const { createNewTab, closeTab } = useOrderTabs()
 const { submitOrder } = useOrderSubmission()
 const { success, error: showError } = useToast()
-const { formatCurrency, formatDateTime } = useFormatting()
+const { formatCurrency, formatDateTime, formatTime, formatDateShort } = useFormatting()
 const {
     activeDailyPromotion,
     activeLoyaltyStep,
@@ -452,6 +461,30 @@ const productsStore = useProductsStore()
 // State
 const showCustomerDetail = ref(false)
 const selectedCustomer = ref<Customer | null>(null)
+const itemList = ref<InstanceType<typeof OrderItemList> | null>(null)
+const showNoteDialog = ref(false)
+const guestNameTouched = ref(false)
+const scheduleExpanded = ref(false)
+const scheduleIncomplete = computed(() => currentOrder.value?.type === 'reservation'
+    ? !!orderScheduleError(prepareAtDateLocal.value, reservedForDateLocal.value)
+    : !!currentOrder.value?.isLater && (!prepareAtLocal.value || !reservedForLocal.value))
+const scheduleSummary = computed(() => {
+    const order = currentOrder.value
+    if (!order || (order.type !== 'reservation' && !order.isLater)) return 'Ahora'
+    if (scheduleIncomplete.value) return 'Completar horario'
+    if (order.type === 'reservation') return `${formatDateShort(reservedForDateLocal.value!)} · ${formatTime(prepareAtDateLocal.value!)} → ${formatTime(reservedForDateLocal.value!)}`
+    return order.reservedFor ? `Hoy · ${formatTime(order.reservedFor)}` : 'Completar horario'
+})
+const draftPaymentSummary = computed(() => {
+    const order = currentOrder.value
+    if (!order) return 'Sin pagos'
+    const count = order.bankPayments.length + Number(!!order.appPayment) + Number(order.paidInStoreCash === true)
+    return count ? `${count} registrado${count === 1 ? '' : 's'}` : 'Sin pagos registrados'
+})
+function saveDraftNotes(notes: string) {
+    if (!currentTabId.value) throw new Error('El pedido ya no está disponible.')
+    ordersStore.updateOrderNotes(notes)
+}
 // onsite / delivery: time-picker (solo hora, mismo día)
 const prepareAtLocal = ref<LocalHour | null>(null)
 const reservedForLocal = ref<LocalHour | null>(null)
@@ -478,6 +511,10 @@ const manualGiftProductId = ref<number | null>(null)
 // Computed
 const currentOrder = computed(() => ordersStore.currentOrder)
 const currentTabId = computed(() => ordersStore.currentTabId)
+watch(() => currentTabId.value, () => { showNoteDialog.value = false; guestNameTouched.value = false })
+watch(() => [currentTabId.value, currentOrder.value?.type], () => {
+    scheduleExpanded.value = currentOrder.value?.type === 'reservation' || currentOrder.value?.isLater === true
+}, { immediate: true })
 const { canSubmitOrder, orderErrors } = useOrderValidation()
 const discountCodeInput = computed(() => currentOrder.value?.discountCodeInput ?? '')
 const discountCodeError = computed(() => currentOrder.value?.discountCodeError ?? '')
@@ -852,10 +889,6 @@ const handleCustomerUpdated = () => {
     // Customer updated, refresh if needed
 }
 
-const updateOrderNotes = (notes: string) => {
-    if (!currentTabId.value) return
-    ordersStore.updateOrderNotes(notes)
-}
 
 const updateGuestName = (name: string) => {
     if (!currentTabId.value) return
@@ -1178,24 +1211,13 @@ watch(
 </script>
 
 <style scoped>
-.order-sidebar {
-    min-width: 400px;
-    max-width: 500px;
-}
-
-@media (max-width: 1024px) {
-    .order-sidebar {
-        min-width: 350px;
-        max-width: 400px;
-    }
-}
-
-@media (max-width: 768px) {
-    .order-sidebar {
-        min-width: 100%;
-        max-width: 100%;
-    }
-}
+.order-sidebar { width: clamp(390px, 35vw, 490px); flex-shrink: 0; }
+.sidebar-disclosure { border-top: 1px solid #f3f4f6; padding-top: 0.625rem; }
+.sidebar-summary { display: flex; align-items: center; gap: 0.5rem; min-height: 28px; cursor: pointer; list-style: none; font-size: 0.8125rem; font-weight: 500; color: #374151; border-radius: 6px; }
+.sidebar-summary::-webkit-details-marker { display: none; }
+.sidebar-summary:hover { color: #047857; }
+.sidebar-summary:focus-visible { outline: 2px solid #059669; outline-offset: 3px; }
+.disclosure-chevron { transition: transform 150ms; }
+details[open] > summary .disclosure-chevron { transform: rotate(180deg); }
+@media (max-width: 1023px) { .order-sidebar { width: 100%; min-height: 0; flex: 1; } }
 </style>
-
-

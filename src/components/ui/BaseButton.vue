@@ -33,12 +33,13 @@ import { computed } from 'vue';
 
 interface Props {
 	variant?: 'primary' | 'secondary' | 'danger' | 'success' | 'outline' | 'ghost';
-	size?: 'sm' | 'md' | 'lg';
+	size?: 'xs' | 'sm' | 'md' | 'lg';
 	type?: 'button' | 'submit' | 'reset';
 	disabled?: boolean;
 	loading?: boolean;
 	loadingText?: string;
 	fullWidth?: boolean;
+	iconOnly?: boolean;
 	icon?: any;
 	rightIcon?: any;
 }
@@ -50,6 +51,7 @@ const props = withDefaults(defineProps<Props>(), {
 	disabled: false,
 	loading: false,
 	fullWidth: false,
+	iconOnly: false,
 });
 
 defineEmits<{
@@ -69,14 +71,17 @@ const buttonClasses = computed(() => {
 	};
 
 	const sizes = {
+		xs: 'px-2 py-1 text-xs',
 		sm: 'px-3 py-1.5 text-sm',
 		md: 'px-4 py-2 text-sm',
 		lg: 'px-6 py-3 text-base',
 	};
 
+	const iconSizes = { xs: 'h-6 w-6 p-0 text-xs', sm: 'h-8 w-8 p-0 text-sm', md: 'h-9 w-9 p-0 text-sm', lg: 'h-11 w-11 p-0 text-base' };
+	const dimensions = props.iconOnly ? `${iconSizes[props.size]} shrink-0` : sizes[props.size];
 	const width = props.fullWidth ? 'w-full' : '';
 
-	return `${base} ${variants[props.variant]} ${sizes[props.size]} ${width}`;
+	return `${base} ${variants[props.variant]} ${dimensions} ${width}`;
 });
 
 const iconClasses = computed(() => {

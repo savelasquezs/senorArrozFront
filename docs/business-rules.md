@@ -139,7 +139,7 @@ enum UserRole {
 
 - Admin, Cajero y Superadmin pueden tomar un pedido para cualquier sucursal activa del mismo tenant sin cambiar `authStore.branchId` ni el contexto global de sucursal.
 - `DraftOrder.workspaceBranchId` conserva la partición visual donde se abrió el tab; `DraftOrder.branchId` es independiente por borrador y determina la sucursal que prepara, cobra y despacha el pedido.
-- La selección de sucursal que prepara y despacha está centralizada en el checkbox **Atender desde otra sucursal** del `OrderSidebar`, debajo del tipo de pedido. Aplica a `onsite`, `delivery` y `reservation`, incluso sin cliente ni dirección.
+- La selección de sucursal que prepara y despacha está centralizada en el texto clickeable **Atender desde otra sucursal** del `OrderSidebar`, debajo del tipo de pedido. Aplica a `onsite`, `delivery` y `reservation`, incluso sin cliente ni dirección.
 - La selección de sucursal no cambia la sucursal de sesión, el JWT ni `branchContext`; solo actualiza el borrador activo.
 - Si la dirección existente no tiene cobertura en el nuevo destino, se limpia y debe seleccionarse una dirección cubierta. En recogidas `onsite` siempre se limpia dirección y el domicilio queda en 0.
 - Cambiar la sucursal operativa recalcula el domicilio, invalida beneficios y medios de pago dependientes de sucursal, recarga configuración POS, bancos y apps, recalcula totales y persiste únicamente el borrador actual.
@@ -481,6 +481,15 @@ Validaciones implementadas antes de enviar un pedido al backend:
 - **Pestaña Reservas**: Carga `150` registros por página y prioriza por `prepareAt` para mostrar primero las reservas que deben empezar a prepararse antes; el contenedor de tabla mantiene scroll interno con encabezado visible para no desbordar el viewport.
 
 ## 📱 Reglas de UI/UX
+
+### OrderSidebar compacto
+
+- El tipo de pedido usa tres opciones del mismo ancho y conserva la navegación nativa con teclado. Cliente, dirección, destinatario y productos permanecen arriba; la sucursal operativa se cambia desde un texto clickeable que muestra el destino cuando es otra sede y permite volver al origen. Conserva el mismo alcance por borrador y los reinicios vigentes al cambiar sucursal.
+- Programación, pagos, facturación y notas se sitúan después de los productos. La programación se despliega inicialmente en reservas o pedidos para más tarde; plegarla no borra horarios. Pagos inicia plegado, muestra si hay registros y conserva sus editores al plegarse. El destinatario fiscal y la confirmación de emisión mantienen su comportamiento; bajar el acceso no activa facturas automáticamente.
+- El total, copiar direcciones, copiar mensaje y Enviar pedido permanecen en el pie visible, fuera del scroll. Copiar direcciones conserva las condiciones existentes de disponibilidad y su formato de texto. Las notas generales usan el mismo modal que las notas de producto, con Guardar y Cancelar. Cambiar de pestaña cierra el editor sin trasladar el texto a otro pedido. Los campos de destinatario validan al perder el foco y mantienen los requisitos de envío.
+- La tarjeta del cliente en `CustomerSection` comparte una fila para cambiar cliente, nombre clickeable que abre el detalle y teléfonos. `PhoneNumberItem` ofrece copiar, llamar y WhatsApp al pasar el puntero, enfocar con teclado o tocar el número; Escape cierra las acciones. Conserva el segundo teléfono y la validación vigente del acceso a WhatsApp. El cambio se aplica a todos los usos de la tarjeta compartida, sin duplicar esa interfaz en el sidebar.
+- Las tarjetas compactas de cliente y dirección conservan teléfonos, acciones, tarifa, avisos de ubicación y selección entre todas las direcciones, sin selector adicional de sucursal. La dirección seleccionada usa una fila compartida: cambiar a la izquierda solo si hay varias, texto clickeable para editar, tarifa pequeña en color y cruz roja para quitar la selección; los textos largos conservan el contenido completo en el tooltip y en el formulario. En pantallas pequeñas catálogo y sidebar se apilan sin ancho horizontal adicional.
+- En el sidebar, fidelidad se resume a la derecha de la sucursal (`5 entregas más → 5% dcto` o `Hoy → premio`), con el mensaje completo en el tooltip. Cliente y dirección se apilan sin el rótulo Dirección; Recibe/Recoge comparte línea con su campo y los productos omiten la cabecera de unidades y Limpiar. El conteo permanece en el pie fijo.
 
 ### Detalle de pedido compacto
 
