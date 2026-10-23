@@ -76,7 +76,7 @@
                     <p class="font-medium text-gray-900 break-words" :title="item.productName">
                         {{ formatKitchenProductDisplayName(item.productName) }}
                     </p>
-                    <p v-if="item.notes" class="text-[10px] text-gray-600 italic mt-0.5 break-words">
+                    <p v-if="item.notes?.trim()" class="text-[10px] text-gray-600 italic mt-0.5 whitespace-pre-wrap break-words">
                         Nota: {{ item.notes }}</p>
                 </div>
             </div>

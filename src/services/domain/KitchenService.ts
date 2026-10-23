@@ -129,33 +129,25 @@ export class KitchenService {
 
 	static generateOrderSpeechText(
 		order: OrderListItem,
-		products: Array<{ name: string; quantity: number }>,
+		products: Array<{ name: string; quantity: number; notes?: string | null }>,
 		orderNotes?: string | null,
 	): string {
-		const items = products.map((p, index) => {
-			const quantity =
-				p.quantity === 1
-					? 'una'
-					: p.quantity === 2
-						? 'dos'
-						: p.quantity === 3
-							? 'tres'
-							: `${p.quantity}`;
-			const isLast = index === products.length - 1;
-			const connector = isLast && products.length > 1 ? ' y ' : ', ';
-			return `${quantity} ${p.name}${!isLast ? connector : ''}`;
-		});
+		const items = products.map((p) =>
+			this.formatProductInstruction(p.name, p.quantity, p.notes));
 
 		const spokenNotes = this.formatOrderNotesForVoice(orderNotes);
-		const notesSegment = spokenNotes ? `. ${spokenNotes} por favor` : '';
-		return `Nuevo pedido,  ${items.join('')}${notesSegment}`;
+		const notesSegment = spokenNotes ? ` Notas generales del pedido: ${spokenNotes}` : '';
+		return `Nuevo pedido, ${items.join(' ')}${notesSegment}`;
 	}
 
 	static generateOrderNotificationText(
 		order: OrderListItem,
-		products: Array<{ name: string; quantity: number }>,
+		products: Array<{ name: string; quantity: number; notes?: string | null }>,
 	): string {
-		const items = products.map((p) => `${p.quantity}x ${p.name}`).join(', ');
+		const items = products.map((p) => {
+			const notes = this.formatOrderNotesForVoice(p.notes);
+			return `${p.quantity}x ${p.name}${notes ? ` (Nota: ${notes})` : ''}`;
+		}).join(', ');
 		return `Pedido #${order.id}: ${items}`;
 	}
 
@@ -164,6 +156,11 @@ export class KitchenService {
 		if (n === 2) return 'dos';
 		if (n === 3) return 'tres';
 		return `${n}`;
+	}
+
+	private static formatProductInstruction(name: string, quantity: number, notes?: string | null): string {
+		const text = this.formatOrderNotesForVoice(notes);
+		return `${this.qtyWord(quantity)} ${name}${text ? `, nota: ${text}` : ''}${text.endsWith('.') ? '' : '.'}`;
 	}
 
 	/** Texto de notas del pedido listo para TTS / notificación (espacios y longitud). */
@@ -192,18 +189,12 @@ export class KitchenService {
 			const rep = changes.productReplacements ?? [];
 			for (const r of rep) {
 				parts.push(
-					`Cambio de ${r.previousProductName} por ${r.newProductName}.`,
+					`Cambio de ${r.previousProductName} por ${this.formatProductInstruction(r.newProductName, r.newQuantity ?? 1, r.newNotes)}`,
 				);
 			}
 			const added = changes.addedLines ?? [];
-			if (added.length === 1) {
-				parts.push(
-					`Se agregó ${this.qtyWord(added[0].quantity)} ${added[0].productName}.`,
-				);
-			} else if (added.length > 1) {
-				parts.push(
-					`Se agregaron: ${added.map((a) => `${a.quantity}x ${a.productName}`).join(', ')}.`,
-				);
+			for (const line of added) {
+				parts.push(`Se agregó ${this.formatProductInstruction(line.productName, line.quantity, line.notes)}`);
 			}
 			const rem = changes.removedLines ?? [];
 			if (rem.length === 1) {
@@ -221,6 +212,17 @@ export class KitchenService {
 					`Ya no es ${this.qtyWord(q.previousQuantity)} de ${q.productName}, ${dir} a ${this.qtyWord(q.newQuantity)}.`,
 				);
 			}
+			for (const change of changes.lineNoteChanges ?? []) {
+				const target = `${this.qtyWord(change.quantity)} ${change.productName}`;
+				const notes = this.formatOrderNotesForVoice(change.notes);
+				const previousNotes = this.formatOrderNotesForVoice(change.previousNotes);
+				if (notes) {
+					const action = previousNotes ? 'Se cambió' : 'Se agregó';
+					parts.push(`${action} la nota para ${target}: ${notes}${notes.endsWith('.') ? '' : '.'}`);
+				} else if (previousNotes) {
+					parts.push(`Se eliminó la nota para ${target}.`);
+				}
+			}
 			if (changes.scheduleChanged) {
 				if (changes.scheduleChangeKind === 'prepare_now') {
 					parts.push('Se cambió la hora del pedido. Queda para preparar ya.');
@@ -233,7 +235,7 @@ export class KitchenService {
 			if (changes.notesChanged) {
 				const spoken = this.formatOrderNotesForVoice(orderNotes);
 				if (spoken) {
-					parts.push(spoken.endsWith('.') ? spoken : `${spoken}.`);
+					parts.push(`Notas generales del pedido: ${spoken}${spoken.endsWith('.') ? '' : '.'}`);
 				}
 			}
 		}

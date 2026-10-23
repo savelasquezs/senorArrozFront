@@ -48,12 +48,12 @@ vi.mock('@/services/MainAPI/printJobsApi', () => ({ printJobsApi: {
     enqueueKitchenJob: vi.fn(),
 } }))
 
-const line = (orderId: number, count = 1) => ({
+const line = (orderId: number, count = 1, notes: string | null = null) => ({
     id: orderId * 10, orderId, productId: 2,
     productName: 'Arroz', productDescription: null,
     productCategoryId: 1, productCategoryName: 'Arroces',
     quantity: count, unitPrice: 18000, discount: 0, subtotal: 18000,
-    notes: null, createdAt: '2026-10-15T15:00:00Z', updatedAt: '2026-10-15T15:00:00Z',
+    notes, createdAt: '2026-10-15T15:00:00Z', updatedAt: '2026-10-15T15:00:00Z',
 })
 const order = (id: number, count = 1) => ({
     id, branchId: 1, branchName: 'Santander',
@@ -154,6 +154,52 @@ describe('KitchenView batched requests and event refresh', () => {
         await mocks.callbacks.NewOrder!({ id: 1 })
         await flushPromises()
         expect(mocks.speak).toHaveBeenCalledTimes(2)
+    })
+
+    it.each(['new', 'reservation'])('reads the product note for a %s event', async kind => {
+        mocks.getOrders.mockResolvedValue(paged([{ ...order(1), kitchenDetails: [line(1, 2, 'Salsa aparte')] }], 1))
+        mocks.voiceEvents.mockResolvedValue({ cursor: 30, hasMore: false, events: [{ id: 30, orderId: 1, branchId: 1, kind }] })
+        mount()
+        await flushPromises()
+        await wrapper.findAll('button').find(b => b.text().includes('Activar voz'))!.trigger('click')
+        await flushPromises()
+        const speech = mocks.speak.mock.calls.at(-1)![0]
+        expect(speech).toContain(kind === 'new' ? 'Nuevo pedido' : 'Reserva lista para cocina')
+        expect(speech).toContain('dos Arroz, nota: Salsa aparte.')
+        expect(speech).toContain('Notas generales del pedido: Sin cebolla')
+        expect(mocks.notify).toHaveBeenCalledWith(expect.any(String), expect.objectContaining({ body: expect.stringContaining('2x Arroz (Nota: Salsa aparte)') }))
+        expect(mocks.fetchDetail).not.toHaveBeenCalled()
+    })
+
+    it.each([
+        [null, 'Sin salsa', 'Se agregó'],
+        ['Sin salsa', 'Salsa aparte', 'Se cambió'],
+        ['Salsa aparte', '', 'Se eliminó'],
+    ])('refreshes and announces a product note change: %s -> %s', async (previousNotes, notes, action) => {
+        mount()
+        await flushPromises()
+        await wrapper.findAll('button').find(b => b.text().includes('Activar voz'))!.trigger('click')
+        await flushPromises()
+        mocks.speak.mockClear()
+        mocks.getOrders.mockResolvedValue(paged([{ ...order(1), kitchenDetails: [line(1, 1, notes)] }], 1))
+        await mocks.callbacks.OrderModified!({ order: { id: 1 }, modificationKind: 'content', kitchenChanges: {
+            lineNoteChanges: [{ productName: 'Arroz', quantity: 1, previousNotes, notes }],
+        } })
+        const instruction = notes ? `: ${notes}.` : '.'
+        expect(mocks.speak).toHaveBeenCalledWith(expect.stringContaining(`${action} la nota para una Arroz${instruction}`))
+        const cache = wrapper.findComponent(OrderCardGrid).props('orderItemsMap') as Map<number, any[]>
+        expect(cache.get(1)![0].notes).toBe(notes)
+        expect(mocks.fetchDetail).not.toHaveBeenCalled()
+    })
+
+    it('includes product notes when announcing an order transferred into the branch', async () => {
+        mocks.getOrders.mockResolvedValue(paged([{ ...order(1), kitchenDetails: [line(1, 1, 'Sin salsa')] }], 1))
+        mount()
+        await flushPromises()
+        await wrapper.findAll('button').find(b => b.text().includes('Activar voz'))!.trigger('click')
+        await flushPromises()
+        await mocks.callbacks.OrderTransferred!({ orderId: 1, targetBranchId: 1, announceKitchen: true })
+        expect(mocks.speak).toHaveBeenCalledWith(expect.stringContaining('Pedido trasladado, una Arroz, nota: Sin salsa.'))
     })
 
     it('does not acknowledge a browser-rejected voice alert', async () => {

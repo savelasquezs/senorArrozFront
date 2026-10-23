@@ -1,128 +1,69 @@
 ﻿<template>
     <MainLayout>
-        <div class="p-3 sm:p-4 md:p-5 space-y-3 sm:space-y-4">
-            <div v-if="(authStore.isKitchen || authStore.isAdmin || authStore.isSuperadmin) && !soundReady"
-                class="flex items-center justify-between gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
-                <span>{{ voiceError || 'La voz no está activa. Chrome requiere un clic para anunciar los pedidos.' }}</span>
-                <button type="button" class="font-semibold underline whitespace-nowrap" :disabled="soundActivating" @click="toggleSound">Activar voz</button>
-            </div>
-            <!-- PestaÃ±as + barra de cocina (solo rol Kitchen) en la misma franja -->
-            <div
-                class="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between sm:gap-3 border-b border-gray-200 -mx-3 px-3 sm:mx-0 sm:px-0"
-            >
-                <!-- PestaÃ±as: scroll solo en esta franja (sin envolver al checkbox) para no mostrar barra rara entre check y "Conectado" -->
-                <div class="-mb-px flex min-w-0 flex-1 items-end gap-2 sm:gap-3">
-                    <nav
-                        class="kitchen-tabs-nav min-w-0 flex-1 flex items-end space-x-4 sm:space-x-6 overflow-x-auto overflow-y-hidden"
-                        aria-label="Vistas de cocina">
-                        <button type="button" @click="activeTab = 'scheduled'" :class="[
-                            'py-2 sm:py-2.5 px-1 border-b-2 font-medium text-xs sm:text-sm transition-colors whitespace-nowrap flex-shrink-0',
-                            activeTab === 'scheduled'
-                                ? 'border-indigo-500 text-indigo-600'
-                                : 'border-transparent text-gray-500 hover:text-gray-700'
+        <div class="-m-3 space-y-3 sm:m-0">
+            <div class="flex min-w-0 flex-wrap items-center justify-between gap-2 border-b border-gray-200 pb-2">
+                <nav class="grid w-full grid-cols-2 gap-1 rounded-lg bg-gray-100 p-1 sm:flex sm:w-auto sm:flex-wrap"
+                    aria-label="Vistas de cocina">
+                    <button v-for="tab in kitchenTabs" :key="tab.key" type="button" @click="activeTab = tab.key"
+                        :aria-pressed="activeTab === tab.key" :class="[
+                            'inline-flex items-center justify-center gap-1.5 rounded-md px-3 py-2 text-xs sm:text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600',
+                            activeTab === tab.key ? 'bg-white text-emerald-700 shadow-sm' : 'text-gray-600 hover:bg-white/70 hover:text-gray-900',
                         ]">
-                            <span>Reservas hoy</span>
-                            <span v-if="scheduledReservationOrders.length > 0"
-                                class="ml-1.5 sm:ml-2 py-0.5 px-1.5 sm:px-2 rounded-full text-[10px] sm:text-xs bg-indigo-100 text-indigo-700">
-                                {{ scheduledReservationOrders.length }}
-                            </span>
-                        </button>
-
-                        <button type="button" @click="activeTab = 'active'" :class="[
-                            'py-2 sm:py-2.5 px-1 border-b-2 font-medium text-xs sm:text-sm transition-colors whitespace-nowrap flex-shrink-0',
-                            activeTab === 'active'
-                                ? 'border-emerald-500 text-emerald-600'
-                                : 'border-transparent text-gray-500 hover:text-gray-700'
-                        ]">
-                            <span>Pedidos Activos</span>
-                            <span v-if="activeOrders.length > 0"
-                                class="ml-1.5 sm:ml-2 py-0.5 px-1.5 sm:px-2 rounded-full text-[10px] sm:text-xs bg-emerald-100 text-emerald-600">
-                                {{ activeOrders.length }}
-                            </span>
-                        </button>
-
-                        <button type="button" @click="activeTab = 'ready'" :class="[
-                            'py-2 sm:py-2.5 px-1 border-b-2 font-medium text-xs sm:text-sm transition-colors whitespace-nowrap flex-shrink-0',
-                            activeTab === 'ready'
-                                ? 'border-emerald-500 text-emerald-600'
-                                : 'border-transparent text-gray-500 hover:text-gray-700'
-                        ]">
-                            <span>Pedidos Listos</span>
-                            <span v-if="readyOrders.length > 0"
-                                class="ml-1.5 sm:ml-2 py-0.5 px-1.5 sm:px-2 rounded-full text-[10px] sm:text-xs bg-green-100 text-green-600">
-                                {{ readyOrders.length }}
-                            </span>
-                        </button>
-
-                        <button type="button" @click="activeTab = 'hourly_summary'" :class="[
-                            'py-2 sm:py-2.5 px-1 border-b-2 font-medium text-xs sm:text-sm transition-colors whitespace-nowrap flex-shrink-0',
-                            activeTab === 'hourly_summary'
-                                ? 'border-amber-500 text-amber-600'
-                                : 'border-transparent text-gray-500 hover:text-gray-700'
-                        ]">
-                            <span>Resumen por hora</span>
-                            <span v-if="hourlySummary.hourSlots.length > 0"
-                                class="ml-1.5 sm:ml-2 py-0.5 px-1.5 sm:px-2 rounded-full text-[10px] sm:text-xs bg-amber-100 text-amber-700">
-                                {{ hourlySummary.hourSlots.length }}
-                            </span>
-                        </button>
-                    </nav>
-
-                    <div v-if="activeTab === 'active'" class="flex flex-shrink-0 items-end pb-2 sm:pb-2.5 -mb-px">
-                        <label
-                            class="inline-flex items-center gap-1.5 text-[11px] sm:text-xs text-gray-800 cursor-pointer select-none whitespace-nowrap"
-                            title="Agrupa Tomado y En preparaciÃ³n en un solo bloque">
-                            <input v-model="combinedKitchenMode" type="checkbox"
-                                class="rounded border-gray-300 text-emerald-600 focus:ring-emerald-500" />
-                            <span class="font-medium">Modo combinado</span>
-                        </label>
-                    </div>
-                </div>
+                        {{ tab.label }}
+                        <span v-if="tab.count > 0" class="rounded-full bg-emerald-100 px-1.5 py-0.5 text-[10px] leading-none text-emerald-700">
+                            {{ tab.count }}
+                        </span>
+                    </button>
+                </nav>
 
                 <div v-if="authStore.isKitchen || authStore.isAdmin || authStore.isSuperadmin"
-                    class="flex flex-wrap items-center justify-end gap-1.5 sm:gap-2 sm:pb-0.5 sm:flex-shrink-0">
-                    <div :class="[
-                        'flex items-center gap-1 px-1.5 sm:px-2 py-0.5 rounded-md text-[11px] sm:text-xs',
-                        isConnected ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
-                    ]">
-                        <span :class="['w-1.5 h-1.5 rounded-full flex-shrink-0', isConnected ? 'bg-green-500' : 'bg-red-500']"></span>
-                        <span class="whitespace-nowrap">{{ isConnected ? 'Conectado' : 'Desconectado' }}</span>
-                    </div>
-
+                    class="flex min-w-0 flex-wrap items-center gap-2 text-xs">
+                    <label v-if="activeTab === 'active'" class="inline-flex items-center gap-1.5 whitespace-nowrap text-gray-600 cursor-pointer"
+                        title="Ver tomados y en preparación juntos">
+                        <input v-model="combinedKitchenMode" type="checkbox"
+                            class="rounded border-gray-300 text-emerald-600 focus:ring-emerald-500" />
+                        Modo combinado
+                    </label>
+                    <span class="inline-flex items-center gap-1.5 whitespace-nowrap"
+                        :class="isConnected ? 'text-emerald-700' : 'text-red-700'" role="status">
+                        <span class="h-2 w-2 rounded-full" :class="isConnected ? 'bg-emerald-500' : 'bg-red-500'"></span>
+                        {{ isConnected ? 'Conectado' : 'Desconectado' }}
+                    </span>
                     <button v-if="permission === 'default'" type="button" @click="requestPermission"
-                        class="flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[11px] sm:text-xs bg-amber-100 text-amber-700 hover:bg-amber-200 transition-colors"
-                        title="Activar notificaciones">
-                        <BellIcon class="w-3.5 h-3.5 flex-shrink-0" />
-                        <span class="hidden sm:inline">Activar notificaciones</span>
+                        class="inline-flex h-8 w-8 items-center justify-center rounded-md border border-gray-200 text-gray-500 hover:bg-gray-50"
+                        aria-label="Activar notificaciones" title="Activar notificaciones">
+                        <BellIcon class="h-4 w-4" />
                     </button>
-                    <div v-else :class="[
-                        'flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[11px] sm:text-xs',
-                        permission === 'granted' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'
-                    ]" :title="permission === 'granted' ? 'Notificaciones activas' : 'Notificaciones desactivadas'">
-                        <BellIcon class="w-3.5 h-3.5 flex-shrink-0" />
-                        <span class="hidden sm:inline">{{ permission === 'granted' ? 'Notif. OK' : 'No' }}</span>
-                    </div>
-                    <button type="button" @click="toggleSound" :disabled="soundActivating" :class="[
-                        'flex items-center gap-1 p-1 rounded-md transition-colors',
-                        soundReady ? 'bg-emerald-100 text-emerald-600' : 'bg-amber-100 text-amber-700'
-                    ]" :title="soundReady ? 'Desactivar sonido' : 'Activar sonido y probar voz'">
-                        <component :is="soundReady ? SpeakerWaveIcon : SpeakerXMarkIcon" class="w-4 h-4 sm:w-5 sm:h-5" />
-                        <span class="text-[11px]">{{ soundReady ? 'Voz lista' : 'Activar voz' }}</span>
+                    <button type="button" @click="toggleSound" :disabled="soundActivating" :aria-pressed="soundReady"
+                        :title="soundReady ? 'Desactivar avisos por voz' : 'Escuchar pedidos y cambios'" :class="[
+                            'inline-flex min-h-8 items-center gap-1.5 whitespace-nowrap rounded-md border px-2.5 py-1.5 font-medium transition-colors disabled:opacity-60',
+                            soundReady ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-amber-300 bg-amber-50 text-amber-800 hover:bg-amber-100',
+                        ]">
+                        <component :is="soundReady ? SpeakerWaveIcon : SpeakerXMarkIcon" class="h-4 w-4" />
+                        {{ soundActivating ? 'Activando voz…' : soundReady ? 'Voz lista' : 'Activar voz' }}
                     </button>
-
                     <BaseButton @click="refreshOrders" variant="outline" size="sm" :loading="isLoading">
-                        <span class="flex items-center gap-1">
-                            <ArrowPathIcon class="w-3.5 h-3.5" />
-                            <span class="text-xs">Actualizar</span>
+                        <span class="inline-flex items-center gap-1.5 text-xs">
+                            <ArrowPathIcon class="h-3.5 w-3.5" />
+                            Actualizar
                         </span>
                     </BaseButton>
                 </div>
             </div>
+            <p v-if="voiceError" role="status" aria-live="polite"
+                class="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900 break-words">
+                {{ voiceError }}
+            </p>
 
             <div v-if="activeTab === 'scheduled'">
-                <p v-if="scheduledReservationOrders.length === 0" class="text-sm text-gray-500 mb-3">
-                    No hay reservas del dÃ­a en Â«TomadoÂ» pendientes de hora. Al llegar la hora de cocina o al pasar a preparaciÃ³n aparecen en Pedidos activos.
-                </p>
+                <div v-if="scheduledReservationOrders.length === 0"
+                    class="flex items-start gap-3 rounded-lg border border-dashed border-gray-200 bg-gray-50/60 px-4 py-5">
+                    <CalendarDaysIcon class="h-5 w-5 shrink-0 text-gray-400" aria-hidden="true" />
+                    <div>
+                        <p class="text-sm font-medium text-gray-700">No hay reservas pendientes para hoy</p>
+                        <p class="mt-1 text-xs text-gray-500">Cuando llegue su hora de preparación, aparecerán en Pedidos activos.</p>
+                    </div>
+                </div>
                 <OrderCardGrid v-else ref="cardGridRef" :orders="scheduledReservationOrders"
                     :order-items-map="orderItemsMap" :show-status-actions="false"
                     @change-status="handleChangeStatus" />
@@ -313,7 +254,7 @@ import ReadyOrdersTable from '@/components/kitchen/ReadyOrdersTable.vue'
 import ConfirmStatusChangeModal from '@/components/kitchen/ConfirmStatusChangeModal.vue'
 import BaseDatePicker from '@/components/ui/BaseDatePicker.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
-import { ArrowPathIcon, SpeakerWaveIcon, SpeakerXMarkIcon, BellIcon } from '@heroicons/vue/24/outline'
+import { ArrowPathIcon, SpeakerWaveIcon, SpeakerXMarkIcon, BellIcon, CalendarDaysIcon } from '@heroicons/vue/24/outline'
 
 const router = useRouter()
 const authStore = useAuthStore()
@@ -343,7 +284,7 @@ const isLoading = ref(false)
 const summaryLoading = ref(false)
 const showConfirmModal = ref(false)
 const ordersToConfirm = ref<OrderListItem[]>([])
-/** Copia de `combinedKitchenMode` al abrir el modal (confirmaciÃ³n encadenada a Listo). */
+/** Copia de `combinedKitchenMode` al abrir el modal (confirmación encadenada a Listo). */
 const confirmChainTakenToReady = ref(false)
 const orderItemsMap = ref(new Map<number, OrderDetailItem[]>())
 const cardGridRef = ref<InstanceType<typeof OrderCardGrid> | null>(null)
@@ -352,12 +293,12 @@ const summaryDate = ref(defaultBusinessCalendar.todayYmd())
 const selectedSummaryHourKey = ref('')
 const canViewDailyCategorySummary = computed(() => authStore.isAdmin || authStore.isSuperadmin)
 
-/** Ids cuyo due de cocina ya anunciÃ³ el servidor (ReservationReady) pero el reloj local podrÃ­a aÃºn considerar â€œpendiente de horaâ€. Alinea lista activa con el backend. */
+/** Ids cuyo due de cocina ya anunció el servidor (ReservationReady) pero el reloj local podría aún considerar “pendiente de hora”. Alinea lista activa con el backend. */
 const reservationServerDue = ref<Set<number>>(new Set())
 
 const allOrders = computed(() => ordersStore.list?.items || [])
 
-/** Reservas del dÃ­a en Â«TomadoÂ» cuya hora de cocina aÃºn no llegÃ³ (prepareAt o reservedForâˆ’1h); luego pasan a Pedidos activos. */
+/** Reservas del día en «Tomado» cuya hora de cocina aún no llegó (prepareAt o reservedFor−1h); luego pasan a Pedidos activos. */
 const scheduledReservationOrders = computed(() => {
     const list = allOrders.value.filter(
         (o) =>
@@ -390,6 +331,13 @@ const dailyCategorySummary = computed(() =>
 const selectedSummaryGroups = computed(
     () => hourlySummary.value.groupedByHour[selectedSummaryHourKey.value] ?? [],
 )
+
+const kitchenTabs = computed(() => [
+    { key: 'scheduled', label: 'Reservas hoy', count: scheduledReservationOrders.value.length },
+    { key: 'active', label: 'Pedidos Activos', count: activeOrders.value.length },
+    { key: 'ready', label: 'Pedidos Listos', count: readyOrders.value.length },
+    { key: 'hourly_summary', label: 'Resumen por hora', count: hourlySummary.value.hourSlots.length },
+] as const)
 
 // Kitchen must load every eligible order, not silently truncate the last 100.
 const KITCHEN_PAGE_SIZE = 100
@@ -601,7 +549,7 @@ const announceVoiceEvent = async (event: VoiceEvent): Promise<boolean> => {
             details = []
         }
     }
-    const products = details.map(item => ({ name: item.productName, quantity: item.quantity }))
+    const products = details.map(item => ({ name: item.productName, quantity: item.quantity, notes: item.notes }))
     const baseText = KitchenService.generateOrderSpeechText(
         (order ?? { id: event.orderId }) as OrderListItem, products, notes,
     )
@@ -613,7 +561,7 @@ const announceVoiceEvent = async (event: VoiceEvent): Promise<boolean> => {
     const played = await speak(text)
     if (played && permission.value === 'granted') {
         notify(event.kind === 'reservation' ? `Reserva #${event.orderId}` : `Nuevo pedido #${event.orderId}`, {
-            body: products.map(p => `${p.quantity}x ${p.name}`).join(', '),
+            body: KitchenService.generateOrderNotificationText((order ?? { id: event.orderId }) as OrderListItem, products),
             tag: `kitchen-voice-${event.id}`,
         })
     }
@@ -696,7 +644,7 @@ const handleReservationReady = async (orderData: any) => {
     await refreshAfterKitchenEvent()
 }
 
-/** NotificaciÃ³n TTS + navegador; actualiza Ã­tems en mapa desde API. */
+/** Notificación TTS + navegador; actualiza ítems en mapa desde API. */
 const notifyKitchenOrderModified = async (
     orderData: any,
     modificationKind: string,
@@ -745,7 +693,7 @@ const notifyKitchenOrderModified = async (
             speak(speechText)
         }
     } catch (err) {
-        console.error('Error notificaciÃ³n pedido modificado:', err)
+        console.error('Error notificación pedido modificado:', err)
     }
 }
 
@@ -771,12 +719,12 @@ const handleOrderTransferred = async (payload: {
     const order = allOrders.value.find(o => o.id === orderId)
     if (!order || !KitchenService.isVisibleToActiveKitchenForAlerts(order)) return
     const products = (orderItemsMap.value.get(orderId) ?? [])
-        .map(item => ({ name: item.productName, quantity: item.quantity }))
+        .map(item => ({ name: item.productName, quantity: item.quantity, notes: item.notes }))
     const announcement = KitchenService.generateOrderSpeechText(order, products, order.notes)
         .replace(/^Nuevo pedido/i, 'Pedido trasladado')
     if (permission.value === 'granted')
         notify(`Pedido trasladado #${orderId}`, {
-            body: products.map(p => `${p.quantity}x ${p.name}`).join(', '),
+            body: KitchenService.generateOrderNotificationText(order, products),
             tag: `order-transferred-${orderId}`,
         })
     void speak(announcement)
@@ -795,7 +743,7 @@ const handleOrderCancelled = async (payload: any) => {
         8000
     )
     if (soundEnabled.value && soundReady.value) {
-        void speak(`Pedido nÃºmero ${orderId} cancelado.`)
+        void speak(`Pedido número ${orderId} cancelado.`)
     }
     await refreshAfterKitchenEvent()
 }
@@ -880,13 +828,13 @@ const handleReprint = async (orderId: number) => {
     try {
         const res = await printJobsApi.enqueueKitchenJob(branchId, [orderId])
         if (!res.isSuccess) {
-            error('ReimpresiÃ³n', res.message || 'No se pudo encolar la comanda.')
+            error('Reimpresión', res.message || 'No se pudo encolar la comanda.')
             return
         }
-        success('Comanda en cola', 3500, 'El agente de impresiÃ³n la emitirÃ¡ en breve.')
+        success('Comanda en cola', 3500, 'El agente de impresión la emitirá en breve.')
     } catch (err: unknown) {
-        const msg = err instanceof Error ? err.message : 'No se pudo encolar la reimpresiÃ³n.'
-        error('ReimpresiÃ³n', msg)
+        const msg = err instanceof Error ? err.message : 'No se pudo encolar la reimpresión.'
+        error('Reimpresión', msg)
     }
 }
 
@@ -985,20 +933,3 @@ watch(
     },
 )
 </script>
-
-<style scoped>
-/* Scroll horizontal solo en las pestaÃ±as, sin barra/rueditas nativas visibles (no aporta y confunde). */
-.kitchen-tabs-nav {
-    scrollbar-width: none;
-    -ms-overflow-style: none;
-}
-.kitchen-tabs-nav::-webkit-scrollbar {
-    display: none;
-}
-</style>
-
-
-
-
-
-
