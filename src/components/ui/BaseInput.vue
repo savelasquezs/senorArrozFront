@@ -1,5 +1,5 @@
 <template>
-	<div class="space-y-1">
+	<div :class="labelPosition === 'left' && label ? 'grid grid-cols-[auto_minmax(0,1fr)] items-center gap-x-2 gap-y-1' : 'space-y-1'">
 		<!-- Label -->
 		<label v-if="label" :for="inputId" :class="labelClass">
 			{{ label }}
@@ -26,8 +26,8 @@
 		</div>
 
 		<!-- Error & Hint -->
-		<p v-if="error" class="text-sm text-red-600">{{ error }}</p>
-		<p v-else-if="hint" class="text-sm text-gray-500">{{ hint }}</p>
+		<p v-if="error" class="text-sm text-red-600" :class="{ 'col-start-2': labelPosition === 'left' && label }">{{ error }}</p>
+		<p v-else-if="hint" class="text-sm text-gray-500" :class="{ 'col-start-2': labelPosition === 'left' && label }">{{ hint }}</p>
 	</div>
 </template>
 
@@ -41,6 +41,7 @@ interface Props {
 	/** `sm`: compacto · `lg`: más alto (modales de monto). */
 	size?: 'md' | 'sm' | 'lg';
 	label?: string;
+	labelPosition?: 'top' | 'left';
 	ariaLabel?: string;
 	placeholder?: string;
 	required?: boolean;
@@ -57,6 +58,7 @@ interface Props {
 const props = withDefaults(defineProps<Props>(), {
 	type: 'text',
 	size: 'md',
+	labelPosition: 'top',
 	required: false,
 	disabled: false,
 	minlength: 0,

@@ -77,4 +77,15 @@ describe('CustomerSection cross-branch customer creation', () => {
     expect(dependencies.drafts.changeOperationalBranch).toHaveBeenCalledWith(2, createdAddress)
     expect(dependencies.drafts.updateAddress).toHaveBeenCalledWith(createdAddress)
   })
+  it('opens the existing customer detail from the name and preserves both phone numbers', async () => {
+    const customer = { id: 10, name: 'Cliente con dos teléfonos', phone1: '3001234567', phone2: '3011234567', active: true, branchId: 1, createdAt: '', updatedAt: '' }
+    const wrapper = shallowMount(CustomerSection, { props: { orderType: 'onsite', mode: 'persisted', selectedCustomer: customer } })
+    await wrapper.get('[aria-label="Ver cliente Cliente con dos teléfonos"]').trigger('click')
+    expect(wrapper.emitted('view-customer-detail')?.[0]).toEqual([customer])
+    const phones = wrapper.findAllComponents({ name: 'PhoneNumberItem' })
+    expect(phones.map(phone => phone.props('phoneNumber'))).toEqual(['3001234567', '3011234567'])
+    expect(phones.every(phone => phone.props('actionsOnHover') === true)).toBe(true)
+    wrapper.unmount()
+  })
+
 })

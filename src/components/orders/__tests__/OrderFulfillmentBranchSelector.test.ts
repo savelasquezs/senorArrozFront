@@ -45,9 +45,10 @@ describe('OrderFulfillmentBranchSelector', () => {
         const wrapper = shallowMount(OrderFulfillmentBranchSelector, { props: { order: draft() } })
         await flushPromises()
 
-        const checkbox = wrapper.get('[data-test="remote-branch-toggle"]')
-        expect((checkbox.element as HTMLInputElement).checked).toBe(false)
-        await checkbox.setValue(true)
+        const toggle = wrapper.get('[data-test="remote-branch-toggle"]')
+        expect(toggle.element.tagName).toBe('BUTTON')
+        expect(toggle.attributes('aria-expanded')).toBe('false')
+        await toggle.trigger('click')
         await flushPromises()
 
         expect(mocks.changeOperationalBranch).toHaveBeenCalledOnce()
@@ -64,7 +65,7 @@ describe('OrderFulfillmentBranchSelector', () => {
         ] })
         const wrapper = shallowMount(OrderFulfillmentBranchSelector, { props: { order: draft() } })
         await flushPromises()
-        await wrapper.get('[data-test="remote-branch-toggle"]').setValue(true)
+        await wrapper.get('[data-test="remote-branch-toggle"]').trigger('click')
         expect(mocks.changeOperationalBranch).not.toHaveBeenCalled()
 
         wrapper.getComponent(BaseSelect).vm.$emit('update:modelValue', 3)
@@ -75,8 +76,9 @@ describe('OrderFulfillmentBranchSelector', () => {
     it('restores the origin for a remote order without changing the authenticated branch', async () => {
         const wrapper = shallowMount(OrderFulfillmentBranchSelector, { props: { order: draft(2) } })
         await flushPromises()
-        expect((wrapper.get('[data-test="remote-branch-toggle"]').element as HTMLInputElement).checked).toBe(true)
-        await wrapper.get('[data-test="remote-branch-toggle"]').setValue(false)
+        expect(wrapper.get('[data-test="remote-branch-toggle"]').attributes('aria-expanded')).toBe('true')
+        expect(wrapper.text()).toContain('Atiende Manrique · Volver a Santander')
+        await wrapper.get('[data-test="remote-branch-toggle"]').trigger('click')
         await flushPromises()
         expect(mocks.changeOperationalBranch).toHaveBeenCalledWith(1)
     })
