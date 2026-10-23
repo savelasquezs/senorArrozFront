@@ -1,17 +1,19 @@
 <template>
 	<div :class="wrapperClass">
-		<label v-if="label" class="mb-1 block text-xs font-medium text-gray-600">
+		<label v-if="label" :for="inputId" class="mb-1 block text-xs font-medium text-gray-600">
 			{{ label }}
 		</label>
 		<VueDatePicker
 			:model-value="pickerValue"
 			:max-date="maxDate"
 			:min-date="minDate"
-			:enable-time-picker="false"
+			:time-config="{ enableTimePicker: false }"
 			:formats="{ input: format }"
 			:auto-apply="autoApply"
-			:clearable="clearable"
+			:input-attrs="{ clearable, id: inputId }"
+			:aria-labels="{ input: label || placeholder }"
 			:teleport="teleport"
+            :floating="floating"
 			:locale="esLocale"
 			:placeholder="placeholder"
 			:disabled="disabled"
@@ -22,13 +24,14 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
-import { VueDatePicker } from '@vuepic/vue-datepicker'
+import { computed, useId } from 'vue'
+import { VueDatePicker, type FloatingConfig } from '@vuepic/vue-datepicker'
 import { es } from 'date-fns/locale'
 import '@vuepic/vue-datepicker/dist/main.css'
 import { defaultBusinessCalendar } from '@/utils/datetime'
 
 const esLocale = es
+const inputId = useId()
 
 const props = withDefaults(
 	defineProps<{
@@ -37,6 +40,7 @@ const props = withDefaults(
 		maxDate?: Date
 		minDate?: Date
 		teleport?: string | boolean | HTMLElement
+        floating?: Partial<FloatingConfig>
 		clearable?: boolean
 		autoApply?: boolean
 		format?: string
@@ -125,6 +129,9 @@ function onUpdate(value: Date | null) {
 	top: 50%;
 	transform: translateY(-50%);
 	margin: 0;
+	padding: 0;
+	width: 1rem;
+	height: 1rem;
 }
 
 :deep(.base-date-picker .dp__clear_icon) {

@@ -1,4 +1,5 @@
 import type { AxiosRequestConfig } from 'axios'
+import { reactive } from 'vue'
 
 /** The version belongs to the displayed/editing snapshot, never to a global latest-version cache. */
 export interface OrderMutationSnapshot {
@@ -7,6 +8,24 @@ export interface OrderMutationSnapshot {
 }
 
 export const ORDER_CONFLICT_EVENT = 'order-management-conflict'
+const pendingMutations = reactive(new Map<number, number>())
+
+export function isOrderMutationPending(orderId: number): boolean {
+    return (pendingMutations.get(orderId) ?? 0) > 0
+}
+
+export function beginOrderMutation(orderId: number): (() => void) | undefined {
+    if (!Number.isSafeInteger(orderId) || orderId <= 0) return undefined
+    pendingMutations.set(orderId, (pendingMutations.get(orderId) ?? 0) + 1)
+    let finished = false
+    return () => {
+        if (finished) return
+        finished = true
+        const remaining = (pendingMutations.get(orderId) ?? 1) - 1
+        if (remaining > 0) pendingMutations.set(orderId, remaining)
+        else pendingMutations.delete(orderId)
+    }
+}
 
 export function orderMutationConfig(order?: OrderMutationSnapshot | null): AxiosRequestConfig | undefined {
     if (!order || order.managementVersion == null) return undefined

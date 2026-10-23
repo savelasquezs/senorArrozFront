@@ -1,24 +1,37 @@
 <template>
-    <section class="rounded-xl border border-slate-200 bg-white px-3 py-2" aria-label="Facturación electrónica" :aria-busy="loading">
-        <div class="flex flex-wrap items-center gap-x-4 gap-y-1">
-            <h2 class="text-sm font-semibold text-slate-900">Factura electrónica</h2>
-            <BillingRecipientAccess :customer-id="customerId" v-model="recipient" order-context compact label="Datos de facturación" class="min-w-0 flex-1" />
-            <BaseButton v-if="!activeInvoice && status !== 'cancelled'" size="sm" class="min-h-11" :disabled="!billingRecipientComplete(recipient) || !enabled || loading || stale || !order" :loading="busy" @click="requestConfirm = true">Solicitar factura electrónica</BaseButton>
-            <BaseButton v-if="documents.length" size="sm" variant="outline" class="min-h-11" @click="showHistory = true">Ver avance y detalle<span class="sr-only"> de factura</span></BaseButton>
-            <BaseButton v-if="latestInvoice?.hasPdf" size="sm" class="min-h-11" :disabled="busy" @click="download(latestInvoice, 'pdf')">Descargar copia PDF</BaseButton>
-            <BaseButton size="sm" variant="ghost" class="min-h-11" :loading="loading" @click="load">Actualizar</BaseButton>
-        </div>
-        <div class="flex flex-wrap items-center gap-x-3 gap-y-1 pb-1 text-xs text-slate-500">
-            <template v-if="latestInvoice"><span :class="invoiceStatusClass(latestInvoice.status)" class="rounded-full px-2 py-0.5 ring-1 ring-inset">{{ latestInvoice.prefix }}{{ latestInvoice.number || '' }} · {{ invoiceStatusLabels[latestInvoice.status] || latestInvoice.status }}</span><InvoiceProgress :document="latestInvoice" compact /><span v-if="['issued', 'credited'].includes(latestInvoice.status) && !latestInvoice.hasPdf">Preparando copia PDF…</span></template>
-            <span v-else-if="loading" role="status">Consultando documentos…</span>
-            <span v-else-if="stale">Actualiza el pedido antes de solicitar la factura.</span>
-            <span v-else-if="!enabled">La facturación no está activada.</span>
-            <span v-else-if="!billingRecipientComplete(recipient)">Completa los datos para solicitar la factura.</span>
-            <span v-else>Sin factura emitida · Revisa el pedido antes de confirmar.</span>
-            <span v-if="error" role="alert" class="text-red-700">{{ error }}</span><span v-if="message" role="status" class="text-emerald-700">{{ message }}</span>
+    <div class="invoice-menu relative" @mouseenter="openSubmenu" @mouseleave="submenuOpen = false"
+        @focusout="onMenuFocusOut" @keydown.esc.stop="submenuOpen = false">
+        <button ref="menuTrigger" type="button" class="flex w-full items-center justify-end gap-3 rounded-lg px-3 py-2 text-right text-sm font-normal text-gray-700 transition-colors hover:bg-gray-100 hover:text-gray-900 focus-visible:bg-gray-100 focus-visible:outline-emerald-600"
+            :aria-expanded="submenuOpen" :aria-controls="submenuId" aria-haspopup="true"
+            @click="openSubmenu" @keydown.arrow-right.prevent="openSubmenu">
+            <span>Factura electrónica</span><span class="w-4 shrink-0 text-center" aria-hidden="true">▸</span>
+        </button>
+        <div v-show="submenuOpen" :id="submenuId" class="pt-1 sm:absolute sm:right-full sm:top-0 sm:pr-1 sm:pt-0">
+            <div class="w-full rounded-lg border border-gray-200 bg-white p-1 shadow-lg sm:w-64">
+                <BillingRecipientAccess :customer-id="customerId" v-model="recipient" order-context compact>
+                    <template #trigger="{ open }">
+                        <button type="button" class="flex min-h-10 w-full items-center justify-end rounded-lg px-3 py-2 text-right text-sm font-normal text-gray-700 transition-colors hover:bg-gray-100 hover:text-gray-900 focus-visible:bg-gray-100 focus-visible:outline-emerald-600"
+                            @click="openRecipient(open)">Datos de facturación</button>
+                    </template>
+                </BillingRecipientAccess>
+                <div class="group/invoice-send relative rounded-lg focus-visible:outline-2 focus-visible:outline-emerald-600" :title="sendDisabledReason || undefined" :tabindex="sendDisabledReason ? 0 : undefined"
+                    :aria-describedby="sendDisabledReason ? `${submenuId}-tooltip` : undefined">
+                    <button type="button" class="flex min-h-10 w-full items-center justify-end rounded-lg px-3 py-2 text-right text-sm font-normal text-gray-700 transition-colors hover:bg-gray-100 hover:text-gray-900 focus-visible:bg-gray-100 focus-visible:outline-emerald-600 disabled:cursor-not-allowed disabled:text-gray-400"
+                        :disabled="!!sendDisabledReason" :aria-label="documents.length ? 'Ver avance y detalle de factura' : 'Enviar factura electrónica'"
+                        @click="openInvoice">Enviar factura electrónica</button>
+                    <span v-if="sendDisabledReason" :id="`${submenuId}-tooltip`" role="tooltip"
+                        class="pointer-events-none absolute right-0 top-full z-30 mt-1 hidden w-64 whitespace-normal rounded-lg bg-gray-900 px-3 py-2 text-xs leading-relaxed text-white shadow-lg group-hover/invoice-send:block group-focus/invoice-send:block">{{ sendDisabledReason }}</span>
+                </div>
+            </div>
         </div>
         <BaseDialog v-model="showHistory" title="Avance y documentos de facturación" size="3xl" scroll-body z-class="z-[80]">
         <div class="space-y-4">
+            <div class="flex flex-wrap items-center justify-between gap-2">
+                <BaseButton v-if="!activeInvoice && status !== 'cancelled'" size="sm" :disabled="!billingRecipientComplete(recipient) || !enabled || loading || stale || !order" :loading="busy" @click="requestConfirm = true">Solicitar factura electrónica</BaseButton>
+                <BaseButton size="sm" variant="outline" :loading="loading" @click="load">Actualizar</BaseButton>
+            </div>
+            <p v-if="error" role="alert" class="whitespace-normal text-sm text-red-700">{{ error }}</p>
+            <p v-if="message" role="status" class="whitespace-normal text-sm text-emerald-700">{{ message }}</p>
         <article v-for="d in documents" :key="d.id" class="space-y-3 rounded-xl border border-slate-200 p-4 text-sm">
             <div class="flex flex-wrap items-center justify-between gap-2"><strong class="text-slate-900">{{ d.kind === 'credit' ? 'Nota crédito' : 'Factura' }} {{ d.number ? `${d.prefix}${d.number}` : 'por asignar' }}</strong><div class="flex flex-wrap gap-2"><span :class="invoiceStatusClass(d.status)" class="rounded-full px-2.5 py-1 text-xs font-medium ring-1 ring-inset">{{ invoiceStatusLabels[d.status] || d.status }}</span><span v-if="d.environment === 'sandbox'" class="rounded-full bg-sky-50 px-2.5 py-1 text-xs font-medium text-sky-800">Pruebas</span></div></div>
             <div class="rounded-lg bg-slate-50 p-3 text-slate-600"><p class="font-medium text-slate-900">{{ invoiceRecipient(d.recipientJson)?.name || 'Destinatario del documento' }}</p><p>{{ invoiceRecipient(d.recipientJson)?.identification }}</p><p class="break-all">{{ invoiceRecipient(d.recipientJson)?.email || 'Sin correo · descarga al validarse' }}</p><p v-if="d.issuedAt" class="mt-1 text-xs">Validada {{ formatDate(d.issuedAt) }}</p></div>
@@ -56,11 +69,11 @@
         <BaseDialog :model-value="!!emailDocument" @update:model-value="emailDocument = null" title="Reenviar factura por correo" :dismissible="!busy" z-class="z-[90]">
             <div class="space-y-4 text-sm"><p>Se enviará un mensaje con el PDF personalizado y el XML validado a <strong class="break-all">{{ emailDocument ? invoiceRecipient(emailDocument.recipientJson)?.email : '' }}</strong>.</p><p>Esto no emitirá otra factura. Plemsi no enviará un correo adicional.</p><p v-if="emailDocument?.emailStatus === 'accepted'" class="text-amber-900">Plemsi ya envió una copia anteriormente. Confirma solo si necesitas enviar otra copia con el nuevo diseño.</p><p v-if="error" role="alert" class="text-red-700">{{ error }}</p><div class="flex justify-end gap-2"><BaseButton variant="outline" :disabled="busy" @click="emailDocument = null">Cancelar</BaseButton><BaseButton :loading="busy" @click="resendEmail">Confirmar reenvío</BaseButton></div></div>
         </BaseDialog>
-    </section>
+    </div>
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, ref, useId, watch } from 'vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseDialog from '@/components/ui/BaseDialog.vue'
 import BillingRecipientAccess from '@/components/customers/BillingRecipientAccess.vue'
@@ -82,8 +95,38 @@ const loading = ref(false), busy = ref(false), enabled = ref(false), error = ref
 const creditDocument = ref<InvoiceDocument | null>(null), creditReason = ref('')
 const emailDocument = ref<InvoiceDocument | null>(null)
 const activeInvoice = computed(() => documents.value.some(d => d.kind === 'invoice' && !['credited', 'cancelled'].includes(d.status)))
-const latestInvoice = computed(() => documents.value.find(d => d.kind === 'invoice'))
 const showHistory = ref(false)
+const submenuOpen = ref(false), menuTrigger = ref<HTMLButtonElement | null>(null), submenuId = useId()
+const sendDisabledReason = computed(() => {
+    if (loading.value) return 'Consultando facturación…'
+    if (busy.value) return 'Espera a que termine la operación actual.'
+    if (documents.value.length) return ''
+    if (!billingRecipientComplete(recipient.value)) return 'Debes configurar primero los datos de facturación.'
+    if (props.stale) return 'Actualiza el pedido antes de enviar la factura electrónica.'
+    if (props.status === 'cancelled') return 'El pedido está cancelado.'
+    if (!enabled.value) return error.value || 'La facturación electrónica no está activada.'
+    if (!props.order) return 'No se pudo cargar el detalle del pedido.'
+    return ''
+})
+function openSubmenu() {
+    submenuOpen.value = true
+    if (error.value && !loading.value && !busy.value) void load()
+}
+function onMenuFocusOut(event: FocusEvent) {
+    if (!(event.currentTarget as HTMLElement).contains(event.relatedTarget as Node | null)) submenuOpen.value = false
+}
+function openRecipient(open: () => void) {
+    menuTrigger.value?.focus()
+    submenuOpen.value = false
+    open()
+}
+function openInvoice() {
+    if (sendDisabledReason.value) return
+    menuTrigger.value?.focus()
+    submenuOpen.value = false
+    if (documents.value.length) showHistory.value = true
+    else requestConfirm.value = true
+}
 let generation = 0, timer: ReturnType<typeof setInterval> | undefined
 const formatDate = (date: string) => new Date(date).toLocaleString('es-CO', { timeZone: 'America/Bogota', dateStyle: 'medium', timeStyle: 'short' })
 function emailLabel(d: InvoiceDocument) {
@@ -117,7 +160,7 @@ async function authorizeCredit() {
     if (creditDocument.value && await run(() => api.documentAction(creditDocument.value!.id, 'credit', { reason: creditReason.value }), 'Nota crédito solicitada. Espera su validación antes de corregir el pedido.')) creditDocument.value = null
 }
 function refreshVisible() { if (document.visibilityState !== 'hidden' && !busy.value && !loading.value) void load() }
-watch(() => props.orderId, () => { recipient.value = null; documents.value = []; message.value = ''; requestConfirm.value = false; showHistory.value = false; creditDocument.value = null; emailDocument.value = null; void load() }, { immediate: true })
+watch(() => props.orderId, () => { submenuOpen.value = false; recipient.value = null; documents.value = []; message.value = ''; requestConfirm.value = false; showHistory.value = false; creditDocument.value = null; emailDocument.value = null; void load() }, { immediate: true })
 onMounted(() => { document.addEventListener('visibilitychange', refreshVisible); timer = setInterval(() => { if (documents.value.some(d => ['scheduled', 'pending', 'processing', 'verifying'].includes(d.status) || ['pending', 'queued', 'processing'].includes(d.emailStatus) || invoiceEmailTrackingPending(d) || ['issued', 'credited'].includes(d.status) && (!d.hasXml || !d.hasPdf))) refreshVisible() }, 10000) })
 onUnmounted(() => { generation++; clearInterval(timer); document.removeEventListener('visibilitychange', refreshVisible) })
 </script>

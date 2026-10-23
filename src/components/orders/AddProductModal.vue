@@ -52,7 +52,7 @@
                                 :step="100" :error="unitPriceError" />
 
                             <!-- Descuento -->
-                            <BaseInput label="Descuento" v-model.number="discount" type="number" :min="0" :step="100" />
+                            <BaseInput label="Descuento (%)" v-model.number="discountPercentage" type="number" :min="0" :max="100" :step="0.1" />
 
                             <!-- Notas -->
                             <BaseInput label="Notas (opcional)" v-model="notes"
@@ -102,6 +102,7 @@ import { useProductsStore } from '@/store/products'
 import { useProductCategoriesStore } from '@/store/productCategories'
 import { useFormatting } from '@/composables/useFormatting'
 import { useToast } from '@/composables/useToast'
+import { discountAmountFromPercentage } from '@/helpers/orderProductDiscount'
 import type { Product } from '@/types/product'
 
 // Components
@@ -149,7 +150,8 @@ const { success, error } = useToast()
 const selectedProduct = ref<Product | null>(null)
 const quantity = ref<number>(1)
 const unitPrice = ref<number>(0)
-const discount = ref<number>(0)
+const discountPercentage = ref<number>(0)
+const discount = computed(() => discountAmountFromPercentage(quantity.value * unitPrice.value, discountPercentage.value))
 const notes = ref<string>('')
 const searchQuery = ref<string>('')
 const selectedCategoryId = ref<number | null>(null)
@@ -220,7 +222,7 @@ const selectProduct = (product: Product) => {
     selectedProduct.value = product
     quantity.value = 1
     unitPrice.value = product.price
-    discount.value = 0
+    discountPercentage.value = 0
     notes.value = ''
 }
 
@@ -228,7 +230,7 @@ const clearSelection = () => {
     selectedProduct.value = null
     quantity.value = 1
     unitPrice.value = 0
-    discount.value = 0
+    discountPercentage.value = 0
     notes.value = ''
 }
 

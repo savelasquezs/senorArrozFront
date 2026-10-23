@@ -18,6 +18,7 @@
             <!-- Items List with Animations -->
             <TransitionGroup name="item-list" tag="div" class="items-list">
                 <OrderItem v-for="item in items" :key="item.tempId" :item="item" :tab-id="tabId"
+                    :save-note="notes => orderItems.updateNotes(item.tempId, notes, tabId)"
                     @quantity-change="handleQuantityChange" @price-change="handlePriceChange"
                     @discount-change="handleDiscountChange" @remove="handleRemoveItem" />
             </TransitionGroup>

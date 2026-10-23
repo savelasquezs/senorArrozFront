@@ -1,10 +1,9 @@
 <template>
-    <div class="space-y-4">
+    <div class="space-y-3">
         <!-- Header con botón de edición -->
         <div class="flex flex-wrap items-center justify-between gap-3">
             <div>
                 <h3 class="text-base font-semibold text-gray-900">Productos del pedido</h3>
-                <p class="mt-1 text-sm text-gray-500">Cantidades, precios y resumen del pedido.</p>
             </div>
             <BaseButton v-if="!editing && canEdit" size="sm" variant="secondary" @click="enterEditMode">
                 <PencilIcon class="w-4 h-4 mr-1" />
@@ -17,12 +16,13 @@
             <table class="min-w-full divide-y divide-gray-200">
                 <thead class="bg-gray-50">
                     <tr>
-                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Producto</th>
-                        <th class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Cantidad</th>
-                        <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Precio Unit.</th>
-                        <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Descuento</th>
-                        <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Subtotal</th>
-                        <th v-if="editing" class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">
+                        <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Producto</th>
+                        <th class="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase">Cantidad</th>
+                        <th class="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase">Precio Unit.</th>
+                        <th v-if="showDiscountColumn" class="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase">Descuento %</th>
+                        <th v-if="freeDeliveryAppliedTotal > 0" class="px-3 py-2 text-right text-xs font-medium text-gray-500 whitespace-nowrap">Domi gratis</th>
+                        <th class="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase">Subtotal</th>
+                        <th v-if="editing" class="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase">
                             Acciones
                         </th>
                     </tr>
@@ -30,10 +30,17 @@
                 <tbody class="bg-white divide-y divide-gray-200">
                     <tr v-for="(item, index) in localProducts" :key="item.id || index">
                         <!-- Producto -->
-                        <td class="px-4 py-3">
+                        <td class="px-3 py-2">
                             <div>
-                                <p class="text-sm font-medium text-gray-900">{{ item.productName }}</p>
-                                <p v-if="item.productDescription" class="text-xs text-gray-500">
+                                <div class="flex items-center gap-1">
+                                    <p class="text-sm font-medium text-gray-900">{{ item.productName }}</p>
+                                    <button v-if="canEdit" type="button" class="flex h-5 w-5 shrink-0 items-center justify-center rounded text-gray-400 hover:bg-gray-100 hover:text-emerald-700 focus-visible:outline-emerald-600 disabled:opacity-40"
+                                        :aria-label="`Editar nota de ${item.productName}`" :title="item.notes || 'Agregar nota'" :disabled="props.saving"
+                                        @click="noteProduct = item">
+                                        <PencilIcon class="h-3.5 w-3.5" />
+                                    </button>
+                                </div>
+                                <p v-if="item.productDescription && item.productDescription.trim() !== item.productName.trim()" class="text-xs text-gray-500">
                                     {{ item.productDescription }}
                                 </p>
                                 <p v-if="item.notes" class="text-xs text-gray-600 mt-1 italic">
@@ -43,35 +50,41 @@
                         </td>
 
                         <!-- Cantidad -->
-                        <td class="px-4 py-3 text-center">
-                            <BaseInput v-if="editing" v-model.number="item.quantity" type="number" :min="1" class="w-20"
-                                @input="recalculateSubtotal(item)" />
+                        <td class="px-3 py-2 text-center">
+                            <BaseInput v-if="editing" v-model.number="item.quantity" type="number" size="sm" :min="1" class="w-20"
+                                :aria-label="`Cantidad de ${item.productName}`" @input="recalculateSubtotal(item, index)" />
                             <span v-else class="text-sm text-gray-900">{{ item.quantity }}</span>
                         </td>
 
                         <!-- Precio unitario -->
-                        <td class="px-4 py-3 text-right">
-                            <BaseInput v-if="editing" v-model.number="item.unitPrice" type="number" :min="0" step="100"
-                                class="w-28" @input="recalculateSubtotal(item)" />
+                        <td class="px-3 py-2 text-right">
+                            <BaseInput v-if="editing" v-model.number="item.unitPrice" type="number" size="sm" :min="0" step="100"
+                                class="w-28" :aria-label="`Precio de ${item.productName}`" @input="recalculateSubtotal(item, index)" />
                             <span v-else class="text-sm text-gray-900">{{ formatCurrency(item.unitPrice) }}</span>
                         </td>
 
                         <!-- Descuento -->
-                        <td class="px-4 py-3 text-right">
-                            <BaseInput v-if="editing" v-model.number="item.discount" type="number" :min="0" step="100"
-                                class="w-28" @input="recalculateSubtotal(item)" />
-                            <span v-else class="text-sm text-gray-900">
-                                {{ item.discount > 0 ? formatCurrency(item.discount) : '-' }}
-                            </span>
+                        <td v-if="showDiscountColumn" class="px-3 py-2 text-right">
+                            <div class="flex items-center justify-end gap-1 whitespace-nowrap">
+                                <BaseInput v-if="editing" :model-value="Number((discountPercentages[index] ?? 0).toFixed(2))" type="number" size="sm" :min="0" :max="100" step="0.1"
+                                    :aria-label="`Descuento en porcentaje de ${item.productName}`" class="w-20"
+                                    @update:model-value="updateDiscountPercentage(item, index, $event)" />
+                                <span v-if="editing" class="text-xs">%</span>
+                                <span v-else class="text-sm text-gray-900">{{ Number((discountPercentages[index] ?? 0).toFixed(2)) }}%</span>
+                                <span v-if="item.discount > (freeDeliveryAppliedByIndex[index] ?? 0)" class="ml-1 text-xs text-gray-500 tabular-nums">{{ formatCurrency(Math.max(0, item.discount - (freeDeliveryAppliedByIndex[index] ?? 0))) }}</span>
+                            </div>
+                        </td>
+                        <td v-if="freeDeliveryAppliedTotal > 0" class="whitespace-nowrap px-3 py-2 text-right text-sm text-emerald-700 tabular-nums">
+                            {{ freeDeliveryAppliedByIndex[index] ? `−${formatCurrency(freeDeliveryAppliedByIndex[index] ?? 0)}` : '—' }}
                         </td>
 
                         <!-- Subtotal -->
-                        <td class="px-4 py-3 text-right">
+                        <td class="px-3 py-2 text-right">
                             <span class="text-sm font-medium text-gray-900">{{ formatCurrency(item.subtotal) }}</span>
                         </td>
 
                         <!-- Acciones (solo en modo edición) -->
-                        <td v-if="editing" class="px-4 py-3 text-center">
+                        <td v-if="editing" class="px-3 py-2 text-center">
                             <button type="button" class="text-red-600 hover:text-red-700 p-1" title="Eliminar producto"
                                 @click="removeProduct(index)">
                                 <TrashIcon class="w-4 h-4" />
@@ -81,7 +94,7 @@
 
                     <!-- Mensaje si no hay productos -->
                     <tr v-if="localProducts.length === 0">
-                        <td :colspan="editing ? 6 : 5" class="px-4 py-8 text-center text-gray-500">
+                        <td :colspan="4 + Number(showDiscountColumn) + Number(freeDeliveryAppliedTotal > 0) + Number(editing)" class="px-4 py-8 text-center text-gray-500">
                             No hay productos en este pedido
                         </td>
                     </tr>
@@ -98,14 +111,19 @@
         </div>
 
         <!-- Panel de totales -->
-        <div class="rounded-xl border border-gray-200 bg-gray-50/80 p-4 space-y-3 sm:p-5">
+        <div class="rounded-xl border border-gray-200 bg-gray-50/80 p-3 space-y-1.5">
             <div class="flex justify-between text-sm">
                 <span class="text-gray-600">Subtotal:</span>
                 <span class="font-medium text-gray-900">{{ formatCurrency(calculatedSubtotal) }}</span>
             </div>
-            <div v-if="discountTotal > 0" class="flex justify-between text-sm">
+            <div v-if="discountTotal > 0" class="flex items-baseline justify-between gap-x-3 gap-y-1 text-sm">
                 <span class="text-gray-600">Descuentos:</span>
-                <span class="font-medium text-red-600">-{{ formatCurrency(discountTotal) }}</span>
+                <div class="flex flex-wrap items-baseline justify-end gap-x-2 gap-y-0.5 tabular-nums">
+                    <span class="font-medium text-red-600">−{{ formatCurrency(discountTotal) }}</span>
+                    <span class="text-xs text-gray-500">
+                        (<span :class="{ 'text-emerald-700': freeDeliveryAppliedTotal > 0 }">{{ formatCurrency(freeDeliveryAppliedTotal) }} domi gratis</span> · {{ formatCurrency(discountTotal - freeDeliveryAppliedTotal) }} otros)
+                    </span>
+                </div>
             </div>
             <div v-if="showDeliveryFeeLine">
                 <slot name="delivery-fee" :editing-products="editing">
@@ -130,11 +148,7 @@
                     Hasta {{ formatCurrency(freeDeliveryBudgetCap) }} sobre el envío
                 </span>
             </div>
-            <div v-if="freeDeliveryAppliedTotal > 0" class="flex justify-between text-xs text-emerald-700">
-                <span>Domicilio gratis aplicado</span>
-                <span>−{{ formatCurrency(freeDeliveryAppliedTotal) }}</span>
-            </div>
-            <div v-else-if="showLegacyFreeDeliveryRevert" class="flex items-center justify-between gap-3 rounded-md bg-amber-50 px-2 py-1.5 text-xs text-amber-900">
+            <div v-if="freeDeliveryAppliedTotal === 0 && showLegacyFreeDeliveryRevert" class="flex items-center justify-between gap-3 rounded-md bg-amber-50 px-2 py-1.5 text-xs text-amber-900">
                 <span>Domi gratis posible en descuentos</span>
                 <button
                     type="button"
@@ -165,6 +179,9 @@
         <AddProductModal :open="showAddProductModal" :existing-product-ids="existingProductIds"
             @close="showAddProductModal = false" @product-added="handleProductAdded" />
 
+        <OrderNoteDialog :model-value="noteProduct !== null" :notes="noteProduct?.notes"
+            :title="`Notas · ${noteProduct?.productName ?? ''}`" :disabled="!canEdit || !!props.saving"
+            :save="saveNotes" @update:model-value="value => { if (!value) noteProduct = null }" />
         <BaseDialog v-model="showLastProductWarningModal" title="Ultimo producto del pedido" size="md">
             <p class="text-sm text-gray-700">
                 Este es el ultimo producto del pedido. Te recomendamos cancelar el pedido para que no sume en el total del dia.
@@ -186,6 +203,7 @@ import { ref, computed, watch } from 'vue'
 import type { OrderDetailItem, UpdateOrderDetailDto } from '@/types/order'
 import { useFormatting } from '@/composables/useFormatting'
 import { useToast } from '@/composables/useToast'
+import { clampDiscountPercentage, discountAmountFromPercentage, discountPercentageFromAmount } from '@/helpers/orderProductDiscount'
 import {
     deliveryDiscountBudget,
     distributeEqualWithCaps,
@@ -194,6 +212,7 @@ import {
 import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseInput from '@/components/ui/BaseInput.vue'
 import BaseDialog from '@/components/ui/BaseDialog.vue'
+import OrderNoteDialog from './OrderNoteDialog.vue'
 import AddProductModal from './AddProductModal.vue'
 import { PencilIcon, PlusIcon, TrashIcon } from '@heroicons/vue/24/outline'
 
@@ -208,6 +227,7 @@ interface Props {
     freeDeliveryRequested?: boolean
     canEdit: boolean
     saving?: boolean
+    saveProductNote?: (itemId: number, notes: string) => Promise<void>
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -234,9 +254,29 @@ const saving = ref(false)
 const showAddProductModal = ref(false)
 const showLastProductWarningModal = ref(false)
 const localProducts = ref<OrderDetailItem[]>([])
+const noteProduct = ref<OrderDetailItem | null>(null)
+async function saveNotes(notes: string) {
+    const item = noteProduct.value
+    if (!item || !props.canEdit || props.saving || !localProducts.value.includes(item)) throw new Error('El producto ya no permite editar su nota.')
+    if (editing.value) {
+        item.notes = notes
+        return
+    }
+    if (!props.saveProductNote) throw new Error('No se pudo guardar la nota del producto.')
+    await props.saveProductNote(item.id, notes)
+}
+watch(editing, () => { noteProduct.value = null })
+const showDiscountColumn = computed(() => editing.value || localProducts.value.some((item, index) => item.discount > (freeDeliveryAppliedByIndex.value[index] ?? 0)))
 const originalProducts = ref<OrderDetailItem[]>([])
 const localFreeDeliveryRequested = ref(false)
 const freeDeliveryAppliedByIndex = ref<number[]>([])
+const discountPercentages = ref<number[]>([])
+
+function syncDiscountPercentages() {
+    discountPercentages.value = localProducts.value.map((item, index) =>
+        discountPercentageFromAmount(item.quantity * item.unitPrice, Math.max(0, item.discount - (freeDeliveryAppliedByIndex.value[index] ?? 0))),
+    )
+}
 
 // Computed
 const calculatedSubtotal = computed(() => {
@@ -308,6 +348,7 @@ const resetLocalProductsFromProps = () => {
     localProducts.value = copy
     localFreeDeliveryRequested.value = props.freeDeliveryRequested === true
     freeDeliveryAppliedByIndex.value = inferAppliedFreeDeliveryShares(copy)
+    syncDiscountPercentages()
     return copy
 }
 
@@ -408,14 +449,23 @@ const revertLegacyFreeDelivery = () => {
     })
     localFreeDeliveryRequested.value = false
     freeDeliveryAppliedByIndex.value = zeroFreeDeliveryShares()
+    syncDiscountPercentages()
 
     if (!editing.value) {
         emitProductsSave()
     }
 }
 
-const recalculateSubtotal = (item: OrderDetailItem) => {
-    item.subtotal = item.quantity * item.unitPrice - item.discount
+const recalculateSubtotal = (item: OrderDetailItem, index: number) => {
+    const gross = Math.max(0, item.quantity * item.unitPrice)
+    item.discount = discountAmountFromPercentage(gross, discountPercentages.value[index]) + (freeDeliveryAppliedByIndex.value[index] ?? 0)
+    item.subtotal = Math.max(0, gross - item.discount)
+    applyFreeDeliveryDiscount(localFreeDeliveryRequested.value)
+}
+
+const updateDiscountPercentage = (item: OrderDetailItem, index: number, value: unknown) => {
+    discountPercentages.value[index] = clampDiscountPercentage(value)
+    recalculateSubtotal(item, index)
 }
 
 const enterEditMode = () => {
@@ -430,6 +480,7 @@ const cancelEdit = () => {
     localProducts.value = JSON.parse(JSON.stringify(originalProducts.value))
     localFreeDeliveryRequested.value = props.freeDeliveryRequested === true
     freeDeliveryAppliedByIndex.value = inferAppliedFreeDeliveryShares(localProducts.value)
+    syncDiscountPercentages()
     editing.value = false
 }
 
@@ -439,6 +490,9 @@ const removeProduct = (index: number) => {
         return
     }
     localProducts.value.splice(index, 1)
+    freeDeliveryAppliedByIndex.value.splice(index, 1)
+    discountPercentages.value.splice(index, 1)
+    applyFreeDeliveryDiscount(localFreeDeliveryRequested.value)
 }
 
 const handleCancelOrderRequest = () => {
@@ -462,6 +516,9 @@ const handleProductAdded = (newProduct: any) => {
         updatedAt: new Date().toISOString()
     })
 
+    freeDeliveryAppliedByIndex.value.push(0)
+    discountPercentages.value.push(discountPercentageFromAmount(newProduct.quantity * newProduct.unitPrice, newProduct.discount))
+    applyFreeDeliveryDiscount(localFreeDeliveryRequested.value)
     showAddProductModal.value = false
 }
 

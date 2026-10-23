@@ -1,5 +1,34 @@
 <template>
     <div class="relative">
+        <div v-if="compact" class="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+        <ol class="flex flex-wrap items-center gap-x-2 gap-y-1" aria-label="Estados del pedido">
+            <li v-for="(step, index) in steps" :key="step.status">
+                <button type="button" :disabled="!clickable" :aria-current="isCurrentStep(step.status) ? 'step' : undefined"
+                    :title="getTooltipText(step)" class="inline-flex min-h-8 items-center gap-1.5 rounded-md px-2 py-1 text-xs disabled:cursor-default"
+                    :class="isStepCompleted(index) || isCurrentStep(step.status) ? 'bg-emerald-50 text-emerald-800' : 'text-gray-500 hover:bg-gray-50'"
+                    @click="handleStepClick(step.status)">
+                    <component :is="getStepIcon(step.status)" class="h-4 w-4 shrink-0" aria-hidden="true" />
+                    <span>{{ step.label }}</span>
+                    <time v-if="normalizedStatusTimes[step.status] && (isStepCompleted(index) || isCurrentStep(step.status))">{{ formatTime(normalizedStatusTimes[step.status]) }}</time>
+                </button>
+            </li>
+        </ol>
+            <dl aria-label="Tiempos del pedido" class="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] font-normal text-gray-400 tabular-nums">
+                <div title="Desde la hora programada de preparación, o Tomado, hasta Listo">
+                    <dt class="sr-only">Tiempo en preparación</dt>
+                    <dd>{{ durations.preparation === null ? '—' : `${durations.preparation} min` }} en preparación</dd>
+                </div>
+                <div v-if="orderType !== 'onsite'" title="Desde En camino hasta Entregado">
+                    <dt class="sr-only">Tiempo en entrega</dt>
+                    <dd>{{ durations.delivery === null ? '—' : `${durations.delivery} min` }} en entrega</dd>
+                </div>
+                <div title="Desde la hora programada de preparación, o Tomado, hasta Entregado">
+                    <dt class="sr-only">Tiempo total</dt>
+                    <dd>{{ durations.total === null ? '—' : `${durations.total} min` }} total</dd>
+                </div>
+            </dl>
+        </div>
+        <template v-else>
         <!-- Badge de cancelado (si aplica) -->
         <div v-if="currentStatus === 'cancelled'" class="mb-4">
             <span
@@ -57,13 +86,14 @@
                         class="text-xs text-gray-500 mt-0.5">
                         {{ formatTime(normalizedStatusTimes[step.status]) }}
                     </p>
-                    <p v-if="normalizedStatusTimes[step.status] && (isStepCompleted(index) || isCurrentStep(step.status))"
+                    <p v-if="!compact && normalizedStatusTimes[step.status] && (isStepCompleted(index) || isCurrentStep(step.status))"
                         class="text-xs text-emerald-600 font-medium mt-0.5">
                         {{ formatTimeAgo(normalizedStatusTimes[step.status]) }}
                     </p>
                 </div>
             </div>
         </div>
+        </template>
     </div>
 </template>
 
@@ -71,6 +101,7 @@
 import { computed } from 'vue'
 import type { OrderStatus } from '@/types/order'
 import { useFormatting } from '@/composables/useFormatting'
+import { orderDurations } from '@/helpers/orderDurations'
 import {
     ClockIcon,
     FireIcon,
@@ -90,6 +121,8 @@ interface Props {
     statusTimes: Record<string, string>
     clickable?: boolean
     orderType?: 'onsite' | 'delivery' | 'reservation'
+    compact?: boolean
+    prepareAt?: string | Date | null
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -102,6 +135,7 @@ const emit = defineEmits<{
 }>()
 
 const { formatTime, formatTimeAgo } = useFormatting()
+const durations = computed(() => orderDurations(props.statusTimes, props.prepareAt))
 
 // Normalizar claves de statusTimes del backend
 const normalizedStatusTimes = computed(() => {

@@ -4,7 +4,7 @@ import { getAccessToken, refreshAccessToken } from '@/services/auth/authSession'
 import { getStoredUser } from '@/services/auth/authSession';
 import { getSelectedBranchIdForRequest } from '@/services/branchContextSession';
 import { UserRole } from '@/types/auth';
-import { notifyOrderConflict } from './orderMutation';
+import { beginOrderMutation, notifyOrderConflict } from './orderMutation';
 import { WEB_CLIENT_HEADER, WEB_CLIENT_HEADER_VALUE } from '@/constants/deliveryApp';
 
 export type BranchScope = 'selected' | 'all' | 'none';
@@ -14,12 +14,14 @@ declare module 'axios' {
 		branchScope?: BranchScope;
 		_branchContextId?: number | null;
 		onOrderVersion?: (orderId: number, version: number) => void;
+		_finishOrderMutation?: () => void;
 	}
 
 	interface InternalAxiosRequestConfig {
 		branchScope?: BranchScope;
 		_branchContextId?: number | null;
 		onOrderVersion?: (orderId: number, version: number) => void;
+		_finishOrderMutation?: () => void;
 	}
 }
 
@@ -66,6 +68,7 @@ export class BaseApi {
 				if (config.data instanceof FormData && config.headers) {
 					delete config.headers['Content-Type'];
 				}
+				config._finishOrderMutation ??= beginOrderMutation(Number(config.headers?.['X-Order-Id']));
 				return config;
 			},
 			(error) => Promise.reject(error)
@@ -73,22 +76,29 @@ export class BaseApi {
 
 		this.api.interceptors.response.use(
 			(response) => {
-				const requestBranchId = response.config._branchContextId;
-				if (
-					requestBranchId
-					&& requestBranchId !== getSelectedBranchIdForRequest()
-				) {
-					throw new CanceledError('La sucursal activa cambió durante la solicitud.');
+				try {
+					const requestBranchId = response.config._branchContextId;
+					if (
+						requestBranchId
+						&& requestBranchId !== getSelectedBranchIdForRequest()
+					) {
+						throw new CanceledError('La sucursal activa cambió durante la solicitud.');
+					}
+					const returnedOrderId = Number(response.headers['x-order-id']);
+					const returnedVersion = Number(response.headers['x-order-version']);
+					response.config.onOrderVersion?.(returnedOrderId, returnedVersion);
+					return response;
+				} finally {
+					response.config._finishOrderMutation?.();
+					delete response.config._finishOrderMutation;
 				}
-                const returnedOrderId = Number(response.headers['x-order-id']);
-                const returnedVersion = Number(response.headers['x-order-version']);
-                response.config.onOrderVersion?.(returnedOrderId, returnedVersion);
-                return response;
 			},
 			async (error) => {
 				const originalRequest = error.config;
+				originalRequest?._finishOrderMutation?.();
+				if (originalRequest) delete originalRequest._finishOrderMutation;
                 const url = String(originalRequest?.url ?? '');
-                if (error.response?.status === 409 && !String(error.response?.data?.code).startsWith('EMPLOYEE_')) {
+                if (error.response?.status === 409 && error.response?.data?.code === 'ORDER_VERSION_CONFLICT') {
                     notifyOrderConflict(Number(originalRequest?.headers?.['X-Order-Id']));
                 }
 

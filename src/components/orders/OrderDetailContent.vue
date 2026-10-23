@@ -1,11 +1,11 @@
 <template>
-	<div class="space-y-4 text-gray-900 md:space-y-5" v-if="order">
+	<div :key="detailReload" class="order-detail space-y-3 text-gray-900" v-if="order">
         <div v-if="isRemoteOrder" class="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-900">
             Pedido tomado desde esta sede · prepara y despacha <strong>{{ order.branchName }}</strong>.
             Los pagos ya registrados conservan sus bancos y aplicaciones originales.
         </div>
         <div v-if="staleSnapshot" role="status" class="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
-            El pedido pudo cambiar en otra pantalla. Actualiza antes de continuar; se descartarán los cambios sin guardar.
+            Este pedido cambió desde que lo abriste. Tus cambios sin guardar se conservan hasta que decidas actualizar.
             <BaseButton size="sm" variant="outline" :loading="refreshingOrder" @click="reloadOrder">Descartar cambios y actualizar</BaseButton>
         </div>
         <p v-if="optionsLoading" class="text-sm text-gray-500">Cargando opciones de {{ order.branchName }}…</p>
@@ -18,51 +18,32 @@
 		<div v-if="order.inventoryIssue" class="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-800">
 			Alerta de inventario: {{ order.inventoryIssue }}
 		</div>
-		<!-- Header con ID y acciones -->
-		<section aria-label="Resumen del pedido" class="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm sm:p-6">
-		<div
-			class="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between"
-		>
-			<div>
-				<p class="mb-2 text-xs font-semibold uppercase tracking-wider text-gray-500">Detalle del pedido</p>
-				<div
-					class="flex flex-col sm:flex-row items-start sm:items-center space-y-2 sm:space-y-0 sm:space-x-3"
-				>
-					<h1 class="text-2xl sm:text-3xl font-bold text-gray-900">
-						#{{ order.id }}
-					</h1>
-					<OrderSourceBadge :source="order.orderSource" />
-					<OrderTypeBadge
-						:type="order.type"
-						:display-name="order.typeDisplayName"
-					/>
-				</div>
-				<p class="mt-1 text-xs sm:text-sm text-gray-500">
-					Creado el {{ formatDateTime(order.createdAt) }}
-				</p>
-			</div>
-
-			<div
-				class="flex flex-wrap items-center gap-2 xl:max-w-xl xl:justify-end"
-			>
+        <section aria-label="Resumen del pedido" class="rounded-xl border border-gray-200 bg-white px-3 py-3 sm:px-4">
+            <div class="flex flex-wrap items-center justify-between gap-2">
+                <div class="flex min-w-0 flex-wrap items-center gap-2">
+                    <h1 class="text-xl font-bold">#{{ order.id }}</h1>
+                    <OrderSourceBadge :source="order.orderSource" />
+                    <OrderTypeBadge :type="order.type" :display-name="order.typeDisplayName" />
+                    <span class="rounded-full bg-gray-100 px-2 py-1 text-xs font-medium">{{ getOrderStatusDisplayName(order.status) }}</span>
+                    <span class="text-sm text-gray-600">{{ order.branchName }}</span>
+                </div>
+                <div class="flex flex-wrap items-center gap-1">
 				<BaseButton
 					v-if="!isDeliveryman"
 					variant="secondary"
 					size="sm"
-					class="min-h-10"
+
 					@click="$router.push({ name: 'OrdersList', query: orderReturnQuery })"
 				>
 					<ArrowLeftIcon class="w-4 h-4 mr-1" />
 					Volver
 				</BaseButton>
-                <BaseButton v-if="!isDeliveryman && order.type === 'delivery' && order.status === 'on_the_way'"
-                    size="sm" variant="outline" @click="showTracking = true">Ver ubicación</BaseButton>
 				<div v-if="permissions.canReprintThermalTickets() && order" role="group" aria-label="Impresión"
-                    class="flex flex-wrap gap-2 rounded-xl border border-gray-200 bg-gray-50 p-1">
+                    class="flex flex-wrap gap-1">
 					<BaseButton
 						variant="outline"
 						size="sm"
-						class="min-h-10"
+
 						:loading="reprintKitchenLoading"
 						title="Reimprimir comanda de cocina"
 						@click="onReprintKitchen"
@@ -73,7 +54,7 @@
 					<BaseButton
 						variant="outline"
 						size="sm"
-						class="min-h-10"
+
 						:loading="reprintDeliveryLoading"
 						title="Reimprimir ticket de domicilio"
 						@click="onReprintDelivery"
@@ -82,21 +63,24 @@
 						Ticket domicilio
 					</BaseButton>
 				</div>
-				<BaseButton v-if="authStore.isSuperadmin && order && ['awaiting_payment', 'taken', 'in_preparation', 'ready'].includes(order.status)"
-                    variant="outline" size="sm" class="w-full sm:w-auto"
-                    @click="showTransferBranchDialog = true">
-                    Cambiar sucursal
-                </BaseButton>
-				<BaseButton
-					v-if="permissions.canCancel(order)"
-					variant="ghost"
-					size="sm"
-					class="min-h-10 text-red-700 hover:bg-red-50"
-					@click="showCancelModal = true"
-				>
-					<XCircleIcon class="w-4 h-4 mr-1" />
-					Cancelar Pedido
-				</BaseButton>
+                <details v-if="permissions.canCancel(order) || canTransferBranch || canManageInvoices || canViewTracking" class="relative">
+                    <summary class="cursor-pointer rounded-lg px-3 py-2 text-sm hover:bg-gray-50">Más acciones</summary>
+                    <div class="absolute right-0 z-20 mt-1 flex flex-col items-stretch whitespace-nowrap rounded-lg border border-gray-200 bg-white p-1 shadow-lg">
+                        <button v-if="canViewTracking" type="button" @click="showTracking = true"
+                            class="flex w-full items-center justify-end gap-3 rounded-lg px-3 py-2 text-right text-sm font-normal text-gray-700 transition-colors hover:bg-gray-100 hover:text-gray-900 focus-visible:bg-gray-100 focus-visible:outline-emerald-600">
+                            <span>Ver ubicación</span><MapPinIcon class="h-4 w-4 shrink-0" aria-hidden="true" />
+                        </button>
+                        <OrderElectronicInvoicing v-if="canManageInvoices" :order-id="order.id" :customer-id="order.customerId" :status="order.status" :order="order" :stale="staleSnapshot" />
+                        <button v-if="canTransferBranch" type="button" @click="showTransferBranchDialog = true"
+                            class="flex w-full items-center justify-end gap-3 rounded-lg px-3 py-2 text-right text-sm font-normal text-gray-700 transition-colors hover:bg-gray-100 hover:text-gray-900 focus-visible:bg-gray-100 focus-visible:outline-emerald-600">
+                            <span>Cambiar sucursal</span><span class="w-4 shrink-0" aria-hidden="true"></span>
+                        </button>
+                        <button v-if="permissions.canCancel(order)" type="button" @click="showCancelModal = true"
+                            class="flex w-full items-center justify-end gap-3 rounded-lg px-3 py-2 text-right text-sm font-normal text-gray-700 transition-colors hover:bg-gray-100 hover:text-gray-900 focus-visible:bg-gray-100 focus-visible:outline-emerald-600">
+                            <span>Cancelar pedido</span><XCircleIcon class="h-4 w-4 shrink-0" aria-hidden="true" />
+                        </button>
+                    </div>
+                </details>
 				<BaseButton
 					v-if="permissions.canUncancel(order)"
 					variant="primary"
@@ -107,28 +91,13 @@
 					<CheckCircleIcon class="w-4 h-4 mr-1" />
 					Descancelar
 				</BaseButton>
-			</div>
-		</div>
-		<dl class="mt-5 grid grid-cols-2 gap-4 border-t border-gray-100 pt-5 lg:grid-cols-4">
-			<div>
-				<dt class="text-xs font-medium text-gray-500">Total del pedido</dt>
-				<dd class="mt-1 text-xl font-bold tabular-nums tracking-tight text-emerald-700 sm:text-2xl">{{ formatCurrency(order.total) }}</dd>
-			</div>
-			<div>
-				<dt class="text-xs font-medium text-gray-500">{{ hasOrderDelivery(order) ? 'Domicilio' : 'Modalidad' }}</dt>
-				<dd class="mt-1 text-sm font-semibold tabular-nums">{{ hasOrderDelivery(order) ? formatCurrency(order.deliveryFee ?? 0) : 'En el local' }}</dd>
-			</div>
-			<div>
-				<dt class="text-xs font-medium text-gray-500">{{ order.reservedFor ? 'Entrega programada' : 'Estado actual' }}</dt>
-				<dd class="mt-1 text-sm font-semibold">{{ order.reservedFor ? formatDateTime(order.reservedFor) : getOrderStatusDisplayName(order.status) }}</dd>
-			</div>
-			<div>
-				<dt class="text-xs font-medium text-gray-500">Sucursal que atiende</dt>
-				<dd class="mt-1 text-sm font-semibold">{{ order.branchName }}</dd>
-			</div>
-		</dl>
-		</section>
-		<OrderElectronicInvoicing v-if="['Admin', 'Superadmin', 'Cashier'].includes(authStore.userRole ?? '')" :order-id="order.id" :customer-id="order.customerId" :status="order.status" :order="order" :stale="staleSnapshot" />
+                </div>
+            </div>
+            <div class="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-500">
+                <span>Creado {{ formatDateTime(order.createdAt) }}</span>
+                <span v-if="order.takenByName">Tomado por {{ order.takenByName }}</span>
+            </div>
+        </section>
 
 		<div
 			v-if="order.status === 'cancelled' && order.cancelledReason"
@@ -138,61 +107,20 @@
 			<p class="mt-1 text-sm text-red-700">{{ order.cancelledReason }}</p>
 		</div>
 
-		<!-- Barra de progreso -->
-		<section v-if="!isDeliveryman" aria-label="Seguimiento del pedido" class="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm sm:p-6">
-			<div class="mb-4 flex flex-wrap items-center justify-between gap-2">
-				<h2 class="text-sm font-semibold">Estado del pedido</h2>
-				<span class="rounded-full bg-gray-100 px-3 py-1 text-xs font-medium text-gray-700">{{ getOrderStatusDisplayName(order.status) }}</span>
-			</div>
-			<OrderProgressBar
-				:current-status="order.status"
-				:status-times="order.statusTimes"
-				:order-type="order.type"
-				:clickable="order.status !== 'cancelled' || canSelectAnyOrderStatus"
-				@status-click="handleStatusChange"
-			/>
-		</section>
-
-		<!-- Tabs de contenido -->
-		<div class="min-w-0 rounded-2xl border border-gray-200 bg-white shadow-sm">
-			<!-- Tab headers -->
-			<div class="sticky top-0 z-10 rounded-t-2xl border-b border-gray-200 bg-white p-2 sm:px-4 sm:py-3">
-				<nav
-					class="grid grid-cols-3 gap-1 rounded-xl bg-gray-100 p-1 sm:gap-2"
-					role="tablist" aria-label="Secciones del pedido"
-				>
-					<button
-						v-for="tab in visibleTabs"
-						:key="tab.id"
-						:id="`${detailId}-tab-${tab.id}`" type="button" role="tab"
-						:aria-selected="activeTab === tab.id" :aria-controls="`${detailId}-panel-${tab.id}`"
-						:tabindex="activeTab === tab.id ? 0 : -1"
-						:class="[
-							'flex min-h-11 min-w-0 items-center justify-center gap-1.5 rounded-lg px-2 py-2 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 focus-visible:ring-offset-2 sm:gap-2 sm:text-sm',
-							activeTab === tab.id
-								? 'bg-white text-emerald-700 shadow-sm ring-1 ring-gray-200/70'
-								: 'text-gray-600 hover:bg-white/60 hover:text-gray-900',
-						]"
-						@click="activeTab = tab.id"
-						@keydown="onTabKeydown($event, tab.id)"
-					>
-						<component
-							:is="tab.icon"
-							class="hidden h-4 w-4 shrink-0 min-[360px]:block" aria-hidden="true"
-						/>
-						<span>{{ tab.name }}</span>
-					</button>
-				</nav>
-			</div>
-
-			<!-- Tab content -->
-			<div class="p-4 sm:p-6">
-				<!-- Tab: Información General -->
-				<div v-show="activeTab === 'info'" :id="`${detailId}-panel-info`" role="tabpanel" :aria-labelledby="`${detailId}-tab-info`" tabindex="0" class="space-y-6 focus:outline-none">
-					<div>
-						<h2 class="text-base font-semibold">Información del pedido</h2>
-						<p class="mt-1 text-sm text-gray-500">Cliente, entrega y horarios de preparación.</p>
-					</div>
+        <details v-if="!isDeliveryman" class="rounded-xl border border-gray-200 bg-white px-3 py-2 sm:px-4" :open="!['delivered', 'cancelled'].includes(order.status)">
+            <summary class="cursor-pointer text-sm font-medium">Seguimiento · {{ getOrderStatusDisplayName(order.status) }}</summary>
+            <OrderProgressBar class="mt-2" compact :current-status="order.status" :status-times="order.statusTimes"
+                :order-type="order.type" :prepare-at="order.prepareAt" :clickable="order.status !== 'cancelled' || canSelectAnyOrderStatus"
+                @status-click="handleStatusChange" />
+        </details>
+        <nav aria-label="Secciones del pedido" class="flex gap-1 lg:hidden">
+            <a v-for="section in detailSections" :key="section.id" :href="`#${detailId}-${section.id}`"
+                @click="section.id === 'payments' && scrollToPaymentsTab()"
+                class="flex-1 rounded-lg border border-gray-200 bg-white px-2 py-2 text-center text-sm text-emerald-700">{{ section.name }}</a>
+        </nav>
+        <div class="grid min-w-0 items-start gap-3 lg:grid-cols-[minmax(280px,340px)_minmax(0,1fr)]">
+            <section :id="`${detailId}-info`" aria-label="Información del pedido" tabindex="-1" class="order-info min-w-0 scroll-mt-3 space-y-3 rounded-xl border border-gray-200 bg-white p-3 sm:p-4">
+                <h2 class="text-sm font-semibold">Cliente y entrega</h2>
 					<div
 						v-if="order.externalFulfillmentProvider === 'rappi'"
 						class="rounded-lg border border-orange-200 bg-orange-50 p-4"
@@ -211,7 +139,7 @@
 							<p>Cargos: <strong>{{ formatCurrency(order.externalCharges || 0) }}</strong></p>
 						</div>
 					</div>
-					<div class="order-info-grid grid grid-cols-1 gap-4 md:grid-cols-2">
+					<div class="order-info-grid grid grid-cols-1 gap-3">
 						<!-- Cliente -->
 						<div class="space-y-2">
 							<label class="text-xs sm:text-sm font-medium text-gray-700"
@@ -365,142 +293,64 @@
 							</div>
 						</div>
 
-						<div v-if="hasOrderDelivery(order)" class="space-y-2 md:col-span-2">
+					</div>
+                <section v-if="showScheduleEditor || order.reservedFor || order.prepareAt" aria-label="Programación y atención" class="space-y-2 border-t border-gray-100 pt-3">
+                    <div class="flex items-center justify-between gap-2">
+                        <h3 class="text-sm font-semibold">Programación</h3>
+                        <BaseButton v-if="showScheduleEditor" size="sm" variant="ghost" aria-label="Editar horarios del pedido"
+                            title="Editar horarios" :disabled="staleSnapshot" @click="openDetailEditor('schedule')">
+                            <PencilIcon class="h-4 w-4" />
+                        </BaseButton>
+                    </div>
+                    <dl class="space-y-2 text-sm">
+                        <div v-if="order.prepareAt"><dt class="text-xs text-gray-500">Preparar</dt><dd>{{ formatDateTime(order.prepareAt) }}</dd></div>
+                        <div v-if="order.reservedFor"><dt class="text-xs text-gray-500">Tener listo / entregar</dt><dd class="font-medium">{{ formatDateTime(order.reservedFor) }}</dd></div>
+                    </dl>
+                </section>
+					<!-- Notas -->
+					<div class="space-y-2 border-t border-gray-100 pt-3">
+                        <div class="flex items-center justify-between gap-2">
+                            <h3 class="text-sm font-semibold text-gray-700">Notas del pedido</h3>
+                            <BaseButton v-if="permissions.canEditOrder(order)" size="sm" variant="ghost"
+                                aria-label="Editar notas del pedido" title="Editar notas" :disabled="staleSnapshot"
+                                @click="openDetailEditor('notes')">
+                                <PencilIcon class="h-4 w-4" />
+                            </BaseButton>
+                        </div>
+                        <p v-if="order.notes" class="whitespace-pre-wrap break-words text-sm">{{ order.notes }}</p>
+                        <p v-else class="text-sm text-gray-400">Sin notas</p>
+					</div>
+            </section>
+            <div class="min-w-0 space-y-3">
+                <section :id="`${detailId}-products`" aria-label="Productos del pedido" tabindex="-1" class="min-w-0 scroll-mt-3 rounded-xl border border-gray-200 bg-white p-3 sm:p-4">
+					<OrderDetailProductsList
+						v-if="order"
+						:products="order?.orderDetails"
+						:delivery-fee="order?.deliveryFee ?? 0"
+						:order-type="order?.type"
+						:address-id="order?.addressId ?? null"
+						:max-free-delivery-discount="maxFreeDeliveryDiscount"
+						:free-delivery-requested="order?.freeDeliveryRequested === true"
+						:show-delivery-fee-line="hasOrderDelivery(order)"
+						:can-edit="!staleSnapshot && permissions.canEditProducts(order) && !!operationOptions && !optionsLoading && !savingDeliveryFee"
+						:saving="savingProducts"
+                        :save-product-note="saveProductNote"
+						@save="handleProductsUpdate"
+						@request-cancel-order="handleRequestCancelOrderFromProducts"
+						@editing-change="editingProducts = $event"
+					>
+						<template #delivery-fee="{ editingProducts }">
 							<OrderDeliveryFeeEditor :key="order.id" :delivery-fee="order.deliveryFee ?? 0" :total="order.total"
-								:can-edit="permissions.canEditDeliveryFee(order)" :saving="savingDeliveryFee" :disabled="staleSnapshot || editingProducts || savingProducts"
-								:error="deliveryFeeSaveError" @edit="deliveryFeeSaveError = ''" @save="updateDeliveryFee" />
-						</div>
-
-					</div>
-					<section class="space-y-3" aria-label="Programación y atención">
-						<h3 class="text-sm font-semibold">Programación y atención</h3>
-						<div class="order-info-grid grid grid-cols-1 gap-4 md:grid-cols-2">
-						<!-- Horarios de reserva / programación (edición admin/cajero) -->
-						<div
-							v-if="showScheduleEditor"
-							class="grid gap-3 rounded-lg border border-amber-100 bg-amber-50/40 sm:grid-cols-2 md:col-span-2"
-						>
-							<p class="text-xs font-medium text-amber-900 sm:col-span-2">
-								Horarios de entrega y preparación
-							</p>
-							<div class="space-y-1.5">
-								<label class="text-xs font-medium text-gray-700"
-									>Inicio de preparación (opcional)</label
-								>
-								<VueDatePicker
-									v-model="editablePrepareAtDate"
-									placeholder="Cuándo empezar en cocina"
-									:min-date="new Date()"
-									auto-apply
-									class="order-detail-picker w-full"
-								/>
-								<p class="text-[11px] text-gray-500">
-									Si lo dejas vacío, el sistema usa una hora antes de la
-									entrega. Debe haber al menos 40 minutos entre preparación y
-									entrega.
-								</p>
-							</div>
-							<div class="space-y-1.5">
-								<label class="text-xs font-medium text-gray-700"
-									>Tener listo (entrega al cliente)</label
-								>
-								<VueDatePicker
-									v-model="editableReservedForDate"
-									placeholder="Fecha y hora de entrega"
-									:min-date="new Date()"
-									auto-apply
-									class="order-detail-picker w-full"
-								/>
-							</div>
-
-							<div class="flex flex-col sm:flex-row gap-2 flex-wrap sm:col-span-2">
-								<BaseButton
-									size="sm"
-									variant="secondary"
-									class="w-full sm:w-auto"
-									:loading="savingSchedule"
-									@click="saveSchedule"
-								>
-									Guardar horarios
-								</BaseButton>
-								<BaseButton
-									v-if="showPrepareNowButton"
-									size="sm"
-									variant="primary"
-									class="w-full sm:w-auto"
-									:loading="savingPrepareNow"
-									@click="onPrepareNowClick"
-								>
-									Preparar ya
-								</BaseButton>
-							</div>
-						</div>
-
-						<!-- Solo lectura si el usuario no puede editar pero hay fechas -->
-						<template v-else>
-							<div
-								v-if="order.type === 'reservation' && order.reservedFor"
-								class="space-y-2"
-							>
-								<label class="text-xs sm:text-sm font-medium text-gray-700"
-									>Tener listo a esta hora</label
-								>
-								<div class="bg-gray-50 rounded-lg p-2 sm:p-3">
-									<p class="text-xs sm:text-sm text-gray-900">
-										{{ formatDateTime(order.reservedFor) }}
-									</p>
-								</div>
-							</div>
-							<div v-if="order.prepareAt" class="space-y-2">
-								<label class="text-xs sm:text-sm font-medium text-gray-700"
-									>Preparar a esta hora</label
-								>
-								<div class="bg-gray-50 rounded-lg p-2 sm:p-3">
-									<p class="text-xs sm:text-sm text-gray-900">
-										{{ formatDateTime(order.prepareAt) }}
-									</p>
-								</div>
-							</div>
+								:can-edit="permissions.canEditDeliveryFee(order)" :saving="savingDeliveryFee"
+								:disabled="staleSnapshot || editingProducts || savingProducts" :error="deliveryFeeSaveError"
+								@edit="deliveryFeeSaveError = ''" @save="updateDeliveryFee" />
 						</template>
-
-						<!-- Tomado por -->
-						<div class="space-y-2">
-							<label class="text-xs sm:text-sm font-medium text-gray-700"
-								>Tomado por</label
-							>
-							<div class="bg-gray-50 rounded-lg p-2 sm:p-3">
-								<p class="text-xs sm:text-sm text-gray-900">
-									{{ order.takenByName }}
-								</p>
-							</div>
-						</div>
-
-						<!-- Sucursal -->
-						<div class="space-y-2">
-							<label class="text-xs sm:text-sm font-medium text-gray-700"
-								>Sucursal</label
-							>
-							<div class="bg-gray-50 rounded-lg p-2 sm:p-3">
-								<p class="text-xs sm:text-sm text-gray-900">
-									{{ order.branchName }}
-								</p>
-							</div>
-						</div>
-					</div>
-
-					</section>
-					<div v-if="order" class="rounded-xl border border-emerald-200 bg-emerald-50/60 px-4 py-4">
-						<div class="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-							<div>
-								<p class="text-xs font-medium uppercase tracking-wide text-emerald-700">Beneficio aplicado</p>
-								<p class="mt-1 text-sm font-semibold" :class="appliedBenefitLabel ? 'text-emerald-900' : 'text-gray-500'">
-									{{ appliedBenefitLabel || 'Sin beneficio aplicado' }}
-								</p>
-								<p v-if="order.appliedBenefitCode" class="mt-0.5 text-xs text-emerald-700">
-									Codigo: {{ order.appliedBenefitCode }}
-								</p>
-							</div>
-							<div v-if="permissions.canEditOrder(order)" class="w-full space-y-2 lg:max-w-md">
+					</OrderDetailProductsList>
+                </section>
+                <details class="rounded-xl border border-emerald-200 bg-emerald-50/50 px-3 py-2">
+                    <summary class="cursor-pointer text-sm"><span class="font-medium">Beneficio</span> · {{ appliedBenefitLabel || 'Sin beneficio aplicado' }}<span v-if="permissions.canEditOrder(order)" class="ml-2 text-xs text-emerald-700">Gestionar</span></summary>
+                    <p v-if="order.appliedBenefitCode" class="mt-2 text-xs">Código: {{ order.appliedBenefitCode }}</p>
+							<div v-if="permissions.canEditOrder(order)" class="mt-3 space-y-2">
 								<div class="flex gap-2">
 									<BaseInput
 										:model-value="detailDiscountCodeInput"
@@ -548,70 +398,16 @@
 									<p v-if="order.manualBenefitGrantedByUserName">Otorgado por {{ order.manualBenefitGrantedByUserName }}<span v-if="order.manualBenefitGrantedAt"> · {{ formatDateTime(order.manualBenefitGrantedAt) }}</span></p>
 								</div>
 							</div>
-						</div>
-					</div>
+                </details>
 
-					<!-- Notas -->
-					<div class="space-y-2 rounded-xl border border-gray-200 p-4">
-						<label :for="`${detailId}-notes`" class="text-sm font-semibold text-gray-700"
-							>Notas del pedido</label
-						>
-						<textarea
-							:id="`${detailId}-notes`"
-							v-model="editableNotes"
-							rows="3"
-							class="w-full rounded-lg border-gray-300 shadow-sm focus:border-emerald-500 focus:ring-emerald-500 text-sm sm:text-base"
-							placeholder="Agregar notas..."
-							:disabled="!permissions.canEditOrder(order)"
-							@blur="updateNotes"
-						/>
-					</div>
-				</div>
-
-				<!-- Tab: Productos -->
-				<div v-show="activeTab === 'products'" :id="`${detailId}-panel-products`" role="tabpanel" :aria-labelledby="`${detailId}-tab-products`" tabindex="0" class="focus:outline-none">
-					<OrderDetailProductsList
-						v-if="order && visitedTabs.has('products')"
-						:products="order?.orderDetails"
-						:delivery-fee="order?.deliveryFee ?? 0"
-						:order-type="order?.type"
-						:address-id="order?.addressId ?? null"
-						:max-free-delivery-discount="maxFreeDeliveryDiscount"
-						:free-delivery-requested="order?.freeDeliveryRequested === true"
-						:show-delivery-fee-line="hasOrderDelivery(order)"
-						:can-edit="permissions.canEditProducts(order) && !!operationOptions && !optionsLoading && !savingDeliveryFee"
-						:saving="savingProducts"
-						@save="handleProductsUpdate"
-						@request-cancel-order="handleRequestCancelOrderFromProducts"
-						@editing-change="editingProducts = $event"
-					>
-						<template #delivery-fee="{ editingProducts }">
-							<OrderDeliveryFeeEditor :key="order.id" :delivery-fee="order.deliveryFee ?? 0" :total="order.total"
-								:can-edit="permissions.canEditDeliveryFee(order)" :saving="savingDeliveryFee"
-								:disabled="staleSnapshot || editingProducts || savingProducts" :error="deliveryFeeSaveError"
-								@edit="deliveryFeeSaveError = ''" @save="updateDeliveryFee" />
-						</template>
-					</OrderDetailProductsList>
-				</div>
-
-				<!-- Tab: Pagos -->
-				<div v-show="activeTab === 'payments'" ref="paymentsSectionRef" :id="`${detailId}-panel-payments`" role="tabpanel" :aria-labelledby="`${detailId}-tab-payments`" tabindex="0" class="focus:outline-none">
-					<div v-if="visitedTabs.has('payments')" class="mb-6">
-						<h3
-							class="text-base font-semibold text-gray-900 mb-2"
-						>
-							Pagos del pedido
-						</h3>
-						<p class="text-xs sm:text-sm text-gray-600 mb-3 sm:mb-4">
-							<span v-if="isDeliveryman"
-								>Visualiza los pagos del pedido para saber cuánto debes
-								cobrar.</span
-							>
-							<span v-else
-								>Administra los pagos del pedido. Los pagos bancarios pueden ser
-								verificados y los pagos por app pueden ser liquidados.</span
-							>
-						</p>
+                <section :id="`${detailId}-payments`" ref="paymentsSectionRef" aria-label="Pagos del pedido" tabindex="-1" class="min-w-0 scroll-mt-3 rounded-xl border border-gray-200 bg-white p-3 sm:p-4">
+                    <details ref="paymentsDetailsRef" class="group">
+                        <summary class="flex cursor-pointer list-none flex-wrap items-center gap-2 text-sm font-semibold">
+                            <span class="text-xs transition-transform group-open:rotate-90" aria-hidden="true">▶</span>
+                            <h2>Pagos y saldo por cobrar</h2>
+                            <span class="ml-auto text-emerald-700 group-open:hidden">Por cobrar: {{ formatCurrency(cashAmount) }}</span>
+                        </summary>
+                        <div class="mt-3">
 						<PaidInStoreCashPanel
 							v-if="showPaidInStoreDetailPanel"
 							:input-id="'paid-in-store-' + order.id"
@@ -620,9 +416,9 @@
 							:max-paid-in-store-amount="paidInStoreCap"
 							:editable="permissions.canEditPayments(order)"
 							:disabled="savingPaidInStore"
-							density="comfortable"
-							extra-class="mb-4"
-							:helper-text="'El domiciliario no cobra efectivo en la entrega. Queda registrado para el cuadre de caja.'"
+							density="compact"
+							extra-class="mb-3"
+							:helper-text="hasOrderDelivery(order) ? 'El saldo restante se cobra en la entrega.' : 'Efectivo registrado en caja.'"
 							@update:paid-in-store-cash="onPaidInStoreChange"
 							@edit-paid-in-store-cash="openEditPaidInStoreDetail"
 							@remove-paid-in-store-cash="openRemovePaidInStoreDetail"
@@ -632,12 +428,15 @@
 							:order="order"
 							:bank-options="bankOptions"
 							:app-options="appOptions"
+                                compact
 							@updated="handlePaymentUpdated"
 						/>
-					</div>
-				</div>
-			</div>
-		</div>
+                        </div>
+                    </details>
+                </section>
+
+            </div>
+        </div>
 
 		<!-- Sección de entrega para domiciliarios -->
 		<div
@@ -729,6 +528,24 @@
 		@go-to-payments="scrollToPaymentsTab"
 	/>
 
+    <OrderNoteDialog :model-value="detailEditor === 'notes'" :notes="order?.notes" title="Notas del pedido"
+        label="Indicaciones para preparar o entregar este pedido" :disabled="staleSnapshot || !order || !permissions.canEditOrder(order)"
+        :save="updateNotes" @update:model-value="value => { if (!value) detailEditor = null }" />
+    <BaseDialog :model-value="detailEditor === 'schedule'" title="Programación del pedido" size="2xl"
+        :dismissible="!savingSchedule && !savingPrepareNow" :close-on-backdrop="false"
+        @update:model-value="value => { if (!value) detailEditor = null }">
+        <OrderScheduleFields v-if="detailEditor === 'schedule'" :prepare-at="editablePrepareAtDate" :reserved-for="editableReservedForDate"
+            :disabled="savingSchedule || savingPrepareNow || staleSnapshot" @change="updateEditableSchedule" />
+        <p v-if="staleSnapshot" role="alert" class="mt-3 text-sm text-amber-800">El pedido cambió. Cierra este editor y actualiza el pedido antes de guardar.</p>
+        <p v-if="editorSaveError" role="alert" class="mt-3 text-sm text-red-600">{{ editorSaveError }}</p>
+        <template #footer>
+            <BaseButton variant="secondary" :disabled="savingSchedule || savingPrepareNow" @click="detailEditor = null">Cancelar</BaseButton>
+            <BaseButton v-if="showPrepareNowButton" variant="outline" :loading="savingPrepareNow"
+                :disabled="savingSchedule || staleSnapshot" @click="onPrepareNowClick">Preparar ya</BaseButton>
+            <BaseButton variant="primary" :loading="savingSchedule"
+                :disabled="savingPrepareNow || staleSnapshot" @click="saveSchedule">Guardar horarios</BaseButton>
+        </template>
+    </BaseDialog>
 	<BaseDialog
 		v-model="showKitchenScheduleConfirm"
 		title="Pedido en cocina"
@@ -891,6 +708,7 @@ import OrderElectronicInvoicing from './OrderElectronicInvoicing.vue'
 import OrderTypeBadge from '@/components/orders/OrderTypeBadge.vue';
 import OrderSourceBadge from '@/components/orders/OrderSourceBadge.vue';
 import OrderProgressBar from '@/components/orders/OrderProgressBar.vue';
+import OrderNoteDialog from '@/components/orders/OrderNoteDialog.vue';
 import OrderDetailProductsList from '@/components/orders/OrderDetailProductsList.vue';
 import OrderDeliveryFeeEditor from '@/components/orders/OrderDeliveryFeeEditor.vue';
 import { deliveryFeeValidationMessage, hasOrderDelivery } from '@/helpers/orderDeliveryFee';
@@ -903,8 +721,8 @@ import EditOrderTypeModal from '@/components/orders/EditOrderTypeModal.vue';
 import OrderBankPaymentSyncDialog from '@/components/orders/OrderBankPaymentSyncDialog.vue';
 import BaseDialog from '@/components/ui/BaseDialog.vue';
 import BaseInput from '@/components/ui/BaseInput.vue';
-import { VueDatePicker } from '@vuepic/vue-datepicker';
-import '@vuepic/vue-datepicker/dist/main.css';
+import OrderScheduleFields from './OrderScheduleFields.vue';
+import { orderScheduleError } from '@/helpers/orderSchedule';
 import PersistedPaymentSelector from '@/components/payments/PersistedPaymentSelector.vue';
 import PhoneNumberItem from '@/components/customers/PhoneNumberItem.vue';
 import { useFormatting } from '@/composables/useFormatting';
@@ -934,7 +752,7 @@ import { discountCodeApi } from '@/services/MainAPI/discountCodeApi';
 import { bankPaymentApi } from '@/services/MainAPI/bankPaymentApi';
 import { orderManagementApi } from '@/services/MainAPI/orderManagementApi';
 import type { OrderOperationOptions } from '@/types/orderManagement';
-import { useOrderManagementUpdates } from '@/composables/useOrderManagementUpdates';
+import { useOrderSnapshotUpdates } from '@/composables/useOrderSnapshotUpdates';
 import { useBranchContextStore } from '@/store/branchContext';
 import OrderTrackingDialog from '@/components/orders/OrderTrackingDialog.vue';
 import {
@@ -962,11 +780,9 @@ import {
 	ArrowLeftIcon,
 	XCircleIcon,
 	PencilIcon,
-	InformationCircleIcon,
-	ShoppingBagIcon,
-	CreditCardIcon,
 	CheckCircleIcon,
 	PrinterIcon,
+    MapPinIcon,
 } from '@heroicons/vue/24/outline';
 import { ref, computed, watch, onMounted, nextTick, useId } from 'vue';
 const detailId = useId();
@@ -978,10 +794,11 @@ const operationOptions = ref<OrderOperationOptions | null>(null);
 const operationOptionsError = ref('');
 const optionsLoading = ref(false);
 const maxFreeDeliveryDiscount = computed(() => operationOptions.value?.maxFreeDeliveryDiscount ?? 0);
-const staleSnapshot = ref(false);
 const refreshingOrder = ref(false);
+const detailReload = ref(0);
 const showTracking = ref(false);
 const showTransferBranchDialog = ref(false);
+const canManageInvoices = computed(() => ['Admin', 'Superadmin', 'Cashier'].includes(authStore.userRole ?? ''));
 const isDeliveryman = computed(() => authStore.userRole === 'Deliveryman');
 const pendingOrderType = ref<'onsite' | 'delivery' | 'reservation' | null>(
 	null,
@@ -992,7 +809,8 @@ const originalOrderType = ref<'onsite' | 'delivery' | 'reservation' | null>(
 const pendingDeleteReservationAssociations = ref(false);
 // Estado local (solo lo que no está en el store)
 const editableGuestName = ref('');
-const editableNotes = ref('');
+const detailEditor = ref<'notes' | 'schedule' | null>(null);
+const editorSaveError = ref('');
 const savingDeliveryFee = ref(false);
 const editingProducts = ref(false);
 const deliveryFeeSaveError = ref('');
@@ -1042,8 +860,11 @@ const emit = defineEmits<{
 }>();
 
 const order = ref<OrderDetailView | null>(null);
+const { staleSnapshot, checkForChanges, markRefreshed } = useOrderSnapshotUpdates(order);
+const canTransferBranch = computed(() => authStore.isSuperadmin && order.value != null && ['awaiting_payment', 'taken', 'in_preparation', 'ready'].includes(order.value.status));
+const canViewTracking = computed(() => !isDeliveryman.value && order.value?.type === 'delivery' && order.value.status === 'on_the_way');
 const appliedBenefitLabel = computed(() =>
-	order.value?.appliedBenefitLabel || order.value?.loyaltyRuleName || '',
+	order.value?.appliedBenefitLabel || order.value?.loyaltyRuleName || (order.value?.freeDeliveryRequested ? 'Domicilio gratis aplicado' : ''),
 );
 
 type DetailLineDraft = UpdateOrderDetailDto & {
@@ -1326,9 +1147,11 @@ const prepareNowTargetTypeLabel = computed(() =>
 );
 
 const { formatDateTime, formatCurrency } = useFormatting();
-const activeTab = ref('info');
-const visitedTabs = ref(new Set(['info']));
-watch(activeTab, tab => { visitedTabs.value.add(tab); });
+const detailSections = [
+    { id: 'info', name: 'Información' },
+    { id: 'products', name: 'Productos' },
+    { id: 'payments', name: 'Pagos' },
+];
 
 const { success, error } = useToast();
 
@@ -1419,6 +1242,7 @@ const showCancelModal = ref(false);
 const showEditOrderTypeModal = ref(false);
 
 const paymentsSectionRef = ref<HTMLElement | null>(null);
+const paymentsDetailsRef = ref<HTMLDetailsElement | null>(null);
 const showBankSyncDialog = ref(false);
 const bankSyncPrompt = ref<BankSyncPrompt>({ kind: 'none' });
 const bankSyncAdjusting = ref(false);
@@ -1440,7 +1264,7 @@ async function promptBankSyncIfNeeded(snapshot: OrderPaymentSnapshot | null) {
 }
 
 function scrollToPaymentsTab() {
-	activeTab.value = 'payments';
+	if (paymentsDetailsRef.value) paymentsDetailsRef.value.open = true;
 	void nextTick(() => {
 		paymentsSectionRef.value?.scrollIntoView({
 			behavior: 'smooth',
@@ -1476,35 +1300,6 @@ async function onConfirmBankPaymentAdjust() {
 	}
 }
 
-// Tabs
-const tabs = [
-	{ id: 'info', name: 'Información', icon: InformationCircleIcon },
-	{ id: 'products', name: 'Productos', icon: ShoppingBagIcon },
-	{ id: 'payments', name: 'Pagos', icon: CreditCardIcon },
-];
-
-// Filtrar tabs para domiciliarios (los domiciliarios pueden ver pagos pero no editarlos)
-const visibleTabs = computed(() => {
-	// Todos los tabs están disponibles para todos los usuarios
-	// Los permisos de edición se manejan dentro de cada componente
-	return tabs;
-});
-
-function onTabKeydown(event: KeyboardEvent, tabId: string) {
-    const index = visibleTabs.value.findIndex(tab => tab.id === tabId);
-    let next = index;
-    if (event.key === 'ArrowRight') next = (index + 1) % visibleTabs.value.length;
-    else if (event.key === 'ArrowLeft') next = (index - 1 + visibleTabs.value.length) % visibleTabs.value.length;
-    else if (event.key === 'Home') next = 0;
-    else if (event.key === 'End') next = visibleTabs.value.length - 1;
-    else return;
-    event.preventDefault();
-    const tab = visibleTabs.value[next];
-    if (!tab) return;
-    activeTab.value = tab.id;
-    const nav = (event.currentTarget as HTMLElement).closest('[role="tablist"]');
-    void nextTick(() => nav?.querySelector<HTMLButtonElement>(`[id="${detailId}-tab-${tab.id}"]`)?.focus());
-}
 const loadCustomer = async (customerId: number) => {
 	if (!customerId) return;
 
@@ -1678,15 +1473,13 @@ watch(
 	ordersDataStoreCurrent,
 	(newOrder) => {
 		if (newOrder) {
+            if (order.value?.id !== newOrder.id) detailEditor.value = null;
 			order.value = newOrder;
 			editableGuestName.value = newOrder.guestName || '';
-			editableNotes.value = newOrder.notes || '';
-			editableReservedForDate.value = parseOrderDate(
-				newOrder.reservedFor as string | Date | undefined,
-			);
-			editablePrepareAtDate.value = parseOrderDate(
-				newOrder.prepareAt as string | Date | undefined,
-			);
+            if (detailEditor.value !== 'schedule') {
+                editableReservedForDate.value = parseOrderDate(newOrder.reservedFor);
+                editablePrepareAtDate.value = parseOrderDate(newOrder.prepareAt);
+            }
 			// Cargar cliente completo si hay customerId
 			if (newOrder.customerId) {
 				loadCustomer(newOrder.customerId);
@@ -1717,7 +1510,7 @@ async function loadOperationOptions() {
         if (request === optionsRequest) optionsLoading.value = false;
     }
 }
-watch(() => order.value?.id, () => { staleSnapshot.value = false; void loadOperationOptions(); }, { immediate: true });
+watch(() => order.value?.id, () => { void loadOperationOptions(); }, { immediate: true });
 onMounted(() => {
     if (canGrantManualBenefit.value) void productsStore.ensureCatalogLoaded();
 });
@@ -1745,19 +1538,17 @@ async function reloadOrder() {
     refreshingOrder.value = true;
     try {
         await ordersDataStore.fetchById(order.value.id, { silent: true });
-        staleSnapshot.value = false;
+        markRefreshed();
+        detailReload.value++;
+        editingProducts.value = false;
+        detailEditor.value = null;
+        editableReservedForDate.value = parseOrderDate(order.value?.reservedFor);
+        editablePrepareAtDate.value = parseOrderDate(order.value?.prepareAt);
         await loadOperationOptions();
     } catch (err: unknown) {
         error('No se pudo actualizar', err instanceof Error ? err.message : 'Intenta nuevamente.');
     } finally { refreshingOrder.value = false; }
 }
-useOrderManagementUpdates(
-    event => {
-        if (event.orderId === order.value?.id && event.managementVersion > (order.value.managementVersion ?? 0)) staleSnapshot.value = true;
-    },
-    () => { if (order.value) staleSnapshot.value = true; },
-    id => { if (order.value?.id === id) staleSnapshot.value = true; },
-);
 
 const handleStatusChange = async (newStatus: OrderStatus) => {
 	if (!order.value) return;
@@ -1814,26 +1605,34 @@ const updateGuestName = async () => {
 	}
 };
 
-const updateNotes = async () => {
-	if (!order.value || editableNotes.value === order.value.notes) return;
+function openDetailEditor(section: 'notes' | 'schedule') {
+    if (!order.value || staleSnapshot.value || (section === 'notes' ? !permissions.canEditOrder(order.value) : !showScheduleEditor.value)) return;
+    editablePrepareAtDate.value = parseOrderDate(order.value.prepareAt);
+    editableReservedForDate.value = parseOrderDate(order.value.reservedFor);
+    editorSaveError.value = '';
+    detailEditor.value = section;
+}
 
-	try {
-		await ordersDataStore.update(order.value.id, {
-			notes: editableNotes.value || undefined,
-		});
-		success('Actualizado', 5000, 'Notas actualizadas');
-		// ✅ No necesita recargar
-	} catch (err: any) {
-		error('Error', err.message);
-	}
+const updateNotes = async (notes: string) => {
+    if (!order.value || staleSnapshot.value || !permissions.canEditOrder(order.value)) throw new Error('El pedido ya no permite editar las notas.');
+    await ordersDataStore.update(order.value.id, { notes });
+    success('Actualizado', 5000, 'Notas actualizadas');
 };
 
+function updateEditableSchedule(schedule: { prepareAt: Date | null; reservedFor: Date | null }) {
+    editablePrepareAtDate.value = schedule.prepareAt;
+    editableReservedForDate.value = schedule.reservedFor;
+}
+
 const saveSchedule = () => {
-	if (!order.value || !showScheduleEditor.value) return;
+	if (!order.value || !showScheduleEditor.value || savingSchedule.value || staleSnapshot.value) return;
 	if (!editableReservedForDate.value) {
 		error('Horarios', 'Indica fecha y hora de entrega (tener listo).');
 		return;
 	}
+
+    const scheduleError = orderScheduleError(editablePrepareAtDate.value, editableReservedForDate.value);
+    if (scheduleError) { error('Horarios', scheduleError); return; }
 
 	const st = order.value.status;
 	if (st === 'taken' || st === 'in_preparation') {
@@ -1853,11 +1652,13 @@ async function doSaveSchedule() {
 	if (
 		!order.value ||
 		!showScheduleEditor.value ||
+        savingSchedule.value || staleSnapshot.value ||
 		!editableReservedForDate.value
 	)
 		return;
 
 	savingSchedule.value = true;
+    editorSaveError.value = '';
 	try {
 		const reservedIso = editableReservedForDate.value.toISOString();
 		const payload: { reservedFor: string; prepareAt?: string } = {
@@ -1867,13 +1668,14 @@ async function doSaveSchedule() {
 			payload.prepareAt = editablePrepareAtDate.value.toISOString();
 		}
 		await ordersDataStore.update(order.value.id, payload as any);
+        detailEditor.value = null;
 		success(
 			'Horarios actualizados',
 			5000,
 			'Cocina y domiciliario recibirán aviso si aplica.',
 		);
 	} catch (err: any) {
-		error('Error al guardar horarios', err.message);
+        editorSaveError.value = err.message || 'No se pudieron guardar los horarios. Intenta nuevamente.';
 	} finally {
 		savingSchedule.value = false;
 	}
@@ -1914,6 +1716,7 @@ async function executePrepareNow() {
 			prepareAt: now,
 			reservedFor: null as unknown as undefined,
 		} as any);
+        detailEditor.value = null;
 		success(
 			'Preparar ya',
 			5000,
@@ -1951,6 +1754,26 @@ const updateDeliveryFee = async (next: number) => {
 };
 
 const savingProducts = ref(false);
+const saveProductNote = async (itemId: number, notes: string) => {
+    if (!order.value || staleSnapshot.value || savingProducts.value || savingDeliveryFee.value || editingProducts.value || !permissions.canEditProducts(order.value)) {
+        throw new Error('El pedido ya no permite editar los productos.');
+    }
+    if (!order.value.orderDetails.some(item => item.id === itemId)) throw new Error('El producto ya no está en el pedido.');
+    savingProducts.value = true;
+    try {
+        await ordersDataStore.update(order.value.id, {
+            orderDetails: order.value.orderDetails.map(item => ({
+                id: item.id, productId: item.productId, quantity: item.quantity,
+                unitPrice: item.unitPrice, discount: item.discount,
+                notes: item.id === itemId ? notes : (item.notes ?? ''),
+            })),
+        });
+        success('Actualizado', 4000, 'Nota del producto actualizada');
+    } finally {
+        savingProducts.value = false;
+    }
+};
+
 const handleProductsUpdate = async (payload: {
 	products: UpdateOrderDetailDto[];
 	freeDeliveryRequested: boolean;
@@ -1984,7 +1807,7 @@ const handleRequestCancelOrderFromProducts = () => {
 
 const handlePaymentUpdated = (updates: Partial<OrderDetailView>) => {
     ordersDataStore.updateCurrent(updates);
-    if (order.value) void ordersDataStore.fetchById(order.value.id, { silent: true }).catch(() => { staleSnapshot.value = true; });
+    if (order.value) void ordersDataStore.fetchById(order.value.id, { silent: true }).catch(() => { void checkForChanges(); });
 };
 
 const onPaidInStoreChange = async (checked: boolean) => {
@@ -2272,10 +2095,13 @@ const updateOrderCustomer = (updatedOrder: any) => {
 </script>
 
 <style scoped>
+.order-info :deep(input), .order-info :deep(textarea) { min-width: 0; }
+@media (pointer: coarse) {
+    .order-detail :deep(button), .order-detail summary, .order-detail nav a { min-height: 44px; }
+    .order-info :deep(input), .order-info :deep(textarea) { font-size: 16px; }
+}
+
 .order-info-grid > div {
     min-width: 0;
-    border: 1px solid #e5e7eb;
-    border-radius: 0.75rem;
-    padding: 1rem;
 }
 </style>

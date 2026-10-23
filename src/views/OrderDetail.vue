@@ -1,5 +1,6 @@
 <template>
-    <MainLayout>
+    <MainLayout no-card>
+        <div class="h-full overflow-y-auto p-3 sm:p-4">
         <!-- Loading state -->
         <div v-if="loading" class="flex justify-center items-center py-12">
             <BaseLoading size="lg" />
@@ -13,6 +14,7 @@
         </div>
         <!-- Order detail -->
         <OrderDetailContent v-else-if="order" :flat-order="order" />
+        </div>
     </MainLayout>
 </template>
 
