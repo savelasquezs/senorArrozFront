@@ -72,6 +72,8 @@ export type PrincipalDashboardPayload = {
 export type PrincipalDashboardQueryOptions = {
 	/** Rango UTC para KPIs (opcional). Si se envía, deben ir ambas fechas. */
 	kpiRange?: [Date, Date];
+	/** Cancela solicitudes obsoletas al cambiar sucursal, fechas o sección. */
+	signal?: AbortSignal;
 };
 
 export async function fetchPrincipalDashboard(
@@ -93,7 +95,7 @@ export async function fetchPrincipalDashboard(
 		branchId,
 		kpiFrom,
 		kpiTo,
-	});
+	}, options?.signal);
 	return mapPrincipalFromApi(raw);
 }
 
