@@ -2,6 +2,12 @@ import { describe, expect, it } from 'vitest'
 import { getRouteViewKey } from '../routeViewKey'
 
 describe('getRouteViewKey', () => {
+    it('keeps dashboard filters and layout mounted on section changes but resets on workspace changes', () => {
+        const key = getRouteViewKey('/dashboard', '/dashboard?section=domicilios', 3)
+        expect(getRouteViewKey('/dashboard', '/dashboard?section=ventas', 3)).toBe(key)
+        expect(getRouteViewKey('/dashboard', '/dashboard?section=domicilios', 4)).not.toBe(key)
+    })
+
     it('does not remount OrdersList on remoteBranchId tab changes', () => {
         const local = getRouteViewKey('/orders', '/orders', 3)
         const remote = getRouteViewKey('/orders', '/orders?remoteBranchId=2', 3)

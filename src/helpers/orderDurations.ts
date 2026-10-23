@@ -15,8 +15,18 @@ export function orderDurations(statusTimes: Record<string, string>, prepareAt?: 
 }
 
 function elapsedMinutes(start?: string | Date | null, end?: string | Date | null): number | null {
+    const seconds = elapsedSeconds(start, end)
+    return seconds !== null ? Math.floor(seconds / 60) : null
+}
+
+export function elapsedSeconds(start?: string | Date | null, end?: string | Date | null): number | null {
     const from = timestamp(start), to = timestamp(end)
-    return from !== null && to !== null && to >= from ? Math.floor((to - from) / 60000) : null
+    return from !== null && to !== null && to >= from ? Math.floor((to - from) / 1000) : null
+}
+
+export function formatElapsedDuration(start?: string | Date | null, end?: string | Date | null): string {
+    const seconds = elapsedSeconds(start, end)
+    return seconds === null ? 'No disponible' : `${Math.floor(seconds / 60)} min ${seconds % 60} s`
 }
 
 function timestamp(value?: string | Date | null): number | null {

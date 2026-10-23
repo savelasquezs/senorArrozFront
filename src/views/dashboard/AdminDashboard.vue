@@ -1,6 +1,8 @@
 <template>
-    <div class="flex flex-col lg:flex-row-reverse lg:items-start min-h-0 gap-0">
+    <div class="flex min-h-0 flex-col gap-0" :class="activeSection === 'domicilios' ? 'gap-2' : 'lg:flex-row-reverse lg:items-start'">
         <DashboardRightNav
+            :compact="activeSection === 'domicilios'"
+            :show-global-filters="activeSection !== 'domicilios'"
             v-model="activeSection"
             v-model:date-range="globalDashboardDateRange"
             v-model:time-granularity="globalTimeGranularity"
@@ -8,13 +10,12 @@
             :branch-options="deliveryBranchOptions"
             :show-branch-filter="false"
         />
-        <div class="min-w-0 flex-1 pb-8 pr-0 lg:pr-6">
+        <div class="min-w-0 flex-1" :class="activeSection === 'domicilios' ? '' : 'pb-8 pr-0 lg:pr-6'">
             <p
                 v-if="adminBranchId == null"
                 class="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900"
             >
-                No hay sucursal asignada en tu perfil. Los datos de prueba pueden mostrarse como agregados;
-                en producción el API usará tu sucursal implícita.
+                No hay sucursal asignada en tu perfil. Contacta al administrador para revisar tu acceso.
             </p>
             <KeepAlive :max="8">
                 <DashboardPrincipalSection
@@ -75,20 +76,16 @@
                     key="domicilios"
                     :loading="domiciliosLoading"
                     :error="domiciliosError"
-                    :date-range="globalDashboardDateRange"
+                    v-model:date-range="globalDashboardDateRange"
                     :show-branch-filter="false"
                     :branch-options="deliveryBranchOptions"
                     v-model:branch-id="adminBranchIdWritable"
                     v-model:delivery-evolution-driver-id="deliveryEvolutionDriverId"
-                    :avg-prep-minutes="avgPrepMinutes"
-                    :avg-delivery-minutes="avgDeliveryMinutes"
-                    :deliverymen="filteredDeliverymenEfficiency"
-                    :evolution-labels="deliveryEvolutionBundle.labels"
-                    :evolution-data="deliveryEvolutionDeliveriesScaled"
-                    :evolution-fee-data="deliveryEvolutionFeesScaled"
-                    :evolution-sales-totals="deliveryEvolutionBundle.salesTotals"
-                    :period-fee-to-sales-percent="deliveryPeriodFeeToSalesPercent"
+                    v-model:exclude-wednesdays="deliveryExcludeWednesdays"
+                    :refreshing="domiciliosSection.refreshBusy.value"
+
                     :route-metrics="deliveryRouteMetrics"
+                    @refresh="domiciliosSection.refresh"
                 />
                 <DashboardMapaEntregasSection
                     v-else-if="activeSection === 'mapa_entregas'"
@@ -105,7 +102,7 @@ import { ref, computed, watch } from 'vue'
 import { DashboardRightNav, defaultDateRangeToday } from '@/components/dashboard'
 import { BASE_BRANCH_COMPARISON_ROWS } from '@/views/dashboard/mock/dashboardMockCore'
 import { useAuthStore } from '@/store/auth'
-import type { DashboardSectionId } from '@/views/dashboard/dashboardSectionIds'
+import { useDashboardSection } from '@/composables/dashboard/useDashboardSection'
 import { useDashboardPrincipalSection } from '@/composables/dashboard/useDashboardPrincipalSection'
 import { useDashboardPrincipalSalesVsExpenses } from '@/composables/dashboard/useDashboardPrincipalSalesVsExpenses'
 import { useDashboardVentasSection } from '@/composables/dashboard/useDashboardVentasSection'
@@ -145,7 +142,7 @@ watch(
 
 const adminBranchId = computed(() => adminBranchIdWritable.value)
 
-const activeSection = ref<DashboardSectionId>('principal')
+const activeSection = useDashboardSection()
 
 const globalDashboardDateRange = ref<[Date, Date]>(defaultDateRangeToday())
 const globalTimeGranularity = ref<DashboardTimeGranularity>('day')
@@ -166,6 +163,7 @@ const ventasProductsGroupBy = ref<VentasProductsGroupBy>('product')
 
 /** Filtro domiciliario: mismo ref para el API y las series del shell. */
 const deliveryEvolutionDriverId = ref<number | 'all'>('all')
+const deliveryExcludeWednesdays = ref(true)
 
 const principalSection = useDashboardPrincipalSection(
 	activeSection,
@@ -192,6 +190,7 @@ const domiciliosSection = useDashboardDomiciliosSection(
 	adminBranchIdWritable,
 	globalDashboardDateRange,
 	deliveryEvolutionDriverId,
+    deliveryExcludeWednesdays,
 )
 const gastosSection = useDashboardGastosSection(
 	activeSection,
@@ -237,13 +236,6 @@ const ventasHourly = computed(() => ventasSection.data.value?.hourly ?? null)
 
 const {
     deliveryBranchOptions,
-    deliveryEvolutionBundle,
-    filteredDeliverymenEfficiency,
-    deliveryEvolutionDeliveriesScaled,
-    deliveryEvolutionFeesScaled,
-    deliveryPeriodFeeToSalesPercent,
-    avgPrepMinutes,
-    avgDeliveryMinutes,
     salesByDay: shellSalesByDay,
     salesByMonth: shellSalesByMonth,
     salesByYear: shellSalesByYear,

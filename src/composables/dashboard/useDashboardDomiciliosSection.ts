@@ -24,6 +24,7 @@ export function useDashboardDomiciliosSection(
 	branchId: Ref<number | null>,
 	dateRange: Ref<[Date, Date]>,
 	deliveryManId: Ref<number | 'all'>,
+    excludeWednesdays: Ref<boolean> = ref(false),
 ) {
 	const deliveryPayload = ref<DeliveryDashboardPayload | null>(null);
 	const loading = ref(false);
@@ -33,9 +34,11 @@ export function useDashboardDomiciliosSection(
 	const hasCompletedInitialLoad = ref(false);
 
 	const isActive = computed(() => activeSection.value === 'domicilios');
+    let requestVersion = 0;
 
 	async function load() {
 		if (!isActive.value) return;
+        const version = ++requestVersion;
 		const hadData = hasCompletedInitialLoad.value;
 		if (hadData) refreshBusy.value = true;
 		else loading.value = true;
@@ -45,15 +48,19 @@ export function useDashboardDomiciliosSection(
 				deliveryPayload.value = null;
 				return;
 			}
-			deliveryPayload.value = await fetchDeliveryDashboard(
+			const payload = await fetchDeliveryDashboard(
 				branchId.value,
 				dateRange.value,
 				deliveryManId.value,
+                excludeWednesdays.value,
 			);
+            if (version === requestVersion) deliveryPayload.value = payload;
 		} catch (e) {
+            if (version !== requestVersion) return;
 			error.value = e instanceof Error ? e.message : 'Error al cargar Domicilios';
-			if (!hadData) deliveryPayload.value = null;
+			deliveryPayload.value = null;
 		} finally {
+            if (version !== requestVersion) return;
 			loading.value = false;
 			refreshBusy.value = false;
 			hasCompletedInitialLoad.value = true;
@@ -61,7 +68,7 @@ export function useDashboardDomiciliosSection(
 	}
 
 	watch(
-		[isActive, branchId, () => rangeKey(dateRange.value), () => driverKey(deliveryManId.value)],
+		[isActive, branchId, () => rangeKey(dateRange.value), () => driverKey(deliveryManId.value), excludeWednesdays],
 		() => void load(),
 		{ immediate: true },
 	);

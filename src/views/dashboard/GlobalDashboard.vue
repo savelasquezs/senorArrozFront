@@ -1,14 +1,16 @@
 <template>
-    <div class="flex flex-col lg:flex-row-reverse lg:items-start min-h-0 gap-0">
+    <div class="flex min-h-0 flex-col gap-0" :class="activeSection === 'domicilios' ? 'gap-2' : 'lg:flex-row-reverse lg:items-start'">
         <DashboardRightNav
+            :compact="activeSection === 'domicilios'"
+            :show-global-filters="activeSection !== 'domicilios'"
             v-model="activeSection"
             v-model:date-range="globalDashboardDateRange"
             v-model:time-granularity="globalTimeGranularity"
             v-model:branch-id="globalDashboardBranchId"
             :branch-options="dashboardBranchOptions"
-            :show-branch-filter="authStore.isSuperadmin"
+            :show-branch-filter="authStore.isSuperadmin && activeSection !== 'domicilios'"
         />
-        <div class="min-w-0 flex-1 pb-8 pr-0 lg:pr-6">
+        <div class="min-w-0 flex-1" :class="activeSection === 'domicilios' ? '' : 'pb-8 pr-0 lg:pr-6'">
             <KeepAlive :max="8">
                 <DashboardPrincipalSection
                     v-if="activeSection === 'principal'"
@@ -67,20 +69,16 @@
                     key="domicilios"
                     :loading="domiciliosLoading"
                     :error="domiciliosError"
-                    :date-range="globalDashboardDateRange"
-                    :show-branch-filter="false"
+                    v-model:date-range="globalDashboardDateRange"
+                    :show-branch-filter="authStore.isSuperadmin"
                     :branch-options="dashboardBranchOptions"
                     v-model:branch-id="globalDashboardBranchId"
                     v-model:delivery-evolution-driver-id="deliveryEvolutionDriverId"
-                    :avg-prep-minutes="avgPrepMinutes"
-                    :avg-delivery-minutes="avgDeliveryMinutes"
-                    :deliverymen="filteredDeliverymenEfficiency"
-                    :evolution-labels="deliveryEvolutionBundle.labels"
-                    :evolution-data="deliveryEvolutionDeliveriesScaled"
-                    :evolution-fee-data="deliveryEvolutionFeesScaled"
-                    :evolution-sales-totals="deliveryEvolutionBundle.salesTotals"
-                    :period-fee-to-sales-percent="deliveryPeriodFeeToSalesPercent"
+                    v-model:exclude-wednesdays="deliveryExcludeWednesdays"
+                    :refreshing="domiciliosSection.refreshBusy.value"
+
                     :route-metrics="deliveryRouteMetrics"
+                    @refresh="domiciliosSection.refresh"
                 />
                 <DashboardMapaEntregasSection
                     v-else-if="activeSection === 'mapa_entregas'"
@@ -98,7 +96,7 @@ import { DashboardRightNav, defaultDateRangeToday } from '@/components/dashboard
 import { BASE_BRANCH_COMPARISON_ROWS } from '@/views/dashboard/mock/dashboardMockCore'
 import { useAuthStore } from '@/store/auth'
 import { useBranchContextStore } from '@/store/branchContext'
-import type { DashboardSectionId } from '@/views/dashboard/dashboardSectionIds'
+import { useDashboardSection } from '@/composables/dashboard/useDashboardSection'
 import { useDashboardPrincipalSection } from '@/composables/dashboard/useDashboardPrincipalSection'
 import { useDashboardPrincipalSalesVsExpenses } from '@/composables/dashboard/useDashboardPrincipalSalesVsExpenses'
 import { useDashboardVentasSection } from '@/composables/dashboard/useDashboardVentasSection'
@@ -124,7 +122,7 @@ import DashboardRegalosSection from '@/views/dashboard/sections/DashboardRegalos
 const authStore = useAuthStore()
 const branchContext = useBranchContextStore()
 
-const activeSection = ref<DashboardSectionId>('principal')
+const activeSection = useDashboardSection()
 
 /** Filtro de sucursal global (superadmin). */
 const globalDashboardBranchId = ref<number | null>(branchContext.selectedBranchId)
@@ -156,6 +154,7 @@ const ventasProductsGroupBy = ref<VentasProductsGroupBy>('product')
 
 /** Filtro domiciliario: mismo ref para el API y las series del shell. */
 const deliveryEvolutionDriverId = ref<number | 'all'>('all')
+const deliveryExcludeWednesdays = ref(true)
 
 const principalSection = useDashboardPrincipalSection(
 	activeSection,
@@ -182,6 +181,7 @@ const domiciliosSection = useDashboardDomiciliosSection(
 	globalDashboardBranchId,
 	globalDashboardDateRange,
 	deliveryEvolutionDriverId,
+    deliveryExcludeWednesdays,
 )
 const gastosSection = useDashboardGastosSection(
 	activeSection,
@@ -226,13 +226,6 @@ const ventasProducts = computed(() => ventasSection.data.value?.products ?? null
 const ventasHourly = computed(() => ventasSection.data.value?.hourly ?? null)
 
 const {
-    deliveryEvolutionBundle,
-    filteredDeliverymenEfficiency,
-    deliveryEvolutionDeliveriesScaled,
-    deliveryEvolutionFeesScaled,
-    deliveryPeriodFeeToSalesPercent,
-    avgPrepMinutes,
-    avgDeliveryMinutes,
     salesByDay: shellSalesByDay,
     salesByMonth: shellSalesByMonth,
     salesByYear: shellSalesByYear,

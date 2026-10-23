@@ -169,8 +169,10 @@ export function useDashboardShellMockState(options: UseDashboardShellMockStateOp
 	watch(
 		filteredDeliverymenEfficiency,
 		(rows) => {
+            if (deliveryFromApi) return;
 			const sel = deliveryEvolutionDriverId.value;
-			if (sel !== 'all' && !rows.some((d) => d.id === sel)) {
+            const options = domiciliosApiPayload.value?.routeMetrics?.performance?.driverOptions ?? rows;
+			if (sel !== 'all' && !options.some((d) => d.id === sel)) {
 				deliveryEvolutionDriverId.value = 'all';
 			}
 		},

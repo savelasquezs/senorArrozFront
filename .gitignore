@@ -25,3 +25,9 @@ dist-ssr
 .env
 .env.*
 !.env.example
+# Local dashboard review data
+src/dev/.local-*.json
+
+delivery-dashboard-preview.html
+
+src/dev/DeliveryDashboardPreview.vue
