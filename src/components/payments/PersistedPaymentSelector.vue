@@ -1,7 +1,7 @@
 <template>
-    <div class="space-y-6">
+    <div :class="compact ? 'space-y-3' : 'space-y-6'">
         <!-- App Payment Section -->
-        <div class="space-y-3">
+        <div v-if="!compact || hasAppPayment || (canEdit && canAddPayments)" class="space-y-2">
             <div class="flex items-center justify-between">
                 <label class="text-sm font-medium text-gray-700">Pago por APP (máx. 1)</label>
                 <BaseButton v-if="canEdit && !hasAppPayment && canAddPayments" size="sm" variant="secondary"
@@ -11,12 +11,12 @@
                 </BaseButton>
             </div>
 
-            <div v-if="!hasAppPayment" class="text-center py-4 text-gray-500 text-sm">
+            <div v-if="!compact && !hasAppPayment" class="text-center py-4 text-gray-500 text-sm">
                 No hay pagos por app
             </div>
 
             <!-- Existing App Payment -->
-            <div v-else class="flex items-center justify-between p-3 bg-blue-50 rounded-lg border border-blue-200">
+            <div v-if="hasAppPayment" class="flex flex-wrap items-center justify-between gap-2 p-2 bg-blue-50 rounded-lg border border-blue-200">
                 <div class="flex items-center gap-3 flex-1">
                     <DevicePhoneMobileIcon class="w-5 h-5 text-blue-600" />
                     <div class="flex-1">
@@ -78,7 +78,7 @@
         </div>
 
         <!-- Bank Payment Section -->
-        <div class="space-y-3">
+        <div v-if="!compact || bankPayments.length || (canEdit && canAddPayments)" class="space-y-2">
             <div class="flex items-center justify-between">
                 <label class="text-sm font-medium text-gray-700">Pagos Bancarios (múltiples)</label>
                 <BaseButton v-if="canEdit && canAddPayments" size="sm" variant="secondary"
@@ -88,7 +88,7 @@
                 </BaseButton>
             </div>
 
-            <div v-if="bankPayments.length === 0" class="text-center py-4 text-gray-500 text-sm">
+            <div v-if="!compact && bankPayments.length === 0" class="text-center py-4 text-gray-500 text-sm">
                 No hay pagos bancarios
             </div>
 
@@ -99,7 +99,7 @@
             </p>
             <!-- Existing Bank Payments -->
             <OrderBankPaymentRow v-for="payment in bankPayments" :key="payment.id" :payment="payment"
-                density="comfortable" variant="panel"
+                :density="compact ? 'compact' : 'comfortable'" variant="panel"
                 :show-verify-action="canVerify && (payment.branchId === order.branchId || authStore.isSuperadmin)"
                 :show-unverify-action="canUnverify && (payment.branchId === order.branchId || authStore.isSuperadmin)"
                 :show-edit-remove="canEdit && payment.branchId === order.branchId"
@@ -108,17 +108,17 @@
         </div>
 
         <!-- Payment Summary -->
-        <div class="bg-gray-50 rounded-lg p-4 space-y-2">
-            <div class="flex justify-between text-sm">
-                <span class="text-gray-600">Total Pagos:</span>
+        <div class="bg-gray-50 rounded-lg" :class="compact ? 'grid gap-2 p-3 sm:grid-cols-3' : 'p-4 space-y-2'">
+            <div class="flex items-center text-sm" :class="compact ? 'justify-center gap-2' : 'justify-between'">
+                <span class="text-gray-600">{{ compact ? 'Bancos y apps:' : 'Total Pagos:' }}</span>
                 <span class="font-medium">{{ formatCurrency(totalPayments) }}</span>
             </div>
-            <div class="flex justify-between text-sm">
+            <div class="flex items-center text-sm" :class="compact ? 'justify-center gap-2' : 'justify-between'">
                 <span class="text-gray-600">Total Pedido:</span>
                 <span class="font-medium">{{ formatCurrency(total) }}</span>
             </div>
-            <div class="flex justify-between font-semibold pt-2 border-t border-gray-200">
-                <span>Efectivo:</span>
+            <div class="flex items-center gap-2 font-semibold" :class="compact ? 'justify-center' : 'justify-between pt-2 border-t border-gray-200'">
+                <span>{{ compact ? 'Por cobrar:' : 'Efectivo:' }}</span>
                 <span class="text-emerald-600">{{ formatCurrency(cashAmount) }}</span>
             </div>
         </div>
@@ -223,6 +223,7 @@ interface Props {
     order: OrderDetailView
     bankOptions: { value: number; label: string }[]
     appOptions: { value: number; label: string }[]
+    compact?: boolean
 }
 
 const props = defineProps<Props>()

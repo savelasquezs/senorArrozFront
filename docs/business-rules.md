@@ -156,7 +156,7 @@ enum UserRole {
 
 #### Delivery (A domicilio)
 
-- **Tarifa en el detalle**: Admin y Superadmin pueden editar el domicilio de pedidos `delivery` y reservas con dirección desde Información o desde el resumen de Productos. Se guarda explícitamente, admite $0 y conserva horarios y abonos cuando solo cambia la tarifa. El modal de cliente conserva sus permisos existentes y también admite la tarifa de reservas con dirección. Las reservas sin dirección no muestran editor de domicilio. Los tabs mantienen la edición local al navegar entre secciones y cargan Productos/Pagos al visitarlos por primera vez.
+- **Tarifa en el detalle**: Admin y Superadmin pueden editar el domicilio de pedidos `delivery` y reservas con dirección desde un único editor en el resumen de Productos. Se guarda explícitamente, admite $0 y conserva horarios y abonos cuando solo cambia la tarifa. El modal de cliente conserva sus permisos existentes y también admite la tarifa de reservas con dirección. Las reservas sin dirección no muestran editor de domicilio. La navegación entre secciones conserva las ediciones locales; editar productos bloquea temporalmente el editor de tarifa.
 - **Cliente**: Obligatorio
 - **Dirección**: Obligatoria (seleccionar de las direcciones del cliente)
 - **guestName**: Obligatorio (auto-completado con nombre del cliente, editable)
@@ -177,6 +177,7 @@ enum UserRole {
 - **Validación**: No se puede crear sin fecha/hora de entrega
 - **Reserva → en preparación (cocina)**: al pasar de `taken` a `in_preparation`, el backend puede fijar el tipo final (`delivery` si hay `address_id`, `onsite` si no). Las **líneas del pedido** deben conservarse; ese paso no debe borrar ni reemplazar productos.
 - **Cambio manual de tipo (reserva → domicilio o en el local)**: si el pedido ya tenía `reserved_for` y `prepare_at`, deben **conservarse** (mismo horario de entrega y de aparición en cocina), salvo que en ese mismo flujo el usuario edite esas fechas.
+- **Programación en POS y detalle**: la reserva se prepara y entrega en la misma fecha de negocio. Ambos flujos reutilizan `OrderScheduleFields`: una fecha común, hora de preparación y hora de entrega. Cambiar preparación propone entrega una hora después; la entrega admite ajuste manual y conserva el mínimo existente de 40 minutos. La sugerencia nunca pasa silenciosamente al día siguiente. El API conserva los dos instantes UTC `prepareAt` y `reservedFor`.
 
 ### Totales al crear pedido (API)
 
@@ -480,6 +481,20 @@ Validaciones implementadas antes de enviar un pedido al backend:
 
 ## 📱 Reglas de UI/UX
 
+### Detalle de pedido compacto
+
+- El aviso de pedido desactualizado exige una versión de gestión mayor para ese mismo pedido o un `ORDER_VERSION_CONFLICT` real. Volver a la pestaña, recuperar conexión o una falla de red no bastan: se comprueba la versión sin reemplazar el pedido ni sus borradores. Las notificaciones repetidas, antiguas o de otros pedidos no activan el aviso. Durante un guardado propio se espera su respuesta y el aviso desaparece si el snapshot ya incorpora la versión notificada. Los demás conflictos de negocio conservan su mensaje específico.
+
+- Información, Productos y Pagos se muestran simultáneamente. En escritorio, cliente/entrega/programación ocupan una columna lateral y productos/importes/pagos la principal. En móvil se apilan y los accesos de sección desplazan sin desmontar contenido ni descartar borradores.
+- El seguimiento muestra estados y horas en formato compacto; el historial de pedidos entregados/cancelados inicia plegado. Se conservan permisos y confirmaciones para cambiar estados.
+- El seguimiento incluye una línea tenue de tiempos en minutos completos: preparación desde `prepareAt` válido si existe, o la marca Tomado, hasta Listo; entrega desde En camino hasta Entregado; total desde la misma referencia inicial hasta Entregado, incluyendo la espera para despacho. Si el pedido alcanzó Listo/Entregado antes de su hora programada, usa Tomado como referencia real. Si falta una marca, es inválida o el final sigue siendo anterior al inicio, muestra `—` en lugar de inventar una duración. En recogidas sin etapa En camino se omite el tiempo en entrega.
+- Los horarios actuales y las notas existentes permanecen visibles. Cada sección tiene un lápiz que abre el mismo modal centrado con Guardar y Cancelar, mostrando las notas o los tres campos de programación según corresponda. Perder el foco no guarda; cancelar conserva los valores anteriores y vaciar las notas permite quitarlas. Un error conserva el borrador para reintentar. Guardar horarios mantiene la confirmación de cocina y Preparar ya conserva su confirmación. Los beneficios se despliegan al necesitarlos. Cambiar sucursal y Cancelar pedido se agrupan en Más acciones, conservando sus permisos y confirmaciones.
+- Cada producto tiene un lápiz compacto para agregar, editar o borrar su nota en el modal compartido de notas, tanto en el detalle como en OrderSidebar. En el detalle conserva los permisos de edición de productos; durante una edición conjunta, la nota se incorpora al borrador hasta Guardar Cambios. En el sidebar se guarda en el borrador de su pestaña. Cancelar no modifica la nota y un error conserva el texto para reintentar. Editar notas no modifica cantidades, precios ni descuentos.
+- Los productos omiten descripciones iguales al nombre y ocultan la columna de descuento manual cuando todas sus líneas están sin descuento manual, excepto durante edición. El porcentaje y su importe COP se muestran en una sola línea, con el importe en texto menor y atenuado. El domicilio gratis se muestra en su propia columna, con un importe por celda; solo las notas reales agregan una segunda línea al producto.
+- La fila Descuentos mantiene el desglose `domi gratis · otros` junto al total, incluso si alguna parte es $0. Solo presenta los importes calculados con los datos guardados; no reactiva beneficios ni reclasifica descuentos al cambiar el tipo de pedido. Más acciones contiene Ver ubicación con la misma condición existente: pedido delivery en camino y usuario distinto de domiciliario. Cambiar sucursal y editar programación conservan sus restricciones por estado y rol.
+- El descuento de producto se edita como porcentaje de `cantidad × precio unitario`, igual que en OrderSidebar, tanto en las líneas existentes como al agregar un producto. El API sigue recibiendo COP enteros. Cambiar cantidad o precio conserva el porcentaje; el reparto de domicilio gratis se mantiene separado y no permite subtotales negativos. Guardar sin tocar un porcentaje redondeado conserva el descuento monetario histórico exacto.
+- Pagos inicia plegado y se puede desplegar y plegar sin desmontar sus editores; al plegar conserva visible el saldo por cobrar. Su resumen centra los bloques de bancos/apps, total y saldo. Conserva montos, verificación, liquidación y acciones autorizadas. Los bloques vacíos no reservan espacio; los controles para agregar pagos permanecen disponibles cuando corresponde. Facturación se accede desde Más acciones y conserva su panel de detalle, estados fiscales y confirmaciones.
+
 ### Navegación
 - **Redirección por rol**: Cada rol tiene su dashboard específico
 - **Protección de rutas**: Validación de permisos en router
@@ -503,7 +518,7 @@ Validaciones implementadas antes de enviar un pedido al backend:
 
 - El detalle presenta las reglas de rechazo DIAN en líneas separadas. Reintentar una factura rechazada confirma el envío de datos corregidos con el mismo consecutivo; consultar una pendiente solo solicita reconciliación. El backend calcula el DV del NIT sin agregar requisitos al formulario.
 
-- El detalle del pedido resume facturación en una barra compacta y abre productos, cantidades, descuentos, domicilio, pagos registrados y total antes de confirmar. Un pedido desactualizado bloquea la confirmación hasta recargarlo. El historial usa el snapshot fiscal, nunca importes actuales para representar documentos anteriores.
+- Más acciones → Factura electrónica despliega al pasar el puntero o al pulsarlo dos opciones: Datos de facturación y Enviar factura electrónica. Si faltan datos para una nueva factura, Enviar permanece deshabilitado y explica mediante tooltip que primero deben configurarse. Los documentos existentes conservan acceso a su avance, archivos y reenvío con el destinatario histórico, incluso si no hay un destinatario actual seleccionado o falla la disponibilidad de emisión. Crear una nueva factura abre productos, cantidades, descuentos, domicilio, pagos registrados y total antes de confirmar. Un pedido desactualizado bloquea la confirmación hasta recargarlo. El historial usa el snapshot fiscal, nunca importes actuales para representar documentos anteriores.
 - El avance distingue solicitud, transmisión a Plemsi, validación DIAN y correo aceptado por el proveedor. Transmitir no confirma recepción DIAN; aceptar correo no confirma entrega al buzón. PDF/XML se descargan cuando el archivo oficial está disponible; una falla de correo no invalida la factura.
 
 - Completar con datos DIAN lee `customerName` y `customerEmail` de Plemsi según el tipo y número indicados. Muestra el resultado junto al botón, conserva los valores manuales si no hay datos y descarta respuestas de otra identificación o cliente. La consulta no guarda destinatarios ni emite documentos.

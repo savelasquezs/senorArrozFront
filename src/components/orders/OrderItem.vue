@@ -25,7 +25,12 @@
                 <span class="text-xs text-gray-500 whitespace-nowrap">Precio base: {{ formatCurrency(item.productPrice)
                 }}</span>
             </div>
-            <div class="flex items-center ">
+            <div class="flex shrink-0 items-center">
+                <button type="button" class="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-emerald-700 focus-visible:outline-emerald-600"
+                    :class="{ 'text-emerald-700': item.notes }" :aria-label="`Editar nota de ${item.productName}`"
+                    :title="item.notes || 'Agregar nota'" @click="showNoteDialog = true">
+                    <PencilIcon class="h-4 w-4" />
+                </button>
                 <BaseButton @click="handleRemove" variant="ghost" size="sm" title="Eliminar">
                     <TrashIcon class="w-4 h-4" />
                 </BaseButton>
@@ -100,6 +105,7 @@
                 Domicilio gratis: −{{ formatCurrency(freeDeliveryCop) }}
             </div>
         </div>
+        <OrderNoteDialog v-model="showNoteDialog" :notes="item.notes" :title="`Notas · ${item.productName}`" :save="saveNotes" />
     </div>
 </template>
 
@@ -107,23 +113,32 @@
 import { computed, ref, watch } from 'vue'
 import type { OrderItem } from '@/types/order'
 import { useFormatting } from '@/composables/useFormatting'
+import { discountAmountFromPercentage, discountPercentageFromAmount } from '@/helpers/orderProductDiscount'
 
 // Components
 import BaseButton from '@/components/ui/BaseButton.vue'
+import OrderNoteDialog from './OrderNoteDialog.vue'
 
 // Icons
 import {
     PlusIcon,
     MinusIcon,
-    TrashIcon
+    TrashIcon,
+    PencilIcon
 } from '@heroicons/vue/24/outline'
 
 interface Props {
     item: OrderItem
     tabId: string
+    saveNote: (notes: string) => void | Promise<void>
 }
 
 const props = defineProps<Props>()
+const showNoteDialog = ref(false)
+watch(() => [props.tabId, props.item.tempId], () => { showNoteDialog.value = false })
+function saveNotes(notes: string) {
+    return props.saveNote(notes)
+}
 
 // Emits
 const emit = defineEmits<{
@@ -146,11 +161,7 @@ const discountPercentage = ref(0)
 // Calcular descuento en porcentaje basado en el valor actual
 const calculateDiscountPercentage = () => {
     const subtotalSinDescuento = localQuantity.value * localUnitPrice.value
-    if (subtotalSinDescuento > 0) {
-        discountPercentage.value = (props.item.discount / subtotalSinDescuento) * 100
-    } else {
-        discountPercentage.value = 0
-    }
+    discountPercentage.value = discountPercentageFromAmount(subtotalSinDescuento, props.item.discount)
 }
 
 // Inicializar porcentaje de descuento
@@ -163,7 +174,7 @@ const subtotalSinDescuento = computed(() => {
 
 // Valor del descuento calculado
 const discountAmount = computed(() => {
-    return (subtotalSinDescuento.value * discountPercentage.value) / 100
+    return discountAmountFromPercentage(subtotalSinDescuento.value, discountPercentage.value)
 })
 
 const freeDeliveryCop = computed(() => Math.max(0, props.item.freeDeliveryDiscount ?? 0))

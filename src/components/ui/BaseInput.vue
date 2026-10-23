@@ -8,7 +8,7 @@
 
 		<!-- Input wrapper -->
 		<div class="relative">
-			<input :id="inputId" :type="type" v-model="inputValue" :placeholder="placeholder" :required="required"
+			<input :id="inputId" :type="type" v-model="inputValue" :placeholder="placeholder" :required="required" :aria-label="ariaLabel"
 				:disabled="disabled" :class="inputClasses" @blur="onBlur" @focus="onFocus" :minlength="minlength"
 				:maxlength="maxlength" :min="min" :max="max" :step="step" @keyup.enter="onEnter" />
 			<div v-if="$slots.icon"
@@ -41,6 +41,7 @@ interface Props {
 	/** `sm`: compacto · `lg`: más alto (modales de monto). */
 	size?: 'md' | 'sm' | 'lg';
 	label?: string;
+	ariaLabel?: string;
 	placeholder?: string;
 	required?: boolean;
 	disabled?: boolean;

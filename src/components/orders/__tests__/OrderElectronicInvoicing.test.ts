@@ -12,7 +12,7 @@ const current = { id: 1, documentType: 3, identification: '123', name: 'Nombre a
 const documentRow: InvoiceDocument = { id: 1, kind: 'invoice', status: 'issued', environment: 'sandbox', prefix: 'SETT', number: 1, emailStatus: 'accepted', creditRequested: false, recipientJson: JSON.stringify({ Name: 'Destinatario histórico', Identification: '456', Email: 'historico@example.com' }), hasPdf: true, hasXml: true }
 const order = { id: 1, total: 23000, deliveryFee: 3000, bankPayments: [{ bankName: 'Bancolombia', amount: 10000 }], appPayments: [], notes: 'Sin cebolla', orderDetails: [{ productName: 'Arroz familiar', quantity: 2, unitPrice: 12000, discount: 4000 }] } as unknown as OrderDetailView
 async function openHistory(wrapper: ReturnType<typeof mount>) {
-    await wrapper.findAll('button').find(b => b.text().includes('Ver avance y detalle'))!.trigger('click')
+    await wrapper.get('button[aria-label="Ver avance y detalle de factura"]').trigger('click')
     await flushPromises()
     return document.querySelector('[role="dialog"]')!
 }
@@ -24,6 +24,31 @@ describe('Detalle fiscal del pedido', () => {
         vi.mocked(api.documents).mockResolvedValue({ data: [documentRow] } as never)
     })
     afterEach(() => vi.useRealTimers())
+    it('opens the two invoice options on hover and closes them when the pointer leaves', async () => {
+        const wrapper = mount(OrderElectronicInvoicing, { props: { orderId: 1, customerId: 10, status: 'taken', order } })
+        await flushPromises()
+        const trigger = wrapper.get('button[aria-haspopup="true"]')
+        expect(trigger.attributes('aria-expanded')).toBe('false')
+        await wrapper.get('.invoice-menu').trigger('mouseenter')
+        expect(trigger.attributes('aria-expanded')).toBe('true')
+        expect(wrapper.findAll('button').map(button => button.text())).toEqual(['Factura electrónica▸', 'Datos de facturación', 'Enviar factura electrónica'])
+        await wrapper.get('.invoice-menu').trigger('mouseleave')
+        expect(trigger.attributes('aria-expanded')).toBe('false')
+        expect(api.request).not.toHaveBeenCalled()
+        wrapper.unmount()
+    })
+    it('disables sending a new invoice and explains that billing data must be configured first', async () => {
+        vi.mocked(api.documents).mockResolvedValue({ data: [] } as never)
+        vi.mocked(api.recipients).mockResolvedValue({ data: [] } as never)
+        const wrapper = mount(OrderElectronicInvoicing, { props: { orderId: 1, customerId: 10, status: 'taken', order } })
+        await flushPromises()
+        expect(wrapper.get('button[aria-label="Enviar factura electrónica"]').attributes('disabled')).toBeDefined()
+        expect(wrapper.get('[role="tooltip"]').text()).toBe('Debes configurar primero los datos de facturación.')
+        await wrapper.get('button[aria-label="Enviar factura electrónica"]').trigger('click')
+        expect(document.querySelector('[role="dialog"]')).toBeNull()
+        expect(api.request).not.toHaveBeenCalled()
+        wrapper.unmount()
+    })
     it.each([
         ['delivered', 'Correo entregado', 'done'], ['bounced', 'Correo rebotado', 'error'],
         ['delayed', 'Entrega demorada', 'active'], ['failed', 'Correo no entregado', 'error'],
@@ -31,11 +56,11 @@ describe('Detalle fiscal del pedido', () => {
         vi.mocked(api.documents).mockResolvedValue({ data: [{ ...documentRow, emailChannel: 'application', emailStatus: 'sent', emailDelivery: { status, occurredAt: '2026-10-23T02:20:00Z', error: status === 'bounced' ? 'Mailbox unavailable' : null } }] } as never)
         const wrapper = mount(OrderElectronicInvoicing, { props: { orderId: 1, status: 'delivered' } })
         await flushPromises()
-        const steps = wrapper.findAll('[aria-label="Avance de la factura"] li')
-        expect(steps[2]!.attributes('data-state')).toBe('done')
-        expect(steps[3]!.text()).toContain(label)
-        expect(steps[3]!.attributes('data-state')).toBe(state)
         const dialog = await openHistory(wrapper)
+        const steps = dialog.querySelectorAll('[aria-label="Avance de la factura"] li')
+        expect(steps[2]!.getAttribute('data-state')).toBe('done')
+        expect(steps[3]!.textContent).toContain(label)
+        expect(steps[3]!.getAttribute('data-state')).toBe(state)
         if (status === 'bounced') expect(dialog.textContent).toContain('Mailbox unavailable')
         if (status === 'delayed') expect([...dialog.querySelectorAll('button')].find(b => b.textContent?.includes('Entrega en curso'))!.disabled).toBe(true)
         expect(api.documentAction).not.toHaveBeenCalled()
@@ -49,9 +74,10 @@ describe('Detalle fiscal del pedido', () => {
             .mockResolvedValue({ data: [{ ...row, emailDelivery: { status: 'delivered' } }] } as never)
         const wrapper = mount(OrderElectronicInvoicing, { props: { orderId: 1, status: 'delivered' } })
         await flushPromises()
-        expect(wrapper.text()).toContain('Correo aceptado para envío')
+        const dialog = await openHistory(wrapper)
+        expect(dialog.textContent).toContain('Correo aceptado para envío')
         await vi.advanceTimersByTimeAsync(10000); await flushPromises()
-        expect(wrapper.text()).toContain('Correo entregado')
+        expect(dialog.textContent).toContain('Correo entregado')
         await vi.advanceTimersByTimeAsync(30000); await flushPromises()
         expect(api.documents).toHaveBeenCalledTimes(2)
         wrapper.unmount()
@@ -91,7 +117,7 @@ describe('Detalle fiscal del pedido', () => {
         expect(history.querySelector('article')!.textContent).toContain('historico@example.com')
         expect(history.querySelector('article')!.textContent).not.toContain('Nombre actual')
         vi.mocked(api.documents).mockResolvedValue({ data: [{ ...documentRow, recipientJson: JSON.stringify({ Name: 'Sin correo' }) }] } as never)
-        await wrapper.findAll('button').find(b => b.text() === 'Actualizar')!.trigger('click'); await flushPromises()
+        ;[...history.querySelectorAll('button')].find(b => b.textContent === 'Actualizar')!.click(); await flushPromises()
         expect(history.textContent).not.toContain('Reenviar correo'); wrapper.unmount()
     })
     it('confirma la solicitud antes de llamar al backend', async () => {
@@ -99,7 +125,7 @@ describe('Detalle fiscal del pedido', () => {
         vi.mocked(api.request).mockResolvedValue({ data: {} } as never)
         const wrapper = mount(OrderElectronicInvoicing, { props: { orderId: 1, customerId: 10, status: 'taken', order } })
         await flushPromises()
-        const request = wrapper.findAll('button').find(b => b.text() === 'Solicitar factura electrónica')!
+        const request = wrapper.findAll('button').find(b => b.text() === 'Enviar factura electrónica')!
         await request.trigger('click'); await flushPromises()
         expect(api.request).not.toHaveBeenCalled()
         const confirm = document.querySelector('[role="dialog"]')!
@@ -111,7 +137,7 @@ describe('Detalle fiscal del pedido', () => {
         expect(confirm.textContent).toContain('Descuentos')
         const confirmButton = [...confirm.querySelectorAll('button')].find(b => b.textContent?.includes('Confirmar factura'))!
         confirmButton.click(); await flushPromises()
-        expect(api.request).toHaveBeenCalledTimes(1); expect(wrapper.text()).toContain('Solicitud guardada')
+        expect(api.request).toHaveBeenCalledTimes(1); expect(document.body.textContent).toContain('Solicitud guardada')
         wrapper.unmount()
     })
     it('conserva el historial aunque falle la consulta de disponibilidad', async () => {
@@ -119,7 +145,7 @@ describe('Detalle fiscal del pedido', () => {
         const wrapper = mount(OrderElectronicInvoicing, { props: { orderId: 1, customerId: 10, status: 'taken' } })
         await flushPromises()
         expect((await openHistory(wrapper)).textContent).toContain('Destinatario histórico')
-        expect(wrapper.text()).toContain('El historial sigue disponible')
+        expect(document.body.textContent).toContain('El historial sigue disponible')
         wrapper.unmount()
     })
     it('pausa la actualización cuando la pantalla está oculta y recupera al volver', async () => {
@@ -137,7 +163,7 @@ describe('Detalle fiscal del pedido', () => {
         vi.mocked(api.documents).mockResolvedValue({ data: [] } as never)
         const wrapper = mount(OrderElectronicInvoicing, { props: { orderId: 1, customerId: 10, status: 'taken', order } })
         await flushPromises()
-        await wrapper.findAll('button').find(b => b.text() === 'Solicitar factura electrónica')!.trigger('click')
+        await wrapper.findAll('button').find(b => b.text() === 'Enviar factura electrónica')!.trigger('click')
         await wrapper.setProps({ stale: true })
         const dialog = document.querySelector('[role="dialog"]')!
         expect(dialog.textContent).toContain('El pedido cambió')
@@ -149,19 +175,22 @@ describe('Detalle fiscal del pedido', () => {
         vi.mocked(api.documents).mockResolvedValue({ data: [{ ...documentRow, status, emailStatus: 'pending', hasPdf: false, submittedAt: '2026-10-22T18:00:00Z' }] } as never)
         const wrapper = mount(OrderElectronicInvoicing, { props: { orderId: 1, customerId: 10, status: 'taken' } })
         await flushPromises()
-        const steps = wrapper.findAll('[aria-label="Avance de la factura"] li')
-        expect(steps[2]!.attributes('data-state')).toBe('pending')
-        expect(steps[3]!.attributes('data-state')).not.toBe('done')
-        expect(wrapper.text()).not.toContain('Descargar copia PDF')
+        const dialog = await openHistory(wrapper)
+        const steps = dialog.querySelectorAll('[aria-label="Avance de la factura"] li')
+        expect(steps[2]!.getAttribute('data-state')).toBe('pending')
+        expect(steps[3]!.getAttribute('data-state')).not.toBe('done')
+        expect(dialog.textContent).not.toContain('Descargar copia PDF')
         wrapper.unmount()
     })
     it('conserva validación DIAN aunque falle el correo y permite descargar la copia oficial', async () => {
         vi.mocked(api.documents).mockResolvedValue({ data: [{ ...documentRow, emailStatus: 'pending', lastError: 'Error de correo' }] } as never)
         const wrapper = mount(OrderElectronicInvoicing, { props: { orderId: 1, customerId: 10, status: 'taken' } })
         await flushPromises()
-        expect(wrapper.findAll('[aria-label="Avance de la factura"] li')[2]!.attributes('data-state')).toBe('done')
-        expect(wrapper.findAll('[aria-label="Avance de la factura"] li')[3]!.attributes('data-state')).toBe('active')
-        await wrapper.findAll('button').find(b => b.text() === 'Descargar copia PDF')!.trigger('click')
+        const dialog = await openHistory(wrapper)
+        const steps = dialog.querySelectorAll('[aria-label="Avance de la factura"] li')
+        expect(steps[2]!.getAttribute('data-state')).toBe('done')
+        expect(steps[3]!.getAttribute('data-state')).toBe('active')
+        ;[...dialog.querySelectorAll('button')].find(b => b.textContent === 'Descargar copia PDF')!.click()
         await flushPromises()
         expect(api.download).toHaveBeenCalledWith(1, 'pdf', 'SETT1')
         expect(api.request).not.toHaveBeenCalled()
@@ -182,7 +211,7 @@ describe('Detalle fiscal del pedido', () => {
         const retry = [...dialog.querySelectorAll('button')].find(b => b.textContent?.includes('Reintentar con los datos seleccionados'))!
         retry.click(); await flushPromises()
         expect(api.documentAction).toHaveBeenCalledWith(1, 'retry', current)
-        expect(wrapper.text()).toContain('Reintento solicitado con los datos corregidos y el mismo consecutivo.')
+        expect(dialog.textContent).toContain('Reintento solicitado con los datos corregidos y el mismo consecutivo.')
         expect(api.request).not.toHaveBeenCalled()
         wrapper.unmount()
     })

@@ -76,21 +76,9 @@
                         <VueDatePicker v-model="reservedForLocal" time-picker placeholder="Hora entrega"
                             @update:model-value="onReservedForInput" />
                     </div>
-                    <!-- Fecha y hora para reservas (otro día, siempre visible) -->
-                    <div class="py-3 border-b border-gray-200 space-y-4" v-if="currentOrder.type === 'reservation'">
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1">Fecha/hora preparación <span
-                                    class="text-gray-400 font-normal">(opcional)</span></label>
-                            <VueDatePicker v-model="prepareAtDateLocal" placeholder="Cuándo empezar a preparar"
-                                :min-date="new Date()" @update:model-value="onPrepareAtDateInput" />
-                        </div>
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1">Fecha/hora del evento <span
-                                    class="text-red-500">*</span></label>
-                            <VueDatePicker v-model="reservedForDateLocal" placeholder="Cuándo se entrega/sirve"
-                                :min-date="new Date()" @update:model-value="onReservedForDateInput" />
-                        </div>
-                    </div>
+                    <OrderScheduleFields v-if="currentOrder.type === 'reservation'" :key="currentOrder.tabId"
+                        class="border-b border-gray-200 py-3" :prepare-at="prepareAtDateLocal" :reserved-for="reservedForDateLocal"
+                        @change="updateReservationSchedule" />
 
                     <OrderItemList :tab-id="currentTabId || ''" @add-products="handleAddProducts" />
                     <div
@@ -432,6 +420,8 @@ import {
 } from '@heroicons/vue/24/outline'
 import type { LocalHour } from '@/types/common'
 import { DateTimeService } from '@/services/domain/DateTimeService'
+import OrderScheduleFields from './OrderScheduleFields.vue'
+import { orderScheduleError } from '@/helpers/orderSchedule'
 
 
 
@@ -465,7 +455,7 @@ const selectedCustomer = ref<Customer | null>(null)
 // onsite / delivery: time-picker (solo hora, mismo día)
 const prepareAtLocal = ref<LocalHour | null>(null)
 const reservedForLocal = ref<LocalHour | null>(null)
-// reservation: datepicker completo (fecha + hora, otro día)
+// reservation: fecha común y horas de preparación/entrega
 const prepareAtDateLocal = ref<Date | null>(null)
 const reservedForDateLocal = ref<Date | null>(null)
 
@@ -794,6 +784,7 @@ const submitButtonTooltip = computed(() => {
 
 const submitButtonDisabled = computed(() => {
     return !canSubmitOrder.value || isSubmittingOrder.value || isCheckingDuplicateOrderDate.value
+        || (currentOrder.value?.type === 'reservation' && !!orderScheduleError(prepareAtDateLocal.value, reservedForDateLocal.value))
 })
 
 const onPrepareAtInput = (time: LocalHour | undefined) => {
@@ -817,26 +808,13 @@ const onReservedForInput = (time: LocalHour | undefined) => {
     ordersStore.updateReservedFor(date)
 }
 
-// Handlers para reservas (fecha + hora completa)
-const onPrepareAtDateInput = (date: Date | null) => {
+function updateReservationSchedule(schedule: { prepareAt: Date | null; reservedFor: Date | null }) {
     if (!currentTabId.value) return
-    ordersStore.updatePrepareAt(date ?? null)
-    if (date) {
-        const oneHourLater = new Date(date.getTime() + 60 * 60 * 1000)
-        reservedForDateLocal.value = oneHourLater
-        ordersStore.updateReservedFor(oneHourLater)
-    }
+    prepareAtDateLocal.value = schedule.prepareAt
+    reservedForDateLocal.value = schedule.reservedFor
+    ordersStore.updatePrepareAt(schedule.prepareAt)
+    ordersStore.updateReservedFor(schedule.reservedFor)
 }
-
-const onReservedForDateInput = (date: Date | null) => {
-    if (!currentTabId.value) return
-    ordersStore.updateReservedFor(date ?? null)
-}
-
-
-
-
-
 
 // Methods
 const createNewOrder = () => {
@@ -1072,6 +1050,8 @@ const handleSubmitOrder = async () => {
 
     const tabToClose = currentTabId.value
     if (currentOrder.value.type === 'reservation') {
+        const scheduleError = orderScheduleError(prepareAtDateLocal.value, reservedForDateLocal.value)
+        if (scheduleError) { showError('Horarios', scheduleError); return }
         if (reservedForDateLocal.value) {
             currentOrder.value.reservedFor = reservedForDateLocal.value
         }

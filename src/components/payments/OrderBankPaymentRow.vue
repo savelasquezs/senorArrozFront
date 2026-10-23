@@ -4,6 +4,8 @@
         <div class="flex items-center gap-1 min-w-0 flex-1">
             <component :is="leadIcon" :class="compactIconClass" />
             <span class="font-medium truncate min-w-0 flex-1 text-left" :title="bankDisplayName">{{ bankDisplayName }}</span>
+            <span v-if="showVerificationBadge" class="shrink-0 text-xs" :class="payment.isVerified ? 'text-green-700' : 'text-amber-800'"
+                :title="payment.verifiedAt ? `Verificado: ${formatDateTime(payment.verifiedAt)}` : undefined">{{ payment.isVerified ? 'Verificado' : 'Pendiente' }}</span>
             <span v-if="(showVerifyAction || showUnverifyAction) && payment.isVerified" class="shrink-0 text-green-600" title="Verificado">
                 <CheckCircleIcon class="w-3 h-3" />
             </span>
@@ -128,7 +130,7 @@ const leadIcon = computed(() => (props.variant === 'table' ? BanknotesIcon : Bui
 const compactWrapperClass = computed(() =>
     props.variant === 'table'
         ? 'flex items-center justify-between gap-1 text-xs bg-blue-50 rounded px-1.5 py-0.5 min-w-0'
-        : 'flex items-center justify-between gap-1 text-xs bg-green-50 rounded px-1.5 py-0.5 min-w-0 border border-green-200'
+        : `flex flex-wrap items-center justify-between gap-1 text-sm rounded px-2 py-1.5 min-w-0 border ${props.payment.isVerified ? 'bg-green-50 border-green-200' : 'bg-amber-50 border-amber-200'}`
 )
 
 const compactIconClass = computed(() =>

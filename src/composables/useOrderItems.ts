@@ -191,17 +191,15 @@ export function useOrderItems() {
         void resolveBenefits()
     }
 
-    const updateNotes = (itemTempId: string, notes: string) => {
-        if (!store.currentTabId) return
-        const order = store.draftOrders.get(store.currentTabId)
-        if (!order) return
-
+    const updateNotes = (itemTempId: string, notes: string, tabId = store.currentTabId) => {
+        const order = tabId ? store.draftOrders.get(tabId) : undefined
+        if (!order || !tabId || !order.orderItems.some(item => item.tempId === itemTempId)) {
+            throw new Error('El producto ya no está en este pedido.')
+        }
         const updatedItems = order.orderItems.map(item =>
             item.tempId === itemTempId ? { ...item, notes } : item
         )
-
-        const updated = { ...order, orderItems: updatedItems, updatedAt: new Date() }
-        store.draftOrders.set(store.currentTabId, updated)
+        store.draftOrders.set(tabId, { ...order, orderItems: updatedItems, updatedAt: new Date() })
         store.saveToLocalStorage()
     }
 
