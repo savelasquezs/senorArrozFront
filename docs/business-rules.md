@@ -536,6 +536,7 @@ Validaciones implementadas antes de enviar un pedido al backend:
 - Script aditivo e idempotente: SenorArroz.Infrastructure/Scripts/add_employee_lunch.sql, antes del backend y las interfaces. Sin cambios automáticos de nómina ni dependencia de facturación electrónica.
 
 ## Identidad visual de facturación
+Las confirmaciones anteriores al webhook pueden consolidarse por mantenimiento únicamente tras comprobar ID, destinatario y documento en el panel autenticado de Resend. Se identifica el origen y se omite la fecha si no se conoce con precisión; no se simulan webhooks ni se reenvía el correo para consultar estado.
 Superadmin configura logo y nombre comercial por tenant, compartidos entre sucursales y proveedores, sin desactivar la integración fiscal. PNG/JPG de máximo 500 KB, vista previa proporcional y confirmación de guardado. Cada versión se conserva para los documentos que la utilizaron. Las nuevas solicitudes requieren identidad. El PDF y correo muestran la identidad del restaurante y conservan razón social/NIT fiscales. Guardar identidad no emite ni reenvía documentos.
 
 ## Empresas y destinatarios compartidos
