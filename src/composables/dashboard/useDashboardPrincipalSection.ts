@@ -1,4 +1,4 @@
-import { ref, watch, computed, type Ref } from 'vue';
+import { ref, watch, computed, onScopeDispose, type Ref } from 'vue';
 import {
 	fetchPrincipalDashboard,
 	type PrincipalDashboardPayload,
@@ -26,29 +26,57 @@ export function useDashboardPrincipalSection(
 	const error = ref<string | null>(null);
 
 	const isActive = computed(() => activeSection.value === 'principal');
+	let requestVersion = 0;
+	let currentController: AbortController | null = null;
+
+	function invalidatePending() {
+		requestVersion += 1;
+		currentController?.abort();
+		currentController = null;
+	}
+
+	onScopeDispose(invalidatePending);
 
 	async function load() {
 		if (!isActive.value) return;
+		currentController?.abort();
+		const controller = new AbortController();
+		currentController = controller;
+		const version = ++requestVersion;
 		const hadData = data.value != null;
 		if (hadData) refreshBusy.value = true;
 		else loading.value = true;
 		error.value = null;
 		try {
-			data.value = await fetchPrincipalDashboard(branchId.value, {
-				kpiRange: dateRange.value,
+			const nextData = await fetchPrincipalDashboard(branchId.value, {
+				kpiRange: [dateRange.value[0], dateRange.value[1]],
+				signal: controller.signal,
 			});
+			if (version !== requestVersion || !isActive.value) return;
+			data.value = nextData;
 		} catch (e) {
+			if (version !== requestVersion || !isActive.value) return;
 			error.value = e instanceof Error ? e.message : 'Error al cargar Principal';
 			if (!hadData) data.value = null;
 		} finally {
-			loading.value = false;
-			refreshBusy.value = false;
+			if (version === requestVersion) {
+				currentController = null;
+				loading.value = false;
+				refreshBusy.value = false;
+			}
 		}
 	}
 
 	watch(
 		[isActive, branchId, () => rangeKey(dateRange.value)],
-		() => void load(),
+		() => {
+			if (isActive.value) void load();
+			else {
+				invalidatePending();
+				loading.value = false;
+				refreshBusy.value = false;
+			}
+		},
 		{ immediate: true },
 	);
 
