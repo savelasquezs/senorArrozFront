@@ -94,6 +94,7 @@
 import { ref, computed, watch } from 'vue'
 import { DashboardRightNav, defaultDateRangeToday } from '@/components/dashboard'
 import { BASE_BRANCH_COMPARISON_ROWS } from '@/views/dashboard/mock/dashboardMockCore'
+import { USE_VENTAS_MOCK } from '@/services/MainAPI/dashboardSectionApi'
 import { useAuthStore } from '@/store/auth'
 import { useBranchContextStore } from '@/store/branchContext'
 import { useDashboardSection } from '@/composables/dashboard/useDashboardSection'
@@ -214,12 +215,9 @@ const domiciliosError = domiciliosSection.error
 const deliveryRouteMetrics = computed(() => domiciliosSection.deliveryPayload.value?.routeMetrics ?? null)
 
 const ventasComparisonRows = computed(() => {
-    if (activeSection.value !== 'ventas') {
-        return BASE_BRANCH_COMPARISON_ROWS
-    }
-    const rows = ventasSection.data.value?.comparisonRows
-    if (rows && rows.length > 0) return rows
-    return BASE_BRANCH_COMPARISON_ROWS
+    const rows = activeSection.value === 'ventas' ? ventasSection.data.value?.comparisonRows : null
+    return rows ?? (USE_VENTAS_MOCK ? BASE_BRANCH_COMPARISON_ROWS : [])
+
 })
 
 const ventasProducts = computed(() => ventasSection.data.value?.products ?? null)
@@ -246,25 +244,25 @@ const {
 })
 
 const salesByDay = computed(
-	() => ventasSection.data.value?.evolution?.salesByDay ?? shellSalesByDay.value,
+	() => ventasSection.data.value?.evolution?.salesByDay ?? (USE_VENTAS_MOCK ? shellSalesByDay.value : { labels: [], datasets: [] }),
 )
 const salesByMonth = computed(
-	() => ventasSection.data.value?.evolution?.salesByMonth ?? shellSalesByMonth.value,
+	() => ventasSection.data.value?.evolution?.salesByMonth ?? (USE_VENTAS_MOCK ? shellSalesByMonth.value : { labels: [], datasets: [] }),
 )
 const salesByYear = computed(
-	() => ventasSection.data.value?.evolution?.salesByYear ?? shellSalesByYear.value,
+	() => ventasSection.data.value?.evolution?.salesByYear ?? (USE_VENTAS_MOCK ? shellSalesByYear.value : { labels: [], datasets: [] }),
 )
 const salesByFortnight = computed(() =>
 	aggregateSalesBlockByFortnight(salesByDay.value, globalDashboardDateRange.value),
 )
 const ordersByDay = computed(
-	() => ventasSection.data.value?.evolution?.ordersByDay ?? shellOrdersByDay.value,
+	() => ventasSection.data.value?.evolution?.ordersByDay ?? (USE_VENTAS_MOCK ? shellOrdersByDay.value : { labels: [], counts: [] }),
 )
 const ordersByMonth = computed(
-	() => ventasSection.data.value?.evolution?.ordersByMonth ?? shellOrdersByMonth.value,
+	() => ventasSection.data.value?.evolution?.ordersByMonth ?? (USE_VENTAS_MOCK ? shellOrdersByMonth.value : { labels: [], counts: [] }),
 )
 const ordersByYear = computed(
-	() => ventasSection.data.value?.evolution?.ordersByYear ?? shellOrdersByYear.value,
+	() => ventasSection.data.value?.evolution?.ordersByYear ?? (USE_VENTAS_MOCK ? shellOrdersByYear.value : { labels: [], counts: [] }),
 )
 const ordersByFortnight = computed(() =>
 	aggregateOrdersBlockByFortnight(ordersByDay.value, globalDashboardDateRange.value),
