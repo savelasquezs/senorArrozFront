@@ -77,7 +77,7 @@ export function useDashboardPrincipalSalesVsExpenses(
 	}
 
 	watch(
-		[isActive, branchId, () => rangeKey(dateRange.value), timeGranularity],
+		[isActive, branchId, () => rangeKey(dateRange.value), () => principalSalesVsExpensesGranularity(timeGranularity.value)],
 		() => {
 			if (isActive.value) void load();
 			else {

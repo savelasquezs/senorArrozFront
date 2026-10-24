@@ -215,10 +215,11 @@ export async function fetchDeliveryDashboard(
 	periodRange: [Date, Date],
 	deliveryManId: number | 'all' = 'all',
     excludeWednesdays = false,
+    signal?: AbortSignal,
 ): Promise<DeliveryDashboardPayload> {
 	const { from, to } = encodeDashboardRangeToApi(periodRange);
 	const dm = deliveryManId === 'all' ? null : deliveryManId;
-	const raw = await dashboardApi.getDelivery(branchId, from, to, { deliveryManId: dm, excludeWednesdays });
+	const raw = await dashboardApi.getDelivery(branchId, from, to, { deliveryManId: dm, excludeWednesdays }, signal);
 	return mapDeliveryFromApi(raw);
 }
 

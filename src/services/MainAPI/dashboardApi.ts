@@ -120,6 +120,7 @@ class DashboardApi extends BaseApi {
 		fromIso: string,
 		toIso: string,
 		opts?: { deliveryManId?: number | null; excludeWednesdays?: boolean },
+		signal?: AbortSignal,
 	): Promise<DashboardDeliveryApiResponse> {
 		const params: Record<string, string | number> = { from: fromIso, to: toIso };
 		if (branchId != null) params.branchId = branchId;
@@ -128,6 +129,7 @@ class DashboardApi extends BaseApi {
 		return this.get<DashboardDeliveryApiResponse>('/dashboard/delivery', {
 			params,
 			branchScope: 'all',
+			signal,
 		});
 	}
 

@@ -28,6 +28,7 @@ export function useDashboardPrincipalSection(
 	const isActive = computed(() => activeSection.value === 'principal');
 	let requestVersion = 0;
 	let currentController: AbortController | null = null;
+	let currentFilterKey: string | null = null;
 
 	function invalidatePending() {
 		requestVersion += 1;
@@ -43,6 +44,11 @@ export function useDashboardPrincipalSection(
 		const controller = new AbortController();
 		currentController = controller;
 		const version = ++requestVersion;
+		const key = `${branchId.value ?? 'all'}:${rangeKey(dateRange.value)}`;
+		if (currentFilterKey !== key) {
+			data.value = null;
+			currentFilterKey = key;
+		}
 		const hadData = data.value != null;
 		if (hadData) refreshBusy.value = true;
 		else loading.value = true;
@@ -73,6 +79,7 @@ export function useDashboardPrincipalSection(
 			if (isActive.value) void load();
 			else {
 				invalidatePending();
+				data.value = null;
 				loading.value = false;
 				refreshBusy.value = false;
 			}
