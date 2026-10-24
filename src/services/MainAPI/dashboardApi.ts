@@ -237,6 +237,7 @@ class DashboardApi extends BaseApi {
 		toIso: string,
 		opts: { granularity: 'day' | 'month' | 'year'; categoryId?: number | null },
 		dayOfWeek?: number | null,
+		signal?: AbortSignal,
 	): Promise<DashboardCategoryWeightsApiResponse> {
 		const params: Record<string, string | number> = {
 			from: fromIso,
@@ -250,6 +251,7 @@ class DashboardApi extends BaseApi {
 		return this.get<DashboardCategoryWeightsApiResponse>('/dashboard/sales/category-weights', {
 			params,
 			branchScope: 'all',
+			signal,
 		});
 	}
 

@@ -102,7 +102,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue';
+import { computed, ref, watch, onScopeDispose } from 'vue';
 import BaseCard from '@/components/ui/BaseCard.vue';
 import DashboardLineChart from './DashboardLineChart.vue';
 import DashboardWeightShareDonut from './DashboardWeightShareDonut.vue';
@@ -132,6 +132,9 @@ const error = ref<string | null>(null);
 const payload = ref<DashboardCategoryWeightsApiResponse | null>(null);
 
 const selectedCategoryId = ref<number | null>(null);
+let requestVersion = 0;
+let currentController: AbortController | null = null;
+onScopeDispose(() => { requestVersion++; currentController?.abort(); });
 const selectedCategoryModel = computed({
 	get: () => (selectedCategoryId.value === null ? '' : String(selectedCategoryId.value)),
 	set: (v: string) => {
@@ -286,6 +289,10 @@ function formatWeightKgGrams(grams: number): string {
 }
 
 async function load() {
+    currentController?.abort();
+    const controller = new AbortController();
+    currentController = controller;
+    const version = ++requestVersion;
 	if (USE_VENTAS_MOCK) {
 		payload.value = null;
 		error.value = null;
@@ -301,7 +308,8 @@ async function load() {
 		const raw = await dashboardApi.getSalesCategoryWeights(props.branchId, from, to, {
 			granularity: weightEvolutionGranularity.value,
 			categoryId: selectedCategoryId.value,
-		});
+		}, undefined, controller.signal);
+        if (version !== requestVersion) return;
 		payload.value = {
 			...raw,
 			evolutionsByCategory: raw.evolutionsByCategory ?? [],
@@ -312,9 +320,12 @@ async function load() {
 			selectedCategoryId.value = null;
 		}
 	} catch (e) {
+        if (version !== requestVersion) return;
 		error.value = e instanceof Error ? e.message : 'Error al cargar pesos';
 		payload.value = null;
 	} finally {
+        if (version !== requestVersion) return;
+        currentController = null;
 		loading.value = false;
 		chartBusy.value = false;
 	}
@@ -326,7 +337,7 @@ watch(
 			props.branchId,
 			props.dateRange[0].getTime(),
 			props.dateRange[1].getTime(),
-			props.timeGranularity,
+			weightEvolutionGranularity.value,
 			selectedCategoryId.value,
 		] as const,
 	() => void load(),
