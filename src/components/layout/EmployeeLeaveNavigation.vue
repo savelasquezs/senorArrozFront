@@ -5,7 +5,6 @@
   </div>
 </template>
 <script setup lang="ts">
-import { onMounted } from 'vue';
 import { useRoute } from 'vue-router';
 import { ClipboardDocumentListIcon, UsersIcon } from '@heroicons/vue/24/outline';
 import { useEmployeeLeavesStore } from '@/store/employeeLeaves';
@@ -16,6 +15,5 @@ function classes(review: boolean) {
   const selected = route.path.startsWith('/permisos') && (route.query.tab === 'review') === review;
   return ['flex items-center gap-3 rounded-xl px-3 py-2 text-sm', selected ? 'bg-emerald-600 text-white' : 'text-gray-600 hover:bg-gray-100'];
 }
-useEmployeeLeaveUpdates(store.refreshSummary);
-onMounted(() => { void store.refreshSummary(); });
+useEmployeeLeaveUpdates();
 </script>

@@ -4,7 +4,7 @@
       <RouterLink :to="{ path: '/permisos', query: route.query }" class="leave-text-button inline-flex items-center gap-2 mb-5"><ArrowLeftIcon class="w-4 h-4" />Volver a permisos</RouterLink>
       <p v-if="error" role="alert" class="leave-alert leave-alert--error mb-4">{{ error }} <button class="underline ml-2" @click="reload">Actualizar</button></p>
       <p v-if="changed" role="status" class="leave-alert leave-alert--warning mb-4">La solicitud cambió. Cierra la operación y actualiza antes de confirmar.</p>
-      <div v-if="loading && !detail" class="leave-panel leave-empty" role="status"><ArrowPathIcon class="w-7 h-7 animate-spin text-emerald-600" /><p class="leave-help">Cargando solicitud…</p></div>
+      <div v-if="loading && !detail" class="leave-panel leave-empty" role="status"><ArrowPathIcon class="h-7 w-7 animate-spin text-emerald-600" /><p class="leave-help">Cargando solicitud…</p></div>
       <template v-if="detail">
         <header class="leave-header"><div><p class="leave-eyebrow">Solicitud de permiso</p><h1 class="leave-title">{{ kind?.label ?? detail.request.kind }}</h1>
           <p class="leave-subtitle">{{ detail.request.applicantName }} <span class="mx-1">·</span> {{ detail.request.branchName }}</p></div>
@@ -39,7 +39,7 @@
                   <p class="leave-help mt-1">{{ evidenceLabel(file.evidenceCode) }} · {{ Math.max(1, Math.round(file.size / 1024)) }} KB</p>
                   <p v-if="file.reviewReason" class="leave-alert mt-2" :class="{ 'leave-alert--warning': file.reviewStatus === 'rejected' }">{{ file.reviewReason }}</p>
                   <div class="leave-file-actions"><button class="leave-text-button" @click="download(file)">Descargar</button>
-                    <template v-if="canReviewDocuments"><button class="leave-text-button" @click="reviewFile(file, 'verified')">Verificar documento</button><button class="leave-text-button text-amber-700" @click="reviewFile(file, 'rejected')">Solicitar corrección</button></template>
+                    <template v-if="canReviewDocuments"><button class="leave-text-button" @click="reviewFile(file, 'verified')">Verificar documento</button><button class="leave-text-button" @click="reviewFile(file, 'rejected')">Solicitar corrección</button></template>
                     <button v-if="canUpload && file.reviewStatus === 'rejected'" class="leave-text-button" @click="prepareUpload(file)">Reemplazar</button>
                     <button v-if="detail.canEdit && !requiredBefore(file)" class="leave-text-button text-red-700" @click="prepareRemove(file)">Retirar</button>
                   </div>
@@ -117,7 +117,8 @@ import LeaveStatusBadge from '@/components/users/LeaveStatusBadge.vue';
 import LeaveAttachmentsPicker from '@/components/users/LeaveAttachmentsPicker.vue';
 import { useAuthStore } from '@/store/auth';
 import { useEmployeeLeavesStore } from '@/store/employeeLeaves';
-import { useEmployeeLeaveUpdates } from '@/composables/useEmployeeLeaveUpdates';
+import { useEmployeeLeaveUpdates, type EmployeeLeaveRefreshContext } from '@/composables/useEmployeeLeaveUpdates';
+import type { RefreshContext } from '@/utils/serialRefresh';
 import { employeeLeaveApi } from '@/services/MainAPI/employeeLeaveApi';
 import { colombiaLocal, colombiaUtc, leaveDate, leaveDuration, leavePeriod, leaveStatusLabels, leaveHistoryLabels,
   type LeaveAction, type LeaveAttachment, type LeaveDetail, type LeaveHistory, type LeavePendingFile, type LeaveStatus } from '@/types/employeeLeave';
@@ -130,8 +131,10 @@ const action = reactive<Omit<LeaveAction, 'password'>>({ version: 0, reason: '' 
 const paidChoice = ref('no'), setDue = ref(false), supportDue = ref(''), selectedFile = ref<LeaveAttachment>(), replacement = ref<LeaveAttachment>();
 const pendingFiles = ref<LeavePendingFile[]>([]);
 const paidOptions = [{ id: 'yes', name: 'Remunerado' }, { id: 'no', name: 'No remunerado' }];
-let generation = 0, actionOwner: number | undefined;
+let generation = 0, historyGeneration = 0, actionOwner: number | undefined;
+let historyController: AbortController | undefined;
 const publicId = computed(() => String(route.params.publicId));
+const busy = computed(() => editing.value || actionOpen.value || confirming.value);
 const kind = computed(() => store.kinds.find(x => x.code === detail.value?.request.kind));
 const requestedPaid = computed(() => detail.value?.request.requestedIsPaid ?? kind.value?.paidByCompanyPolicy ?? false);
 const recognizedPaid = computed(() => detail.value?.isPaid ?? requestedPaid.value);
@@ -148,20 +151,52 @@ const requiredBefore = (file: LeaveAttachment) => requirements.value.some(x => x
 const actionTitle = computed(() => actionType.value === 'decision' ? `${leaveStatusLabels[action.status ?? 'pending']}: registrar respuesta`
   : ({ cancel: 'Cancelar solicitud', return: 'Registrar mi regreso', verify: action.attachmentId ? action.supportStatus === 'verified' ? 'Verificar documento' : 'Solicitar corrección' : 'Verificar regreso', upload: replacement.value ? 'Reemplazar soporte' : 'Adjuntar soporte', remove: 'Retirar documento' })[actionType.value]);
 const confirmationDescription = computed(() => `${actionTitle.value}. ${selectedFile.value?.fileName ?? pendingFiles.value[0]?.file.name ?? ''}`);
-async function loadHistory(page = 1) {
-  const id = publicId.value, ticket = generation;
-  try { const data = await employeeLeaveApi.history(id, page); if (id === publicId.value && ticket === generation) { history.value = data.items; historyPage.value = data.page; historyPages.value = data.totalPages; } }
-  catch (e) { if (ticket === generation) error.value = (e as Error).message; }
-}
-async function reload() {
-  const ticket = ++generation, id = publicId.value; loading.value = true; error.value = '';
+async function loadHistory(page = 1, context?: RefreshContext) {
+  if (context && !context.isCurrent()) return;
+  historyController?.abort();
+  const controller = new AbortController(); historyController = controller;
+  const id = publicId.value, ticket = generation, historyTicket = ++historyGeneration;
+  const abort = () => controller.abort();
+  context?.signal.addEventListener('abort', abort, { once: true });
+  const current = () => id === publicId.value && ticket === generation && historyTicket === historyGeneration
+    && !controller.signal.aborted && (!context || context.isCurrent());
   try {
-    const data = await employeeLeaveApi.detail(id); if (ticket !== generation) return;
-    detail.value = data; changed.value = false; await loadHistory();
-    if (data.request.userId === auth.user?.id && data.request.isUnread) { await employeeLeaveApi.read(id, data.request.version); await store.refreshSummary(); }
-  } catch (e) { if (ticket === generation) error.value = (e as Error).message; }
+    const data = await employeeLeaveApi.history(id, page, controller.signal);
+    if (current()) { history.value = data.items; historyPage.value = data.page; historyPages.value = data.totalPages; }
+  } catch (e) { if (current()) error.value = (e as Error).message; }
+  finally { context?.signal.removeEventListener('abort', abort); if (historyController === controller) historyController = undefined; }
+}
+async function refreshDetail(context: EmployeeLeaveRefreshContext) {
+  const ticket = generation, id = publicId.value;
+  const current = () => ticket === generation && id === publicId.value && context.isCurrent();
+  if (!auth.isAuthenticated || store.isTerminal) return;
+  if (context.change && (context.change.publicId !== id || context.change.version <= (detail.value?.request.version ?? 0))) return;
+  if (context.reason === 'change' && busy.value && detail.value) { changed.value = true; return; }
+  loading.value = true; error.value = '';
+  try {
+    const data = await employeeLeaveApi.detail(id, context.signal);
+    if (!current()) return;
+    // Visibility/reconnection is not proof of a conflict. Preserve an open form and compare versions.
+    if (context.reason !== 'manual' && busy.value && detail.value) {
+      if (data.request.version > detail.value.request.version) changed.value = true;
+      return;
+    }
+    detail.value = data; changed.value = false;
+    await loadHistory(1, context);
+    if (!current()) return;
+    if (data.request.userId === auth.user?.id && data.request.isUnread) {
+      await employeeLeaveApi.read(id, data.request.version, context.signal);
+      if (!current()) return;
+      if (detail.value?.request.version === data.request.version) detail.value.request.isUnread = false;
+      store.invalidate();
+    }
+  } catch (e) { if (current()) error.value = (e as Error).message; }
   finally { if (ticket === generation) loading.value = false; }
 }
+const updates = useEmployeeLeaveUpdates(refreshDetail, {
+  acceptChange: change => change.publicId === publicId.value && change.version > (detail.value?.request.version ?? 0),
+});
+function reload() { return updates.refresh(); }
 function prepare(type: typeof actionType.value, status?: LeaveStatus) {
   if (!detail.value) return;
   if (changed.value) { void reload(); return; }
@@ -203,11 +238,20 @@ async function confirmAction(password: string) {
   }
 }
 async function download(file: LeaveAttachment) { try { await employeeLeaveApi.download(publicId.value, file); } catch (e) { error.value = (e as Error).message; } }
-useEmployeeLeaveUpdates(async () => { await store.refreshSummary(); if (editing.value || actionOpen.value || confirming.value) changed.value = true; else await reload(); });
-function clearPrivateState() { generation++; detail.value = undefined; history.value = []; editing.value = false; actionOpen.value = false; confirming.value = false; pendingFiles.value = []; selectedFile.value = undefined; replacement.value = undefined; }
-watch(publicId, () => { clearPrivateState(); void reload(); });
-watch(() => auth.user?.id, clearPrivateState);
+function clearPrivateState() {
+  generation++; updates.cancel(); historyGeneration++; historyController?.abort(); historyController = undefined;
+  detail.value = undefined; history.value = []; historyPage.value = 1; historyPages.value = 1;
+  editing.value = false; actionOpen.value = false; confirming.value = false; changed.value = false; loading.value = false;
+  error.value = ''; actionError.value = ''; actionOwner = undefined;
+  pendingFiles.value = []; selectedFile.value = undefined; replacement.value = undefined;
+}
+watch(publicId, () => { clearPrivateState(); void reload(); }, { flush: 'sync' });
+watch(() => store.sessionKey, () => { clearPrivateState(); void reload(); }, { flush: 'sync' });
 watch(actionOpen, open => { if (!open) pendingFiles.value = []; });
-onMounted(() => { void reload(); void store.loadKinds().catch(e => { error.value = (e as Error).message; }); });
+watch(busy, value => { if (!value && changed.value) void reload(); });
+onMounted(() => {
+  const ticket = generation;
+  void store.loadKinds().catch(e => { if (ticket === generation) error.value = (e as Error).message; });
+});
 onUnmounted(clearPrivateState);
 </script>

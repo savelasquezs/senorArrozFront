@@ -31,14 +31,21 @@ const detail = { request, documentNumber: null, justification: 'Asistir a una ci
   evidenceRequirements: rules.map(rule => ({ ...rule, status: rule.stage === 'before' ? 'submitted' : 'missing' })), policyVersion: 2 };
 const rows = [request, { ...request, publicId: '79aa29c2-bf3d-43a4-ab04-683ad36ccce8', kind: 'personal_errand', status: 'approved', requestedIsPaid: false, isPaid: false, supportStatus: 'not_required',
   startsAt: '2026-10-23T05:00:00Z', endsAt: '2026-10-24T05:00:00Z', isAllDay: true, isUnread: false }];
-const fake = `import { reactive } from 'vue';
+const fake = `import { reactive, onMounted, onBeforeUnmount } from 'vue';
 const kinds = ${JSON.stringify(kinds)};
 const auth = reactive({ user: { id: 7, accountType: 'personal' }, userName: 'Usuario de prueba', branchName: 'Sucursal de prueba', isAuthenticated: true, isAdmin: false, isSuperadmin: true });
 const leaves = reactive({ kinds, summary: { unread: 1, pendingReview: 1 }, isTerminal: false, canReview: true, loadKinds: async () => {}, refreshSummary: async () => {}, invalidate: () => {} });
 export const useAuthStore = () => auth;
 export const useEmployeeLeavesStore = () => leaves;
 export const useBranchContextStore = () => ({ options: [{ id: 1, name: 'Sucursal de prueba' }], selectedBranchId: 1 });
-export const useEmployeeLeaveUpdates = () => {};
+export const useEmployeeLeaveUpdates = (callback = () => {}) => {
+  let alive = true;
+  const controller = new AbortController();
+  const refresh = async () => { if (alive) await callback({ reason: 'manual', signal: controller.signal, isCurrent: () => alive }); };
+  onMounted(() => { void refresh(); });
+  onBeforeUnmount(() => { alive = false; controller.abort(); });
+  return { refresh, cancel: () => {} };
+};
 export const employeeLeaveApi = {
   list: async () => ({ items: ${JSON.stringify(rows)}, totalCount: 2, page: 1, pageSize: 20, totalPages: 1 }),
   detail: async () => (${JSON.stringify(detail)}),

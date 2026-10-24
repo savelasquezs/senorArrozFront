@@ -73,7 +73,7 @@ import LeaveStatusBadge from '@/components/users/LeaveStatusBadge.vue';
 import { useAuthStore } from '@/store/auth';
 import { useBranchContextStore } from '@/store/branchContext';
 import { useEmployeeLeavesStore } from '@/store/employeeLeaves';
-import { useEmployeeLeaveUpdates } from '@/composables/useEmployeeLeaveUpdates';
+import { useEmployeeLeaveUpdates, type EmployeeLeaveRefreshContext } from '@/composables/useEmployeeLeaveUpdates';
 import { employeeLeaveApi } from '@/services/MainAPI/employeeLeaveApi';
 import { addLeaveDays, colombiaUtc, leavePeriod, leaveDuration, leaveStatusLabels, supportStatusLabels, type LeaveItem } from '@/types/employeeLeave';
 import '@/assets/employee-leaves.css';
@@ -86,7 +86,7 @@ const supportOptions = [{ id: '', name: 'Todos' }, ...Object.entries(supportStat
 const branchOptions = computed(() => [{ id: 0, name: 'Todas las sucursales' }, ...branch.options]);
 const items = ref<LeaveItem[]>([]), error = ref(''), loading = ref(false), formOpen = ref(false);
 const total = ref(0), totalPages = ref(0), page = computed(() => Math.max(1, Math.min(100000, Number(route.query.page) || 1)));
-let generation = 0;
+let generation = 0, deferredLoad = false;
 const kindName = (code: string) => store.kinds.find(k => k.code === code)?.label ?? code;
 const isPaid = (item: LeaveItem) => item.isPaid ?? item.requestedIsPaid ?? store.kinds.find(k => k.code === item.kind)?.paidByCompanyPolicy ?? false;
 const detailLink = (id: string) => ({ path: `/permisos/${id}`, query: route.query });
@@ -95,34 +95,47 @@ function syncFilters() {
   Object.assign(filters, { status: String(q.status ?? ''), search: String(q.search ?? ''), from: q.from ? String(q.from) : null, to: q.to ? String(q.to) : null,
     branchId: Number(q.branchId) || (q.all === '0' ? branch.selectedBranchId ?? 0 : 0), remuneration: String(q.remuneration ?? ''), support: String(q.support ?? '') });
 }
-async function load() {
-  const ticket = ++generation; error.value = ''; loading.value = true;
-  if (!auth.isAuthenticated || store.isTerminal) { items.value = []; loading.value = false; return; }
+async function loadData(context: EmployeeLeaveRefreshContext) {
+  const ticket = generation; error.value = ''; loading.value = true;
+  const current = () => ticket === generation && context.isCurrent();
+  if (!auth.isAuthenticated || store.isTerminal) { items.value = []; total.value = 0; totalPages.value = 0; loading.value = false; return; }
   try {
     const q = route.query;
     const data = await employeeLeaveApi.list({ review: review.value, status: String(q.status ?? '') || undefined, search: review.value ? String(q.search ?? '') || undefined : undefined,
       branchId: review.value && auth.isSuperadmin ? Number(q.branchId) || (q.all === '0' ? branch.selectedBranchId ?? undefined : undefined) : undefined,
       from: q.from ? colombiaUtc(`${q.from}T00:00`) : undefined, to: q.to ? colombiaUtc(`${addLeaveDays(String(q.to), 1)}T00:00`) : undefined,
       remunerated: q.remuneration === 'paid' ? true : q.remuneration === 'unpaid' ? false : undefined,
-      support: String(q.support ?? '') || undefined, page: page.value });
-    if (ticket !== generation) return;
+      support: String(q.support ?? '') || undefined, page: page.value }, context.signal);
+    if (!current()) return;
     items.value = data.items; total.value = data.totalCount; totalPages.value = data.totalPages;
-  } catch (e) { if (ticket === generation) { error.value = (e as Error).message; items.value = []; } }
+  } catch (e) { if (current()) { error.value = (e as Error).message; items.value = []; total.value = 0; totalPages.value = 0; } }
   finally { if (ticket === generation) loading.value = false; }
 }
+const updates = useEmployeeLeaveUpdates(async context => {
+  if (formOpen.value) { deferredLoad = true; return; }
+  await loadData(context);
+});
+function load() { return updates.refresh(); }
 function apply() {
   if (filters.from && filters.to && filters.from > filters.to) { error.value = 'La fecha final no puede ser anterior a la inicial.'; return; }
   void router.replace({ path: '/permisos', query: { tab: review.value ? 'review' : undefined, status: filters.status || undefined,
-    search: review.value ? filters.search || undefined : undefined, from: filters.from || undefined, to: filters.to || undefined,
+    search: review.value ? filters.search || undefined : undefined, from: filters.from || undefined, to: filters.to ? filters.to : undefined,
     branchId: review.value && auth.isSuperadmin && filters.branchId ? String(filters.branchId) : undefined,
     remuneration: filters.remuneration || undefined, support: filters.support || undefined } });
 }
 function clearFilters() { void router.replace({ path: '/permisos', query: { tab: review.value ? 'review' : undefined } }); }
 function goPage(value: number) { void router.replace({ query: { ...route.query, page: String(value) } }); }
 function openDetail(id: string) { void router.push(detailLink(id)); }
-watch(() => route.query, () => { syncFilters(); void load(); });
-watch(() => auth.user?.id, () => { items.value = []; void load(); });
-useEmployeeLeaveUpdates(async () => { await store.refreshSummary(); if (!formOpen.value) await load(); });
-onMounted(async () => { syncFilters(); void load(); void store.refreshSummary(); try { await store.loadKinds(); } catch (e) { error.value = (e as Error).message; } });
+watch(() => route.query, () => { generation++; updates.cancel(); syncFilters(); void load(); }, { flush: 'sync' });
+watch(() => store.sessionKey, () => {
+  generation++; updates.cancel(); items.value = []; total.value = 0; totalPages.value = 0; loading.value = false; error.value = '';
+  void load();
+}, { flush: 'sync' });
+watch(formOpen, open => { if (!open && deferredLoad) { deferredLoad = false; void load(); } });
+onMounted(() => {
+  syncFilters();
+  const ticket = generation;
+  void store.loadKinds().catch(e => { if (ticket === generation) error.value = (e as Error).message; });
+});
 onUnmounted(() => { generation++; });
 </script>

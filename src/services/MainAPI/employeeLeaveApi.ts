@@ -4,14 +4,14 @@ import type { PagedResult } from '@/types/common';
 import type { LeaveAction, LeaveAttachment, LeaveDetail, LeaveHistory, LeaveInput, LeaveItem, LeaveKind, LeavePendingFile, LeaveSummary } from '@/types/employeeLeave';
 const root = '/employee-leaves';
 class EmployeeLeaveApi extends BaseApi {
-  list(params: { review?: boolean; status?: string; search?: string; branchId?: number; from?: string; to?: string; page?: number; remunerated?: boolean; support?: string }) {
-    return this.get<PagedResult<LeaveItem>>(root, { params, branchScope: 'none' });
+  list(params: { review?: boolean; status?: string; search?: string; branchId?: number; from?: string; to?: string; page?: number; remunerated?: boolean; support?: string }, signal?: AbortSignal) {
+    return this.get<PagedResult<LeaveItem>>(root, { params, signal, branchScope: 'none' });
   }
-  detail(id: string) { return this.get<LeaveDetail>(`${root}/${id}`, { branchScope: 'none' }); }
-  history(id: string, page = 1) { return this.get<PagedResult<LeaveHistory>>(`${root}/${id}/history`, { params: { page, pageSize: 25 }, branchScope: 'none' }); }
-  catalog() { return this.get<LeaveKind[]>(`${root}/catalog`, { branchScope: 'none' }); }
-  summary() { return this.get<LeaveSummary>(`${root}/summary`, { branchScope: 'none' }); }
-  read(id: string, version: number) { return this.send<void>({ method: 'POST', url: `${root}/${id}/read`, data: { version } }); }
+  detail(id: string, signal?: AbortSignal) { return this.get<LeaveDetail>(`${root}/${id}`, { signal, branchScope: 'none' }); }
+  history(id: string, page = 1, signal?: AbortSignal) { return this.get<PagedResult<LeaveHistory>>(`${root}/${id}/history`, { params: { page, pageSize: 25 }, signal, branchScope: 'none' }); }
+  catalog(signal?: AbortSignal) { return this.get<LeaveKind[]>(`${root}/catalog`, { signal, branchScope: 'none' }); }
+  summary(signal?: AbortSignal) { return this.get<LeaveSummary>(`${root}/summary`, { signal, branchScope: 'none' }); }
+  read(id: string, version: number, signal?: AbortSignal) { return this.send<void>({ method: 'POST', url: `${root}/${id}/read`, data: { version }, signal }); }
   save(id: string | undefined, input: LeaveInput, files: LeavePendingFile[] = [], progress?: (percent: number) => void) {
     const data = new FormData();
     const { password, ...payload } = input;
