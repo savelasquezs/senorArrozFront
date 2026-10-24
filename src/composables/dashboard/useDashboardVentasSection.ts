@@ -1,101 +1,109 @@
-import { ref, watch, computed, type Ref } from 'vue';
-import {
-	fetchVentasDashboard,
-	fetchVentasProductsOnly,
-	USE_VENTAS_MOCK,
-	type VentasDashboardPayload,
-	type VentasProductsGroupBy,
-} from '@/services/MainAPI/dashboardSectionApi';
+import { ref, watch, computed, onScopeDispose, type Ref } from 'vue';
+import { fetchVentasDashboard, fetchVentasProductsOnly, USE_VENTAS_MOCK,
+  type VentasDashboardPayload, type VentasProductsGroupBy } from '@/services/MainAPI/dashboardSectionApi';
 import type { DashboardSectionId } from '@/views/dashboard/dashboardSectionIds';
 
 function rangeKey(range: [Date, Date]) {
-	const [a, b] = range;
-	return `${a.getTime()}-${b.getTime()}`;
+  return `${range[0].getTime()}-${range[1].getTime()}`;
 }
 
-/**
- * Carga Ventas: comparativa, evolución temporal y productos/categorías para el rango del `TimeEvolutionPanel`.
- * Cambiar Productos ↔ Categorías solo vuelve a pedir `/sales/products` y no muestra el estado de carga de toda la sección.
- */
 export function useDashboardVentasSection(
-	activeSection: Ref<DashboardSectionId>,
-	branchId: Ref<number | null>,
-	dateRange: Ref<[Date, Date]>,
-	productsGroupBy: Ref<VentasProductsGroupBy>,
+  activeSection: Ref<DashboardSectionId>,
+  branchId: Ref<number | null>,
+  dateRange: Ref<[Date, Date]>,
+  productsGroupBy: Ref<VentasProductsGroupBy>,
 ) {
-	const data = ref<VentasDashboardPayload | null>(null);
-	const loading = ref(false);
-	const refreshBusy = ref(false);
-	const error = ref<string | null>(null);
+  const data = ref<VentasDashboardPayload | null>(null);
+  const loading = ref(false);
+  const refreshBusy = ref(false);
+  const error = ref<string | null>(null);
+  const isActive = computed(() => activeSection.value === 'ventas');
+  const scopeKey = () => `${branchId.value ?? 'all'}|${rangeKey(dateRange.value)}`;
+  let fullLoadSeq = 0, productsOnlySeq = 0;
+  let fullController: AbortController | null = null;
+  let productsController: AbortController | null = null;
+  let lastScope = '';
 
-	const isActive = computed(() => activeSection.value === 'ventas');
+  function cancelPending() {
+    fullLoadSeq++;
+    productsOnlySeq++;
+    fullController?.abort();
+    productsController?.abort();
+    fullController = null;
+    productsController = null;
+  }
+  onScopeDispose(cancelPending);
 
-	let fullLoadSeq = 0;
-	let productsOnlySeq = 0;
+  async function loadFull() {
+    if (!isActive.value) return;
+    cancelPending();
+    const seq = fullLoadSeq;
+    const controller = new AbortController();
+    fullController = controller;
+    const key = scopeKey();
+    if (key !== lastScope) {
+      data.value = null;
+      lastScope = key;
+    }
+    const hadData = data.value !== null;
+    if (hadData) refreshBusy.value = true;
+    else loading.value = true;
+    error.value = null;
+    const groupForFetch = productsGroupBy.value;
+    try {
+      const result = await fetchVentasDashboard(
+        branchId.value, [dateRange.value[0], dateRange.value[1]], groupForFetch, controller.signal,
+      );
+      if (seq !== fullLoadSeq || !isActive.value || key !== scopeKey()) return;
+      data.value = result;
+    } catch (e) {
+      if (seq !== fullLoadSeq || !isActive.value) return;
+      error.value = e instanceof Error ? e.message : 'Error al cargar Ventas';
+      data.value = null;
+    } finally {
+      if (seq === fullLoadSeq) {
+        fullController = null;
+        loading.value = false;
+        refreshBusy.value = false;
+      }
+    }
+    if (seq === fullLoadSeq && isActive.value && data.value && productsGroupBy.value !== groupForFetch) {
+      void refreshProductsOnly();
+    }
+  }
 
-	async function loadFull() {
-		if (!isActive.value) return;
-		const seq = ++fullLoadSeq;
-		const hadData = data.value != null;
-		if (hadData) refreshBusy.value = true;
-		else loading.value = true;
-		error.value = null;
-		const groupByForThisFetch = productsGroupBy.value;
-		try {
-			const result = await fetchVentasDashboard(
-				branchId.value,
-				dateRange.value,
-				groupByForThisFetch,
-			);
-			if (seq !== fullLoadSeq) return;
-			data.value = result;
-		} catch (e) {
-			if (seq !== fullLoadSeq) return;
-			error.value = e instanceof Error ? e.message : 'Error al cargar Ventas';
-			if (!hadData) data.value = null;
-		} finally {
-			if (seq === fullLoadSeq) {
-				loading.value = false;
-				refreshBusy.value = false;
-			}
-		}
-		// Tras quitar el loading: si el agrupamiento cambió durante la petición, actualizar solo gráficas de productos.
-		if (seq === fullLoadSeq && data.value && productsGroupBy.value !== groupByForThisFetch) {
-			void refreshProductsOnly();
-		}
-	}
+  async function refreshProductsOnly() {
+    if (!isActive.value || USE_VENTAS_MOCK || !data.value) return;
+    productsController?.abort();
+    const controller = new AbortController();
+    productsController = controller;
+    const seq = ++productsOnlySeq;
+    const parentSeq = fullLoadSeq;
+    const key = scopeKey();
+    const group = productsGroupBy.value;
+    try {
+      const products = await fetchVentasProductsOnly(
+        branchId.value, [dateRange.value[0], dateRange.value[1]], group, controller.signal,
+      );
+      if (seq !== productsOnlySeq || parentSeq !== fullLoadSeq || !isActive.value
+          || key !== scopeKey() || productsGroupBy.value !== group || !data.value) return;
+      data.value = { ...data.value, products };
+    } catch {
+      // A ranking-only error does not hide the remaining sales charts.
+    } finally {
+      if (seq === productsOnlySeq) productsController = null;
+    }
+  }
 
-	async function refreshProductsOnly() {
-		if (!isActive.value || USE_VENTAS_MOCK) return;
-		if (!data.value) return;
-		const seq = ++productsOnlySeq;
-		try {
-			const products = await fetchVentasProductsOnly(
-				branchId.value,
-				dateRange.value,
-				productsGroupBy.value,
-			);
-			if (seq !== productsOnlySeq) return;
-			if (!data.value) return;
-			data.value = { ...data.value, products };
-		} catch {
-			// Mantener gráficas anteriores; no bloquear la sección.
-		}
-	}
-
-	watch(
-		[isActive, branchId, () => rangeKey(dateRange.value)],
-		() => void loadFull(),
-		{ immediate: true },
-	);
-
-	watch(productsGroupBy, () => void refreshProductsOnly());
-
-	return {
-		data,
-		loading,
-		refreshBusy,
-		error,
-		refresh: loadFull,
-	};
+  watch([isActive, branchId, () => rangeKey(dateRange.value)], () => {
+    if (isActive.value) void loadFull();
+    else {
+      cancelPending();
+      data.value = null;
+      loading.value = false;
+      refreshBusy.value = false;
+    }
+  }, { immediate: true });
+  watch(productsGroupBy, () => void refreshProductsOnly());
+  return { data, loading, refreshBusy, error, refresh: loadFull };
 }

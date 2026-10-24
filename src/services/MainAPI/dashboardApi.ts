@@ -163,6 +163,7 @@ class DashboardApi extends BaseApi {
 		fromIso: string,
 		toIso: string,
 		dayOfWeek?: number | null,
+		signal?: AbortSignal,
 	): Promise<DashboardSalesComparisonApiResponse> {
 		const params: Record<string, string | number> = { from: fromIso, to: toIso };
 		if (branchId != null) params.branchId = branchId;
@@ -170,6 +171,7 @@ class DashboardApi extends BaseApi {
 		return this.get<DashboardSalesComparisonApiResponse>('/dashboard/sales/comparison', {
 			params,
 			branchScope: 'all',
+			signal,
 		});
 	}
 
@@ -179,6 +181,7 @@ class DashboardApi extends BaseApi {
 		fromIso: string,
 		toIso: string,
 		dayOfWeek?: number | null,
+		signal?: AbortSignal,
 	): Promise<DashboardSalesEvolutionApiResponse> {
 		const params: Record<string, string | number> = { from: fromIso, to: toIso };
 		if (branchId != null) params.branchId = branchId;
@@ -186,6 +189,7 @@ class DashboardApi extends BaseApi {
 		return this.get<DashboardSalesEvolutionApiResponse>('/dashboard/sales/evolution', {
 			params,
 			branchScope: 'all',
+			signal,
 		});
 	}
 
@@ -194,6 +198,7 @@ class DashboardApi extends BaseApi {
 		fromIso: string,
 		toIso: string,
 		dayOfWeek?: number | null,
+		signal?: AbortSignal,
 	): Promise<DashboardSalesHourlyApiResponse> {
 		const params: Record<string, string | number> = { from: fromIso, to: toIso };
 		if (branchId != null) params.branchId = branchId;
@@ -201,6 +206,7 @@ class DashboardApi extends BaseApi {
 		return this.get<DashboardSalesHourlyApiResponse>('/dashboard/sales/hourly', {
 			params,
 			branchScope: 'all',
+			signal,
 		});
 	}
 
@@ -212,6 +218,7 @@ class DashboardApi extends BaseApi {
 		top = 10,
 		groupBy: 'product' | 'category' = 'product',
 		dayOfWeek?: number | null,
+		signal?: AbortSignal,
 	): Promise<DashboardSalesProductsApiResponse> {
 		const params: Record<string, string | number> = { from: fromIso, to: toIso, top, groupBy, includeWeights: 'false' };
 		if (branchId != null) params.branchId = branchId;
@@ -219,6 +226,7 @@ class DashboardApi extends BaseApi {
 		return this.get<DashboardSalesProductsApiResponse>('/dashboard/sales/products', {
 			params,
 			branchScope: 'all',
+			signal,
 		});
 	}
 
