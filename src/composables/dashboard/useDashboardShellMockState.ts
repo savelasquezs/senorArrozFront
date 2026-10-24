@@ -16,6 +16,7 @@ import { defaultDashboardPeriodThisMonth } from '@/utils/dashboardPeriodPresets'
 import type { DashboardSectionId } from '@/views/dashboard/dashboardSectionIds';
 import type { DeliveryDashboardPayload } from '@/services/MainAPI/dashboardSectionApi';
 import { buildDeliveryEvolutionBundle, scaleSeriesToTargetSum } from '@/utils/deliveryEvolutionSeries';
+import { USE_DELIVERY_MOCK } from '@/services/MainAPI/dashboardSectionApi';
 import { ClipboardDocumentListIcon, CurrencyDollarIcon, UsersIcon } from '@heroicons/vue/24/outline';
 import { defaultBusinessCalendar } from '@/utils/datetime';
 
@@ -133,12 +134,14 @@ export function useDashboardShellMockState(options: UseDashboardShellMockStateOp
 				salesTotals: api.evolutionSalesTotals,
 			};
 		}
+		if (!USE_DELIVERY_MOCK) return { labels: [], deliveries: [], feesTotal: [], salesTotals: [] };
 		return buildDeliveryEvolutionBundle(deliveryDateRange.value);
 	});
 
 	const scaledDeliverymenAll = computed<DeliverymanEfficiencyRow[]>(() => {
 		const api = domiciliosApiPayload.value;
 		if (api) return api.deliverymen;
+		if (!USE_DELIVERY_MOCK) return [];
 		const [from, to] = deliveryDateRange.value;
 		const seed =
 			Math.abs(Math.floor(from.getTime() / 86400000) + Math.floor(to.getTime() / 86400000)) % 97;

@@ -73,6 +73,7 @@ export type PrincipalDashboardPayload = {
 export type PrincipalDashboardQueryOptions = {
 	/** Rango UTC para KPIs (opcional). Si se envía, deben ir ambas fechas. */
 	kpiRange?: [Date, Date];
+	signal?: AbortSignal;
 };
 
 export async function fetchPrincipalDashboard(
@@ -94,7 +95,7 @@ export async function fetchPrincipalDashboard(
 		branchId,
 		kpiFrom,
 		kpiTo,
-	});
+	}, options?.signal);
 	return mapPrincipalFromApi(raw);
 }
 
@@ -214,10 +215,11 @@ export async function fetchDeliveryDashboard(
 	periodRange: [Date, Date],
 	deliveryManId: number | 'all' = 'all',
     excludeWednesdays = false,
+    signal?: AbortSignal,
 ): Promise<DeliveryDashboardPayload> {
 	const { from, to } = encodeDashboardRangeToApi(periodRange);
 	const dm = deliveryManId === 'all' ? null : deliveryManId;
-	const raw = await dashboardApi.getDelivery(branchId, from, to, { deliveryManId: dm, excludeWednesdays });
+	const raw = await dashboardApi.getDelivery(branchId, from, to, { deliveryManId: dm, excludeWednesdays }, signal);
 	return mapDeliveryFromApi(raw);
 }
 
@@ -437,6 +439,7 @@ export async function fetchVentasDashboard(
 	branchId: number | null,
 	dateRange: [Date, Date],
 	productsGroupBy: VentasProductsGroupBy = 'product',
+	signal?: AbortSignal,
 ): Promise<VentasDashboardPayload> {
 	if (USE_VENTAS_MOCK) {
 		await delay();
@@ -449,10 +452,10 @@ export async function fetchVentasDashboard(
 	}
 	const { from, to } = encodeDashboardRangeToApi(dateRange);
 	const [comp, evo, hourly, prod] = await Promise.all([
-		dashboardApi.getSalesComparison(branchId, from, to),
-		dashboardApi.getSalesEvolution(branchId, from, to),
-		dashboardApi.getSalesHourly(branchId, from, to),
-		dashboardApi.getSalesProducts(branchId, from, to, 10, productsGroupBy),
+		dashboardApi.getSalesComparison(branchId, from, to, undefined, signal),
+		dashboardApi.getSalesEvolution(branchId, from, to, undefined, signal),
+		dashboardApi.getSalesHourly(branchId, from, to, undefined, signal),
+		dashboardApi.getSalesProducts(branchId, from, to, 10, productsGroupBy, undefined, signal),
 	]);
 	return {
 		comparisonRows: mapComparisonFromApi(comp),
@@ -467,6 +470,7 @@ export async function fetchVentasProductsOnly(
 	branchId: number | null,
 	dateRange: [Date, Date],
 	productsGroupBy: VentasProductsGroupBy,
+	signal?: AbortSignal,
 ): Promise<VentasProductsPayload | null> {
 	if (USE_VENTAS_MOCK) return null;
 	const { from, to } = encodeDashboardRangeToApi(dateRange);
@@ -476,6 +480,8 @@ export async function fetchVentasProductsOnly(
 		to,
 		10,
 		productsGroupBy,
+		undefined,
+		signal,
 	);
 	return mapProductsFromApi(raw);
 }

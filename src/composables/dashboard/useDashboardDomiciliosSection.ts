@@ -1,4 +1,4 @@
-import { ref, watch, computed, type Ref } from 'vue';
+import { ref, watch, computed, onScopeDispose, type Ref } from 'vue';
 import {
 	fetchDeliveryDashboard,
 	USE_DELIVERY_MOCK,
@@ -35,10 +35,20 @@ export function useDashboardDomiciliosSection(
 
 	const isActive = computed(() => activeSection.value === 'domicilios');
     let requestVersion = 0;
+    let currentController: AbortController | null = null;
+    function invalidatePending() {
+        ++requestVersion;
+        currentController?.abort();
+        currentController = null;
+    }
+    onScopeDispose(invalidatePending);
 
 	async function load() {
 		if (!isActive.value) return;
-        const version = ++requestVersion;
+        invalidatePending();
+        const version = requestVersion;
+        const controller = new AbortController();
+        currentController = controller;
 		const hadData = hasCompletedInitialLoad.value;
 		if (hadData) refreshBusy.value = true;
 		else loading.value = true;
@@ -53,14 +63,16 @@ export function useDashboardDomiciliosSection(
 				dateRange.value,
 				deliveryManId.value,
                 excludeWednesdays.value,
+                controller.signal,
 			);
-            if (version === requestVersion) deliveryPayload.value = payload;
+            if (version === requestVersion && isActive.value) deliveryPayload.value = payload;
 		} catch (e) {
-            if (version !== requestVersion) return;
+            if (version !== requestVersion || !isActive.value) return;
 			error.value = e instanceof Error ? e.message : 'Error al cargar Domicilios';
 			deliveryPayload.value = null;
 		} finally {
-            if (version !== requestVersion) return;
+            if (version !== requestVersion || !isActive.value) return;
+            currentController = null;
 			loading.value = false;
 			refreshBusy.value = false;
 			hasCompletedInitialLoad.value = true;
@@ -69,7 +81,15 @@ export function useDashboardDomiciliosSection(
 
 	watch(
 		[isActive, branchId, () => rangeKey(dateRange.value), () => driverKey(deliveryManId.value), excludeWednesdays],
-		() => void load(),
+		() => {
+            if (isActive.value) void load();
+            else {
+                invalidatePending();
+                deliveryPayload.value = null;
+                loading.value = false;
+                refreshBusy.value = false;
+            }
+        },
 		{ immediate: true },
 	);
 

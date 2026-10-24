@@ -26,7 +26,7 @@ describe('delivery dashboard requests', () => {
     await nextTick()
     await flushPromises()
     expect(fetchDeliveryDashboard).toHaveBeenCalledTimes(2)
-    expect(fetchDeliveryDashboard).toHaveBeenLastCalledWith(1, dates.value, 26, true)
+    expect(fetchDeliveryDashboard).toHaveBeenLastCalledWith(1, dates.value, 26, true, expect.any(AbortSignal))
     scope.stop()
   })
 
@@ -40,7 +40,7 @@ describe('delivery dashboard requests', () => {
     excluded.value = true
     await nextTick()
     await flushPromises()
-    expect(fetchDeliveryDashboard).toHaveBeenLastCalledWith(1, range, 'all', true)
+    expect(fetchDeliveryDashboard).toHaveBeenLastCalledWith(1, range, 'all', true, expect.any(AbortSignal))
     scope.stop()
   })
   it('ignores a response belonging to an earlier branch selection', async () => {

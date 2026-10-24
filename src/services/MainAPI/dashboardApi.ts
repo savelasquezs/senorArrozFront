@@ -101,7 +101,7 @@ export type DashboardMainQueryParams = {
 };
 
 class DashboardApi extends BaseApi {
-	async getMain(params: DashboardMainQueryParams): Promise<DashboardMainApiResponse> {
+	async getMain(params: DashboardMainQueryParams, signal?: AbortSignal): Promise<DashboardMainApiResponse> {
 		const q: Record<string, string | number> = {
 			activityLimit: params.activityLimit ?? 20,
 		};
@@ -111,6 +111,7 @@ class DashboardApi extends BaseApi {
 		return this.get<DashboardMainApiResponse>('/dashboard/main', {
 			params: q,
 			branchScope: 'all',
+			signal,
 		});
 	}
 
@@ -119,6 +120,7 @@ class DashboardApi extends BaseApi {
 		fromIso: string,
 		toIso: string,
 		opts?: { deliveryManId?: number | null; excludeWednesdays?: boolean },
+		signal?: AbortSignal,
 	): Promise<DashboardDeliveryApiResponse> {
 		const params: Record<string, string | number> = { from: fromIso, to: toIso };
 		if (branchId != null) params.branchId = branchId;
@@ -127,6 +129,7 @@ class DashboardApi extends BaseApi {
 		return this.get<DashboardDeliveryApiResponse>('/dashboard/delivery', {
 			params,
 			branchScope: 'all',
+			signal,
 		});
 	}
 
@@ -160,6 +163,7 @@ class DashboardApi extends BaseApi {
 		fromIso: string,
 		toIso: string,
 		dayOfWeek?: number | null,
+		signal?: AbortSignal,
 	): Promise<DashboardSalesComparisonApiResponse> {
 		const params: Record<string, string | number> = { from: fromIso, to: toIso };
 		if (branchId != null) params.branchId = branchId;
@@ -167,6 +171,7 @@ class DashboardApi extends BaseApi {
 		return this.get<DashboardSalesComparisonApiResponse>('/dashboard/sales/comparison', {
 			params,
 			branchScope: 'all',
+			signal,
 		});
 	}
 
@@ -176,6 +181,7 @@ class DashboardApi extends BaseApi {
 		fromIso: string,
 		toIso: string,
 		dayOfWeek?: number | null,
+		signal?: AbortSignal,
 	): Promise<DashboardSalesEvolutionApiResponse> {
 		const params: Record<string, string | number> = { from: fromIso, to: toIso };
 		if (branchId != null) params.branchId = branchId;
@@ -183,6 +189,7 @@ class DashboardApi extends BaseApi {
 		return this.get<DashboardSalesEvolutionApiResponse>('/dashboard/sales/evolution', {
 			params,
 			branchScope: 'all',
+			signal,
 		});
 	}
 
@@ -191,6 +198,7 @@ class DashboardApi extends BaseApi {
 		fromIso: string,
 		toIso: string,
 		dayOfWeek?: number | null,
+		signal?: AbortSignal,
 	): Promise<DashboardSalesHourlyApiResponse> {
 		const params: Record<string, string | number> = { from: fromIso, to: toIso };
 		if (branchId != null) params.branchId = branchId;
@@ -198,6 +206,7 @@ class DashboardApi extends BaseApi {
 		return this.get<DashboardSalesHourlyApiResponse>('/dashboard/sales/hourly', {
 			params,
 			branchScope: 'all',
+			signal,
 		});
 	}
 
@@ -209,13 +218,15 @@ class DashboardApi extends BaseApi {
 		top = 10,
 		groupBy: 'product' | 'category' = 'product',
 		dayOfWeek?: number | null,
+		signal?: AbortSignal,
 	): Promise<DashboardSalesProductsApiResponse> {
-		const params: Record<string, string | number> = { from: fromIso, to: toIso, top, groupBy };
+		const params: Record<string, string | number> = { from: fromIso, to: toIso, top, groupBy, includeWeights: 'false' };
 		if (branchId != null) params.branchId = branchId;
 		if (dayOfWeek != null) params.dayOfWeek = dayOfWeek;
 		return this.get<DashboardSalesProductsApiResponse>('/dashboard/sales/products', {
 			params,
 			branchScope: 'all',
+			signal,
 		});
 	}
 
@@ -226,6 +237,7 @@ class DashboardApi extends BaseApi {
 		toIso: string,
 		opts: { granularity: 'day' | 'month' | 'year'; categoryId?: number | null },
 		dayOfWeek?: number | null,
+		signal?: AbortSignal,
 	): Promise<DashboardCategoryWeightsApiResponse> {
 		const params: Record<string, string | number> = {
 			from: fromIso,
@@ -239,6 +251,7 @@ class DashboardApi extends BaseApi {
 		return this.get<DashboardCategoryWeightsApiResponse>('/dashboard/sales/category-weights', {
 			params,
 			branchScope: 'all',
+			signal,
 		});
 	}
 
@@ -317,12 +330,13 @@ class DashboardApi extends BaseApi {
 		fromIso: string,
 		toIso: string,
 		granularity: 'day' | 'month' | 'year',
+		signal?: AbortSignal,
 	): Promise<DashboardPrincipalSalesVsExpensesApiResponse> {
 		const params: Record<string, string> = { from: fromIso, to: toIso, granularity };
 		if (branchId != null) params.branchId = String(branchId);
 		return this.get<DashboardPrincipalSalesVsExpensesApiResponse>(
 			'/dashboard/principal/sales-vs-expenses',
-			{ params, branchScope: 'all' },
+			{ params, branchScope: 'all', signal },
 		);
 	}
 }
