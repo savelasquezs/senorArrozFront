@@ -126,7 +126,7 @@ export function useDashboardGastosSection(
 		filterExpenseId.value = null;
 	});
 
-	async function loadCoreAndSeries(silent: boolean) {
+	async function loadCoreAndSeries() {
 		if (!isActive.value) return;
 		const seq = ++coreSeq;
 		seriesSeq++;
@@ -195,7 +195,7 @@ export function useDashboardGastosSection(
 			if (!data.value) return;
 			rawSeries = mapTimeSeries(tsRaw);
 			rawSeriesKey = key;
-			let ts = formatTimeSeriesForScale(rawSeries, timeGranularity.value, dateRange.value);
+			const ts = formatTimeSeriesForScale(rawSeries, timeGranularity.value, dateRange.value);
 			data.value = {
 				...data.value,
 				timeSeries: ts,
@@ -269,7 +269,7 @@ export function useDashboardGastosSection(
 				data.value = null;
 				return;
 			}
-			void loadCoreAndSeries(false);
+			void loadCoreAndSeries();
 		},
 		{ immediate: true },
 	);
