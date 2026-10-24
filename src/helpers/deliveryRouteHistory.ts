@@ -1,4 +1,4 @@
-import type { DeliveryRouteDetail } from '@/types/deliveryPerformance'
+import type { DeliveryRouteDetail, DeliveryRouteStatus } from '@/types/deliveryPerformance'
 import { elapsedSeconds, formatElapsedDuration } from '@/helpers/orderDurations'
 
 export function deliveryStopTiming(stop: DeliveryRouteDetail['stops'][number]) {
@@ -12,9 +12,16 @@ export function deliveryRouteTiming(detail: DeliveryRouteDetail) {
   const onTheWayTimes = detail.stops.filter(stop => elapsedSeconds(stop.onTheWayAtUtc, stop.deliveredAtUtc) !== null
     && elapsedSeconds(stop.onTheWayAtUtc, detail.completedAtUtc) !== null).map(stop => stop.onTheWayAtUtc!)
     .sort((a, b) => Date.parse(a) - Date.parse(b))
-  const start = hasDeparture ? detail.departedAtUtc : onTheWayTimes[0] ?? null
-  return { start, duration: detail.returnIsInconsistent ? 'No disponible' : formatElapsedDuration(start, detail.completedAtUtc),
-    description: detail.returnIsInconsistent ? 'Regreso inconsistente: cierre fuera de la jornada. Excluido de los promedios de tiempo.' : 'Desde la salida hasta el regreso' }
+  const start = hasDeparture ? detail.departedAtUtc : detail.startedAtUtc ?? onTheWayTimes[0] ?? null
+  const pending = detail.status === 'returnPending' || detail.status === 'inProgress'
+  return { start, duration: pending ? deliveryRouteStatusLabel(detail.status) : detail.returnIsInconsistent ? 'No disponible' : formatElapsedDuration(start, detail.completedAtUtc),
+    description: pending ? 'Sin regreso registrado. Esta ruta no aporta duración completa ni SLA a los promedios.'
+      : detail.returnIsInconsistent ? 'Regreso inconsistente: cierre fuera de la jornada. Excluido de los promedios de tiempo.' : 'Desde la salida hasta el regreso' }
+}
+
+export function deliveryRouteStatusLabel(status?: DeliveryRouteStatus, metSla?: boolean | null) {
+  return status === 'returnPending' ? 'Regreso pendiente' : status === 'inProgress' ? 'En curso'
+    : metSla === true ? 'A tiempo' : metSla === false ? 'Con retraso' : 'Sin SLA'
 }
 
 export function hasRouteCoordinates(latitude: number | null, longitude: number | null): boolean {

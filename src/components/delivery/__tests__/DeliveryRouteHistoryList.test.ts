@@ -10,6 +10,69 @@ const route = (id: number): DeliveryPerformanceRoute => ({ id, deliverymanId: 1,
 const detail = (id: number): DeliveryRouteDetail => ({ routeId: id, branchLatitude: null, branchLongitude: null, departedAtUtc: null, completedAtUtc: null, gpsCoveragePercent: 0, segments: [], stops: [] })
 
 describe('route history details', () => {
+  it('expands the filtered list and switches paginated route details inside one dialog', async () => {
+    const load = vi.fn(async (id: number) => detail(id))
+    const wrapper = mount(DeliveryRouteHistoryList, { props: { compact: true, routes: Array.from({ length: 10 }, (_, i) => route(i + 1)), branchId: 1, loadDetail: load },
+      global: { stubs: { BaseDialog: { props: ['modelValue', 'title'], template: '<div v-if="modelValue" role="dialog" :aria-label="title"><slot /></div>' } } } })
+    await wrapper.get('[aria-label="Ampliar últimas rutas"]').trigger('click')
+    const dialog = wrapper.get('[role="dialog"]')
+    expect(dialog.attributes('aria-label')).toBe('Últimas rutas')
+    expect(dialog.text()).toContain('10 rutas')
+    expect(load).not.toHaveBeenCalled()
+    await dialog.get('[aria-label="Ver recorrido de D2, ruta 2"]').trigger('click')
+    await flushPromises()
+    expect(dialog.text()).toContain('Recorrido · Ruta #2')
+    expect(dialog.text()).toContain('Mapa 2')
+    expect(wrapper.findAll('[role="dialog"]')).toHaveLength(1)
+    await dialog.findAll('button').find(button => button.text() === 'Siguiente')!.trigger('click')
+    expect(dialog.text()).toContain('9–10 de 10')
+    await dialog.get('[aria-label="Ver recorrido de D9, ruta 9"]').trigger('click')
+    await flushPromises()
+    expect(dialog.text()).toContain('Recorrido · Ruta #9')
+    expect(dialog.text()).toContain('Mapa 9')
+    expect(dialog.text()).not.toContain('Mapa 2')
+    expect(wrapper.findAll('[role="dialog"]')).toHaveLength(1)
+    await wrapper.setProps({ routes: [route(11)] })
+    expect(dialog.text()).toContain('1 ruta')
+    expect(dialog.text()).not.toContain('Mapa 9')
+    expect(dialog.text()).toContain('Selecciona una ruta de la lista')
+    wrapper.unmount()
+  })
+
+  it('retries a failed detail without losing the expanded list', async () => {
+    const load = vi.fn().mockRejectedValueOnce(new Error('Sin conexión')).mockResolvedValueOnce(detail(1))
+    const wrapper = mount(DeliveryRouteHistoryList, { props: { expanded: true, routes: [route(1)], branchId: 1, loadDetail: load } })
+    await wrapper.get('[aria-label="Ver recorrido de D1, ruta 1"]').trigger('click')
+    await flushPromises()
+    expect(wrapper.get('[role="alert"]').text()).toContain('Sin conexión')
+    await wrapper.get('[role="alert"] button').trigger('click')
+    await flushPromises()
+    expect(wrapper.text()).toContain('Mapa 1')
+    expect(wrapper.get('[aria-label="Ver recorrido de D1, ruta 1"]').attributes('aria-pressed')).toBe('true')
+    expect(wrapper.find('[role="dialog"]').exists()).toBe(false)
+    wrapper.unmount()
+  })
+
+  it('shows pending returns and in-progress deliveries without invented route durations', async () => {
+    const active = { ...route(2), status: 'inProgress' as const, startedAtUtc: '2026-10-23T23:30:00Z', deliveredCount: 0, pendingOrdersCount: 1 }
+    const pending = { ...route(1), status: 'returnPending' as const, deliveredCount: 2 }
+    const data: DeliveryRouteDetail = { ...detail(2), status: 'inProgress', startedAtUtc: active.startedAtUtc,
+      stops: [{ orderId: 8745, stopSequence: 1, isPending: true, addressSnapshotText: null, customerName: null, addressText: null,
+        latitude: null, longitude: null, onTheWayAtUtc: active.startedAtUtc, deliveredAtUtc: null }] }
+    const wrapper = mount(DeliveryRouteHistoryList, { props: { expanded: true, routes: [active, pending], branchId: 1, loadDetail: vi.fn().mockResolvedValue(data) } })
+    expect(wrapper.get('[aria-label="Ver recorrido de D1, ruta 1"]').text()).toContain('Regreso pendiente')
+    const row = wrapper.get('[aria-label="Ver recorrido de D2, ruta 2"]')
+    expect(row.text()).toContain('En curso')
+    expect(row.text()).toContain('1 pendiente')
+    expect(row.text()).not.toContain('— min')
+    await row.trigger('click')
+    await flushPromises()
+    expect(wrapper.text()).toContain('Aún no entregado')
+    expect(wrapper.text()).toContain('Esta ruta no aporta duración completa ni SLA')
+    expect(wrapper.text()).toContain('23 de octubre de 2026, 18:30')
+    wrapper.unmount()
+  })
+
   it('shows En camino timestamps and durations when the route has no observed departure', async () => {
     const data: DeliveryRouteDetail = { ...detail(1), completedAtUtc: '2026-10-04T17:45:19.408Z', stops: [
       { orderId: 7900, stopSequence: 1, addressSnapshotText: null, customerName: null, addressText: null, latitude: null, longitude: null,

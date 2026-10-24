@@ -50,10 +50,10 @@ function selectOrder(id: number, pan = true) {
   const address = document.createElement('p')
   address.textContent = stop.addressSnapshotText || stop.addressText || 'Dirección sin registrar'
   const time = document.createElement('p')
-  time.textContent = stop.deliveredAtUtc ? `Entregado: ${defaultBusinessCalendar.formatDateTime(stop.deliveredAtUtc)}` : 'Sin hora de entrega'
+  time.textContent = stop.deliveredAtUtc ? `Entregado: ${defaultBusinessCalendar.formatDateTime(stop.deliveredAtUtc)}` : stop.isPending ? 'Aún no entregado' : 'Sin hora de entrega'
   const duration = document.createElement('p')
   const timing = deliveryStopTiming(stop)
-  duration.textContent = `Tiempo de entrega: ${timing.duration}`
+  duration.textContent = stop.isPending ? stop.isOnTheWay ? 'Pedido en camino · Pendiente de entrega' : 'Pedido pendiente de entrega' : `Tiempo de entrega: ${timing.duration}`
   const reference = document.createElement('p')
   reference.textContent = timing.reference
   const onTheWay = document.createElement('p')
@@ -72,7 +72,7 @@ function draw() {
   if (hasRouteCoordinates(detail.branchLatitude, detail.branchLongitude)) {
     const position = { lat: detail.branchLatitude!, lng: detail.branchLongitude! }
     bounds.extend(position)
-    objects.push(new google.maps.Marker({ map, position, title: 'Sucursal · salida y regreso', label: { text: 'S', color: 'white' }, zIndex: 5 }))
+    objects.push(new google.maps.Marker({ map, position, title: detail.completedAtUtc ? 'Sucursal · salida y regreso' : 'Sucursal · origen', label: { text: 'S', color: 'white' }, zIndex: 5 }))
   }
   for (const segment of detail.segments) {
     const path = segment.map(p => ({ lat: p.latitude, lng: p.longitude }))

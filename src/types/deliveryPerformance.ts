@@ -1,4 +1,10 @@
 export interface DeliveryPerformanceSummary {
+  assignedCount?: number
+  pendingCount?: number
+  onTheWayCount?: number
+  routesCount?: number
+  inProgressRoutesCount?: number
+  returnPendingRoutesCount?: number
   inconsistentReturnCount?: number
   deliveredCount: number
   completedRoutesCount: number
@@ -30,7 +36,12 @@ export interface DeliveryPerformanceDriver extends DeliveryPerformanceSummary {
   branchId: number
 }
 
+export type DeliveryRouteStatus = 'completed' | 'inProgress' | 'returnPending'
+
 export interface DeliveryPerformanceRoute {
+  status?: DeliveryRouteStatus
+  startedAtUtc?: string | null
+  pendingOrdersCount?: number
   returnIsInconsistent?: boolean
   id: number
   deliverymanId: number
@@ -60,6 +71,8 @@ export interface DeliveryPerformance {
 }
 
 export interface DeliveryRouteDetail {
+  status?: DeliveryRouteStatus
+  startedAtUtc?: string | null
   returnIsInconsistent?: boolean
   routeId: number
   branchLatitude: number | null
@@ -69,6 +82,8 @@ export interface DeliveryRouteDetail {
   gpsCoveragePercent: number
   segments: Array<Array<{ latitude: number; longitude: number; recordedAt: string }>>
   stops: Array<{
+    isPending?: boolean
+    isOnTheWay?: boolean
     orderId: number
     stopSequence: number
     addressSnapshotText: string | null
