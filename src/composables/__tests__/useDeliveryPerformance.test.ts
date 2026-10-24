@@ -17,6 +17,27 @@ function summary(overrides: Partial<DeliveryPerformanceSummary> = {}): DeliveryP
 }
 
 describe('delivery performance cards', () => {
+  it('reconciles all assigned orders and route states while preserving completed-only performance samples', () => {
+    const current = summary({ assignedCount: 9, deliveredCount: 8, onTheWayCount: 1, routesCount: 6, completedRoutesCount: 4,
+      inProgressRoutesCount: 1, returnPendingRoutesCount: 1, ordersPerRoute: 1.5, routeSampleCount: 4, avgRouteMinutes: 25 })
+    const performance = { current, previous: summary(), driverOptions: [], drivers: [], evolution: [], labels: [], recentRoutes: [] } as DeliveryPerformance
+    const { cards } = useDeliveryPerformance(() => performance)
+    expect(cards.value.find(card => card.key === 'deliveredCount')).toMatchObject({ value: '8', sample: '9 asignados · 1 en camino' })
+    expect(cards.value.find(card => card.key === 'ordersPerRoute')?.sample).toBe('4 cerradas de 6 rutas')
+    const global = useDeliveryPerformance(() => ({ ...performance, current: { ...current, deliveredCount: 10 } }))
+    expect(global.cards.value.find(card => card.key === 'deliveredCount')?.sample).toBe('9 asignados · 1 en camino · 2 sin domiciliario')
+    const pending = useDeliveryPerformance(() => ({ ...performance, current: { ...current, assignedCount: 10, pendingCount: 2 } }))
+    expect(pending.cards.value.find(card => card.key === 'deliveredCount')?.sample).toBe('10 asignados · 1 en camino · 1 otro pendiente')
+    const wrapper = shallowMount(DeliveryAnalyticsPanel, { props: { performance, branchId: 1, driverId: 7, showBranchFilter: false,
+      branchOptions: [], dateRange: [new Date(), new Date()] } })
+    const states = wrapper.get('[aria-label="Estado de las rutas del periodo"]').text()
+    expect(states).toContain('6 rutas en total')
+    expect(states).toContain('4 cerradas')
+    expect(states).toContain('1 en curso')
+    expect(states).toContain('1 con regreso pendiente')
+    wrapper.unmount()
+  })
+
   it('identifies estimated distance samples and separates GPS from planned chart values', () => {
     const data = summary({ gpsSampleCount: 1, distanceSampleCount: 3, estimatedDistanceSampleCount: 2,
       minutesPerKm: 4, gpsMinutesPerKm: 10, estimatedMinutesPerKm: 3.33 })
