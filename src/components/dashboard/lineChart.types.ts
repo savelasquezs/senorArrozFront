@@ -3,4 +3,6 @@ export interface LineChartDataset {
 	data: (number | null)[];
 	borderColor?: string;
 	backgroundColor?: string;
+    borderDash?: number[];
+    pointRadius?: number;
 }

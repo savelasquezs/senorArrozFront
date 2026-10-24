@@ -1,4 +1,5 @@
 import { BaseApi } from './baseApi';
+import type { DeliveryPerformance, DeliveryRouteDetail } from '@/types/deliveryPerformance';
 
 /** Respuesta alineada a `PrincipalDashboardPayload` / DTOs del API. */
 export type DashboardMainApiResponse = {
@@ -48,6 +49,7 @@ export type DashboardDeliveryRouteHistoryApiItem = {
 };
 
 export type DashboardDeliveryRouteMetricsApi = {
+    performance?: DeliveryPerformance;
 	completedRoutesCount: number;
 	routesWithSlaDataCount: number;
 	periodOnTimePercent: number;
@@ -64,16 +66,7 @@ export type DashboardDeliveryRouteMetricsApi = {
 	recentRoutes: DashboardDeliveryRouteHistoryApiItem[];
 };
 
-export type DashboardDeliveryRouteStopsApiResponse = {
-	routeId: number;
-	stops: Array<{
-		orderId: number;
-		stopSequence: number;
-		addressSnapshotText: string | null;
-		customerName: string | null;
-		addressText: string | null;
-	}>;
-};
+export type DashboardDeliveryRouteStopsApiResponse = DeliveryRouteDetail;
 
 export type DashboardDeliveryApiResponse = {
 	avgPrepMinutes: number;
@@ -126,11 +119,12 @@ class DashboardApi extends BaseApi {
 		branchId: number | null,
 		fromIso: string,
 		toIso: string,
-		opts?: { deliveryManId?: number | null },
+		opts?: { deliveryManId?: number | null; excludeWednesdays?: boolean },
 	): Promise<DashboardDeliveryApiResponse> {
 		const params: Record<string, string | number> = { from: fromIso, to: toIso };
 		if (branchId != null) params.branchId = branchId;
 		if (opts?.deliveryManId != null) params.deliveryManId = opts.deliveryManId;
+        if (opts?.excludeWednesdays) params.excludeWednesdays = 'true';
 		return this.get<DashboardDeliveryApiResponse>('/dashboard/delivery', {
 			params,
 			branchScope: 'all',
@@ -157,7 +151,7 @@ class DashboardApi extends BaseApi {
 		if (branchId != null && branchId !== undefined) params.branchId = branchId;
 		return this.get<DashboardDeliveryRouteStopsApiResponse>(
 			`/dashboard/delivery/routes/${routeId}/stops`,
-			{ params },
+			{ params, branchScope: 'all' },
 		);
 	}
 
@@ -217,7 +211,7 @@ class DashboardApi extends BaseApi {
 		groupBy: 'product' | 'category' = 'product',
 		dayOfWeek?: number | null,
 	): Promise<DashboardSalesProductsApiResponse> {
-		const params: Record<string, string | number> = { from: fromIso, to: toIso, top, groupBy };
+		const params: Record<string, string | number> = { from: fromIso, to: toIso, top, groupBy, includeWeights: 'false' };
 		if (branchId != null) params.branchId = branchId;
 		if (dayOfWeek != null) params.dayOfWeek = dayOfWeek;
 		return this.get<DashboardSalesProductsApiResponse>('/dashboard/sales/products', {

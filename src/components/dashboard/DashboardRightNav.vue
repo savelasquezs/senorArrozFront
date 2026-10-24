@@ -1,20 +1,22 @@
 <template>
 	<aside
-		class="flex w-full shrink-0 flex-col border-l border-gray-200 bg-white lg:sticky lg:top-0 lg:h-[calc(100vh-4rem)] lg:w-72 lg:min-w-[18rem] lg:max-w-[18rem]"
+		class="flex w-full shrink-0 flex-col border-gray-200 bg-white"
+        :class="compact ? 'rounded-xl border' : 'border-l lg:sticky lg:top-0 lg:h-[calc(100vh-4rem)] lg:w-72 lg:min-w-[18rem] lg:max-w-[18rem]'"
 		aria-label="Navegación del dashboard"
 	>
-		<div class="border-b border-gray-100 p-3">
-			<p class="text-xs font-semibold uppercase tracking-wide text-gray-500">Secciones</p>
-			<nav class="mt-2 flex flex-col gap-1" role="navigation">
+		<div :class="compact ? 'p-1.5' : 'border-b border-gray-100 p-3'">
+			<p v-if="!compact" class="text-xs font-semibold uppercase tracking-wide text-gray-500">Secciones</p>
+			<nav class="flex gap-1" :class="compact ? 'flex-wrap' : 'mt-2 flex-col'" aria-label="Secciones del dashboard">
 				<button
 					v-for="item in DASHBOARD_SECTION_NAV"
 					:key="item.id"
 					type="button"
-					class="rounded-lg px-3 py-2 text-left text-sm font-medium transition-colors"
+					class="rounded-lg px-3 text-left font-medium transition-colors"
+                    :aria-current="modelValue === item.id ? 'page' : undefined"
 					:class="
-						modelValue === item.id
+						[compact ? 'py-1.5 text-xs' : 'py-2 text-sm', modelValue === item.id
 							? 'bg-emerald-700 text-white'
-							: 'text-gray-700 hover:bg-gray-50'
+							: 'text-gray-700 hover:bg-gray-50']
 					"
 					@click="$emit('update:modelValue', item.id)"
 				>
@@ -74,6 +76,7 @@ import type { DashboardTimeGranularity } from '@/views/dashboard/dashboardGlobal
 const props = withDefaults(
 	defineProps<{
 		modelValue: DashboardSectionId;
+        compact?: boolean;
 		branchId: number | null;
 		branchOptions: DeliveryBranchOption[];
 		showBranchFilter: boolean;
@@ -82,7 +85,7 @@ const props = withDefaults(
 		timeGranularity: DashboardTimeGranularity;
 		showGlobalFilters?: boolean;
 	}>(),
-	{ showGlobalFilters: true },
+	{ showGlobalFilters: true, compact: false },
 );
 
 const emit = defineEmits<{

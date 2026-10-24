@@ -1,5 +1,5 @@
 <template>
-	<div class="relative w-full min-h-[180px] h-52 sm:h-64 md:min-h-[240px] md:h-72">
+	<div class="relative w-full" :class="expanded ? 'h-[55dvh] min-h-72 max-h-[640px]' : compact ? 'h-40 min-h-40 min-[56.25rem]:h-[90px] min-[56.25rem]:min-h-[90px]' : 'min-h-[180px] h-52 sm:h-64 md:min-h-[240px] md:h-72'">
 		<Bar :data="chartData" :options="chartOptions" />
 	</div>
 </template>
@@ -32,6 +32,8 @@ const props = withDefaults(
 		yFormat?: 'currency' | 'number' | 'percent';
 		/** Apila series en el eje de valores (útil para 70% / 30% en barras horizontales). */
 		stacked?: boolean;
+        compact?: boolean;
+        expanded?: boolean;
 		/**
 		 * Tooltip en 2 líneas: `Nombre — total` y `70%: x  30%: y`.
 		 * Oculta filas por dataset y reduce tamaño; solo con `stacked` + `currency`.
@@ -79,6 +81,7 @@ const chartOptions = computed<ChartOptions<'bar'>>(() => {
 		legend: {
 			display: props.datasets.length > 1,
 			position: 'bottom',
+            labels: { boxWidth: 10, font: { size: props.compact ? 9 : 12 }, padding: props.compact ? 5 : 10 },
 		},
 		tooltip: {
 			...(compact
@@ -159,6 +162,8 @@ const chartOptions = computed<ChartOptions<'bar'>>(() => {
 			beginAtZero: true,
 			grid: { color: 'rgba(0,0,0,0.06)' },
 			ticks: {
+                maxTicksLimit: props.compact ? 4 : undefined,
+                font: { size: props.compact ? 9 : 12 },
 				callback: (val) => {
 					const n = Number(val);
 					if (yFormat === 'currency') return formatAxisCurrency(n);
@@ -171,7 +176,7 @@ const chartOptions = computed<ChartOptions<'bar'>>(() => {
 		},
 		y: {
 			grid: { display: false },
-			ticks: { autoSkip: false },
+			ticks: { autoSkip: false, font: { size: props.compact ? 9 : 12 } },
 		},
 	},
 };

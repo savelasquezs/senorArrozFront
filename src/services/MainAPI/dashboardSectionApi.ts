@@ -12,6 +12,7 @@ import {
 	type ActivityItem,
 } from '@/views/dashboard/mock/dashboardMockCore';
 import type { OrderPipelineStatusCounts } from '@/components/dashboard/operation.types';
+import type { DeliveryPerformance } from '@/types/deliveryPerformance';
 import type { BranchComparisonRow, DeliverymanEfficiencyRow } from '@/components/dashboard';
 import {
 	dashboardApi,
@@ -72,7 +73,6 @@ export type PrincipalDashboardPayload = {
 export type PrincipalDashboardQueryOptions = {
 	/** Rango UTC para KPIs (opcional). Si se envía, deben ir ambas fechas. */
 	kpiRange?: [Date, Date];
-	/** Cancela solicitudes obsoletas al cambiar sucursal, fechas o sección. */
 	signal?: AbortSignal;
 };
 
@@ -121,6 +121,7 @@ export type DashboardRouteHistoryItem = {
 
 /** Métricas `delivery_route`: SLA, tiempos, distancias y series alineadas a `evolutionLabels`. */
 export type DeliveryRouteDashboardMetrics = {
+    performance?: DeliveryPerformance;
 	completedRoutesCount: number;
 	routesWithSlaDataCount: number;
 	periodOnTimePercent: number;
@@ -167,6 +168,7 @@ function mapRouteHistoryItem(x: DashboardDeliveryRouteHistoryApiItem): Dashboard
 function mapRouteMetrics(raw: DashboardDeliveryRouteMetricsApi | null | undefined): DeliveryRouteDashboardMetrics | null {
 	if (raw == null) return null;
 	return {
+        performance: raw.performance,
 		completedRoutesCount: raw.completedRoutesCount,
 		routesWithSlaDataCount: raw.routesWithSlaDataCount,
 		periodOnTimePercent: raw.periodOnTimePercent,
@@ -212,10 +214,11 @@ export async function fetchDeliveryDashboard(
 	branchId: number | null,
 	periodRange: [Date, Date],
 	deliveryManId: number | 'all' = 'all',
+    excludeWednesdays = false,
 ): Promise<DeliveryDashboardPayload> {
 	const { from, to } = encodeDashboardRangeToApi(periodRange);
 	const dm = deliveryManId === 'all' ? null : deliveryManId;
-	const raw = await dashboardApi.getDelivery(branchId, from, to, { deliveryManId: dm });
+	const raw = await dashboardApi.getDelivery(branchId, from, to, { deliveryManId: dm, excludeWednesdays });
 	return mapDeliveryFromApi(raw);
 }
 
