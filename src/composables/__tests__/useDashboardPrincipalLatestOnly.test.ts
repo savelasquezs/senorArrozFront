@@ -168,4 +168,25 @@ describe('M29-F01 dashboard principal: última solicitud vigente', () => {
 		await flushPromises();
 		expect(dashboard.data.value).toBeNull();
 	});
+    it('reutiliza una respuesta diaria al alternar entre Día y Quincena', async () => {
+        const fetch = vi.mocked(dashboardApi.getPrincipalSalesVsExpenses).mockResolvedValue({
+            granularity: 'day',
+            labels: ['vie 23 oct'],
+            salesCop: [100],
+            expenseCategories: [],
+        });
+        const refs = state();
+        scope = effectScope();
+        const dashboard = scope.run(() => useDashboardPrincipalSalesVsExpenses(
+            refs.active, refs.branch, refs.range, refs.granularity,
+        ))!;
+        await flushPromises();
+        expect(fetch).toHaveBeenCalledTimes(1);
+        refs.granularity.value = 'fortnight';
+        await nextTick();
+        await flushPromises();
+        expect(fetch).toHaveBeenCalledTimes(1);
+        expect(dashboard.data.value?.granularity).toBe('fortnight');
+    });
+
 });
