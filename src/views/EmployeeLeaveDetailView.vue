@@ -4,7 +4,7 @@
       <RouterLink :to="{ path: '/permisos', query: route.query }" class="leave-text-button inline-flex items-center gap-2 mb-5"><ArrowLeftIcon class="w-4 h-4" />Volver a permisos</RouterLink>
       <p v-if="error" role="alert" class="leave-alert leave-alert--error mb-4">{{ error }} <button class="underline ml-2" @click="reload">Actualizar</button></p>
       <p v-if="changed" role="status" class="leave-alert leave-alert--warning mb-4">La solicitud cambió. Cierra la operación y actualiza antes de confirmar.</p>
-      <div v-if="loading && !detail" class="leave-panel leave-empty" role="status"><ArrowPathIcon class="h-7 w-7 animate-spin text-emerald-600" /><p class="leave-help">Cargando solicitud…</p></div>
+      <div v-if="loading && !detail" class="leave-panel leave-empty" role="status"><ArrowPathIcon class="w-7 h-7 animate-spin text-emerald-600" /><p class="leave-help">Cargando solicitud…</p></div>
       <template v-if="detail">
         <header class="leave-header"><div><p class="leave-eyebrow">Solicitud de permiso</p><h1 class="leave-title">{{ kind?.label ?? detail.request.kind }}</h1>
           <p class="leave-subtitle">{{ detail.request.applicantName }} <span class="mx-1">·</span> {{ detail.request.branchName }}</p></div>
@@ -186,9 +186,12 @@ async function refreshDetail(context: EmployeeLeaveRefreshContext) {
     if (!current()) return;
     if (data.request.userId === auth.user?.id && data.request.isUnread) {
       await employeeLeaveApi.read(id, data.request.version, context.signal);
+      // The write succeeded even if a newer resync superseded this snapshot.
+      // Refresh counters in this scope, but never continue after navigation/logout/unmount.
+      if (ticket !== generation || id !== publicId.value) return;
+      store.invalidate();
       if (!current()) return;
       if (detail.value?.request.version === data.request.version) detail.value.request.isUnread = false;
-      store.invalidate();
     }
   } catch (e) { if (current()) error.value = (e as Error).message; }
   finally { if (ticket === generation) loading.value = false; }

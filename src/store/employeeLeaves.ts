@@ -52,12 +52,15 @@ export const useEmployeeLeavesStore = defineStore('employeeLeaves', () => {
   }
   function invalidate() { revision.value++; void refreshSummary({ invalidate: true }); }
   watch(sessionKey, () => {
+    const reloadCatalog = kinds.value.length > 0 || kindsPending !== undefined;
     generation++;
     summaryQueue.cancel();
     kindsController?.abort(); kindsController = undefined; kindsPending = undefined;
     eventVersions.clear();
     summary.value = { unread: 0, pendingReview: 0 }; kinds.value = []; revision.value++;
     void refreshSummary();
+    // A mounted view still needs labels after a role/session change. Navigation alone does not load the catalog.
+    if (reloadCatalog) void loadKinds().catch(() => {});
   }, { flush: 'sync' });
   onScopeDispose(() => { generation++; summaryQueue.dispose(); kindsController?.abort(); });
   return { summary, kinds, revision, isTerminal, canReview, sessionKey, refreshSummary, loadKinds, invalidate };

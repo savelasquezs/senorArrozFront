@@ -69,6 +69,20 @@ describe('employee leave shared reads', () => {
     expect(api.catalog).toHaveBeenCalledTimes(1); gate.resolve(values); await Promise.all([one, two]);
     await store.loadKinds(); expect(api.catalog).toHaveBeenCalledTimes(1);
   });
+  it('reloads a used catalog after a role change without reusing the old identity', async () => {
+    const previous = [{ code: 'before', label: 'Before', paidByCompanyPolicy: false }];
+    const current = [{ code: 'after', label: 'After', paidByCompanyPolicy: false }];
+    api.catalog.mockResolvedValueOnce(previous).mockResolvedValueOnce(current); api.summary.mockResolvedValue(summary(0));
+    const store = useEmployeeLeavesStore(); await store.loadKinds();
+    useAuthStore().user = { ...useAuthStore().user!, role: 'Cashier' };
+    await store.loadKinds(); await store.refreshSummary();
+    expect(api.catalog).toHaveBeenCalledTimes(2); expect(store.kinds).toEqual(current);
+  });
+  it('changing identity in navigation alone does not fetch the unused catalog', async () => {
+    api.summary.mockResolvedValue(summary(0)); const store = useEmployeeLeavesStore();
+    useAuthStore().user = { ...useAuthStore().user!, id: 8 };
+    await store.refreshSummary(); expect(api.catalog).not.toHaveBeenCalled();
+  });
   it('disposal aborts summary and drops a queued refresh', async () => {
     const gate = deferred<ReturnType<typeof summary>>(); api.summary.mockReturnValue(gate.promise);
     const store = useEmployeeLeavesStore(); const first = store.refreshSummary(); await Promise.resolve();

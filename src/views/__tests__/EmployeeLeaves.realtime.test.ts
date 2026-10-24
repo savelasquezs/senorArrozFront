@@ -37,6 +37,7 @@ vi.mock('@/components/layout/MainLayout.vue', () => ({ default: { name: 'MainLay
 vi.mock('@/components/users/EmployeeLeaveForm.vue', () => ({ default: { name: 'EmployeeLeaveForm', props: ['modelValue', 'detail'], emits: ['update:modelValue', 'saved'], template: '<div />' } }));
 vi.mock('@/components/auth/PasswordConfirmation.vue', () => ({ default: { name: 'PasswordConfirmation', props: ['modelValue', 'description', 'action'], emits: ['update:modelValue'], template: '<div />' } }));
 import { useAuthStore } from '@/store/auth';
+import { useEmployeeLeavesStore } from '@/store/employeeLeaves';
 import List from '../EmployeeLeavesView.vue';
 import Detail from '../EmployeeLeaveDetailView.vue';
 import Navigation from '@/components/layout/EmployeeLeaveNavigation.vue';
@@ -127,6 +128,30 @@ describe('leave views with real refresh coordinator and store', () => {
     mocks.state.value = 'connecting'; const wrapper = render(Detail); await flushPromises();
     mocks.api.detail.mockResolvedValue(snapshot(2)); mocks.state.value = 'connected'; await flushPromises();
     expect(mocks.api.detail).toHaveBeenCalledTimes(2); expect(wrapper.text()).toContain('Version 2');
+  });
+  it('refreshes counters after a read marker that completed during a newer resync', async () => {
+    let unread = 1; const gate = deferred<void>();
+    mocks.api.summary.mockImplementation(async () => ({ unread, pendingReview: 0 }));
+    mocks.api.detail.mockImplementation(async () => {
+      const data = snapshot(); data.request.userId = 7; data.request.isUnread = unread > 0; return data;
+    });
+    mocks.api.read.mockImplementation(async () => { await gate.promise; unread = 0; });
+    render(Detail); await flushPromises();
+    expect(mocks.api.read).toHaveBeenCalledTimes(1); expect(useEmployeeLeavesStore().summary.unread).toBe(1);
+    visible(); await flushPromises();
+    expect(mocks.api.summary).toHaveBeenCalledTimes(2); expect(useEmployeeLeavesStore().summary.unread).toBe(1);
+    gate.resolve(undefined); await flushPromises();
+    expect(mocks.api.read).toHaveBeenCalledTimes(1); expect(mocks.api.detail).toHaveBeenCalledTimes(2);
+    expect(mocks.api.summary).toHaveBeenCalledTimes(3); expect(useEmployeeLeavesStore().summary.unread).toBe(0);
+  });
+  it('a read marker completing after unmount does not start another counter request', async () => {
+    const data = snapshot(); data.request.userId = 7; data.request.isUnread = true;
+    const gate = deferred<void>(); mocks.api.detail.mockResolvedValue(data); mocks.api.read.mockReturnValue(gate.promise);
+    const wrapper = render(Detail); await flushPromises();
+    expect(mocks.api.read).toHaveBeenCalledTimes(1);
+    const signal = mocks.api.read.mock.calls[0]![2] as AbortSignal;
+    wrapper.unmount(); wrappers.splice(wrappers.indexOf(wrapper), 1); gate.resolve(undefined); await flushPromises();
+    expect(signal.aborted).toBe(true); expect(mocks.api.summary).toHaveBeenCalledTimes(1);
   });
   it('unmount during detail prevents later history, read markers and queued reloads', async () => {
     const gate = deferred<LeaveDetail>(); mocks.api.detail.mockReturnValue(gate.promise);
