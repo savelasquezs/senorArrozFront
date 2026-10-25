@@ -3,6 +3,8 @@ import { reactive, ref } from 'vue'
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest'
 import OrdersList from '@/views/OrdersList.vue'
 import OrdersTable from '@/components/orders/OrdersTable.vue'
+import ReservationsTable from '@/components/reservations/ReservationsTable.vue'
+import BaseInput from '@/components/ui/BaseInput.vue'
 import EditCustomerModal from '@/components/orders/EditCustomerModal.vue'
 import BaseSelect from '@/components/ui/BaseSelect.vue'
 
@@ -226,4 +228,69 @@ describe('remote order workspaces', () => {
         finishRemote(paged([remote])); await flushPromises()
         expect(wrapper.findComponent(OrdersTable).props('orders')).toEqual([local])
     })
+    it('requests active reservations from the server and preserves server totals across pages', async () => {
+        const active = { ...local, id: 71, type: 'reservation', status: 'taken' }
+        mocks.search.mockImplementation(async body => body.type === 'reservation'
+            ? { items: [active], totalCount: 301, totalPages: 3, page: 1, pageSize: 150 }
+            : paged([local]))
+        mountView(); await flushPromises(); await clickTab('Reservas')
+        expect(mocks.search).toHaveBeenLastCalledWith(expect.objectContaining({
+            type: 'reservation', activeReservationsOnly: true, page: 1, pageSize: 150,
+        }))
+        expect(wrapper.findComponent(ReservationsTable).props('reservations')).toEqual([active])
+        expect(wrapper.text()).toContain('de 301 reservas')
+        expect(wrapper.text()).toContain('Página 1 de 3')
+        const options = wrapper.findComponent(BaseSelect).props('options') as Array<{ value: string }>
+        expect(options.some(option => option.value === 'reservation')).toBe(false)
+    })
+
+    it('retains explicit All and Delivered status searches without the active filter', async () => {
+        mountView(); await flushPromises(); await clickTab('Reservas')
+        const status = wrapper.findComponent(BaseSelect)
+        status.vm.$emit('update:modelValue', '__all__'); await flushPromises()
+        expect(mocks.search.mock.lastCall![0]).toMatchObject({ type: 'reservation', activeReservationsOnly: false })
+        expect(mocks.search.mock.lastCall![0].status).toBeUndefined()
+        status.vm.$emit('update:modelValue', 'delivered'); await flushPromises()
+        expect(mocks.search.mock.lastCall![0]).toMatchObject({
+            type: 'reservation', activeReservationsOnly: false, status: 'delivered', page: 1,
+        })
+    })
+
+    it('searches across all reservation pages on the server with debounce', async () => {
+        const serverMatch = { ...local, id: 42, type: 'reservation', status: 'taken', guestName: 'OTHER' }
+        mocks.search.mockImplementation(async body => body.type === 'reservation'
+            ? { items: [serverMatch], totalCount: 1 } : paged([local]))
+        mountView(); await flushPromises(); await clickTab('Reservas')
+        const before = mocks.search.mock.calls.length
+        vi.useFakeTimers()
+        const search = wrapper.findComponent(BaseInput)
+        search.vm.$emit('update:modelValue', 'cliente de otra página')
+        search.vm.$emit('input')
+        await vi.advanceTimersByTimeAsync(330)
+        await flushPromises()
+        expect(mocks.search.mock.calls.length).toBe(before + 1)
+        expect(mocks.search.mock.lastCall![0]).toMatchObject({
+            type: 'reservation', searchTerm: 'cliente de otra página', page: 1,
+        })
+        // No se vuelve a filtrar localmente una página que ya filtró PostgreSQL.
+        expect(wrapper.findComponent(ReservationsTable).props('reservations')).toEqual([serverMatch])
+    })
+
+    it('ignores an obsolete reservation response after changing status', async () => {
+        let resolveOld!: (value: any) => void
+        const updated = { ...local, id: 99, type: 'reservation', status: 'delivered' }
+        const older = { ...local, id: 88, type: 'reservation', status: 'taken' }
+        mocks.search.mockImplementation(body => {
+            if (body.type !== 'reservation') return Promise.resolve(paged([local]))
+            return body.status === 'delivered' ? Promise.resolve(paged([updated]))
+                : new Promise(resolve => { resolveOld = resolve })
+        })
+        mountView(); await flushPromises(); await clickTab('Reservas')
+        wrapper.findComponent(BaseSelect).vm.$emit('update:modelValue', 'delivered')
+        await flushPromises()
+        expect(wrapper.findComponent(ReservationsTable).props('reservations')).toEqual([updated])
+        resolveOld(paged([older])); await flushPromises()
+        expect(wrapper.findComponent(ReservationsTable).props('reservations')).toEqual([updated])
+    })
+
 })
