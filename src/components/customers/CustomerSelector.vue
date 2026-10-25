@@ -164,22 +164,28 @@ const initialUsername = ref('')
 // Methods
 const handleSearch = () => {
     const query = searchQuery.value.trim()
-    if (!query) {
-        cancelPendingSearch()
-        searchResults.value = []
-        return
-    }
-    if (query.length < 2) return
+    // Invalidate the previous timer AND any request already in flight, including
+    // when the input shrinks below two characters.
     cancelPendingSearch()
     searchResults.value = []
+    if (query.length < 2) return
+
     const generation = searchGeneration
+    const branchId = props.branchId
+    const isCurrent = () =>
+        generation === searchGeneration &&
+        searchQuery.value.trim() === query &&
+        props.branchId === branchId
+
     searchDebounceTimer = setTimeout(async () => {
         searchDebounceTimer = null
-        if (generation !== searchGeneration) return
+        if (!isCurrent()) return
         try {
-            searchResults.value = await customersStore.searchCustomers(query, props.branchId)
+            const customers = await customersStore.searchCustomers(query, branchId)
+            // Debouncing does not prevent earlier HTTP responses from arriving last.
+            if (isCurrent()) searchResults.value = customers
         } catch (e: unknown) {
-            if (generation !== searchGeneration) return
+            if (!isCurrent()) return
             const msg = e instanceof Error ? e.message : String(e)
             showError('Búsqueda de clientes', msg || 'No se pudo buscar clientes')
         }
@@ -270,8 +276,12 @@ onUnmounted(() => {
     cancelPendingSearch()
 })
 
+// The active branch is part of the search scope. Never retain results from
+// another branch while the POS/WhatsApp context changes.
+watch(() => props.branchId, handleSearch)
+
 watch(searchQuery, () => {
-    if (!searchQuery.value.trim()) {
+    if (searchQuery.value.trim().length < 2) {
         cancelPendingSearch()
         searchResults.value = []
     }
