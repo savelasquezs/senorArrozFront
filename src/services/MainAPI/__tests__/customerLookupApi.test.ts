@@ -10,7 +10,7 @@ const api = new CustomerLookupApi()
 const response = (data: unknown) => ({ data: { data } })
 
 describe('customer lookup transport', () => {
-    beforeEach(() => mocks.get.mockReset())
+    beforeEach(() => { mocks.get.mockReset() })
     it('passes the branch, page and abort signal to the lightweight endpoint', async () => {
         const signal = new AbortController().signal
         mocks.get.mockResolvedValue(response({ items: [], page: 2, hasMore: false }))
