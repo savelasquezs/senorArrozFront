@@ -15,7 +15,7 @@ describe('customer lookup transport', () => {
         const signal = new AbortController().signal
         mocks.get.mockResolvedValue(response({ items: [], page: 2, hasMore: false }))
         await api.search('Ana', 2, 2, signal)
-        expect(mocks.get).toHaveBeenCalledWith('/customers/lookup', { params: { search: 'Ana', branchId: 2, page: 2 }, signal })
+        expect(mocks.get).toHaveBeenCalledWith('/customers/lookup/search', { params: { search: 'Ana', branchId: 2, page: 2 }, signal })
     })
     it('supports an older API only when the new route is unavailable', async () => {
         const signal = new AbortController().signal

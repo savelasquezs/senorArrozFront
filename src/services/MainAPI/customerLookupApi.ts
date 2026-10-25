@@ -18,7 +18,7 @@ export class CustomerLookupApi extends BaseApi {
 
     async search(search: string, branchId: number, page = 1, signal?: AbortSignal): Promise<CustomerSuggestionPage> {
         const params = { search, branchId, page };
-        try { return await this.read<CustomerSuggestionPage>('/customers/lookup', params, signal); }
+        try { return await this.read<CustomerSuggestionPage>('/customers/lookup/search', params, signal); }
         catch (cause: any) {
             if (signal?.aborted || ![404, 405].includes(cause.status)) throw cause;
             // Compatibility during API-first rollout/rollback only. Never fall back on auth/server errors.
