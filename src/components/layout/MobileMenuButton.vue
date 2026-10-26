@@ -1,5 +1,5 @@
 <template>
-	<button type="button"
+	<button type="button" aria-label="Menú de navegación"
 		class="p-2 rounded-xl text-gray-500 hover:text-emerald-600 hover:bg-emerald-50 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-emerald-500"
 		@click="$emit('toggle')">
 		<svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
