@@ -69,7 +69,7 @@ class ExpenseApi extends BaseApi {
         fromUtc: string
         toUtc: string
         branchId?: number | null
-    }): Promise<ApiResponse<ExpenseMenuAttributionResponse>> {
+    }, signal?: AbortSignal): Promise<ApiResponse<ExpenseMenuAttributionResponse>> {
         const q: Record<string, string | number> = {
             FromUtc: params.fromUtc,
             ToUtc: params.toUtc,
@@ -78,7 +78,7 @@ class ExpenseApi extends BaseApi {
             q.BranchId = params.branchId;
         }
         return this.get<ApiResponse<ExpenseMenuAttributionResponse>>('/ExpenseMenuAttribution', {
-            params: q,
+            params: q, signal,
         });
     }
 

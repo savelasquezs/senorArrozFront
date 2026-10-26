@@ -120,7 +120,8 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, reactive, ref } from 'vue'
+import { createLatestRead } from '@/helpers/latestRead'
+import { onMounted, onUnmounted, reactive, ref } from 'vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseInput from '@/components/ui/BaseInput.vue'
 import { whatsappApi } from '@/services/MainAPI/whatsappApi'
@@ -151,11 +152,16 @@ function apply(value: TenantWhatsAppSettings) {
   if (value.channel) Object.assign(channel, value.channel, { accessToken: '', appSecret: '' })
   if (value.ai) Object.assign(ai, value.ai)
 }
+const settingsRead = createLatestRead()
+onUnmounted(() => settingsRead.invalidate())
 async function load() {
+  const request = settingsRead.begin()
   loading.value = true
-  try { apply((await whatsappApi.getTenantSettings()).data) }
-  catch (error: any) { message.value = { text: error.message, error: true } }
-  finally { loading.value = false }
+  try {
+    const response = await whatsappApi.getTenantSettings(request.signal)
+    if (request.isCurrent()) apply(response.data)
+  } catch (error: any) { if (request.isCurrent()) message.value = { text: error.message, error: true } }
+  finally { if (request.isCurrent()) loading.value = false }
 }
 async function saveChannel() {
   savingChannel.value = true; message.value = null

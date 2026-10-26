@@ -5,7 +5,11 @@ import './style.css'
 import App from './App.vue'
 import { CHUNK_RECOVERY_EVENT, isStaleChunkError, recoverFromStaleChunk } from '@/utils/chunkRecovery'
 
-function offerChunkRecovery(error: unknown, target = window.location.pathname + window.location.search) {
+let navigationTarget: string | undefined
+router.beforeEach(to => { navigationTarget = to.fullPath })
+router.afterEach(() => { navigationTarget = undefined })
+
+function offerChunkRecovery(error: unknown, target = navigationTarget ?? window.location.pathname + window.location.search) {
     if (error !== undefined && !isStaleChunkError(error)) return false
     window.dispatchEvent(new CustomEvent(CHUNK_RECOVERY_EVENT, { detail: { target } }))
     return recoverFromStaleChunk(error, () => {})

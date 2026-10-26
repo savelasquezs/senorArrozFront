@@ -34,8 +34,8 @@ export function whatsappWebhookUrl(): string {
 }
 
 class WhatsAppApi extends BaseApi {
-  getTenantSettings(): Promise<ApiResponse<TenantWhatsAppSettings>> {
-    return this.get<ApiResponse<TenantWhatsAppSettings>>('/tenant/whatsapp', { branchScope: 'none' })
+  getTenantSettings(signal?: AbortSignal): Promise<ApiResponse<TenantWhatsAppSettings>> {
+    return this.get<ApiResponse<TenantWhatsAppSettings>>('/tenant/whatsapp', { branchScope: 'none', signal })
   }
 
   saveTenantChannel(payload: UpdateTenantWhatsAppChannel): Promise<ApiResponse<TenantWhatsAppChannel>> {

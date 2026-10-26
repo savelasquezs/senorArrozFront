@@ -1,3 +1,4 @@
+import { appendFileSync } from 'node:fs'
 import { createPinia, setActivePinia } from 'pinia'
 import { expect, it } from 'vitest'
 import { useAuthStore } from '../auth'
@@ -30,5 +31,6 @@ it.each([1, 5, 20])('persists %i drafts synchronously without losing recovery da
     expect(drafts.draftOrders.size).toBe(count)
     expect(drafts.currentTabId).toBe(currentId)
     expect(drafts.currentOrder?.orderItems).toHaveLength(20)
-    console.info('DRAFT_PERSISTENCE_JSDOM', JSON.stringify({ count, itemsPerDraft: 20, bytes: new TextEncoder().encode(stored).length, repetitions: 20, medianMs: times.sort((a, b) => a - b)[10] }))
+    const result = JSON.stringify({ count, itemsPerDraft: 20, bytes: new TextEncoder().encode(stored).length, repetitions: 20, medianMs: times.sort((a, b) => a - b)[10] })
+    if (process.env.FRONT_PERF_DRAFT_LOG) appendFileSync(process.env.FRONT_PERF_DRAFT_LOG, result + '\n')
 })
