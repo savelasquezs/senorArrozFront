@@ -1264,45 +1264,27 @@ async function loadBranchPageData() {
         return
     }
 
-    try {
-        if (userRole === 'Superadmin') {
-            await banksStore.fetch({
-                page: 1,
-                pageSize: 100,
-                branchId: branchId.value,
-            })
-        } else {
-            // Admin en su sucursal: mismo alcance que el token y el bootstrap; evita GET duplicado.
-            await banksStore.ensureListLoaded()
-        }
-    } catch (error: any) {
-        console.error('Error loading banks:', error)
-        showError(
-            'Error al cargar bancos',
-            error.message || 'No se pudieron cargar los bancos de esta sucursal.'
-        )
-    }
-
-    try {
-        if (userRole === 'Superadmin') {
-            await appsStore.fetch({
-                page: 1,
-                pageSize: 100,
-                branchId: branchId.value,
-            })
-        } else {
-            await appsStore.ensureListLoaded()
-        }
-    } catch (error: any) {
-        console.error('Error loading apps:', error)
-        showError(
-            'Error al cargar apps de pago',
-            error.message || 'No se pudieron cargar las apps de esta sucursal.'
-        )
-    }
-
     resetExpenseSectionState()
-    await syncExpensesTabData(expensesActiveTab.value)
+    await loadVisibleBranchSection()
+}
+
+let banksAppsLoadedFor = 0
+let banksAppsRequest: Promise<void> | null = null
+async function loadVisibleBranchSection() {
+    if (branchesStore.current?.id !== branchId.value) return
+    if (activeBranchSection.value === 'expenses') {
+        await syncExpensesTabData(expensesActiveTab.value)
+    } else if (activeBranchSection.value === 'banks-apps') {
+        if (banksAppsLoadedFor === branchId.value) return
+        if (banksAppsRequest) return banksAppsRequest
+        const id = branchId.value
+        banksAppsRequest = Promise.allSettled([banksStore.ensureListLoaded(id), appsStore.ensureListLoaded(id)]).then(results => {
+            if (branchId.value !== id) return
+            if (results.every(result => result.status === 'fulfilled')) banksAppsLoadedFor = id
+            else showError('Error al cargar', 'No se pudieron cargar todos los bancos y apps. Vuelve a abrir la sección para reintentar.')
+        }).finally(() => { banksAppsRequest = null })
+        await banksAppsRequest
+    }
 }
 
 watch(branchId, () => {
@@ -1315,11 +1297,7 @@ watch(expensesActiveTab, (tab) => {
     }
 })
 
-watch(activeBranchSection, (section) => {
-    if (section === 'expenses') {
-        void syncExpensesTabData(expensesActiveTab.value)
-    }
-})
+watch(activeBranchSection, () => { void loadVisibleBranchSection() })
 
 onMounted(() => {
     void loadBranchPageData()
