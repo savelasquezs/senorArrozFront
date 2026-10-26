@@ -1,5 +1,8 @@
 import { defineStore } from 'pinia'
-import { ref } from 'vue'
+import { loadPagedCatalog } from '@/helpers/loadPagedCatalog'
+import { ref, watch } from 'vue'
+import { useAuthStore } from './auth'
+import { useBranchContextStore } from './branchContext'
 import { appApi } from '@/services/MainAPI/appApi'
 import type {
     App,
@@ -16,14 +19,14 @@ import {
     type ResourceActionOptions,
 } from './helpers/resourceStore'
 
-let appsListEnsureInFlight: Promise<void> | null = null
-let appsEnsureInFlightBranchId: number | null = null
-let appsLoadedBranchId: number | null = null
-let appsListLoaded = false
-
 type FetchOpts = ResourceActionOptions
 
 export const useAppsStore = defineStore('apps', () => {
+    const options = ref<App[]>([])
+    let optionsKey: string | null = null, optionsLoaded = false, optionsVersion = 0
+    let optionsPending: Promise<void> | null = null
+    function invalidateOptions() { optionsVersion++; optionsLoaded = false; optionsPending = null }
+
     const list = ref<PagedResult<App> | null>(null)
     const current = ref<App | null>(null)
     const byBank = ref<App[] | null>(null)
@@ -37,36 +40,21 @@ export const useAppsStore = defineStore('apps', () => {
     }
 
     const ensureListLoaded = async (branchId?: number | null, forOrderCreation = false) => {
-        const normalizedBranchId = branchId && branchId > 0 ? branchId : null
-        if (appsListLoaded && appsLoadedBranchId === normalizedBranchId) {
-            return
-        }
-        if (appsListEnsureInFlight) {
-            if (appsEnsureInFlightBranchId === normalizedBranchId) {
-                return appsListEnsureInFlight
-            }
-            await appsListEnsureInFlight
-            return ensureListLoaded(branchId, forOrderCreation)
-        }
-        if (appsLoadedBranchId !== normalizedBranchId) {
-            list.value = null
-            byBank.value = null
-            appsListLoaded = false
-        }
-        appsListEnsureInFlight = fetch({
-            page: 1,
-            pageSize: 100,
-            branchId: normalizedBranchId ?? undefined,
-            forOrderCreation,
-        }).then(() => {
-            appsLoadedBranchId = normalizedBranchId
-            appsListLoaded = true
-        }).finally(() => {
-            appsListEnsureInFlight = null
-            appsEnsureInFlightBranchId = null
-        })
-        appsEnsureInFlightBranchId = normalizedBranchId
-        return appsListEnsureInFlight
+        const key = `${branchId ?? 'default'}:${forOrderCreation}`
+        if (optionsKey !== key) { invalidateOptions(); optionsKey = key; options.value = [] }
+        if (optionsLoaded) return
+        if (optionsPending) return optionsPending
+        const version = optionsVersion
+        optionsPending = (async () => {
+            try {
+                const rows = await loadPagedCatalog<App>(page => appApi.getApps({
+                    branchId: branchId ?? undefined, forOrderCreation, page, pageSize: 100,
+                }), () => {})
+                if (version !== optionsVersion) return
+                options.value = rows; optionsLoaded = true
+            } finally { if (version === optionsVersion) optionsPending = null }
+        })()
+        return optionsPending
     }
 
     const fetchById = async (id: number, opts?: FetchOpts) => {
@@ -84,6 +72,7 @@ export const useAppsStore = defineStore('apps', () => {
     }
 
     const create = async (payload: CreateAppDto, opts?: FetchOpts) => {
+        invalidateOptions()
         return run(async () => {
             const response = await appApi.createApp(payload)
             prependPagedItem(list, response)
@@ -96,6 +85,7 @@ export const useAppsStore = defineStore('apps', () => {
     }
 
     const update = async (id: number, payload: UpdateAppDto, opts?: FetchOpts) => {
+        invalidateOptions()
         return run(async () => {
             const response = await appApi.updateApp(id, payload)
             replacePagedItem(list, response)
@@ -113,6 +103,7 @@ export const useAppsStore = defineStore('apps', () => {
     }
 
     const remove = async (id: number, opts?: FetchOpts) => {
+        invalidateOptions()
         await run(async () => {
             await appApi.deleteApp(id)
             removePagedItem(list, id)
@@ -131,15 +122,16 @@ export const useAppsStore = defineStore('apps', () => {
     }
 
     const clearList = () => {
+        invalidateOptions(); options.value = []; optionsKey = null
         list.value = null
-        byBank.value = null
-        appsLoadedBranchId = null
-        appsEnsureInFlightBranchId = null
-        appsListLoaded = false
         clearError()
     }
 
+    const auth = useAuthStore(), branches = useBranchContextStore()
+    watch(() => [auth.user?.id, auth.user?.role, branches.revision], () => { clear(); clearList() }, { flush: 'sync' })
+
     return {
+        options,
         list,
         current,
         byBank,

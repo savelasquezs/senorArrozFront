@@ -58,6 +58,21 @@ describe('banks store', () => {
         expect(store.list).toEqual(payload)
     })
 
+    it('keeps payment options complete and independent from administrative pages and creation scope', async () => {
+        const store = useBanksStore()
+        bankApiMock.getBanks.mockResolvedValueOnce({ items: [{ id: 1 }], totalPages: 2 })
+            .mockResolvedValueOnce({ items: [{ id: 101 }], totalPages: 2 })
+            .mockResolvedValueOnce({ items: [{ id: 999 }], totalPages: 1 })
+            .mockResolvedValueOnce({ items: [{ id: 2 }], totalPages: 1 })
+        await store.ensureListLoaded(1, true)
+        await store.fetch({ page: 1, pageSize: 10 })
+        await store.ensureListLoaded(1, true)
+        expect(store.options.map(row => row.id)).toEqual([1, 101])
+        expect(store.list?.items.map(row => row.id)).toEqual([999])
+        await store.ensureListLoaded(1, false)
+        expect(store.options.map(row => row.id)).toEqual([2])
+    })
+
     it('treats an empty bank list as loaded for the same branch', async () => {
         const store = useBanksStore()
         store.clearList()
@@ -76,7 +91,7 @@ describe('banks store', () => {
         await store.ensureListLoaded(77)
 
         expect(bankApiMock.getBanks).toHaveBeenCalledTimes(1)
-        expect(store.list?.items).toEqual([])
+        expect(store.options).toEqual([])
     })
 
     it('creates a bank and prepends it to the list', async () => {

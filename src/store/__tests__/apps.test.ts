@@ -75,7 +75,7 @@ describe('apps store', () => {
         await store.ensureListLoaded(77)
 
         expect(appApiMock.getApps).toHaveBeenCalledTimes(1)
-        expect(store.list?.items).toEqual([])
+        expect(store.options).toEqual([])
     })
 
     it('fetches apps by bank into the side list', async () => {

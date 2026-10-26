@@ -14,7 +14,7 @@ import type {
 class AppPaymentApi extends BaseApi {
     // 1. Obtener pagos de apps con filtros y paginación
     async getAppPayments(
-        filters?: AppPaymentFilters
+        filters?: AppPaymentFilters, signal?: AbortSignal
     ): Promise<PagedResult<AppPayment>> {
         // Mapear parámetros de frontend (camelCase) a backend (PascalCase)
         const params: any = {};
@@ -33,7 +33,7 @@ class AppPaymentApi extends BaseApi {
         }
 
         return this.get<PagedResult<AppPayment>>('/apppayments', {
-            params,
+            params, signal,
         });
     }
 
