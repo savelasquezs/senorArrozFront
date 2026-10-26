@@ -4,7 +4,6 @@ import { useBranchContextStore } from '@/store/branchContext';
 import { hasAccessToken } from '@/services/auth/authSession';
 import { accountCanVisit, accountHome, safeReturnPath } from '@/helpers/employeeAccountAccess';
 import Login from '@/views/Login.vue';
-import MainLayout from '@/components/layout/MainLayout.vue';
 
 const admin = ['Superadmin', 'Admin'];
 const office = [...admin, 'Cashier'];
@@ -59,7 +58,7 @@ const routes: RouteRecordRaw[] = [
 const authenticatedRoutes = routes.filter(route => route.meta?.requiresAuth);
 const router = createRouter({ history: createWebHistory(), routes: [
   ...routes.filter(route => !route.meta?.requiresAuth),
-  { path: '/', name: 'AuthenticatedLayout', component: MainLayout, children: authenticatedRoutes },
+  { path: '/', name: 'AuthenticatedLayout', component: () => import('@/components/layout/MainLayout.vue'), children: authenticatedRoutes },
 ],
   scrollBehavior(_to, _from, savedPosition) { return savedPosition ?? { top: 0 }; },
 });
