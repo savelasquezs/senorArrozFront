@@ -1028,13 +1028,11 @@ async function retryWhatsAppStatus() {
   loadingStatus.value = true
   statusLoadError.value = ''
   try {
-    await whatsappStore.refreshStatus()
+    await whatsappStore.ensureStatus()
     if (whatsappStore.enabled) {
-      await Promise.allSettled([
-        whatsappStore.fetchQuickReplies(),
-        whatsappStore.fetchOperationalBranches(),
-        reloadConversations(),
-      ])
+      void whatsappStore.fetchQuickReplies().catch(() => {})
+      void whatsappStore.fetchOperationalBranches().catch(() => {})
+      await reloadConversations()
     } else {
       stopAiDiagnosticsPolling()
     }
@@ -1117,15 +1115,17 @@ const slashQuickReplyMatches = computed(() => {
     .slice(0, 8)
 })
 
+let conversationsGeneration = 0, contextGeneration = 0, conversationSelection = 0
 async function reloadConversations() {
+  const generation = ++conversationsGeneration
   const previousSelected = selectedConversation.value
-  await whatsappStore.fetchConversations({
+  await Promise.all([whatsappStore.fetchConversations({
     branchId: selectedBranchId.value || undefined,
     search: search.value.trim() || undefined,
     unreadOnly: unreadOnly.value || undefined,
-  })
-  await whatsappStore.fetchUnreadSummary()
-  if (previousSelected) {
+  }), whatsappStore.fetchUnreadSummary()])
+  if (generation !== conversationsGeneration) return
+  if (previousSelected && selectedConversation.value?.id === previousSelected.id) {
     const refreshed = whatsappStore.conversations.find(c => c.id === previousSelected.id)
     selectedConversation.value = refreshed
       ?? (previousSelected.isCentralChannel && previousSelected.assignedUserId === authStore.user?.id
@@ -1136,6 +1136,7 @@ async function reloadConversations() {
 }
 
 let realtimeFallbackId: number | undefined
+let fallbackRunning = false
 
 function stopRealtimeFallback() {
   if (!realtimeFallbackId) return
@@ -1146,19 +1147,23 @@ function stopRealtimeFallback() {
 function startRealtimeFallback() {
   if (realtimeFallbackId || connectionState.value === 'connected') return
   realtimeFallbackId = window.setInterval(async () => {
-    if (!whatsappStore.enabled || !isPageVisible.value || !isUserActive.value) return
+    if (!whatsappStore.enabled || !isPageVisible.value || !isUserActive.value || !navigator.onLine || fallbackRunning) return
+    fallbackRunning = true
+    try {
     const activeId = selectedConversation.value?.id
     await reloadConversations()
-    if (activeId) await whatsappStore.fetchMessages(activeId)
+    if (activeId && selectedConversation.value?.id === activeId) await whatsappStore.fetchMessages(activeId)
+    } catch {} finally { fallbackRunning = false }
   }, 15_000)
 }
 
 async function selectConversation(conversation: WhatsAppConversation) {
+  const selection = ++conversationSelection
   selectedConversation.value = conversation
   showCustomerSelector.value = false
-  await whatsappStore.fetchMessages(conversation.id)
-  await loadConversationContext(conversation)
-  await scrollToBottom()
+  void router.replace({ query: { ...route.query, conversationId: String(conversation.id) } })
+  await Promise.allSettled([whatsappStore.fetchMessages(conversation.id), loadConversationContext(conversation)])
+  if (selection === conversationSelection) await scrollToBottom()
 }
 
 async function selectConversationFromRoute() {
@@ -1211,6 +1216,8 @@ async function handleRealtimeMessage(payload: WhatsAppRealtimeMessagePayload) {
 }
 
 async function loadConversationContext(conversation: WhatsAppConversation) {
+  const generation = ++contextGeneration
+  const isCurrent = () => generation === contextGeneration && selectedConversation.value?.id === conversation.id
   selectedCustomer.value = null
   selectedAddress.value = null
   aiOrderDraft.value = null
@@ -1221,16 +1228,19 @@ async function loadConversationContext(conversation: WhatsAppConversation) {
     addressSelectionNote.value = ''
     const mode = whatsappOrderContextMode(conversation.attentionMode)
     const loadedDraft = mode === 'ai'
-      ? await loadAiOrderDraft(conversation.id)
+      ? await loadAiOrderDraft(conversation.id, isCurrent)
       : null
+    if (!isCurrent()) return
     if (!conversation.customerId) return
     const customerRes = await customerApi.getCustomerById(conversation.customerId)
+    if (!isCurrent()) return
     const customer = customerRes.data
     if (!customer) return
 
     let addresses: CustomerAddress[] = customer.addresses ?? []
     if (addresses.length === 0) {
       const addressRes = await customerApi.getCustomerAddresses(customer.id)
+      if (!isCurrent()) return
       addresses = addressRes.data ?? []
     }
 
@@ -1243,16 +1253,16 @@ async function loadConversationContext(conversation: WhatsAppConversation) {
         ? addresses.find(a => a.isPrimary) ?? addresses[0] ?? null
         : null
   } catch (error: any) {
-    contextError.value = error.message || 'No se pudo cargar el cliente.'
+    if (isCurrent()) contextError.value = error.message || 'No se pudo cargar el cliente.'
   } finally {
-    contextLoading.value = false
+    if (isCurrent()) contextLoading.value = false
   }
 }
 
-async function loadAiOrderDraft(conversationId: number) {
+async function loadAiOrderDraft(conversationId: number, isCurrent = () => selectedConversation.value?.id === conversationId) {
   const response = await whatsappApi.getOrderDraft(conversationId)
   const loaded = response.data ?? null
-  if (selectedConversation.value?.id === conversationId) aiOrderDraft.value = loaded
+  if (isCurrent()) aiOrderDraft.value = loaded
   return loaded
 }
 
@@ -1801,6 +1811,7 @@ onMounted(async () => {
 })
 
 onBeforeUnmount(() => {
+  conversationsGeneration++; contextGeneration++; conversationSelection++
   offSignalR('WhatsAppMessageCreated', handleRealtimeMessage)
   offSignalR('WhatsAppAttentionChanged', handleAttentionChanged)
   offSignalR('WhatsAppConversationRoutingChanged', handleConversationRoutingChanged)
