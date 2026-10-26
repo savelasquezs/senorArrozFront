@@ -1,1 +1,5 @@
 @import "tailwindcss";
+
+:root {
+    --order-sidebar-width: clamp(390px, 35vw, 490px);
+}

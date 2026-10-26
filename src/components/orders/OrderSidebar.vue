@@ -1047,7 +1047,7 @@ watch(
 </script>
 
 <style scoped>
-.order-sidebar { width: clamp(390px, 35vw, 490px); flex-shrink: 0; }
+.order-sidebar { width: var(--order-sidebar-width); flex-shrink: 0; }
 .sidebar-summary { display: flex; align-items: center; gap: 0.5rem; min-height: 28px; cursor: pointer; list-style: none; font-size: 0.8125rem; font-weight: 500; color: #374151; border-radius: 6px; }
 .sidebar-summary:hover { color: #047857; }
 .sidebar-summary:focus-visible { outline: 2px solid #059669; outline-offset: 3px; }
