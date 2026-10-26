@@ -39,8 +39,8 @@ export function buildExpenseHeaderQueryParams(filters?: ExpenseHeaderFilters): U
 }
 
 class ExpenseHeaderApi extends BaseApi {
-    async getExpenseHeaders(filters?: ExpenseHeaderFilters): Promise<ExpenseHeaderListResult> {
-        const config: AxiosRequestConfig = { params: buildExpenseHeaderQueryParams(filters) }
+    async getExpenseHeaders(filters?: ExpenseHeaderFilters, signal?: AbortSignal): Promise<ExpenseHeaderListResult> {
+        const config: AxiosRequestConfig = { params: buildExpenseHeaderQueryParams(filters), signal }
         return this.get<ExpenseHeaderListResult>('/expenseheaders', config)
     }
 

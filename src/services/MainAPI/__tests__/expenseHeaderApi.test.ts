@@ -1,5 +1,6 @@
-import { describe, expect, it } from 'vitest'
-import { buildExpenseHeaderQueryParams } from '@/services/MainAPI/expenseHeaderApi'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { BaseApi } from '@/services/MainAPI/baseApi'
+import { buildExpenseHeaderQueryParams, expenseHeaderApi } from '@/services/MainAPI/expenseHeaderApi'
 
 describe('buildExpenseHeaderQueryParams', () => {
     it('serializa una categoria string como un solo CategoryNames', () => {
@@ -44,5 +45,26 @@ describe('buildExpenseHeaderQueryParams', () => {
         expect(params.getAll('BankNames')).toEqual([])
         expect(params.getAll('SupplierIds')).toEqual([])
         expect(params.get('ExpenseName')).toBe('servilleta')
+    })
+})
+
+describe('expense list cancellation at the HTTP boundary', () => {
+    afterEach(() => vi.restoreAllMocks())
+
+    it('forwards AbortSignal while preserving all page/filter query parameters', async () => {
+        const signal = new AbortController().signal
+        const get = vi.spyOn(BaseApi.prototype, 'get').mockResolvedValue({
+            items: [], totalCount: 0, page: 3, pageSize: 25, totalPages: 0,
+        })
+        await expenseHeaderApi.getExpenseHeaders({
+            page: 3, pageSize: 25, expenseName: 'caja', categoryNames: ['Operación'],
+        }, signal)
+        expect(get).toHaveBeenCalledTimes(1)
+        const [url, config] = get.mock.calls[0]!
+        expect(url).toBe('/expenseheaders')
+        expect(config?.signal).toBe(signal)
+        expect((config?.params as URLSearchParams).get('Page')).toBe('3')
+        expect((config?.params as URLSearchParams).get('PageSize')).toBe('25')
+        expect((config?.params as URLSearchParams).getAll('CategoryNames')).toEqual(['Operación'])
     })
 })

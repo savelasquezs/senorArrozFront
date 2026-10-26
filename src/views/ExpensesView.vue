@@ -21,7 +21,7 @@
                 :supplier-options="supplierOptions" :sort-by="sortBy" :sort-order="sortOrder" :loading="loading"
                 :has-active-filters="hasActiveFilters" @update:preset-id="onPresetIdChange"
                 @update:custom-range="onCustomRangeChange" @update:sort-by="onSortByChange"
-                @toggle-sort-order="toggleSortOrder" @clear-filters="clearFilters" @refresh="fetchExpenses">
+                @toggle-sort-order="toggleSortOrder" @clear-filters="clearFilters" @refresh="refreshExpenses">
                 <template #result-hint>
                     <span v-if="!loading && totalCount > 0">
                         Facturas en página:
@@ -122,7 +122,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, defineAsyncComponent, nextTick, onMounted, ref, watch } from 'vue'
+import { computed, defineAsyncComponent, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { ChevronLeftIcon, ChevronRightIcon, PlusIcon } from '@heroicons/vue/24/outline'
 import ExpenseDetailsTable from '@/components/expenses/ExpenseDetailsTable.vue'
 import ExpensesFilters from '@/components/expenses/ExpensesFilters.vue'
@@ -138,6 +138,9 @@ import {
     type ExpenseTableState,
 } from '@/composables/useExpensesViewPersistence'
 import { useDebouncedCallback } from '@/composables/useDebouncedCallback'
+import { createLatestExpenseHeadersQuery } from '@/composables/createLatestExpenseHeadersQuery'
+import { useAuthStore } from '@/store/auth'
+import { useBranchContextStore } from '@/store/branchContext'
 import { useExpensePermissions } from '@/composables/useExpensePermissions'
 import { useToast } from '@/composables/useToast'
 import { defaultDateRangeThisMonth } from '@/components/dashboard/dashboardDateUtils'
@@ -145,7 +148,7 @@ import { bankApi } from '@/services/MainAPI/bankApi'
 import { expenseCategoryApi } from '@/services/MainAPI/expenseCategoryApi'
 import { expenseHeaderApi } from '@/services/MainAPI/expenseHeaderApi'
 import { supplierApi } from '@/services/MainAPI/supplierApi'
-import type { ExpenseHeader, UpdateExpenseHeaderDto } from '@/types/expense'
+import type { ExpenseHeader, ExpenseHeaderFilters, UpdateExpenseHeaderDto } from '@/types/expense'
 import { defaultBusinessCalendar } from '@/utils/datetime'
 import type { DashboardPeriodPresetId } from '@/utils/dashboardPeriodPresets'
 import { presetToExpenseApiDateRange } from '@/utils/expensesDateRange'
@@ -161,6 +164,8 @@ const ExpenseFormModal = defineAsyncComponent(
 
 const { success, error } = useToast()
 const expensePermissions = useExpensePermissions()
+const auth = useAuthStore()
+const branchContext = useBranchContextStore()
 const stored = loadExpensesViewState()
 
 const loading = ref(false)
@@ -324,48 +329,27 @@ const debouncedFetchExpenses = useDebouncedCallback(() => {
     void fetchExpenses()
 }, 300)
 
-watch(
-    () => localFilters.value.expenseName,
-    () => {
-        currentPage.value = 1
-        debouncedFetchExpenses.schedule()
-    },
-)
+// One post-flush watcher coalesces simultaneous filter changes (e.g. Clear all).
+// Typing still debounces; categorical filters apply immediately.
+watch(normalizedFilters, (next, prev) => {
+    currentPage.value = 1
+    debouncedFetchExpenses.cancel()
+    const sameNonTextFilters = JSON.stringify([
+        next.categoryNames, next.bankNames, next.supplierIds,
+    ]) === JSON.stringify([prev.categoryNames, prev.bankNames, prev.supplierIds])
+    if (sameNonTextFilters) debouncedFetchExpenses.schedule()
+    else void fetchExpenses()
+}, { flush: 'post' })
 
-watch(
-    () => normalizedFilters.value.categoryNames,
-    () => {
-        currentPage.value = 1
-        debouncedFetchExpenses.cancel()
-        void fetchExpenses()
-    },
-)
-
-watch(
-    () => normalizedFilters.value.bankNames,
-    () => {
-        currentPage.value = 1
-        debouncedFetchExpenses.cancel()
-        void fetchExpenses()
-    },
-)
-
-watch(
-    () => normalizedFilters.value.supplierIds,
-    () => {
-        currentPage.value = 1
-        debouncedFetchExpenses.cancel()
-        void fetchExpenses()
-    },
-)
-
-function syncDatesFromPresetAndFetch() {
-    const r = presetToExpenseApiDateRange(presetId.value, new Date(), customRange.value)
-    dateFilters.value = { fromDate: r.fromDate, toDate: r.toDate }
+// Scope is part of the request identity: never reuse data across users/branches.
+const listScopeKey = computed(() => [
+    auth.user?.id, auth.user?.role, auth.user?.branchId, branchContext.selectedBranchId,
+].join(':'))
+watch(listScopeKey, () => {
     currentPage.value = 1
     debouncedFetchExpenses.cancel()
     void fetchExpenses()
-}
+}, { flush: 'post' })
 
 function onPresetIdChange(id: DashboardPeriodPresetId) {
     if (id !== 'custom') {
@@ -407,33 +391,41 @@ function toggleSortOrder() {
     void fetchExpenses()
 }
 
-const fetchExpenses = async () => {
-    loading.value = true
-    summary.value = { totalAmount: 0, rowCount: 0 }
+const currentExpenseFilters = (): ExpenseHeaderFilters => ({
+    fromDate: dateFilters.value.fromDate || undefined,
+    toDate: dateFilters.value.toDate || undefined,
+    supplierIds: normalizedFilters.value.supplierIds,
+    bankNames: normalizedFilters.value.bankNames,
+    categoryNames: normalizedFilters.value.categoryNames,
+    expenseName: normalizedFilters.value.expenseName.trim(),
+    page: currentPage.value,
+    pageSize: pageSize.value,
+    sortBy: sortBy.value,
+    sortOrder: sortOrder.value,
+})
 
-    try {
-        const response = await expenseHeaderApi.getExpenseHeaders({
-            fromDate: dateFilters.value.fromDate || undefined,
-            toDate: dateFilters.value.toDate || undefined,
-            supplierIds: normalizedFilters.value.supplierIds,
-            bankNames: normalizedFilters.value.bankNames,
-            categoryNames: normalizedFilters.value.categoryNames,
-            expenseName: normalizedFilters.value.expenseName,
-            page: currentPage.value,
-            pageSize: pageSize.value,
-            sortBy: sortBy.value,
-            sortOrder: sortOrder.value,
-        })
-
-        expenses.value = response.items.map(normalizeExpense)
-        totalCount.value = response.totalCount
-    } catch (err: unknown) {
-        const msg = err instanceof Error ? err.message : 'Error desconocido'
-        error('Error al cargar gastos', msg)
-    } finally {
-        loading.value = false
-    }
-}
+const expenseListQuery = createLatestExpenseHeadersQuery(
+    (filters, signal) => expenseHeaderApi.getExpenseHeaders(filters, signal),
+    currentExpenseFilters,
+    () => listScopeKey.value,
+    {
+        onStart: () => {
+            loading.value = true
+            summary.value = { totalAmount: 0, rowCount: 0 }
+        },
+        onSuccess: response => {
+            expenses.value = response.items.map(normalizeExpense)
+            totalCount.value = response.totalCount
+        },
+        onError: err => {
+            const msg = err instanceof Error ? err.message : 'Error desconocido'
+            error('Error al cargar gastos', msg)
+        },
+        onFinish: () => { loading.value = false },
+    },
+)
+const fetchExpenses = (force = false) => expenseListQuery.run(force)
+const refreshExpenses = () => { debouncedFetchExpenses.cancel(); void fetchExpenses(true) }
 
 const loadFilterOptions = async () => {
     try {
@@ -469,7 +461,15 @@ const clearFilters = () => {
     }
     presetId.value = 'today'
     customRange.value = null
-    syncDatesFromPresetAndFetch()
+    const range = presetToExpenseApiDateRange('today', new Date(), null)
+    dateFilters.value = { fromDate: range.fromDate, toDate: range.toDate }
+    currentPage.value = 1
+    // Let the post-flush filter watcher run first, then cancel a possible text
+    // debounce. A categorical watcher fetch already in flight is deduplicated.
+    void nextTick().then(() => {
+        debouncedFetchExpenses.cancel()
+        return fetchExpenses()
+    })
 }
 
 const changePage = (page: number) => {
@@ -640,6 +640,7 @@ const confirmDeleteDetailLine = async () => {
         if (mode === 'full') {
             await expenseHeaderApi.deleteExpenseHeader(headerId)
             success('Factura eliminada', 5000, 'Se eliminó el gasto completo.')
+            expenseListQuery.cancel()
             expenses.value = expenses.value.filter(e => e.id !== headerId)
             totalCount.value = Math.max(0, totalCount.value - 1)
             if (selectedExpense.value?.id === headerId) {
@@ -673,6 +674,7 @@ const confirmDeleteDetailLine = async () => {
 
             const updated = normalizeExpense(await expenseHeaderApi.updateExpenseHeader(headerId, updatePayload))
             success('Línea eliminada', 5000, 'Se actualizó la factura.')
+            expenseListQuery.cancel()
 
             const idx = expenses.value.findIndex(e => e.id === headerId)
             if (idx !== -1) {
@@ -714,6 +716,7 @@ const closeFormModal = () => {
 }
 
 const handleSubmitExpense = (expense: ExpenseHeader) => {
+    expenseListQuery.cancel()
     const enrichedExpense = normalizeExpense(expense)
     const index = expenses.value.findIndex(e => e.id === enrichedExpense.id)
 
@@ -733,6 +736,11 @@ const handleSubmitExpense = (expense: ExpenseHeader) => {
     closeFormModal()
     success('Gasto guardado', 5000, 'El gasto se guardó exitosamente')
 }
+
+onUnmounted(() => {
+    debouncedFetchExpenses.cancel()
+    expenseListQuery.dispose()
+})
 
 onMounted(() => {
     if (!dateFilters.value.fromDate && !dateFilters.value.toDate) {
