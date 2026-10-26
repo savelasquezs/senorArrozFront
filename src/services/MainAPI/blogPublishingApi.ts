@@ -8,16 +8,17 @@ import type {
 } from '@/types/blogPublishing'
 
 class BlogPublishingApi extends BaseApi {
-  async getQueue(page = 1, pageSize = 100): Promise<ApiResponse<BlogPublishingQueueItem[]>> {
-    const response = await this.get<ApiResponse<PagedResult<BlogPublishingQueueItem>>>(
-      `/blog-publishing/queue?page=${page}&pageSize=${pageSize}`,
-      { branchScope: 'none' },
-    )
+  async getQueue(page = 1, pageSize = 100, signal?: AbortSignal): Promise<ApiResponse<BlogPublishingQueueItem[]>> {
+    const response = await this.getQueuePage(page, pageSize, signal)
 
     return {
       ...response,
       data: response.data?.items ?? [],
     }
+  }
+
+  getQueuePage(page = 1, pageSize = 50, signal?: AbortSignal): Promise<ApiResponse<PagedResult<BlogPublishingQueueItem>>> {
+    return this.get(`/blog-publishing/queue?page=${page}&pageSize=${pageSize}`, { branchScope: 'none', signal })
   }
 
   getApproved(): Promise<ApiResponse<BlogArticleSummary[]>> {
@@ -26,10 +27,10 @@ class BlogPublishingApi extends BaseApi {
     })
   }
 
-  getPreview(notionPageId: string): Promise<ApiResponse<BlogArticlePreview>> {
+  getPreview(notionPageId: string, signal?: AbortSignal): Promise<ApiResponse<BlogArticlePreview>> {
     return this.get<ApiResponse<BlogArticlePreview>>(
       `/blog-publishing/${encodeURIComponent(notionPageId)}/preview`,
-      { branchScope: 'none' },
+      { branchScope: 'none', signal },
     )
   }
 

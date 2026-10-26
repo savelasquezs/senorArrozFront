@@ -146,7 +146,8 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { createLatestRead } from '@/helpers/latestRead'
+import { onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import BaseAlert from '@/components/ui/BaseAlert.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
@@ -170,22 +171,29 @@ function branchId() {
   return route.query.branchId ? Number(route.query.branchId) : null
 }
 
+const listRead = createLatestRead()
+onUnmounted(() => listRead.invalidate())
+watch(() => route.query.branchId, () => { void load() })
 async function load() {
+  const request = listRead.begin()
   loading.value = true
   errorText.value = ''
   try {
-    orders.value = (await integrationApi.getRappiOrders(branchId())).data
+    const response = await integrationApi.getRappiOrders(branchId(), request.signal)
+    if (request.isCurrent()) orders.value = response.data
   } catch (error: any) {
-    errorText.value = error.message
+    if (request.isCurrent()) errorText.value = error.message
   } finally {
-    loading.value = false
+    if (request.isCurrent()) loading.value = false
   }
 }
 
 async function revalidateAndAccept(id: number) {
+  if (workingId.value != null) return
   workingId.value = id
   errorText.value = ''
   try {
+    listRead.invalidate(); loading.value = false
     const response = await integrationApi.revalidateAndAcceptRappiOrder(id)
     await load()
     if (response.data.internalOrderId) {
@@ -205,10 +213,11 @@ function openReject(id: number) {
 }
 
 async function reject() {
-  if (!rejectId.value || !rejectReason.value.trim()) return
+  if (workingId.value != null || !rejectId.value || !rejectReason.value.trim()) return
   workingId.value = rejectId.value
   errorText.value = ''
   try {
+    listRead.invalidate(); loading.value = false
     await integrationApi.rejectRappiOrder(rejectId.value, rejectReason.value.trim())
     showReject.value = false
     await load()
