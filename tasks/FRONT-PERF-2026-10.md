@@ -18,7 +18,7 @@ Mejorar UX y rendimiento de todas las rutas y secciones Vue, con cambios API nec
 
 | ID | Rama | Trabajo y aceptación | Estado |
 |---|---|---|---|
-| P00 | p00-baseline | Inventario completo, builds A/B, escenarios frío/caliente y trazas anonimizadas. Distinguir simulación, integración y producción. | Evidencia A/B local reproducible |
+| P00 | baseline detached | Inventario completo, builds A/B, escenarios frío/caliente y trazas anonimizadas. Distinguir simulación, integración y producción. | Evidencia A/B local reproducible |
 | P01 | p01-http-lifecycle | Preservar cancelación HTTP, compartir lecturas y descartar resultados/errores obsoletos. Dos consumidores no se cancelan entre sí. | Código local verificado |
 | P02 | p02-persistent-layout | Shell autenticada persistente; propietarios globales únicos; desmontaje por identidad/rol/contexto. Navegar no reinicia hubs. | Código local verificado |
 | P03 | p03-route-state | Identidad por recurso/contexto, queries en sitio y estado de listados. Back/forward y enlaces directos conservan contexto. | Código local verificado |
@@ -31,12 +31,12 @@ Mejorar UX y rendimiento de todas las rutas y secciones Vue, con cambios API nec
 | P10 | p10-whatsapp-workspace | Integrar 46; bandeja y contexto independientes; A lento→B rápido; fallback serial visible/online. | Código local verificado |
 | P11 | p11-whatsapp-history | Cursor fecha/ID, 50 mensajes iniciales (máx. 100), páginas/scroll/realtime y medios acotados. Endpoint anterior compatible. | Código local verificado |
 | P12 | p12-whatsapp-settings | Plantillas y canal; quitar espera artificial 350 ms; promesas reales, abort/generación y cleanup. | Código local verificado |
-| P13 | p13-kitchen | Verificar batch/coalescencia/render, voz durable y estados. Sin anuncios ni transiciones duplicadas. | Implementación existente conservada y verificada |
+| P13 | existente, sin rama nueva | Verificar batch/coalescencia/render, voz durable y estados. Sin anuncios ni transiciones duplicadas. | Implementación existente conservada y verificada |
 | P14 | p14-delivery | Disponibles/asignados independientes, métricas/historial por demanda y eventos antes del snapshot. | Código local verificado |
 | P15 | p15-delivery-management | Ubicaciones/pedidos agrupados para mapa; resumen independiente; sin HTTP proporcional a empleados. | Código local verificado |
 | P16 | p16-tracking | Alertas/incidentes/playback bajo demanda; abort/contexto y timers visibles. Histórico no se refresca. | Código local verificado |
 | P17 | p17-inventory | Cargas por sección, metadata mínima, coalescencia, conteos/recetas/transferencias protegidos. | Código local verificado |
-| P18 | p18-expenses | Integrar 44/70; gastos/conceptos/proveedores/imputación. Última intención gana y lecturas no restauran borrados. | PR 44/70 integrados localmente; imputación protegida |
+| P18 | PR 44 / API 70 + p26-validation | Integrar 44/70; gastos/conceptos/proveedores/imputación. Última intención gana y lecturas no restauran borrados. | PR 44/70 integrados localmente; imputación protegida |
 | P19 | p19-dashboard | Retener última clave por sección, TTL 30 s, cleanup/cancelación oculta; mapas/detalles diferidos. | Código local verificado |
 | P20 | p20-branches | Ficha primero; usuarios/nómina/horarios/barrios/impresión/descuentos/fidelización/integraciones por sección. | Código local verificado |
 | P21 | p21-banks-apps | Ficha/movimientos/pagos independientes; paginación real, contexto y selección vigente tras mutaciones. | Código local verificado |
@@ -121,3 +121,5 @@ La implementación local está integrada y revisable. Falta ejecutar CI remoto y
 Para revertir una publicación, retirar primero el frontend que consume los endpoints nuevos y después la API, conservando los contratos anteriores. No hay reversión de esquema.
 
 Los artefactos compilados de API/pruebas se movieron a `D:/CodexTemp/SenorArroz-front-performance-20261026` y se enlazaron desde el worktree para resolver falta de espacio en C:. El PostgreSQL de prueba es independiente de la base de la aplicación.
+
+El smoke inicial/error de las 35 rutas se repitió sobre el build final `6309c6c`, sin excepciones. El PostgreSQL desechable quedó detenido al terminar.

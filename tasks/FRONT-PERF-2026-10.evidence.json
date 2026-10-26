@@ -519,14 +519,14 @@
       "path": "/orders",
       "name": "OrdersList",
       "landed": "/orders",
-      "textLength": 735,
+      "textLength": 805,
       "errors": []
     },
     {
       "path": "/orders/new",
       "name": "OrdersNew",
       "landed": "/orders/new",
-      "textLength": 6481,
+      "textLength": 7621,
       "errors": []
     },
     {
@@ -1089,5 +1089,6 @@
     "101 configured PostgreSQL/provider integration cases were skipped; no new RLS or production throughput claim.",
     "Heap snapshots without forced GC are reference data; no memory leak conclusion.",
     "Route smoke uses Superadmin and anonymous public forms with partial API failures; it is not a real operational or all-role end-to-end test."
-  ]
+  ],
+  "routeSmokeSourceSha": "6309c6ca45e58cd7c21a0606b89f379a02fd2cc2"
 }
