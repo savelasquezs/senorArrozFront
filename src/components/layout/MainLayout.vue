@@ -10,7 +10,7 @@
 			<TopNavigation @toggle-sidebar="sidebarOpen = !sidebarOpen" />
 
 			<!-- Page content -->
-			<main class="flex-1 overflow-x-hidden bg-gray-50"
+			<main ref="contentElement" class="flex-1 overflow-x-hidden bg-gray-50"
 				:class="[{ 'px-6': !noCard }, noCard ? 'overflow-hidden' : 'overflow-y-auto']">
 				<div :class="noCard ? 'h-full' : ' mx-auto h-full flex flex-col'">
 					<!-- Page header -->
@@ -51,7 +51,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onBeforeUnmount, onMounted, watch } from 'vue';
+import { ref, computed, nextTick, onBeforeUnmount, onMounted, watch } from 'vue';
 import { RouterView, useRoute, useRouter } from 'vue-router';
 import { getRouteViewKey } from '@/utils/routeViewKey';
 import { useAuthStore } from '@/store/auth';
@@ -94,6 +94,13 @@ const { on: onOrdersSignalR, off: offOrdersSignalR } = useSignalR(ORDERS_SIGNALR
 const { isPageVisible, isUserActive } = useNetworkActivityManager();
 
 const sidebarOpen = ref(false);
+const contentElement = ref<HTMLElement>();
+const scrollPositions = new Map<string, number>();
+watch(() => route.path, async (path, previous) => {
+	if (contentElement.value) scrollPositions.set(previous, contentElement.value.scrollTop);
+	await nextTick();
+	if (route.path === path && contentElement.value) contentElement.value.scrollTop = scrollPositions.get(path) ?? 0;
+});
 let whatsAppPollingId: number | undefined;
 let catalogPrefetchId: number | undefined;
 let previousWhatsAppLatestMessageAt: string | null = null;
