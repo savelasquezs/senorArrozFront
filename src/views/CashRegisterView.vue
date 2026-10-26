@@ -785,6 +785,9 @@ function emptyDenominationCounts(): Record<number, number> {
 
 // ===== STATE =====
 const loading = ref(false)
+const validationPending = ref(false)
+const validationError = ref('')
+let loadGeneration = 0, loansGeneration = 0
 const saving = ref(false)
 const expected = ref<CashRegisterExpected | null>(null)
 
@@ -1086,6 +1089,7 @@ const undeliveredCount = computed(() => expected.value?.undeliveredOrdersCount ?
 const canSave = computed(
   () =>
     !saving.value &&
+    !loading.value && !validationPending.value && !validationError.value && !!expected.value &&
     undeliveredCount.value === 0 &&
     allBanksCuadred.value &&
     globalCuadred.value &&
@@ -1098,6 +1102,8 @@ const cashVaultBank = computed(() => {
 })
 
 const saveBlockReason = computed(() => {
+  if (validationPending.value) return 'Completando la validación del cuadre…'
+  if (validationError.value) return validationError.value
   const n = undeliveredCount.value
   if (n > 0) {
     return n === 1
@@ -1234,20 +1240,27 @@ async function onBankTransferSaved() {
 }
 
 async function loadBranchInformalLoans() {
+  const generation = ++loansGeneration
+  const branchId = activeBranchId.value
   informalLoansLoading.value = true
   try {
     const scope = loansTab.value === 'inactive' ? 'inactive' : 'active'
-    branchInformalLoans.value = await cashRegisterApi.getInformalLoans(
-      activeBranchId.value ?? undefined,
+    const loans = await cashRegisterApi.getInformalLoans(
+      branchId ?? undefined,
       scope,
       loanSourceFilter.value,
       loanSourceFilter.value === 'bank' ? loanBankFilter.value ?? undefined : undefined,
     )
+    if (generation !== loansGeneration || branchId !== activeBranchId.value) return false
+    branchInformalLoans.value = loans
+    return true
   } catch (e) {
+    if (generation !== loansGeneration) return false
     console.error('Error cargando préstamos informales:', e)
     branchInformalLoans.value = []
+    return false
   } finally {
-    informalLoansLoading.value = false
+    if (generation === loansGeneration) informalLoansLoading.value = false
   }
 }
 
@@ -1548,16 +1561,27 @@ async function confirmDeactivateLoan() {
 }
 
 async function loadData() {
+  const generation = ++loadGeneration
   loading.value = true
+  validationPending.value = true
+  validationError.value = ''
   try {
     const branchId = activeBranchId.value ?? undefined
-    const [expectedResult, banksResult] = await Promise.all([
-      cashRegisterApi.getExpected(branchId),
-      bankApi.getBanks({ branchId, page: 1, pageSize: 200 }),
-    ])
+    void Promise.all([
+      bankApi.getBanks({ branchId, page: 1, pageSize: 200 }).then(banksResult => {
+        if (generation !== loadGeneration) return
+        loanFilterBanks.value = banksResult.items.filter(bank => bank.type === 'normal')
+        loanBanks.value = loanFilterBanks.value.filter(bank => bank.active)
+      }),
+      loadBranchInformalLoans().then(loaded => {
+        if (!loaded && generation === loadGeneration) validationError.value = 'No se pudieron validar los préstamos. Actualiza antes de cerrar.'
+      }),
+    ]).catch(() => {
+      if (generation === loadGeneration) validationError.value = 'No se pudieron validar los bancos. Actualiza antes de cerrar.'
+    }).finally(() => { if (generation === loadGeneration) validationPending.value = false })
+    const expectedResult = await cashRegisterApi.getExpected(branchId)
+    if (generation !== loadGeneration) return
     expected.value = expectedResult
-    loanFilterBanks.value = banksResult.items.filter(bank => bank.type === 'normal')
-    loanBanks.value = loanFilterBanks.value.filter(bank => bank.active)
     movementsBankId.value = null
 
     // Inicializar conciliaciones con valores del sistema
@@ -1572,11 +1596,12 @@ async function loadData() {
 
     hydrateDenominationDraft(expected.value)
     hydrateBankActualsDraft(expected.value)
-    await loadBranchInformalLoans()
   } catch (e: any) {
+    if (generation !== loadGeneration) return
+    validationError.value = 'No se pudo actualizar el esperado. Reintenta antes de cerrar.'
     console.error('Error cargando datos del cuadre:', e)
   } finally {
-    loading.value = false
+    if (generation === loadGeneration) loading.value = false
   }
 }
 
@@ -1644,6 +1669,7 @@ onMounted(() => {
 })
 
 onBeforeUnmount(() => {
+  loadGeneration++; loansGeneration++
   flushPersistDenominationDraft()
   flushPersistBankActualsDraft()
 })
