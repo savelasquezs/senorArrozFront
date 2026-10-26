@@ -43,6 +43,23 @@ export const useWhatsAppStore = defineStore('whatsapp', () => {
   let statusLoadedAt = 0
   let statusInFlight: Promise<WhatsAppStatus> | null = null
   let unreadInFlight: Promise<WhatsAppUnreadSummary> | null = null
+  // One network request per conversation, with explicit invalidation on reset/logout.
+  const messageRequests = new Map<number, { promise: Promise<WhatsAppMessage[]>; abort: AbortController }>()
+  const messageRevisions = new Map<number, number>()
+  const messageEpochs = new Map<number, number>()
+  let messageScope = 0
+
+  function markMessageChanged(conversationId: number) {
+    messageRevisions.set(conversationId, (messageRevisions.get(conversationId) ?? 0) + 1)
+  }
+
+  function invalidateMessageRequest(conversationId: number) {
+    const pending = messageRequests.get(conversationId)
+    messageRequests.delete(conversationId)
+    pending?.abort.abort()
+    messageEpochs.set(conversationId, (messageEpochs.get(conversationId) ?? 0) + 1)
+    isLoadingMessages.value = messageRequests.size > 0
+  }
 
   const enabled = computed(() => status.value?.enabled === true)
   const enabledBranchIds = computed(() => status.value?.branchIds ?? [])
@@ -159,33 +176,66 @@ export const useWhatsAppStore = defineStore('whatsapp', () => {
     return res.data
   }
 
-  async function fetchMessages(conversationId: number) {
-    try {
-      isLoadingMessages.value = true
-      error.value = null
-      const res = await whatsappApi.getMessages(conversationId)
-      messages.value[conversationId] = sortMessages(res.data ?? [])
-      const diagnostics = aiDiagnosticsByConversation.value[conversationId]
-      for (const processing of diagnostics?.recentMessages ?? []) {
-        attachAiProcessingToMessage(conversationId, processing.messageId, processing)
-      }
-      const conversation = conversations.value.find(c => c.id === conversationId)
-      if (conversation && conversation.unreadCount > 0) {
-        const previousUnread = conversation.unreadCount
-        conversation.unreadCount = 0
-        unreadSummary.value = {
-          ...unreadSummary.value,
-          totalUnread: Math.max(0, unreadSummary.value.totalUnread - previousUnread),
-          unreadConversations: Math.max(0, unreadSummary.value.unreadConversations - 1),
+  function fetchMessages(conversationId: number): Promise<WhatsAppMessage[]> {
+    const inFlight = messageRequests.get(conversationId)
+    if (inFlight) return inFlight.promise
+
+    const scope = messageScope
+    const epoch = messageEpochs.get(conversationId) ?? 0
+    const revision = messageRevisions.get(conversationId) ?? 0
+    const abort = new AbortController()
+    error.value = null
+    isLoadingMessages.value = true
+    const isCurrent = () => messageScope === scope
+      && (messageEpochs.get(conversationId) ?? 0) === epoch
+      && !abort.signal.aborted
+
+    let request!: Promise<WhatsAppMessage[]>
+    request = (async () => {
+      try {
+        const res = await whatsappApi.getMessages(conversationId, abort.signal)
+        if (!isCurrent()) return messages.value[conversationId] ?? []
+
+        // SignalR/send may deliver a newer message or status while HTTP is pending.
+        // Preserve those updates instead of replacing the entire conversation.
+        const changedDuringRequest = (messageRevisions.get(conversationId) ?? 0) !== revision
+        const byId = new Map((res.data ?? []).map(message => [message.id, message]))
+        if (changedDuringRequest) {
+          for (const current of messages.value[conversationId] ?? []) byId.set(current.id, current)
+        }
+        messages.value[conversationId] = sortMessages([...byId.values()])
+
+        const diagnostics = aiDiagnosticsByConversation.value[conversationId]
+        for (const processing of diagnostics?.recentMessages ?? []) {
+          attachAiProcessingToMessage(conversationId, processing.messageId, processing)
+        }
+
+        // A new inbound SignalR event must not be marked read by an older HTTP reply.
+        const conversation = conversations.value.find(c => c.id === conversationId)
+        if (!changedDuringRequest && conversation && conversation.unreadCount > 0) {
+          const previousUnread = conversation.unreadCount
+          conversation.unreadCount = 0
+          unreadSummary.value = {
+            ...unreadSummary.value,
+            totalUnread: Math.max(0, unreadSummary.value.totalUnread - previousUnread),
+            unreadConversations: Math.max(0, unreadSummary.value.unreadConversations - 1),
+          }
+        }
+        return messages.value[conversationId]
+      } catch (err: any) {
+        // A canceled/invalidated request belongs to the previous session/reset.
+        if (!isCurrent()) return messages.value[conversationId] ?? []
+        error.value = err.message || 'No se pudieron cargar los mensajes'
+        throw err
+      } finally {
+        if (messageRequests.get(conversationId)?.promise === request) {
+          messageRequests.delete(conversationId)
+          isLoadingMessages.value = messageRequests.size > 0
         }
       }
-      return messages.value[conversationId]
-    } catch (err: any) {
-      error.value = err.message || 'No se pudieron cargar los mensajes'
-      throw err
-    } finally {
-      isLoadingMessages.value = false
-    }
+    })()
+    messageRequests.set(conversationId, { promise: request, abort })
+    return request
   }
 
   async function sendMessage(conversationId: number, text: string) {
@@ -213,6 +263,7 @@ export const useWhatsAppStore = defineStore('whatsapp', () => {
     const res = await whatsappApi.resetConversationForTesting(conversationId)
     const conversation = conversations.value.find(x => x.id === conversationId)
     if (conversation && res.data) Object.assign(conversation, res.data)
+    invalidateMessageRequest(conversationId)
     messages.value[conversationId] = []
     delete aiDiagnosticsByConversation.value[conversationId]
     return res.data
@@ -336,6 +387,7 @@ export const useWhatsAppStore = defineStore('whatsapp', () => {
       ? existing.map(x => x.id === enrichedMessage.id ? enrichedMessage : x)
       : [...existing, enrichedMessage]
     messages.value[conversationId] = sortMessages(updated)
+    markMessageChanged(conversationId)
   }
 
   function attachAiProcessingToMessage(
@@ -351,6 +403,7 @@ export const useWhatsAppStore = defineStore('whatsapp', () => {
       && !shouldApplyAiProcessingUpdate(conversationMessages[index].aiProcessing, processing)) return
     conversationMessages[index] = { ...conversationMessages[index], aiProcessing: processing }
     messages.value[conversationId] = [...conversationMessages]
+    markMessageChanged(conversationId)
   }
 
   function applyAiProcessingChanged(payload: WhatsAppAiProcessingChangedPayload) {
@@ -498,6 +551,12 @@ export const useWhatsAppStore = defineStore('whatsapp', () => {
   }
 
   function clear() {
+    messageScope++
+    for (const pending of messageRequests.values()) pending.abort.abort()
+    messageRequests.clear()
+    messageEpochs.clear()
+    messageRevisions.clear()
+    isLoadingMessages.value = false
     statusInFlight = null
     unreadInFlight = null
     statusLoadedAt = 0
