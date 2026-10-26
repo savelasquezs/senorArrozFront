@@ -288,6 +288,7 @@
 </template>
 
 <script setup lang="ts">
+import { createLatestRead } from '@/helpers/latestRead'
 import { computed, defineComponent, h, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import { trackingEventLabel } from '@/utils/trackingEvidence'
 import BaseBadge from '@/components/ui/BaseBadge.vue'
@@ -415,7 +416,10 @@ function colombiaDayAfter(value: string): string | undefined {
   return value ? defaultBusinessCalendar.addZonedDays(parseYmd(value), 1).toISOString() : undefined
 }
 
+const deliverymenRead = createLatestRead()
+const listRead = createLatestRead(), detailRead = createLatestRead(), contextRead = createLatestRead(), explorerRead = createLatestRead()
 async function loadIncidents() {
+  const request = listRead.begin()
   loading.value = true
   loadError.value = ''
   try {
@@ -426,13 +430,15 @@ async function loadIncidents() {
       to: colombiaDayAfter(toDate.value),
       page: page.value,
       pageSize,
-    })
+    }, request.signal)
+    if (!request.isCurrent()) return
     items.value = response.data.items
     totalCount.value = response.data.totalCount
   } catch (error: any) {
+    if (!request.isCurrent()) return
     loadError.value = error.message || 'No fue posible cargar los incidentes.'
   } finally {
-    loading.value = false
+    if (request.isCurrent()) loading.value = false
   }
 }
 
@@ -447,11 +453,14 @@ function changePage(value: number) {
 }
 
 async function openDetail(id: number) {
+  const request = detailRead.begin()
+  contextRead.invalidate()
   detailOpen.value = true
   detailLoading.value = true
   detail.value = null
   try {
-    const response = await deliveryTrackingIncidentsApi.getById(id)
+    const response = await deliveryTrackingIncidentsApi.getById(id, request.signal)
+    if (!request.isCurrent()) return
     detail.value = response.data
     hydrateReviewForm(response.data)
     mapMode.value = 'playback'
@@ -462,10 +471,11 @@ async function openDetail(id: number) {
     contextRecoveryMissing.value = range.recoveryMissing
     await loadContextPlayback()
   } catch (error: any) {
+    if (!request.isCurrent()) return
     detailOpen.value = false
     toast.error('No se pudo cargar el incidente', error.message)
   } finally {
-    detailLoading.value = false
+    if (request.isCurrent()) detailLoading.value = false
   }
 }
 
@@ -476,13 +486,15 @@ async function loadContextPlayback(silent = false, toOverride?: string) {
     playbackError.value = ''
     contextPlayback.value = null
   }
+  const request = contextRead.begin()
   try {
     const response = await deliveryTrackingIncidentsApi.getPlayback({
       deliverymanIds: [detail.value.deliverymanId],
       from: colombiaDateTimeLocalToIso(contextFrom.value),
       to: toOverride || colombiaDateTimeLocalToIso(contextTo.value),
       branchId: detail.value.branchId,
-    })
+    }, request.signal)
+    if (!request.isCurrent()) return
     contextPlayback.value = response.data
     const range = calculateIncidentPlaybackRange(
       detail.value,
@@ -494,9 +506,10 @@ async function loadContextPlayback(silent = false, toOverride?: string) {
       && Math.abs(new Date(toOverride || colombiaDateTimeLocalToIso(contextTo.value)).getTime() - Date.now()) < 90_000
     updateLiveRefreshTimer()
   } catch (error: any) {
+    if (!request.isCurrent()) return
     if (!silent) playbackError.value = error.message || 'No fue posible cargar el recorrido.'
   } finally {
-    if (!silent) playbackLoading.value = false
+    if (request.isCurrent()) playbackLoading.value = false
   }
 }
 
@@ -510,6 +523,7 @@ function openExplorer() {
 }
 
 async function loadExplorerDeliverymen() {
+  const request = deliverymenRead.begin()
   const selectedBranch = Number(explorerBranchId.value || authStore.branchId)
   explorerDeliverymen.value = []
   explorerSelectedIds.value = []
@@ -527,11 +541,12 @@ async function loadExplorerDeliverymen() {
       totalPages = response.totalPages
       page++
     } while (page <= totalPages)
+    if (!request.isCurrent()) return
     explorerDeliverymen.value = values
   } catch (error: any) {
-    explorerError.value = error.message || 'No fue posible cargar los domiciliarios.'
+    if (request.isCurrent()) explorerError.value = error.message || 'No fue posible cargar los domiciliarios.'
   } finally {
-    deliverymenLoading.value = false
+    if (request.isCurrent()) deliverymenLoading.value = false
   }
 }
 
@@ -545,21 +560,24 @@ async function loadExplorerPlayback(silent = false, toOverride?: string) {
     explorerLoading.value = true
     explorerPlayback.value = null
   }
+  const request = explorerRead.begin()
   try {
     const response = await deliveryTrackingIncidentsApi.getPlayback({
       deliverymanIds: explorerSelectedIds.value,
       from: colombiaDateTimeLocalToIso(explorerFrom.value),
       to: toOverride || colombiaDateTimeLocalToIso(explorerTo.value),
       branchId: Number(explorerBranchId.value || authStore.branchId),
-    })
+    }, request.signal)
+    if (!request.isCurrent()) return
     explorerPlayback.value = response.data
     explorerLiveFollow.value = response.data.deliverymen.some(item => item.stays.some(stay => stay.isActive))
       && Math.abs(new Date(toOverride || colombiaDateTimeLocalToIso(explorerTo.value)).getTime() - Date.now()) < 90_000
     updateLiveRefreshTimer()
   } catch (error: any) {
+    if (!request.isCurrent()) return
     if (!silent) explorerError.value = error.message || 'No fue posible cargar el recorrido.'
   } finally {
-    if (!silent) explorerLoading.value = false
+    if (request.isCurrent()) explorerLoading.value = false
   }
 }
 
@@ -568,14 +586,16 @@ function canExtendLiveRange(from: string) {
 }
 
 async function refreshLiveMaps() {
-  if (liveRefreshRunning) return
+  if (liveRefreshRunning || document.visibilityState === 'hidden' || !navigator.onLine) return
   liveRefreshRunning = true
   try {
     if (detailOpen.value && detail.value?.isActive && contextLiveFollow.value) {
       if (!canExtendLiveRange(contextFrom.value)) {
         contextLiveFollow.value = false
       } else {
-        const response = await deliveryTrackingIncidentsApi.getById(detail.value.id)
+        const incidentId = detail.value.id
+        const response = await deliveryTrackingIncidentsApi.getById(incidentId)
+        if (!detailOpen.value || detail.value?.id !== incidentId) return
         detail.value = response.data
         contextTo.value = isoToColombiaDateTimeLocal(Date.now())
         await loadContextPlayback(true, new Date().toISOString())
@@ -688,21 +708,21 @@ function orderStatusLabel(value: string | null) { return ({ OnTheWay: 'En camino
 
 
 onMounted(async () => {
-  try { await loadBranches() } catch (error: any) { toast.error('No se pudieron cargar las sucursales', error.message) }
-  await loadIncidents()
+  await Promise.all([loadBranches().catch((error: any) => toast.error('No se pudieron cargar las sucursales', error.message)), loadIncidents()])
 })
 
 onUnmounted(() => {
+  deliverymenRead.invalidate(); listRead.invalidate(); detailRead.invalidate(); contextRead.invalidate(); explorerRead.invalidate()
   if (liveRefreshTimer != null) window.clearInterval(liveRefreshTimer)
 })
 
 watch(detailOpen, value => {
-  if (!value) contextLiveFollow.value = false
+  if (!value) { contextLiveFollow.value = false; detailRead.invalidate(); contextRead.invalidate(); playbackLoading.value = false; detailLoading.value = false }
   updateLiveRefreshTimer()
 })
 
 watch(explorerOpen, value => {
-  if (!value) explorerLiveFollow.value = false
+  if (!value) { explorerLiveFollow.value = false; explorerRead.invalidate(); explorerLoading.value = false }
   updateLiveRefreshTimer()
 })
 

@@ -6,6 +6,15 @@ export function createLatestRead() {
         active?.controller.abort()
         active = undefined
     }
+    let currentController: AbortController | undefined
+    function begin() {
+        invalidate()
+        currentController?.abort()
+        const controller = new AbortController()
+        currentController = controller
+        const revision = version
+        return { signal: controller.signal, isCurrent: () => revision === version && !controller.signal.aborted }
+    }
     function load<T>(key: string, read: (signal: AbortSignal) => Promise<T>, assign: (value: T) => void) {
         if (active?.key === key) return active.promise
         invalidate()
@@ -24,5 +33,5 @@ export function createLatestRead() {
         active = { key, controller, promise }
         return promise
     }
-    return { load, invalidate }
+    return { load, begin, invalidate: () => { invalidate(); currentController?.abort() } }
 }
