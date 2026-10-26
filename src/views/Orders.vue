@@ -48,7 +48,7 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, onUnmounted, computed, ref } from 'vue'
+import { onMounted, onUnmounted, computed, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useOrdersDraftsStore } from '@/store/ordersDrafts'
 import { useProductsStore } from '@/store/products'
@@ -98,7 +98,7 @@ const posTabs = computed(() => buildOrderPosTabs(categories.value))
 const ensureOrderPageData = async () => {
     try {
         await Promise.all([
-            bootstrapOrderCatalog(authStore.userRole, ordersStore.activeBranchId),
+            bootstrapOrderCatalog(authStore.userRole, ordersStore.currentOrder?.branchId ?? ordersStore.activeBranchId),
             ordersStore.loadBanks(), ordersStore.loadApps(),
         ])
     } catch (error) {
@@ -106,7 +106,9 @@ const ensureOrderPageData = async () => {
     }
 }
 
-function retryCatalog() { void productsStore.ensureCatalogLoaded(ordersStore.activeBranchId, true).catch(() => {}) }
+const catalogBranchId = computed(() => ordersStore.currentOrder?.branchId ?? ordersStore.activeBranchId)
+watch(catalogBranchId, branchId => { void productsStore.ensureCatalogLoaded(branchId).catch(() => {}) })
+function retryCatalog() { void productsStore.ensureCatalogLoaded(catalogBranchId.value, true).catch(() => {}) }
 
 const onCategorySelected = (_categoryId: number | null) => {
     // Category selection is already handled by the CategoriesBar component
