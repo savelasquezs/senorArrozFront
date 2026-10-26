@@ -1,5 +1,5 @@
 ﻿<template>
-    <MainLayout>
+    <div class="contents">
         <div class="-m-3 space-y-3 sm:m-0">
             <div class="flex min-w-0 flex-wrap items-center justify-between gap-2 border-b border-gray-200 pb-2">
                 <nav class="grid w-full grid-cols-2 gap-1 rounded-lg bg-gray-100 p-1 sm:flex sm:w-auto sm:flex-wrap"
@@ -226,7 +226,7 @@
 
         <ConfirmStatusChangeModal :is-open="showConfirmModal" :orders="ordersToConfirm" :order-items-map="orderItemsMap"
             :chain-taken-to-ready="confirmChainTakenToReady" @close="closeConfirmModal" @updated="handleModalUpdated" />
-    </MainLayout>
+    </div>
 </template>
 
 <script setup lang="ts">
@@ -248,7 +248,6 @@ import type { KitchenOrderModificationSummary } from '@/types/kitchenModificatio
 import { printJobsApi } from '@/services/MainAPI/printJobsApi'
 import type { OrderListItem, OrderDetailItem, OrderStatus, KitchenSummaryOrder } from '@/types/order'
 import { defaultBusinessCalendar } from '@/utils/datetime'
-import MainLayout from '@/components/layout/MainLayout.vue'
 import OrderCardGrid from '@/components/kitchen/OrderCardGrid.vue'
 import ReadyOrdersTable from '@/components/kitchen/ReadyOrdersTable.vue'
 import ConfirmStatusChangeModal from '@/components/kitchen/ConfirmStatusChangeModal.vue'

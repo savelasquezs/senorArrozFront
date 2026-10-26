@@ -1,6 +1,6 @@
 <!-- src/views/CustomersList.vue -->
 <template>
-    <MainLayout page-title="Clientes">
+    <div class="contents">
         <BaseLoading v-if="store.isLoading && !store.list" text="Cargando clientes..." />
 
         <div v-else class="flex flex-col gap-2 min-h-0 -mx-2 sm:mx-0">
@@ -204,7 +204,7 @@
             :loading="detailModalLoading"
             @close="closeCustomerDetail"
             @customer-updated="onCustomerUpdatedFromDetail" />
-    </MainLayout>
+    </div>
 </template>
 
 <script setup lang="ts">
@@ -215,7 +215,6 @@ import { useAuthStore } from '@/store/auth'
 import { useToast } from '@/composables/useToast'
 import { useRoute, useRouter } from 'vue-router'
 
-import MainLayout from '@/components/layout/MainLayout.vue'
 import BaseCard from '@/components/ui/BaseCard.vue'
 import BaseInput from '@/components/ui/BaseInput.vue'
 import BaseSelect from '@/components/ui/BaseSelect.vue'

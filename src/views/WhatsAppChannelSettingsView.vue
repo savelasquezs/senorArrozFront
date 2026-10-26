@@ -1,5 +1,5 @@
 <template>
-  <MainLayout>
+  <div class="contents">
     <section class="mx-auto max-w-6xl space-y-6">
       <div>
         <p class="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-600">Canal central · Tenant 1</p>
@@ -116,12 +116,11 @@
         </article>
       </template>
     </section>
-  </MainLayout>
+  </div>
 </template>
 
 <script setup lang="ts">
 import { onMounted, reactive, ref } from 'vue'
-import MainLayout from '@/components/layout/MainLayout.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseInput from '@/components/ui/BaseInput.vue'
 import { whatsappApi } from '@/services/MainAPI/whatsappApi'

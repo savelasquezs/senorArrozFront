@@ -1,5 +1,5 @@
 <template>
-    <MainLayout>
+    <div class="contents">
         <div class="p-3 md:p-6 space-y-4 md:space-y-6">
 
             <!-- Header -->
@@ -324,7 +324,7 @@
             @assigned="handleAssigned"
         />
 
-    </MainLayout>
+    </div>
 </template>
 
 <script setup lang="ts">
@@ -336,7 +336,6 @@ import { useSignalR } from '@/composables/useSignalR'
 import { ORDERS_SIGNALR_HUB_URL } from '@/config/signalr'
 import { useToast } from '@/composables/useToast'
 import type { DeliverymanHistoryBranchSummary, OrderListItem } from '@/types/order'
-import MainLayout from '@/components/layout/MainLayout.vue'
 import DeliveryCardGrid from '@/components/delivery/DeliveryCardGrid.vue'
 import DeliveryHistoryTable from '@/components/delivery/DeliveryHistoryTable.vue'
 import ConfirmAssignmentModal from '@/components/delivery/ConfirmAssignmentModal.vue'

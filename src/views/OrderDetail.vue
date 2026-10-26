@@ -1,5 +1,5 @@
 <template>
-    <MainLayout no-card>
+    <div class="contents">
         <div class="h-full overflow-y-auto p-3 sm:p-4">
         <!-- Loading state -->
         <div v-if="loading" class="flex justify-center items-center py-12">
@@ -15,7 +15,7 @@
         <!-- Order detail -->
         <OrderDetailContent v-else-if="order" :flat-order="order" />
         </div>
-    </MainLayout>
+    </div>
 </template>
 
 <script setup lang="ts">
@@ -28,7 +28,6 @@ import { useOrdersDataStore } from '@/store/ordersData'
 
 
 
-import MainLayout from '@/components/layout/MainLayout.vue'
 import BaseLoading from '@/components/ui/BaseLoading.vue'
 
 import type { OrderDetailView } from '@/types/order'

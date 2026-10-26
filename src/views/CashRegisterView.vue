@@ -1,5 +1,5 @@
 <template>
-  <MainLayout>
+  <div class="contents">
     <div class="p-4 space-y-4 max-w-7xl mx-auto">
 
       <!-- Header -->
@@ -721,12 +721,11 @@
         </BaseButton>
       </template>
     </BaseDialog>
-  </MainLayout>
+  </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
-import MainLayout from '@/components/layout/MainLayout.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseDialog from '@/components/ui/BaseDialog.vue'
 import CashClosureHistoryModal from '@/components/cashRegister/CashClosureHistoryModal.vue'

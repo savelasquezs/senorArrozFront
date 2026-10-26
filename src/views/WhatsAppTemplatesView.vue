@@ -1,5 +1,5 @@
 <template>
-  <MainLayout no-card>
+  <div class="contents">
     <div class="h-full min-h-0 bg-gray-50 flex flex-col">
       <div class="border-b border-gray-200 bg-white px-4 py-3 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <div>
@@ -154,12 +154,11 @@
         </aside>
       </div>
     </div>
-  </MainLayout>
+  </div>
 </template>
 
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
-import MainLayout from '@/components/layout/MainLayout.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseLoading from '@/components/ui/BaseLoading.vue'
 import { customerApi } from '@/services/MainAPI/customerApi'

@@ -114,10 +114,10 @@ async function reloadDailyPromotion() {
 }
 
 onMounted(() => {
-	void reloadDailyPromotion();
+	void dailyPromotionStore.loadActive(activeBranchId.value);
 });
 
 watch(activeBranchId, () => {
-	void reloadDailyPromotion();
+	void dailyPromotionStore.loadActive(activeBranchId.value);
 });
 </script>

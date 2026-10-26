@@ -1,6 +1,6 @@
 <!-- src/views/BranchDetail.vue -->
 <template>
-    <MainLayout>
+    <div class="contents">
         <div class="p-6">
             <!-- Loading State -->
             <BaseLoading v-if="branchesStore.isLoading" text="Cargando sucursal..." />
@@ -405,7 +405,7 @@
                     @submit="handleNeighborhoodSubmit" @cancel="closeNeighborhoodForm" />
             </BaseDialog>
         </div>
-    </MainLayout>
+    </div>
 </template>
 
 <script setup lang="ts">
@@ -421,7 +421,6 @@ import { resetBranchScopedState } from '@/utils/branchScopedState'
 import { useToast } from '@/composables/useToast'
 import { useDialog } from '@/composables/useDialog'
 import { defaultBusinessCalendar } from '@/utils/datetime'
-import MainLayout from '@/components/layout/MainLayout.vue'
 import BaseCard from '@/components/ui/BaseCard.vue'
 import BranchMenuSettings from '@/components/branches/BranchMenuSettings.vue'
 import BranchBusinessHoursForm from '@/components/branches/BranchBusinessHoursForm.vue'

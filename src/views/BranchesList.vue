@@ -1,6 +1,6 @@
 <!-- src/views/BranchesList.vue -->
 <template>
-    <MainLayout page-title="Sucursales">
+    <div class="contents">
         <!-- Loading State -->
         <BaseLoading v-if="store.isLoading" text="Cargando sucursales..." />
 
@@ -187,7 +187,7 @@
             <BranchForm v-if="showCreate" :branch="null" :loading="creating" @submit="submitCreate"
                 @cancel="showCreate = false" />
         </BaseDialog>
-    </MainLayout>
+    </div>
 </template>
 
 <script setup lang="ts">
@@ -199,7 +199,6 @@ import { resetBranchScopedState } from '@/utils/branchScopedState'
 import { useToast } from '@/composables/useToast'
 import { useRouter } from 'vue-router'
 
-import MainLayout from '@/components/layout/MainLayout.vue'
 import BaseCard from '@/components/ui/BaseCard.vue'
 import BaseInput from '@/components/ui/BaseInput.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'

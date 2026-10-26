@@ -1,6 +1,6 @@
 <!-- src/views/ProductsList.vue -->
 <template>
-    <MainLayout page-title="Productos">
+    <div class="contents">
         <BaseLoading v-if="listLoading" text="Cargando productos..." />
 
         <div v-else class="flex flex-col gap-2 min-h-0 -mx-2 sm:mx-0">
@@ -156,7 +156,7 @@
             :product-id="detailProductId"
             @close="closeProductDetail"
             @refresh="loadAll" />
-    </MainLayout>
+    </div>
 </template>
 
 <script setup lang="ts">
@@ -168,7 +168,6 @@ import { useToast } from '@/composables/useToast'
 import { useDialog } from '@/composables/useDialog'
 import { useRoute, useRouter } from 'vue-router'
 
-import MainLayout from '@/components/layout/MainLayout.vue'
 import BaseCard from '@/components/ui/BaseCard.vue'
 import BaseInput from '@/components/ui/BaseInput.vue'
 import BaseSelect from '@/components/ui/BaseSelect.vue'
