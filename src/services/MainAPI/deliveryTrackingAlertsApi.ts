@@ -54,8 +54,8 @@ export interface DeliveryTrackingAlertFilters {
 }
 
 class DeliveryTrackingAlertsApi extends BaseApi {
-  getAll(filters: DeliveryTrackingAlertFilters): Promise<ApiResponse<PagedResult<DeliveryTrackingAlert>>> {
-    return this.get('/delivery-tracking-alerts', { params: filters })
+  getAll(filters: DeliveryTrackingAlertFilters, signal?: AbortSignal): Promise<ApiResponse<PagedResult<DeliveryTrackingAlert>>> {
+    return this.get('/delivery-tracking-alerts', { params: filters, signal })
   }
 
   resolve(id: number, reason: string | null): Promise<ApiResponse<DeliveryTrackingAlert>> {
