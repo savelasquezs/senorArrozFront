@@ -30,6 +30,8 @@ export const useWhatsAppStore = defineStore('whatsapp', () => {
   const conversations = ref<WhatsAppConversation[]>([])
   const operationalBranches = ref<WhatsAppOperationalBranchOption[]>([])
   const messages = ref<Record<number, WhatsAppMessage[]>>({})
+  const messageHistory = ref<Record<number, { nextCursor: string | null; hasMore: boolean }>>({})
+  const olderMessagesLoading = ref<Record<number, boolean>>({})
   const quickReplies = ref<WhatsAppQuickReply[]>([])
   const aiDiagnosticsByBranch = ref<Record<number, WhatsAppAiDiagnostics>>({})
   const aiDiagnosticsByConversation = ref<Record<number, WhatsAppAiDiagnostics>>({})
@@ -45,6 +47,7 @@ export const useWhatsAppStore = defineStore('whatsapp', () => {
   let unreadInFlight: Promise<WhatsAppUnreadSummary> | null = null
   // One network request per conversation, with explicit invalidation on reset/logout.
   const messageRequests = new Map<number, { promise: Promise<WhatsAppMessage[]>; abort: AbortController }>()
+  const olderMessageRequests = new Map<number, { promise: Promise<WhatsAppMessage[]>; abort: AbortController }>()
   const messageRevisions = new Map<number, number>()
   const messageEpochs = new Map<number, number>()
   let messageScope = 0
@@ -58,8 +61,12 @@ export const useWhatsAppStore = defineStore('whatsapp', () => {
     const pending = messageRequests.get(conversationId)
     messageRequests.delete(conversationId)
     pending?.abort.abort()
+    olderMessageRequests.get(conversationId)?.abort.abort()
+    olderMessageRequests.delete(conversationId)
+    delete messageHistory.value[conversationId]
+    delete olderMessagesLoading.value[conversationId]
     messageEpochs.set(conversationId, (messageEpochs.get(conversationId) ?? 0) + 1)
-    isLoadingMessages.value = messageRequests.size > 0
+    isLoadingMessages.value = messageRequests.size + olderMessageRequests.size > 0
   }
 
   const enabled = computed(() => status.value?.enabled === true)
@@ -193,9 +200,12 @@ export const useWhatsAppStore = defineStore('whatsapp', () => {
     return res.data
   }
 
-  function fetchMessages(conversationId: number): Promise<WhatsAppMessage[]> {
-    const inFlight = messageRequests.get(conversationId)
+  function fetchMessages(conversationId: number, older = false): Promise<WhatsAppMessage[]> {
+    const requests = older ? olderMessageRequests : messageRequests
+    const inFlight = requests.get(conversationId)
     if (inFlight) return inFlight.promise
+    const before = older ? messageHistory.value[conversationId]?.nextCursor : undefined
+    if (older && !before) return Promise.resolve(messages.value[conversationId] ?? [])
 
     const scope = messageScope
     const epoch = messageEpochs.get(conversationId) ?? 0
@@ -203,6 +213,7 @@ export const useWhatsAppStore = defineStore('whatsapp', () => {
     const abort = new AbortController()
     error.value = null
     isLoadingMessages.value = true
+    if (older) olderMessagesLoading.value[conversationId] = true
     const isCurrent = () => messageScope === scope
       && (messageEpochs.get(conversationId) ?? 0) === epoch
       && !abort.signal.aborted
@@ -210,17 +221,30 @@ export const useWhatsAppStore = defineStore('whatsapp', () => {
     let request!: Promise<WhatsAppMessage[]>
     request = (async () => {
       try {
-        const res = await whatsappApi.getMessages(conversationId, abort.signal)
+        const existingIds = new Set((messages.value[conversationId] ?? []).map(item => item.id))
+        let res = await whatsappApi.getMessagesPage(conversationId, abort.signal, before ?? undefined)
+        const fetched = [...(res.data?.items ?? [])]
+        let overlaps = fetched.some(item => existingIds.has(item.id))
+        while (!older && existingIds.size && !overlaps && res.data.hasMore && res.data.nextCursor && isCurrent()) {
+          res = await whatsappApi.getMessagesPage(conversationId, abort.signal, res.data.nextCursor)
+          fetched.push(...res.data.items)
+          overlaps = res.data.items.some(item => existingIds.has(item.id))
+        }
         if (!isCurrent()) return messages.value[conversationId] ?? []
 
         // SignalR/send may deliver a newer message or status while HTTP is pending.
         // Preserve those updates instead of replacing the entire conversation.
         const changedDuringRequest = (messageRevisions.get(conversationId) ?? 0) !== revision
-        const byId = new Map((res.data ?? []).map(message => [message.id, message]))
-        if (changedDuringRequest) {
-          for (const current of messages.value[conversationId] ?? []) byId.set(current.id, current)
+        const byId = new Map(fetched.map(message => [message.id, message]))
+        if (changedDuringRequest || older || overlaps) {
+          for (const current of messages.value[conversationId] ?? []) {
+            if (changedDuringRequest || older || !byId.has(current.id)) byId.set(current.id, current)
+          }
         }
         messages.value[conversationId] = sortMessages([...byId.values()])
+        if (older || !messageHistory.value[conversationId] || !overlaps) {
+          messageHistory.value[conversationId] = { nextCursor: res.data.nextCursor, hasMore: res.data.hasMore }
+        }
 
         const diagnostics = aiDiagnosticsByConversation.value[conversationId]
         for (const processing of diagnostics?.recentMessages ?? []) {
@@ -229,7 +253,7 @@ export const useWhatsAppStore = defineStore('whatsapp', () => {
 
         // A new inbound SignalR event must not be marked read by an older HTTP reply.
         const conversation = conversations.value.find(c => c.id === conversationId)
-        if (!changedDuringRequest && conversation && conversation.unreadCount > 0) {
+        if (!older && !changedDuringRequest && conversation && conversation.unreadCount > 0) {
           const previousUnread = conversation.unreadCount
           conversation.unreadCount = 0
           unreadSummary.value = {
@@ -245,13 +269,14 @@ export const useWhatsAppStore = defineStore('whatsapp', () => {
         error.value = err.message || 'No se pudieron cargar los mensajes'
         throw err
       } finally {
-        if (messageRequests.get(conversationId)?.promise === request) {
-          messageRequests.delete(conversationId)
-          isLoadingMessages.value = messageRequests.size > 0
+        if (requests.get(conversationId)?.promise === request) {
+          requests.delete(conversationId)
+          if (older) olderMessagesLoading.value[conversationId] = false
+          isLoadingMessages.value = messageRequests.size + olderMessageRequests.size > 0
         }
       }
     })()
-    messageRequests.set(conversationId, { promise: request, abort })
+    requests.set(conversationId, { promise: request, abort })
     return request
   }
 
@@ -573,6 +598,10 @@ export const useWhatsAppStore = defineStore('whatsapp', () => {
     isLoadingConversations.value = false
     messageScope++
     for (const pending of messageRequests.values()) pending.abort.abort()
+    for (const pending of olderMessageRequests.values()) pending.abort.abort()
+    olderMessageRequests.clear()
+    messageHistory.value = {}
+    olderMessagesLoading.value = {}
     messageRequests.clear()
     messageEpochs.clear()
     messageRevisions.clear()
@@ -602,6 +631,8 @@ export const useWhatsAppStore = defineStore('whatsapp', () => {
     conversations,
     operationalBranches,
     messages,
+    messageHistory,
+    olderMessagesLoading,
     quickReplies,
     aiDiagnosticsByBranch,
     aiDiagnosticsByConversation,
