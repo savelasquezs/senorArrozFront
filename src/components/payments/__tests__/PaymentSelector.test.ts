@@ -89,7 +89,7 @@ describe('PaymentSelector compact payment flow', () => {
         harness.store = useOrdersDraftsStore()
         harness.store.currentTabId = 'one'
         harness.store.banks = [bank(10, 'Banco inactivo', false), bank(11, 'Bancolombia'), bank(12, 'Davivienda'), bank(13, 'Nequi')]
-        harness.store.apps = [app(20, 'App inactiva', false), app(21, 'Rappi'), app(22, 'DiDi Food'), app(23, 'App aliada')]
+        harness.store.apps = [app(20, 'App inactiva', false), app(21, 'Rappi'), app(22, 'DiDi Food'), app(23, 'Wompi')]
         vi.spyOn(harness.store, 'saveToLocalStorage')
     })
 
@@ -101,7 +101,7 @@ describe('PaymentSelector compact payment flow', () => {
         vi.restoreAllMocks()
     })
 
-    it.each([UserRole.CASHIER, UserRole.ADMIN, UserRole.SUPERADMIN])('offers visible payment banks and apps, excluding all vaults and hidden banks for %s', role => {
+    it.each([UserRole.CASHIER, UserRole.ADMIN, UserRole.SUPERADMIN])('offers three direct banks and apps without More, excluding all vaults and hidden banks for %s', role => {
         useAuthStore().user!.role = role
         harness.store.banks.splice(2, 0,
             { ...bank(14, 'Caja Mayor Banco'), type: 'real_vault' },
@@ -110,11 +110,10 @@ describe('PaymentSelector compact payment flow', () => {
         )
         const view = mountSelector()
         expect(view.findAll('section[aria-label="Bancos"] button[aria-label^="Agregar pago de "], section[aria-label="Aplicaciones"] button[aria-label^="Agregar pago de "]').map(button => button.attributes('aria-label')))
-            .toEqual(['Agregar pago de Bancolombia', 'Agregar pago de Davivienda', 'Agregar pago de Rappi', 'Agregar pago de DiDi Food'])
-        expect(action(view, 'Más opciones de bancos').text()).toContain('Nequi')
-        expect(action(view, 'Más opciones de bancos').findAll('option').map(option => option.attributes('value')))
-            .toEqual(['', '11', '12', '13'])
-        expect(action(view, 'Más opciones de aplicaciones').text()).toContain('App aliada')
+            .toEqual(['Agregar pago de Bancolombia', 'Agregar pago de Davivienda', 'Agregar pago de Nequi',
+                'Agregar pago de Rappi', 'Agregar pago de DiDi Food', 'Agregar pago de Wompi'])
+        expect(view.find('[aria-label="Más opciones de bancos"]').exists()).toBe(false)
+        expect(view.find('[aria-label="Más opciones de aplicaciones"]').exists()).toBe(false)
         expect(view.text()).not.toContain('Banco inactivo')
         expect(view.text()).not.toContain('App inactiva')
         expect(view.text()).not.toContain('Caja Mayor')
@@ -194,17 +193,28 @@ describe('PaymentSelector compact payment flow', () => {
         expect(action(view, 'Agregar otro banco').attributes('disabled')).toBeDefined()
     })
 
-    it('selects less frequent banks and apps from More with the same automatic balance behavior', async () => {
+    it('keeps only overflow banks and apps in More and assigns the remaining balance without an editor', async () => {
+        harness.store.banks.push(bank(17, 'Banco de Bogotá'))
+        harness.store.apps.push(app(24, 'App aliada'))
         const view = mountSelector()
-        await action(view, 'Más opciones de bancos').setValue('13')
-        expect(currentOrder().bankPayments).toEqual([expect.objectContaining({ bankId: 13, bankName: 'Nequi', amount: 45000 })])
+        expect(action(view, 'Agregar pago de Nequi').exists()).toBe(true)
+        expect(action(view, 'Agregar pago de Wompi').exists()).toBe(true)
+        expect(view.find('[aria-label="Agregar pago de Banco de Bogotá"]').exists()).toBe(false)
+        expect(view.find('[aria-label="Agregar pago de App aliada"]').exists()).toBe(false)
+        expect(action(view, 'Más opciones de bancos').findAll('option').map(option => [option.attributes('value'), option.text()]))
+            .toEqual([['', 'Más opciones'], ['17', 'Banco de Bogotá']])
+        expect(action(view, 'Más opciones de aplicaciones').findAll('option').map(option => [option.attributes('value'), option.text()]))
+            .toEqual([['', 'Más opciones'], ['24', 'App aliada']])
+
+        await action(view, 'Más opciones de bancos').setValue('17')
+        expect(currentOrder().bankPayments).toEqual([expect.objectContaining({ bankId: 17, bankName: 'Banco de Bogotá', amount: 45000 })])
         expect(view.find('input').exists()).toBe(false)
 
-        await action(view, 'Editar pago de Nequi').trigger('click')
-        await action(view, 'Monto de Nequi').setValue('25000')
-        await action(view, 'Guardar pago de Nequi').trigger('click')
-        await action(view, 'Más opciones de aplicaciones').setValue('23')
-        expect(currentOrder().appPayment).toMatchObject({ appId: 23, appName: 'App aliada', amount: 20000 })
+        await action(view, 'Editar pago de Banco de Bogotá').trigger('click')
+        await action(view, 'Monto de Banco de Bogotá').setValue('25000')
+        await action(view, 'Guardar pago de Banco de Bogotá').trigger('click')
+        await action(view, 'Más opciones de aplicaciones').setValue('24')
+        expect(currentOrder().appPayment).toMatchObject({ appId: 24, appName: 'App aliada', amount: 20000 })
         expect(view.find('input').exists()).toBe(false)
     })
 

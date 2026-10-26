@@ -59,17 +59,17 @@
 
             <div v-if="!section.rows.length || (section.type === 'bank' && showBankOptions)" class="payment-choices">
                 <template v-if="section.options.length">
-                    <button v-for="option in section.options.slice(0, 2)" :key="option.id" type="button"
+                    <button v-for="option in section.options.slice(0, 3)" :key="option.id" type="button"
                         class="payment-link" :aria-label="`Agregar pago de ${option.name}`"
                         :title="section.type === 'cash' ? 'Registrar efectivo recibido en tienda' : option.name"
                         :disabled="!canAddPayments" @click="addPayment(section.type, option.id)">
                         {{ option.name }}
                     </button>
-                    <select v-if="section.options.length > 2" class="payment-more" :disabled="!canAddPayments"
+                    <select v-if="section.options.length > 3" class="payment-more" :disabled="!canAddPayments"
                         :aria-label="`Más opciones de ${section.type === 'bank' ? 'bancos' : 'aplicaciones'}`"
                         @change="selectOtherPayment(section.type, $event)">
                         <option value="" selected disabled>Más opciones</option>
-                        <option v-for="option in section.options" :key="option.id" :value="option.id">
+                        <option v-for="option in section.options.slice(3)" :key="option.id" :value="option.id">
                             {{ option.name }}
                         </option>
                     </select>
