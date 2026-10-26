@@ -324,10 +324,10 @@ const navigationGroups = computed(() => [
 ])
 
 const summaryCards = computed(() => [
-  { label: 'Valor inventario', value: loadedSections.balances ? money(store.totalValue) : '—', hint: activeBranchName.value, icon: BanknotesIcon },
-  { label: 'Con existencia', value: loadedSections.balances ? String(store.itemsWithStock) : '—', hint: 'insumos con saldo positivo', icon: CubeIcon },
-  { label: 'Transferencias pendientes', value: loadedSections.transfers ? String(store.pendingTransfers) : '—', hint: 'en camino a una sucursal', icon: ArrowsRightLeftIcon },
-  { label: 'Ãšltimo conteo', value: !loadedSections.counts ? '—' : store.latestConfirmedCount ? shortDate(store.latestConfirmedCount.confirmedAt!) : 'Sin conteos', hint: store.latestConfirmedCount ? `Conteo #${store.latestConfirmedCount.id}` : 'pendiente de confirmar', icon: ClipboardDocumentCheckIcon },
+  { label: 'Valor inventario', value: loadedSections.balances ? money(store.totalValue) : 'â€”', hint: activeBranchName.value, icon: BanknotesIcon },
+  { label: 'Con existencia', value: loadedSections.balances ? String(store.itemsWithStock) : 'â€”', hint: 'insumos con saldo positivo', icon: CubeIcon },
+  { label: 'Transferencias pendientes', value: loadedSections.transfers ? String(store.pendingTransfers) : 'â€”', hint: 'en camino a una sucursal', icon: ArrowsRightLeftIcon },
+  { label: 'Ãšltimo conteo', value: !loadedSections.counts ? 'â€”' : store.latestConfirmedCount ? shortDate(store.latestConfirmedCount.confirmedAt!) : 'Sin conteos', hint: store.latestConfirmedCount ? `Conteo #${store.latestConfirmedCount.id}` : 'pendiente de confirmar', icon: ClipboardDocumentCheckIcon },
 ])
 
 const expenseById = (id: number) => expenses.value.find(item => item.id === id)

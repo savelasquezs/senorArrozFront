@@ -84,7 +84,7 @@
 import { ref, onMounted, onUnmounted, watch, computed } from 'vue'
 import { setOptions, importLibrary } from '@googlemaps/js-api-loader'
 import BaseButton from '@/components/ui/BaseButton.vue'
-import type { OrderListItem } from '@/types/order'
+import type { DeliveryMapOrder } from '@/types/deliveryman'
 import { RouteOptimizationService } from '@/services/domain/RouteOptimizationService'
 import type { GeoLocation } from '@/composables/useGeolocation'
 import { currentRouteIdForDriver } from '@/utils/deliveryMapRoutes'
@@ -105,7 +105,7 @@ export interface DriverLocation {
 }
 
 interface Props {
-    orders: OrderListItem[]
+    orders: DeliveryMapOrder[]
     /** Mapa de ubicaciones GPS: clave = deliverymanId */
     deliverymanLocations?: Record<number, DriverLocation>
     /** Pedido que debe quedar centrado al abrir el mapa desde el listado. */
@@ -158,7 +158,7 @@ function lastUpdatedLabelFor(loc: DriverLocation): string {
     return `Hace ${diffD} día(s)`
 }
 
-function ordersOnTheWayForDriver(driverId: number): OrderListItem[] {
+function ordersOnTheWayForDriver(driverId: number): DeliveryMapOrder[] {
     return props.orders.filter(
         (o) =>
             o.type === 'delivery' &&
@@ -198,7 +198,7 @@ const panelDriverTitle = computed(() => {
 
 const selectedDriverName = computed(() => panelDriverTitle.value.trim())
 
-const panelOrders = computed((): OrderListItem[] => {
+const panelOrders = computed((): DeliveryMapOrder[] => {
     const id = selectedDriverId.value
     if (id == null || !props.deliverymanLocations) return []
     const loc = props.deliverymanLocations[id]
@@ -216,15 +216,15 @@ function closeDriverPanel() {
     selectedDriverId.value = null
 }
 
-function orderCustomerName(order: OrderListItem): string {
+function orderCustomerName(order: DeliveryMapOrder): string {
     return order.customerName?.trim() || order.guestName?.trim() || 'Cliente sin nombre'
 }
 
-function orderAddressText(order: OrderListItem): string {
+function orderAddressText(order: DeliveryMapOrder): string {
     return deliveryAddressText(order) || 'Dirección registrada'
 }
 
-async function copyDeliveryInquiry(order: OrderListItem) {
+async function copyDeliveryInquiry(order: DeliveryMapOrder) {
     const deliverymanName = selectedDriverName.value
     if (!deliverymanName) return
     const message = buildDeliveryInquiryMessage({
@@ -526,7 +526,7 @@ watch(
 // =========================
 // 🔹 Funciones de mapa
 // =========================
-const getOrderCoords = (order: OrderListItem): GeoLocation | null => {
+const getOrderCoords = (order: DeliveryMapOrder): GeoLocation | null => {
     if (typeof order.latitude === 'number' && typeof order.longitude === 'number') {
         return { lat: order.latitude, lng: order.longitude }
     }
@@ -558,7 +558,7 @@ const loadMarkers = () => {
     void tryFocusOrder()
 }
 
-function createOrderMarkerContent(order: OrderListItem): HTMLElement {
+function createOrderMarkerContent(order: DeliveryMapOrder): HTMLElement {
     const root = document.createElement('div')
     root.className = 'order-marker-root'
     root.style.cssText = 'display:flex;flex-direction:column;align-items:center;cursor:pointer;user-select:none;'
@@ -577,7 +577,7 @@ function createOrderMarkerContent(order: OrderListItem): HTMLElement {
     return root
 }
 
-function createOrderInfoContent(order: OrderListItem, coords: GeoLocation): HTMLElement {
+function createOrderInfoContent(order: DeliveryMapOrder, coords: GeoLocation): HTMLElement {
     const root = document.createElement('div')
     root.className = 'p-2'
 
@@ -614,7 +614,7 @@ function createOrderInfoContent(order: OrderListItem, coords: GeoLocation): HTML
     return root
 }
 
-const addOrderMarker = (order: OrderListItem, coords: GeoLocation) => {
+const addOrderMarker = (order: DeliveryMapOrder, coords: GeoLocation) => {
     if (!map || orderMarkers.has(order.id)) return
 
     const AdvancedMarkerElement = (window as any)._AdvancedMarkerElement
@@ -654,7 +654,7 @@ const addOrderMarker = (order: OrderListItem, coords: GeoLocation) => {
 
 const orderGeocodePromises = new Map<number, Promise<GeoLocation | null>>()
 
-function resolveOrderCoords(order: OrderListItem): Promise<GeoLocation | null> {
+function resolveOrderCoords(order: DeliveryMapOrder): Promise<GeoLocation | null> {
     const existing = getOrderCoords(order)
     if (existing) return Promise.resolve(existing)
     if (!order.addressDescription || !geocoder.value) return Promise.resolve(null)
@@ -719,7 +719,7 @@ async function tryFocusOrder(): Promise<void> {
     if (shouldMoveCamera) emit('focus-completed', orderId)
 }
 
-const geocodeOrder = async (order: OrderListItem): Promise<void> => {
+const geocodeOrder = async (order: DeliveryMapOrder): Promise<void> => {
     const coords = await resolveOrderCoords(order)
     if (!coords) return
     addOrderMarker(order, coords)
@@ -732,7 +732,7 @@ const recalculateRoute = async (orderedIds?: number[]) => {
     if (!map || props.orders.length === 0) return
 
     const sourceOrders = orderedIds?.length
-        ? orderedIds.map((id) => props.orders.find((o) => o.id === id)).filter(Boolean) as OrderListItem[]
+        ? orderedIds.map((id) => props.orders.find((o) => o.id === id)).filter(Boolean) as DeliveryMapOrder[]
         : props.orders
 
     const coordsList = sourceOrders

@@ -60,7 +60,7 @@ class CustomerApi extends BaseApi {
     }
 
     async deleteCustomer(id: number): Promise<ApiResponse<string>> {
-        return this.delete<ApiResponse<string>>(`/customers/${id}`, { signal });
+        return this.delete<ApiResponse<string>>(`/customers/${id}`);
     }
 
     async getCustomerAddresses(

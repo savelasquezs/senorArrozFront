@@ -49,7 +49,7 @@ export const useInventoryStore = defineStore('inventory', () => {
         if (context.isCurrent()) assign(value)
       } catch (cause: any) {
         if (context.isCurrent()) {
-          errors[section] = cause?.message || 'No se pudo cargar la información'
+          errors[section] = cause?.message || 'No se pudo cargar la informaciÃ³n'
           throw cause
         }
       } finally {

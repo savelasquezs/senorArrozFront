@@ -8,6 +8,7 @@ const apiMocks = vi.hoisted(() => ({
     getDailyOverview: vi.fn(),
     getDaySummary: vi.fn(),
     getLastLocation: vi.fn(),
+    getMap: vi.fn(),
 }))
 const routerMocks = vi.hoisted(() => ({
     replace: vi.fn(),
@@ -69,6 +70,7 @@ vi.mock('@/services/MainAPI/deliverymanApi', () => ({
         getDailyOverview: apiMocks.getDailyOverview,
         getDaySummary: apiMocks.getDaySummary,
         getLastLocation: apiMocks.getLastLocation,
+        getMap: apiMocks.getMap,
     },
 }))
 
@@ -116,6 +118,7 @@ const focusedOrder = {
 
 describe('DeliverymenManagementView focused order navigation', () => {
     beforeEach(() => {
+        apiMocks.getMap.mockReset().mockResolvedValue({ orders: { items: [focusedOrder], totalPages: 1 }, locations: [] })
         apiMocks.fetchDetail.mockReset().mockResolvedValue(focusedOrder)
         apiMocks.fetchAssignedOrders.mockReset().mockResolvedValue({
             items: [focusedOrder],
@@ -199,15 +202,10 @@ describe('DeliverymenManagementView focused order navigation', () => {
         expect(apiMocks.getDailyOverview).toHaveBeenCalledWith({
             date: '2026-07-24',
             branchId: 4,
-        })
-        expect(apiMocks.fetchAssignedOrders).toHaveBeenCalledWith(
-            8,
-            expect.objectContaining({
-                fromDate: '2026-07-24',
-                toDate: '2026-07-24',
-                branchId: 4,
-            }),
-        )
+        }, expect.any(AbortSignal))
+        expect(apiMocks.getMap).toHaveBeenCalledWith(expect.objectContaining({ date: '2026-07-24', branchId: 4 }), expect.any(AbortSignal))
+        expect(apiMocks.fetchAssignedOrders).not.toHaveBeenCalled()
+        expect(apiMocks.getLastLocation).not.toHaveBeenCalled()
         const map = wrapper.get('[data-test="delivery-map"]')
         expect(map.attributes('data-focus')).toBe('567')
         expect(map.attributes('data-orders')).toBe('1')

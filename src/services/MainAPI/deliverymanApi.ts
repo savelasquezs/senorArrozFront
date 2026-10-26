@@ -1,4 +1,5 @@
 import type {
+    DeliveryMapOrder,
     DeliverymanAdvance,
     DeliverymanStats,
     DeliverymanDetail,
@@ -39,6 +40,10 @@ export interface MyDeliverymanDayStateDto {
 }
 
 class DeliverymanApi extends BaseApi {
+    getMap(params: { branchId: number; date: string; page?: number; pageSize?: number }, signal?: AbortSignal) {
+        return this.get<{ orders: PagedResult<DeliveryMapOrder>; locations: DeliverymanLastLocationDto[] }>('/deliverymen/map', { params, signal })
+    }
+
     /**
      * Estado mínimo del día para el domiciliario autenticado (p. ej. día bloqueado tras liquidación).
      */
@@ -56,8 +61,8 @@ class DeliverymanApi extends BaseApi {
         fromDate?: string
         toDate?: string
         branchId?: number
-    }): Promise<DailyOverviewResponse> {
-        return this.get<DailyOverviewResponse>('/deliverymen/daily-overview', { params })
+    }, signal?: AbortSignal): Promise<DailyOverviewResponse> {
+        return this.get<DailyOverviewResponse>('/deliverymen/daily-overview', { params, signal })
     }
 
     /**
