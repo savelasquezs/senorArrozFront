@@ -28,6 +28,7 @@ type FetchOpts = ResourceActionOptions;
 export const useProductsStore = defineStore('products', () => {
     const list = ref<PagedResult<Product> | null>(null);
     const catalogProducts = ref<Product[]>([]);
+    const catalogBranchId = ref<number | null>(null);
     const catalogLoading = ref(false);
     const catalogLoaded = ref(false);
     const catalogError = ref<string | null>(null);
@@ -70,7 +71,7 @@ export const useProductsStore = defineStore('products', () => {
     const ensureCatalogLoaded = async (branchId?: number | null, force = false) => {
         const key = `${auth.user?.id}:${auth.user?.role}:${branchId ?? auth.user?.branchId}`;
         if (key !== catalogKey) {
-            invalidateCatalog(); catalogKey = key; catalogProducts.value = [];
+            invalidateCatalog(); catalogKey = key; catalogProducts.value = []; catalogBranchId.value = branchId ?? auth.user?.branchId ?? null;
         }
         if (!force && catalogLoaded.value) return;
         if (catalogLoadInFlight) return catalogLoadInFlight;
@@ -88,7 +89,12 @@ export const useProductsStore = defineStore('products', () => {
                 });
                 if (version !== catalogVersion) return;
                 if (!catalogProducts.value.length) { catalogLoaded.value = true; return; }
-                const availability = await inventoryApi.getAvailability(catalogProducts.value.map(product => product.id));
+                const controlled = catalogProducts.value.filter(product => product.inventoryEnabled);
+                const availability = [] as Awaited<ReturnType<typeof inventoryApi.getAvailability>>;
+                for (let offset = 0; offset < controlled.length; offset += 100) {
+                    if (version !== catalogVersion) return;
+                    availability.push(...await inventoryApi.getAvailability(controlled.slice(offset, offset + 100).map(product => product.id), catalogBranchId.value, true));
+                }
                 if (version !== catalogVersion) return;
                 const byProduct = new Map(availability.map(item => [item.productId, item]));
                 catalogProducts.value = catalogProducts.value.map(product => {
@@ -188,6 +194,7 @@ export const useProductsStore = defineStore('products', () => {
     return {
         list,
         catalogProducts,
+        catalogBranchId,
         catalogLoading,
         catalogLoaded,
         catalogError,

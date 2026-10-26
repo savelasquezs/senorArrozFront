@@ -4,10 +4,12 @@ import type { InventoryBalance, InventoryCount, InventoryDeviationPoint, Invento
 const operationConfig = () => ({ headers: { 'Idempotency-Key': crypto.randomUUID() } })
 
 class InventoryApi extends BaseApi {
-  getAvailability(productIds: number[]) {
+  getAvailability(productIds: number[], branchId?: number | null, forOrderCreation = false) {
     const params = new URLSearchParams()
     productIds.forEach(id => params.append('productIds', String(id)))
-    return this.get<ProductAvailability[]>('/inventory/availability', { params })
+    if (branchId) params.set('branchId', String(branchId))
+    if (forOrderCreation) params.set('forOrderCreation', 'true')
+    return this.get<ProductAvailability[]>('/inventory/availability', { params, ...(forOrderCreation ? { branchScope: 'none' as const } : {}) })
   }
   getBalances(signal?: AbortSignal) { return this.get<InventoryBalance[]>('/inventory/balances', { signal }) }
   getMovements(take = 200, signal?: AbortSignal) { return this.get<InventoryMovement[]>('/inventory/movements', { params: { take }, signal }) }

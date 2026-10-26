@@ -60,4 +60,13 @@ describe('POS catalog ownership', () => {
         expect(store.catalogLoaded).toBe(false)
         expect(api.availability).not.toHaveBeenCalled()
     })
+    it('uses the draft branch for stock and bounds availability batches', async () => {
+        api.products.mockResolvedValue(page(Array.from({ length: 205 }, (_, id) => product(id + 1, { inventoryEnabled: true, inventoryControlMode: 'strict' }))))
+        api.availability.mockImplementation(async (ids: number[]) => ids.map(productId => ({ productId, controlMode: 'strict', maximumQuantity: 2, available: true })))
+        const store = useProductsStore()
+        await store.ensureCatalogLoaded(2)
+        expect(api.availability.mock.calls.map(call => call[0].length)).toEqual([100, 100, 5])
+        expect(api.availability.mock.calls.every(call => call[1] === 2 && call[2] === true)).toBe(true)
+        expect(store.catalogProducts.every(row => row.stock === 2 && !row.availabilityPending)).toBe(true)
+    })
 })
