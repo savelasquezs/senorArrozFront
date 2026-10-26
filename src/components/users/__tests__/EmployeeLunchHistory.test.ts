@@ -33,7 +33,7 @@ describe('historial de almuerzos', () => {
     expect(wrapper.find('[aria-label^="Corregir almuerzo"]').exists()).toBe(false);
     await wrapper.get('input[type="date"]').setValue('2026-10-18');
     await flushPromises();
-    expect(mocks.api.branch).toHaveBeenLastCalledWith('2026-10-18', 1);
+    expect(mocks.api.branch).toHaveBeenLastCalledWith('2026-10-18', 1, 50, expect.any(AbortSignal));
     expect(mocks.api.correct).not.toHaveBeenCalled();
   });
 
