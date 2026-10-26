@@ -973,7 +973,7 @@ const deliveryManFilterOptions = computed(() => [
 ])
 
 const bankFilterOptions = computed(() => {
-    const items = remoteBranchId.value == null ? banksStore.list?.items || [] : remoteOptions.value?.banks || []
+    const items = remoteBranchId.value == null ? banksStore.options : remoteOptions.value?.banks || []
     const active = items.filter((b) => b.active).sort((a, b) => a.name.localeCompare(b.name))
     return [
         { value: null as number | null, label: 'Todos los bancos' },
@@ -1015,7 +1015,7 @@ const displayedOrders = computed<OrderListItem[]>(() => {
 })
 
 const appFilterOptions = computed(() => {
-    const items = remoteBranchId.value == null ? appsStore.list?.items || [] : remoteOptions.value?.apps || []
+    const items = remoteBranchId.value == null ? appsStore.options : remoteOptions.value?.apps || []
     const active = items.filter((a) => a.active).sort((a, b) => a.name.localeCompare(b.name))
     return [
         { value: null as number | null, label: 'Todas las apps' },
@@ -2259,7 +2259,7 @@ const handleAssignDeliveryModalClose = () => {
 }
 
 const quickBanks = computed(() => {
-    const items = remoteBranchId.value == null ? banksStore.list?.items || [] : remoteOptions.value?.banks || []
+    const items = remoteBranchId.value == null ? banksStore.options : remoteOptions.value?.banks || []
     return items
         .filter(b => b.active)
         .sort((a, b) => a.id - b.id)

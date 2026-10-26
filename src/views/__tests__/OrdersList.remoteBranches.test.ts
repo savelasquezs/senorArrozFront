@@ -19,11 +19,12 @@ const mocks = vi.hoisted(() => ({
 }))
 const state = reactive({ role: 'Cashier', branchId: 1, query: {} as Record<string, string> })
 const localBanks = [{ id: 101, name: 'Banco Origen', branchId: 1, active: true }]
+const localApps = [{ id: 301, name: 'App Origen', branchId: 1, active: true }]
 vi.mock('vue-router', () => ({ useRoute: () => ({ get query() { return state.query } }), useRouter: () => ({ replace: mocks.replace }) }))
 vi.mock('@/store/auth', () => ({ useAuthStore: () => ({ get userRole() { return state.role }, get branchId() { return state.branchId }, isSuperadmin: false }) }))
 vi.mock('@/store/branchContext', () => ({ useBranchContextStore: () => ({ selectedBranchId: 1 }) }))
-vi.mock('@/store/banks', () => ({ useBanksStore: () => ({ list: { items: localBanks }, ensureListLoaded: mocks.banksLoaded }) }))
-vi.mock('@/store/apps', () => ({ useAppsStore: () => ({ list: { items: [] }, ensureListLoaded: mocks.appsLoaded }) }))
+vi.mock('@/store/banks', () => ({ useBanksStore: () => ({ options: localBanks, list: null, ensureListLoaded: mocks.banksLoaded }) }))
+vi.mock('@/store/apps', () => ({ useAppsStore: () => ({ options: localApps, list: null, ensureListLoaded: mocks.appsLoaded }) }))
 vi.mock('@/services/MainAPI/orderApi', () => ({ orderApi: { searchOrders: mocks.search, getDeliverymanOptions: mocks.deliverymen } }))
 vi.mock('@/services/MainAPI/orderManagementApi', () => ({ orderManagementApi: { remoteBranches: mocks.branches, options: mocks.options } }))
 vi.mock('@/services/MainAPI/bankPaymentApi', () => ({ bankPaymentApi: { createBankPayment: mocks.payment } }))
@@ -67,6 +68,28 @@ beforeEach(() => {
 afterEach(() => { wrapper?.unmount(); vi.useRealTimers() })
 
 describe('remote order workspaces', () => {
+    it('uses payment catalogs for local shortcuts and filters before visiting administrative lists', async () => {
+        mountView(); await flushPromises()
+        expect(wrapper.findComponent(OrdersTable).props('quickBanks')).toEqual(localBanks)
+        await wrapper.findAll('button').find(button => button.text() === 'Ver filtros avanzados')!.trigger('click')
+        const selects = wrapper.findAllComponents(BaseSelect)
+        expect(selects.find(select => select.attributes('placeholder') === 'Banco (pagos)')?.props('options'))
+            .toContainEqual({ value: 101, label: 'Banco Origen' })
+        expect(selects.find(select => select.attributes('placeholder') === 'App (pagos)')?.props('options'))
+            .toContainEqual({ value: 301, label: 'App Origen' })
+    })
+
+    it('registers only the remaining balance through a local bank shortcut', async () => {
+        const partiallyPaid = { ...local, bankPayments: [{ id: 8, bankId: 101, amount: 10000 }] }
+        mocks.search.mockResolvedValue(paged([partiallyPaid]))
+        mocks.payment.mockResolvedValue({ id: 501, bankId: 101, orderId: 10, amount: 20000 })
+        mountView(); await flushPromises()
+        wrapper.findComponent(OrdersTable).vm.$emit('quick-bank-transfer', partiallyPaid, 101)
+        await flushPromises()
+        expect(mocks.payment).toHaveBeenCalledWith({ orderId: 10, bankId: 101, amount: 20000 }, partiallyPaid)
+        expect(wrapper.findComponent(OrdersTable).props('orders')[0].bankPayments).toHaveLength(2)
+    })
+
     it('shows local rows while bank options are still pending', async () => {
         mocks.banksLoaded.mockReturnValueOnce(new Promise(() => {}))
         mountView(); await flushPromises()
