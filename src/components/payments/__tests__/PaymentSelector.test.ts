@@ -101,14 +101,24 @@ describe('PaymentSelector compact payment flow', () => {
         vi.restoreAllMocks()
     })
 
-    it('offers the first two active banks and apps in catalog order, retaining the others in More', () => {
+    it.each([UserRole.CASHIER, UserRole.ADMIN, UserRole.SUPERADMIN])('offers visible payment banks and apps, excluding all vaults and hidden banks for %s', role => {
+        useAuthStore().user!.role = role
+        harness.store.banks.splice(2, 0,
+            { ...bank(14, 'Caja Mayor Banco'), type: 'real_vault' },
+            { ...bank(15, 'Caja Mayor Efectivo'), type: 'cash_vault', isHidden: false },
+            { ...bank(16, 'Banco oculto'), type: 'normal', isHidden: true },
+        )
         const view = mountSelector()
         expect(view.findAll('section[aria-label="Bancos"] button[aria-label^="Agregar pago de "], section[aria-label="Aplicaciones"] button[aria-label^="Agregar pago de "]').map(button => button.attributes('aria-label')))
             .toEqual(['Agregar pago de Bancolombia', 'Agregar pago de Davivienda', 'Agregar pago de Rappi', 'Agregar pago de DiDi Food'])
         expect(action(view, 'Más opciones de bancos').text()).toContain('Nequi')
+        expect(action(view, 'Más opciones de bancos').findAll('option').map(option => option.attributes('value')))
+            .toEqual(['', '11', '12', '13'])
         expect(action(view, 'Más opciones de aplicaciones').text()).toContain('App aliada')
         expect(view.text()).not.toContain('Banco inactivo')
         expect(view.text()).not.toContain('App inactiva')
+        expect(view.text()).not.toContain('Caja Mayor')
+        expect(view.text()).not.toContain('Banco oculto')
     })
 
     it('assigns the remainder only once on rapid bank clicks and restores choices on removal', async () => {

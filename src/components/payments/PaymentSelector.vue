@@ -111,7 +111,10 @@ const editingError = ref('')
 const errorId = computed(() => `payment-error-${props.order.tabId}`)
 
 const branchId = computed(() => props.order.branchId ?? ordersStore.activeBranchId)
-const bankOptions = computed(() => ordersStore.banks.filter(bank => bank.active && bank.branchId === branchId.value))
+const bankOptions = computed(() => ordersStore.banks.filter(bank =>
+    bank.active && bank.branchId === branchId.value && !bank.isHidden
+    && (bank.type == null || bank.type === 'normal'),
+))
 const appOptions = computed(() => ordersStore.apps.filter(app => app.active && app.branchId === branchId.value))
 const nonCashPayments = computed(() => sumOrderNonCashPayments(props.order))
 const paidCashAmount = computed(() => {
