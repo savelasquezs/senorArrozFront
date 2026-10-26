@@ -27,8 +27,8 @@ export async function bootstrapOrderCatalog(
 		await Promise.all([
 			useProductsStore().ensureCatalogLoaded(branchId),
 			useProductCategoriesStore().ensureCatalogLoaded(),
-			useBanksStore().ensureListLoaded(branchId),
-			useAppsStore().ensureListLoaded(branchId),
+			useBanksStore().ensureListLoaded(branchId, true),
+			useAppsStore().ensureListLoaded(branchId, true),
 			useCustomersStore().ensureNeighborhoodsLoaded(branchId),
 		])
 	} catch (err) {
