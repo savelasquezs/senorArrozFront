@@ -142,64 +142,40 @@
                         </div>
                     </div>
 
-                <details :key="`schedule-${currentTabId}`" class="sidebar-disclosure" :open="scheduleExpanded"
-                    @toggle="scheduleExpanded = ($event.target as HTMLDetailsElement).open">
-                    <summary class="sidebar-summary">
-                        <CalendarDaysIcon class="h-4 w-4 shrink-0 text-gray-400" />
-                        <span>Programación</span>
-                        <span class="ml-auto min-w-0 truncate text-xs font-normal" :class="scheduleIncomplete ? 'text-amber-700' : 'text-gray-500'">{{ scheduleSummary }}</span>
-                        <ChevronDownIcon class="disclosure-chevron h-3.5 w-3.5 shrink-0 text-gray-400" />
-                    </summary>
-                    <div class="pt-2 pb-1">
-                        <label v-if="currentOrder.type !== 'reservation'" class="mb-2 flex cursor-pointer items-center gap-2 text-sm text-gray-600">
-                            <input type="checkbox" :checked="currentOrder.isLater" class="h-4 w-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500"
-                                @change="e => updateIsLater((e.target as HTMLInputElement).checked)" />
-                            Para más tarde
-                        </label>
-                        <div v-if="currentOrder.type !== 'reservation' && currentOrder.isLater" class="grid grid-cols-2 gap-2">
-                            <div>
+                <section class="border-t border-gray-100 pt-2" data-test="sidebar-payments">
+                    <PaymentSelector :key="currentOrder.tabId" :order="currentOrder" @editing-changed="isEditingPayment = $event" />
+                </section>
+
+                <section :key="`schedule-${currentTabId}`" class="sidebar-schedule border-t border-gray-100 pt-2" data-test="sidebar-schedule">
+                    <div class="mb-1.5 flex min-h-6 items-center gap-1.5 text-xs text-gray-500">
+                        <CalendarDaysIcon class="h-3.5 w-3.5" />
+                        <span>{{ currentOrder.type === 'reservation' ? 'Programación' : 'Para más tarde' }}</span>
+                        <button v-if="currentOrder.type !== 'reservation' && (currentOrder.isLater || prepareAtLocal || reservedForLocal)"
+                            type="button" class="ml-auto flex h-6 w-6 items-center justify-center rounded hover:bg-gray-100 hover:text-gray-800 focus-visible:outline-emerald-600"
+                            aria-label="Quitar programación" title="Quitar programación" @click="clearSchedule">
+                            <XMarkIcon class="h-3.5 w-3.5" />
+                        </button>
+                    </div>
+                    <OrderScheduleFields v-if="currentOrder.type === 'reservation'" :key="currentOrder.tabId"
+                        :prepare-at="prepareAtDateLocal" :reserved-for="reservedForDateLocal" @change="updateReservationSchedule" />
+                    <template v-else>
+                        <div class="grid grid-cols-2 gap-2">
+                            <div class="min-w-0">
                                 <label class="mb-1 block text-xs text-gray-600">Preparar</label>
-                                <VueDatePicker v-model="prepareAtLocal" time-picker :auto-apply="true" :input-attrs="{ clearable: false }"
+                                <VueDatePicker :model-value="prepareAtLocal" time-picker :auto-apply="true" :input-attrs="{ clearable: false }"
                                     :teleport="true" :floating="{ strategy: 'fixed' }" :aria-labels="{ input: 'Hora de preparación' }"
-                                    placeholder="Hora preparación" @update:model-value="onPrepareAtInput" />
+                                    placeholder="Hora" @update:model-value="onPrepareAtInput" />
                             </div>
-                            <div>
+                            <div class="min-w-0">
                                 <label class="mb-1 block text-xs text-gray-600">Entregar</label>
-                                <VueDatePicker v-model="reservedForLocal" time-picker :auto-apply="true" :input-attrs="{ clearable: false }"
+                                <VueDatePicker :model-value="reservedForLocal" time-picker :auto-apply="true" :input-attrs="{ clearable: false }"
                                     :teleport="true" :floating="{ strategy: 'fixed' }" :aria-labels="{ input: 'Hora de entrega' }"
-                                    placeholder="Hora entrega" @update:model-value="onReservedForInput" />
+                                    placeholder="Hora" @update:model-value="onReservedForInput" />
                             </div>
                         </div>
-                        <OrderScheduleFields v-if="currentOrder.type === 'reservation'" :key="currentOrder.tabId"
-                            :prepare-at="prepareAtDateLocal" :reserved-for="reservedForDateLocal" @change="updateReservationSchedule" />
-                    </div>
-                </details>
-
-                <details :key="`payments-${currentTabId}`" class="sidebar-disclosure" data-test="sidebar-payments">
-                    <summary class="sidebar-summary">
-                        <CreditCardIcon class="h-4 w-4 shrink-0 text-gray-400" />
-                        <span>Pagos</span>
-                        <span class="ml-auto text-xs font-normal text-gray-500">{{ draftPaymentSummary }}</span>
-                        <ChevronDownIcon class="disclosure-chevron h-3.5 w-3.5 shrink-0 text-gray-400" />
-                    </summary>
-                    <div class="pt-2">
-                    <PaidInStoreCashPanel
-                        v-if="showPaidInStoreInDraft && currentOrder"
-                        :input-id="'draft-paid-store-' + currentOrder.tabId"
-                        :paid-in-store-cash="currentOrder.paidInStoreCash === true"
-                        :paid-in-store-cash-amount="currentOrder.paidInStoreCashAmount ?? null"
-                        :max-paid-in-store-amount="draftPaidInStoreCap"
-                        editable
-                        density="compact"
-                        extra-class="mb-2"
-                        helper-text="Se registra al enviar el pedido."
-                        @update:paid-in-store-cash="onPaidInStoreDraftChange"
-                        @edit-paid-in-store-cash="openDraftEditPaidInStore"
-                        @remove-paid-in-store-cash="openDraftRemovePaidInStore" />
-                    <PaymentSelector :order="currentOrder" @payment-updated="handlePaymentUpdated" />
-
-                    </div>
-                </details>
+                        <p v-if="scheduleError" role="alert" class="mt-1 text-xs text-red-700">{{ scheduleError }}</p>
+                    </template>
+                </section>
 
                 <BillingRecipientAccess :key="currentOrder.tabId" :customer-id="currentOrder.customerId" :model-value="currentOrder.billingRecipient"
                     order-context @update:model-value="updateBillingRecipient">
@@ -247,41 +223,6 @@
         </footer>
         <OrderNoteDialog v-model="showNoteDialog" :notes="currentOrder?.notes" title="Notas del pedido"
             label="Indicaciones para preparar o entregar este pedido" :save="saveDraftNotes" />
-
-        <BaseDialog v-model="showDraftRemovePaidInStoreDialog" title="Quitar cobro en tienda (borrador)" size="sm">
-            <p v-if="currentOrder" class="text-sm text-gray-600">
-                Se quitará el marcador de efectivo en tienda
-                (<span class="font-medium tabular-nums">{{ formatCurrency(draftPaidInStoreDisplayAmount) }}</span>).
-            </p>
-            <template #footer>
-                <BaseButton variant="secondary" size="sm" @click="showDraftRemovePaidInStoreDialog = false">
-                    Cancelar
-                </BaseButton>
-                <BaseButton variant="primary" size="sm" class="bg-red-600 hover:bg-red-700"
-                    @click="confirmDraftRemovePaidInStore">
-                    Quitar
-                </BaseButton>
-            </template>
-        </BaseDialog>
-
-        <BaseDialog v-model="showDraftEditPaidInStoreDialog" title="Editar monto — efectivo en tienda (borrador)"
-            size="sm">
-            <div v-if="currentOrder" class="space-y-3">
-                <p class="text-sm text-gray-600">
-                    Máximo {{ formatCurrency(maxDraftEditPaidInStoreAmount) }}
-                </p>
-                <BaseInput v-model.number="draftEditPaidInStoreAmount" type="number"
-                    :max="maxDraftEditPaidInStoreAmount" placeholder="Monto" class="w-full" />
-            </div>
-            <template #footer>
-                <BaseButton variant="secondary" size="sm" @click="showDraftEditPaidInStoreDialog = false">
-                    Cancelar
-                </BaseButton>
-                <BaseButton variant="primary" size="sm" @click="confirmDraftEditPaidInStore">
-                    Guardar
-                </BaseButton>
-            </template>
-        </BaseDialog>
 
         <BaseDialog v-model="showDuplicateOrderConfirmDialog" title="Pedido ya registrado para esta fecha" size="sm">
             <p class="text-sm text-gray-600">
@@ -394,7 +335,6 @@ import { useRouter } from 'vue-router'
 
 import { useToast } from '@/composables/useToast'
 import { useFormatting } from '@/composables/useFormatting'
-import { orderCashToCollect, sumPaymentsAmounts } from '@/utils/orderCashToCollect'
 import { customerApi } from '@/services/MainAPI/customerApi'
 import { whatsappApi } from '@/services/MainAPI/whatsappApi'
 import { discountCodeApi } from '@/services/MainAPI/discountCodeApi'
@@ -416,21 +356,19 @@ import CustomerSection from '@/components/customers/CustomerSection.vue'
 import OrderFulfillmentBranchSelector from '@/components/orders/OrderFulfillmentBranchSelector.vue'
 import CustomerDetailModal from '@/components/customers/CustomerDetailModal.vue'
 import PaymentSelector from '@/components/payments/PaymentSelector.vue'
-import PaidInStoreCashPanel from '@/components/orders/PaidInStoreCashPanel.vue'
 
 // Icons
 import {
     ShoppingCartIcon,
-    PlusIcon,
     PaperAirplaneIcon,
     ClipboardDocumentIcon,
     MapPinIcon,
-    CalendarDaysIcon, CreditCardIcon, DocumentTextIcon, ChevronDownIcon, PencilIcon, ChatBubbleLeftEllipsisIcon,
+    CalendarDaysIcon, DocumentTextIcon, PencilIcon, ChatBubbleLeftEllipsisIcon, XMarkIcon,
 } from '@heroicons/vue/24/outline'
 import type { LocalHour } from '@/types/common'
 import { DateTimeService } from '@/services/domain/DateTimeService'
 import OrderScheduleFields from './OrderScheduleFields.vue'
-import { orderScheduleError } from '@/helpers/orderSchedule'
+import { orderScheduleError, suggestedOrderDelivery } from '@/helpers/orderSchedule'
 
 
 
@@ -440,7 +378,7 @@ const { ordersStore } = useOrderPersistence()
 const { createNewTab, closeTab } = useOrderTabs()
 const { submitOrder } = useOrderSubmission()
 const { success, error: showError } = useToast()
-const { formatCurrency, formatDateTime, formatTime, formatDateShort } = useFormatting()
+const { formatCurrency, formatDateTime } = useFormatting()
 const {
     activeDailyPromotion,
     activeLoyaltyStep,
@@ -463,24 +401,8 @@ const showCustomerDetail = ref(false)
 const selectedCustomer = ref<Customer | null>(null)
 const itemList = ref<InstanceType<typeof OrderItemList> | null>(null)
 const showNoteDialog = ref(false)
+const isEditingPayment = ref(false)
 const guestNameTouched = ref(false)
-const scheduleExpanded = ref(false)
-const scheduleIncomplete = computed(() => currentOrder.value?.type === 'reservation'
-    ? !!orderScheduleError(prepareAtDateLocal.value, reservedForDateLocal.value)
-    : !!currentOrder.value?.isLater && (!prepareAtLocal.value || !reservedForLocal.value))
-const scheduleSummary = computed(() => {
-    const order = currentOrder.value
-    if (!order || (order.type !== 'reservation' && !order.isLater)) return 'Ahora'
-    if (scheduleIncomplete.value) return 'Completar horario'
-    if (order.type === 'reservation') return `${formatDateShort(reservedForDateLocal.value!)} · ${formatTime(prepareAtDateLocal.value!)} → ${formatTime(reservedForDateLocal.value!)}`
-    return order.reservedFor ? `Hoy · ${formatTime(order.reservedFor)}` : 'Completar horario'
-})
-const draftPaymentSummary = computed(() => {
-    const order = currentOrder.value
-    if (!order) return 'Sin pagos'
-    const count = order.bankPayments.length + Number(!!order.appPayment) + Number(order.paidInStoreCash === true)
-    return count ? `${count} registrado${count === 1 ? '' : 's'}` : 'Sin pagos registrados'
-})
 function saveDraftNotes(notes: string) {
     if (!currentTabId.value) throw new Error('El pedido ya no está disponible.')
     ordersStore.updateOrderNotes(notes)
@@ -492,9 +414,6 @@ const reservedForLocal = ref<LocalHour | null>(null)
 const prepareAtDateLocal = ref<Date | null>(null)
 const reservedForDateLocal = ref<Date | null>(null)
 
-const showDraftRemovePaidInStoreDialog = ref(false)
-const showDraftEditPaidInStoreDialog = ref(false)
-const draftEditPaidInStoreAmount = ref(0)
 const showDuplicateOrderConfirmDialog = ref(false)
 const pendingDuplicateConfirmOrder = ref<DraftOrder | null>(null)
 const pendingDuplicateConfirmTabId = ref<string | null>(null)
@@ -511,10 +430,14 @@ const manualGiftProductId = ref<number | null>(null)
 // Computed
 const currentOrder = computed(() => ordersStore.currentOrder)
 const currentTabId = computed(() => ordersStore.currentTabId)
-watch(() => currentTabId.value, () => { showNoteDialog.value = false; guestNameTouched.value = false })
-watch(() => [currentTabId.value, currentOrder.value?.type], () => {
-    scheduleExpanded.value = currentOrder.value?.type === 'reservation' || currentOrder.value?.isLater === true
-}, { immediate: true })
+watch(() => currentTabId.value, () => { showNoteDialog.value = false; guestNameTouched.value = false; isEditingPayment.value = false })
+const scheduleError = computed(() => {
+    if (currentOrder.value?.type === 'reservation') return orderScheduleError(prepareAtDateLocal.value, reservedForDateLocal.value)
+    if (!currentOrder.value?.isLater) return ''
+    if (!prepareAtLocal.value) return 'Indica la hora de preparación.'
+    if (!reservedForLocal.value) return 'Indica la hora de entrega.'
+    return ''
+})
 const { canSubmitOrder, orderErrors } = useOrderValidation()
 const discountCodeInput = computed(() => currentOrder.value?.discountCodeInput ?? '')
 const discountCodeError = computed(() => currentOrder.value?.discountCodeError ?? '')
@@ -546,84 +469,6 @@ const showCopyAddressesButton = computed(() => {
     if (!o || (o.type !== 'delivery' && o.type !== 'reservation')) return false
     return o.customerId != null && o.customerId > 0
 })
-
-/** Remanente a cubrir en efectivo (total − banco − app); mismo criterio que PaymentSelector. */
-const draftNonStoreCashRemainder = computed(() => {
-    const o = currentOrder.value
-    if (!o) return 0
-    return orderCashToCollect(
-        o.total,
-        { bankPayments: o.bankPayments, appPayment: o.appPayment },
-        { floorAtZero: true },
-    )
-})
-
-/** Panel visible si hay remanente > 0 o ya quedó marcado cobro en tienda (editar/quitar). */
-const showPaidInStoreInDraft = computed(() => {
-    const o = currentOrder.value
-    if (!o) return false
-    return draftNonStoreCashRemainder.value > 0 || o.paidInStoreCash === true
-})
-
-const draftPaidInStoreCap = computed(() => {
-    const o = currentOrder.value
-    if (!o) return 0
-    return Math.max(
-        0,
-        o.total - sumPaymentsAmounts(o.bankPayments) - (o.appPayment ? Number(o.appPayment.amount ?? 0) : 0),
-    )
-})
-
-const draftPaidInStoreDisplayAmount = computed(() => {
-    const o = currentOrder.value
-    if (!o) return 0
-    if (typeof o.paidInStoreCashAmount === 'number' && Number.isFinite(o.paidInStoreCashAmount)) {
-        return o.paidInStoreCashAmount
-    }
-    return draftPaidInStoreCap.value
-})
-
-const maxDraftEditPaidInStoreAmount = computed(() => draftPaidInStoreCap.value)
-
-function onPaidInStoreDraftChange(checked: boolean) {
-    ordersStore.updatePaidInStoreCash({ paidInStoreCash: checked })
-}
-
-function openDraftRemovePaidInStore() {
-    showDraftRemovePaidInStoreDialog.value = true
-}
-
-function confirmDraftRemovePaidInStore() {
-    ordersStore.updatePaidInStoreCash({ paidInStoreCash: false })
-    showDraftRemovePaidInStoreDialog.value = false
-}
-
-function openDraftEditPaidInStore() {
-    const o = currentOrder.value
-    if (!o) return
-    const cap = draftPaidInStoreCap.value
-    const seed =
-        typeof o.paidInStoreCashAmount === 'number' && Number.isFinite(o.paidInStoreCashAmount)
-            ? o.paidInStoreCashAmount
-            : Math.max(1, cap)
-    draftEditPaidInStoreAmount.value = cap < 1 ? 0 : Math.min(seed, cap)
-    showDraftEditPaidInStoreDialog.value = true
-}
-
-function confirmDraftEditPaidInStore() {
-    const amount = Number(draftEditPaidInStoreAmount.value)
-    const max = maxDraftEditPaidInStoreAmount.value
-    if (!Number.isFinite(amount) || amount < 1) {
-        showError('Monto inválido', 'Ingresa un monto mayor a cero.')
-        return
-    }
-    if (amount > max) {
-        showError('Monto inválido', `El máximo permitido es ${formatCurrency(max)}.`)
-        return
-    }
-    ordersStore.updatePaidInStoreCash({ paidInStoreCash: true, paidInStoreCashAmount: amount })
-    showDraftEditPaidInStoreDialog.value = false
-}
 
 function formatAddressLineForCopy(a: CustomerAddress): string {
     const street = (a.address || '').trim()
@@ -801,6 +646,8 @@ const submitButtonTooltip = computed(() => {
     if (!currentOrder.value) {
         return 'No hay pedido activo'
     }
+    if (isEditingPayment.value) return 'Guarda o cancela la edición del pago antes de enviar.'
+    if (scheduleError.value) return scheduleError.value
 
     if (canSubmitOrder.value) {
         return 'Enviar pedido al sistema'
@@ -820,29 +667,35 @@ const submitButtonTooltip = computed(() => {
 })
 
 const submitButtonDisabled = computed(() => {
-    return !canSubmitOrder.value || isSubmittingOrder.value || isCheckingDuplicateOrderDate.value
-        || (currentOrder.value?.type === 'reservation' && !!orderScheduleError(prepareAtDateLocal.value, reservedForDateLocal.value))
+    return !canSubmitOrder.value || isSubmittingOrder.value || isCheckingDuplicateOrderDate.value || isEditingPayment.value
+        || !!scheduleError.value
 })
 
-const onPrepareAtInput = (time: LocalHour | undefined) => {
-    if (!time) {
-        reservedForLocal.value = null
-        if (currentTabId.value) ordersStore.updatePrepareAt(null)
-        return
-    }
-    reservedForLocal.value = { hours: time.hours + 1, minutes: time.minutes, seconds: time.seconds }
-    const prepareDate = DateTimeService.localHourToDate(time)
-    const reserveDate = DateTimeService.localHourToDate(reservedForLocal.value)
-    if (currentTabId.value) {
-        ordersStore.updatePrepareAt(prepareDate)
-        ordersStore.updateReservedFor(reserveDate)
-    }
+const onPrepareAtInput = (time: LocalHour | null | undefined) => {
+    if (!currentTabId.value) return
+    if (!time) { clearSchedule(); return }
+    prepareAtLocal.value = { ...time, seconds: time.seconds ?? 0 }
+    const prepareDate = DateTimeService.localHourToDate(prepareAtLocal.value)
+    const reserveDate = suggestedOrderDelivery(prepareDate)
+    reservedForLocal.value = reserveDate ? DateTimeService.dateToLocalHour(reserveDate) : null
+    ordersStore.updateIsLater(true)
+    ordersStore.updatePrepareAt(prepareDate)
+    ordersStore.updateReservedFor(reserveDate)
 }
 
-const onReservedForInput = (time: LocalHour | undefined) => {
-    if (!time || !currentTabId.value) return
-    const date = DateTimeService.localHourToDate(time)
-    ordersStore.updateReservedFor(date)
+const onReservedForInput = (time: LocalHour | null | undefined) => {
+    if (!currentTabId.value) return
+    if (!time) { clearSchedule(); return }
+    reservedForLocal.value = { ...time, seconds: time.seconds ?? 0 }
+    ordersStore.updateIsLater(true)
+    ordersStore.updateReservedFor(DateTimeService.localHourToDate(reservedForLocal.value))
+}
+
+function clearSchedule() {
+    if (!currentTabId.value) return
+    ordersStore.updateIsLater(false)
+    prepareAtLocal.value = null
+    reservedForLocal.value = null
 }
 
 function updateReservationSchedule(schedule: { prepareAt: Date | null; reservedFor: Date | null }) {
@@ -871,10 +724,6 @@ const getAddress = (addressId: number | null, customer: Customer | null) => {
 
 // CustomerSelection y AddressSelection ahora se manejan internamente en CustomerSection (modo 'draft')
 
-const handlePaymentUpdated = () => {
-    // Payment updated, totals recalculate automatically
-}
-
 const handleViewCustomerDetail = (customer: any) => {
     selectedCustomer.value = customer
     showCustomerDetail.value = true
@@ -893,11 +742,6 @@ const handleCustomerUpdated = () => {
 const updateGuestName = (name: string) => {
     if (!currentTabId.value) return
     ordersStore.updateGuestName(name)
-}
-
-const updateIsLater = (value: boolean) => {
-    if (!currentTabId.value) return
-    ordersStore.updateIsLater(value)
 }
 
 const handleAddProducts = () => {
@@ -1045,6 +889,10 @@ function goToOrderDetail(orderId: number) {
 }
 
 const handleSubmitOrder = async () => {
+    if (isEditingPayment.value) {
+        showError('Pago en edición', 'Guarda o cancela la edición del pago antes de enviar.')
+        return
+    }
     await resolveBenefits()
     if (benefitConflictExists.value) {
         showBenefitConflictDialog.value = true
@@ -1082,9 +930,8 @@ const handleSubmitOrder = async () => {
     if (isSubmittingOrder.value || isCheckingDuplicateOrderDate.value) return
 
     const tabToClose = currentTabId.value
+    if (scheduleError.value) { showError('Horarios', scheduleError.value); return }
     if (currentOrder.value.type === 'reservation') {
-        const scheduleError = orderScheduleError(prepareAtDateLocal.value, reservedForDateLocal.value)
-        if (scheduleError) { showError('Horarios', scheduleError); return }
         if (reservedForDateLocal.value) {
             currentOrder.value.reservedFor = reservedForDateLocal.value
         }
@@ -1092,9 +939,8 @@ const handleSubmitOrder = async () => {
             currentOrder.value.prepareAt = prepareAtDateLocal.value
         }
     } else if (currentOrder.value.isLater) {
-        if (!prepareAtLocal.value || !reservedForLocal.value) return
-        currentOrder.value.prepareAt = DateTimeService.localHourToDate(prepareAtLocal.value)
-        currentOrder.value.reservedFor = DateTimeService.localHourToDate(reservedForLocal.value)
+        currentOrder.value.prepareAt = DateTimeService.localHourToDate(prepareAtLocal.value!)
+        currentOrder.value.reservedFor = DateTimeService.localHourToDate(reservedForLocal.value!)
     }
 
     const conflicts = await loadDuplicateCustomerOrderDateConflicts(currentOrder.value)
@@ -1157,9 +1003,9 @@ watch(currentOrder, () => {
     showCustomerDetail.value = false
 }, { immediate: false })
 
-// Sincronizar refs de fecha al cambiar de tab
+// Cada pestaña y tipo conserva sus horas sin heredar las del pedido anterior.
 watch(
-    () => currentTabId.value,
+    [() => currentTabId.value, () => currentOrder.value?.type],
     () => {
         const order = currentOrder.value
         if (!order) {
@@ -1198,26 +1044,14 @@ watch(
     { immediate: true }
 )
 
-// Valores por defecto: día actual cuando cambia tipo o pestaña (onsite/delivery/reservation)
-watch(
-    () => [currentOrder.value?.type, currentTabId.value] as const,
-    () => {
-        if (!currentTabId.value) return
-        const type = currentOrder.value?.type
-        if (!type || (type !== 'onsite' && type !== 'delivery' && type !== 'reservation')) return
-    },
-    { immediate: true }
-)
 </script>
 
 <style scoped>
 .order-sidebar { width: clamp(390px, 35vw, 490px); flex-shrink: 0; }
-.sidebar-disclosure { border-top: 1px solid #f3f4f6; padding-top: 0.625rem; }
 .sidebar-summary { display: flex; align-items: center; gap: 0.5rem; min-height: 28px; cursor: pointer; list-style: none; font-size: 0.8125rem; font-weight: 500; color: #374151; border-radius: 6px; }
-.sidebar-summary::-webkit-details-marker { display: none; }
 .sidebar-summary:hover { color: #047857; }
 .sidebar-summary:focus-visible { outline: 2px solid #059669; outline-offset: 3px; }
-.disclosure-chevron { transition: transform 150ms; }
-details[open] > summary .disclosure-chevron { transform: rotate(180deg); }
+.sidebar-schedule :deep(.dp__input) { min-height: 32px; padding-top: 5px; padding-bottom: 5px; border-color: #e5e7eb; border-radius: 6px; font-size: 12px; }
+@media (pointer: coarse) { .sidebar-schedule :deep(.dp__input) { min-height: 40px; font-size: 16px; } }
 @media (max-width: 1023px) { .order-sidebar { width: 100%; min-height: 0; flex: 1; } }
 </style>

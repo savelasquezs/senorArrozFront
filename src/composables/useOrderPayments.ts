@@ -28,7 +28,7 @@ export function useOrderPayments() {
             amount
         }
 
-        const updated = { ...order, appPayment, paidInStoreCash: false, paidInStoreCashAmount: null }
+        const updated = { ...order, appPayment }
         store.draftOrders.set(store.currentTabId, updated)
         store.saveToLocalStorage()
     }
@@ -79,8 +79,6 @@ export function useOrderPayments() {
         const updated = {
             ...order,
             bankPayments: [...order.bankPayments, bankPayment],
-            paidInStoreCash: false,
-            paidInStoreCashAmount: null,
         }
 
         store.draftOrders.set(store.currentTabId, updated)

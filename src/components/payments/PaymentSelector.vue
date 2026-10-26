@@ -1,303 +1,289 @@
 <template>
-    <div class="payment-selector">
-        <div class="grid grid-cols-2 gap-2">
-            <BaseSelect v-if="!order.appPayment" v-model="selectedAppId" :options="appOptions" label="App"
-                placeholder="Agregar app…" size="sm" value-key="value" display-key="label" :disabled="!canAddElectronicPayments"
-                @update:model-value="handleAppSelected" />
-            <div v-else class="self-end py-2 text-xs text-gray-400">Una app por pedido</div>
-            <BaseSelect v-model="selectedBankId" :options="bankOptions" label="Banco" placeholder="Agregar banco…" size="sm"
-                value-key="value" display-key="label" :disabled="!canAddElectronicPayments" @update:model-value="handleBankSelected" />
-        </div>
-        <div v-if="order.appPayment" class="mt-2 flex items-center gap-2 rounded-lg border border-blue-100 bg-blue-50 px-2 py-1.5 text-xs">
-            <DevicePhoneMobileIcon class="h-4 w-4 shrink-0 text-blue-600" />
-            <span class="min-w-0 flex-1 truncate font-medium text-blue-900">{{ order.appPayment.appName }}</span>
-            <strong class="tabular-nums text-blue-800">{{ formatCurrency(order.appPayment.amount) }}</strong>
-            <BaseButton @click="handleUpdateAppPayment" variant="ghost" size="sm" icon-only class="h-7 w-7 p-0" aria-label="Editar pago de app"><PencilIcon class="h-3.5 w-3.5" /></BaseButton>
-            <BaseButton @click="handleRemoveAppPayment" variant="ghost" size="sm" icon-only class="h-7 w-7 p-0 text-gray-400 hover:text-red-600" aria-label="Quitar pago de app"><TrashIcon class="h-3.5 w-3.5" /></BaseButton>
-        </div>
-        <div v-for="payment in order.bankPayments" :key="payment.tempId" class="mt-2 flex items-center gap-2 rounded-lg border border-emerald-100 bg-emerald-50 px-2 py-1.5 text-xs">
-            <BuildingLibraryIcon class="h-4 w-4 shrink-0 text-emerald-600" />
-            <span class="min-w-0 flex-1 truncate font-medium text-emerald-900">{{ payment.bankName }}</span>
-            <strong class="tabular-nums text-emerald-800">{{ formatCurrency(payment.amount) }}</strong>
-            <BaseButton @click="handleUpdateBankPayment(payment.tempId)" variant="ghost" size="sm" icon-only class="h-7 w-7 p-0" :aria-label="`Editar pago de ${payment.bankName}`"><PencilIcon class="h-3.5 w-3.5" /></BaseButton>
-            <BaseButton @click="handleRemoveBankPayment(payment.tempId)" variant="ghost" size="sm" icon-only class="h-7 w-7 p-0 text-gray-400 hover:text-red-600" :aria-label="`Quitar pago de ${payment.bankName}`"><TrashIcon class="h-3.5 w-3.5" /></BaseButton>
-        </div>
-        <div v-if="hasPayments" class="mt-2 flex flex-wrap justify-between gap-2 rounded-lg bg-gray-50 px-2 py-2 text-xs tabular-nums" :class="{ 'text-red-700': hasOverpayment }">
-            <span>Registrado <strong>{{ formatCurrency(totalPayments) }}</strong></span>
-            <span>Efectivo <strong class="text-emerald-700">{{ formatCurrency(cashAmount) }}</strong></span>
-        </div>
-        <!-- Total Covered Indicator -->
-        <div v-if="!canAddPayments && hasPayments" class="mt-2 text-xs text-emerald-600 font-medium text-center">
-            ✓ Total cubierto
-        </div>
-
-        <!-- Overpayment Warning -->
-        <div v-if="hasOverpayment" class="mt-2 p-2 bg-red-50 border border-red-200 rounded-md">
-            <div class="flex items-start gap-2">
-                <ExclamationTriangleIcon class="w-4 h-4 text-red-600 flex-shrink-0 mt-0.5" />
-                <div class="text-xs">
-                    <p class="font-semibold text-red-900">Pagos exceden el total</p>
-                    <p class="text-red-700">Exceso: {{ formatCurrency(overpaymentAmount) }}</p>
+    <div ref="container" class="payment-selector">
+        <section v-for="section in sections" :key="section.type" :aria-label="section.label" class="payment-section">
+            <header v-if="section.type !== 'cash'" class="payment-heading">
+                <div class="flex items-center gap-1">
+                    <span>{{ section.label }}</span>
+                    <button v-if="section.type === 'bank' && section.rows.length" type="button"
+                        class="payment-icon text-gray-500 hover:text-gray-800" aria-label="Agregar otro banco"
+                        title="Agregar otro banco" :aria-expanded="showBankOptions" :disabled="!canAddPayments"
+                        @click="toggleBankOptions">
+                        <PlusIcon class="h-3.5 w-3.5" />
+                    </button>
                 </div>
+                <span v-if="section.type === 'bank'" class="tabular-nums" aria-live="polite">
+                    Por cobrar <span class="ml-1">{{ formatCurrency(cashAmount) }}</span>
+                </span>
+            </header>
+
+            <TransitionGroup name="payment-row" tag="div" class="payment-lines">
+                <form v-for="payment in section.rows" :key="payment.id" class="payment-line" novalidate
+                    :data-payment-id="payment.id" :data-payment-type="section.type" @submit.prevent="savePaymentAmount">
+                    <span class="min-w-0 truncate" :title="payment.name">{{ payment.name }}</span>
+                    <template v-if="isEditing(section.type, payment.id)">
+                        <label class="payment-amount-input">
+                            <span aria-hidden="true">$</span>
+                            <input v-model.number="paymentAmount" type="number" inputmode="numeric" min="1" step="1"
+                                :max="maxPaymentAmount" :aria-label="`Monto de ${payment.name}`"
+                                :aria-invalid="!!editingError" :aria-describedby="editingError ? errorId : undefined"
+                                @input="editingError = ''" @keydown.esc.prevent="cancelEditing" />
+                        </label>
+                        <button type="submit" class="payment-icon text-emerald-600 hover:bg-emerald-50"
+                            :aria-label="`Guardar pago de ${payment.name}`" title="Guardar monto">
+                            <CheckIcon class="h-4 w-4" />
+                        </button>
+                        <button type="button" class="payment-icon text-red-500 hover:bg-red-50"
+                            :aria-label="`Cancelar edición de ${payment.name}`" title="Cancelar edición"
+                            @click="cancelEditing">
+                            <XMarkIcon class="h-3.5 w-3.5" />
+                        </button>
+                        <p v-if="editingError" :id="errorId" class="col-span-4 text-[11px] text-red-600" role="alert">
+                            {{ editingError }}
+                        </p>
+                    </template>
+                    <template v-else>
+                        <strong class="text-right font-medium tabular-nums">{{ formatCurrency(payment.amount) }}</strong>
+                        <button type="button" class="payment-icon text-sky-600 hover:bg-sky-50"
+                            :aria-label="`Editar pago de ${payment.name}`" title="Editar monto"
+                            @click="editPayment(section.type, payment)">
+                            <PencilIcon class="h-3.5 w-3.5" />
+                        </button>
+                        <button type="button" class="payment-icon text-red-500 hover:bg-red-50"
+                            :aria-label="`Quitar pago de ${payment.name}`" title="Quitar pago"
+                            @click="removePayment(section.type, payment.id)">
+                            <XMarkIcon class="h-3.5 w-3.5" />
+                        </button>
+                    </template>
+                </form>
+            </TransitionGroup>
+
+            <div v-if="!section.rows.length || (section.type === 'bank' && showBankOptions)" class="payment-choices">
+                <template v-if="section.options.length">
+                    <button v-for="option in section.options.slice(0, 2)" :key="option.id" type="button"
+                        class="payment-link" :aria-label="`Agregar pago de ${option.name}`"
+                        :title="section.type === 'cash' ? 'Registrar efectivo recibido en tienda' : option.name"
+                        :disabled="!canAddPayments" @click="addPayment(section.type, option.id)">
+                        {{ option.name }}
+                    </button>
+                    <select v-if="section.options.length > 2" class="payment-more" :disabled="!canAddPayments"
+                        :aria-label="`Más opciones de ${section.type === 'bank' ? 'bancos' : 'aplicaciones'}`"
+                        @change="selectOtherPayment(section.type, $event)">
+                        <option value="" selected disabled>Más opciones</option>
+                        <option v-for="option in section.options" :key="option.id" :value="option.id">
+                            {{ option.name }}
+                        </option>
+                    </select>
+                </template>
+                <span v-else class="text-xs text-gray-400">Sin opciones disponibles</span>
             </div>
-        </div>
+        </section>
 
-        <!-- Payment Amount Modal -->
-        <BaseDialog v-model="showAmountModal" title="Monto de Pago" size="sm">
-            <div v-if="editingPayment" class="space-y-3">
-                <div>
-                    <label class="block text-xs font-medium text-gray-700 mb-1.5">
-                        {{ editingPayment.name }} (Máx: {{ formatCurrency(maxPaymentAmount) }})
-                    </label>
-                    <BaseInput v-model.number="paymentAmount" type="number" :max="maxPaymentAmount" placeholder="0"
-                        size="md" class="text-lg" autofocus />
-                </div>
-
-                <div class="flex justify-end space-x-2">
-                    <BaseButton @click="closeAmountModal" variant="outline" size="sm">
-                        Cancelar
-                    </BaseButton>
-                    <BaseButton @click="savePaymentAmount" variant="primary" size="sm">
-                        Guardar
-                    </BaseButton>
-                </div>
-            </div>
-        </BaseDialog>
+        <p v-if="totalPayments > order.total" class="mt-2 text-xs text-red-600" role="alert">
+            Los pagos exceden el total por {{ formatCurrency(totalPayments - order.total) }}.
+        </p>
     </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { computed, nextTick, ref, watch } from 'vue'
+import { CheckIcon, PencilIcon, PlusIcon, XMarkIcon } from '@heroicons/vue/24/outline'
 import { useOrdersDraftsStore } from '@/store/ordersDrafts'
 import { useOrderPayments } from '@/composables/useOrderPayments'
-import type { DraftOrder } from '@/types/order'
+import { formatCurrency } from '@/composables/useFormatting'
 import { orderCashToCollect, sumOrderNonCashPayments } from '@/utils/orderCashToCollect'
+import type { DraftOrder } from '@/types/order'
 
-// Components
-import BaseButton from '@/components/ui/BaseButton.vue'
-import BaseSelect from '@/components/ui/BaseSelect.vue'
-import BaseInput from '@/components/ui/BaseInput.vue'
-import BaseDialog from '@/components/ui/BaseDialog.vue'
+type PaymentType = 'bank' | 'app' | 'cash'
+interface PaymentRow { id: string; name: string; amount: number }
 
-// Icons
-import {
-    DevicePhoneMobileIcon,
-    BuildingLibraryIcon,
-    TrashIcon,
-    PencilIcon,
-    ExclamationTriangleIcon,
-} from '@heroicons/vue/24/outline'
-
-// Props
-interface Props {
-    order: DraftOrder
-}
-
-const props = defineProps<Props>()
-
-// Emits
+const props = defineProps<{ order: DraftOrder }>()
 const emit = defineEmits<{
     paymentUpdated: [order: DraftOrder]
+    editingChanged: [editing: boolean]
 }>()
-
-// Composables
 const ordersStore = useOrdersDraftsStore()
 const payments = useOrderPayments()
+const container = ref<HTMLElement | null>(null)
+const showBankOptions = ref(false)
+const editingPayment = ref<{ type: PaymentType; id: string } | null>(null)
+const paymentAmount = ref<number | string>(0)
+const editingError = ref('')
+const errorId = computed(() => `payment-error-${props.order.tabId}`)
 
-// State
-const selectedAppId = ref<number | null>(null)
-const selectedBankId = ref<number | null>(null)
-const showAmountModal = ref(false)
-const paymentAmount = ref(0)
-const editingPayment = ref<{
-    id: string
-    type: 'app' | 'bank'
-    name: string
-} | null>(null)
-
-// Computed
-const appOptions = computed(() => {
-    // Si ya hay un app payment, no mostrar opciones
-    if (props.order.appPayment) {
-        return []
-    }
-    return ordersStore.apps
-        .filter(app => app.active)
-        .map(app => ({ value: app.id, label: app.name }))
+const branchId = computed(() => props.order.branchId ?? ordersStore.activeBranchId)
+const bankOptions = computed(() => ordersStore.banks.filter(bank => bank.active && bank.branchId === branchId.value))
+const appOptions = computed(() => ordersStore.apps.filter(app => app.active && app.branchId === branchId.value))
+const nonCashPayments = computed(() => sumOrderNonCashPayments(props.order))
+const paidCashAmount = computed(() => {
+    if (!props.order.paidInStoreCash) return 0
+    const amount = props.order.paidInStoreCashAmount
+    return typeof amount === 'number' && Number.isFinite(amount)
+        ? amount
+        : Math.max(0, props.order.total - nonCashPayments.value)
 })
-
-const bankOptions = computed(() => {
-    return ordersStore.banks
-        .filter(bank => bank.active)
-        .map(bank => ({ value: bank.id, label: bank.name }))
+const totalPayments = computed(() => nonCashPayments.value + paidCashAmount.value)
+const sections = computed(() => [
+    {
+        type: 'bank' as const,
+        label: 'Bancos',
+        options: bankOptions.value,
+        rows: props.order.bankPayments.map(payment => ({ id: payment.tempId, name: payment.bankName, amount: payment.amount })),
+    },
+    {
+        type: 'app' as const,
+        label: 'Aplicaciones',
+        options: appOptions.value,
+        rows: props.order.appPayment
+            ? [{ id: props.order.appPayment.tempId, name: props.order.appPayment.appName, amount: props.order.appPayment.amount }]
+            : [],
+    },
+    {
+        type: 'cash' as const,
+        label: 'Efectivo en tienda',
+        options: [{ id: 0, name: 'Efectivo' }],
+        rows: props.order.paidInStoreCash
+            ? [{ id: 'cash', name: 'Efectivo', amount: paidCashAmount.value }]
+            : [],
+    },
+])
+const cashToCollect = (order: DraftOrder) => orderCashToCollect(order.total, order, {
+    floorAtZero: true,
+    paidInStoreCash: order.paidInStoreCash === true,
+    paidInStoreCashAmount: order.paidInStoreCashAmount ?? null,
 })
+const cashAmount = computed(() => cashToCollect(props.order))
+const canAddPayments = computed(() => cashAmount.value > 0)
+const editedRow = computed(() => sections.value.find(section => section.type === editingPayment.value?.type)
+    ?.rows.find(row => row.id === editingPayment.value?.id))
+const maxPaymentAmount = computed(() => props.order.total - totalPayments.value + (editedRow.value?.amount ?? 0))
+const isEditing = (type: PaymentType, id: string) => editingPayment.value?.type === type && editingPayment.value.id === id
+const isCurrentDraft = () => ordersStore.currentTabId === props.order.tabId
+    && ordersStore.currentOrder?.branchId === props.order.branchId
 
-const hasPayments = computed(() => {
-    return props.order.appPayment !== null || props.order.bankPayments.length > 0
-})
+watch(() => editingPayment.value !== null, editing => emit('editingChanged', editing), { immediate: true, flush: 'sync' })
 
-const totalPayments = computed(() =>
-    sumOrderNonCashPayments({
-        bankPayments: props.order.bankPayments,
-        appPayment: props.order.appPayment,
-    })
-)
+watch(editedRow, row => {
+    if (!row && editingPayment.value) cancelEditing()
+}, { flush: 'sync' })
 
-const cashAmount = computed(() =>
-    orderCashToCollect(
-        props.order.total,
-        {
-            bankPayments: props.order.bankPayments,
-            appPayment: props.order.appPayment,
-        },
-        {
-            floorAtZero: true,
-            paidInStoreCash: props.order.paidInStoreCash === true,
-            paidInStoreCashAmount: props.order.paidInStoreCashAmount ?? null,
-        }
-    )
-)
-
-const canAddPayments = computed(() => {
-    return cashAmount.value > 0
-})
-
-/** Pagos banco/app: mismo remanente que el efectivo a cobrar (si hay cobro parcial en tienda, aún se pueden agregar). */
-const canAddElectronicPayments = computed(() => canAddPayments.value)
-
-const maxPaymentAmount = computed(() => {
-    if (!editingPayment.value) return props.order.total
-
-    // Si estamos editando, excluir el monto actual del cálculo
-    const currentAmount = editingPayment.value.type === 'app' && props.order.appPayment
-        ? props.order.appPayment.amount
-        : editingPayment.value.type === 'bank'
-            ? props.order.bankPayments.find(p => p.tempId === editingPayment.value?.id)?.amount || 0
-            : 0
-
-    // Máximo = total - pagos actuales + monto que está editando
-    return props.order.total - totalPayments.value + currentAmount
-})
-
-const hasOverpayment = computed(() => {
-    return totalPayments.value > props.order.total
-})
-
-const overpaymentAmount = computed(() => {
-    if (!hasOverpayment.value) return 0
-    return totalPayments.value - props.order.total
-})
-
-// Methods
-const formatCurrency = (amount: number): string => {
-    return new Intl.NumberFormat('es-CO', {
-        style: 'currency',
-        currency: 'COP',
-        minimumFractionDigits: 0,
-    }).format(amount)
-}
-
-
-const handleUpdateAppPayment = () => {
-    const payment = props.order.appPayment
-    if (!payment) return
-
-    editingPayment.value = {
-        id: payment.tempId,
-        type: 'app',
-        name: payment.appName || ''
-    }
-    paymentAmount.value = payment.amount
-    showAmountModal.value = true
-}
-
-const handleRemoveAppPayment = () => {
-    payments.removeAppPayment()
-    emit('paymentUpdated', props.order)
-}
-
-const handleUpdateBankPayment = (paymentTempId: string) => {
-    const payment = props.order.bankPayments.find(p => p.tempId === paymentTempId)
-    if (!payment) return
-
-    editingPayment.value = {
-        id: payment.tempId,
-        type: 'bank',
-        name: payment.bankName || ''
-    }
-    paymentAmount.value = payment.amount
-    showAmountModal.value = true
-}
-
-const handleRemoveBankPayment = (paymentTempId: string) => {
-    payments.removeBankPayment(paymentTempId)
-    emit('paymentUpdated', props.order)
-}
-
-const savePaymentAmount = () => {
-    if (!editingPayment.value || paymentAmount.value <= 0) return
-
-    // Validar que no exceda el máximo permitido
-    if (paymentAmount.value > maxPaymentAmount.value) {
-        paymentAmount.value = maxPaymentAmount.value
-    }
-
-    if (editingPayment.value.type === 'app') {
-        if (editingPayment.value.id === 'app-new') {
-            // Adding new app payment
-            const appId = selectedAppId.value
-            if (!appId) return
-            payments.addAppPayment(appId, paymentAmount.value)
-        } else {
-            // Updating existing app payment
-            payments.updateAppPayment(paymentAmount.value)
-        }
-    } else if (editingPayment.value.type === 'bank') {
-        if (editingPayment.value.id === 'bank-new') {
-            // Adding new bank payment
-            const bankId = selectedBankId.value
-            if (!bankId) return
-            payments.addBankPayment(bankId, paymentAmount.value)
-        } else {
-            // Updating existing bank payment
-            payments.updateBankPayment(editingPayment.value.id, paymentAmount.value)
-        }
-    }
-
-    // Reset selections
-    selectedAppId.value = null
-    selectedBankId.value = null
-
-    closeAmountModal()
-    emit('paymentUpdated', props.order)
-}
-
-const closeAmountModal = () => {
-    showAmountModal.value = false
+watch([() => props.order.tabId, () => props.order.branchId], () => {
     editingPayment.value = null
-    paymentAmount.value = 0
+    editingError.value = ''
+    showBankOptions.value = false
+}, { flush: 'sync' })
+
+const notifyPaymentUpdated = () => emit('paymentUpdated', ordersStore.currentOrder ?? props.order)
+
+async function focusPayment(type: PaymentType, id: string, selector: string) {
+    await nextTick()
+    const row = Array.from(container.value?.querySelectorAll<HTMLElement>('[data-payment-id]') ?? [])
+        .find(element => element.dataset.paymentId === id && element.dataset.paymentType === type)
+    const target = row?.querySelector<HTMLElement>(selector)
+    target?.focus({ preventScroll: true })
+    if (target instanceof HTMLInputElement) target.select()
 }
 
-// Auto-add handlers
-const handleAppSelected = (appId: number | null) => {
-    if (appId && canAddPayments.value) {
-        // Auto-agregar con el valor del efectivo restante
-        payments.addAppPayment(appId, cashAmount.value)
-        selectedAppId.value = null // Reset para permitir nueva selección
-        emit('paymentUpdated', props.order)
-    }
+function editPayment(type: PaymentType, payment: PaymentRow) {
+    if (!isCurrentDraft()) return
+    editingPayment.value = { type, id: payment.id }
+    paymentAmount.value = payment.amount
+    editingError.value = ''
+    showBankOptions.value = false
+    void focusPayment(type, payment.id, 'input')
 }
 
-const handleBankSelected = (bankId: number | null) => {
-    if (bankId && canAddPayments.value) {
-        // Auto-agregar con el valor del efectivo restante
-        payments.addBankPayment(bankId, cashAmount.value)
-        selectedBankId.value = null // Reset para permitir nueva selección
-        emit('paymentUpdated', props.order)
+function cancelEditing() {
+    const previous = editingPayment.value
+    editingPayment.value = null
+    editingError.value = ''
+    if (previous) void focusPayment(previous.type, previous.id, 'button')
+}
+
+function savePaymentAmount() {
+    if (!editingPayment.value || !editedRow.value || !isCurrentDraft()) {
+        cancelEditing()
+        return
     }
+    const amount = Number(paymentAmount.value)
+    if (!Number.isFinite(amount) || amount <= 0) {
+        editingError.value = 'Ingresa un valor mayor que cero.'
+        return
+    }
+    if (editingPayment.value.type === 'cash' && amount < 1) {
+        editingError.value = 'El efectivo debe ser de al menos $1.'
+        return
+    }
+    if (amount > maxPaymentAmount.value) {
+        editingError.value = `El máximo es ${formatCurrency(maxPaymentAmount.value)}.`
+        return
+    }
+    if (editingPayment.value.type === 'cash') {
+        ordersStore.updatePaidInStoreCash({ paidInStoreCash: true, paidInStoreCashAmount: amount })
+    } else if (editingPayment.value.type === 'app') payments.updateAppPayment(amount)
+    else payments.updateBankPayment(editingPayment.value.id, amount)
+    cancelEditing()
+    notifyPaymentUpdated()
+}
+
+function removePayment(type: PaymentType, id: string) {
+    if (!isCurrentDraft()) return
+    if (isEditing(type, id)) cancelEditing()
+    if (type === 'cash') ordersStore.updatePaidInStoreCash({ paidInStoreCash: false })
+    else if (type === 'app') payments.removeAppPayment()
+    else payments.removeBankPayment(id)
+    notifyPaymentUpdated()
+}
+
+function addPayment(type: PaymentType, id: number) {
+    const order = ordersStore.currentOrder
+    if (!order || !isCurrentDraft()) return
+    const options = sections.value.find(section => section.type === type)?.options ?? []
+    if (!options.some(option => option.id === id)
+        || (type === 'app' && order.appPayment)
+        || (type === 'cash' && order.paidInStoreCash)) return
+    // Read the live draft so a second click cannot reuse the pre-render balance.
+    const amount = cashToCollect(order)
+    if (amount <= 0) return
+    if (type === 'cash') ordersStore.updatePaidInStoreCash({ paidInStoreCash: true, paidInStoreCashAmount: amount })
+    else if (type === 'app') payments.addAppPayment(id, amount)
+    else payments.addBankPayment(id, amount)
+    showBankOptions.value = false
+    notifyPaymentUpdated()
+}
+
+function selectOtherPayment(type: PaymentType, event: Event) {
+    const select = event.target as HTMLSelectElement
+    const id = Number(select.value)
+    select.value = ''
+    if (id > 0) addPayment(type, id)
+}
+
+function toggleBankOptions() {
+    cancelEditing()
+    showBankOptions.value = !showBankOptions.value
 }
 </script>
 
 <style scoped>
-/* Custom styles if needed */
+.payment-selector { display: grid; gap: 12px; }
+.payment-section { min-width: 0; }
+.payment-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 24px; font-size: 11px; color: #6b7280; }
+.payment-lines { display: grid; gap: 3px; }
+.payment-line { display: grid; grid-template-columns: minmax(0, 1fr) minmax(88px, auto) 24px 24px; align-items: center; column-gap: 8px; min-height: 28px; font-size: 12px; color: #374151; }
+.payment-choices { display: flex; align-items: center; gap: 16px; min-height: 28px; }
+.payment-link { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: 0; border: 0; background: none; color: #374151; font-size: 13px; line-height: 26px; cursor: pointer; }
+.payment-link:hover { color: #047857; text-decoration: underline; text-underline-offset: 3px; }
+.payment-more { width: 88px; flex-shrink: 0; padding: 0; border: 0; border-radius: 0; background: transparent; appearance: none; color: #6b7280; font-size: 12px; line-height: 26px; cursor: pointer; }
+.payment-icon { position: relative; display: flex; align-items: center; justify-content: center; width: 24px; height: 24px; padding: 0; border: 0; border-radius: 4px; background-color: transparent; cursor: pointer; }
+.payment-icon::after { content: ''; position: absolute; inset: -3px; }
+.payment-link:focus-visible, .payment-more:focus-visible, .payment-icon:focus-visible { outline: 2px solid #059669; outline-offset: 2px; border-radius: 3px; }
+.payment-link:disabled, .payment-more:disabled, .payment-icon:disabled { cursor: default; opacity: .4; text-decoration: none; }
+.payment-amount-input { display: flex; align-items: center; gap: 4px; width: 110px; height: 24px; margin-left: auto; padding: 0 5px; border: 1px solid #a7f3d0; border-radius: 4px; color: #6b7280; }
+.payment-amount-input:focus-within { border-color: #059669; box-shadow: 0 0 0 1px #d1fae5; }
+.payment-amount-input input { width: 100%; min-width: 0; padding: 0; border: 0; outline: 0; background: transparent; font-size: 12px; line-height: 22px; color: #374151; text-align: right; font-variant-numeric: tabular-nums; appearance: textfield; }
+.payment-amount-input input::-webkit-inner-spin-button, .payment-amount-input input::-webkit-outer-spin-button { appearance: none; margin: 0; }
+.payment-row-enter-active, .payment-row-leave-active, .payment-row-move { transition: opacity 160ms ease, transform 160ms ease; }
+.payment-row-enter-from, .payment-row-leave-to { opacity: 0; transform: translateY(6px); }
+@media (pointer: coarse) { .payment-link, .payment-more { min-height: 44px; margin-block: -8px; } }
+@media (prefers-reduced-motion: reduce) { .payment-row-enter-active, .payment-row-leave-active, .payment-row-move { transition: none; } }
 </style>
