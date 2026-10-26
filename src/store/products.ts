@@ -44,22 +44,26 @@ export const useProductsStore = defineStore('products', () => {
 
     const currentProducts = computed(() => list.value?.items || []);
     const totalProducts = computed(() => list.value?.totalCount || 0);
+    let listVersion = 0;
 
     const fetch = async (filters?: ProductFilters, opts?: FetchOpts) => {
+        const version = ++listVersion;
         await run(async () => {
             const res = await productApi.getProducts(filters);
-            if (res.data?.items?.length) {
-                try {
-                    const availability = await inventoryApi.getAvailability(res.data.items.map(product => product.id));
+            if (version !== listVersion) return;
+            list.value = res.data;
+            const controlled = res.data?.items?.filter(product => product.inventoryEnabled) ?? [];
+            if (controlled.length) {
+                void inventoryApi.getAvailability(controlled.map(product => product.id)).then(availability => {
+                    if (version !== listVersion) return;
                     const byProduct = new Map(availability.map(item => [item.productId, item]));
-                    res.data.items = res.data.items.map(product => {
+                    list.value!.items = list.value!.items.map(product => {
                         const item = byProduct.get(product.id);
                         if (!item || item.controlMode === 'estimated') return product;
                         return { ...product, stock: item.maximumQuantity ?? (item.available ? null : 0) };
                     });
-                } catch {}
+                }).catch(() => {});
             }
-            list.value = res.data;
         }, { ...opts, errorMessage: 'Error al cargar productos' });
     };
 
@@ -176,6 +180,7 @@ export const useProductsStore = defineStore('products', () => {
     };
 
     const clearList = () => {
+        listVersion++;
         list.value = null;
         clearError();
     };
