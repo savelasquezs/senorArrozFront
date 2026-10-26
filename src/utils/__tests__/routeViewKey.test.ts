@@ -21,9 +21,20 @@ describe('getRouteViewKey', () => {
             .not.toBe(getRouteViewKey('/orders', '/orders?remoteBranchId=2', 5))
     })
 
-    it('preserves previous remount rules for other routes', () => {
+    it('updates detail modals and sections in place', () => {
         expect(getRouteViewKey('/branches/2', '/branches/2?section=pos', 3))
-            .not.toBe(getRouteViewKey('/branches/2', '/branches/2?section=payments', 3))
+            .toBe(getRouteViewKey('/branches/2', '/branches/2?section=payments', 3))
+        for (const path of ['/customers', '/products', '/inventory', '/whatsapp']) {
+            expect(getRouteViewKey(path, `${path}?detail=1`, 3))
+                .toBe(getRouteViewKey(path, `${path}?detail=2`, 3))
+        }
+        expect(getRouteViewKey('/branches/2', '/branches/2', 3))
+            .not.toBe(getRouteViewKey('/branches/3', '/branches/3', 3))
+        expect(getRouteViewKey('/branches/2', '/branches/2', 3))
+            .not.toBe(getRouteViewKey('/branches/2', '/branches/2', 4))
+    })
+
+    it('preserves other resource remount rules', () => {
         expect(getRouteViewKey('/orders/8351', '/orders/8351?a=1', 3))
             .not.toBe(getRouteViewKey('/orders/8351', '/orders/8351?a=2', 3))
         expect(getRouteViewKey('/orders/new', '/orders/new', 3))

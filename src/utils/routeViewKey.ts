@@ -1,17 +1,5 @@
-/**
- * Reuse orders and dashboard views while changing only their query parameters
- * (notably remoteBranchId). Its tabs and URL are synchronized in-place.
- *
- * Before this, `route.fullPath` keyed <RouterView> and recreated OrdersList,
- * MainLayout and both SignalR hubs on every tab switch; each onMounted
- * dispatched a second complete set of orders/driver/options requests.
- *
- * Keep all unrelated routes' existing remount semantics, and preserve the
- * branch-context revision so changing the authenticated workspace resets data.
- */
 export function getRouteViewKey(path: string, fullPath: string, branchRevision: number): string {
-    if (path === '/orders' || path === '/dashboard') return `${path}:${branchRevision}`
-    return path.startsWith('/branches/')
-        ? fullPath
-        : `${fullPath}:${branchRevision}`
+    const updatesInPlace = ['/orders', '/dashboard', '/customers', '/products', '/inventory', '/whatsapp'].includes(path)
+        || /^\/branches\/\d+$/.test(path)
+    return `${updatesInPlace ? path : fullPath}:${branchRevision}`
 }

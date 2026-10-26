@@ -178,6 +178,7 @@ import BaseBadge from '@/components/ui/BaseBadge.vue'
 import ProductForm from '@/components/products/ProductForm.vue'
 import ProductDetailModal from '@/components/products/ProductDetailModal.vue'
 import CommercialProfilesManager from '@/components/products/CommercialProfilesManager.vue'
+import { useSessionViewState } from '@/composables/useSessionViewState'
 
 import {
     CubeIcon,
@@ -216,7 +217,7 @@ function servesPeopleLabel(product: Product) {
     return `${product.servesPeopleMin}-${product.servesPeopleMax} personas`
 }
 
-const filters = ref({
+const filters = useSessionViewState('products:filters', {
     name: '',
     categoryId: undefined as number | undefined,
     active: undefined as boolean | undefined,
@@ -312,7 +313,7 @@ const closeProductDetail = () => {
 watch(
     () => route.query.detail,
     q => {
-        if (typeof q !== 'string') return
+        if (typeof q !== 'string') { detailOpen.value = false; detailProductId.value = null; return }
         const id = Number(q)
         if (!Number.isFinite(id) || id <= 0) return
         detailProductId.value = id
