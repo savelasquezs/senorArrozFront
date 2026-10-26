@@ -5,21 +5,10 @@
             <div class="flex flex-1 min-h-0 flex-col lg:flex-row">
                 <!-- Left Panel - Products and Categories -->
                 <div class="h-[35dvh] shrink-0 bg-white border-r border-gray-200 overflow-hidden flex flex-col min-h-0 lg:h-auto lg:flex-1">
-                    <!-- Categories Bar -->
-                    <div class="px-4 border-b border-gray-200 bg-gray-50">
-                        <CategoriesBar :rice-tabs="posTabs.rice" :other-tabs="posTabs.other"
-                            @category-selected="onCategorySelected" />
-                    </div>
-
-                    <!-- Products Grid -->
-                    <div class="flex-1 overflow-y-auto p-4">
-                        <div v-if="productsStore.catalogError" role="alert" class="mb-3 rounded-lg bg-amber-50 p-3 text-sm text-amber-900">
-                            {{ productsStore.catalogError }}
-                            <button type="button" class="ml-2 font-medium underline" @click="retryCatalog">Reintentar</button>
-                        </div>
-                        <ProductsGrid :products="ordersStore.filteredProducts"
-                            :loading="productsStore.catalogLoading && !productsStore.catalogProducts.length" />
-                    </div>
+                    <OrderProductCatalog v-model:search-query="ordersStore.searchQuery"
+                        v-model:selected-category-ids="ordersStore.selectedCategoryIds"
+                        :products="productsStore.catalogProducts" :categories="productCategoriesStore.catalogCategories"
+                        :loading="productsStore.catalogLoading" :error="productsStore.catalogError" @retry="retryCatalog" />
                 </div>
 
                 <!-- Right Panel - Order Sidebar -->
@@ -55,12 +44,10 @@ import { useProductsStore } from '@/store/products'
 import { useProductCategoriesStore } from '@/store/productCategories'
 import { useAuthStore } from '@/store/auth'
 import { bootstrapOrderCatalog } from '@/utils/orderCatalogBootstrap'
-import { buildOrderPosTabs } from '@/config/orderPosCategories'
 // Components
 import BaseLoading from '@/components/ui/BaseLoading.vue'
 import BaseAlert from '@/components/ui/BaseAlert.vue'
-import ProductsGrid from '@/components/orders/products/ProductGrid.vue'
-import CategoriesBar from '@/components/products/CategoriesBar.vue'
+import OrderProductCatalog from '@/components/orders/OrderProductCatalog.vue'
 import OrderSidebar from '@/components/orders/OrderSidebar.vue'
 // Toast is handled automatically by useToast composable
 
@@ -71,28 +58,6 @@ const productCategoriesStore = useProductCategoriesStore()
 const authStore = useAuthStore()
 const router = useRouter()
 const whatsappReturnConversationId = ref<number | null>(null)
-
-// Categorías transversales desde el store; respaldo por productos cargados en catálogo.
-const categories = computed(() => {
-    const fromCatalog = productCategoriesStore.catalogCategories
-    if (fromCatalog?.length) {
-        return fromCatalog.map((c) => ({ id: c.id, name: c.name }))
-    }
-    if (!productsStore.catalogProducts) return []
-
-    const categoryMap = new Map<number, { id: number; name: string }>()
-    productsStore.catalogProducts.forEach((product) => {
-        if (product.categoryId && !categoryMap.has(product.categoryId)) {
-            categoryMap.set(product.categoryId, {
-                id: product.categoryId,
-                name: product.categoryName || 'Sin categoría',
-            })
-        }
-    })
-    return Array.from(categoryMap.values())
-})
-
-const posTabs = computed(() => buildOrderPosTabs(categories.value))
 
 // Catálogo ya en bootstrap (login / layout); aquí solo sincronizamos draft con Pinia.
 const ensureOrderPageData = async () => {
@@ -109,11 +74,6 @@ const ensureOrderPageData = async () => {
 const catalogBranchId = computed(() => ordersStore.currentOrder?.branchId ?? ordersStore.activeBranchId)
 watch(catalogBranchId, branchId => { void productsStore.ensureCatalogLoaded(branchId).catch(() => {}) })
 function retryCatalog() { void productsStore.ensureCatalogLoaded(catalogBranchId.value, true).catch(() => {}) }
-
-const onCategorySelected = (_categoryId: number | null) => {
-    // Category selection is already handled by the CategoriesBar component
-    // through the ordersStore.setSelectedCategory method
-}
 
 const refreshTotals = () => {
     // Los totales ya se recalculan automáticamente en cada cambio

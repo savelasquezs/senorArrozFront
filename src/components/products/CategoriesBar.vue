@@ -50,6 +50,7 @@ const props = withDefaults(
     defineProps<{
         riceTabs?: OrderPosCategoryTab[]
         otherTabs?: OrderPosCategoryTab[]
+        selectedCategoryIds?: number[] | null
     }>(),
     {
         riceTabs: () => [],
@@ -59,11 +60,12 @@ const props = withDefaults(
 
 const emit = defineEmits<{
     categorySelected: [categoryId: number | null]
+    'update:selectedCategoryIds': [categoryIds: number[] | null]
 }>()
 
 const ordersStore = useOrdersDraftsStore()
 
-const selectedIds = computed(() => ordersStore.selectedCategoryIds)
+const selectedIds = computed(() => props.selectedCategoryIds === undefined ? ordersStore.selectedCategoryIds : props.selectedCategoryIds)
 
 const isAllSelected = computed(() => selectedIds.value === null)
 
@@ -71,12 +73,14 @@ const isTabActive = (ids: number[]) =>
     selectedIds.value !== null && sameCategoryIdSelection(selectedIds.value, ids)
 
 const selectTab = (categoryIds: number[]) => {
-    ordersStore.setSelectedCategoryIds(categoryIds)
+    if (props.selectedCategoryIds === undefined) ordersStore.setSelectedCategoryIds(categoryIds)
+    emit('update:selectedCategoryIds', categoryIds)
     emit('categorySelected', categoryIds.length === 1 ? categoryIds[0] : null)
 }
 
 const clearSelection = () => {
-    ordersStore.setSelectedCategoryIds(null)
+    if (props.selectedCategoryIds === undefined) ordersStore.setSelectedCategoryIds(null)
+    emit('update:selectedCategoryIds', null)
     emit('categorySelected', null)
 }
 </script>
