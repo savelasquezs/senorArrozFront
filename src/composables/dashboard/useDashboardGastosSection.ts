@@ -1,5 +1,6 @@
 import { ref, watch, computed, onScopeDispose, type Ref } from 'vue';
 import { dashboardApi } from '@/services/MainAPI/dashboardApi';
+import { createSectionSnapshot } from '@/helpers/sectionSnapshot';
 import { encodeDashboardRangeToApi } from '@/services/MainAPI/dashboardSectionApi';
 import type { DashboardSectionId } from '@/views/dashboard/dashboardSectionIds';
 import {
@@ -116,11 +117,18 @@ export function useDashboardGastosSection(
 	let seriesSeq = 0;
 	let topSeq = 0;
 	let lastCoreKey = '';
+	const coreSnapshot = createSectionSnapshot(), topSnapshot = createSectionSnapshot();
+	const controllers = new Map<string, AbortController>();
+	function startRequest(kind: string) {
+		controllers.get(kind)?.abort();
+		const controller = new AbortController(); controllers.set(kind, controller); return controller;
+	}
+	function stopRequests() { controllers.forEach(controller => controller.abort()); controllers.clear(); }
 	let rawSeries: GastosTimeSeriesPayload | null = null;
 	let rawSeriesKey = '';
 	const coreKey = () => `${branchId.value ?? 'all'}|${rangeKey(dateRange.value)}`;
 	const seriesKey = () => `${coreKey()}|${filterCategoryId.value ?? 'all'}|${filterExpenseId.value ?? 'all'}|${expenseTimeSeriesGranularity(timeGranularity.value) ?? 'auto'}`;
-	onScopeDispose(() => { coreSeq++; seriesSeq++; topSeq++; });
+	onScopeDispose(() => { coreSeq++; seriesSeq++; topSeq++; stopRequests(); });
 
 	watch(filterCategoryId, () => {
 		filterExpenseId.value = null;
@@ -128,6 +136,11 @@ export function useDashboardGastosSection(
 
 	async function loadCoreAndSeries() {
 		if (!isActive.value) return;
+		if (data.value && coreSnapshot.fresh(coreKey())) {
+			if (rawSeriesKey !== seriesKey()) await loadSeriesOnly();
+			return;
+		}
+		const controller = startRequest('core');
 		const seq = ++coreSeq;
 		seriesSeq++;
 		const key = coreKey();
@@ -144,15 +157,16 @@ export function useDashboardGastosSection(
 			const b = branchId.value;
 			const granOpt = expenseTimeSeriesGranularity(timeGranularity.value);
 			const [summaryRaw, catRaw, tsRaw] = await Promise.all([
-				dashboardApi.getExpenseSummary(b, from, to),
-				dashboardApi.getExpenseByCategory(b, from, to),
+				dashboardApi.getExpenseSummary(b, from, to, controller.signal),
+				dashboardApi.getExpenseByCategory(b, from, to, controller.signal),
 				dashboardApi.getExpenseTimeSeries(b, from, to, {
 					categoryId: filterCategoryId.value,
 					expenseId: filterExpenseId.value,
 					granularity: granOpt,
-				}),
+				}, controller.signal),
 			]);
 			if (seq !== coreSeq || !isActive.value) return;
+			coreSnapshot.loaded(key);
 			const seriesMatches = fetchedSeriesKey === seriesKey();
 			rawSeries = seriesMatches ? mapTimeSeries(tsRaw) : null;
 			rawSeriesKey = seriesMatches ? fetchedSeriesKey : '';
@@ -180,6 +194,7 @@ export function useDashboardGastosSection(
 
 	async function loadSeriesOnly() {
 		if (!isActive.value || !data.value) return;
+		const controller = startRequest('series');
 		const seq = ++seriesSeq;
 		const key = seriesKey();
 		seriesBusy.value = true;
@@ -190,7 +205,7 @@ export function useDashboardGastosSection(
 				categoryId: filterCategoryId.value,
 				expenseId: filterExpenseId.value,
 				granularity: granOpt,
-			});
+			}, controller.signal);
 			if (seq !== seriesSeq || key !== seriesKey() || !isActive.value) return;
 			if (!data.value) return;
 			rawSeries = mapTimeSeries(tsRaw);
@@ -211,16 +226,19 @@ export function useDashboardGastosSection(
 		if (!isActive.value) {
 			topSeq++;
 			topLinesLoading.value = false;
-			topLines.value = [];
 			return;
 		}
 		if (filterCategoryId.value == null) {
+			topSnapshot.invalidate();
 			topSeq++;
 			topLinesLoading.value = false;
 			topLines.value = [];
 			return;
 		}
 		const seq = ++topSeq;
+		const key = `${coreKey()}|${filterCategoryId.value}|${filterExpenseId.value}|${topLinesLimit.value}`;
+		if (topSnapshot.fresh(key)) return;
+		const controller = startRequest('top');
 		topLinesLoading.value = true;
 		try {
 			const { from, to } = encodeDashboardRangeToApi(dateRange.value);
@@ -228,8 +246,9 @@ export function useDashboardGastosSection(
 				categoryId: filterCategoryId.value,
 				expenseId: filterExpenseId.value,
 				limit: topLinesLimit.value,
-			});
+			}, controller.signal);
 			if (seq !== topSeq) return;
+			topSnapshot.loaded(key);
 			topLines.value = (raw.items ?? []).map((r) => ({
 				expenseId: r.expenseId,
 				expenseName: r.expenseName,
@@ -265,8 +284,8 @@ export function useDashboardGastosSection(
 		() => {
 			if (!isActive.value) {
 				coreSeq++; seriesSeq++; topSeq++;
+				stopRequests();
 				loading.value = false; seriesBusy.value = false; topLinesLoading.value = false;
-				data.value = null;
 				return;
 			}
 			void loadCoreAndSeries();

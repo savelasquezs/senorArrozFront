@@ -64,11 +64,29 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+	vi.restoreAllMocks();
 	scope?.stop();
 	scope = null;
 });
 
 describe('M29-F01 dashboard principal: última solicitud vigente', () => {
+	it('conserva la sección al volver dentro del TTL y revalida cuando vence', async () => {
+		const fetch = vi.mocked(fetchPrincipalDashboard).mockResolvedValue(principal(100));
+		const refs = state();
+		scope = effectScope();
+		const dashboard = scope.run(() => useDashboardPrincipalSection(refs.active, refs.branch, refs.range))!;
+		await flushPromises();
+		refs.active.value = 'ventas'; await nextTick();
+		expect(dashboard.data.value?.kpis.totalSales).toBe(100);
+		refs.active.value = 'principal'; await flushPromises();
+		expect(fetch).toHaveBeenCalledOnce();
+		const now = Date.now(); vi.spyOn(Date, 'now').mockReturnValue(now + 31_000);
+		refs.active.value = 'ventas'; await nextTick();
+		refs.active.value = 'principal'; await flushPromises();
+		expect(fetch).toHaveBeenCalledTimes(2);
+		refs.branch.value = 2; await flushPromises();
+		expect(fetch).toHaveBeenCalledTimes(3);
+	});
 	it('cancela la consulta anterior y no permite que los KPI viejos reemplacen los nuevos', async () => {
 		const first = deferred<PrincipalDashboardPayload>();
 		const second = deferred<PrincipalDashboardPayload>();
