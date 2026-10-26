@@ -114,3 +114,7 @@ export interface UpdateDeliverymanAdvanceDto {
     notes?: string
 }
 
+
+export type DeliveryMapOrder = Pick<import('./order').OrderListItem,
+    'id' | 'deliveryManId' | 'deliveryRouteId' | 'type' | 'status' | 'statusDisplayName' |
+    'customerName' | 'guestName' | 'addressDescription' | 'addressAdditionalInfo' | 'latitude' | 'longitude'>
