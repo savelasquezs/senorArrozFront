@@ -78,6 +78,34 @@ describe('customers store', () => {
         vi.clearAllMocks()
     })
 
+    it('shares identical reads and ignores an older list after deletion', async () => {
+        const store = useCustomersStore()
+        store.list = { items: [makeCustomer()], totalCount: 1 } as PagedResult<Customer>
+        let resolve!: (value: any) => void
+        customerApiMock.getCustomers.mockImplementationOnce(() => new Promise(r => { resolve = r }))
+        customerApiMock.deleteCustomer.mockResolvedValue({})
+        const first = store.fetch({ page: 1 })
+        const second = store.fetch({ page: 1 })
+        expect(customerApiMock.getCustomers).toHaveBeenCalledTimes(1)
+        await store.remove(1)
+        resolve({ data: { items: [makeCustomer()], totalCount: 1 } })
+        await Promise.all([first, second])
+        expect(store.list?.items).toEqual([])
+        expect(store.isLoading).toBe(false)
+    })
+
+    it('publishes only the newest customer detail', async () => {
+        const store = useCustomersStore()
+        let resolve!: (value: any) => void
+        customerApiMock.getCustomerById.mockImplementationOnce(() => new Promise(r => { resolve = r }))
+            .mockResolvedValueOnce({ data: makeCustomer({ id: 2 }) })
+        const first = store.fetchById(1)
+        await store.fetchById(2)
+        resolve({ data: makeCustomer({ id: 1 }) })
+        await first
+        expect(store.current?.id).toBe(2)
+    })
+
     it('fetches and stores the customer list', async () => {
         const store = useCustomersStore()
         const payload: PagedResult<Customer> = {

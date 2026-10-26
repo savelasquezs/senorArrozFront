@@ -38,8 +38,8 @@ class CustomerApi extends BaseApi {
         });
     }
 
-    async getCustomerById(id: number): Promise<ApiResponse<Customer>> {
-        return this.get<ApiResponse<Customer>>(`/customers/${id}`);
+    async getCustomerById(id: number, signal?: AbortSignal): Promise<ApiResponse<Customer>> {
+        return this.get<ApiResponse<Customer>>(`/customers/${id}`, { signal });
     }
 
     async getCustomerByPhone(phone: string): Promise<ApiResponse<Customer>> {
@@ -60,13 +60,13 @@ class CustomerApi extends BaseApi {
     }
 
     async deleteCustomer(id: number): Promise<ApiResponse<string>> {
-        return this.delete<ApiResponse<string>>(`/customers/${id}`);
+        return this.delete<ApiResponse<string>>(`/customers/${id}`, { signal });
     }
 
     async getCustomerAddresses(
-        customerId: number
+        customerId: number, signal?: AbortSignal
     ): Promise<ApiResponse<CustomerAddress[]>> {
-        return this.get<ApiResponse<CustomerAddress[]>>(`/customers/${customerId}/addresses`);
+        return this.get<ApiResponse<CustomerAddress[]>>(`/customers/${customerId}/addresses`, { signal });
     }
 
     async getCustomerAddressById(

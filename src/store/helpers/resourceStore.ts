@@ -10,6 +10,7 @@ export type ResourceActionOptions = {
 export function createResourceState() {
     const isLoading = ref(false)
     const error = ref<string | null>(null)
+    let loadingCount = 0
 
     const run = async <T>(
         task: () => Promise<T>,
@@ -17,11 +18,13 @@ export function createResourceState() {
     ): Promise<T> => {
         try {
             if (!options?.silent) {
+                loadingCount++
                 isLoading.value = true
             }
             error.value = null
             return await task()
         } catch (err: unknown) {
+            if ((err as { code?: string })?.code === 'ERR_CANCELED') throw err
             error.value =
                 err instanceof Error
                     ? err.message
@@ -29,7 +32,8 @@ export function createResourceState() {
             throw err
         } finally {
             if (!options?.silent) {
-                isLoading.value = false
+                loadingCount--
+                isLoading.value = loadingCount > 0
             }
         }
     }

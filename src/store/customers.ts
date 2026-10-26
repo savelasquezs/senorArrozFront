@@ -1,5 +1,8 @@
 import { defineStore } from 'pinia';
-import { computed, ref } from 'vue';
+import { createLatestRead } from '@/helpers/latestRead';
+import { useAuthStore } from '@/store/auth';
+import { useBranchContextStore } from '@/store/branchContext';
+import { computed, ref, watch } from 'vue';
 import { customerApi } from '@/services/MainAPI/customerApi';
 import type {
     Customer,
@@ -20,17 +23,17 @@ import {
     type ResourceActionOptions,
 } from './helpers/resourceStore';
 
-let neighborhoodsLoadInFlight: Promise<void> | null = null;
-let neighborhoodsLoadInFlightKey: string | null = null;
-let neighborhoodsLoadedKey: string | null = null;
-let latestNeighborhoodsRequestKey: string | null = null;
-
 const neighborhoodsKey = (branchId?: number | null, forOrderAddress = false) =>
     `${branchId && branchId > 0 ? branchId : 'default'}:${forOrderAddress ? 'order' : 'regular'}`;
 
 type FetchOpts = ResourceActionOptions;
 
 export const useCustomersStore = defineStore('customers', () => {
+    let neighborhoodsLoadInFlight: Promise<void> | null = null;
+    let neighborhoodsLoadInFlightKey: string | null = null;
+    let neighborhoodsLoadedKey: string | null = null;
+    let latestNeighborhoodsRequestKey: string | null = null;
+    let neighborhoodsVersion = 0;
     const list = ref<PagedResult<Customer> | null>(null);
     const current = ref<Customer | null>(null);
     const addresses = ref<CustomerAddress[]>([]);
@@ -40,17 +43,19 @@ export const useCustomersStore = defineStore('customers', () => {
     const currentAddresses = computed(() => addresses.value);
     const availableNeighborhoods = computed(() => neighborhoods.value);
 
+    const listRead = createLatestRead();
+    const detailRead = createLatestRead();
+    const addressesRead = createLatestRead();
+
     const fetch = async (filters?: CustomerFilters, opts?: FetchOpts) => {
         await run(async () => {
-            const res = await customerApi.getCustomers(filters);
-            list.value = res.data;
+            await listRead.load(JSON.stringify(filters ?? {}), signal => customerApi.getCustomers(filters, signal), res => { list.value = res.data; });
         }, { ...opts, errorMessage: 'Error al cargar clientes' });
     };
 
     const fetchById = async (id: number, opts?: FetchOpts) => {
         await run(async () => {
-            const res = await customerApi.getCustomerById(id);
-            current.value = res.data;
+            await detailRead.load(String(id), signal => customerApi.getCustomerById(id, signal), res => { current.value = res.data; });
         }, { ...opts, errorMessage: 'Error al cargar el cliente' });
     };
 
@@ -72,6 +77,7 @@ export const useCustomersStore = defineStore('customers', () => {
     };
 
     const create = async (payload: CreateCustomerDto, opts?: FetchOpts) => {
+        listRead.invalidate();
         return run(async () => {
             const res = await customerApi.createCustomer(payload);
             prependPagedItem(list, res.data);
@@ -80,6 +86,8 @@ export const useCustomersStore = defineStore('customers', () => {
     };
 
     const update = async (id: number, payload: UpdateCustomerDto, opts?: FetchOpts) => {
+        listRead.invalidate();
+        detailRead.invalidate();
         return run(async () => {
             const res = await customerApi.updateCustomer(id, payload);
             current.value = res.data;
@@ -89,6 +97,8 @@ export const useCustomersStore = defineStore('customers', () => {
     };
 
     const remove = async (id: number, opts?: FetchOpts) => {
+        listRead.invalidate();
+        detailRead.invalidate();
         await run(async () => {
             await customerApi.deleteCustomer(id);
             removePagedItem(list, id);
@@ -101,8 +111,7 @@ export const useCustomersStore = defineStore('customers', () => {
 
     const fetchAddresses = async (customerId: number, opts?: FetchOpts) => {
         await run(async () => {
-            const res = await customerApi.getCustomerAddresses(customerId);
-            addresses.value = res.data;
+            await addressesRead.load(String(customerId), signal => customerApi.getCustomerAddresses(customerId, signal), res => { addresses.value = res.data; });
         }, { ...opts, errorMessage: 'Error al cargar direcciones' });
     };
 
@@ -114,6 +123,7 @@ export const useCustomersStore = defineStore('customers', () => {
     };
 
     const createAddress = async (customerId: number, payload: CreateCustomerAddressDto, opts?: FetchOpts) => {
+        addressesRead.invalidate();
         return run(async () => {
             const res = await customerApi.createCustomerAddress(customerId, payload);
             addresses.value.push(res.data);
@@ -122,6 +132,7 @@ export const useCustomersStore = defineStore('customers', () => {
     };
 
     const updateAddress = async (customerId: number, addressId: number, payload: UpdateCustomerAddressDto, opts?: FetchOpts) => {
+        addressesRead.invalidate();
         return run(async () => {
             const res = await customerApi.updateCustomerAddress(customerId, addressId, payload);
             const index = addresses.value.findIndex(addr => addr.id === addressId);
@@ -133,6 +144,7 @@ export const useCustomersStore = defineStore('customers', () => {
     };
 
     const removeAddress = async (customerId: number, addressId: number, opts?: FetchOpts) => {
+        addressesRead.invalidate();
         await run(async () => {
             await customerApi.deleteCustomerAddress(customerId, addressId);
             addresses.value = addresses.value.filter(addr => addr.id !== addressId);
@@ -140,6 +152,7 @@ export const useCustomersStore = defineStore('customers', () => {
     };
 
     const setPrimaryAddress = async (customerId: number, addressId: number, opts?: FetchOpts) => {
+        addressesRead.invalidate();
         return run(async () => {
             const res = await customerApi.setPrimaryAddress(customerId, addressId);
             const addressIndex = addresses.value.findIndex(addr => addr.id === addressId);
@@ -161,9 +174,10 @@ export const useCustomersStore = defineStore('customers', () => {
         const normalizedBranchId = branchId && branchId > 0 ? branchId : null;
         const requestKey = neighborhoodsKey(normalizedBranchId, forOrderAddress);
         latestNeighborhoodsRequestKey = requestKey;
+        const version = ++neighborhoodsVersion;
         await run(async () => {
             const res = await customerApi.getNeighborhoods(normalizedBranchId ?? undefined, forOrderAddress);
-            if (latestNeighborhoodsRequestKey !== requestKey) return;
+            if (latestNeighborhoodsRequestKey !== requestKey || version !== neighborhoodsVersion) return;
             neighborhoods.value = res.data;
             neighborhoodsLoadedKey = requestKey;
         }, { ...opts, errorMessage: 'Error al cargar barrios' });
@@ -233,12 +247,15 @@ export const useCustomersStore = defineStore('customers', () => {
     };
 
     const clear = () => {
+        detailRead.invalidate(); addressesRead.invalidate();
         current.value = null;
         addresses.value = [];
         clearError();
     };
 
     const clearList = () => {
+        listRead.invalidate();
+        neighborhoodsVersion++;
         list.value = null;
         neighborhoods.value = [];
         neighborhoodsLoadedKey = null;
@@ -247,6 +264,10 @@ export const useCustomersStore = defineStore('customers', () => {
         latestNeighborhoodsRequestKey = null;
         clearError();
     };
+
+    const auth = useAuthStore();
+    const branches = useBranchContextStore();
+    watch(() => [auth.user?.id, auth.user?.role, branches.revision], () => { clear(); clearList(); }, { flush: 'sync' });
 
     return {
         list,
