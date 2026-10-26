@@ -38,6 +38,11 @@ describe('authenticated navigation', () => {
         expect(counters.shells).toBe(1)
         expect(counters.customers).toBe(4)
         expect(counters.products).toBe(3)
+        window.dispatchEvent(new CustomEvent('senor-arroz:chunk-recovery', { detail: { target: '/products' } }))
+        await flushPromises()
+        expect(wrapper.get('[role="alert"]').text()).toContain('Recargar y abrir')
+        expect(wrapper.get('[role="alert"]').text()).toContain('Seguir aquí')
+        expect(counters.shells).toBe(1)
         scope.revision++
         await flushPromises()
         expect(counters.shells).toBe(2)

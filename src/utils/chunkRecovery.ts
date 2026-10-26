@@ -1,5 +1,7 @@
 const CHUNK_RELOAD_KEY = 'senor-arroz:chunk-reload-at'
 const CHUNK_RELOAD_COOLDOWN_MS = 30_000
+export const CHUNK_RECOVERY_EVENT = 'senor-arroz:chunk-recovery'
+let memoryReloadAt = 0
 
 const CHUNK_ERROR_PATTERNS = [
     /failed to fetch dynamically imported module/i,
@@ -30,12 +32,14 @@ export function recoverFromStaleChunk(
 ): boolean {
     if (error !== undefined && !isStaleChunkError(error)) return false
 
-    const lastReloadAt = Number(sessionStorage.getItem(CHUNK_RELOAD_KEY) || '0')
+    let lastReloadAt = memoryReloadAt
+    try { lastReloadAt = Number(sessionStorage.getItem(CHUNK_RELOAD_KEY) || '0') } catch {}
     if (Number.isFinite(lastReloadAt) && now - lastReloadAt < CHUNK_RELOAD_COOLDOWN_MS) {
         return false
     }
 
-    sessionStorage.setItem(CHUNK_RELOAD_KEY, String(now))
+    memoryReloadAt = now
+    try { sessionStorage.setItem(CHUNK_RELOAD_KEY, String(now)) } catch {}
     reload()
     return true
 }

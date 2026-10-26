@@ -3,24 +3,30 @@ import router from './router'
 import { createPinia } from 'pinia'
 import './style.css'
 import App from './App.vue'
-import { recoverFromStaleChunk } from '@/utils/chunkRecovery'
+import { CHUNK_RECOVERY_EVENT, isStaleChunkError, recoverFromStaleChunk } from '@/utils/chunkRecovery'
+
+function offerChunkRecovery(error: unknown, target = window.location.pathname + window.location.search) {
+    if (error !== undefined && !isStaleChunkError(error)) return false
+    window.dispatchEvent(new CustomEvent(CHUNK_RECOVERY_EVENT, { detail: { target } }))
+    return recoverFromStaleChunk(error, () => {})
+}
 
 // Vite emits this event when a lazy-loaded asset can no longer be fetched,
 // commonly because the browser still has an older deployment open.
 window.addEventListener('vite:preloadError', (event) => {
-    event.preventDefault()
-    recoverFromStaleChunk()
+    const payload = (event as Event & { payload?: unknown }).payload
+    if (offerChunkRecovery(payload)) event.preventDefault()
 })
 
-router.onError((error) => {
-    if (recoverFromStaleChunk(error)) return
+router.onError((error, to) => {
+    if (offerChunkRecovery(error, to.fullPath)) return
     console.error('Router error:', error)
 })
 
 // Global error handler for unhandled promise rejections and errors.
 // Do not suppress unrelated errors: they must stay visible for diagnosis.
 window.addEventListener('unhandledrejection', (event) => {
-    if (recoverFromStaleChunk(event.reason)) {
+    if (offerChunkRecovery(event.reason)) {
         event.preventDefault()
         return
     }
