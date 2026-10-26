@@ -328,7 +328,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
+import { createSerialRefresh } from '@/utils/serialRefresh'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/store/auth'
 import { useDeliveryStore } from '@/store/delivery'
@@ -473,7 +474,8 @@ const historyModalBranchTabs = computed((): DeliverymanHistoryBranchSummary[] =>
 const analyticsDateRange = ref<[Date, Date]>(defaultDateRangeToday())
 const analyticsBranchId = ref<number | null>(null)
 const analyticsDriverId = ref<number | 'all'>('all')
-const deliveryAnalytics = useDeliverySelfAnalytics(analyticsDateRange, analyticsBranchId)
+const deliveryAnalytics = useDeliverySelfAnalytics(analyticsDateRange, analyticsBranchId,
+    computed(() => authStore.isDeliveryman && activeTab.value === 'analytics'))
 const deliveryAnalyticsLoading = deliveryAnalytics.loading
 const deliveryAnalyticsError = deliveryAnalytics.error
 const deliveryAnalyticsResolved = deliveryAnalytics.resolvedPayload
@@ -489,16 +491,18 @@ function onAnalyticsBranchChange(e: Event) {
 
 // ─── Carga de datos ───────────────────────────────────────────
 
-const loadAvailableOrders = async () => {
+const availableRefresh = createSerialRefresh(async context => {
     try {
         isLoading.value = true
-        await deliveryStore.loadAvailableOrders(authStore.user?.branchId)
+        await deliveryStore.loadAvailableOrders(authStore.user?.branchId, context)
     } catch (err: any) {
-        error('Error al cargar pedidos disponibles', err.message)
+        if (context.isCurrent()) error('Error al cargar pedidos disponibles', err.message)
     } finally {
-        isLoading.value = false
+        if (context.isCurrent()) isLoading.value = false
     }
-}
+})
+const loadAvailableOrders = () => availableRefresh.request(true)
+onUnmounted(() => availableRefresh.dispose())
 
 const loadPreparationOrders = async () => {
     try {
@@ -781,7 +785,7 @@ watch(activeTab, async (newTab) => {
     } else if (newTab === 'preparation') {
         await loadPreparationOrders()
     } else if (newTab === 'analytics') {
-        await deliveryAnalytics.refresh()
+        if (authStore.isDeliveryman && authStore.user?.id) await deliveryStore.loadHistoryBranchSummaries(authStore.user.id)
     } else if (newTab === 'routing') {
         await loadRoutingPlan()
     }
@@ -809,21 +813,13 @@ onMounted(async () => {
         return
     }
 
-    await loadFcmTestBranches()
-    await loadAvailableOrders()
-    await loadRouteAssigned()
-    // Precarga conteo/lista del día para el badge "Mi historial" (mismo rango que el modal)
-    if (authStore.user?.id) {
-        try {
-            await deliveryStore.loadHistory(authStore.user.id, userBranchId(), true)
-        } catch {
-            /* badge sin datos si falla */
-        }
-    }
     on('OrderReady', handleOrderReady)
     on('OrderAssigned', handleOrderAssigned)
     on('OrderModified', handleOrderModifiedSignalR)
     on('DeliveryRoutingPlanChanged', () => loadRoutingPlan())
     on('RouteProposalClaimed', () => loadRoutingPlan())
+    void loadFcmTestBranches()
+    if (authStore.isDeliveryman && authStore.user?.id) void deliveryStore.loadHistoryBranchSummaries(authStore.user.id).catch(() => {})
+    await Promise.all([loadAvailableOrders(), loadRouteAssigned()])
 })
 </script>
