@@ -99,8 +99,8 @@ class WhatsAppApi extends BaseApi {
     return this.put<ApiResponse<WhatsAppConversation>>(`/whatsapp/conversations/${conversationId}/operational-branch`, { branchId })
   }
 
-  getMessages(conversationId: number): Promise<ApiResponse<WhatsAppMessage[]>> {
-    return this.get<ApiResponse<WhatsAppMessage[]>>(`/whatsapp/conversations/${conversationId}/messages`)
+  getMessages(conversationId: number, signal?: AbortSignal): Promise<ApiResponse<WhatsAppMessage[]>> {
+    return this.get<ApiResponse<WhatsAppMessage[]>>(`/whatsapp/conversations/${conversationId}/messages`, { signal })
   }
   getOrderDraft(conversationId: number): Promise<ApiResponse<WhatsAppOrderDraft>> {
     return this.get<ApiResponse<WhatsAppOrderDraft>>(`/whatsapp/conversations/${conversationId}/order-draft`)
