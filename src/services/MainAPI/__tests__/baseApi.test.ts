@@ -126,6 +126,15 @@ describe('BaseApi interceptors', () => {
         )
     })
 
+    it.each(['get', 'post', 'put', 'patch', 'delete'] as const)('preserves cancellation identity for %s', async method => {
+        const api = new TestApi()
+        const canceled = Object.assign(new Error('request canceled'), { code: 'ERR_CANCELED', __CANCEL__: true })
+        axiosInstanceMock[method].mockRejectedValue(canceled)
+
+        await expect(api[method]('/orders')).rejects.toBe(canceled)
+        expect(refreshAccessTokenMock).not.toHaveBeenCalled()
+    })
+
     it('shows populated validation errors before the generic API message', async () => {
         const api = new TestApi()
         axiosInstanceMock.get.mockRejectedValue({

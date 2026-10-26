@@ -126,6 +126,7 @@ export class BaseApi {
 	}
 
 	protected handleError(error: any): Error {
+		if (error?.code === 'ERR_CANCELED' || error?.__CANCEL__ === true) return error;
 		if (error.code === 'ECONNABORTED' || /timeout/i.test(String(error.message ?? ''))) {
 			return new Error(
 				'El servidor o proveedor externo tardó demasiado en responder. Intenta de nuevo y revisa el estado del servicio.'
