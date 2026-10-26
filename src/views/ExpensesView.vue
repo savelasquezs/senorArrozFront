@@ -351,14 +351,6 @@ watch(listScopeKey, () => {
     void fetchExpenses()
 }, { flush: 'post' })
 
-function syncDatesFromPresetAndFetch() {
-    const r = presetToExpenseApiDateRange(presetId.value, new Date(), customRange.value)
-    dateFilters.value = { fromDate: r.fromDate, toDate: r.toDate }
-    currentPage.value = 1
-    debouncedFetchExpenses.cancel()
-    void fetchExpenses()
-}
-
 function onPresetIdChange(id: DashboardPeriodPresetId) {
     if (id !== 'custom') {
         customRange.value = null
@@ -469,7 +461,15 @@ const clearFilters = () => {
     }
     presetId.value = 'today'
     customRange.value = null
-    syncDatesFromPresetAndFetch()
+    const range = presetToExpenseApiDateRange('today', new Date(), null)
+    dateFilters.value = { fromDate: range.fromDate, toDate: range.toDate }
+    currentPage.value = 1
+    // Let the post-flush filter watcher run first, then cancel a possible text
+    // debounce. A categorical watcher fetch already in flight is deduplicated.
+    void nextTick().then(() => {
+        debouncedFetchExpenses.cancel()
+        return fetchExpenses()
+    })
 }
 
 const changePage = (page: number) => {
