@@ -620,6 +620,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
+import { useSessionViewState } from '@/composables/useSessionViewState'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/store/auth'
 import { useBranchContextStore } from '@/store/branchContext'
@@ -805,8 +806,7 @@ async function activateTab(tab: TabValue) {
     transferVerificationBankId.value = null
     pendingUpdates.value = false
     if (tab === 'reservations') { void fetchReservations({ background: reservations.value.length > 0 }); return }
-    await loadWorkspaceOptions()
-    await fetchOrdersWithDeliverymen()
+    await Promise.all([loadWorkspaceOptions(), fetchOrdersWithDeliverymen()])
 }
 
 async function switchTab(tab: TabValue) {
@@ -829,14 +829,14 @@ const { formatCurrency } = useFormatting()
 const loading = ref(false)
 const orders = ref<OrderListItem[]>([])
 const totalCount = ref(0)
-const currentPage = ref(1)
-const pageSize = ref(100)
-const sortBy = ref<'id' | 'total' | 'createdAt'>('id')
-const sortOrder = ref<'asc' | 'desc'>('desc')
+const currentPage = useSessionViewState('orders:page', 1)
+const pageSize = useSessionViewState('orders:pageSize', 100)
+const sortBy = useSessionViewState<'id' | 'total' | 'createdAt'>('orders:sortBy', 'id')
+const sortOrder = useSessionViewState<'asc' | 'desc'>('orders:sortOrder', 'desc')
 const showAdvancedFilters = ref(false)
 
 // Filtros
-const filters = ref<OrderFilterState>({
+const filters = useSessionViewState<OrderFilterState>('orders:filters', {
     totalQuery: '',
     search: '',
     type: null,
@@ -859,7 +859,7 @@ const groupByRoute = ref(false)
 
 const datePresetId = ref<DashboardPeriodPresetId>('today')
 const customDateRange = ref<[Date, Date] | null>(null)
-const dateFilters = ref({
+const dateFilters = useSessionViewState('orders:dates', {
     fromDate: todayYmd(),
     toDate: todayYmd(),
 })
@@ -1229,15 +1229,24 @@ const toggleAdvancedFilters = () => {
 // Métodos
 let lastOrdersFetchedAt = 0
 const inFlightOrderSearches = new Map<string, ReturnType<typeof orderApi.searchOrders>>()
+const searchControllers = new Map<string, AbortController>()
+const deliverymenOptionsRequests = new Map<string, ReturnType<typeof orderApi.getDeliverymanOptions>>()
 function searchOrdersOnce(scope: TabValue, body: Record<string, unknown>) {
     // Coalesce equal queries (initial load + reconnect) without deduplicating
     // the separate deliverymen search that keeps the full driver filter updated.
     const key = JSON.stringify([workspaceBranchId.value, scope, body])
     const pending = inFlightOrderSearches.get(key)
     if (pending) return pending
-    const request = orderApi.searchOrders(body)
+    for (const [otherKey, controller] of searchControllers) {
+        if (otherKey !== key) { controller.abort(); searchControllers.delete(otherKey) }
+    }
+    const controller = new AbortController()
+    searchControllers.set(key, controller)
+    const request = orderApi.searchOrders(body, controller.signal)
     inFlightOrderSearches.set(key, request)
-    const clear = () => { if (inFlightOrderSearches.get(key) === request) inFlightOrderSearches.delete(key) }
+    const clear = () => {
+        if (inFlightOrderSearches.get(key) === request) { inFlightOrderSearches.delete(key); searchControllers.delete(key) }
+    }
     void request.then(clear, clear)
     return request
 }
@@ -1303,6 +1312,7 @@ const fetchOrders = async (options: { background?: boolean } = {}): Promise<Orde
 }
 
 const onOrdersTextFilterInput = () => {
+    ordersRequest++
     currentPage.value = 1
     debouncedRefetchOrders.schedule()
 }
@@ -1345,23 +1355,6 @@ const onDateFiltersChange = () => {
     void fetchOrders()
 }
 
-const buildDeliverymenInRangeSearchBody = (page: number, pageSizeValue: number) =>
-    buildOrderSearchBody({
-        page,
-        pageSize: pageSizeValue,
-        sortBy: 'createdAt',
-        sortOrder: 'desc',
-        excludeFutureReservations: remoteBranchId.value == null,
-        remoteOnly: remoteBranchId.value != null,
-        branchId: remoteBranchId.value ?? undefined,
-        fromDate: dateFilters.value.fromDate || undefined,
-        toDate: dateFilters.value.toDate || undefined,
-        search: '',
-        totalQuery: '',
-        type: 'delivery',
-        status: null,
-    })
-
 const loadDeliverymenInRange = async (mainPage: OrdersSearchSnapshot | null = null) => {
     if (remoteBranchId.value != null && !remoteBranches.value.some(b => b.id === remoteBranchId.value)) {
         deliverymenInRange.value = []
@@ -1381,30 +1374,19 @@ const loadDeliverymenInRange = async (mainPage: OrdersSearchSnapshot | null = nu
             deliverymenInRange.value = completeOptions
             return
         }
-        const pageSizeValue = 200
-        let page = 1
-        let totalPagesCount = 1
-        const unique = new Map<number, string>()
-
-        while (page <= totalPagesCount) {
-            const response = await searchOrdersOnce(scope, buildDeliverymenInRangeSearchBody(page, pageSizeValue))
-            if (request !== deliverymenRequest || scope !== activeTab.value) return
-
-            for (const order of response.items) {
-                if (order.deliveryManId == null) continue
-                const label = order.deliveryManName?.trim() || `Domiciliario #${order.deliveryManId}`
-                if (!unique.has(order.deliveryManId)) {
-                    unique.set(order.deliveryManId, label)
-                }
-            }
-
-            totalPagesCount = Math.max(1, Math.ceil(response.totalCount / pageSizeValue))
-            page += 1
+        const params = { fromDate: dateFilters.value.fromDate || undefined, toDate: dateFilters.value.toDate || undefined,
+            branchId: remoteBranchId.value ?? undefined, remoteOnly: remoteBranchId.value != null }
+        const key = JSON.stringify([workspaceBranchId.value, params])
+        let pending = deliverymenOptionsRequests.get(key)
+        if (!pending) {
+            pending = orderApi.getDeliverymanOptions(params)
+            deliverymenOptionsRequests.set(key, pending)
+            const clear = () => { if (deliverymenOptionsRequests.get(key) === pending) deliverymenOptionsRequests.delete(key) }
+            void pending.then(clear, clear)
         }
-
-        deliverymenInRange.value = [...unique.entries()]
-            .map(([value, label]) => ({ value, label }))
-            .sort((a, b) => a.label.localeCompare(b.label))
+        const options = await pending
+        if (request !== deliverymenRequest || scope !== activeTab.value) return
+        deliverymenInRange.value = options
 
         if (
             deliveryManFilterId.value != null &&
@@ -2644,18 +2626,24 @@ async function retryRemoteWorkspace() {
 }
 onMounted(async () => {
     mounted = true
+    const destinations = loadRemoteBranches()
+    const rows = remoteBranchId.value == null ? fetchOrdersWithDeliverymen()
+        : destinations.then(() => fetchOrdersWithDeliverymen())
     await Promise.allSettled([
         // Same branch scope as MainLayout/bootstrapOrderCatalog: share the
         // existing in-flight requests instead of fetching banks/apps twice.
         banksStore.ensureListLoaded(workspaceBranchId.value),
         appsStore.ensureListLoaded(workspaceBranchId.value),
-        loadRemoteBranches(),
+        destinations, rows,
     ])
     await loadWorkspaceOptions()
-    await fetchOrdersWithDeliverymen()
 })
 onUnmounted(() => {
     mounted = false
+    searchControllers.forEach(controller => controller.abort())
+    searchControllers.clear()
+    inFlightOrderSearches.clear()
+    deliverymenOptionsRequests.clear()
     ordersRequest++; deliverymenRequest++; reservationsRequest++; branchOptionsRequest++; branchesRequest++
     debouncedRefetchOrders.cancel()
     debouncedRefetchReservations.cancel()
