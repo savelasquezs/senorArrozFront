@@ -222,8 +222,13 @@ class OrderApi extends BaseApi {
     }
 
     // 20. Buscar pedidos con filtros avanzados (para historial)
-    async searchOrders(filters: any): Promise<PagedResult<OrderListItem>> {
-        return this.post<PagedResult<OrderListItem>>('/orders/search', filters);
+    async searchOrders(filters: any, signal?: AbortSignal): Promise<PagedResult<OrderListItem>> {
+        return this.post<PagedResult<OrderListItem>>('/orders/search', filters, { signal });
+    }
+
+    getDeliverymanOptions(params: { fromDate?: string; toDate?: string; branchId?: number; remoteOnly?: boolean }, signal?: AbortSignal) {
+        return this.get<Array<{ id: number; name: string }>>('/orders/deliveryman-options', { params, signal })
+            .then(items => items.map(item => ({ value: item.id, label: item.name })));
     }
 
     // 21. Obtener pedidos asignados a un domiciliario (opcional: FromDate/ToDate yyyy-MM-DD para filtrar por CreatedAt)

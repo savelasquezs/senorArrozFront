@@ -9,7 +9,7 @@ import EditCustomerModal from '@/components/orders/EditCustomerModal.vue'
 import BaseSelect from '@/components/ui/BaseSelect.vue'
 
 const mocks = vi.hoisted(() => ({
-    search: vi.fn(), branches: vi.fn(), options: vi.fn(), payment: vi.fn(), toast: vi.fn(), replace: vi.fn(),
+    search: vi.fn(), deliverymen: vi.fn(), branches: vi.fn(), options: vi.fn(), payment: vi.fn(), toast: vi.fn(), replace: vi.fn(),
     changes: {
         changed: null as null | ((event: any) => void),
         resume: null as null | (() => void),
@@ -24,7 +24,7 @@ vi.mock('@/store/auth', () => ({ useAuthStore: () => ({ get userRole() { return 
 vi.mock('@/store/branchContext', () => ({ useBranchContextStore: () => ({ selectedBranchId: 1 }) }))
 vi.mock('@/store/banks', () => ({ useBanksStore: () => ({ list: { items: localBanks }, ensureListLoaded: mocks.banksLoaded }) }))
 vi.mock('@/store/apps', () => ({ useAppsStore: () => ({ list: { items: [] }, ensureListLoaded: mocks.appsLoaded }) }))
-vi.mock('@/services/MainAPI/orderApi', () => ({ orderApi: { searchOrders: mocks.search } }))
+vi.mock('@/services/MainAPI/orderApi', () => ({ orderApi: { searchOrders: mocks.search, getDeliverymanOptions: mocks.deliverymen } }))
 vi.mock('@/services/MainAPI/orderManagementApi', () => ({ orderManagementApi: { remoteBranches: mocks.branches, options: mocks.options } }))
 vi.mock('@/services/MainAPI/bankPaymentApi', () => ({ bankPaymentApi: { createBankPayment: mocks.payment } }))
 vi.mock('@/composables/useToast', () => ({ useToast: () => ({ success: vi.fn(), error: mocks.toast }) }))
@@ -60,12 +60,29 @@ beforeEach(() => {
     mocks.branches.mockResolvedValue([{ id: 2, name: 'Manrique', sampleOrderId: 20 }])
     mocks.options.mockResolvedValue({ branchId: 2, branchName: 'Manrique', banks: [{ id: 202, name: 'Banco Destino', active: true }], apps: [], deliverymen: [], maxFreeDeliveryDiscount: 3000 })
     mocks.search.mockImplementation(async body => paged(body.remoteOnly ? [remote] : [local]))
+    mocks.deliverymen.mockResolvedValue([{ value: 17, label: 'Kevin' }])
     mocks.payment.mockResolvedValue({ id: 500, bankId: 202, orderId: 20, amount: 30000 })
     mocks.replace.mockImplementation(async ({ query }) => { state.query = query })
 })
 afterEach(() => { wrapper?.unmount(); vi.useRealTimers() })
 
 describe('remote order workspaces', () => {
+    it('shows local rows while bank options are still pending', async () => {
+        mocks.banksLoaded.mockReturnValueOnce(new Promise(() => {}))
+        mountView(); await flushPromises()
+        expect(mocks.search).toHaveBeenCalledOnce()
+        expect(wrapper.findComponent(OrdersTable).props('orders')).toEqual([local])
+    })
+
+    it('aborts the table transport when its owner unmounts', async () => {
+        mocks.search.mockReturnValueOnce(new Promise(() => {}))
+        mountView(); await flushPromises()
+        const signal = mocks.search.mock.calls[0]![1] as AbortSignal
+        expect(signal.aborted).toBe(false)
+        wrapper.unmount()
+        expect(signal.aborted).toBe(true)
+    })
+
     it('makes only one orders/search call per complete local and remote tab', async () => {
         const withDriver = (o: typeof local) => ({
             ...o, deliveryManId: 17, deliveryManName: 'Kevin',
@@ -83,32 +100,31 @@ describe('remote order workspaces', () => {
         expect(mocks.search).toHaveBeenCalledTimes(3)
     })
 
-    it('keeps the exhaustive deliveryman query if the main page is incomplete', async () => {
+    it('uses projected deliverymen without downloading all order pages', async () => {
         mocks.search.mockImplementation(async body => body.type === 'delivery'
             ? paged([{ ...local, deliveryManId: 17, deliveryManName: 'Kevin' }])
             : { ...paged([local]), totalCount: 150 })
         mountView(); await flushPromises()
-        expect(mocks.search).toHaveBeenCalledTimes(2)
-        expect(mocks.search.mock.calls.filter(([body]) => body.type === 'delivery')).toHaveLength(1)
+        expect(mocks.search).toHaveBeenCalledTimes(1)
+        expect(mocks.deliverymen).toHaveBeenCalledOnce()
         expect(wrapper.findComponent(OrdersTable).props('orders')).toEqual([local])
     })
 
     it('coalesces identical in-flight deliverymen searches during an overlapping date refresh', async () => {
         let finishDeliverymen!: (value: any) => void
-        mocks.search.mockImplementation((body) => body.type === 'delivery'
-            ? new Promise(resolve => { finishDeliverymen = resolve })
-            : Promise.resolve({ ...paged([local]), totalCount: 150 }))
+        mocks.search.mockResolvedValue({ ...paged([local]), totalCount: 150 })
+        mocks.deliverymen.mockImplementation(() => new Promise(resolve => { finishDeliverymen = resolve }))
         mountView()
         await flushPromises()
 
         // The first page is incomplete; the dropdown requests a full deliverymen
         // search. A second refresh with the same date must join that HTTP request.
-        expect(mocks.search.mock.calls.filter(([body]) => body.type === 'delivery')).toHaveLength(1)
+        expect(mocks.deliverymen).toHaveBeenCalledOnce()
         wrapper.findComponent(BaseSelect).vm.$emit('update:modelValue', 'today')
         await flushPromises()
-        expect(mocks.search.mock.calls.filter(([body]) => body.type === 'delivery')).toHaveLength(1)
+        expect(mocks.deliverymen).toHaveBeenCalledOnce()
 
-        finishDeliverymen(paged([{ ...local, deliveryManId: 17, deliveryManName: 'Kevin' }]))
+        finishDeliverymen([{ value: 17, label: 'Kevin' }])
         await flushPromises()
         expect(wrapper.findComponent(OrdersTable).props('orders')).toEqual([local])
     })
@@ -166,7 +182,7 @@ describe('remote order workspaces', () => {
         expect(table.props('orders')).toEqual([remote])
         expect(table.props('quickBanks')).toEqual([{ id: 202, name: 'Banco Destino', active: true }])
         expect(table.props('detailQuery')).toEqual({ remoteBranchId: '2' })
-        expect(mocks.search).toHaveBeenLastCalledWith(expect.objectContaining({ remoteOnly: true, branchId: 2 }))
+        expect(mocks.search).toHaveBeenLastCalledWith(expect.objectContaining({ remoteOnly: true, branchId: 2 }), expect.any(AbortSignal))
         expect(mocks.options).toHaveBeenCalledWith(20)
         expect(state.branchId).toBe(1)
         expect(localBanks[0]!.id).toBe(101)
