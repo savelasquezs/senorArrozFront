@@ -102,6 +102,10 @@ class WhatsAppApi extends BaseApi {
   getMessages(conversationId: number, signal?: AbortSignal): Promise<ApiResponse<WhatsAppMessage[]>> {
     return this.get<ApiResponse<WhatsAppMessage[]>>(`/whatsapp/conversations/${conversationId}/messages`, { signal })
   }
+  getMessagesPage(conversationId: number, signal?: AbortSignal, before?: string) {
+    return this.get<ApiResponse<{ items: WhatsAppMessage[]; nextCursor: string | null; hasMore: boolean }>>(
+      `/whatsapp/conversations/${conversationId}/messages/page`, { signal, params: { limit: 50, before } })
+  }
   getOrderDraft(conversationId: number): Promise<ApiResponse<WhatsAppOrderDraft>> {
     return this.get<ApiResponse<WhatsAppOrderDraft>>(`/whatsapp/conversations/${conversationId}/order-draft`)
   }

@@ -217,7 +217,13 @@
             </div>
           </div>
           <template v-else>
-            <div class="flex-1 min-h-0 overflow-y-auto px-4 py-4 space-y-3">
+            <div ref="messagesContainer" class="flex-1 min-h-0 overflow-y-auto px-4 py-4 space-y-3">
+              <p v-if="whatsappStore.isLoadingMessages && !currentMessages.length" role="status" class="text-center text-sm text-gray-500">Cargando mensajes…</p>
+              <button v-if="whatsappStore.messageHistory[selectedConversation.id]?.hasMore" type="button"
+                class="mx-auto block rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm disabled:opacity-50"
+                :disabled="whatsappStore.olderMessagesLoading[selectedConversation.id]" @click="loadOlderMessages">
+                {{ whatsappStore.olderMessagesLoading[selectedConversation.id] ? 'Cargando…' : 'Cargar mensajes anteriores' }}
+              </button>
               <div
                 v-for="message in currentMessages"
                 :key="message.id"
@@ -237,18 +243,21 @@
                       @click="openImagePreview(message)"
                     >
                       <img
+                        loading="lazy" decoding="async"
                         :src="message.mediaUrl"
                         :alt="message.mediaFileName || 'Imagen de WhatsApp'"
                         class="max-h-80 max-w-full cursor-zoom-in object-contain"
                       />
                     </button>
                     <audio
+                      preload="none"
                       v-else-if="message.type === 'audio'"
                       :src="message.mediaUrl"
                       controls
                       class="w-72 max-w-full"
                     />
                     <video
+                      preload="none"
                       v-else-if="message.type === 'video'"
                       :src="message.mediaUrl"
                       controls
@@ -1660,6 +1669,21 @@ function onSearchInput() {
 async function scrollToBottom() {
   await nextTick()
   messagesEnd.value?.scrollIntoView({ block: 'end' })
+}
+const messagesContainer = ref<HTMLElement>()
+async function loadOlderMessages() {
+  const id = selectedConversation.value?.id, container = messagesContainer.value
+  if (!id || !container) return
+  const height = container.scrollHeight, top = container.scrollTop
+  try {
+    await whatsappStore.fetchMessages(id, true)
+    await nextTick()
+    if (selectedConversation.value?.id === id && container === messagesContainer.value) {
+      container.scrollTop = top + container.scrollHeight - height
+    }
+  } catch (error: any) {
+    if (selectedConversation.value?.id === id) showError('Mensajes', error.message || 'No se pudo cargar el historial.')
+  }
 }
 
 function conversationTitle(conversation: WhatsAppConversation) {
