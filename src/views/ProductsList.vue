@@ -148,10 +148,11 @@
                 @cancel="showForm = false" />
         </BaseDialog>
         <BaseDialog v-model="showProfiles" title="Fichas comerciales" size="lg">
-            <CommercialProfilesManager v-if="auth.branchId" :branch-id="auth.branchId" />
+            <CommercialProfilesManager v-if="showProfiles && auth.branchId" :branch-id="auth.branchId" />
         </BaseDialog>
 
         <ProductDetailModal
+            v-if="detailOpen"
             :open="detailOpen"
             :product-id="detailProductId"
             @close="closeProductDetail"
@@ -160,7 +161,7 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref, computed, watch } from 'vue'
+import { defineAsyncComponent, onMounted, ref, computed, watch } from 'vue'
 import { useProductsStore } from '@/store/products'
 import { useProductCategoriesStore } from '@/store/productCategories'
 import { useAuthStore } from '@/store/auth'
@@ -176,8 +177,8 @@ import BaseLoading from '@/components/ui/BaseLoading.vue'
 import BaseDialog from '@/components/ui/BaseDialog.vue'
 import BaseBadge from '@/components/ui/BaseBadge.vue'
 import ProductForm from '@/components/products/ProductForm.vue'
-import ProductDetailModal from '@/components/products/ProductDetailModal.vue'
-import CommercialProfilesManager from '@/components/products/CommercialProfilesManager.vue'
+const ProductDetailModal = defineAsyncComponent(() => import('@/components/products/ProductDetailModal.vue'))
+const CommercialProfilesManager = defineAsyncComponent(() => import('@/components/products/CommercialProfilesManager.vue'))
 import { useSessionViewState } from '@/composables/useSessionViewState'
 
 import {
@@ -390,11 +391,10 @@ const deleteProduct = async (product: Product) => {
 
 onMounted(async () => {
     try {
-        await productCategoriesStore.fetch({
+        await Promise.all([productCategoriesStore.fetch({
             page: 1,
             pageSize: CATEGORIES_PAGE_SIZE,
-        })
-        await loadAll()
+        }), loadAll()])
     } catch (e) {
         listLoading.value = false
         showError('Error al cargar', 'No se pudieron cargar los datos iniciales')

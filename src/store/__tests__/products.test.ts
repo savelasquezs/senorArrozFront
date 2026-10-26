@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { useProductsStore } from '../products'
 import type { Product, ProductDetail } from '@/types/product'
 import type { ApiResponse, PagedResult } from '@/types/common'
+import { inventoryApi } from '@/services/MainAPI/inventoryApi'
 
 const { productApiMock } = vi.hoisted(() => ({
     productApiMock: {
@@ -68,6 +69,17 @@ describe('products store', () => {
         expect(store.currentProducts).toEqual(payload.items)
         expect(store.totalProducts).toBe(1)
         expect(store.error).toBeNull()
+    })
+
+    it('shows administrative rows before optional inventory finishes', async () => {
+        let finish!: (value: unknown[]) => void
+        vi.mocked(inventoryApi.getAvailability).mockReturnValueOnce(new Promise(resolve => { finish = resolve as never }))
+        productApiMock.getProducts.mockResolvedValue({ data: { items: [makeProduct({ inventoryEnabled: true })], totalCount: 1 } })
+        const store = useProductsStore()
+        await store.fetch()
+        expect(store.list?.items[0].id).toBe(1)
+        expect(store.isLoading).toBe(false)
+        finish([])
     })
 
     it('creates a product and prepends it to the current list', async () => {
