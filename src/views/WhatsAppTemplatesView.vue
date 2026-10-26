@@ -158,7 +158,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseLoading from '@/components/ui/BaseLoading.vue'
 import { customerApi } from '@/services/MainAPI/customerApi'
@@ -203,30 +203,15 @@ const renderedPreview = computed(() => {
 })
 
 async function reloadAll() {
-  await Promise.all([loadTemplates(), loadCustomers()])
+  await Promise.allSettled([loadTemplatesNow(), loadCustomersNow()])
 }
 
-async function loadTemplates() {
+let templateGeneration = 0, customerGeneration = 0
+let templateController: AbortController | undefined, customerController: AbortController | undefined
+function loadTemplates() {
+  templateGeneration++; templateController?.abort()
   window.clearTimeout(templateSearchTimeout)
-  templateSearchTimeout = window.setTimeout(async () => {
-    try {
-      loadingTemplates.value = true
-      const res = await whatsappApi.getTemplates({
-        branchId: selectedBranchId.value || undefined,
-        status: 'APPROVED',
-        search: search.value.trim() || undefined,
-      })
-      templates.value = res.data ?? []
-      if (selectedTemplate.value && !templates.value.some(x => x.id === selectedTemplate.value?.id)) {
-        selectedTemplate.value = null
-        parameters.value = []
-      }
-    } catch (error: any) {
-      showError('Plantillas', error.message || 'No se pudieron cargar las plantillas.')
-    } finally {
-      loadingTemplates.value = false
-    }
-  }, 250)
+  templateSearchTimeout = window.setTimeout(() => { void loadTemplatesNow() }, 250)
 }
 
 async function syncTemplates() {
@@ -245,16 +230,23 @@ async function syncTemplates() {
 
 async function loadTemplatesNow() {
   window.clearTimeout(templateSearchTimeout)
+  templateController?.abort()
+  const generation = ++templateGeneration, controller = new AbortController()
+  templateController = controller
   loadingTemplates.value = true
   try {
     const res = await whatsappApi.getTemplates({
-      branchId: selectedBranchId.value || undefined,
-      status: 'APPROVED',
-      search: search.value.trim() || undefined,
-    })
+      branchId: selectedBranchId.value || undefined, status: 'APPROVED', search: search.value.trim() || undefined,
+    }, controller.signal)
+    if (generation !== templateGeneration) return
     templates.value = res.data ?? []
+    if (selectedTemplate.value && !templates.value.some(item => item.id === selectedTemplate.value?.id)) {
+      selectedTemplate.value = null; parameters.value = []
+    }
+  } catch (error: any) {
+    if (generation === templateGeneration && !controller.signal.aborted) showError('Plantillas', error.message || 'No se pudieron cargar las plantillas.')
   } finally {
-    loadingTemplates.value = false
+    if (generation === templateGeneration) loadingTemplates.value = false
   }
 }
 
@@ -266,24 +258,27 @@ function selectTemplate(template: WhatsAppTemplate) {
 }
 
 function loadCustomers() {
+  customerGeneration++; customerController?.abort()
   window.clearTimeout(customerSearchTimeout)
-  customerSearchTimeout = window.setTimeout(async () => {
-    try {
-      loadingCustomers.value = true
-      const res = await customerApi.getCustomers({
-        branchId: selectedBranchId.value || whatsappStore.enabledBranchIds[0],
-        name: customerSearch.value.trim() || undefined,
-        active: true,
-        page: 1,
-        pageSize: 20,
-      })
-      customers.value = res.data?.items ?? []
-    } catch {
-      customers.value = []
-    } finally {
-      loadingCustomers.value = false
-    }
-  }, 300)
+  customerSearchTimeout = window.setTimeout(() => { void loadCustomersNow() }, 300)
+}
+async function loadCustomersNow() {
+  window.clearTimeout(customerSearchTimeout)
+  customerController?.abort()
+  const generation = ++customerGeneration, controller = new AbortController()
+  customerController = controller
+  loadingCustomers.value = true
+  try {
+    const res = await customerApi.getCustomers({
+      branchId: selectedBranchId.value || whatsappStore.enabledBranchIds[0],
+      name: customerSearch.value.trim() || undefined, active: true, page: 1, pageSize: 20,
+    }, controller.signal)
+    if (generation === customerGeneration) customers.value = res.data?.items ?? []
+  } catch {
+    if (generation === customerGeneration && !controller.signal.aborted) customers.value = []
+  } finally {
+    if (generation === customerGeneration) loadingCustomers.value = false
+  }
 }
 
 async function sendTemplate() {
@@ -335,13 +330,19 @@ function statusClass(status: string) {
 
 onMounted(async () => {
   try {
-    await whatsappStore.ensureStatus(0)
+    await whatsappStore.ensureStatus()
     selectedBranchId.value = whatsappStore.enabledBranchIds[0] || 0
     if (whatsappStore.enabled) {
-      await Promise.all([loadTemplatesNow(), new Promise<void>((resolve) => { loadCustomers(); window.setTimeout(resolve, 350) })])
+      loadingStatus.value = false
+      await reloadAll()
     }
   } finally {
     loadingStatus.value = false
   }
+})
+onBeforeUnmount(() => {
+  templateGeneration++; customerGeneration++
+  templateController?.abort(); customerController?.abort()
+  window.clearTimeout(templateSearchTimeout); window.clearTimeout(customerSearchTimeout)
 })
 </script>

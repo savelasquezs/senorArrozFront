@@ -157,8 +157,8 @@ class WhatsAppApi extends BaseApi {
     return this.post<ApiResponse<WhatsAppTemplateSyncResult>>('/whatsapp/templates/sync', { branchId: branchId || null })
   }
 
-  getTemplates(filters?: WhatsAppTemplateFilters): Promise<ApiResponse<WhatsAppTemplate[]>> {
-    return this.get<ApiResponse<WhatsAppTemplate[]>>('/whatsapp/templates', { params: filters })
+  getTemplates(filters?: WhatsAppTemplateFilters, signal?: AbortSignal): Promise<ApiResponse<WhatsAppTemplate[]>> {
+    return this.get<ApiResponse<WhatsAppTemplate[]>>('/whatsapp/templates', { params: filters, signal })
   }
 
   sendTemplate(payload: SendWhatsAppTemplate): Promise<ApiResponse<WhatsAppTemplateSendResult>> {

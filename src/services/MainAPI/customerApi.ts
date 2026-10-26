@@ -18,7 +18,7 @@ import { buildQueryParams } from './queryParams';
 
 class CustomerApi extends BaseApi {
     async getCustomers(
-        filters?: CustomerFilters
+        filters?: CustomerFilters, signal?: AbortSignal
     ): Promise<ApiResponse<PagedResult<Customer>>> {
         const params = buildQueryParams(filters, {
             Search: 'search',
@@ -34,7 +34,7 @@ class CustomerApi extends BaseApi {
         });
 
         return this.get<ApiResponse<PagedResult<Customer>>>('/customers', {
-            params,
+            params, signal,
         });
     }
 
