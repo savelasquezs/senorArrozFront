@@ -418,6 +418,8 @@ export const useOrdersDraftsStore = defineStore('ordersDrafts', () => {
         const updatedOrder = {
             ...order,
             isLater: value,
+            prepareAt: value ? order.prepareAt : null,
+            reservedFor: value ? order.reservedFor : null,
             updatedAt: new Date()
         }
 

@@ -125,6 +125,31 @@ describe('useOrderSubmission', () => {
         expect(dto.deliveryFee).toBeUndefined()
     })
 
+    it('clearing a later order persists both empty dates and sends it immediately after reopening', () => {
+        const store = useOrdersDraftsStore()
+        const { transformDraftToCreateDto } = useOrderSubmission()
+        const schedule = {
+            branchId: 5, isLater: true,
+            prepareAt: new Date('2026-10-26T17:00:00Z'),
+            reservedFor: new Date('2026-10-26T18:00:00Z'),
+        }
+        store.draftOrders.set('t1', minimalDraft({ ...schedule, type: 'delivery', addressId: 42 }))
+        store.draftOrders.set('t2', minimalDraft({ ...schedule, tabId: 't2' }))
+        store.currentTabId = 't1'
+        expect(transformDraftToCreateDto(store.currentOrder!).type).toBe('reservation')
+
+        store.updateIsLater(false)
+        expect(store.currentOrder).toMatchObject({ isLater: false, prepareAt: null, reservedFor: null })
+        expect(store.draftOrders.get('t2')).toMatchObject(schedule)
+        store.draftOrders.clear()
+        store.loadFromLocalStorage()
+        const dto = transformDraftToCreateDto(store.currentOrder!)
+        expect(dto.type).toBe('delivery')
+        expect(dto.addressId).toBe(42)
+        expect(dto.prepareAt).toBeUndefined()
+        expect(dto.reservedFor).toBeUndefined()
+    })
+
     it('permite enviar un borrador para una sucursal distinta a la del usuario', () => {
         const { transformDraftToCreateDto } = useOrderSubmission()
 
