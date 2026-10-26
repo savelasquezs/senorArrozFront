@@ -87,8 +87,8 @@ class WhatsAppApi extends BaseApi {
     return this.post<ApiResponse<WhatsAppTestConnectionResult>>(`/branches/${branchId}/whatsapp-settings/test-connection`, {})
   }
 
-  getConversations(filters?: WhatsAppConversationFilters): Promise<ApiResponse<WhatsAppConversation[]>> {
-    return this.get<ApiResponse<WhatsAppConversation[]>>('/whatsapp/conversations', { params: filters })
+  getConversations(filters?: WhatsAppConversationFilters, signal?: AbortSignal): Promise<ApiResponse<WhatsAppConversation[]>> {
+    return this.get<ApiResponse<WhatsAppConversation[]>>('/whatsapp/conversations', { params: filters, signal })
   }
 
   getOperationalBranches(): Promise<ApiResponse<WhatsAppOperationalBranchOption[]>> {

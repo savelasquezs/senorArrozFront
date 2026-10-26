@@ -48,6 +48,7 @@ export const useWhatsAppStore = defineStore('whatsapp', () => {
   const messageRevisions = new Map<number, number>()
   const messageEpochs = new Map<number, number>()
   let messageScope = 0
+  let conversationRequest: { key: string; abort: AbortController; promise: Promise<WhatsAppConversation[]> } | null = null
 
   function markMessageChanged(conversationId: number) {
     messageRevisions.set(conversationId, (messageRevisions.get(conversationId) ?? 0) + 1)
@@ -148,19 +149,35 @@ export const useWhatsAppStore = defineStore('whatsapp', () => {
     return request
   }
 
-  async function fetchConversations(filters?: WhatsAppConversationFilters) {
-    try {
+  function fetchConversations(filters?: WhatsAppConversationFilters): Promise<WhatsAppConversation[]> {
+    const key = JSON.stringify(filters ?? {})
+    if (conversationRequest?.key === key) return conversationRequest.promise
+    conversationRequest?.abort.abort()
+    const abort = new AbortController(), scope = messageScope
+    const revisions = new Map(messageRevisions)
+    const isCurrent = () => scope === messageScope && !abort.signal.aborted
+    const promise = (async () => {
+      try {
       isLoadingConversations.value = true
       error.value = null
-      const res = await whatsappApi.getConversations(filters)
-      conversations.value = res.data ?? []
+      const res = await whatsappApi.getConversations(filters, abort.signal)
+      if (!isCurrent()) return conversations.value
+      const byId = new Map((res.data ?? []).map(item => [item.id, item]))
+      for (const current of conversations.value) {
+        if (messageRevisions.get(current.id) !== revisions.get(current.id)) byId.set(current.id, current)
+      }
+      conversations.value = [...byId.values()]
       return conversations.value
     } catch (err: any) {
+      if (!isCurrent()) return conversations.value
       error.value = err.message || 'No se pudieron cargar las conversaciones'
       throw err
     } finally {
-      isLoadingConversations.value = false
+      if (isCurrent()) { isLoadingConversations.value = false; conversationRequest = null }
     }
+    })()
+    conversationRequest = { key, abort, promise }
+    return promise
   }
 
   async function fetchOperationalBranches() {
@@ -551,6 +568,9 @@ export const useWhatsAppStore = defineStore('whatsapp', () => {
   }
 
   function clear() {
+    conversationRequest?.abort.abort()
+    conversationRequest = null
+    isLoadingConversations.value = false
     messageScope++
     for (const pending of messageRequests.values()) pending.abort.abort()
     messageRequests.clear()
