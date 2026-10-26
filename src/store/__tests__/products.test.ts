@@ -19,6 +19,7 @@ const { productApiMock } = vi.hoisted(() => ({
 vi.mock('@/services/MainAPI/productApi', () => ({
     productApi: productApiMock,
 }))
+vi.mock('@/services/MainAPI/inventoryApi', () => ({ inventoryApi: { getAvailability: vi.fn().mockResolvedValue([]) } }))
 
 const makeProduct = (overrides: Partial<Product> = {}): Product => ({
     id: 1,

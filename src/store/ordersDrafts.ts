@@ -158,13 +158,13 @@ export const useOrdersDraftsStore = defineStore('ordersDrafts', () => {
     // Delegar a productsStore
     const products = computed(() => {
         const productsStore = useProductsStore()
-        return productsStore.currentProducts
+        return productsStore.catalogProducts ?? productsStore.currentProducts
     })
 
     const filteredProducts = computed(() => {
         const productsStore = useProductsStore()
         // Filtrar primero los productos activos para evitar mostrar inactivos en la orden
-        let filtered = productsStore.currentProducts.filter(product => product.active)
+        let filtered = (productsStore.catalogProducts ?? productsStore.currentProducts).filter(product => product.active)
 
         // Aplicar búsqueda
         if (searchQuery.value) {
@@ -183,7 +183,7 @@ export const useOrdersDraftsStore = defineStore('ordersDrafts', () => {
 
         const catStore = useProductCategoriesStore()
         const catalog =
-            catStore.list?.items?.map((c) => ({ id: c.id, name: c.name ?? '' })) ?? []
+            (catStore.catalogCategories ?? catStore.list?.items)?.map((c) => ({ id: c.id, name: c.name ?? '' })) ?? []
         const riceIds = getRiceCategoryIdSet(catalog)
         if (
             selectedCategoryIds.value?.length &&

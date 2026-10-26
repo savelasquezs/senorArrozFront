@@ -13,7 +13,12 @@
 
                     <!-- Products Grid -->
                     <div class="flex-1 overflow-y-auto p-4">
-                        <ProductsGrid :products="ordersStore.filteredProducts" />
+                        <div v-if="productsStore.catalogError" role="alert" class="mb-3 rounded-lg bg-amber-50 p-3 text-sm text-amber-900">
+                            {{ productsStore.catalogError }}
+                            <button type="button" class="ml-2 font-medium underline" @click="retryCatalog">Reintentar</button>
+                        </div>
+                        <ProductsGrid :products="ordersStore.filteredProducts"
+                            :loading="productsStore.catalogLoading && !productsStore.catalogProducts.length" />
                     </div>
                 </div>
 
@@ -69,14 +74,14 @@ const whatsappReturnConversationId = ref<number | null>(null)
 
 // Categorías transversales desde el store; respaldo por productos cargados en catálogo.
 const categories = computed(() => {
-    const fromCatalog = productCategoriesStore.list?.items
+    const fromCatalog = productCategoriesStore.catalogCategories
     if (fromCatalog?.length) {
         return fromCatalog.map((c) => ({ id: c.id, name: c.name }))
     }
-    if (!productsStore.list?.items) return []
+    if (!productsStore.catalogProducts) return []
 
     const categoryMap = new Map<number, { id: number; name: string }>()
-    productsStore.list.items.forEach((product) => {
+    productsStore.catalogProducts.forEach((product) => {
         if (product.categoryId && !categoryMap.has(product.categoryId)) {
             categoryMap.set(product.categoryId, {
                 id: product.categoryId,
@@ -92,13 +97,16 @@ const posTabs = computed(() => buildOrderPosTabs(categories.value))
 // Catálogo ya en bootstrap (login / layout); aquí solo sincronizamos draft con Pinia.
 const ensureOrderPageData = async () => {
     try {
-        await bootstrapOrderCatalog(authStore.userRole, ordersStore.activeBranchId)
-        await ordersStore.loadBanks()
-        await ordersStore.loadApps()
+        await Promise.all([
+            bootstrapOrderCatalog(authStore.userRole, ordersStore.activeBranchId),
+            ordersStore.loadBanks(), ordersStore.loadApps(),
+        ])
     } catch (error) {
         console.error('Error cargando datos de pedidos:', error)
     }
 }
+
+function retryCatalog() { void productsStore.ensureCatalogLoaded(ordersStore.activeBranchId, true).catch(() => {}) }
 
 const onCategorySelected = (_categoryId: number | null) => {
     // Category selection is already handled by the CategoriesBar component
