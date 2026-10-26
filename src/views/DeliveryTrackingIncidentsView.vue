@@ -1,5 +1,5 @@
 <template>
-  <MainLayout>
+  <div class="contents">
   <div class="space-y-6 p-4 sm:p-6">
     <header class="overflow-hidden rounded-2xl border border-emerald-100 bg-gradient-to-r from-emerald-50 via-white to-blue-50 p-5 sm:p-6">
       <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -284,13 +284,12 @@
       </div>
     </BaseDialog>
   </div>
-  </MainLayout>
+  </div>
 </template>
 
 <script setup lang="ts">
 import { computed, defineComponent, h, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import { trackingEventLabel } from '@/utils/trackingEvidence'
-import MainLayout from '@/components/layout/MainLayout.vue'
 import BaseBadge from '@/components/ui/BaseBadge.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseCard from '@/components/ui/BaseCard.vue'

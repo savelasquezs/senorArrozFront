@@ -1,5 +1,5 @@
 <template>
-    <MainLayout :no-card="true">
+    <div class="contents">
         <div class="orders-view h-full bg-gray-50 flex flex-col">
             <!-- Main Content -->
             <div class="flex flex-1 min-h-0 flex-col lg:flex-row">
@@ -39,7 +39,7 @@
                 WhatsApp
             </button>
         </div>
-    </MainLayout>
+    </div>
 </template>
 
 <script setup lang="ts">
@@ -52,7 +52,6 @@ import { useAuthStore } from '@/store/auth'
 import { bootstrapOrderCatalog } from '@/utils/orderCatalogBootstrap'
 import { buildOrderPosTabs } from '@/config/orderPosCategories'
 // Components
-import MainLayout from '@/components/layout/MainLayout.vue'
 import BaseLoading from '@/components/ui/BaseLoading.vue'
 import BaseAlert from '@/components/ui/BaseAlert.vue'
 import ProductsGrid from '@/components/orders/products/ProductGrid.vue'

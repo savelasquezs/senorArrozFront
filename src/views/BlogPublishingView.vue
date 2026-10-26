@@ -1,5 +1,5 @@
 <template>
-  <MainLayout>
+  <div class="contents">
     <section class="space-y-6">
       <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
@@ -219,7 +219,7 @@
         </button>
       </template>
     </BaseDialog>
-  </MainLayout>
+  </div>
 </template>
 
 <script setup lang="ts">
@@ -232,7 +232,6 @@ import {
   ExclamationTriangleIcon,
   EyeIcon,
 } from '@heroicons/vue/24/outline'
-import MainLayout from '@/components/layout/MainLayout.vue'
 import BaseDialog from '@/components/ui/BaseDialog.vue'
 import BlogArticleRenderer from '@/components/blog/BlogArticleRenderer.vue'
 import { useToast } from '@/composables/useToast'

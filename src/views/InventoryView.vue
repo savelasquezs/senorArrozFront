@@ -1,5 +1,5 @@
 <template>
-  <MainLayout page-title="Inventario" hide-quick-order>
+  <div class="contents">
     <div class="space-y-5">
       <header class="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
         <div>
@@ -258,14 +258,13 @@
       </div>
       <template #footer><BaseButton variant="secondary" :disabled="saving" @click="countPreviewOpen = false">Volver al conteo</BaseButton><BaseButton :loading="saving" :disabled="!activeCount || !countIsComplete" @click="activeCount && confirmCount(activeCount)">Confirmar conteo</BaseButton></template>
     </BaseDialog>
-  </MainLayout>
+  </div>
 </template>
 
 <script setup lang="ts">
 import { computed, defineComponent, h, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ArrowPathIcon, ArrowsRightLeftIcon, BanknotesIcon, ClipboardDocumentCheckIcon, CubeIcon } from '@heroicons/vue/24/outline'
-import MainLayout from '@/components/layout/MainLayout.vue'
 import BaseBadge from '@/components/ui/BaseBadge.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseDialog from '@/components/ui/BaseDialog.vue'

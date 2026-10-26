@@ -1,5 +1,5 @@
 <template>
-  <MainLayout page-title="Detalle de permiso" hide-quick-order>
+  <div class="contents">
     <section class="leaves-page">
       <RouterLink :to="{ path: '/permisos', query: route.query }" class="leave-text-button inline-flex items-center gap-2 mb-5"><ArrowLeftIcon class="w-4 h-4" />Volver a permisos</RouterLink>
       <p v-if="error" role="alert" class="leave-alert leave-alert--error mb-4">{{ error }} <button class="underline ml-2" @click="reload">Actualizar</button></p>
@@ -100,13 +100,12 @@
       <template #footer><BaseButton variant="secondary" :disabled="confirming" @click="actionOpen = false">Cancelar</BaseButton><BaseButton :form="actionFormId" type="submit" :disabled="confirming || changed">Confirmar con contraseña</BaseButton></template>
     </BaseDialog>
     <PasswordConfirmation v-model="confirming" :description="confirmationDescription" :action="confirmAction" />
-  </MainLayout>
+  </div>
 </template>
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, reactive, ref, useId, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import { ArrowLeftIcon, CalendarDaysIcon, DocumentTextIcon, LockClosedIcon, PaperClipIcon, ArrowPathIcon } from '@heroicons/vue/24/outline';
-import MainLayout from '@/components/layout/MainLayout.vue';
 import BaseButton from '@/components/ui/BaseButton.vue';
 import BaseDialog from '@/components/ui/BaseDialog.vue';
 import BaseSelect from '@/components/ui/BaseSelect.vue';

@@ -1,5 +1,5 @@
 <template>
-  <MainLayout>
+  <div class="contents">
     <div class="space-y-6 p-4 sm:p-6">
       <header class="overflow-hidden rounded-2xl border border-amber-100 bg-gradient-to-r from-amber-50 via-white to-emerald-50 p-5 sm:p-6">
         <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -98,12 +98,11 @@
         <template #footer><BaseButton variant="outline" :disabled="saving" @click="resolveOpen = false">Cancelar</BaseButton><BaseButton :loading="saving" @click="confirmResolve">Resolver alerta</BaseButton></template>
       </BaseDialog>
     </div>
-  </MainLayout>
+  </div>
 </template>
 
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
-import MainLayout from '@/components/layout/MainLayout.vue'
 import BaseBadge from '@/components/ui/BaseBadge.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseCard from '@/components/ui/BaseCard.vue'

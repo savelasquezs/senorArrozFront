@@ -1,5 +1,5 @@
 <template>
-    <MainLayout>
+    <div class="contents">
         <div class="max-w-2xl mx-auto p-4 md:p-8 space-y-6">
 
             <!-- Header -->
@@ -133,7 +133,7 @@
                 </BaseButton>
             </div>
         </div>
-    </MainLayout>
+    </div>
 </template>
 
 <script setup lang="ts">
@@ -142,7 +142,6 @@ import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/store/auth'
 import { userApi } from '@/services/MainAPI/userApi'
 import { useToast } from '@/composables/useToast'
-import MainLayout from '@/components/layout/MainLayout.vue'
 import BaseInput from '@/components/ui/BaseInput.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import {

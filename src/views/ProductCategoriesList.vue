@@ -1,6 +1,6 @@
 <!-- src/views/ProductCategoriesList.vue -->
 <template>
-    <MainLayout page-title="Categorías de Productos">
+    <div class="contents">
         <BaseLoading v-if="store.isLoading" text="Cargando categorías..." />
 
         <div v-else class="flex flex-col gap-2 min-h-0 -mx-2 sm:mx-0">
@@ -122,7 +122,7 @@
             <ProductCategoryForm :category="editingCategory" :loading="formLoading" @submit="handleFormSubmit"
                 @cancel="showForm = false" />
         </BaseDialog>
-    </MainLayout>
+    </div>
 </template>
 
 <script setup lang="ts">
@@ -134,7 +134,6 @@ import { useAuthStore } from '@/store/auth'
 import { useToast } from '@/composables/useToast'
 import { useDialog } from '@/composables/useDialog'
 
-import MainLayout from '@/components/layout/MainLayout.vue'
 import BaseCard from '@/components/ui/BaseCard.vue'
 import BaseInput from '@/components/ui/BaseInput.vue'
 import BaseSelect from '@/components/ui/BaseSelect.vue'

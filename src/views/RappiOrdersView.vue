@@ -1,5 +1,5 @@
 <template>
-  <MainLayout>
+  <div class="contents">
     <div class="space-y-5 p-6">
       <div class="flex flex-wrap items-center justify-between gap-3">
         <div>
@@ -142,13 +142,12 @@
         </div>
       </form>
     </BaseDialog>
-  </MainLayout>
+  </div>
 </template>
 
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import MainLayout from '@/components/layout/MainLayout.vue'
 import BaseAlert from '@/components/ui/BaseAlert.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseCard from '@/components/ui/BaseCard.vue'

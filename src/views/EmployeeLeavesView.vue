@@ -1,5 +1,5 @@
 <template>
-  <MainLayout page-title="Permisos laborales" hide-quick-order>
+  <div class="contents">
     <section class="leaves-page">
       <header class="leave-header">
         <div><p class="leave-eyebrow">Personal / Solicitudes</p><h1 class="leave-title">Permisos laborales</h1>
@@ -57,13 +57,12 @@
       <p class="leave-help mt-4">Las solicitudes no modifican automáticamente nómina, turnos ni almuerzos. Las fechas se muestran en hora de Colombia.</p>
       <EmployeeLeaveForm v-model="formOpen" @saved="openDetail" />
     </section>
-  </MainLayout>
+  </div>
 </template>
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { PlusIcon, UserCircleIcon, UserGroupIcon, CalendarDaysIcon, ChevronRightIcon, ArrowPathIcon } from '@heroicons/vue/24/outline';
-import MainLayout from '@/components/layout/MainLayout.vue';
 import BaseButton from '@/components/ui/BaseButton.vue';
 import BaseInput from '@/components/ui/BaseInput.vue';
 import BaseSelect from '@/components/ui/BaseSelect.vue';

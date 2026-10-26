@@ -1,5 +1,5 @@
 <template>
-  <MainLayout page-title="Documentos corporativos">
+  <div class="contents">
     <section class="space-y-6">
       <header class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
@@ -253,7 +253,7 @@
         </div>
       </div>
     </BaseDialog>
-  </MainLayout>
+  </div>
 </template>
 
 <script setup lang="ts">
@@ -269,7 +269,6 @@ import {
   QrCodeIcon,
   TrashIcon,
 } from '@heroicons/vue/24/outline'
-import MainLayout from '@/components/layout/MainLayout.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseDialog from '@/components/ui/BaseDialog.vue'
 import BaseLoading from '@/components/ui/BaseLoading.vue'

@@ -1,5 +1,11 @@
 # Reglas de Negocio - Señor Arroz
 
+## Navegación y contexto de trabajo
+
+- Las pantallas autenticadas comparten una sola cabecera, menú, control de almuerzo y conexiones globales durante la navegación. Cambiar de usuario, rol o contexto global de sucursal reinicia esa shell; la renovación del token de la misma identidad no la reinicia.
+- Los ajustes visuales de cada pantalla (sin tarjeta o sin acceso rápido a pedidos) pertenecen a su ruta. Las rutas públicas conservan su presentación independiente.
+- Navegar no fuerza la consulta de promociones ni integraciones. Guardar una promoción invalida su caché; el estado de integraciones se actualiza por contexto y periódicamente mientras la página está visible y en línea.
+
 ## Revisión de seguimiento de domiciliarios
 
 - Los mapas consumen las estadías agrupadas entregadas por el API y ocultan por defecto sus puntos GPS centrales.

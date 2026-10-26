@@ -1,5 +1,5 @@
 <template>
-    <MainLayout>
+    <div class="contents">
         <div class="w-full space-y-6">
             <div v-if="remoteLoadError" role="alert" class="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
                 {{ remoteLoadError }}
@@ -615,7 +615,7 @@
                 </BaseButton>
             </template>
         </BaseDialog>
-    </MainLayout>
+    </div>
 </template>
 
 <script setup lang="ts">
@@ -649,7 +649,6 @@ import { appPaymentIsSettled } from '@/utils/orderListPayments'
 import type { BankPayment } from '@/types/bank'
 import { useBanksStore } from '@/store/banks'
 import { useAppsStore } from '@/store/apps'
-import MainLayout from '@/components/layout/MainLayout.vue'
 import OrdersTable from '@/components/orders/OrdersTable.vue'
 import EditCustomerModal from '@/components/orders/EditCustomerModal.vue'
 import AssignDeliveryModal from '@/components/orders/AssignDeliveryModal.vue'

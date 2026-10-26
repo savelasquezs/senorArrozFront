@@ -1,5 +1,5 @@
 <template>
-    <MainLayout>
+    <div class="contents">
         <div class="flex flex-col min-h-0 h-[calc(100vh-5.75rem)] max-h-[calc(100vh-3.5rem)]">
             <div class="flex-shrink-0 mb-2 flex items-center justify-between gap-2">
                 <div class="min-w-0">
@@ -118,7 +118,7 @@
                 </BaseButton>
             </template>
         </BaseDialog>
-    </MainLayout>
+    </div>
 </template>
 
 <script setup lang="ts">
@@ -127,7 +127,6 @@ import { ChevronLeftIcon, ChevronRightIcon, PlusIcon } from '@heroicons/vue/24/o
 import ExpenseDetailsTable from '@/components/expenses/ExpenseDetailsTable.vue'
 import ExpensesFilters from '@/components/expenses/ExpensesFilters.vue'
 import ExpensesSummary from '@/components/expenses/ExpensesSummary.vue'
-import MainLayout from '@/components/layout/MainLayout.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseDialog from '@/components/ui/BaseDialog.vue'
 import BaseSelect from '@/components/ui/BaseSelect.vue'

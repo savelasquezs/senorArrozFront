@@ -1,5 +1,5 @@
 <template>
-    <MainLayout>
+    <div class="contents">
         <div class="p-6 space-y-6">
             <!-- Header -->
             <div class="flex items-center justify-between">
@@ -154,7 +154,7 @@
             :selected-date="selectedDate"
             @close="closeOrdersModal"
         />
-    </MainLayout>
+    </div>
 </template>
 
 <script setup lang="ts">
@@ -170,7 +170,6 @@ import { orderApi } from '@/services/MainAPI/orderApi'
 import type { OrderListItem } from '@/types/order'
 import type { DeliverymanStats, DeliverymanAdvance, DeliverymanDetail, SettleDeliverymanDayResultDto } from '@/types/deliveryman'
 import { useOrdersDraftsStore } from '@/store/ordersDrafts'
-import MainLayout from '@/components/layout/MainLayout.vue'
 import BaseDatePicker from '@/components/ui/BaseDatePicker.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import DeliverymanCard from '@/components/deliverymen/DeliverymanCard.vue'

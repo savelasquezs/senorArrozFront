@@ -1,5 +1,5 @@
 <template>
-    <MainLayout>
+    <div class="contents">
         <div class="p-6 space-y-6 max-w-7xl mx-auto">
             <div class="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
                 <div>
@@ -68,12 +68,11 @@
                 </table>
             </div>
         </div>
-    </MainLayout>
+    </div>
 </template>
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
-import MainLayout from '@/components/layout/MainLayout.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseYmdDateRangePicker from '@/components/ui/BaseYmdDateRangePicker.vue'
 import { expenseApi } from '@/services/MainAPI/expenseApi'
