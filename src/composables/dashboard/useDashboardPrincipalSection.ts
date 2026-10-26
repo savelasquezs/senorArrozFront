@@ -4,6 +4,7 @@ import {
 	type PrincipalDashboardPayload,
 } from '@/services/MainAPI/dashboardSectionApi';
 import type { DashboardSectionId } from '@/views/dashboard/dashboardSectionIds';
+import { createSectionSnapshot } from '@/helpers/sectionSnapshot';
 
 function rangeKey(range: [Date, Date]) {
 	const [a, b] = range;
@@ -29,6 +30,7 @@ export function useDashboardPrincipalSection(
 	let requestVersion = 0;
 	let currentController: AbortController | null = null;
 	let currentFilterKey: string | null = null;
+	const snapshot = createSectionSnapshot();
 
 	function invalidatePending() {
 		requestVersion += 1;
@@ -38,13 +40,14 @@ export function useDashboardPrincipalSection(
 
 	onScopeDispose(invalidatePending);
 
-	async function load() {
+	async function load(force = true) {
 		if (!isActive.value) return;
+		const key = `${branchId.value ?? 'all'}:${rangeKey(dateRange.value)}`;
+		if (!force && data.value && snapshot.fresh(key)) return;
 		currentController?.abort();
 		const controller = new AbortController();
 		currentController = controller;
 		const version = ++requestVersion;
-		const key = `${branchId.value ?? 'all'}:${rangeKey(dateRange.value)}`;
 		if (currentFilterKey !== key) {
 			data.value = null;
 			currentFilterKey = key;
@@ -60,6 +63,7 @@ export function useDashboardPrincipalSection(
 			});
 			if (version !== requestVersion || !isActive.value) return;
 			data.value = nextData;
+			snapshot.loaded(key);
 		} catch (e) {
 			if (version !== requestVersion || !isActive.value) return;
 			error.value = e instanceof Error ? e.message : 'Error al cargar Principal';
@@ -76,10 +80,9 @@ export function useDashboardPrincipalSection(
 	watch(
 		[isActive, branchId, () => rangeKey(dateRange.value)],
 		() => {
-			if (isActive.value) void load();
+			if (isActive.value) void load(false);
 			else {
 				invalidatePending();
-				data.value = null;
 				loading.value = false;
 				refreshBusy.value = false;
 			}

@@ -5,6 +5,7 @@ import {
 	type DeliveryDashboardPayload,
 } from '@/services/MainAPI/dashboardSectionApi';
 import type { DashboardSectionId } from '@/views/dashboard/dashboardSectionIds';
+import { createSectionSnapshot } from '@/helpers/sectionSnapshot';
 /**
  * Carga datos de Domicilios desde `GET /api/dashboard/delivery` (rango + sucursal).
  * El rango debe ser el mismo que el filtro global del sidebar (`dateRange`).
@@ -36,6 +37,8 @@ export function useDashboardDomiciliosSection(
 	const isActive = computed(() => activeSection.value === 'domicilios');
     let requestVersion = 0;
     let currentController: AbortController | null = null;
+    const snapshot = createSectionSnapshot();
+    let filterKey = '';
     function invalidatePending() {
         ++requestVersion;
         currentController?.abort();
@@ -43,8 +46,11 @@ export function useDashboardDomiciliosSection(
     }
     onScopeDispose(invalidatePending);
 
-	async function load() {
+	async function load(force = true) {
 		if (!isActive.value) return;
+        const key = `${branchId.value}:${rangeKey(dateRange.value)}:${driverKey(deliveryManId.value)}:${excludeWednesdays.value}`;
+        if (!force && deliveryPayload.value && snapshot.fresh(key)) return;
+        if (filterKey !== key) { deliveryPayload.value = null; filterKey = key; }
         invalidatePending();
         const version = requestVersion;
         const controller = new AbortController();
@@ -65,7 +71,7 @@ export function useDashboardDomiciliosSection(
                 excludeWednesdays.value,
                 controller.signal,
 			);
-            if (version === requestVersion && isActive.value) deliveryPayload.value = payload;
+            if (version === requestVersion && isActive.value) { deliveryPayload.value = payload; snapshot.loaded(key); }
 		} catch (e) {
             if (version !== requestVersion || !isActive.value) return;
 			error.value = e instanceof Error ? e.message : 'Error al cargar Domicilios';
@@ -82,10 +88,9 @@ export function useDashboardDomiciliosSection(
 	watch(
 		[isActive, branchId, () => rangeKey(dateRange.value), () => driverKey(deliveryManId.value), excludeWednesdays],
 		() => {
-            if (isActive.value) void load();
+            if (isActive.value) void load(false);
             else {
                 invalidatePending();
-                deliveryPayload.value = null;
                 loading.value = false;
                 refreshBusy.value = false;
             }
