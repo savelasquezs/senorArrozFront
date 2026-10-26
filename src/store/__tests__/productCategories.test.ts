@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { setActivePinia, createPinia } from 'pinia'
 import { useProductCategoriesStore } from '../productCategories'
 import type { ProductCategory } from '@/types/product'
+vi.mock('@/store/auth', () => ({ useAuthStore: () => ({ user: null }) }))
 
 // Mock localStorage
 const localStorageMock = {

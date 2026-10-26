@@ -151,7 +151,7 @@ const products = computed(() => {
 })
 
 const posCatalog = computed(() =>
-    productCategoriesStore.list?.items?.map(c => ({ id: c.id, name: c.name ?? '' })) ?? [],
+    (productCategoriesStore.catalogCategories ?? productCategoriesStore.list?.items)?.map(c => ({ id: c.id, name: c.name ?? '' })) ?? [],
 )
 
 const selectedGroupKey = ref<string | null>(null)

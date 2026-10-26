@@ -1,5 +1,7 @@
 import { defineStore } from 'pinia';
-import { computed, ref } from 'vue';
+import { computed, ref, watch } from 'vue';
+import { useAuthStore } from './auth';
+import { loadPagedCatalog } from '@/helpers/loadPagedCatalog';
 import { productApi } from '@/services/MainAPI/productApi';
 import { inventoryApi } from '@/services/MainAPI/inventoryApi';
 import type {
@@ -21,12 +23,21 @@ import {
 
 export const ORDER_CATALOG_PRODUCT_PAGE_SIZE = 150;
 
-let catalogLoadInFlight: Promise<void> | null = null;
-
 type FetchOpts = ResourceActionOptions;
 
 export const useProductsStore = defineStore('products', () => {
     const list = ref<PagedResult<Product> | null>(null);
+    const catalogProducts = ref<Product[]>([]);
+    const catalogLoading = ref(false);
+    const catalogLoaded = ref(false);
+    const catalogError = ref<string | null>(null);
+    const auth = useAuthStore();
+    let catalogVersion = 0, catalogKey = '';
+    let catalogLoadInFlight: Promise<void> | null = null;
+    function invalidateCatalog() { catalogVersion++; catalogLoaded.value = false; catalogLoadInFlight = null; }
+    watch(() => [auth.user?.id, auth.user?.role, auth.user?.branchId].join(':'), () => {
+        invalidateCatalog(); catalogProducts.value = []; catalogError.value = null; catalogLoading.value = false;
+    }, { flush: 'sync' });
     const current = ref<Product | null>(null);
     const currentDetail = ref<ProductDetail | null>(null);
     const { isLoading, error, run, clearError } = createResourceState();
@@ -52,25 +63,46 @@ export const useProductsStore = defineStore('products', () => {
         }, { ...opts, errorMessage: 'Error al cargar productos' });
     };
 
-    const ensureCatalogLoaded = async () => {
-        if (list.value?.items && list.value.items.length > 0) {
-            return;
+    const ensureCatalogLoaded = async (branchId?: number | null, force = false) => {
+        const key = `${auth.user?.id}:${auth.user?.role}:${branchId ?? auth.user?.branchId}`;
+        if (key !== catalogKey) {
+            invalidateCatalog(); catalogKey = key; catalogProducts.value = [];
         }
-        if (catalogLoadInFlight) {
-            return catalogLoadInFlight;
-        }
-        catalogLoadInFlight = (async () => {
+        if (!force && catalogLoaded.value) return;
+        if (catalogLoadInFlight) return catalogLoadInFlight;
+        const version = ++catalogVersion;
+        catalogLoading.value = true; catalogError.value = null;
+        const request = (async () => {
             try {
-                await fetch({
-                    page: 1,
-                    pageSize: ORDER_CATALOG_PRODUCT_PAGE_SIZE,
-                    active: true,
+                await loadPagedCatalog<Product>(async page => {
+                    const response = await productApi.getProducts({ page, pageSize: ORDER_CATALOG_PRODUCT_PAGE_SIZE, active: true });
+                    return response.data;
+                }, items => {
+                    if (version === catalogVersion) catalogProducts.value = items.map(product => ({
+                        ...product, availabilityPending: product.inventoryEnabled && product.inventoryControlMode === 'strict',
+                    }));
                 });
+                if (version !== catalogVersion) return;
+                if (!catalogProducts.value.length) { catalogLoaded.value = true; return; }
+                const availability = await inventoryApi.getAvailability(catalogProducts.value.map(product => product.id));
+                if (version !== catalogVersion) return;
+                const byProduct = new Map(availability.map(item => [item.productId, item]));
+                catalogProducts.value = catalogProducts.value.map(product => {
+                    const item = byProduct.get(product.id);
+                    if (!item || item.controlMode === 'estimated') return product;
+                    return { ...product, availabilityPending: false, stock: item.maximumQuantity ?? (item.available ? null : 0) };
+                });
+                if (catalogProducts.value.some(product => product.availabilityPending)) throw new Error('No se pudo confirmar la disponibilidad de algunos productos.');
+                catalogLoaded.value = true;
+            } catch (error) {
+                if (version === catalogVersion) catalogError.value = error instanceof Error ? error.message : 'No se pudo cargar el catálogo.';
+                throw error;
             } finally {
-                catalogLoadInFlight = null;
+                if (version === catalogVersion) { catalogLoadInFlight = null; catalogLoading.value = false; }
             }
         })();
-        return catalogLoadInFlight;
+        catalogLoadInFlight = request;
+        return request;
     };
 
     const fetchById = async (id: number, opts?: FetchOpts) => {
@@ -90,6 +122,7 @@ export const useProductsStore = defineStore('products', () => {
     const create = async (payload: CreateProductDto, opts?: FetchOpts) => {
         return run(async () => {
             const res = await productApi.createProduct(payload);
+            invalidateCatalog();
             prependPagedItem(list, res.data);
             return res.data;
         }, { ...opts, errorMessage: 'Error al crear el producto' });
@@ -98,6 +131,7 @@ export const useProductsStore = defineStore('products', () => {
     const update = async (id: number, payload: UpdateProductDto, opts?: FetchOpts) => {
         return run(async () => {
             const res = await productApi.updateProduct(id, payload);
+            invalidateCatalog();
             current.value = res.data;
             replacePagedItem(list, res.data);
             return res.data;
@@ -107,6 +141,7 @@ export const useProductsStore = defineStore('products', () => {
     const remove = async (id: number, opts?: FetchOpts) => {
         await run(async () => {
             await productApi.deleteProduct(id);
+            invalidateCatalog();
             removePagedItem(list, id);
 
             if (current.value?.id === id) {
@@ -119,6 +154,7 @@ export const useProductsStore = defineStore('products', () => {
     const adjustStock = async (id: number, payload: StockAdjustmentDto, opts?: FetchOpts) => {
         return run(async () => {
             const res = await productApi.adjustStock(id, payload);
+            invalidateCatalog();
 
             const listRow = list.value?.items.find((product) => product.id === id);
             if (listRow) {
@@ -146,6 +182,11 @@ export const useProductsStore = defineStore('products', () => {
 
     return {
         list,
+        catalogProducts,
+        catalogLoading,
+        catalogLoaded,
+        catalogError,
+        invalidateCatalog,
         current,
         currentDetail,
         isLoading,

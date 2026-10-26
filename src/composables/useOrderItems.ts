@@ -26,6 +26,7 @@ export function useOrderItems() {
     }
 
     const addProduct = (product: Product, quantity: number = 1) => {
+        if (product.availabilityPending) throw new Error('Confirma la disponibilidad del producto antes de agregarlo.')
         // Auto-crear tab si no existe
         if (!store.currentTabId) {
             createNewTab()
