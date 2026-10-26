@@ -1330,7 +1330,7 @@ export const useOrdersDraftsStore = defineStore('ordersDrafts', () => {
     // Auto-ajustar pago único al total del pedido
     const autoAdjustSinglePayment = (order: DraftOrder): DraftOrder => {
         // Contar pagos totales
-        const totalPayments = (order.appPayment ? 1 : 0) + order.bankPayments.length
+        const totalPayments = (order.appPayment ? 1 : 0) + order.bankPayments.length + (order.paidInStoreCash ? 1 : 0)
 
         // Solo proceder si hay exactamente 1 pago
         if (totalPayments !== 1) return order

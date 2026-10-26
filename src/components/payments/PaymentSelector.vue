@@ -1,7 +1,7 @@
 <template>
     <div ref="container" class="payment-selector">
         <section v-for="section in sections" :key="section.type" :aria-label="section.label" class="payment-section">
-            <header class="payment-heading">
+            <header v-if="section.type !== 'cash'" class="payment-heading">
                 <div class="flex items-center gap-1">
                     <span>{{ section.label }}</span>
                     <button v-if="section.type === 'bank' && section.rows.length" type="button"
@@ -60,7 +60,8 @@
             <div v-if="!section.rows.length || (section.type === 'bank' && showBankOptions)" class="payment-choices">
                 <template v-if="section.options.length">
                     <button v-for="option in section.options.slice(0, 2)" :key="option.id" type="button"
-                        class="payment-link" :aria-label="`Agregar pago de ${option.name}`" :title="option.name"
+                        class="payment-link" :aria-label="`Agregar pago de ${option.name}`"
+                        :title="section.type === 'cash' ? 'Registrar efectivo recibido en tienda' : option.name"
                         :disabled="!canAddPayments" @click="addPayment(section.type, option.id)">
                         {{ option.name }}
                     </button>
@@ -92,7 +93,7 @@ import { formatCurrency } from '@/composables/useFormatting'
 import { orderCashToCollect, sumOrderNonCashPayments } from '@/utils/orderCashToCollect'
 import type { DraftOrder } from '@/types/order'
 
-type PaymentType = 'bank' | 'app'
+type PaymentType = 'bank' | 'app' | 'cash'
 interface PaymentRow { id: string; name: string; amount: number }
 
 const props = defineProps<{ order: DraftOrder }>()
@@ -112,6 +113,15 @@ const errorId = computed(() => `payment-error-${props.order.tabId}`)
 const branchId = computed(() => props.order.branchId ?? ordersStore.activeBranchId)
 const bankOptions = computed(() => ordersStore.banks.filter(bank => bank.active && bank.branchId === branchId.value))
 const appOptions = computed(() => ordersStore.apps.filter(app => app.active && app.branchId === branchId.value))
+const nonCashPayments = computed(() => sumOrderNonCashPayments(props.order))
+const paidCashAmount = computed(() => {
+    if (!props.order.paidInStoreCash) return 0
+    const amount = props.order.paidInStoreCashAmount
+    return typeof amount === 'number' && Number.isFinite(amount)
+        ? amount
+        : Math.max(0, props.order.total - nonCashPayments.value)
+})
+const totalPayments = computed(() => nonCashPayments.value + paidCashAmount.value)
 const sections = computed(() => [
     {
         type: 'bank' as const,
@@ -127,8 +137,15 @@ const sections = computed(() => [
             ? [{ id: props.order.appPayment.tempId, name: props.order.appPayment.appName, amount: props.order.appPayment.amount }]
             : [],
     },
+    {
+        type: 'cash' as const,
+        label: 'Efectivo en tienda',
+        options: [{ id: 0, name: 'Efectivo' }],
+        rows: props.order.paidInStoreCash
+            ? [{ id: 'cash', name: 'Efectivo', amount: paidCashAmount.value }]
+            : [],
+    },
 ])
-const totalPayments = computed(() => sumOrderNonCashPayments(props.order))
 const cashToCollect = (order: DraftOrder) => orderCashToCollect(order.total, order, {
     floorAtZero: true,
     paidInStoreCash: order.paidInStoreCash === true,
@@ -144,6 +161,10 @@ const isCurrentDraft = () => ordersStore.currentTabId === props.order.tabId
     && ordersStore.currentOrder?.branchId === props.order.branchId
 
 watch(() => editingPayment.value !== null, editing => emit('editingChanged', editing), { immediate: true, flush: 'sync' })
+
+watch(editedRow, row => {
+    if (!row && editingPayment.value) cancelEditing()
+}, { flush: 'sync' })
 
 watch([() => props.order.tabId, () => props.order.branchId], () => {
     editingPayment.value = null
@@ -188,11 +209,17 @@ function savePaymentAmount() {
         editingError.value = 'Ingresa un valor mayor que cero.'
         return
     }
+    if (editingPayment.value.type === 'cash' && amount < 1) {
+        editingError.value = 'El efectivo debe ser de al menos $1.'
+        return
+    }
     if (amount > maxPaymentAmount.value) {
         editingError.value = `El máximo es ${formatCurrency(maxPaymentAmount.value)}.`
         return
     }
-    if (editingPayment.value.type === 'app') payments.updateAppPayment(amount)
+    if (editingPayment.value.type === 'cash') {
+        ordersStore.updatePaidInStoreCash({ paidInStoreCash: true, paidInStoreCashAmount: amount })
+    } else if (editingPayment.value.type === 'app') payments.updateAppPayment(amount)
     else payments.updateBankPayment(editingPayment.value.id, amount)
     cancelEditing()
     notifyPaymentUpdated()
@@ -201,7 +228,8 @@ function savePaymentAmount() {
 function removePayment(type: PaymentType, id: string) {
     if (!isCurrentDraft()) return
     if (isEditing(type, id)) cancelEditing()
-    if (type === 'app') payments.removeAppPayment()
+    if (type === 'cash') ordersStore.updatePaidInStoreCash({ paidInStoreCash: false })
+    else if (type === 'app') payments.removeAppPayment()
     else payments.removeBankPayment(id)
     notifyPaymentUpdated()
 }
@@ -209,12 +237,15 @@ function removePayment(type: PaymentType, id: string) {
 function addPayment(type: PaymentType, id: number) {
     const order = ordersStore.currentOrder
     if (!order || !isCurrentDraft()) return
-    const options = type === 'bank' ? bankOptions.value : appOptions.value
-    if (!options.some(option => option.id === id) || (type === 'app' && order.appPayment)) return
+    const options = sections.value.find(section => section.type === type)?.options ?? []
+    if (!options.some(option => option.id === id)
+        || (type === 'app' && order.appPayment)
+        || (type === 'cash' && order.paidInStoreCash)) return
     // Read the live draft so a second click cannot reuse the pre-render balance.
     const amount = cashToCollect(order)
     if (amount <= 0) return
-    if (type === 'app') payments.addAppPayment(id, amount)
+    if (type === 'cash') ordersStore.updatePaidInStoreCash({ paidInStoreCash: true, paidInStoreCashAmount: amount })
+    else if (type === 'app') payments.addAppPayment(id, amount)
     else payments.addBankPayment(id, amount)
     showBankOptions.value = false
     notifyPaymentUpdated()

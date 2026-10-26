@@ -17,7 +17,7 @@ vi.mock('vue-router', () => ({ useRouter: () => ({ push: vi.fn() }) }))
 vi.mock('@/services/MainAPI/electronicInvoicingApi', () => ({ electronicInvoicingApi: { availability: vi.fn() } }))
 const stubs = {
     OrderTabs: true, CustomerSection: true, BillingRecipientAccess: true, OrderFulfillmentBranchSelector: true,
-    OrderItemList: true, PaymentSelector: true, PaidInStoreCashPanel: true, CustomerDetailModal: true,
+    OrderItemList: true, PaymentSelector: true, CustomerDetailModal: true,
     VueDatePickerRoot: { name: 'VueDatePickerRoot', props: ['modelValue'], emits: ['update:model-value'], template: '<input class="time-picker-stub" />' },
     BaseDialog: { props: ['modelValue'], template: '<div v-if="modelValue" role="dialog"><slot /><slot name="footer" /></div>' },
 }
@@ -56,6 +56,7 @@ describe('OrderSidebar', () => {
     it('keeps the total and send action outside the scroll with payments and hours directly available', () => {
         const wrapper = mount(OrderSidebar, { global: { stubs } })
         expect(wrapper.get('payment-selector-stub').element.closest('details')).toBeNull()
+        expect(wrapper.get('[data-test="sidebar-payments"]').find('details').exists()).toBe(false)
         expect(wrapper.get('[data-test="sidebar-schedule"]').findAll('.time-picker-stub')).toHaveLength(2)
         expect(wrapper.get('[data-test="sidebar-schedule"]').find('input[type="checkbox"]').exists()).toBe(false)
         const footer = wrapper.get('[data-test="sidebar-footer"]')

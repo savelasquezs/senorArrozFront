@@ -1,22 +1,16 @@
 import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
-import { defineComponent, h, reactive } from 'vue'
+import { createPinia, setActivePinia } from 'pinia'
+import { defineComponent, h } from 'vue'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import PaymentSelector from '@/components/payments/PaymentSelector.vue'
+import { useOrderSubmission } from '@/composables/useOrderSubmission'
+import { useAuthStore } from '@/store/auth'
+import { useOrdersDraftsStore } from '@/store/ordersDrafts'
+import { UserRole } from '@/types/auth'
 import type { App, Bank } from '@/types/bank'
 import type { DraftOrder, OrderAppPayment, OrderBankPayment } from '@/types/order'
 
-interface DraftHarness {
-    currentTabId: string
-    activeBranchId: number
-    banks: Bank[]
-    apps: App[]
-    draftOrders: Map<string, DraftOrder>
-    readonly currentOrder: DraftOrder | null
-    saveToLocalStorage: ReturnType<typeof vi.fn>
-}
-
-const harness = vi.hoisted(() => ({ store: {} as DraftHarness }))
-vi.mock('@/store/ordersDrafts', () => ({ useOrdersDraftsStore: () => harness.store }))
+const harness = { store: {} as ReturnType<typeof useOrdersDraftsStore> }
 
 const timestamp = '2026-10-26T15:00:00.000Z'
 
@@ -46,7 +40,11 @@ function draft(overrides: Partial<DraftOrder> = {}): DraftOrder {
         customerPhone: '3000000000', guestName: 'Cliente de prueba', addressId: 1,
         addressDescription: 'Dirección de prueba', deliveryFee: 3000,
         freeDeliveryRequested: false, reservedFor: null, prepareAt: null, isLater: false,
-        notes: '', orderItems: [], bankPayments: [], appPayment: null,
+        notes: '',
+        orderItems: [{ tempId: 'rice', productId: 1, productName: 'Arroz familiar',
+            productPrice: 42000, quantity: 1, unitPrice: 42000, discount: 0,
+            subtotal: 42000, notes: '' }],
+        bankPayments: [], appPayment: null,
         subtotal: 42000, total: 45000, discountTotal: 0,
         createdAt: new Date(timestamp), updatedAt: new Date(timestamp),
         paidInStoreCash: false, paidInStoreCashAmount: null,
@@ -56,6 +54,7 @@ function draft(overrides: Partial<DraftOrder> = {}): DraftOrder {
 
 let wrapper: VueWrapper | undefined
 let mountTarget: HTMLDivElement | undefined
+let pinia: ReturnType<typeof createPinia>
 
 function mountSelector(overrides: Partial<DraftOrder> = {}) {
     harness.store.draftOrders.set('one', draft(overrides))
@@ -63,7 +62,7 @@ function mountSelector(overrides: Partial<DraftOrder> = {}) {
     document.body.append(mountTarget)
     wrapper = mount(defineComponent({
         setup: () => () => h(PaymentSelector, { order: harness.store.currentOrder! }),
-    }), { attachTo: mountTarget })
+    }), { attachTo: mountTarget, global: { plugins: [pinia] } })
     return wrapper
 }
 
@@ -81,17 +80,17 @@ function expectEditingSignal(view: VueWrapper, editing: boolean) {
 
 describe('PaymentSelector compact payment flow', () => {
     beforeEach(() => {
-        // Keep the real useOrderPayments composable: it replaces drafts and persists changes.
-        harness.store = reactive({
-            currentTabId: 'one', activeBranchId: 1,
-            banks: [bank(10, 'Banco inactivo', false), bank(11, 'Bancolombia'), bank(12, 'Davivienda'), bank(13, 'Nequi')],
-            apps: [app(20, 'App inactiva', false), app(21, 'Rappi'), app(22, 'DiDi Food'), app(23, 'App aliada')],
-            draftOrders: new Map<string, DraftOrder>(),
-            get currentOrder(): DraftOrder | null {
-                return this.draftOrders.get(this.currentTabId) ?? null
-            },
-            saveToLocalStorage: vi.fn(),
-        })
+        localStorage.clear()
+        pinia = createPinia()
+        setActivePinia(pinia)
+        useAuthStore().user = { id: 4, name: 'Cajera', email: 'caja@example.com', phone: '',
+            active: true, role: UserRole.CASHIER, branchId: 1, branchName: 'Santander' }
+        // Exercise the real store and payment composable, including cash clamping and persistence.
+        harness.store = useOrdersDraftsStore()
+        harness.store.currentTabId = 'one'
+        harness.store.banks = [bank(10, 'Banco inactivo', false), bank(11, 'Bancolombia'), bank(12, 'Davivienda'), bank(13, 'Nequi')]
+        harness.store.apps = [app(20, 'App inactiva', false), app(21, 'Rappi'), app(22, 'DiDi Food'), app(23, 'App aliada')]
+        vi.spyOn(harness.store, 'saveToLocalStorage')
     })
 
     afterEach(() => {
@@ -99,11 +98,12 @@ describe('PaymentSelector compact payment flow', () => {
         mountTarget?.remove()
         wrapper = undefined
         mountTarget = undefined
+        vi.restoreAllMocks()
     })
 
     it('offers the first two active banks and apps in catalog order, retaining the others in More', () => {
         const view = mountSelector()
-        expect(view.findAll('button[aria-label^="Agregar pago de "]').map(button => button.attributes('aria-label')))
+        expect(view.findAll('section[aria-label="Bancos"] button[aria-label^="Agregar pago de "], section[aria-label="Aplicaciones"] button[aria-label^="Agregar pago de "]').map(button => button.attributes('aria-label')))
             .toEqual(['Agregar pago de Bancolombia', 'Agregar pago de Davivienda', 'Agregar pago de Rappi', 'Agregar pago de DiDi Food'])
         expect(action(view, 'Más opciones de bancos').text()).toContain('Nequi')
         expect(action(view, 'Más opciones de aplicaciones').text()).toContain('App aliada')
@@ -213,6 +213,154 @@ describe('PaymentSelector compact payment flow', () => {
         expect(harness.store.saveToLocalStorage).not.toHaveBeenCalled()
     })
 
+    it('records cash in one click, then edits, cancels, and removes it through the real store', async () => {
+        const view = mountSelector()
+        const cashSection = view.get('section[aria-label="Efectivo en tienda"]')
+        const updateCash = vi.spyOn(harness.store, 'updatePaidInStoreCash')
+        expect(cashSection.text()).toBe('Efectivo')
+        expect(cashSection.find('input').exists()).toBe(false)
+
+        const shortcut = action(view, 'Agregar pago de Efectivo')
+        await Promise.all([shortcut.trigger('click'), shortcut.trigger('click')])
+        expect(updateCash).toHaveBeenCalledExactlyOnceWith({ paidInStoreCash: true, paidInStoreCashAmount: 45000 })
+        expect(currentOrder()).toMatchObject({ paidInStoreCash: true, paidInStoreCashAmount: 45000 })
+        expect(cashSection.text()).toContain('45.000')
+        expect(view.find('input').exists()).toBe(false)
+        expect(view.find('[aria-label="Agregar pago de Efectivo"]').exists()).toBe(false)
+        expectEditingSignal(view, false)
+
+        await action(view, 'Editar pago de Efectivo').trigger('click')
+        expectEditingSignal(view, true)
+        expect(action(view, 'Monto de Efectivo').element.closest('section')).toBe(cashSection.element)
+        await action(view, 'Monto de Efectivo').setValue('20000')
+        await action(view, 'Cancelar edición de Efectivo').trigger('click')
+        expect(currentOrder().paidInStoreCashAmount).toBe(45000)
+        expect(view.find('input').exists()).toBe(false)
+        expectEditingSignal(view, false)
+
+        await action(view, 'Editar pago de Efectivo').trigger('click')
+        await action(view, 'Monto de Efectivo').setValue('20000')
+        await action(view, 'Guardar pago de Efectivo').trigger('click')
+        expect(currentOrder()).toMatchObject({ paidInStoreCash: true, paidInStoreCashAmount: 20000 })
+        expectEditingSignal(view, false)
+        const persisted = JSON.parse(localStorage.getItem('senor-arroz-draft-orders')!)
+        expect(persisted.draftOrders[0]).toMatchObject({ paidInStoreCash: true, paidInStoreCashAmount: 20000 })
+
+        await action(view, 'Quitar pago de Efectivo').trigger('click')
+        expect(currentOrder()).toMatchObject({ paidInStoreCash: false, paidInStoreCashAmount: null })
+        expect(action(view, 'Agregar pago de Efectivo').exists()).toBe(true)
+        expect(view.find('[aria-label="Editar pago de Efectivo"]').exists()).toBe(false)
+    })
+
+    it('adds cash for the remainder after a partial bank payment and preserves both in the submission DTO', async () => {
+        const view = mountSelector()
+        await action(view, 'Agregar pago de Bancolombia').trigger('click')
+        await action(view, 'Editar pago de Bancolombia').trigger('click')
+        await action(view, 'Monto de Bancolombia').setValue('15000')
+        await action(view, 'Guardar pago de Bancolombia').trigger('click')
+        await action(view, 'Agregar pago de Efectivo').trigger('click')
+
+        expect(currentOrder()).toMatchObject({
+            bankPayments: [{ bankId: 11, amount: 15000 }],
+            paidInStoreCash: true, paidInStoreCashAmount: 30000,
+        })
+        expect(view.find('input').exists()).toBe(false)
+        expect(action(view, 'Agregar pago de Rappi').attributes('disabled')).toBeDefined()
+        const { transformDraftToCreateDto } = useOrderSubmission()
+        expect(transformDraftToCreateDto(currentOrder())).toMatchObject({
+            bankPayments: [{ bankId: 11, amount: 15000 }],
+            paidInStoreCash: true, paidInStoreCashAmount: 30000,
+        })
+
+        await action(view, 'Quitar pago de Efectivo').trigger('click')
+        expect(currentOrder().bankPayments).toEqual([expect.objectContaining({ bankId: 11, amount: 15000 })])
+        expect(transformDraftToCreateDto(currentOrder())).toMatchObject({ paidInStoreCash: false })
+        expect(transformDraftToCreateDto(currentOrder()).paidInStoreCashAmount).toBeUndefined()
+    })
+
+    it.each([
+        { name: 'Bancolombia', draftPayment: { bankPayments: [{ bankId: 11, amount: 25000 }] }, dtoPayment: { bankPayments: [{ bankId: 11, amount: 25000 }] } },
+        { name: 'Rappi', draftPayment: { appPayment: { appId: 21, amount: 25000 } }, dtoPayment: { appPayments: [{ appId: 21, amount: 25000 }] } },
+    ])('keeps a cash deposit when adding $name and recalculating products', async ({ name, draftPayment, dtoPayment }) => {
+        const view = mountSelector()
+        await action(view, 'Agregar pago de Efectivo').trigger('click')
+        await action(view, 'Editar pago de Efectivo').trigger('click')
+        await action(view, 'Monto de Efectivo').setValue('20000')
+        await action(view, 'Guardar pago de Efectivo').trigger('click')
+        await action(view, `Agregar pago de ${name}`).trigger('click')
+        expect(currentOrder()).toMatchObject({
+            ...draftPayment, paidInStoreCash: true, paidInStoreCashAmount: 20000,
+        })
+
+        // A real product-price change must leave both recorded amounts intact.
+        harness.store.recalculateTotals({
+            ...currentOrder(),
+            orderItems: currentOrder().orderItems.map(item => ({ ...item, productPrice: 52000, unitPrice: 52000 })),
+        })
+        await flushPromises()
+        expect(currentOrder()).toMatchObject({
+            ...draftPayment, total: 55000, paidInStoreCash: true, paidInStoreCashAmount: 20000,
+        })
+        const { transformDraftToCreateDto } = useOrderSubmission()
+        expect(transformDraftToCreateDto(currentOrder())).toMatchObject({
+            ...dtoPayment, paidInStoreCash: true, paidInStoreCashAmount: 20000,
+        })
+    })
+
+    it('limits cash and noncash edits by all other recorded payments and keeps invalid edits pending', async () => {
+        const view = mountSelector({
+            bankPayments: [bankPayment(15000)], appPayment: appPayment(10000),
+            paidInStoreCash: true, paidInStoreCashAmount: 12000,
+        })
+        await action(view, 'Editar pago de Efectivo').trigger('click')
+        for (const invalid of ['', '0', '-1', '0.5', '20001']) {
+            await action(view, 'Monto de Efectivo').setValue(invalid)
+            await action(view, 'Guardar pago de Efectivo').trigger('click')
+            expect(currentOrder().paidInStoreCashAmount).toBe(12000)
+            expect(action(view, 'Monto de Efectivo').exists()).toBe(true)
+            expectEditingSignal(view, true)
+        }
+        await action(view, 'Monto de Efectivo').setValue('20000')
+        await action(view, 'Guardar pago de Efectivo').trigger('click')
+        expect(currentOrder().paidInStoreCashAmount).toBe(20000)
+        expectEditingSignal(view, false)
+
+        for (const [name, excessiveAmount] of [['Bancolombia', '15001'], ['Rappi', '10001']]) {
+            await action(view, `Editar pago de ${name}`).trigger('click')
+            await action(view, `Monto de ${name}`).setValue(excessiveAmount)
+            await action(view, `Guardar pago de ${name}`).trigger('click')
+            expect(currentOrder()).toMatchObject({
+                bankPayments: [{ amount: 15000 }], appPayment: { amount: 10000 },
+                paidInStoreCash: true, paidInStoreCashAmount: 20000,
+            })
+            expectEditingSignal(view, true)
+            await action(view, `Cancelar edición de ${name}`).trigger('click')
+            expectEditingSignal(view, false)
+        }
+    })
+
+    it('closes the cash editor when recalculating the total removes the cash payment', async () => {
+        const view = mountSelector({
+            bankPayments: [bankPayment(30000)], paidInStoreCash: true, paidInStoreCashAmount: 15000,
+        })
+        await action(view, 'Editar pago de Efectivo').trigger('click')
+        expectEditingSignal(view, true)
+
+        harness.store.recalculateTotals({
+            ...currentOrder(),
+            orderItems: currentOrder().orderItems.map(item => ({ ...item, productPrice: 27000, unitPrice: 27000 })),
+        })
+        await flushPromises()
+
+        expect(currentOrder()).toMatchObject({
+            total: 30000, bankPayments: [{ amount: 30000 }],
+            paidInStoreCash: false, paidInStoreCashAmount: null,
+        })
+        expect(view.find('input').exists()).toBe(false)
+        expect(view.find('[aria-label="Guardar pago de Efectivo"]').exists()).toBe(false)
+        expectEditingSignal(view, false)
+    })
+
     it('clears pending edits and additional-bank choices when switching order tabs', async () => {
         const view = mountSelector({ bankPayments: [bankPayment(10000)] })
         harness.store.draftOrders.set('two', draft({ tabId: 'two', bankPayments: [bankPayment(5000)] }))
@@ -248,7 +396,7 @@ describe('PaymentSelector compact payment flow', () => {
         expect(view.find('input').exists()).toBe(false)
         expectEditingSignal(view, false)
         expect(view.find('[aria-label="Guardar pago de Bancolombia"]').exists()).toBe(false)
-        expect(view.find('button[aria-label^="Agregar pago de "]').exists()).toBe(false)
+        expect(view.find('section[aria-label="Bancos"] button[aria-label^="Agregar pago de "], section[aria-label="Aplicaciones"] button[aria-label^="Agregar pago de "]').exists()).toBe(false)
         expect(currentOrder().appPayment).toBeNull()
         expect(currentOrder().bankPayments).toEqual([])
 

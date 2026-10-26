@@ -144,25 +144,6 @@
 
                 <section class="border-t border-gray-100 pt-2" data-test="sidebar-payments">
                     <PaymentSelector :key="currentOrder.tabId" :order="currentOrder" @editing-changed="isEditingPayment = $event" />
-                    <details v-if="showPaidInStoreInDraft" :key="`cash-${currentTabId}`" class="mt-1">
-                        <summary class="sidebar-summary text-xs">
-                            <span>Efectivo en tienda</span>
-                            <span class="ml-auto flex items-center gap-2">
-                                <span v-if="currentOrder.paidInStoreCash" class="font-normal text-emerald-700">{{ formatCurrency(draftPaidInStoreDisplayAmount) }}</span>
-                                <ChevronDownIcon class="disclosure-chevron h-3.5 w-3.5 shrink-0 text-gray-400" />
-                            </span>
-                        </summary>
-                        <PaidInStoreCashPanel
-                            :input-id="'draft-paid-store-' + currentOrder.tabId"
-                            :paid-in-store-cash="currentOrder.paidInStoreCash === true"
-                            :paid-in-store-cash-amount="currentOrder.paidInStoreCashAmount ?? null"
-                            :max-paid-in-store-amount="draftPaidInStoreCap"
-                            editable density="compact" extra-class="mt-1"
-                            helper-text="Se registra al enviar el pedido."
-                            @update:paid-in-store-cash="onPaidInStoreDraftChange"
-                            @edit-paid-in-store-cash="openDraftEditPaidInStore"
-                            @remove-paid-in-store-cash="openDraftRemovePaidInStore" />
-                    </details>
                 </section>
 
                 <section :key="`schedule-${currentTabId}`" class="sidebar-schedule border-t border-gray-100 pt-2" data-test="sidebar-schedule">
@@ -242,41 +223,6 @@
         </footer>
         <OrderNoteDialog v-model="showNoteDialog" :notes="currentOrder?.notes" title="Notas del pedido"
             label="Indicaciones para preparar o entregar este pedido" :save="saveDraftNotes" />
-
-        <BaseDialog v-model="showDraftRemovePaidInStoreDialog" title="Quitar cobro en tienda (borrador)" size="sm">
-            <p v-if="currentOrder" class="text-sm text-gray-600">
-                Se quitará el marcador de efectivo en tienda
-                (<span class="font-medium tabular-nums">{{ formatCurrency(draftPaidInStoreDisplayAmount) }}</span>).
-            </p>
-            <template #footer>
-                <BaseButton variant="secondary" size="sm" @click="showDraftRemovePaidInStoreDialog = false">
-                    Cancelar
-                </BaseButton>
-                <BaseButton variant="primary" size="sm" class="bg-red-600 hover:bg-red-700"
-                    @click="confirmDraftRemovePaidInStore">
-                    Quitar
-                </BaseButton>
-            </template>
-        </BaseDialog>
-
-        <BaseDialog v-model="showDraftEditPaidInStoreDialog" title="Editar monto — efectivo en tienda (borrador)"
-            size="sm">
-            <div v-if="currentOrder" class="space-y-3">
-                <p class="text-sm text-gray-600">
-                    Máximo {{ formatCurrency(maxDraftEditPaidInStoreAmount) }}
-                </p>
-                <BaseInput v-model.number="draftEditPaidInStoreAmount" type="number"
-                    :max="maxDraftEditPaidInStoreAmount" placeholder="Monto" class="w-full" />
-            </div>
-            <template #footer>
-                <BaseButton variant="secondary" size="sm" @click="showDraftEditPaidInStoreDialog = false">
-                    Cancelar
-                </BaseButton>
-                <BaseButton variant="primary" size="sm" @click="confirmDraftEditPaidInStore">
-                    Guardar
-                </BaseButton>
-            </template>
-        </BaseDialog>
 
         <BaseDialog v-model="showDuplicateOrderConfirmDialog" title="Pedido ya registrado para esta fecha" size="sm">
             <p class="text-sm text-gray-600">
@@ -389,7 +335,6 @@ import { useRouter } from 'vue-router'
 
 import { useToast } from '@/composables/useToast'
 import { useFormatting } from '@/composables/useFormatting'
-import { orderCashToCollect, sumPaymentsAmounts } from '@/utils/orderCashToCollect'
 import { customerApi } from '@/services/MainAPI/customerApi'
 import { whatsappApi } from '@/services/MainAPI/whatsappApi'
 import { discountCodeApi } from '@/services/MainAPI/discountCodeApi'
@@ -411,7 +356,6 @@ import CustomerSection from '@/components/customers/CustomerSection.vue'
 import OrderFulfillmentBranchSelector from '@/components/orders/OrderFulfillmentBranchSelector.vue'
 import CustomerDetailModal from '@/components/customers/CustomerDetailModal.vue'
 import PaymentSelector from '@/components/payments/PaymentSelector.vue'
-import PaidInStoreCashPanel from '@/components/orders/PaidInStoreCashPanel.vue'
 
 // Icons
 import {
@@ -419,7 +363,7 @@ import {
     PaperAirplaneIcon,
     ClipboardDocumentIcon,
     MapPinIcon,
-    CalendarDaysIcon, DocumentTextIcon, ChevronDownIcon, PencilIcon, ChatBubbleLeftEllipsisIcon, XMarkIcon,
+    CalendarDaysIcon, DocumentTextIcon, PencilIcon, ChatBubbleLeftEllipsisIcon, XMarkIcon,
 } from '@heroicons/vue/24/outline'
 import type { LocalHour } from '@/types/common'
 import { DateTimeService } from '@/services/domain/DateTimeService'
@@ -470,9 +414,6 @@ const reservedForLocal = ref<LocalHour | null>(null)
 const prepareAtDateLocal = ref<Date | null>(null)
 const reservedForDateLocal = ref<Date | null>(null)
 
-const showDraftRemovePaidInStoreDialog = ref(false)
-const showDraftEditPaidInStoreDialog = ref(false)
-const draftEditPaidInStoreAmount = ref(0)
 const showDuplicateOrderConfirmDialog = ref(false)
 const pendingDuplicateConfirmOrder = ref<DraftOrder | null>(null)
 const pendingDuplicateConfirmTabId = ref<string | null>(null)
@@ -528,84 +469,6 @@ const showCopyAddressesButton = computed(() => {
     if (!o || (o.type !== 'delivery' && o.type !== 'reservation')) return false
     return o.customerId != null && o.customerId > 0
 })
-
-/** Remanente a cubrir en efectivo (total − banco − app); mismo criterio que PaymentSelector. */
-const draftNonStoreCashRemainder = computed(() => {
-    const o = currentOrder.value
-    if (!o) return 0
-    return orderCashToCollect(
-        o.total,
-        { bankPayments: o.bankPayments, appPayment: o.appPayment },
-        { floorAtZero: true },
-    )
-})
-
-/** Panel visible si hay remanente > 0 o ya quedó marcado cobro en tienda (editar/quitar). */
-const showPaidInStoreInDraft = computed(() => {
-    const o = currentOrder.value
-    if (!o) return false
-    return draftNonStoreCashRemainder.value > 0 || o.paidInStoreCash === true
-})
-
-const draftPaidInStoreCap = computed(() => {
-    const o = currentOrder.value
-    if (!o) return 0
-    return Math.max(
-        0,
-        o.total - sumPaymentsAmounts(o.bankPayments) - (o.appPayment ? Number(o.appPayment.amount ?? 0) : 0),
-    )
-})
-
-const draftPaidInStoreDisplayAmount = computed(() => {
-    const o = currentOrder.value
-    if (!o) return 0
-    if (typeof o.paidInStoreCashAmount === 'number' && Number.isFinite(o.paidInStoreCashAmount)) {
-        return o.paidInStoreCashAmount
-    }
-    return draftPaidInStoreCap.value
-})
-
-const maxDraftEditPaidInStoreAmount = computed(() => draftPaidInStoreCap.value)
-
-function onPaidInStoreDraftChange(checked: boolean) {
-    ordersStore.updatePaidInStoreCash({ paidInStoreCash: checked })
-}
-
-function openDraftRemovePaidInStore() {
-    showDraftRemovePaidInStoreDialog.value = true
-}
-
-function confirmDraftRemovePaidInStore() {
-    ordersStore.updatePaidInStoreCash({ paidInStoreCash: false })
-    showDraftRemovePaidInStoreDialog.value = false
-}
-
-function openDraftEditPaidInStore() {
-    const o = currentOrder.value
-    if (!o) return
-    const cap = draftPaidInStoreCap.value
-    const seed =
-        typeof o.paidInStoreCashAmount === 'number' && Number.isFinite(o.paidInStoreCashAmount)
-            ? o.paidInStoreCashAmount
-            : Math.max(1, cap)
-    draftEditPaidInStoreAmount.value = cap < 1 ? 0 : Math.min(seed, cap)
-    showDraftEditPaidInStoreDialog.value = true
-}
-
-function confirmDraftEditPaidInStore() {
-    const amount = Number(draftEditPaidInStoreAmount.value)
-    const max = maxDraftEditPaidInStoreAmount.value
-    if (!Number.isFinite(amount) || amount < 1) {
-        showError('Monto inválido', 'Ingresa un monto mayor a cero.')
-        return
-    }
-    if (amount > max) {
-        showError('Monto inválido', `El máximo permitido es ${formatCurrency(max)}.`)
-        return
-    }
-    ordersStore.updatePaidInStoreCash({ paidInStoreCash: true, paidInStoreCashAmount: amount })
-    showDraftEditPaidInStoreDialog.value = false
-}
 
 function formatAddressLineForCopy(a: CustomerAddress): string {
     const street = (a.address || '').trim()
@@ -1186,11 +1049,8 @@ watch(
 <style scoped>
 .order-sidebar { width: clamp(390px, 35vw, 490px); flex-shrink: 0; }
 .sidebar-summary { display: flex; align-items: center; gap: 0.5rem; min-height: 28px; cursor: pointer; list-style: none; font-size: 0.8125rem; font-weight: 500; color: #374151; border-radius: 6px; }
-.sidebar-summary::-webkit-details-marker { display: none; }
 .sidebar-summary:hover { color: #047857; }
 .sidebar-summary:focus-visible { outline: 2px solid #059669; outline-offset: 3px; }
-.disclosure-chevron { transition: transform 150ms; }
-details[open] > summary .disclosure-chevron { transform: rotate(180deg); }
 .sidebar-schedule :deep(.dp__input) { min-height: 32px; padding-top: 5px; padding-bottom: 5px; border-color: #e5e7eb; border-radius: 6px; font-size: 12px; }
 @media (pointer: coarse) { .sidebar-schedule :deep(.dp__input) { min-height: 40px; font-size: 16px; } }
 @media (max-width: 1023px) { .order-sidebar { width: 100%; min-height: 0; flex: 1; } }
