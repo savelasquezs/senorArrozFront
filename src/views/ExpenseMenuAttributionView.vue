@@ -72,7 +72,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { createLatestRead } from '@/helpers/latestRead'
+import { ref, onMounted, onUnmounted } from 'vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseYmdDateRangePicker from '@/components/ui/BaseYmdDateRangePicker.vue'
 import { expenseApi } from '@/services/MainAPI/expenseApi'
@@ -127,7 +128,10 @@ async function loadBranches() {
     }
 }
 
+const reportRead = createLatestRead()
+onUnmounted(() => reportRead.invalidate())
 async function loadReport() {
+    const request = reportRead.begin()
     errorMsg.value = ''
     loading.value = true
     try {
@@ -139,7 +143,8 @@ async function loadReport() {
             fromUtc,
             toUtc,
             branchId: bid,
-        })
+        }, request.signal)
+        if (!request.isCurrent()) return
         if (!res.isSuccess) {
             errorMsg.value = res.message || 'No se pudo cargar el reporte'
             data.value = null
@@ -147,16 +152,16 @@ async function loadReport() {
         }
         data.value = res.data
     } catch (e: any) {
+        if (!request.isCurrent()) return
         errorMsg.value = e?.message || 'Error al cargar'
         data.value = null
     } finally {
-        loading.value = false
+        if (request.isCurrent()) loading.value = false
     }
 }
 
 onMounted(async () => {
     padRange()
-    await loadBranches()
-    await loadReport()
+    await Promise.all([loadBranches(), loadReport()])
 })
 </script>
