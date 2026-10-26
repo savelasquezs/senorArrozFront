@@ -28,7 +28,7 @@ describe('Recursos compartidos de facturación', () => {
         let finish!: (value: never) => void
         vi.mocked(api.recipients).mockImplementation(() => new Promise(resolve => { finish = resolve }))
         const resources = useInvoiceResources(), request = resources.loadRecipients(10)
-        useAuthStore().token = 'otra-sesion'
+        useAuthStore().user = { id: 8, role: 'Admin', branchId: 1 } as never
         finish({ data: [{ id: 1, name: 'Anterior' }] } as never)
         expect(await request).toEqual([]); expect(resources.recipients[10]).toBeUndefined()
     })
@@ -39,5 +39,16 @@ describe('Recursos compartidos de facturación', () => {
         resources.updateRecipient(10, { id: 1, documentType: 3, identification: '123', name: 'Nuevo' })
         finish({ data: [{ id: 1, name: 'Anterior' }] } as never)
         expect((await request)[0]?.name).toBe('Nuevo')
+    })
+    it('conserva destinatarios al renovar el token de la misma identidad', async () => {
+        const auth = useAuthStore()
+        auth.user = { id: 7, role: 'Admin', branchId: 1 } as never
+        auth.token = 'original'
+        vi.mocked(api.recipients).mockResolvedValue({ data: [{ id: 1, name: 'Actual' }] } as never)
+        const resources = useInvoiceResources()
+        await resources.loadRecipients(10)
+        auth.token = 'renovado'
+        expect((await resources.loadRecipients(10))[0].name).toBe('Actual')
+        expect(api.recipients).toHaveBeenCalledOnce()
     })
 })

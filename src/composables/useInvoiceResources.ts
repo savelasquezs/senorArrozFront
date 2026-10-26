@@ -14,7 +14,7 @@ export const useInvoiceResources = defineStore('invoiceResources', () => {
     let generation = 0, availabilityAt = 0
     let availability: { enabled: boolean; productionEnabled?: boolean } | null = null
     let availabilityPending: Promise<{ enabled: boolean; productionEnabled?: boolean }> | null = null
-    watch(() => [auth.user?.id, auth.token], () => {
+    watch(() => [auth.user?.id, auth.user?.role, auth.user?.branchId, auth.isAuthenticated].join(':'), () => {
         generation++; recipients.value = {}; profiles.value = {}; pending.clear(); fetched.clear(); revisions.clear()
         availability = null; availabilityAt = 0; availabilityPending = null
     }, { flush: 'sync' })
