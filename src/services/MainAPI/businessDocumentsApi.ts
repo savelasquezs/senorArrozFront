@@ -4,7 +4,7 @@ import type { BusinessDocument, BusinessDocumentFilters } from '@/types/business
 
 class BusinessDocumentsApi extends BaseApi {
   getDocuments(
-    filters: BusinessDocumentFilters = {},
+    filters: BusinessDocumentFilters = {}, signal?: AbortSignal,
   ): Promise<ApiResponse<PagedResult<BusinessDocument>>> {
     return this.get<ApiResponse<PagedResult<BusinessDocument>>>('/business-documents', {
       params: {
@@ -14,7 +14,7 @@ class BusinessDocumentsApi extends BaseApi {
         sortBy: filters.sortBy ?? 'name',
         sortOrder: filters.sortOrder ?? 'asc',
       },
-      branchScope: 'none',
+      branchScope: 'none', signal,
     })
   }
 

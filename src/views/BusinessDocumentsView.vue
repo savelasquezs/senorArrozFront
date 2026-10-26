@@ -228,7 +228,7 @@
       title="Código QR del documento"
       size="sm"
     >
-      <div v-if="qrDocument" class="text-center">
+      <div v-if="showQrDialog && qrDocument" class="text-center">
         <p class="mb-4 font-medium text-gray-900">{{ qrDocument.name }}</p>
         <div
           ref="qrContainer"
@@ -257,8 +257,9 @@
 </template>
 
 <script setup lang="ts">
-import { defineComponent, h, onMounted, ref } from 'vue'
-import QrcodeVue from 'qrcode.vue'
+import { defineAsyncComponent, defineComponent, h, onMounted, onUnmounted, ref } from 'vue'
+import { createLatestRead } from '@/helpers/latestRead'
+const QrcodeVue = defineAsyncComponent(() => import('qrcode.vue'))
 import {
   ArrowDownTrayIcon,
   DocumentTextIcon,
@@ -353,17 +354,22 @@ const showQrDialog = ref(false)
 const qrDocument = ref<BusinessDocument | null>(null)
 const qrContainer = ref<HTMLElement | null>(null)
 
+const documentsRead = createLatestRead()
+onUnmounted(() => documentsRead.invalidate())
 async function loadDocuments() {
+  const request = documentsRead.begin()
   loading.value = true
   loadError.value = ''
   try {
-    const response = await businessDocumentsApi.getDocuments(filters.value)
+    const response = await businessDocumentsApi.getDocuments(filters.value, request.signal)
+    if (!request.isCurrent()) return
     if (!response.isSuccess || !response.data) throw new Error(response.message || 'Respuesta inválida')
     pageData.value = response.data
   } catch (error: any) {
+    if (!request.isCurrent()) return
     loadError.value = error?.message || 'No se pudieron cargar los documentos.'
   } finally {
-    loading.value = false
+    if (request.isCurrent()) loading.value = false
   }
 }
 
@@ -427,6 +433,7 @@ function onFileSelected(event: Event) {
 }
 
 async function saveDocument() {
+  if (saving.value) return
   formError.value = ''
   const name = formName.value.trim()
   if (!name) {
@@ -441,6 +448,7 @@ async function saveDocument() {
   saving.value = true
   try {
     if (editingDocument.value) {
+      documentsRead.invalidate(); loading.value = false
       await businessDocumentsApi.updateDocument(
         editingDocument.value.id,
         name,
@@ -448,6 +456,7 @@ async function saveDocument() {
       )
       toast.success('Documento actualizado', 3500)
     } else {
+      documentsRead.invalidate(); loading.value = false
       await businessDocumentsApi.createDocument(name, selectedFile.value!)
       toast.success('Documento publicado', 3500)
     }
@@ -468,7 +477,8 @@ async function confirmDelete(document: BusinessDocument) {
     tone: 'danger',
   }))) return
   try {
-    await businessDocumentsApi.deleteDocument(document.id)
+    documentsRead.invalidate(); loading.value = false
+      await businessDocumentsApi.deleteDocument(document.id)
     toast.success('Documento eliminado', 3500)
     if (pageData.value?.items.length === 1 && filters.value.page > 1) {
       filters.value.page -= 1

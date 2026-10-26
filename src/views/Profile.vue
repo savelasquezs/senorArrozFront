@@ -236,15 +236,18 @@ const isFormValid = computed(() => {
 })
 
 const saveProfile = async () => {
+    if (savingProfile.value) return
     validateForm()
     if (!isFormValid.value) return
 
     try {
         savingProfile.value = true
-        const updated = await userApi.updateProfile(authStore.user!.id, {
+        const ownerId = authStore.user!.id
+        const updated = await userApi.updateProfile(ownerId, {
             email: form.email.trim(),
             phone: form.phone.trim(),
         })
+        if (authStore.user?.id !== ownerId) return
         authStore.updateUserData({ email: updated.email, phone: (updated as any).phone })
         success('Perfil actualizado', 3000, 'Tus datos han sido guardados correctamente')
     } catch (err: any) {
@@ -257,12 +260,15 @@ const saveProfile = async () => {
 const triggerFileInput = () => fileInputRef.value?.click()
 
 const handleFileChange = async (event: Event) => {
+    if (uploadingImage.value) return
     const file = (event.target as HTMLInputElement).files?.[0]
     if (!file) return
 
     try {
         uploadingImage.value = true
-        const updated = await userApi.uploadProfileImage(authStore.user!.id, file)
+        const ownerId = authStore.user!.id
+        const updated = await userApi.uploadProfileImage(ownerId, file)
+        if (authStore.user?.id !== ownerId) return
         authStore.updateUserData({ profileImageUrl: (updated as any).profileImageUrl })
         success('Foto actualizada', 3000)
     } catch (err: any) {
