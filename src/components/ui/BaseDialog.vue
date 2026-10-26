@@ -37,7 +37,7 @@
 					</div>
 
 					<!-- Content -->
-					<div class="min-h-0 overflow-y-auto overscroll-contain p-6" :class="scrollBody ? 'flex-1' : undefined">
+					<div class="min-h-0 overscroll-contain" :class="[scrollBody ? 'flex-1' : undefined, bodyClass || 'overflow-y-auto p-6']">
 						<slot />
 					</div>
 
@@ -77,6 +77,7 @@ interface Props {
 	zClass?: string;
 	/** Clase adicional para el panel del diálogo. */
 	panelClass?: string;
+	bodyClass?: string;
 }
 
 const props = withDefaults(defineProps<Props>(), {

@@ -1,7 +1,7 @@
 <template>
     <div class="product-grid-container">
         <!-- Loading State with Skeleton -->
-        <div v-if="loading" class="grid gap-4" :class="gridClasses">
+        <div v-if="loading" class="grid gap-4" :class="gridClasses" :style="gridStyle">
             <ProductCardSkeleton v-for="n in skeletonCount" :key="`skeleton-${n}`" :variant="cardVariant" />
         </div>
 
@@ -23,7 +23,7 @@
         <div v-else>
             <template v-if="isFirstWordGroupTab && firstWordGroupEntries.length > 0">
                 <template v-if="selectedGroupKey === null">
-                    <div class="products-grid" :class="gridClasses">
+                    <div class="products-grid" :class="gridClasses" :style="gridStyle">
                         <button
                             v-for="row in firstWordGroupEntries"
                             :key="row.key"
@@ -43,13 +43,15 @@
                             Volver
                         </button>
                     </div>
-                    <div class="products-grid" :class="gridClasses">
+                    <div class="products-grid" :class="gridClasses" :style="gridStyle">
                         <ProductCard
                             v-for="product in productsInSelectedGroup"
                             :key="product.id"
                             :product="product"
                             :variant="cardVariant"
-                            :is-selected="isProductSelected(product)"
+                            :is-selected="isProductSelected(product)" :selection-only="selectionOnly"
+                            :disabled="disabled || disabledProductIds.includes(product.id)"
+                            :disabled-reason="disabledProductIds.includes(product.id) ? 'Ya en el pedido' : undefined"
                             @product-click="handleProductClick"
                             @product-add="handleProductAdd"
                         />
@@ -58,9 +60,11 @@
             </template>
 
             <template v-else-if="isSpecialCategory">
-                <div v-if="productsWithoutChich.length > 0" class="products-grid" :class="gridClasses">
+                <div v-if="productsWithoutChich.length > 0" class="products-grid" :class="gridClasses" :style="gridStyle">
                     <ProductCard v-for="product in productsWithoutChich" :key="product.id" :product="product"
-                        :variant="cardVariant" :is-selected="isProductSelected(product)"
+                        :variant="cardVariant" :is-selected="isProductSelected(product)" :selection-only="selectionOnly"
+                            :disabled="disabled || disabledProductIds.includes(product.id)"
+                            :disabled-reason="disabledProductIds.includes(product.id) ? 'Ya en el pedido' : undefined"
                         @product-click="handleProductClick" @product-add="handleProductAdd" />
                 </div>
 
@@ -69,17 +73,21 @@
                         <span class="chich-title">Con chicharrón</span>
                         <span class="chich-count">{{ productsWithChich.length }}</span>
                     </div>
-                    <div class="products-grid" :class="gridClasses">
+                    <div class="products-grid" :class="gridClasses" :style="gridStyle">
                         <ProductCard v-for="product in productsWithChich" :key="product.id" :product="product"
-                            :variant="cardVariant" :is-selected="isProductSelected(product)"
+                            :variant="cardVariant" :is-selected="isProductSelected(product)" :selection-only="selectionOnly"
+                            :disabled="disabled || disabledProductIds.includes(product.id)"
+                            :disabled-reason="disabledProductIds.includes(product.id) ? 'Ya en el pedido' : undefined"
                             @product-click="handleProductClick" @product-add="handleProductAdd" />
                     </div>
                 </div>
             </template>
 
-            <div v-else class="products-grid" :class="gridClasses">
+            <div v-else class="products-grid" :class="gridClasses" :style="gridStyle">
                 <ProductCard v-for="product in products" :key="product.id" :product="product"
-                    :variant="cardVariant" :is-selected="isProductSelected(product)"
+                    :variant="cardVariant" :is-selected="isProductSelected(product)" :selection-only="selectionOnly"
+                            :disabled="disabled || disabledProductIds.includes(product.id)"
+                            :disabled-reason="disabledProductIds.includes(product.id) ? 'Ya en el pedido' : undefined"
                     @product-click="handleProductClick" @product-add="handleProductAdd" />
             </div>
         </div>
@@ -117,11 +125,16 @@ interface Props {
     cardVariant?: 'default' | 'compact'
     showStock?: boolean
     selectedProducts?: Product[]
+    categories?: { id: number; name: string }[]
+    selectedCategoryIds?: number[] | null
+    selectionOnly?: boolean
+    disabled?: boolean
+    fitContainer?: boolean
+    disabledProductIds?: number[]
     skeletonCount?: number
 }
 
 const props = withDefaults(defineProps<Props>(), {
-    products: () => [],
     loading: false,
     columns: 0, // 0 = auto responsive
     gap: 'md',
@@ -131,6 +144,7 @@ const props = withDefaults(defineProps<Props>(), {
     cardVariant: 'default',
     showStock: true,
     selectedProducts: () => [],
+    disabledProductIds: () => [],
     skeletonCount: 8
 })
 
@@ -147,17 +161,19 @@ const productCategoriesStore = useProductCategoriesStore()
 
 // Computed
 const products = computed(() => {
-    return props.products.length > 0 ? props.products : ordersStore.filteredProducts
+    return props.products ?? ordersStore.filteredProducts
 })
 
 const posCatalog = computed(() =>
-    (productCategoriesStore.catalogCategories ?? productCategoriesStore.list?.items)?.map(c => ({ id: c.id, name: c.name ?? '' })) ?? [],
+    props.categories ?? (productCategoriesStore.catalogCategories ?? productCategoriesStore.list?.items)?.map(c => ({ id: c.id, name: c.name ?? '' })) ?? [],
 )
+
+const selectedCategoryIds = computed(() => props.selectedCategoryIds === undefined ? ordersStore.selectedCategoryIds : props.selectedCategoryIds)
 
 const selectedGroupKey = ref<string | null>(null)
 
 const isFirstWordGroupTab = computed(() =>
-    selectedTabIsFirstWordGroupCategory(posCatalog.value, ordersStore.selectedCategoryIds),
+    selectedTabIsFirstWordGroupCategory(posCatalog.value, selectedCategoryIds.value),
 )
 
 function formatFirstWordGroupLabel(key: string): string {
@@ -192,7 +208,7 @@ const chichRegex = /chich/i
 
 /** Paisa o Ropa vieja (una o varias categorías en la pestaña) y hay al menos un producto con chicharrón en el nombre. */
 const isSpecialCategory = computed(() => {
-    if (!selectedTabIsPaisaOrRopaVieja(posCatalog.value, ordersStore.selectedCategoryIds)) return false
+    if (!selectedTabIsPaisaOrRopaVieja(posCatalog.value, selectedCategoryIds.value)) return false
     return products.value.some(p => chichRegex.test(p.name))
 })
 
@@ -205,6 +221,8 @@ const productsWithChich = computed(() => {
     if (!isSpecialCategory.value) return []
     return products.value.filter(product => chichRegex.test(product.name))
 })
+
+const gridStyle = computed(() => props.fitContainer ? { gridTemplateColumns: 'repeat(auto-fill, minmax(min(160px, 100%), 1fr))' } : undefined)
 
 const gridClasses = computed(() => {
     const classes = []
@@ -262,7 +280,7 @@ watch(products, (newProducts) => {
 }, { immediate: true })
 
 watch(
-    () => ({ ids: ordersStore.selectedCategoryIds, productIds: products.value.map(p => p.id) }),
+    () => ({ ids: selectedCategoryIds.value, productIds: products.value.map(p => p.id) }),
     () => {
         selectedGroupKey.value = null
     },

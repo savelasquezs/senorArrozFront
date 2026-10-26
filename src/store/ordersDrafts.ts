@@ -24,10 +24,7 @@ import type {
 } from '@/types/bank'
 import type { Product } from '@/types/product'
 import { useProductCategoriesStore } from './productCategories'
-import {
-    getRiceCategoryIdSet,
-    sortProductsByPortionOrder,
-} from '@/config/orderPosCategories'
+import { filterOrderCatalog, orderCatalogCategories } from '@/helpers/orderProductCatalog'
 import { useBranchPosSettingsStore } from '@/store/branchPosSettings'
 import { useAuthStore } from '@/store/auth'
 import { generatePosCreationKey } from '@/utils/posCreationKey'
@@ -161,39 +158,8 @@ export const useOrdersDraftsStore = defineStore('ordersDrafts', () => {
         return productsStore.catalogProducts ?? productsStore.currentProducts
     })
 
-    const filteredProducts = computed(() => {
-        const productsStore = useProductsStore()
-        // Filtrar primero los productos activos para evitar mostrar inactivos en la orden
-        let filtered = (productsStore.catalogProducts ?? productsStore.currentProducts).filter(product => product.active)
-
-        // Aplicar búsqueda
-        if (searchQuery.value) {
-            const query = searchQuery.value.toLowerCase()
-            filtered = filtered.filter(p =>
-                p.name.toLowerCase().includes(query) ||
-                p.categoryName?.toLowerCase().includes(query)
-            )
-        }
-
-        // Aplicar filtro de categoría (uno o varios ids, p. ej. Paisa + Paisa Chich)
-        if (selectedCategoryIds.value?.length) {
-            const allowed = new Set(selectedCategoryIds.value)
-            filtered = filtered.filter((p) => allowed.has(p.categoryId))
-        }
-
-        const catStore = useProductCategoriesStore()
-        const catalog =
-            (catStore.catalogCategories ?? catStore.list?.items)?.map((c) => ({ id: c.id, name: c.name ?? '' })) ?? []
-        const riceIds = getRiceCategoryIdSet(catalog)
-        if (
-            selectedCategoryIds.value?.length &&
-            selectedCategoryIds.value.every((id) => riceIds.has(id))
-        ) {
-            filtered = sortProductsByPortionOrder(filtered)
-        }
-
-        return filtered
-    })
+    const filteredProducts = computed(() => filterOrderCatalog(products.value,
+        orderCatalogCategories(products.value, useProductCategoriesStore().catalogCategories), searchQuery.value, selectedCategoryIds.value))
 
     const selectedCategory = computed(() => {
         const ids = selectedCategoryIds.value

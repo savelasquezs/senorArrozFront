@@ -13,7 +13,8 @@
 
         <!-- Stock Indicator -->
         <div class="stock-indicator">
-            <span v-if="product.availabilityPending" class="text-xs text-amber-700">Disponibilidad pendiente</span>
+            <span v-if="disabledReason" class="text-xs text-gray-500">{{ disabledReason }}</span>
+            <span v-else-if="product.availabilityPending" class="text-xs text-amber-700">Disponibilidad pendiente</span>
             <ProductStock v-else :stock="product.stock" :has-unlimited-stock="hasUnlimitedStock" variant="text" size="sm" />
         </div>
 
@@ -41,6 +42,8 @@ interface Props {
     variant?: 'default' | 'compact'
     disabled?: boolean
     isLoading?: boolean
+    selectionOnly?: boolean
+    disabledReason?: string
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -57,7 +60,7 @@ const emit = defineEmits<{
 }>()
 
 // Composables
-const orderItems = useOrderItems()
+const orderItems = props.selectionOnly ? null : useOrderItems()
 const { success } = useToast()
 
 // Computed
@@ -98,8 +101,10 @@ const handleClick = () => {
     if (isDisabled.value || props.isLoading) return
 
     try {
-        orderItems.addProduct(props.product)
-        success('Producto agregado', 1500, `${props.product.name}`)
+        if (!props.selectionOnly) {
+            orderItems?.addProduct(props.product)
+            success('Producto agregado', 1500, `${props.product.name}`)
+        }
         emit('product-click', props.product)
         emit('product-add', props.product)
     } catch (error) {

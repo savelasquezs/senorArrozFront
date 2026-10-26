@@ -177,7 +177,8 @@
 
         <!-- Modal para agregar producto -->
         <AddProductModal :open="showAddProductModal" :existing-product-ids="existingProductIds" :branch-id="branchId"
-            @close="showAddProductModal = false" @product-added="handleProductAdded" />
+            :disabled="!editing || !canEdit || props.saving"
+            @close="showAddProductModal = false" @products-added="handleProductsAdded" />
 
         <OrderNoteDialog :model-value="noteProduct !== null" :notes="noteProduct?.notes"
             :title="`Notas · ${noteProduct?.productName ?? ''}`" :disabled="!canEdit || !!props.saving"
@@ -200,7 +201,7 @@
 
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
-import type { OrderDetailItem, UpdateOrderDetailDto } from '@/types/order'
+import type { OrderDetailItem, UpdateOrderDetailDto, OrderProductAddition } from '@/types/order'
 import { useFormatting } from '@/composables/useFormatting'
 import { useToast } from '@/composables/useToast'
 import { clampDiscountPercentage, discountAmountFromPercentage, discountPercentageFromAmount } from '@/helpers/orderProductDiscount'
@@ -501,24 +502,17 @@ const handleCancelOrderRequest = () => {
     emit('requestCancelOrder')
 }
 
-const handleProductAdded = (newProduct: any) => {
-    localProducts.value.push({
-        id: 0,  // ID 0 indica que es nuevo para el backend
-        productId: newProduct.productId,
-        productName: newProduct.productName,
-        productDescription: newProduct.productDescription,
-        quantity: newProduct.quantity,
-        unitPrice: newProduct.unitPrice,
-        discount: newProduct.discount,
-        notes: newProduct.notes,
-        subtotal: (newProduct.quantity * newProduct.unitPrice) - newProduct.discount,
-        orderId: 0, // Temporal, se asignará en el backend
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
-    })
-
-    freeDeliveryAppliedByIndex.value.push(0)
-    discountPercentages.value.push(discountPercentageFromAmount(newProduct.quantity * newProduct.unitPrice, newProduct.discount))
+const handleProductsAdded = (products: OrderProductAddition[]) => {
+    if (!editing.value || !props.canEdit || props.saving) return
+    for (const product of products) {
+        if (existingProductIds.value.includes(product.productId)) continue
+        localProducts.value.push({
+            ...product, subtotal: product.quantity * product.unitPrice - product.discount,
+            orderId: 0, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
+        })
+        freeDeliveryAppliedByIndex.value.push(0)
+        discountPercentages.value.push(discountPercentageFromAmount(product.quantity * product.unitPrice, product.discount))
+    }
     applyFreeDeliveryDiscount(localFreeDeliveryRequested.value)
     showAddProductModal.value = false
 }

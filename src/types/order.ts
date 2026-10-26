@@ -434,6 +434,8 @@ export interface OrderDetailItem {
     updatedAt: string
 }
 
+export type OrderProductAddition = Pick<OrderDetailItem, 'productId' | 'productName' | 'productDescription' | 'quantity' | 'unitPrice' | 'discount' | 'notes'> & { id: 0 }
+
 export interface OrderBankPaymentDetail {
     id: number
     orderId: number
