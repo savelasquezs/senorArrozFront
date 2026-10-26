@@ -5,15 +5,19 @@
             <div class="w-3/5 pr-4 border-r border-gray-200">
                 <div class="space-y-4">
                     <!-- Filtro de Categorías -->
-                    <ProductCategories :categories="categories" :selected-category="selectedCategoryId"
-                        layout="horizontal" :show-counts="false" :compact="true"
+                    <ProductCategories v-if="!catalogError" :categories="categories" :selected-category="selectedCategoryId"
+                        layout="horizontal" :show-counts="false" :compact="true" :loading="catalogLoading"
                         @category-selected="handleCategorySelected" />
 
                     <!-- Input de Búsqueda -->
                     <BaseInput v-model="searchQuery" placeholder="Buscar productos..." :icon="MagnifyingGlassIcon" />
 
                     <!-- Lista de Productos -->
-                    <ProductListView :products="filteredProducts" :loading="productsStore.isLoading"
+                    <div v-if="catalogError" role="alert" class="space-y-3 py-6 text-center">
+                        <p class="text-sm text-red-700">{{ catalogError }}</p>
+                        <BaseButton variant="secondary" @click="loadCatalog(true)">Reintentar</BaseButton>
+                    </div>
+                    <ProductListView v-else :products="filteredProducts" :loading="catalogLoading"
                         :selected-product="selectedProduct" :disabled-product-ids="existingProductIds"
                         empty-message="No se encontraron productos"
                         empty-description="Intenta ajustar los filtros de búsqueda"
@@ -97,7 +101,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, watch, onBeforeUnmount } from 'vue'
 import { useProductsStore } from '@/store/products'
 import { useProductCategoriesStore } from '@/store/productCategories'
 import { useFormatting } from '@/composables/useFormatting'
@@ -119,6 +123,7 @@ import { XMarkIcon, MagnifyingGlassIcon, ShoppingBagIcon } from '@heroicons/vue/
 interface Props {
     open: boolean
     existingProductIds: number[]
+    branchId?: number | null
 }
 
 const props = defineProps<Props>()
@@ -144,7 +149,7 @@ const categoriesStore = useProductCategoriesStore()
 
 // Composables
 const { formatCurrency } = useFormatting()
-const { success, error } = useToast()
+const { success } = useToast()
 
 // State
 const selectedProduct = ref<Product | null>(null)
@@ -155,10 +160,13 @@ const discount = computed(() => discountAmountFromPercentage(quantity.value * un
 const notes = ref<string>('')
 const searchQuery = ref<string>('')
 const selectedCategoryId = ref<number | null>(null)
+const catalogLoading = ref(false)
+const catalogError = ref('')
+let catalogVersion = 0
 
 // Computed
-const products = computed(() => productsStore.currentProducts)
-const categories = computed(() => categoriesStore.currentCategories)
+const products = computed(() => productsStore.catalogProducts)
+const categories = computed(() => categoriesStore.catalogCategories)
 
 const filteredProducts = computed(() => {
     let filtered = [...products.value]
@@ -203,6 +211,7 @@ const unitPriceError = computed(() => {
 
 const canAddProduct = computed(() => {
     return selectedProduct.value &&
+        !catalogLoading.value && !catalogError.value && !selectedProduct.value.availabilityPending &&
         quantity.value >= 1 &&
         unitPrice.value >= 0 &&
         !quantityError.value &&
@@ -219,6 +228,7 @@ const handleProductSelect = (product: Product) => {
 }
 
 const selectProduct = (product: Product) => {
+    if (catalogLoading.value || catalogError.value || product.availabilityPending) return
     selectedProduct.value = product
     quantity.value = 1
     unitPrice.value = product.price
@@ -255,34 +265,36 @@ const addProduct = () => {
     clearSelection()
 }
 
-// Lifecycle
-onMounted(async () => {
+const loadCatalog = async (force = false) => {
+    const version = ++catalogVersion
+    catalogLoading.value = true
+    catalogError.value = ''
     try {
         await Promise.all([
-            productsStore.ensureCatalogLoaded(),
+            productsStore.ensureCatalogLoaded(props.branchId, force),
             categoriesStore.ensureCatalogLoaded(),
         ])
-
-        // Auto-seleccionar categoría "Arroces"
-        const arrocesCategory = categories.value.find(c =>
-            c.name.toLowerCase().includes('arroz')
-        )
-        if (arrocesCategory) {
-            selectedCategoryId.value = arrocesCategory.id
+    } catch {
+        if (version === catalogVersion) {
+            catalogError.value = 'No se pudieron cargar los productos y su disponibilidad. Reintenta.'
+            clearSelection()
         }
-    } catch (err) {
-        error('Error', 'No se pudieron cargar los productos')
-        console.error('Error loading products:', err)
+    } finally {
+        if (version === catalogVersion) catalogLoading.value = false
     }
-})
+}
 
-// Watch para limpiar selección cuando se cierra el modal
-watch(() => props.open, (isOpen) => {
-    if (!isOpen) {
-        clearSelection()
-        searchQuery.value = ''
-    }
-})
+watch(() => [props.open, props.branchId] as const, ([isOpen]) => {
+    catalogVersion++
+    clearSelection()
+    searchQuery.value = ''
+    selectedCategoryId.value = null
+    catalogError.value = ''
+    catalogLoading.value = false
+    if (isOpen) void loadCatalog()
+}, { immediate: true })
+
+onBeforeUnmount(() => { catalogVersion++ })
 </script>
 
 <style scoped>

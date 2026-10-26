@@ -326,6 +326,7 @@
 					<OrderDetailProductsList
 						v-if="order"
 						:products="order?.orderDetails"
+						:branch-id="order.branchId"
 						:delivery-fee="order?.deliveryFee ?? 0"
 						:order-type="order?.type"
 						:address-id="order?.addressId ?? null"

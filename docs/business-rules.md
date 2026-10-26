@@ -6,6 +6,7 @@
 - Los ajustes visuales de cada pantalla (sin tarjeta o sin acceso rápido a pedidos) pertenecen a su ruta. Las rutas públicas conservan su presentación independiente.
 - Navegar no fuerza la consulta de promociones ni integraciones. Guardar una promoción invalida su caché; el estado de integraciones se actualiza por contexto y periódicamente mientras la página está visible y en línea.
 - El catálogo POS es independiente de búsquedas administrativas y completa todas sus páginas. Los productos de inventario estricto con disponibilidad pendiente no se pueden agregar; el fallo permite reintentar sin presentar stock desconocido como ilimitado. Catálogo vacío solo significa una respuesta válida sin productos.
+- Agregar productos desde el detalle utiliza ese catálogo completo y sus categorías al abrir el selector, incluso entrando directamente al pedido. La disponibilidad corresponde a la sucursal del pedido; cargar o reintentar el selector no guarda cambios en el pedido. Carga, error recuperable y resultado vacío se muestran como estados distintos.
 - En caja, el esperado se puede consultar antes de completar opciones bancarias y préstamos. El cierre permanece bloqueado mientras termina esa validación o si alguna lectura necesaria falla; actualizar permite recuperarla sin interpretar valores desconocidos como cero.
 
 ## Revisión de seguimiento de domiciliarios
