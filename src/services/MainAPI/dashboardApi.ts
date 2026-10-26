@@ -138,10 +138,11 @@ class DashboardApi extends BaseApi {
 		fromIso: string,
 		toIso: string,
 		branchId?: number | null,
+		signal?: AbortSignal,
 	): Promise<DashboardDeliveryApiResponse> {
 		const params: Record<string, string | number> = { from: fromIso, to: toIso };
 		if (branchId != null && branchId !== undefined) params.branchId = branchId;
-		return this.get<DashboardDeliveryApiResponse>('/dashboard/delivery/me', { params });
+		return this.get<DashboardDeliveryApiResponse>('/dashboard/delivery/me', { params, signal });
 	}
 
 	/** Paradas de una ruta cerrada (direcciones / pedidos). */

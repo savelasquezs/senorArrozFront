@@ -207,13 +207,13 @@ class OrderApi extends BaseApi {
     // ===== MÉTODOS PARA MÓDULO DE DOMICILIARIOS =====
 
     // 18. Obtener pedidos delivery ready (listos para asignar)
-    async fetchDeliveryReady(filters?: { branchId?: number; page?: number; pageSize?: number }): Promise<PagedResult<OrderListItem>> {
+    async fetchDeliveryReady(filters?: { branchId?: number; page?: number; pageSize?: number }, signal?: AbortSignal): Promise<PagedResult<OrderListItem>> {
         const params: any = {};
         if (filters?.branchId) params.branchId = filters.branchId;
         if (filters?.page) params.page = filters.page;
         if (filters?.pageSize) params.pageSize = filters.pageSize;
 
-        return this.get<PagedResult<OrderListItem>>('/orders/delivery/ready', { params });
+        return this.get<PagedResult<OrderListItem>>('/orders/delivery/ready', { params, signal });
     }
 
     // 19. Autoasignar pedidos (usado por domiciliarios)
