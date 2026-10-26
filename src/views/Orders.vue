@@ -1,10 +1,10 @@
 <template>
     <div class="contents">
-        <div class="orders-view h-full bg-gray-50 flex flex-col">
+        <div class="orders-view h-full min-h-0 overflow-hidden bg-gray-50 flex flex-col">
             <!-- Main Content -->
-            <div class="flex flex-1 min-h-0 flex-col lg:flex-row">
+            <div class="flex flex-1 min-h-0 min-w-0 overflow-hidden flex-col lg:flex-row">
                 <!-- Left Panel - Products and Categories -->
-                <div class="h-[35dvh] shrink-0 bg-white border-r border-gray-200 overflow-hidden flex flex-col min-h-0 lg:h-auto lg:flex-1">
+                <div class="h-[35dvh] shrink-0 bg-white border-r border-gray-200 overflow-hidden flex flex-col min-h-0 min-w-0 lg:h-auto lg:flex-1">
                     <OrderProductCatalog v-model:search-query="ordersStore.searchQuery"
                         v-model:selected-category-ids="ordersStore.selectedCategoryIds"
                         :products="productsStore.catalogProducts" :categories="productCategoriesStore.catalogCategories"
