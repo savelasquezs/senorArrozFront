@@ -74,6 +74,7 @@
 </template>
 
 <script setup lang="ts">
+import { createSerialRefresh } from '@/utils/serialRefresh';
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 import { ArrowPathIcon, CalendarDaysIcon, ChevronLeftIcon, ChevronRightIcon, PencilSquareIcon } from '@heroicons/vue/24/outline';
 import BaseBadge from '@/components/ui/BaseBadge.vue';
@@ -116,17 +117,18 @@ function shiftDate(days: number) {
   day.setUTCDate(day.getUTCDate() + days);
   date.value = day.toISOString().slice(0, 10);
 }
-async function load() {
+const refresh = createSerialRefresh(async context => {
   const current = ++generation;
   loading.value = true; error.value = '';
   try {
-    const result = await employeeLunchApi.branch(date.value, page.value);
-    if (current !== generation) return;
+    const result = await employeeLunchApi.branch(date.value, page.value, 50, context.signal);
+    if (current !== generation || !context.isCurrent()) return;
     people.value = result.items; pages.value = result.totalPages; total.value = result.totalCount;
     if (result.items[0]) offset.value = Date.parse(result.items[0].serverTimeUtc) - Date.now();
-  } catch (e) { if (current === generation) { people.value = []; error.value = (e as Error).message; } }
-  finally { if (current === generation) loading.value = false; }
-}
+  } catch (e) { if (current === generation && context.isCurrent()) { people.value = []; error.value = (e as Error).message; } }
+  finally { if (current === generation && context.isCurrent()) loading.value = false; }
+})
+const load = () => refresh.request(true);
 async function edit(lunch: EmployeeLunch, name: string, event: Event) {
   if (!canCorrect.value) return;
   returnFocus = event.currentTarget as HTMLElement;
@@ -147,7 +149,7 @@ async function save() {
   finally { saving.value = false; }
 }
 watch([date, () => props.branchId], () => {
-  generation++;
+  generation++; refresh.cancel();
   people.value = []; editing.value = null; total.value = 0;
   if (!date.value) { date.value = today; return; }
   if (page.value !== 1) page.value = 1; else void load();
@@ -155,5 +157,5 @@ watch([date, () => props.branchId], () => {
 watch(page, load);
 watch(connectionState, (state, previous) => { if (state === 'connected' && previous !== state) void load(); });
 onMounted(() => { void load(); on('EmployeeLunchChanged', load); timer = setInterval(() => { now.value = Date.now(); }, 1000); });
-onUnmounted(() => { generation++; off('EmployeeLunchChanged', load); clearInterval(timer); });
+onUnmounted(() => { generation++; refresh.dispose(); off('EmployeeLunchChanged', load); clearInterval(timer); });
 </script>

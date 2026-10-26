@@ -34,8 +34,8 @@ export function whatsappWebhookUrl(): string {
 }
 
 class WhatsAppApi extends BaseApi {
-  getTenantSettings(): Promise<ApiResponse<TenantWhatsAppSettings>> {
-    return this.get<ApiResponse<TenantWhatsAppSettings>>('/tenant/whatsapp', { branchScope: 'none' })
+  getTenantSettings(signal?: AbortSignal): Promise<ApiResponse<TenantWhatsAppSettings>> {
+    return this.get<ApiResponse<TenantWhatsAppSettings>>('/tenant/whatsapp', { branchScope: 'none', signal })
   }
 
   saveTenantChannel(payload: UpdateTenantWhatsAppChannel): Promise<ApiResponse<TenantWhatsAppChannel>> {
@@ -87,8 +87,8 @@ class WhatsAppApi extends BaseApi {
     return this.post<ApiResponse<WhatsAppTestConnectionResult>>(`/branches/${branchId}/whatsapp-settings/test-connection`, {})
   }
 
-  getConversations(filters?: WhatsAppConversationFilters): Promise<ApiResponse<WhatsAppConversation[]>> {
-    return this.get<ApiResponse<WhatsAppConversation[]>>('/whatsapp/conversations', { params: filters })
+  getConversations(filters?: WhatsAppConversationFilters, signal?: AbortSignal): Promise<ApiResponse<WhatsAppConversation[]>> {
+    return this.get<ApiResponse<WhatsAppConversation[]>>('/whatsapp/conversations', { params: filters, signal })
   }
 
   getOperationalBranches(): Promise<ApiResponse<WhatsAppOperationalBranchOption[]>> {
@@ -99,8 +99,12 @@ class WhatsAppApi extends BaseApi {
     return this.put<ApiResponse<WhatsAppConversation>>(`/whatsapp/conversations/${conversationId}/operational-branch`, { branchId })
   }
 
-  getMessages(conversationId: number): Promise<ApiResponse<WhatsAppMessage[]>> {
-    return this.get<ApiResponse<WhatsAppMessage[]>>(`/whatsapp/conversations/${conversationId}/messages`)
+  getMessages(conversationId: number, signal?: AbortSignal): Promise<ApiResponse<WhatsAppMessage[]>> {
+    return this.get<ApiResponse<WhatsAppMessage[]>>(`/whatsapp/conversations/${conversationId}/messages`, { signal })
+  }
+  getMessagesPage(conversationId: number, signal?: AbortSignal, before?: string) {
+    return this.get<ApiResponse<{ items: WhatsAppMessage[]; nextCursor: string | null; hasMore: boolean }>>(
+      `/whatsapp/conversations/${conversationId}/messages/page`, { signal, params: { limit: 50, before } })
   }
   getOrderDraft(conversationId: number): Promise<ApiResponse<WhatsAppOrderDraft>> {
     return this.get<ApiResponse<WhatsAppOrderDraft>>(`/whatsapp/conversations/${conversationId}/order-draft`)
@@ -157,8 +161,8 @@ class WhatsAppApi extends BaseApi {
     return this.post<ApiResponse<WhatsAppTemplateSyncResult>>('/whatsapp/templates/sync', { branchId: branchId || null })
   }
 
-  getTemplates(filters?: WhatsAppTemplateFilters): Promise<ApiResponse<WhatsAppTemplate[]>> {
-    return this.get<ApiResponse<WhatsAppTemplate[]>>('/whatsapp/templates', { params: filters })
+  getTemplates(filters?: WhatsAppTemplateFilters, signal?: AbortSignal): Promise<ApiResponse<WhatsAppTemplate[]>> {
+    return this.get<ApiResponse<WhatsAppTemplate[]>>('/whatsapp/templates', { params: filters, signal })
   }
 
   sendTemplate(payload: SendWhatsAppTemplate): Promise<ApiResponse<WhatsAppTemplateSendResult>> {

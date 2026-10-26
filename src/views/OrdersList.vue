@@ -1,5 +1,5 @@
 <template>
-    <MainLayout>
+    <div class="contents">
         <div class="w-full space-y-6">
             <div v-if="remoteLoadError" role="alert" class="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
                 {{ remoteLoadError }}
@@ -270,7 +270,7 @@
                             <div class="flex flex-wrap items-end gap-3">
                                 <div class="flex-1 min-w-[200px]">
                                     <BaseInput v-model="resSearch" placeholder="Buscar por ID, cliente, teléfono, notas..."
-                                        @input="resCurrentPage = 1">
+                                        @input="onReservationSearchInput">
                                         <template #icon><MagnifyingGlassIcon class="w-4 h-4" /></template>
                                     </BaseInput>
                                 </div>
@@ -278,12 +278,12 @@
                                     <div class="w-44 sm:w-48">
                                         <BaseSelect v-model="resStatus" :options="resStatusOptions" value-key="value"
                                             display-key="label" placeholder="Estado"
-                                            @update:model-value="fetchReservations()" />
+                                            @update:model-value="onReservationFilterChange" />
                                     </div>
                                     <div class="flex items-center gap-2 flex-wrap">
                                         <span class="text-xs text-gray-500 whitespace-nowrap">Fecha evento:</span>
                                         <BaseYmdDateRangePicker v-model:from-date="resFrom" v-model:to-date="resTo"
-                                            variant="compact" @change="fetchReservations()" />
+                                            variant="compact" @change="onReservationFilterChange" />
                                     </div>
                                     <BaseButton v-if="resSearch || resStatus || resFrom || resTo" variant="ghost"
                                         size="sm" class="shrink-0" @click="clearResFilters">
@@ -615,11 +615,12 @@
                 </BaseButton>
             </template>
         </BaseDialog>
-    </MainLayout>
+    </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
+import { useSessionViewState } from '@/composables/useSessionViewState'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/store/auth'
 import { useBranchContextStore } from '@/store/branchContext'
@@ -649,7 +650,6 @@ import { appPaymentIsSettled } from '@/utils/orderListPayments'
 import type { BankPayment } from '@/types/bank'
 import { useBanksStore } from '@/store/banks'
 import { useAppsStore } from '@/store/apps'
-import MainLayout from '@/components/layout/MainLayout.vue'
 import OrdersTable from '@/components/orders/OrdersTable.vue'
 import EditCustomerModal from '@/components/orders/EditCustomerModal.vue'
 import AssignDeliveryModal from '@/components/orders/AssignDeliveryModal.vue'
@@ -678,6 +678,9 @@ const banksStore = useBanksStore()
 const appsStore = useAppsStore()
 const debouncedRefetchOrders = useDebouncedCallback(() => {
     void fetchOrders()
+}, 300)
+const debouncedRefetchReservations = useDebouncedCallback(() => {
+    void fetchReservations()
 }, 300)
 const {
     getNextAllowedStatus,
@@ -786,7 +789,9 @@ async function activateTab(tab: TabValue) {
     if (activeTab.value === tab) return
     ordersRequest++
     deliverymenRequest++
+    reservationsRequest++
     debouncedRefetchOrders.cancel()
+    debouncedRefetchReservations.cancel()
     if (updatesTimer) { clearTimeout(updatesTimer); updatesTimer = null }
     activeTab.value = tab
     orders.value = []
@@ -801,8 +806,7 @@ async function activateTab(tab: TabValue) {
     transferVerificationBankId.value = null
     pendingUpdates.value = false
     if (tab === 'reservations') { void fetchReservations({ background: reservations.value.length > 0 }); return }
-    await loadWorkspaceOptions()
-    await fetchOrdersWithDeliverymen()
+    await Promise.all([loadWorkspaceOptions(), fetchOrdersWithDeliverymen()])
 }
 
 async function switchTab(tab: TabValue) {
@@ -825,14 +829,14 @@ const { formatCurrency } = useFormatting()
 const loading = ref(false)
 const orders = ref<OrderListItem[]>([])
 const totalCount = ref(0)
-const currentPage = ref(1)
-const pageSize = ref(100)
-const sortBy = ref<'id' | 'total' | 'createdAt'>('id')
-const sortOrder = ref<'asc' | 'desc'>('desc')
+const currentPage = useSessionViewState('orders:page', 1)
+const pageSize = useSessionViewState('orders:pageSize', 100)
+const sortBy = useSessionViewState<'id' | 'total' | 'createdAt'>('orders:sortBy', 'id')
+const sortOrder = useSessionViewState<'asc' | 'desc'>('orders:sortOrder', 'desc')
 const showAdvancedFilters = ref(false)
 
 // Filtros
-const filters = ref<OrderFilterState>({
+const filters = useSessionViewState<OrderFilterState>('orders:filters', {
     totalQuery: '',
     search: '',
     type: null,
@@ -855,7 +859,7 @@ const groupByRoute = ref(false)
 
 const datePresetId = ref<DashboardPeriodPresetId>('today')
 const customDateRange = ref<[Date, Date] | null>(null)
-const dateFilters = ref({
+const dateFilters = useSessionViewState('orders:dates', {
     fromDate: todayYmd(),
     toDate: todayYmd(),
 })
@@ -1225,15 +1229,24 @@ const toggleAdvancedFilters = () => {
 // Métodos
 let lastOrdersFetchedAt = 0
 const inFlightOrderSearches = new Map<string, ReturnType<typeof orderApi.searchOrders>>()
+const searchControllers = new Map<string, AbortController>()
+const deliverymenOptionsRequests = new Map<string, ReturnType<typeof orderApi.getDeliverymanOptions>>()
 function searchOrdersOnce(scope: TabValue, body: Record<string, unknown>) {
     // Coalesce equal queries (initial load + reconnect) without deduplicating
     // the separate deliverymen search that keeps the full driver filter updated.
     const key = JSON.stringify([workspaceBranchId.value, scope, body])
     const pending = inFlightOrderSearches.get(key)
     if (pending) return pending
-    const request = orderApi.searchOrders(body)
+    for (const [otherKey, controller] of searchControllers) {
+        if (otherKey !== key) { controller.abort(); searchControllers.delete(otherKey) }
+    }
+    const controller = new AbortController()
+    searchControllers.set(key, controller)
+    const request = orderApi.searchOrders(body, controller.signal)
     inFlightOrderSearches.set(key, request)
-    const clear = () => { if (inFlightOrderSearches.get(key) === request) inFlightOrderSearches.delete(key) }
+    const clear = () => {
+        if (inFlightOrderSearches.get(key) === request) { inFlightOrderSearches.delete(key); searchControllers.delete(key) }
+    }
     void request.then(clear, clear)
     return request
 }
@@ -1299,6 +1312,7 @@ const fetchOrders = async (options: { background?: boolean } = {}): Promise<Orde
 }
 
 const onOrdersTextFilterInput = () => {
+    ordersRequest++
     currentPage.value = 1
     debouncedRefetchOrders.schedule()
 }
@@ -1341,23 +1355,6 @@ const onDateFiltersChange = () => {
     void fetchOrders()
 }
 
-const buildDeliverymenInRangeSearchBody = (page: number, pageSizeValue: number) =>
-    buildOrderSearchBody({
-        page,
-        pageSize: pageSizeValue,
-        sortBy: 'createdAt',
-        sortOrder: 'desc',
-        excludeFutureReservations: remoteBranchId.value == null,
-        remoteOnly: remoteBranchId.value != null,
-        branchId: remoteBranchId.value ?? undefined,
-        fromDate: dateFilters.value.fromDate || undefined,
-        toDate: dateFilters.value.toDate || undefined,
-        search: '',
-        totalQuery: '',
-        type: 'delivery',
-        status: null,
-    })
-
 const loadDeliverymenInRange = async (mainPage: OrdersSearchSnapshot | null = null) => {
     if (remoteBranchId.value != null && !remoteBranches.value.some(b => b.id === remoteBranchId.value)) {
         deliverymenInRange.value = []
@@ -1377,30 +1374,19 @@ const loadDeliverymenInRange = async (mainPage: OrdersSearchSnapshot | null = nu
             deliverymenInRange.value = completeOptions
             return
         }
-        const pageSizeValue = 200
-        let page = 1
-        let totalPagesCount = 1
-        const unique = new Map<number, string>()
-
-        while (page <= totalPagesCount) {
-            const response = await searchOrdersOnce(scope, buildDeliverymenInRangeSearchBody(page, pageSizeValue))
-            if (request !== deliverymenRequest || scope !== activeTab.value) return
-
-            for (const order of response.items) {
-                if (order.deliveryManId == null) continue
-                const label = order.deliveryManName?.trim() || `Domiciliario #${order.deliveryManId}`
-                if (!unique.has(order.deliveryManId)) {
-                    unique.set(order.deliveryManId, label)
-                }
-            }
-
-            totalPagesCount = Math.max(1, Math.ceil(response.totalCount / pageSizeValue))
-            page += 1
+        const params = { fromDate: dateFilters.value.fromDate || undefined, toDate: dateFilters.value.toDate || undefined,
+            branchId: remoteBranchId.value ?? undefined, remoteOnly: remoteBranchId.value != null }
+        const key = JSON.stringify([workspaceBranchId.value, params])
+        let pending = deliverymenOptionsRequests.get(key)
+        if (!pending) {
+            pending = orderApi.getDeliverymanOptions(params)
+            deliverymenOptionsRequests.set(key, pending)
+            const clear = () => { if (deliverymenOptionsRequests.get(key) === pending) deliverymenOptionsRequests.delete(key) }
+            void pending.then(clear, clear)
         }
-
-        deliverymenInRange.value = [...unique.entries()]
-            .map(([value, label]) => ({ value, label }))
-            .sort((a, b) => a.label.localeCompare(b.label))
+        const options = await pending
+        if (request !== deliverymenRequest || scope !== activeTab.value) return
+        deliverymenInRange.value = options
 
         if (
             deliveryManFilterId.value != null &&
@@ -2373,6 +2359,7 @@ const resCurrentPage = ref(1)
 const resPageSize = ref(150)
 const resSortBy = ref('prepareAt')
 const resSortOrder = ref<'asc' | 'desc'>('asc')
+let reservationsRequest = 0
 const resSearch = ref('')
 const resStatus = ref<string | null>(null)
 const colombiaDateInput = () => todayYmd()
@@ -2382,7 +2369,6 @@ const resTo = ref('')
 const resStatusOptions = [
     { value: null, label: 'Activas (sin canceladas/entregadas)' },
     { value: '__all__', label: 'Todas' },
-    { value: 'reservation', label: 'Reserva pendiente' },
     { value: 'taken', label: 'Tomada' },
     { value: 'inPreparation', label: 'En preparación' },
     { value: 'ready', label: 'Lista' },
@@ -2399,19 +2385,19 @@ const resVisiblePages = computed(() => {
     return pages
 })
 
-const resFilteredItems = computed(() => {
-    if (!resSearch.value.trim()) return reservations.value
-    const q = resSearch.value.toLowerCase()
-    const qDigits = q.replace(/\D/g, '')
-    return reservations.value.filter(o =>
-        String(o.id).includes(q) ||
-        (o.customerName || '').toLowerCase().includes(q) ||
-        (o.customerPhone || '').toLowerCase().includes(q) ||
-        (!!qDigits && (o.customerPhone || '').replace(/\D/g, '').includes(qDigits)) ||
-        (o.guestName || '').toLowerCase().includes(q) ||
-        (o.notes || '').toLowerCase().includes(q)
-    )
-})
+// La búsqueda y el estado se filtran en el servidor ANTES de paginar.
+const resFilteredItems = computed(() => reservations.value)
+const onReservationSearchInput = () => {
+    resCurrentPage.value = 1
+    // Evita que una respuesta del término anterior se aplique durante el debounce.
+    reservationsRequest++
+    debouncedRefetchReservations.schedule()
+}
+const onReservationFilterChange = () => {
+    resCurrentPage.value = 1
+    debouncedRefetchReservations.cancel()
+    void fetchReservations()
+}
 
 /** YYYY-MM-DD como día en Colombia (UTC-5 fijo) → instante en ISO UTC. */
 const reservedColombiaDateToIsoUtc = (dateStr: string, endOfDay: boolean): string => {
@@ -2427,57 +2413,53 @@ const reservedColombiaDateToIsoUtc = (dateStr: string, endOfDay: boolean): strin
 
 let lastReservationsFetchedAt = 0
 const fetchReservations = async (options: { background?: boolean } = {}) => {
+    if (activeTab.value !== 'reservations') return
+    const request = ++reservationsRequest
+    const workspace = workspaceBranchId.value
     if (!options.background) resLoading.value = true
     try {
-        let statusPayload: string | undefined = undefined
-
-        if (resStatus.value === null) {
-            statusPayload = undefined
-        } else if (resStatus.value === '__all__') {
-            statusPayload = undefined
-        } else {
-            statusPayload = resStatus.value
-        }
-
-        const body: Record<string, any> = {
+        const body: Record<string, unknown> = {
             type: 'reservation',
             page: resCurrentPage.value,
             pageSize: resPageSize.value,
-            sortBy:
-                resSortBy.value === 'prepareAt'
-                    ? 'PrepareAt'
-                    : resSortBy.value === 'reservedFor'
-                      ? 'ReservedFor'
-                      : resSortBy.value === 'createdAt'
-                        ? 'CreatedAt'
-                        : resSortBy.value,
+            sortBy: resSortBy.value === 'prepareAt' ? 'PrepareAt'
+                : resSortBy.value === 'reservedFor' ? 'ReservedFor'
+                : resSortBy.value === 'createdAt' ? 'CreatedAt' : resSortBy.value,
             sortOrder: resSortOrder.value,
+            // Los pedidos entregados/cancelados se excluyen ANTES del conteo y Skip/Take.
+            activeReservationsOnly: resStatus.value === null,
         }
-
-        if (statusPayload) body.status = statusPayload
+        if (resStatus.value && resStatus.value !== '__all__') body.status = resStatus.value
         if (resFrom.value) body.reservedFromDate = reservedColombiaDateToIsoUtc(resFrom.value, false)
         if (resTo.value) body.reservedToDate = reservedColombiaDateToIsoUtc(resTo.value, true)
+        if (resSearch.value.trim()) body.searchTerm = resSearch.value.trim()
 
         const response = await orderApi.searchOrders(body)
+        if (request !== reservationsRequest || activeTab.value !== 'reservations' || workspace !== workspaceBranchId.value) return
 
-        let items = response.items
-        if (resStatus.value === null) {
-            items = items.filter((o: OrderListItem) => o.status !== 'delivered' && o.status !== 'cancelled')
+        // El último elemento de la última página puede haberse entregado/cancelado.
+        // Regresar a una página válida en lugar de dejar un listado vacío.
+        const maxPage = Math.max(1, Math.ceil(response.totalCount / resPageSize.value))
+        if (resCurrentPage.value > maxPage) {
+            resCurrentPage.value = maxPage
+            void fetchReservations(options)
+            return
         }
-
-        reservations.value = items
-        resTotalCount.value = resStatus.value === null ? items.length : response.totalCount
+        reservations.value = response.items
+        resTotalCount.value = response.totalCount
         lastReservationsFetchedAt = Date.now()
     } catch (err: any) {
+        if (request !== reservationsRequest || activeTab.value !== 'reservations' || workspace !== workspaceBranchId.value) return
         if (!options.background) error('Error al cargar reservas', err.message)
     } finally {
-        resLoading.value = false
+        if (request === reservationsRequest) resLoading.value = false
     }
 }
-
 const resChangePage = (page: number) => {
+    if (page < 1 || page > resTotalPages.value) return
     resCurrentPage.value = page
-    fetchReservations()
+    debouncedRefetchReservations.cancel()
+    void fetchReservations()
 }
 
 const handleResSort = (field: string) => {
@@ -2487,7 +2469,9 @@ const handleResSort = (field: string) => {
         resSortBy.value = field
         resSortOrder.value = field === 'prepareAt' || field === 'reservedFor' ? 'asc' : 'desc'
     }
-    fetchReservations()
+    resCurrentPage.value = 1
+    debouncedRefetchReservations.cancel()
+    void fetchReservations()
 }
 
 const handleResQuickBankTransfer = async (order: OrderListItem, bankId: number) => {
@@ -2510,7 +2494,8 @@ const clearResFilters = () => {
     resFrom.value = ''
     resTo.value = ''
     resCurrentPage.value = 1
-    fetchReservations()
+    debouncedRefetchReservations.cancel()
+    void fetchReservations()
 }
 
 const reservationHasAssociatedPayments = (order: OrderListItem): boolean =>
@@ -2626,7 +2611,9 @@ watch(() => route.query.remoteBranchId, () => {
 })
 watch(workspaceBranchId, () => {
     // Global branch changes remount MainLayout in production; invalidate pending reads as a safeguard.
-    ordersRequest++; deliverymenRequest++; branchOptionsRequest++; branchesRequest++
+    ordersRequest++; deliverymenRequest++; reservationsRequest++; branchOptionsRequest++; branchesRequest++
+    debouncedRefetchReservations.cancel()
+    reservations.value = []; resTotalCount.value = 0; resCurrentPage.value = 1
     remoteBranchesLoadedAt = 0; remoteBranchesLoadedFor = null
     remoteBranches.value = []; remoteOptions.value = null; orders.value = []; totalCount.value = 0
     activeTab.value = 'orders'
@@ -2639,20 +2626,27 @@ async function retryRemoteWorkspace() {
 }
 onMounted(async () => {
     mounted = true
+    const destinations = loadRemoteBranches()
+    const rows = remoteBranchId.value == null ? fetchOrdersWithDeliverymen()
+        : destinations.then(() => fetchOrdersWithDeliverymen())
     await Promise.allSettled([
         // Same branch scope as MainLayout/bootstrapOrderCatalog: share the
         // existing in-flight requests instead of fetching banks/apps twice.
         banksStore.ensureListLoaded(workspaceBranchId.value),
         appsStore.ensureListLoaded(workspaceBranchId.value),
-        loadRemoteBranches(),
+        destinations, rows,
     ])
     await loadWorkspaceOptions()
-    await fetchOrdersWithDeliverymen()
 })
 onUnmounted(() => {
     mounted = false
-    ordersRequest++; deliverymenRequest++; branchOptionsRequest++; branchesRequest++
+    searchControllers.forEach(controller => controller.abort())
+    searchControllers.clear()
+    inFlightOrderSearches.clear()
+    deliverymenOptionsRequests.clear()
+    ordersRequest++; deliverymenRequest++; reservationsRequest++; branchOptionsRequest++; branchesRequest++
     debouncedRefetchOrders.cancel()
+    debouncedRefetchReservations.cancel()
     if (updatesTimer) clearTimeout(updatesTimer)
 })
 </script>

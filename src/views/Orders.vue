@@ -1,5 +1,5 @@
 <template>
-    <MainLayout :no-card="true">
+    <div class="contents">
         <div class="orders-view h-full bg-gray-50 flex flex-col">
             <!-- Main Content -->
             <div class="flex flex-1 min-h-0 flex-col lg:flex-row">
@@ -13,7 +13,12 @@
 
                     <!-- Products Grid -->
                     <div class="flex-1 overflow-y-auto p-4">
-                        <ProductsGrid :products="ordersStore.filteredProducts" />
+                        <div v-if="productsStore.catalogError" role="alert" class="mb-3 rounded-lg bg-amber-50 p-3 text-sm text-amber-900">
+                            {{ productsStore.catalogError }}
+                            <button type="button" class="ml-2 font-medium underline" @click="retryCatalog">Reintentar</button>
+                        </div>
+                        <ProductsGrid :products="ordersStore.filteredProducts"
+                            :loading="productsStore.catalogLoading && !productsStore.catalogProducts.length" />
                     </div>
                 </div>
 
@@ -39,11 +44,11 @@
                 WhatsApp
             </button>
         </div>
-    </MainLayout>
+    </div>
 </template>
 
 <script setup lang="ts">
-import { onMounted, onUnmounted, computed, ref } from 'vue'
+import { onMounted, onUnmounted, computed, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useOrdersDraftsStore } from '@/store/ordersDrafts'
 import { useProductsStore } from '@/store/products'
@@ -52,7 +57,6 @@ import { useAuthStore } from '@/store/auth'
 import { bootstrapOrderCatalog } from '@/utils/orderCatalogBootstrap'
 import { buildOrderPosTabs } from '@/config/orderPosCategories'
 // Components
-import MainLayout from '@/components/layout/MainLayout.vue'
 import BaseLoading from '@/components/ui/BaseLoading.vue'
 import BaseAlert from '@/components/ui/BaseAlert.vue'
 import ProductsGrid from '@/components/orders/products/ProductGrid.vue'
@@ -70,14 +74,14 @@ const whatsappReturnConversationId = ref<number | null>(null)
 
 // Categorías transversales desde el store; respaldo por productos cargados en catálogo.
 const categories = computed(() => {
-    const fromCatalog = productCategoriesStore.list?.items
+    const fromCatalog = productCategoriesStore.catalogCategories
     if (fromCatalog?.length) {
         return fromCatalog.map((c) => ({ id: c.id, name: c.name }))
     }
-    if (!productsStore.list?.items) return []
+    if (!productsStore.catalogProducts) return []
 
     const categoryMap = new Map<number, { id: number; name: string }>()
-    productsStore.list.items.forEach((product) => {
+    productsStore.catalogProducts.forEach((product) => {
         if (product.categoryId && !categoryMap.has(product.categoryId)) {
             categoryMap.set(product.categoryId, {
                 id: product.categoryId,
@@ -93,13 +97,18 @@ const posTabs = computed(() => buildOrderPosTabs(categories.value))
 // Catálogo ya en bootstrap (login / layout); aquí solo sincronizamos draft con Pinia.
 const ensureOrderPageData = async () => {
     try {
-        await bootstrapOrderCatalog(authStore.userRole, ordersStore.activeBranchId)
-        await ordersStore.loadBanks()
-        await ordersStore.loadApps()
+        await Promise.all([
+            bootstrapOrderCatalog(authStore.userRole, ordersStore.currentOrder?.branchId ?? ordersStore.activeBranchId),
+            ordersStore.loadBanks(), ordersStore.loadApps(),
+        ])
     } catch (error) {
         console.error('Error cargando datos de pedidos:', error)
     }
 }
+
+const catalogBranchId = computed(() => ordersStore.currentOrder?.branchId ?? ordersStore.activeBranchId)
+watch(catalogBranchId, branchId => { void productsStore.ensureCatalogLoaded(branchId).catch(() => {}) })
+function retryCatalog() { void productsStore.ensureCatalogLoaded(catalogBranchId.value, true).catch(() => {}) }
 
 const onCategorySelected = (_categoryId: number | null) => {
     // Category selection is already handled by the CategoriesBar component

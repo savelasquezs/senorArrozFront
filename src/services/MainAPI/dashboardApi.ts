@@ -138,10 +138,11 @@ class DashboardApi extends BaseApi {
 		fromIso: string,
 		toIso: string,
 		branchId?: number | null,
+		signal?: AbortSignal,
 	): Promise<DashboardDeliveryApiResponse> {
 		const params: Record<string, string | number> = { from: fromIso, to: toIso };
 		if (branchId != null && branchId !== undefined) params.branchId = branchId;
-		return this.get<DashboardDeliveryApiResponse>('/dashboard/delivery/me', { params });
+		return this.get<DashboardDeliveryApiResponse>('/dashboard/delivery/me', { params, signal });
 	}
 
 	/** Paradas de una ruta cerrada (direcciones / pedidos). */
@@ -259,11 +260,12 @@ class DashboardApi extends BaseApi {
 		branchId: number | null,
 		fromIso: string,
 		toIso: string,
+		signal?: AbortSignal,
 	): Promise<DashboardExpenseSummaryApiResponse> {
 		const params: Record<string, string> = { from: fromIso, to: toIso };
 		if (branchId != null) params.branchId = String(branchId);
 		return this.get<DashboardExpenseSummaryApiResponse>('/dashboard/expenses/summary', {
-			params,
+			params, signal,
 			branchScope: 'all',
 		});
 	}
@@ -272,11 +274,12 @@ class DashboardApi extends BaseApi {
 		branchId: number | null,
 		fromIso: string,
 		toIso: string,
+		signal?: AbortSignal,
 	): Promise<DashboardExpenseByCategoryApiResponse> {
 		const params: Record<string, string> = { from: fromIso, to: toIso };
 		if (branchId != null) params.branchId = String(branchId);
 		return this.get<DashboardExpenseByCategoryApiResponse>('/dashboard/expenses/by-category', {
-			params,
+			params, signal,
 			branchScope: 'all',
 		});
 	}
@@ -290,6 +293,7 @@ class DashboardApi extends BaseApi {
 			expenseId?: number | null;
 			granularity?: 'day' | 'month' | 'auto';
 		},
+		signal?: AbortSignal,
 	): Promise<DashboardExpenseTimeSeriesApiResponse> {
 		const params: Record<string, string> = { from: fromIso, to: toIso };
 		if (branchId != null) params.branchId = String(branchId);
@@ -297,7 +301,7 @@ class DashboardApi extends BaseApi {
 		if (opts?.expenseId != null) params.expenseId = String(opts.expenseId);
 		if (opts?.granularity && opts.granularity !== 'auto') params.granularity = opts.granularity;
 		return this.get<DashboardExpenseTimeSeriesApiResponse>('/dashboard/expenses/timeseries', {
-			params,
+			params, signal,
 			branchScope: 'all',
 		});
 	}
@@ -308,6 +312,7 @@ class DashboardApi extends BaseApi {
 		fromIso: string,
 		toIso: string,
 		opts: { categoryId: number; expenseId?: number | null; limit?: number },
+		signal?: AbortSignal,
 	): Promise<DashboardExpenseTopLinesApiResponse> {
 		const params: Record<string, string> = {
 			from: fromIso,
@@ -319,7 +324,7 @@ class DashboardApi extends BaseApi {
 			params.expenseId = String(opts.expenseId);
 		if (opts.limit != null && opts.limit !== undefined) params.limit = String(opts.limit);
 		return this.get<DashboardExpenseTopLinesApiResponse>('/dashboard/expenses/top-lines', {
-			params,
+			params, signal,
 			branchScope: 'all',
 		});
 	}

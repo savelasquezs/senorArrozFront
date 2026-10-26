@@ -1,4 +1,5 @@
 import { ref, watch, computed, onScopeDispose, type Ref } from 'vue';
+import { createSectionSnapshot } from '@/helpers/sectionSnapshot';
 import { dashboardApi, type DashboardPrincipalSalesVsExpensesApiResponse } from '@/services/MainAPI/dashboardApi';
 import { encodeDashboardRangeToApi } from '@/services/MainAPI/dashboardSectionApi';
 import type { DashboardSectionId } from '@/views/dashboard/dashboardSectionIds';
@@ -30,6 +31,8 @@ export function useDashboardPrincipalSalesVsExpenses(
 	const isActive = computed(() => activeSection.value === 'principal');
 	let requestVersion = 0;
 	let currentController: AbortController | null = null;
+	const snapshot = createSectionSnapshot();
+	let filterKey = '';
 
 	function invalidatePending() {
 		requestVersion += 1;
@@ -48,8 +51,11 @@ export function useDashboardPrincipalSalesVsExpenses(
 		return r;
 	});
 
-	async function load() {
+	async function load(force = true) {
 		if (!isActive.value) return;
+		const key = `${branchId.value}:${rangeKey(dateRange.value)}:${principalSalesVsExpensesGranularity(timeGranularity.value)}`;
+		if (!force && rawData.value && snapshot.fresh(key)) return;
+		if (filterKey !== key) { rawData.value = null; filterKey = key; }
 		currentController?.abort();
 		const controller = new AbortController();
 		currentController = controller;
@@ -64,6 +70,7 @@ export function useDashboardPrincipalSalesVsExpenses(
 			);
 			if (version !== requestVersion || !isActive.value) return;
 			rawData.value = nextData;
+			snapshot.loaded(key);
 		} catch (e) {
 			if (version !== requestVersion || !isActive.value) return;
 			error.value = e instanceof Error ? e.message : 'Error al cargar ventas vs gastos';
@@ -79,7 +86,7 @@ export function useDashboardPrincipalSalesVsExpenses(
 	watch(
 		[isActive, branchId, () => rangeKey(dateRange.value), () => principalSalesVsExpensesGranularity(timeGranularity.value)],
 		() => {
-			if (isActive.value) void load();
+			if (isActive.value) void load(false);
 			else {
 				invalidatePending();
 				loading.value = false;

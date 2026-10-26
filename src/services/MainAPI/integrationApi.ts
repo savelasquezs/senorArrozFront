@@ -62,9 +62,9 @@ class IntegrationApi extends BaseApi {
     })
   }
 
-  getRappiOrders(branchId?: number | null) {
+  getRappiOrders(branchId?: number | null, signal?: AbortSignal) {
     return this.get<ApiResponse<RappiExternalOrder[]>>('/integrations/apps/rappi/orders', {
-      params: branchId ? { branchId } : {},
+      params: branchId ? { branchId } : {}, signal,
     })
   }
 

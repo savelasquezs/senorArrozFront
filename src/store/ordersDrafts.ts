@@ -158,13 +158,13 @@ export const useOrdersDraftsStore = defineStore('ordersDrafts', () => {
     // Delegar a productsStore
     const products = computed(() => {
         const productsStore = useProductsStore()
-        return productsStore.currentProducts
+        return productsStore.catalogProducts ?? productsStore.currentProducts
     })
 
     const filteredProducts = computed(() => {
         const productsStore = useProductsStore()
         // Filtrar primero los productos activos para evitar mostrar inactivos en la orden
-        let filtered = productsStore.currentProducts.filter(product => product.active)
+        let filtered = (productsStore.catalogProducts ?? productsStore.currentProducts).filter(product => product.active)
 
         // Aplicar búsqueda
         if (searchQuery.value) {
@@ -183,7 +183,7 @@ export const useOrdersDraftsStore = defineStore('ordersDrafts', () => {
 
         const catStore = useProductCategoriesStore()
         const catalog =
-            catStore.list?.items?.map((c) => ({ id: c.id, name: c.name ?? '' })) ?? []
+            (catStore.catalogCategories ?? catStore.list?.items)?.map((c) => ({ id: c.id, name: c.name ?? '' })) ?? []
         const riceIds = getRiceCategoryIdSet(catalog)
         if (
             selectedCategoryIds.value?.length &&
@@ -1561,7 +1561,7 @@ export const useOrdersDraftsStore = defineStore('ordersDrafts', () => {
         try {
             const banksStore = useBanksStore()
             await banksStore.ensureListLoaded(branchId, true)
-            banks.value = banksStore.list?.items ?? []
+            banks.value = banksStore.options ?? banksStore.list?.items ?? []
         } catch (error) {
             console.error('Error loading banks:', error)
         }
@@ -1571,7 +1571,7 @@ export const useOrdersDraftsStore = defineStore('ordersDrafts', () => {
         try {
             const appsStore = useAppsStore()
             await appsStore.ensureListLoaded(branchId, true)
-            apps.value = appsStore.list?.items ?? []
+            apps.value = appsStore.options ?? appsStore.list?.items ?? []
         } catch (error) {
             console.error('Error loading apps:', error)
         }

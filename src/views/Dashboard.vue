@@ -1,5 +1,5 @@
 <template>
-    <MainLayout no-card hide-quick-order>
+    <div class="contents">
         <div class="h-full overflow-y-auto p-2">
             <div v-if="authStore.userRole === UserRole.SUPERADMIN && route.query.section !== 'domicilios'" class="mb-5 flex justify-end">
                 <router-link
@@ -17,14 +17,13 @@
                 Tu rol no tiene acceso a esta sección.
             </div>
         </div>
-    </MainLayout>
+    </div>
 </template>
 
 <script setup lang="ts">
 import { useRoute } from 'vue-router'
 import { useAuthStore } from '@/store/auth'
 import { UserRole } from '@/types/auth'
-import MainLayout from '@/components/layout/MainLayout.vue'
 import GlobalDashboard from '@/views/dashboard/GlobalDashboard.vue'
 import AdminDashboard from '@/views/dashboard/AdminDashboard.vue'
 

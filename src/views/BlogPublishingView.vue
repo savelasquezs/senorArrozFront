@@ -1,5 +1,5 @@
 <template>
-  <MainLayout>
+  <div class="contents">
     <section class="space-y-6">
       <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
@@ -105,6 +105,11 @@
           </div>
         </article>
       </div>
+      <nav v-if="queueTotal > 50" aria-label="Páginas de artículos" class="flex items-center justify-between gap-3">
+        <button :disabled="loading || queuePage <= 1" class="rounded border px-3 py-2 disabled:opacity-50" @click="changeQueuePage(queuePage - 1)">Anterior</button>
+        <span class="text-sm">Página {{ queuePage }} de {{ Math.ceil(queueTotal / 50) }}</span>
+        <button :disabled="loading || queuePage * 50 >= queueTotal" class="rounded border px-3 py-2 disabled:opacity-50" @click="changeQueuePage(queuePage + 1)">Siguiente</button>
+      </nav>
     </section>
 
     <BaseDialog v-model="previewOpen" size="5xl" :close-on-backdrop="!publishing" title="Vista previa del artículo">
@@ -219,11 +224,12 @@
         </button>
       </template>
     </BaseDialog>
-  </MainLayout>
+  </div>
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { createLatestRead } from '@/helpers/latestRead'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import {
   ArrowPathIcon,
   ArrowTopRightOnSquareIcon,
@@ -232,7 +238,6 @@ import {
   ExclamationTriangleIcon,
   EyeIcon,
 } from '@heroicons/vue/24/outline'
-import MainLayout from '@/components/layout/MainLayout.vue'
 import BaseDialog from '@/components/ui/BaseDialog.vue'
 import BlogArticleRenderer from '@/components/blog/BlogArticleRenderer.vue'
 import { useToast } from '@/composables/useToast'
@@ -244,6 +249,8 @@ import type {
 } from '@/types/blogPublishing'
 
 const articles = ref<BlogPublishingQueueItem[]>([])
+const queuePage = ref(1), queueTotal = ref(0)
+function changeQueuePage(page: number) { queuePage.value = page; void loadQueue() }
 const selectedArticle = ref<BlogPublishingQueueItem | null>(null)
 const preview = ref<BlogArticlePreview | null>(null)
 const loading = ref(false)
@@ -259,37 +266,48 @@ const canPublishSelected = computed(() =>
   || selectedArticle.value?.publicationStatus === 'changesPending',
 )
 
+const queueRead = createLatestRead(), previewRead = createLatestRead()
+onUnmounted(() => { queueRead.invalidate(); previewRead.invalidate(); loading.value = false })
+watch(previewOpen, open => { if (!open) previewRead.invalidate() })
 async function loadQueue() {
+  const request = queueRead.begin()
   loading.value = true
   try {
-    const response = await blogPublishingApi.getQueue()
-    articles.value = response.data ?? []
+    const response = await blogPublishingApi.getQueuePage(queuePage.value, 50, request.signal)
+    if (!request.isCurrent()) return
+    articles.value = response.data?.items ?? []
+    queueTotal.value = response.data?.totalCount ?? 0
   } catch (error) {
+    if (!request.isCurrent()) return
     toast.error('No se pudieron verificar los artículos', errorMessage(error))
   } finally {
-    loading.value = false
+    if (request.isCurrent()) loading.value = false
   }
 }
 
 async function openPreview(article: BlogPublishingQueueItem) {
+  const request = previewRead.begin()
   previewLoadingId.value = article.notionPageId
   selectedArticle.value = article
   publishedUrl.value = null
   try {
-    const response = await blogPublishingApi.getPreview(article.notionPageId)
+    const response = await blogPublishingApi.getPreview(article.notionPageId, request.signal)
+    if (!request.isCurrent()) return
     preview.value = response.data
     previewOpen.value = true
   } catch (error) {
+    if (!request.isCurrent()) return
     toast.error('No se pudo generar la vista previa', errorMessage(error))
   } finally {
-    previewLoadingId.value = null
+    if (request.isCurrent()) previewLoadingId.value = null
   }
 }
 
 async function publishSelected() {
-  if (!preview.value || preview.value.warnings.length || !canPublishSelected.value) return
+  if (publishing.value || !preview.value || preview.value.warnings.length || !canPublishSelected.value) return
   const wasRepublish = selectedArticle.value?.publicationStatus === 'changesPending'
   publishing.value = true
+  queueRead.invalidate(); previewRead.invalidate(); loading.value = false
   try {
     const response = await blogPublishingApi.publish(preview.value.notionPageId)
     publishedUrl.value = response.data.publicUrl

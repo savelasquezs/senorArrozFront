@@ -238,25 +238,25 @@ export interface DeliveryPlaybackFilters {
 }
 
 class DeliveryTrackingIncidentsApi extends BaseApi {
-  getAll(filters: DeliveryTrackingIncidentFilters): Promise<ApiResponse<PagedResult<DeliveryTrackingIncidentListItem>>> {
-    return this.get('/delivery-tracking-incidents', { params: filters })
+  getAll(filters: DeliveryTrackingIncidentFilters, signal?: AbortSignal): Promise<ApiResponse<PagedResult<DeliveryTrackingIncidentListItem>>> {
+    return this.get('/delivery-tracking-incidents', { params: filters, signal })
   }
 
-  getById(id: number): Promise<ApiResponse<DeliveryTrackingIncidentDetail>> {
-    return this.get(`/delivery-tracking-incidents/${id}`)
+  getById(id: number, signal?: AbortSignal): Promise<ApiResponse<DeliveryTrackingIncidentDetail>> {
+    return this.get(`/delivery-tracking-incidents/${id}`, { signal })
   }
 
   review(id: number, payload: ReviewDeliveryTrackingIncident): Promise<ApiResponse<DeliveryTrackingIncidentDetail>> {
     return this.put(`/delivery-tracking-incidents/${id}/review`, payload)
   }
 
-  getPlayback(filters: DeliveryPlaybackFilters): Promise<ApiResponse<DeliveryPlaybackResponse>> {
+  getPlayback(filters: DeliveryPlaybackFilters, signal?: AbortSignal): Promise<ApiResponse<DeliveryPlaybackResponse>> {
     const params = new URLSearchParams()
     filters.deliverymanIds.forEach(id => params.append('deliverymanIds', String(id)))
     params.set('from', filters.from)
     params.set('to', filters.to)
     if (filters.branchId) params.set('branchId', String(filters.branchId))
-    return this.get(`/delivery-tracking/playback?${params.toString()}`)
+    return this.get(`/delivery-tracking/playback?${params.toString()}`, { signal })
   }
 }
 

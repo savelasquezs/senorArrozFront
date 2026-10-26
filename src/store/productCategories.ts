@@ -1,5 +1,7 @@
 import { defineStore } from 'pinia'
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
+import { useAuthStore } from './auth'
+import { loadPagedCatalog } from '@/helpers/loadPagedCatalog'
 import { productCategoryApi } from '@/services/MainAPI/productCategoryApi'
 import type { PagedResult } from '@/types/common'
 import type {
@@ -17,10 +19,17 @@ import {
 
 export const ORDER_CATALOG_CATEGORY_PAGE_SIZE = 100
 
-let categoriesCatalogLoadInFlight: Promise<void> | null = null
-
 export const useProductCategoriesStore = defineStore('productCategories', () => {
   const list = ref<PagedResult<ProductCategory> | null>(null)
+  const catalogCategories = ref<ProductCategory[]>([])
+  const catalogLoading = ref(false)
+  const auth = useAuthStore()
+  let catalogLoaded = false, catalogVersion = 0
+  let categoriesCatalogLoadInFlight: Promise<void> | null = null
+  function invalidateCatalog() { catalogVersion++; catalogLoaded = false; categoriesCatalogLoadInFlight = null }
+  watch(() => [auth.user?.id, auth.user?.role].join(':'), () => {
+    invalidateCatalog(); catalogCategories.value = []; catalogLoading.value = false
+  }, { flush: 'sync' })
   const current = ref<ProductCategory | null>(null)
   const { isLoading, error, run, clearError } = createResourceState()
 
@@ -82,25 +91,25 @@ export const useProductCategoriesStore = defineStore('productCategories', () => 
   }
 
   const ensureCatalogLoaded = async () => {
-    if (list.value?.items && list.value.items.length > 0) {
-      return
-    }
+    if (catalogLoaded) return
     if (categoriesCatalogLoadInFlight) {
       return categoriesCatalogLoadInFlight
     }
-    categoriesCatalogLoadInFlight = (async () => {
+    const version = ++catalogVersion
+    catalogLoading.value = true
+    const request = (async () => {
       try {
-        await fetch({
-          page: 1,
-          pageSize: ORDER_CATALOG_CATEGORY_PAGE_SIZE,
-          sortBy: 'name',
-          sortOrder: 'asc',
-        })
+        await loadPagedCatalog<ProductCategory>(async page => {
+          const response = await productCategoryApi.getProductCategories({ page, pageSize: ORDER_CATALOG_CATEGORY_PAGE_SIZE, sortBy: 'name', sortOrder: 'asc' })
+          return response.data
+        }, items => { if (version === catalogVersion) catalogCategories.value = items })
+        if (version === catalogVersion) catalogLoaded = true
       } finally {
-        categoriesCatalogLoadInFlight = null
+        if (version === catalogVersion) { categoriesCatalogLoadInFlight = null; catalogLoading.value = false }
       }
     })()
-    return categoriesCatalogLoadInFlight
+    categoriesCatalogLoadInFlight = request
+    return request
   }
 
   const fetchById = async (id: number, opts?: { silent?: boolean }) => {
@@ -113,6 +122,7 @@ export const useProductCategoriesStore = defineStore('productCategories', () => 
   const create = async (payload: CreateProductCategoryDto, opts?: { silent?: boolean }) => {
     return run(async () => {
       const res = await productCategoryApi.createProductCategory(payload)
+      invalidateCatalog()
       prependPagedItem(list, res.data)
       return res.data
     }, { ...opts, errorMessage: 'Error al crear la categoria' })
@@ -121,6 +131,7 @@ export const useProductCategoriesStore = defineStore('productCategories', () => 
   const update = async (id: number, payload: UpdateProductCategoryDto, opts?: { silent?: boolean }) => {
     return run(async () => {
       const res = await productCategoryApi.updateProductCategory(id, payload)
+      invalidateCatalog()
       current.value = res.data
       replacePagedItem(list, res.data)
       return res.data
@@ -130,6 +141,7 @@ export const useProductCategoriesStore = defineStore('productCategories', () => 
   const remove = async (id: number, opts?: { silent?: boolean }) => {
     await run(async () => {
       await productCategoryApi.deleteProductCategory(id)
+      invalidateCatalog()
       removePagedItem(list, id)
 
       if (current.value?.id === id) {
@@ -350,6 +362,9 @@ export const useProductCategoriesStore = defineStore('productCategories', () => 
 
   return {
     list,
+    catalogCategories,
+    catalogLoading,
+    invalidateCatalog,
     current,
     isLoading,
     error,

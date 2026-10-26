@@ -1,0 +1,1094 @@
+{
+  "date": "2026-10-26",
+  "status": "Local implementation verified; no remote CI, merge or deployment",
+  "frontendSourceSha": "6309c6ca45e58cd7c21a0606b89f379a02fd2cc2",
+  "apiSourceSha": "70ac0a1f9c25675df6e02a3128d9789deedfcb06",
+  "baselineFrontendSha": "5b29fcf613a244cd832724e4802237231883bb12",
+  "frontendTests": {
+    "files": 149,
+    "passed": 940,
+    "failed": 0
+  },
+  "apiTests": {
+    "total": "1390",
+    "executed": "1289",
+    "passed": "1289",
+    "failed": "0",
+    "error": "0",
+    "timeout": "0",
+    "aborted": "0",
+    "inconclusive": "0",
+    "passedButRunAborted": "0",
+    "notRunnable": "0",
+    "notExecuted": "0",
+    "disconnected": "0",
+    "warning": "0",
+    "completed": "0",
+    "inProgress": "0",
+    "pending": "0"
+  },
+  "typecheck": "passed",
+  "productionBuild": "passed",
+  "manifestSha256": "6f05602b7bb8ab44eba843d0b2aa6ddab9688fa572f9fde42db1ade959bb4cbc",
+  "browser": {
+    "layer": "Synthetic API fixture, local compressed production builds, Chromium headless; not production UX measurements",
+    "apiDelayMs": 150,
+    "repetitions": 20,
+    "results": {
+      "baseline": {
+        "coldProducts": {
+          "repetitions": 20,
+          "medianMs": 1048.2043000000012,
+          "p95Ms": 1112.683399999998,
+          "samplesMs": [
+            1331.9717999999998,
+            1058.7659000000003,
+            1068.3533000000002,
+            1068.2178000000004,
+            1016.0021999999999,
+            1042.6309,
+            999.451500000001,
+            1004.0957999999991,
+            1021.5092999999997,
+            1012.9387999999999,
+            1014.4840999999997,
+            1009.2343999999994,
+            1073.3336999999992,
+            1104.9604,
+            978.9089999999978,
+            1048.2043000000012,
+            996.7397999999994,
+            1112.683399999998,
+            1059.0084000000024,
+            1073.8865000000005
+          ]
+        },
+        "warmNavigation": {
+          "repetitions": 40,
+          "medianMs": 1233.280899999998,
+          "p95Ms": 1308.8506000000016,
+          "samplesMs": [
+            1308.8506000000016,
+            583.6110000000008,
+            1353.953300000001,
+            441.2356,
+            1305.5053000000007,
+            511.8638000000028,
+            1251.3689999999988,
+            510.4375,
+            1306.6466,
+            506.7443999999996,
+            1275.863699999998,
+            482.6895999999979,
+            1271.3201000000045,
+            472.8035999999993,
+            1270.536699999997,
+            453.79849999999715,
+            1299.2517000000007,
+            476.6525000000038,
+            1306.4047999999966,
+            511.43330000000424,
+            1260.412900000003,
+            468.7574999999997,
+            1294.5968999999968,
+            508.5219999999972,
+            1274.9435999999987,
+            475.1380999999965,
+            1275.0907999999981,
+            499.6533000000054,
+            1334.9645999999993,
+            489.7755000000034,
+            1271.6387999999934,
+            464.27470000000176,
+            1270.1873999999953,
+            484.6748000000007,
+            1281.289499999999,
+            449.88320000000385,
+            1233.280899999998,
+            472.97670000000653,
+            1277.7412999999942,
+            457.9244999999937
+          ]
+        },
+        "cycleRequestCounts": {
+          "/hubs/orders/negotiate": 40,
+          "/api/integrations/apps/status": 40,
+          "/api/employee-lunch/me": 40,
+          "/api/branches/1/daily-promotion/active": 40,
+          "/hubs/whatsapp/negotiate": 40,
+          "/api/productcategories": 20,
+          "/api/employee-leaves/summary": 40,
+          "/api/products": 20,
+          "/api/inventory/availability": 20,
+          "/api/customers": 20
+        },
+        "before": {
+          "intervals": 3,
+          "heap": 30577750
+        },
+        "lifecycle": {
+          "intervals": 3,
+          "heap": 31504317,
+          "headers": 1,
+          "mainRegions": 1,
+          "longTasks": []
+        },
+        "mobile": {
+          "viewport": 390,
+          "width": 390,
+          "overflow": [
+            {
+              "tag": "TABLE",
+              "class": "min-w-full divide-y divide-gray-200 text-sm",
+              "text": " Cliente  Contacto  Sucursal  Dir.  Pedidos Estado Acciones Perf customer 001#1 ",
+              "right": 734.484375
+            },
+            {
+              "tag": "THEAD",
+              "class": "bg-gray-50 sticky top-0 z-10 shadow-sm",
+              "text": " Cliente  Contacto  Sucursal  Dir.  Pedidos Estado Acciones ",
+              "right": 734.484375
+            },
+            {
+              "tag": "TR",
+              "class": "",
+              "text": " Cliente  Contacto  Sucursal  Dir.  Pedidos Estado Acciones ",
+              "right": 734.484375
+            },
+            {
+              "tag": "TH",
+              "class": "px-3 py-2 text-left text-[10px] font-semibold text-gray-500 uppercase",
+              "text": " Sucursal ",
+              "right": 430.890625
+            },
+            {
+              "tag": "TH",
+              "class": "px-3 py-2 text-left text-[10px] font-semibold text-gray-500 uppercase",
+              "text": " Dir. ",
+              "right": 473.625
+            },
+            {
+              "tag": "TH",
+              "class": "px-3 py-2 text-left text-[10px] font-semibold text-gray-500 uppercase",
+              "text": " Pedidos ",
+              "right": 549.875
+            },
+            {
+              "tag": "TH",
+              "class": "px-3 py-2 text-left text-[10px] font-semibold text-gray-500 uppercase",
+              "text": "Estado",
+              "right": 622.484375
+            },
+            {
+              "tag": "TH",
+              "class": "px-3 py-2 text-right text-[10px] font-semibold text-gray-500 uppercase",
+              "text": " Acciones ",
+              "right": 734.484375
+            },
+            {
+              "tag": "TBODY",
+              "class": "bg-white divide-y divide-gray-100",
+              "text": "Perf customer 001#1 3000000000 Synthetic00 pedidosActivoPerf customer 002#2 3000",
+              "right": 734.484375
+            },
+            {
+              "tag": "TR",
+              "class": "hover:bg-gray-50/80 align-middle",
+              "text": "Perf customer 001#1 3000000000 Synthetic00 pedidosActivo",
+              "right": 734.484375
+            },
+            {
+              "tag": "TD",
+              "class": "px-3 py-2 text-xs text-gray-800 whitespace-nowrap",
+              "text": " Synthetic",
+              "right": 430.890625
+            },
+            {
+              "tag": "SPAN",
+              "class": "inline-flex items-center gap-0.5",
+              "text": " Synthetic",
+              "right": 418.890625
+            }
+          ]
+        },
+        "pageErrors": [],
+        "unclassifiedExternalResources": []
+      },
+      "candidate": {
+        "coldProducts": {
+          "repetitions": 20,
+          "medianMs": 542.176999999996,
+          "p95Ms": 623.719499999992,
+          "samplesMs": [
+            783.2014999999956,
+            565.8086999999941,
+            592.8651000000027,
+            498.1412999999957,
+            512.109199999999,
+            559.9439999999959,
+            542.1314999999959,
+            530.5961000000025,
+            554.0167999999976,
+            532.7392000000036,
+            568.564099999996,
+            623.719499999992,
+            542.176999999996,
+            533.4435999999987,
+            500.511599999998,
+            501.83469999999215,
+            503.11960000000545,
+            523.1747000000032,
+            577.4847999999911,
+            589.9630000000034
+          ]
+        },
+        "warmNavigation": {
+          "repetitions": 40,
+          "medianMs": 705.2880999999907,
+          "p95Ms": 1117.026199999993,
+          "samplesMs": [
+            705.2880999999907,
+            569.8040000000037,
+            1117.026199999993,
+            541.3759999999893,
+            1097.4067000000068,
+            598.1051000000007,
+            914.2370999999985,
+            558.7013000000006,
+            1117.377800000002,
+            599.994399999996,
+            1140.7822000000015,
+            560.9502999999968,
+            1018.6889999999985,
+            460.8796000000002,
+            1052.9768999999942,
+            539.5241000000096,
+            1046.5552000000025,
+            507.47639999999956,
+            1072.962599999999,
+            516.8329000000085,
+            1045.6100999999908,
+            543.6616999999969,
+            1076.8615999999893,
+            519.292300000001,
+            1045.794900000008,
+            503.0926999999938,
+            1050.8657000000094,
+            533.2016000000003,
+            1049.2804000000033,
+            550.9274000000005,
+            1064.0125000000116,
+            527.6114999999991,
+            1069.3778999999922,
+            533.350299999991,
+            1081.8772999999928,
+            504.41070000000764,
+            1015.1111999999994,
+            546.8487000000023,
+            1005.0517000000109,
+            522.3280999999988
+          ]
+        },
+        "cycleRequestCounts": {
+          "/api/productcategories": 20,
+          "/api/products": 20,
+          "/api/customers": 20,
+          "/hubs/orders/negotiate": 2,
+          "/hubs/whatsapp/negotiate": 2
+        },
+        "before": {
+          "intervals": 4,
+          "heap": 99203663
+        },
+        "lifecycle": {
+          "intervals": 4,
+          "heap": 39915718,
+          "headers": 1,
+          "mainRegions": 1,
+          "longTasks": [
+            55
+          ]
+        },
+        "mobile": {
+          "viewport": 390,
+          "width": 390,
+          "overflow": [
+            {
+              "tag": "TABLE",
+              "class": "min-w-full divide-y divide-gray-200 text-sm",
+              "text": " Cliente  Contacto  Sucursal  Dir.  Pedidos Estado Acciones Perf customer 002#2 ",
+              "right": 734.1875
+            },
+            {
+              "tag": "THEAD",
+              "class": "bg-gray-50 sticky top-0 z-10 shadow-sm",
+              "text": " Cliente  Contacto  Sucursal  Dir.  Pedidos Estado Acciones ",
+              "right": 734.1875
+            },
+            {
+              "tag": "TR",
+              "class": "",
+              "text": " Cliente  Contacto  Sucursal  Dir.  Pedidos Estado Acciones ",
+              "right": 734.1875
+            },
+            {
+              "tag": "TH",
+              "class": "px-3 py-2 text-left text-[10px] font-semibold text-gray-500 uppercase",
+              "text": " Sucursal ",
+              "right": 430.59375
+            },
+            {
+              "tag": "TH",
+              "class": "px-3 py-2 text-left text-[10px] font-semibold text-gray-500 uppercase",
+              "text": " Dir. ",
+              "right": 473.328125
+            },
+            {
+              "tag": "TH",
+              "class": "px-3 py-2 text-left text-[10px] font-semibold text-gray-500 uppercase",
+              "text": " Pedidos ",
+              "right": 549.578125
+            },
+            {
+              "tag": "TH",
+              "class": "px-3 py-2 text-left text-[10px] font-semibold text-gray-500 uppercase",
+              "text": "Estado",
+              "right": 622.1875
+            },
+            {
+              "tag": "TH",
+              "class": "px-3 py-2 text-right text-[10px] font-semibold text-gray-500 uppercase",
+              "text": " Acciones ",
+              "right": 734.1875
+            },
+            {
+              "tag": "TBODY",
+              "class": "bg-white divide-y divide-gray-100",
+              "text": "Perf customer 002#2 3000000001 Synthetic00 pedidosActivo",
+              "right": 734.1875
+            },
+            {
+              "tag": "TR",
+              "class": "hover:bg-gray-50/80 align-middle",
+              "text": "Perf customer 002#2 3000000001 Synthetic00 pedidosActivo",
+              "right": 734.1875
+            },
+            {
+              "tag": "TD",
+              "class": "px-3 py-2 text-xs text-gray-800 whitespace-nowrap",
+              "text": " Synthetic",
+              "right": 430.59375
+            },
+            {
+              "tag": "SPAN",
+              "class": "inline-flex items-center gap-0.5",
+              "text": " Synthetic",
+              "right": 418.59375
+            }
+          ]
+        },
+        "pageErrors": [],
+        "unclassifiedExternalResources": []
+      }
+    },
+    "viewState": {
+      "customerSearchSurvivesNavigation": true
+    },
+    "recovery": {
+      "oldChunk404": true,
+      "explicitReload": true,
+      "offlineReloadDisabled": true,
+      "target": "/documents",
+      "draftPreserved": true
+    }
+  },
+  "routeSmoke": [
+    {
+      "path": "/settings/electronic-invoicing",
+      "name": "BusinessInvoicing",
+      "landed": "/settings/electronic-invoicing",
+      "textLength": 2738,
+      "errors": []
+    },
+    {
+      "path": "/login",
+      "name": "Login",
+      "landed": "/login",
+      "textLength": 237,
+      "errors": []
+    },
+    {
+      "path": "/forgot-password",
+      "name": "ForgotPassword",
+      "landed": "/forgot-password",
+      "textLength": 182,
+      "errors": []
+    },
+    {
+      "path": "/reset-password",
+      "name": "ResetPassword",
+      "landed": "/reset-password",
+      "textLength": 200,
+      "errors": []
+    },
+    {
+      "path": "/change-password",
+      "name": "ChangePassword",
+      "landed": "/change-password",
+      "textLength": 551,
+      "errors": []
+    },
+    {
+      "path": "/dashboard",
+      "name": "Dashboard",
+      "landed": "/dashboard",
+      "textLength": 884,
+      "errors": []
+    },
+    {
+      "path": "/branches",
+      "name": "BranchesList",
+      "landed": "/branches",
+      "textLength": 789,
+      "errors": []
+    },
+    {
+      "path": "/branches/:id",
+      "name": "BranchDetail",
+      "landed": "/branches",
+      "textLength": 789,
+      "errors": []
+    },
+    {
+      "path": "/almuerzos",
+      "name": "EmployeeLunches",
+      "landed": "/almuerzos",
+      "textLength": 498,
+      "errors": []
+    },
+    {
+      "path": "/permisos",
+      "name": "EmployeeLeaves",
+      "landed": "/permisos",
+      "textLength": 984,
+      "errors": []
+    },
+    {
+      "path": "/permisos/:publicId",
+      "name": "EmployeeLeaveDetail",
+      "landed": "/permisos/98e08165-42a1-42d9-a7dc-79e695207f74",
+      "textLength": 488,
+      "errors": []
+    },
+    {
+      "path": "/customers",
+      "name": "CustomersList",
+      "landed": "/customers",
+      "textLength": 1274,
+      "errors": []
+    },
+    {
+      "path": "/products",
+      "name": "ProductsList",
+      "landed": "/products",
+      "textLength": 8238,
+      "errors": []
+    },
+    {
+      "path": "/product-categories",
+      "name": "ProductCategoriesList",
+      "landed": "/product-categories",
+      "textLength": 634,
+      "errors": []
+    },
+    {
+      "path": "/banks/:id",
+      "name": "BankDetail",
+      "landed": "/banks/1",
+      "textLength": 449,
+      "errors": []
+    },
+    {
+      "path": "/apps/:id",
+      "name": "AppDetail",
+      "landed": "/apps/1",
+      "textLength": 441,
+      "errors": []
+    },
+    {
+      "path": "/orders",
+      "name": "OrdersList",
+      "landed": "/orders",
+      "textLength": 805,
+      "errors": []
+    },
+    {
+      "path": "/orders/new",
+      "name": "OrdersNew",
+      "landed": "/orders/new",
+      "textLength": 7621,
+      "errors": []
+    },
+    {
+      "path": "/orders/:id",
+      "name": "OrderDetail",
+      "landed": "/orders/1",
+      "textLength": 418,
+      "errors": []
+    },
+    {
+      "path": "/kitchen",
+      "name": "Kitchen",
+      "landed": "/kitchen",
+      "textLength": 592,
+      "errors": []
+    },
+    {
+      "path": "/delivery",
+      "name": "Delivery",
+      "landed": "/delivery",
+      "textLength": 747,
+      "errors": []
+    },
+    {
+      "path": "/deliverymen",
+      "name": "DeliverymenManagement",
+      "landed": "/deliverymen",
+      "textLength": 947,
+      "errors": []
+    },
+    {
+      "path": "/expenses",
+      "name": "Expenses",
+      "landed": "/expenses",
+      "textLength": 911,
+      "errors": []
+    },
+    {
+      "path": "/inventory",
+      "name": "Inventario",
+      "landed": "/inventory",
+      "textLength": 1140,
+      "errors": []
+    },
+    {
+      "path": "/expenses/menu-attribution",
+      "name": "ExpenseMenuAttribution",
+      "landed": "/expenses/menu-attribution",
+      "textLength": 589,
+      "errors": []
+    },
+    {
+      "path": "/cash-register",
+      "name": "CashRegister",
+      "landed": "/cash-register",
+      "textLength": 567,
+      "errors": []
+    },
+    {
+      "path": "/delivery-incidents",
+      "name": "DeliveryTrackingIncidents",
+      "landed": "/delivery-incidents",
+      "textLength": 1119,
+      "errors": []
+    },
+    {
+      "path": "/delivery-alerts",
+      "name": "DeliveryTrackingAlerts",
+      "landed": "/delivery-alerts",
+      "textLength": 993,
+      "errors": []
+    },
+    {
+      "path": "/integrations/apps/rappi",
+      "name": "RappiOrders",
+      "landed": "/integrations/apps/rappi",
+      "textLength": 579,
+      "errors": []
+    },
+    {
+      "path": "/whatsapp",
+      "name": "WhatsApp",
+      "landed": "/whatsapp",
+      "textLength": 558,
+      "errors": []
+    },
+    {
+      "path": "/whatsapp/templates",
+      "name": "WhatsAppTemplates",
+      "landed": "/whatsapp/templates",
+      "textLength": 589,
+      "errors": []
+    },
+    {
+      "path": "/whatsapp/settings",
+      "name": "WhatsAppChannelSettings",
+      "landed": "/whatsapp/settings",
+      "textLength": 1631,
+      "errors": []
+    },
+    {
+      "path": "/profile",
+      "name": "Profile",
+      "landed": "/profile",
+      "textLength": 707,
+      "errors": []
+    },
+    {
+      "path": "/documents",
+      "name": "BusinessDocuments",
+      "landed": "/documents",
+      "textLength": 636,
+      "errors": []
+    },
+    {
+      "path": "/blog-seo",
+      "name": "BlogPublishing",
+      "landed": "/blog-seo",
+      "textLength": 784,
+      "errors": []
+    }
+  ],
+  "draftPersistenceJsdom": [
+    {
+      "count": 1,
+      "itemsPerDraft": 20,
+      "bytes": 3682,
+      "repetitions": 20,
+      "medianMs": 0.27919999999994616
+    },
+    {
+      "count": 5,
+      "itemsPerDraft": 20,
+      "bytes": 17966,
+      "repetitions": 20,
+      "medianMs": 1.1519000000002961
+    },
+    {
+      "count": 20,
+      "itemsPerDraft": 20,
+      "bytes": 71555,
+      "repetitions": 20,
+      "medianMs": 4.55580000000009
+    }
+  ],
+  "bundles": {
+    "AppDetail": {
+      "baseline": {
+        "javascript": 517153,
+        "gzipEstimated": 180937,
+        "css": 139049
+      },
+      "candidate": {
+        "javascript": 764308,
+        "gzipEstimated": 265152,
+        "css": 139377
+      }
+    },
+    "BankDetail": {
+      "baseline": {
+        "javascript": 540743,
+        "gzipEstimated": 186279,
+        "css": 139049
+      },
+      "candidate": {
+        "javascript": 787943,
+        "gzipEstimated": 270741,
+        "css": 139377
+      }
+    },
+    "BlogPublishingView": {
+      "baseline": {
+        "javascript": 546715,
+        "gzipEstimated": 181726,
+        "css": 114663
+      },
+      "candidate": {
+        "javascript": 565943,
+        "gzipEstimated": 199529,
+        "css": 114764
+      }
+    },
+    "BranchDetail": {
+      "baseline": {
+        "javascript": 1201727,
+        "gzipEstimated": 392141,
+        "css": 139276
+      },
+      "candidate": {
+        "javascript": 1221478,
+        "gzipEstimated": 410553,
+        "css": 139377
+      }
+    },
+    "BranchesList": {
+      "baseline": {
+        "javascript": 584248,
+        "gzipEstimated": 196203,
+        "css": 114663
+      },
+      "candidate": {
+        "javascript": 603489,
+        "gzipEstimated": 214126,
+        "css": 114764
+      }
+    },
+    "BusinessDocumentsView": {
+      "baseline": {
+        "javascript": 572746,
+        "gzipEstimated": 192064,
+        "css": 114663
+      },
+      "candidate": {
+        "javascript": 570756,
+        "gzipEstimated": 202652,
+        "css": 114764
+      }
+    },
+    "BusinessInvoicing": {
+      "baseline": {
+        "javascript": 555976,
+        "gzipEstimated": 184198,
+        "css": 114663
+      },
+      "candidate": {
+        "javascript": 574099,
+        "gzipEstimated": 201649,
+        "css": 114764
+      }
+    },
+    "CashRegisterView": {
+      "baseline": {
+        "javascript": 876933,
+        "gzipEstimated": 281534,
+        "css": 139276
+      },
+      "candidate": {
+        "javascript": 896635,
+        "gzipEstimated": 299802,
+        "css": 139377
+      }
+    },
+    "ChangePassword": {
+      "baseline": {
+        "javascript": 534976,
+        "gzipEstimated": 178087,
+        "css": 114663
+      },
+      "candidate": {
+        "javascript": 553053,
+        "gzipEstimated": 195520,
+        "css": 114764
+      }
+    },
+    "CustomersList": {
+      "baseline": {
+        "javascript": 651171,
+        "gzipEstimated": 218407,
+        "css": 114882
+      },
+      "candidate": {
+        "javascript": 670966,
+        "gzipEstimated": 236738,
+        "css": 114983
+      }
+    },
+    "Dashboard": {
+      "baseline": {
+        "javascript": 1080009,
+        "gzipEstimated": 352094,
+        "css": 139276
+      },
+      "candidate": {
+        "javascript": 1099363,
+        "gzipEstimated": 370385,
+        "css": 139377
+      }
+    },
+    "DeliveryTrackingAlertsView": {
+      "baseline": {
+        "javascript": 740676,
+        "gzipEstimated": 244844,
+        "css": 139276
+      },
+      "candidate": {
+        "javascript": 759087,
+        "gzipEstimated": 262609,
+        "css": 139377
+      }
+    },
+    "DeliveryTrackingIncidentsView": {
+      "baseline": {
+        "javascript": 782493,
+        "gzipEstimated": 255867,
+        "css": 139276
+      },
+      "candidate": {
+        "javascript": 801574,
+        "gzipEstimated": 273789,
+        "css": 139377
+      }
+    },
+    "DeliveryView": {
+      "baseline": {
+        "javascript": 1555049,
+        "gzipEstimated": 515938,
+        "css": 144695
+      },
+      "candidate": {
+        "javascript": 1576101,
+        "gzipEstimated": 534764,
+        "css": 144796
+      }
+    },
+    "DeliverymenManagementView": {
+      "baseline": {
+        "javascript": 1070731,
+        "gzipEstimated": 355462,
+        "css": 140775
+      },
+      "candidate": {
+        "javascript": 1089980,
+        "gzipEstimated": 373687,
+        "css": 140876
+      }
+    },
+    "EmployeeLeaveDetailView": {
+      "baseline": {
+        "javascript": 765288,
+        "gzipEstimated": 252527,
+        "css": 146801
+      },
+      "candidate": {
+        "javascript": 783757,
+        "gzipEstimated": 270272,
+        "css": 146902
+      }
+    },
+    "EmployeeLeavesView": {
+      "baseline": {
+        "javascript": 756760,
+        "gzipEstimated": 250003,
+        "css": 146801
+      },
+      "candidate": {
+        "javascript": 775263,
+        "gzipEstimated": 267766,
+        "css": 146902
+      }
+    },
+    "EmployeeLunchesView": {
+      "baseline": {
+        "javascript": 544824,
+        "gzipEstimated": 182183,
+        "css": 114663
+      },
+      "candidate": {
+        "javascript": 563124,
+        "gzipEstimated": 199737,
+        "css": 114764
+      }
+    },
+    "ExpenseMenuAttributionView": {
+      "baseline": {
+        "javascript": 721869,
+        "gzipEstimated": 236748,
+        "css": 139276
+      },
+      "candidate": {
+        "javascript": 740245,
+        "gzipEstimated": 254513,
+        "css": 139377
+      }
+    },
+    "ExpensesView": {
+      "baseline": {
+        "javascript": 761086,
+        "gzipEstimated": 249786,
+        "css": 140474
+      },
+      "candidate": {
+        "javascript": 780855,
+        "gzipEstimated": 268201,
+        "css": 140575
+      }
+    },
+    "ForgotPassword": {
+      "baseline": {
+        "javascript": 253913,
+        "gzipEstimated": 96639,
+        "css": 114197
+      },
+      "candidate": {
+        "javascript": 259188,
+        "gzipEstimated": 98713,
+        "css": 114298
+      }
+    },
+    "InventoryView": {
+      "baseline": {
+        "javascript": 602635,
+        "gzipEstimated": 196390,
+        "css": 114663
+      },
+      "candidate": {
+        "javascript": 621228,
+        "gzipEstimated": 214219,
+        "css": 114764
+      }
+    },
+    "KitchenView": {
+      "baseline": {
+        "javascript": 780231,
+        "gzipEstimated": 256547,
+        "css": 139314
+      },
+      "candidate": {
+        "javascript": 799008,
+        "gzipEstimated": 274439,
+        "css": 139415
+      }
+    },
+    "OrderDetail": {
+      "baseline": {
+        "javascript": 1060049,
+        "gzipEstimated": 347970,
+        "css": 143897
+      },
+      "candidate": {
+        "javascript": 1080289,
+        "gzipEstimated": 366443,
+        "css": 143998
+      }
+    },
+    "Orders": {
+      "baseline": {
+        "javascript": 965497,
+        "gzipEstimated": 320345,
+        "css": 151401
+      },
+      "candidate": {
+        "javascript": 986542,
+        "gzipEstimated": 339105,
+        "css": 151502
+      }
+    },
+    "OrdersList": {
+      "baseline": {
+        "javascript": 1011323,
+        "gzipEstimated": 333070,
+        "css": 140451
+      },
+      "candidate": {
+        "javascript": 1031925,
+        "gzipEstimated": 351991,
+        "css": 140552
+      }
+    },
+    "ProductCategoriesList": {
+      "baseline": {
+        "javascript": 543097,
+        "gzipEstimated": 181570,
+        "css": 114663
+      },
+      "candidate": {
+        "javascript": 561495,
+        "gzipEstimated": 199158,
+        "css": 114764
+      }
+    },
+    "ProductsList": {
+      "baseline": {
+        "javascript": 770797,
+        "gzipEstimated": 259001,
+        "css": 114663
+      },
+      "candidate": {
+        "javascript": 579281,
+        "gzipEstimated": 204737,
+        "css": 114764
+      }
+    },
+    "Profile": {
+      "baseline": {
+        "javascript": 538592,
+        "gzipEstimated": 179435,
+        "css": 114663
+      },
+      "candidate": {
+        "javascript": 556727,
+        "gzipEstimated": 196881,
+        "css": 114764
+      }
+    },
+    "RappiOrdersView": {
+      "baseline": {
+        "javascript": 537169,
+        "gzipEstimated": 178649,
+        "css": 114663
+      },
+      "candidate": {
+        "javascript": 555593,
+        "gzipEstimated": 196214,
+        "css": 114764
+      }
+    },
+    "ResetPassword": {
+      "baseline": {
+        "javascript": 254433,
+        "gzipEstimated": 96705,
+        "css": 114197
+      },
+      "candidate": {
+        "javascript": 259718,
+        "gzipEstimated": 98781,
+        "css": 114298
+      }
+    },
+    "WhatsAppChannelSettingsView": {
+      "baseline": {
+        "javascript": 540452,
+        "gzipEstimated": 179437,
+        "css": 114663
+      },
+      "candidate": {
+        "javascript": 558727,
+        "gzipEstimated": 196974,
+        "css": 114764
+      }
+    },
+    "WhatsAppTemplatesView": {
+      "baseline": {
+        "javascript": 539916,
+        "gzipEstimated": 179422,
+        "css": 114663
+      },
+      "candidate": {
+        "javascript": 558309,
+        "gzipEstimated": 197052,
+        "css": 114764
+      }
+    },
+    "WhatsAppView": {
+      "baseline": {
+        "javascript": 861930,
+        "gzipEstimated": 284562,
+        "css": 139276
+      },
+      "candidate": {
+        "javascript": 882468,
+        "gzipEstimated": 303132,
+        "css": 139377
+      }
+    }
+  },
+  "limits": [
+    "Browser timings use a synthetic API and local compressed builds, not production.",
+    "SignalR transport is simulated as unavailable; negotiation counts do not prove live hub health.",
+    "Real PostgreSQL validation covers grouped map queries on isolated PostgreSQL 17; other new API regressions use InMemory/controller tests.",
+    "101 configured PostgreSQL/provider integration cases were skipped; no new RLS or production throughput claim.",
+    "Heap snapshots without forced GC are reference data; no memory leak conclusion.",
+    "Route smoke uses Superadmin and anonymous public forms with partial API failures; it is not a real operational or all-role end-to-end test."
+  ],
+  "routeSmokeSourceSha": "6309c6ca45e58cd7c21a0606b89f379a02fd2cc2"
+}

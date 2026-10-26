@@ -1,6 +1,6 @@
 <!-- src/views/AppPaymentsList.vue -->
 <template>
-    <MainLayout page-title="Pagos de Apps">
+    <div class="contents">
         <!-- Loading State -->
         <BaseLoading v-if="store.isLoading" text="Cargando pagos..." />
 
@@ -66,7 +66,7 @@
                 </div>
             </div>
         </div>
-    </MainLayout>
+    </div>
 </template>
 
 <script setup lang="ts">
@@ -77,7 +77,6 @@ import { useBanksStore } from '@/store/banks'
 import { useAuthStore } from '@/store/auth'
 import { useToast } from '@/composables/useToast'
 
-import MainLayout from '@/components/layout/MainLayout.vue'
 import BaseCard from '@/components/ui/BaseCard.vue'
 import BaseInput from '@/components/ui/BaseInput.vue'
 import BaseSelect from '@/components/ui/BaseSelect.vue'

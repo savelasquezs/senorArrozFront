@@ -3,11 +3,13 @@ import { reactive, ref } from 'vue'
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest'
 import OrdersList from '@/views/OrdersList.vue'
 import OrdersTable from '@/components/orders/OrdersTable.vue'
+import ReservationsTable from '@/components/reservations/ReservationsTable.vue'
+import BaseInput from '@/components/ui/BaseInput.vue'
 import EditCustomerModal from '@/components/orders/EditCustomerModal.vue'
 import BaseSelect from '@/components/ui/BaseSelect.vue'
 
 const mocks = vi.hoisted(() => ({
-    search: vi.fn(), branches: vi.fn(), options: vi.fn(), payment: vi.fn(), toast: vi.fn(), replace: vi.fn(),
+    search: vi.fn(), deliverymen: vi.fn(), branches: vi.fn(), options: vi.fn(), payment: vi.fn(), toast: vi.fn(), replace: vi.fn(),
     changes: {
         changed: null as null | ((event: any) => void),
         resume: null as null | (() => void),
@@ -22,7 +24,7 @@ vi.mock('@/store/auth', () => ({ useAuthStore: () => ({ get userRole() { return 
 vi.mock('@/store/branchContext', () => ({ useBranchContextStore: () => ({ selectedBranchId: 1 }) }))
 vi.mock('@/store/banks', () => ({ useBanksStore: () => ({ list: { items: localBanks }, ensureListLoaded: mocks.banksLoaded }) }))
 vi.mock('@/store/apps', () => ({ useAppsStore: () => ({ list: { items: [] }, ensureListLoaded: mocks.appsLoaded }) }))
-vi.mock('@/services/MainAPI/orderApi', () => ({ orderApi: { searchOrders: mocks.search } }))
+vi.mock('@/services/MainAPI/orderApi', () => ({ orderApi: { searchOrders: mocks.search, getDeliverymanOptions: mocks.deliverymen } }))
 vi.mock('@/services/MainAPI/orderManagementApi', () => ({ orderManagementApi: { remoteBranches: mocks.branches, options: mocks.options } }))
 vi.mock('@/services/MainAPI/bankPaymentApi', () => ({ bankPaymentApi: { createBankPayment: mocks.payment } }))
 vi.mock('@/composables/useToast', () => ({ useToast: () => ({ success: vi.fn(), error: mocks.toast }) }))
@@ -58,12 +60,29 @@ beforeEach(() => {
     mocks.branches.mockResolvedValue([{ id: 2, name: 'Manrique', sampleOrderId: 20 }])
     mocks.options.mockResolvedValue({ branchId: 2, branchName: 'Manrique', banks: [{ id: 202, name: 'Banco Destino', active: true }], apps: [], deliverymen: [], maxFreeDeliveryDiscount: 3000 })
     mocks.search.mockImplementation(async body => paged(body.remoteOnly ? [remote] : [local]))
+    mocks.deliverymen.mockResolvedValue([{ value: 17, label: 'Kevin' }])
     mocks.payment.mockResolvedValue({ id: 500, bankId: 202, orderId: 20, amount: 30000 })
     mocks.replace.mockImplementation(async ({ query }) => { state.query = query })
 })
 afterEach(() => { wrapper?.unmount(); vi.useRealTimers() })
 
 describe('remote order workspaces', () => {
+    it('shows local rows while bank options are still pending', async () => {
+        mocks.banksLoaded.mockReturnValueOnce(new Promise(() => {}))
+        mountView(); await flushPromises()
+        expect(mocks.search).toHaveBeenCalledOnce()
+        expect(wrapper.findComponent(OrdersTable).props('orders')).toEqual([local])
+    })
+
+    it('aborts the table transport when its owner unmounts', async () => {
+        mocks.search.mockReturnValueOnce(new Promise(() => {}))
+        mountView(); await flushPromises()
+        const signal = mocks.search.mock.calls[0]![1] as AbortSignal
+        expect(signal.aborted).toBe(false)
+        wrapper.unmount()
+        expect(signal.aborted).toBe(true)
+    })
+
     it('makes only one orders/search call per complete local and remote tab', async () => {
         const withDriver = (o: typeof local) => ({
             ...o, deliveryManId: 17, deliveryManName: 'Kevin',
@@ -81,32 +100,31 @@ describe('remote order workspaces', () => {
         expect(mocks.search).toHaveBeenCalledTimes(3)
     })
 
-    it('keeps the exhaustive deliveryman query if the main page is incomplete', async () => {
+    it('uses projected deliverymen without downloading all order pages', async () => {
         mocks.search.mockImplementation(async body => body.type === 'delivery'
             ? paged([{ ...local, deliveryManId: 17, deliveryManName: 'Kevin' }])
             : { ...paged([local]), totalCount: 150 })
         mountView(); await flushPromises()
-        expect(mocks.search).toHaveBeenCalledTimes(2)
-        expect(mocks.search.mock.calls.filter(([body]) => body.type === 'delivery')).toHaveLength(1)
+        expect(mocks.search).toHaveBeenCalledTimes(1)
+        expect(mocks.deliverymen).toHaveBeenCalledOnce()
         expect(wrapper.findComponent(OrdersTable).props('orders')).toEqual([local])
     })
 
     it('coalesces identical in-flight deliverymen searches during an overlapping date refresh', async () => {
         let finishDeliverymen!: (value: any) => void
-        mocks.search.mockImplementation((body) => body.type === 'delivery'
-            ? new Promise(resolve => { finishDeliverymen = resolve })
-            : Promise.resolve({ ...paged([local]), totalCount: 150 }))
+        mocks.search.mockResolvedValue({ ...paged([local]), totalCount: 150 })
+        mocks.deliverymen.mockImplementation(() => new Promise(resolve => { finishDeliverymen = resolve }))
         mountView()
         await flushPromises()
 
         // The first page is incomplete; the dropdown requests a full deliverymen
         // search. A second refresh with the same date must join that HTTP request.
-        expect(mocks.search.mock.calls.filter(([body]) => body.type === 'delivery')).toHaveLength(1)
+        expect(mocks.deliverymen).toHaveBeenCalledOnce()
         wrapper.findComponent(BaseSelect).vm.$emit('update:modelValue', 'today')
         await flushPromises()
-        expect(mocks.search.mock.calls.filter(([body]) => body.type === 'delivery')).toHaveLength(1)
+        expect(mocks.deliverymen).toHaveBeenCalledOnce()
 
-        finishDeliverymen(paged([{ ...local, deliveryManId: 17, deliveryManName: 'Kevin' }]))
+        finishDeliverymen([{ value: 17, label: 'Kevin' }])
         await flushPromises()
         expect(wrapper.findComponent(OrdersTable).props('orders')).toEqual([local])
     })
@@ -164,7 +182,7 @@ describe('remote order workspaces', () => {
         expect(table.props('orders')).toEqual([remote])
         expect(table.props('quickBanks')).toEqual([{ id: 202, name: 'Banco Destino', active: true }])
         expect(table.props('detailQuery')).toEqual({ remoteBranchId: '2' })
-        expect(mocks.search).toHaveBeenLastCalledWith(expect.objectContaining({ remoteOnly: true, branchId: 2 }))
+        expect(mocks.search).toHaveBeenLastCalledWith(expect.objectContaining({ remoteOnly: true, branchId: 2 }), expect.any(AbortSignal))
         expect(mocks.options).toHaveBeenCalledWith(20)
         expect(state.branchId).toBe(1)
         expect(localBanks[0]!.id).toBe(101)
@@ -226,4 +244,69 @@ describe('remote order workspaces', () => {
         finishRemote(paged([remote])); await flushPromises()
         expect(wrapper.findComponent(OrdersTable).props('orders')).toEqual([local])
     })
+    it('requests active reservations from the server and preserves server totals across pages', async () => {
+        const active = { ...local, id: 71, type: 'reservation', status: 'taken' }
+        mocks.search.mockImplementation(async body => body.type === 'reservation'
+            ? { items: [active], totalCount: 301, totalPages: 3, page: 1, pageSize: 150 }
+            : paged([local]))
+        mountView(); await flushPromises(); await clickTab('Reservas')
+        expect(mocks.search).toHaveBeenLastCalledWith(expect.objectContaining({
+            type: 'reservation', activeReservationsOnly: true, page: 1, pageSize: 150,
+        }))
+        expect(wrapper.findComponent(ReservationsTable).props('reservations')).toEqual([active])
+        expect(wrapper.text()).toContain('de 301 reservas')
+        expect(wrapper.text()).toContain('Página 1 de 3')
+        const options = wrapper.findComponent(BaseSelect).props('options') as Array<{ value: string }>
+        expect(options.some(option => option.value === 'reservation')).toBe(false)
+    })
+
+    it('retains explicit All and Delivered status searches without the active filter', async () => {
+        mountView(); await flushPromises(); await clickTab('Reservas')
+        const status = wrapper.findComponent(BaseSelect)
+        status.vm.$emit('update:modelValue', '__all__'); await flushPromises()
+        expect(mocks.search.mock.lastCall![0]).toMatchObject({ type: 'reservation', activeReservationsOnly: false })
+        expect(mocks.search.mock.lastCall![0].status).toBeUndefined()
+        status.vm.$emit('update:modelValue', 'delivered'); await flushPromises()
+        expect(mocks.search.mock.lastCall![0]).toMatchObject({
+            type: 'reservation', activeReservationsOnly: false, status: 'delivered', page: 1,
+        })
+    })
+
+    it('searches across all reservation pages on the server with debounce', async () => {
+        const serverMatch = { ...local, id: 42, type: 'reservation', status: 'taken', guestName: 'OTHER' }
+        mocks.search.mockImplementation(async body => body.type === 'reservation'
+            ? { items: [serverMatch], totalCount: 1 } : paged([local]))
+        mountView(); await flushPromises(); await clickTab('Reservas')
+        const before = mocks.search.mock.calls.length
+        vi.useFakeTimers()
+        const search = wrapper.findComponent(BaseInput)
+        search.vm.$emit('update:modelValue', 'cliente de otra página')
+        search.vm.$emit('input')
+        await vi.advanceTimersByTimeAsync(330)
+        await flushPromises()
+        expect(mocks.search.mock.calls.length).toBe(before + 1)
+        expect(mocks.search.mock.lastCall![0]).toMatchObject({
+            type: 'reservation', searchTerm: 'cliente de otra página', page: 1,
+        })
+        // No se vuelve a filtrar localmente una página que ya filtró PostgreSQL.
+        expect(wrapper.findComponent(ReservationsTable).props('reservations')).toEqual([serverMatch])
+    })
+
+    it('ignores an obsolete reservation response after changing status', async () => {
+        let resolveOld!: (value: any) => void
+        const updated = { ...local, id: 99, type: 'reservation', status: 'delivered' }
+        const older = { ...local, id: 88, type: 'reservation', status: 'taken' }
+        mocks.search.mockImplementation(body => {
+            if (body.type !== 'reservation') return Promise.resolve(paged([local]))
+            return body.status === 'delivered' ? Promise.resolve(paged([updated]))
+                : new Promise(resolve => { resolveOld = resolve })
+        })
+        mountView(); await flushPromises(); await clickTab('Reservas')
+        wrapper.findComponent(BaseSelect).vm.$emit('update:modelValue', 'delivered')
+        await flushPromises()
+        expect(wrapper.findComponent(ReservationsTable).props('reservations')).toEqual([updated])
+        resolveOld(paged([older])); await flushPromises()
+        expect(wrapper.findComponent(ReservationsTable).props('reservations')).toEqual([updated])
+    })
+
 })

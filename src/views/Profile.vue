@@ -1,5 +1,5 @@
 <template>
-    <MainLayout>
+    <div class="contents">
         <div class="max-w-2xl mx-auto p-4 md:p-8 space-y-6">
 
             <!-- Header -->
@@ -133,7 +133,7 @@
                 </BaseButton>
             </div>
         </div>
-    </MainLayout>
+    </div>
 </template>
 
 <script setup lang="ts">
@@ -142,7 +142,6 @@ import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/store/auth'
 import { userApi } from '@/services/MainAPI/userApi'
 import { useToast } from '@/composables/useToast'
-import MainLayout from '@/components/layout/MainLayout.vue'
 import BaseInput from '@/components/ui/BaseInput.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import {
@@ -237,15 +236,18 @@ const isFormValid = computed(() => {
 })
 
 const saveProfile = async () => {
+    if (savingProfile.value) return
     validateForm()
     if (!isFormValid.value) return
 
     try {
         savingProfile.value = true
-        const updated = await userApi.updateProfile(authStore.user!.id, {
+        const ownerId = authStore.user!.id
+        const updated = await userApi.updateProfile(ownerId, {
             email: form.email.trim(),
             phone: form.phone.trim(),
         })
+        if (authStore.user?.id !== ownerId) return
         authStore.updateUserData({ email: updated.email, phone: (updated as any).phone })
         success('Perfil actualizado', 3000, 'Tus datos han sido guardados correctamente')
     } catch (err: any) {
@@ -258,12 +260,15 @@ const saveProfile = async () => {
 const triggerFileInput = () => fileInputRef.value?.click()
 
 const handleFileChange = async (event: Event) => {
+    if (uploadingImage.value) return
     const file = (event.target as HTMLInputElement).files?.[0]
     if (!file) return
 
     try {
         uploadingImage.value = true
-        const updated = await userApi.uploadProfileImage(authStore.user!.id, file)
+        const ownerId = authStore.user!.id
+        const updated = await userApi.uploadProfileImage(ownerId, file)
+        if (authStore.user?.id !== ownerId) return
         authStore.updateUserData({ profileImageUrl: (updated as any).profileImageUrl })
         success('Foto actualizada', 3000)
     } catch (err: any) {

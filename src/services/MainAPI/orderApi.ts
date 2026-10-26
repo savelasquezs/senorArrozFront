@@ -207,13 +207,13 @@ class OrderApi extends BaseApi {
     // ===== MÉTODOS PARA MÓDULO DE DOMICILIARIOS =====
 
     // 18. Obtener pedidos delivery ready (listos para asignar)
-    async fetchDeliveryReady(filters?: { branchId?: number; page?: number; pageSize?: number }): Promise<PagedResult<OrderListItem>> {
+    async fetchDeliveryReady(filters?: { branchId?: number; page?: number; pageSize?: number }, signal?: AbortSignal): Promise<PagedResult<OrderListItem>> {
         const params: any = {};
         if (filters?.branchId) params.branchId = filters.branchId;
         if (filters?.page) params.page = filters.page;
         if (filters?.pageSize) params.pageSize = filters.pageSize;
 
-        return this.get<PagedResult<OrderListItem>>('/orders/delivery/ready', { params });
+        return this.get<PagedResult<OrderListItem>>('/orders/delivery/ready', { params, signal });
     }
 
     // 19. Autoasignar pedidos (usado por domiciliarios)
@@ -222,8 +222,13 @@ class OrderApi extends BaseApi {
     }
 
     // 20. Buscar pedidos con filtros avanzados (para historial)
-    async searchOrders(filters: any): Promise<PagedResult<OrderListItem>> {
-        return this.post<PagedResult<OrderListItem>>('/orders/search', filters);
+    async searchOrders(filters: any, signal?: AbortSignal): Promise<PagedResult<OrderListItem>> {
+        return this.post<PagedResult<OrderListItem>>('/orders/search', filters, { signal });
+    }
+
+    getDeliverymanOptions(params: { fromDate?: string; toDate?: string; branchId?: number; remoteOnly?: boolean }, signal?: AbortSignal) {
+        return this.get<Array<{ id: number; name: string }>>('/orders/deliveryman-options', { params, signal })
+            .then(items => items.map(item => ({ value: item.id, label: item.name })));
     }
 
     // 21. Obtener pedidos asignados a un domiciliario (opcional: FromDate/ToDate yyyy-MM-DD para filtrar por CreatedAt)

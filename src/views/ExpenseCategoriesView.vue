@@ -1,6 +1,6 @@
 <!-- src/views/ExpenseCategoriesView.vue -->
 <template>
-    <MainLayout page-title="Categorías de Gastos">
+    <div class="contents">
         <!-- Loading State -->
         <BaseLoading v-if="loading" text="Cargando categorías..." />
 
@@ -153,7 +153,7 @@
         <!-- Form Modal -->
         <ExpenseCategoryFormModal :is-open="showForm" :editing-category="editingCategory" :loading="formLoading"
             @close="showForm = false" @submit="handleFormSubmit" />
-    </MainLayout>
+    </div>
 </template>
 
 <script setup lang="ts">
@@ -172,7 +172,6 @@ import {
     TagIcon,
     CurrencyDollarIcon,
 } from '@heroicons/vue/24/outline'
-import MainLayout from '@/components/layout/MainLayout.vue'
 import BaseCard from '@/components/ui/BaseCard.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseInput from '@/components/ui/BaseInput.vue'

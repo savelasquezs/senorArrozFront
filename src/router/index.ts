@@ -10,7 +10,10 @@ const office = [...admin, 'Cashier'];
 const everybody = [...office, 'Kitchen', 'Deliveryman'];
 function page(path: string, name: string, component: RouteRecordSingleView['component'], title: string,
   roles?: string[], requiresAuth = true): RouteRecordRaw {
-  return { path, name, component, meta: { requiresAuth, requiresRole: roles, title } };
+  return { path, name, component, meta: { requiresAuth, requiresRole: roles, title,
+    noCard: ['Dashboard', 'OrdersNew', 'OrderDetail', 'WhatsApp', 'WhatsAppTemplates'].includes(name),
+    hideQuickOrder: ['Dashboard', 'EmployeeLunches', 'EmployeeLeaves', 'EmployeeLeaveDetail', 'Inventario'].includes(name),
+  } };
 }
 const routes: RouteRecordRaw[] = [
   page('/settings/electronic-invoicing', 'BusinessInvoicing', () => import('@/views/BusinessInvoicing.vue'), 'Facturación electrónica', ['Superadmin']),
@@ -50,8 +53,13 @@ const routes: RouteRecordRaw[] = [
   page('/whatsapp/settings', 'WhatsAppChannelSettings', () => import('@/views/WhatsAppChannelSettingsView.vue'), 'Canal central de WhatsApp', admin),
   page('/profile', 'Profile', () => import('@/views/Profile.vue'), 'Perfil'),
   page('/documents', 'BusinessDocuments', () => import('@/views/BusinessDocumentsView.vue'), 'Documentos corporativos', everybody),
+  page('/blog-seo', 'BlogPublishing', () => import('@/views/BlogPublishingView.vue'), 'Blog / SEO', ['Superadmin']),
 ];
-const router = createRouter({ history: createWebHistory(), routes,
+const authenticatedRoutes = routes.filter(route => route.meta?.requiresAuth);
+const router = createRouter({ history: createWebHistory(), routes: [
+  ...routes.filter(route => !route.meta?.requiresAuth),
+  { path: '/', name: 'AuthenticatedLayout', component: () => import('@/components/layout/MainLayout.vue'), children: authenticatedRoutes },
+],
   scrollBehavior(_to, _from, savedPosition) { return savedPosition ?? { top: 0 }; },
 });
 let accountRefresh: Promise<boolean> | undefined;

@@ -1,6 +1,6 @@
 <!-- src/views/CustomersList.vue -->
 <template>
-    <MainLayout page-title="Clientes">
+    <div class="contents">
         <BaseLoading v-if="store.isLoading && !store.list" text="Cargando clientes..." />
 
         <div v-else class="flex flex-col gap-2 min-h-0 -mx-2 sm:mx-0">
@@ -204,7 +204,7 @@
             :loading="detailModalLoading"
             @close="closeCustomerDetail"
             @customer-updated="onCustomerUpdatedFromDetail" />
-    </MainLayout>
+    </div>
 </template>
 
 <script setup lang="ts">
@@ -215,7 +215,6 @@ import { useAuthStore } from '@/store/auth'
 import { useToast } from '@/composables/useToast'
 import { useRoute, useRouter } from 'vue-router'
 
-import MainLayout from '@/components/layout/MainLayout.vue'
 import BaseCard from '@/components/ui/BaseCard.vue'
 import BaseInput from '@/components/ui/BaseInput.vue'
 import BaseSelect from '@/components/ui/BaseSelect.vue'
@@ -243,6 +242,7 @@ import {
 
 import type { Customer, CustomerFilters, CustomerFormData } from '@/types/customer'
 import { defaultBusinessCalendar } from '@/utils/datetime'
+import { useSessionViewState } from '@/composables/useSessionViewState'
 
 const store = useCustomersStore()
 const branchesStore = useBranchesStore()
@@ -251,7 +251,7 @@ const route = useRoute()
 const router = useRouter()
 const { success, error: showError } = useToast()
 
-const filters = ref({
+const filters = useSessionViewState('customers:filters', {
     search: '',
     active: undefined as boolean | undefined,
     branchId: undefined as number | undefined,
@@ -327,7 +327,9 @@ function stripDetailQuery() {
     router.replace({ path: '/customers', query: q }).catch(() => {})
 }
 
+let detailRequest = 0
 async function syncDetailFromRoute() {
+    const request = ++detailRequest
     const raw = route.query.detail
     const q = typeof raw === 'string' ? raw : Array.isArray(raw) ? raw[0] : ''
     if (!q) {
@@ -348,6 +350,7 @@ async function syncDetailFromRoute() {
     detailModalLoading.value = true
     try {
         await store.fetchById(id, { silent: true })
+        if (request !== detailRequest) return
         const c = store.current
         if (!c || c.id !== id) {
             showError('Cliente', 'No se encontró el cliente')
@@ -362,10 +365,11 @@ async function syncDetailFromRoute() {
         detailCustomer.value = c
         detailModalOpen.value = true
     } catch {
+        if (request !== detailRequest) return
         showError('Error', 'No se pudo cargar el cliente')
         stripDetailQuery()
     } finally {
-        detailModalLoading.value = false
+        if (request === detailRequest) detailModalLoading.value = false
     }
 }
 

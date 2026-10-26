@@ -1,5 +1,8 @@
 import { defineStore } from 'pinia'
-import { ref } from 'vue'
+import { loadPagedCatalog } from '@/helpers/loadPagedCatalog'
+import { ref, watch } from 'vue'
+import { useAuthStore } from './auth'
+import { useBranchContextStore } from './branchContext'
 import { bankApi } from '@/services/MainAPI/bankApi'
 import type {
     Bank,
@@ -17,14 +20,14 @@ import {
     type ResourceActionOptions,
 } from './helpers/resourceStore'
 
-let banksListEnsureInFlight: Promise<void> | null = null
-let banksEnsureInFlightBranchId: number | null = null
-let banksLoadedBranchId: number | null = null
-let banksListLoaded = false
-
 type FetchOpts = ResourceActionOptions
 
 export const useBanksStore = defineStore('banks', () => {
+    const options = ref<Bank[]>([])
+    let optionsKey: string | null = null, optionsLoaded = false, optionsVersion = 0
+    let optionsPending: Promise<void> | null = null
+    function invalidateOptions() { optionsVersion++; optionsLoaded = false; optionsPending = null }
+
     const list = ref<PagedResult<Bank> | null>(null)
     const current = ref<Bank | null>(null)
     const currentDetail = ref<BankDetail | null>(null)
@@ -38,35 +41,21 @@ export const useBanksStore = defineStore('banks', () => {
     }
 
     const ensureListLoaded = async (branchId?: number | null, forOrderCreation = false) => {
-        const normalizedBranchId = branchId && branchId > 0 ? branchId : null
-        if (banksListLoaded && banksLoadedBranchId === normalizedBranchId) {
-            return
-        }
-        if (banksListEnsureInFlight) {
-            if (banksEnsureInFlightBranchId === normalizedBranchId) {
-                return banksListEnsureInFlight
-            }
-            await banksListEnsureInFlight
-            return ensureListLoaded(branchId, forOrderCreation)
-        }
-        if (banksLoadedBranchId !== normalizedBranchId) {
-            list.value = null
-            banksListLoaded = false
-        }
-        banksListEnsureInFlight = fetch({
-            page: 1,
-            pageSize: 100,
-            branchId: normalizedBranchId ?? undefined,
-            forOrderCreation,
-        }).then(() => {
-            banksLoadedBranchId = normalizedBranchId
-            banksListLoaded = true
-        }).finally(() => {
-            banksListEnsureInFlight = null
-            banksEnsureInFlightBranchId = null
-        })
-        banksEnsureInFlightBranchId = normalizedBranchId
-        return banksListEnsureInFlight
+        const key = `${branchId ?? 'default'}:${forOrderCreation}`
+        if (optionsKey !== key) { invalidateOptions(); optionsKey = key; options.value = [] }
+        if (optionsLoaded) return
+        if (optionsPending) return optionsPending
+        const version = optionsVersion
+        optionsPending = (async () => {
+            try {
+                const rows = await loadPagedCatalog<Bank>(page => bankApi.getBanks({
+                    branchId: branchId ?? undefined, forOrderCreation, page, pageSize: 100,
+                }), () => {})
+                if (version !== optionsVersion) return
+                options.value = rows; optionsLoaded = true
+            } finally { if (version === optionsVersion) optionsPending = null }
+        })()
+        return optionsPending
     }
 
     const fetchById = async (id: number, opts?: FetchOpts) => {
@@ -84,6 +73,7 @@ export const useBanksStore = defineStore('banks', () => {
     }
 
     const create = async (payload: CreateBankDto, opts?: FetchOpts) => {
+        invalidateOptions()
         return run(async () => {
             const response = await bankApi.createBank(payload)
             prependPagedItem(list, response)
@@ -93,6 +83,7 @@ export const useBanksStore = defineStore('banks', () => {
     }
 
     const update = async (id: number, payload: UpdateBankDto, opts?: FetchOpts) => {
+        invalidateOptions()
         return run(async () => {
             const response = await bankApi.updateBank(id, payload)
             replacePagedItem(list, response)
@@ -107,6 +98,7 @@ export const useBanksStore = defineStore('banks', () => {
     }
 
     const remove = async (id: number, opts?: FetchOpts) => {
+        invalidateOptions()
         await run(async () => {
             await bankApi.deleteBank(id)
             removePagedItem(list, id)
@@ -126,14 +118,16 @@ export const useBanksStore = defineStore('banks', () => {
     }
 
     const clearList = () => {
+        invalidateOptions(); options.value = []; optionsKey = null
         list.value = null
-        banksLoadedBranchId = null
-        banksEnsureInFlightBranchId = null
-        banksListLoaded = false
         clearError()
     }
 
+    const auth = useAuthStore(), branches = useBranchContextStore()
+    watch(() => [auth.user?.id, auth.user?.role, branches.revision], () => { clear(); clearList() }, { flush: 'sync' })
+
     return {
+        options,
         list,
         current,
         currentDetail,

@@ -178,16 +178,6 @@ const handleClose = () => {
     emit('close')
 }
 
-const loadCustomerAddresses = async () => {
-    if (!currentCustomer.value) return
-
-    try {
-        await customersStore.fetchAddresses(currentCustomer.value.id, { silent: true })
-    } catch {
-        /* direcciones ya pueden venir en GET cliente */
-    }
-}
-
 const handleEditCustomer = () => {
     showEditModal.value = true
 }
@@ -233,11 +223,19 @@ const handleViewOrders = (_customer: Customer) => {
 
 
 // Watch for prop changes to sync internal state
-watch(() => props.show, (newShow) => {
+let detailVersion = 0
+watch(() => [props.show, props.customer?.id] as const, async ([newShow, customerId]) => {
+    const version = ++detailVersion
     internalShow.value = newShow
-    if (newShow && props.customer?.id) {
-        showOrdersHistory.value = false
-        void customersStore.fetchById(props.customer.id, { silent: true }).then(() => loadCustomerAddresses())
+    if (!newShow || !customerId) return
+    showOrdersHistory.value = false
+    try {
+        await Promise.all([
+            customersStore.fetchById(customerId, { silent: true }),
+            customersStore.fetchAddresses(customerId, { silent: true }),
+        ])
+    } catch (cause: any) {
+        if (version === detailVersion) showError('No se pudo actualizar el cliente', cause?.message)
     }
 }, { immediate: true })
 

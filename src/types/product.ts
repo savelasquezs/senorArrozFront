@@ -13,6 +13,7 @@ export interface Product {
     active: boolean
     inventoryEnabled: boolean
     inventoryControlMode: 'estimated' | 'strict'
+    availabilityPending?: boolean
     commercialProfileId?: number | null
     commercialProfileName?: string | null
     description?: string | null

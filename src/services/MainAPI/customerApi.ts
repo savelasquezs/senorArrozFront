@@ -18,7 +18,7 @@ import { buildQueryParams } from './queryParams';
 
 class CustomerApi extends BaseApi {
     async getCustomers(
-        filters?: CustomerFilters
+        filters?: CustomerFilters, signal?: AbortSignal
     ): Promise<ApiResponse<PagedResult<Customer>>> {
         const params = buildQueryParams(filters, {
             Search: 'search',
@@ -34,12 +34,12 @@ class CustomerApi extends BaseApi {
         });
 
         return this.get<ApiResponse<PagedResult<Customer>>>('/customers', {
-            params,
+            params, signal,
         });
     }
 
-    async getCustomerById(id: number): Promise<ApiResponse<Customer>> {
-        return this.get<ApiResponse<Customer>>(`/customers/${id}`);
+    async getCustomerById(id: number, signal?: AbortSignal): Promise<ApiResponse<Customer>> {
+        return this.get<ApiResponse<Customer>>(`/customers/${id}`, { signal });
     }
 
     async getCustomerByPhone(phone: string): Promise<ApiResponse<Customer>> {
@@ -64,9 +64,9 @@ class CustomerApi extends BaseApi {
     }
 
     async getCustomerAddresses(
-        customerId: number
+        customerId: number, signal?: AbortSignal
     ): Promise<ApiResponse<CustomerAddress[]>> {
-        return this.get<ApiResponse<CustomerAddress[]>>(`/customers/${customerId}/addresses`);
+        return this.get<ApiResponse<CustomerAddress[]>>(`/customers/${customerId}/addresses`, { signal });
     }
 
     async getCustomerAddressById(

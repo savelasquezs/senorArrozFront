@@ -1,5 +1,5 @@
 <template>
-  <MainLayout page-title="Inventario" hide-quick-order>
+  <div class="contents">
     <div class="space-y-5">
       <header class="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
         <div>
@@ -258,14 +258,14 @@
       </div>
       <template #footer><BaseButton variant="secondary" :disabled="saving" @click="countPreviewOpen = false">Volver al conteo</BaseButton><BaseButton :loading="saving" :disabled="!activeCount || !countIsComplete" @click="activeCount && confirmCount(activeCount)">Confirmar conteo</BaseButton></template>
     </BaseDialog>
-  </MainLayout>
+  </div>
 </template>
 
 <script setup lang="ts">
+import { loadPagedCatalog } from '@/helpers/loadPagedCatalog'
 import { computed, defineComponent, h, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ArrowPathIcon, ArrowsRightLeftIcon, BanknotesIcon, ClipboardDocumentCheckIcon, CubeIcon } from '@heroicons/vue/24/outline'
-import MainLayout from '@/components/layout/MainLayout.vue'
 import BaseBadge from '@/components/ui/BaseBadge.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseDialog from '@/components/ui/BaseDialog.vue'
@@ -324,10 +324,10 @@ const navigationGroups = computed(() => [
 ])
 
 const summaryCards = computed(() => [
-  { label: 'Valor inventario', value: money(store.totalValue), hint: activeBranchName.value, icon: BanknotesIcon },
-  { label: 'Con existencia', value: String(store.itemsWithStock), hint: 'insumos con saldo positivo', icon: CubeIcon },
-  { label: 'Transferencias pendientes', value: String(store.pendingTransfers), hint: 'en camino a una sucursal', icon: ArrowsRightLeftIcon },
-  { label: 'Último conteo', value: store.latestConfirmedCount ? shortDate(store.latestConfirmedCount.confirmedAt!) : 'Sin conteos', hint: store.latestConfirmedCount ? `Conteo #${store.latestConfirmedCount.id}` : 'pendiente de confirmar', icon: ClipboardDocumentCheckIcon },
+  { label: 'Valor inventario', value: loadedSections.balances ? money(store.totalValue) : '—', hint: activeBranchName.value, icon: BanknotesIcon },
+  { label: 'Con existencia', value: loadedSections.balances ? String(store.itemsWithStock) : '—', hint: 'insumos con saldo positivo', icon: CubeIcon },
+  { label: 'Transferencias pendientes', value: loadedSections.transfers ? String(store.pendingTransfers) : '—', hint: 'en camino a una sucursal', icon: ArrowsRightLeftIcon },
+  { label: 'Último conteo', value: !loadedSections.counts ? '—' : store.latestConfirmedCount ? shortDate(store.latestConfirmedCount.confirmedAt!) : 'Sin conteos', hint: store.latestConfirmedCount ? `Conteo #${store.latestConfirmedCount.id}` : 'pendiente de confirmar', icon: ClipboardDocumentCheckIcon },
 ])
 
 const expenseById = (id: number) => expenses.value.find(item => item.id === id)
@@ -641,16 +641,21 @@ function reportRange() { const from = new Date(`${fromDate.value}T00:00:00`); co
 async function loadReports() { const range = reportRange(); await safe(() => store.loadReports(range.from, range.to)); loadedSections.reports = true; if (!reportExpenseId.value || !store.report.some(row => row.expenseId === reportExpenseId.value)) reportExpenseId.value = store.report[0]?.expenseId || 0 }
 function deviationBarWidth(value: number) { const max = Math.max(...selectedDeviation.value.map(point => Math.abs(point.difference)), 1); return Math.max(Math.abs(value) / max * 100, 8) }
 
+let catalogVersion = 0
+let scopeVersion = 0
 async function loadCatalogs(includeProducts = false) {
+  const version = ++catalogVersion
+  const branchId = currentBranchId.value
   catalogsLoading.value = true
   catalogsError.value = null
   try {
     const [expenseResponse, productResponse] = await Promise.all([
       expenseApi.getAllExpenses(),
-      includeProducts ? productApi.getProducts({ branchId: currentBranchId.value, page: 1, pageSize: 500 }) : Promise.resolve(null),
+      includeProducts ? loadPagedCatalog(async page => (await productApi.getProducts({ branchId, page, pageSize: 100 })).data, () => {}) : Promise.resolve(null),
     ])
+    if (version !== catalogVersion) return
     expenses.value = expenseResponse.data || []
-    if (productResponse) products.value = productResponse.data?.items || []
+    if (productResponse) products.value = productResponse
     loadedSections.catalog = true
     if (includeProducts) loadedSections.recipes = true
   } catch (cause: any) { catalogsError.value = cause?.message || 'No se pudieron cargar los catálogos' } finally { catalogsLoading.value = false }
@@ -661,6 +666,7 @@ async function mutate(work: () => Promise<void>, success: string) {
   try { await work(); toast.success(success, 3500) } catch (cause: any) { toast.error('No fue posible completar la operación', cause?.message) } finally { saving.value = false }
 }
 async function ensureSection(section: InventorySection, force = false) {
+  const version = scopeVersion
   if (!force && loadedSections[section]) return
   if (section === 'balances') await safe(() => store.loadBalances())
   else if (section === 'movements') await safe(() => store.loadMovements())
@@ -669,13 +675,13 @@ async function ensureSection(section: InventorySection, force = false) {
   else if (section === 'reports') await loadReports()
   else if (section === 'catalog' && (!expenses.value.length || force)) await loadCatalogs()
   else if (section === 'recipes' && (!loadedSections.recipes || force)) await loadCatalogs(true)
-  loadedSections[section] = true
+  if (version !== scopeVersion) return
+  loadedSections[section] = !(section in store.errors) && !catalogsError.value
 }
 async function refreshActiveSection() {
   if (tab.value === 'catalog') await loadCatalogs()
   else if (tab.value === 'recipes') await loadCatalogs(true)
   else await ensureSection(tab.value, true)
-  if (!['balances', 'counts', 'transfers'].includes(tab.value)) await Promise.all([safe(() => store.loadBalances()), safe(() => store.loadCounts()), safe(() => store.loadTransfers())])
 }
 async function selectSection(section: InventorySection) {
   if (section === tab.value) return
@@ -693,24 +699,29 @@ watch(selectedCatalogIds, ids => { if (!ids.includes(catalogTemplateId.value)) c
 watch(catalogEditor, value => { branches.markDirty('inventory-catalog', !!catalogEditorExpenseId.value && JSON.stringify(value) !== catalogEditorInitial.value) }, { deep: true })
 watch(reportExpenseOptions, options => { if (!options.some(option => option.id === reportExpenseId.value)) reportExpenseId.value = options[0]?.id || 0 })
 watch(() => branches.revision, async () => {
+  store.clear(); catalogVersion++; scopeVersion++
   recipeProductId.value = 0
-  Object.assign(loadedSections, { balances: false, movements: false, counts: false, transfers: false, reports: false })
-  await Promise.all([safe(() => store.loadBalances()), safe(() => store.loadCounts()), safe(() => store.loadTransfers())])
-  initializeCounts(); initializeTransfers(); loadedSections.balances = loadedSections.counts = loadedSections.transfers = true
-  if (tab.value === 'recipes') await loadCatalogs(true)
-  else if (!['balances', 'counts', 'transfers', 'catalog'].includes(tab.value)) await ensureSection(tab.value, true)
+  products.value = []; expenses.value = []
+  Object.keys(loadedSections).forEach(key => { loadedSections[key as InventorySection] = false })
+  await Promise.all([loadCatalogs(tab.value === 'recipes'), ['catalog', 'recipes'].includes(tab.value) ? Promise.resolve() : ensureSection(tab.value, true)])
 })
 
-const handleInventoryChanged = (payload: { branchId?: number }) => { if (!payload?.branchId || payload.branchId === currentBranchId.value) void Promise.all([store.loadBalances(), tab.value === 'movements' ? store.loadMovements() : Promise.resolve(), tab.value === 'counts' ? store.loadCounts() : Promise.resolve()]) }
-const handleTransferPending = (payload: { branchId?: number }) => { if (!payload?.branchId || payload.branchId === currentBranchId.value) void store.loadTransfers().then(initializeTransfers) }
+const handleInventoryChanged = (payload: { branchId?: number }) => {
+  if (payload?.branchId && payload.branchId !== currentBranchId.value) return
+  loadedSections.balances = loadedSections.movements = loadedSections.counts = loadedSections.reports = false
+  void safe(() => ensureSection(tab.value, true))
+}
+const handleTransferPending = (payload: { branchId?: number }) => {
+  if (payload?.branchId && payload.branchId !== currentBranchId.value) return
+  loadedSections.transfers = false
+  if (tab.value === 'transfers') void safe(() => ensureSection('transfers', true))
+}
 onMounted(async () => {
   onSignalR('InventoryChanged', handleInventoryChanged)
   onSignalR('InventoryTransferPending', handleTransferPending)
-  await Promise.all([loadCatalogs(tab.value === 'recipes'), safe(() => store.loadBalances()), safe(() => store.loadCounts()), safe(() => store.loadTransfers())])
-  initializeCounts(); initializeTransfers(); loadedSections.balances = loadedSections.counts = loadedSections.transfers = true
-  await ensureSection(tab.value)
+  await Promise.all([loadCatalogs(tab.value === 'recipes'), ['catalog', 'recipes'].includes(tab.value) ? Promise.resolve() : ensureSection(tab.value)])
 })
-onBeforeUnmount(() => { offSignalR('InventoryChanged', handleInventoryChanged); offSignalR('InventoryTransferPending', handleTransferPending); countDraftTimers.forEach(timer => clearTimeout(timer)); countDraftTimers.clear(); branches.markDirty('inventory-catalog', false) })
+onBeforeUnmount(() => { store.clear(); catalogVersion++; scopeVersion++; offSignalR('InventoryChanged', handleInventoryChanged); offSignalR('InventoryTransferPending', handleTransferPending); countDraftTimers.forEach(timer => clearTimeout(timer)); countDraftTimers.clear(); branches.markDirty('inventory-catalog', false) })
 
 const qty = (value: number) => new Intl.NumberFormat('es-CO', { maximumFractionDigits: 3 }).format(Number(value) || 0)
 const money = (value: number) => new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(Number(value) || 0)

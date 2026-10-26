@@ -1,5 +1,5 @@
 <template>
-  <MainLayout no-card>
+  <div class="contents">
     <div class="h-full min-h-0 bg-gray-50 flex flex-col">
       <div class="border-b border-gray-200 bg-white px-4 py-3 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <div>
@@ -217,7 +217,13 @@
             </div>
           </div>
           <template v-else>
-            <div class="flex-1 min-h-0 overflow-y-auto px-4 py-4 space-y-3">
+            <div ref="messagesContainer" class="flex-1 min-h-0 overflow-y-auto px-4 py-4 space-y-3">
+              <p v-if="whatsappStore.isLoadingMessages && !currentMessages.length" role="status" class="text-center text-sm text-gray-500">Cargando mensajes…</p>
+              <button v-if="whatsappStore.messageHistory[selectedConversation.id]?.hasMore" type="button"
+                class="mx-auto block rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm disabled:opacity-50"
+                :disabled="whatsappStore.olderMessagesLoading[selectedConversation.id]" @click="loadOlderMessages">
+                {{ whatsappStore.olderMessagesLoading[selectedConversation.id] ? 'Cargando…' : 'Cargar mensajes anteriores' }}
+              </button>
               <div
                 v-for="message in currentMessages"
                 :key="message.id"
@@ -237,18 +243,21 @@
                       @click="openImagePreview(message)"
                     >
                       <img
+                        loading="lazy" decoding="async"
                         :src="message.mediaUrl"
                         :alt="message.mediaFileName || 'Imagen de WhatsApp'"
                         class="max-h-80 max-w-full cursor-zoom-in object-contain"
                       />
                     </button>
                     <audio
+                      preload="none"
                       v-else-if="message.type === 'audio'"
                       :src="message.mediaUrl"
                       controls
                       class="w-72 max-w-full"
                     />
                     <video
+                      preload="none"
                       v-else-if="message.type === 'video'"
                       :src="message.mediaUrl"
                       controls
@@ -641,7 +650,7 @@
         </div>
       </Teleport>
     </div>
-  </MainLayout>
+  </div>
 </template>
 
 <script setup lang="ts">
@@ -658,7 +667,6 @@ import {
   PaperAirplaneIcon,
   XMarkIcon,
 } from '@heroicons/vue/24/outline'
-import MainLayout from '@/components/layout/MainLayout.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseDialog from '@/components/ui/BaseDialog.vue'
 import BaseInput from '@/components/ui/BaseInput.vue'
@@ -1029,13 +1037,11 @@ async function retryWhatsAppStatus() {
   loadingStatus.value = true
   statusLoadError.value = ''
   try {
-    await whatsappStore.refreshStatus()
+    await whatsappStore.ensureStatus()
     if (whatsappStore.enabled) {
-      await Promise.allSettled([
-        whatsappStore.fetchQuickReplies(),
-        whatsappStore.fetchOperationalBranches(),
-        reloadConversations(),
-      ])
+      void whatsappStore.fetchQuickReplies().catch(() => {})
+      void whatsappStore.fetchOperationalBranches().catch(() => {})
+      await reloadConversations()
     } else {
       stopAiDiagnosticsPolling()
     }
@@ -1118,15 +1124,17 @@ const slashQuickReplyMatches = computed(() => {
     .slice(0, 8)
 })
 
+let conversationsGeneration = 0, contextGeneration = 0, conversationSelection = 0
 async function reloadConversations() {
+  const generation = ++conversationsGeneration
   const previousSelected = selectedConversation.value
-  await whatsappStore.fetchConversations({
+  await Promise.all([whatsappStore.fetchConversations({
     branchId: selectedBranchId.value || undefined,
     search: search.value.trim() || undefined,
     unreadOnly: unreadOnly.value || undefined,
-  })
-  await whatsappStore.fetchUnreadSummary()
-  if (previousSelected) {
+  }), whatsappStore.fetchUnreadSummary()])
+  if (generation !== conversationsGeneration) return
+  if (previousSelected && selectedConversation.value?.id === previousSelected.id) {
     const refreshed = whatsappStore.conversations.find(c => c.id === previousSelected.id)
     selectedConversation.value = refreshed
       ?? (previousSelected.isCentralChannel && previousSelected.assignedUserId === authStore.user?.id
@@ -1137,6 +1145,7 @@ async function reloadConversations() {
 }
 
 let realtimeFallbackId: number | undefined
+let fallbackRunning = false
 
 function stopRealtimeFallback() {
   if (!realtimeFallbackId) return
@@ -1147,19 +1156,23 @@ function stopRealtimeFallback() {
 function startRealtimeFallback() {
   if (realtimeFallbackId || connectionState.value === 'connected') return
   realtimeFallbackId = window.setInterval(async () => {
-    if (!whatsappStore.enabled || !isPageVisible.value || !isUserActive.value) return
+    if (!whatsappStore.enabled || !isPageVisible.value || !isUserActive.value || !navigator.onLine || fallbackRunning) return
+    fallbackRunning = true
+    try {
     const activeId = selectedConversation.value?.id
     await reloadConversations()
-    if (activeId) await whatsappStore.fetchMessages(activeId)
+    if (activeId && selectedConversation.value?.id === activeId) await whatsappStore.fetchMessages(activeId)
+    } catch {} finally { fallbackRunning = false }
   }, 15_000)
 }
 
 async function selectConversation(conversation: WhatsAppConversation) {
+  const selection = ++conversationSelection
   selectedConversation.value = conversation
   showCustomerSelector.value = false
-  await whatsappStore.fetchMessages(conversation.id)
-  await loadConversationContext(conversation)
-  await scrollToBottom()
+  void router.replace({ query: { ...route.query, conversationId: String(conversation.id) } })
+  await Promise.allSettled([whatsappStore.fetchMessages(conversation.id), loadConversationContext(conversation)])
+  if (selection === conversationSelection) await scrollToBottom()
 }
 
 async function selectConversationFromRoute() {
@@ -1212,6 +1225,8 @@ async function handleRealtimeMessage(payload: WhatsAppRealtimeMessagePayload) {
 }
 
 async function loadConversationContext(conversation: WhatsAppConversation) {
+  const generation = ++contextGeneration
+  const isCurrent = () => generation === contextGeneration && selectedConversation.value?.id === conversation.id
   selectedCustomer.value = null
   selectedAddress.value = null
   aiOrderDraft.value = null
@@ -1222,16 +1237,19 @@ async function loadConversationContext(conversation: WhatsAppConversation) {
     addressSelectionNote.value = ''
     const mode = whatsappOrderContextMode(conversation.attentionMode)
     const loadedDraft = mode === 'ai'
-      ? await loadAiOrderDraft(conversation.id)
+      ? await loadAiOrderDraft(conversation.id, isCurrent)
       : null
+    if (!isCurrent()) return
     if (!conversation.customerId) return
     const customerRes = await customerApi.getCustomerById(conversation.customerId)
+    if (!isCurrent()) return
     const customer = customerRes.data
     if (!customer) return
 
     let addresses: CustomerAddress[] = customer.addresses ?? []
     if (addresses.length === 0) {
       const addressRes = await customerApi.getCustomerAddresses(customer.id)
+      if (!isCurrent()) return
       addresses = addressRes.data ?? []
     }
 
@@ -1244,16 +1262,16 @@ async function loadConversationContext(conversation: WhatsAppConversation) {
         ? addresses.find(a => a.isPrimary) ?? addresses[0] ?? null
         : null
   } catch (error: any) {
-    contextError.value = error.message || 'No se pudo cargar el cliente.'
+    if (isCurrent()) contextError.value = error.message || 'No se pudo cargar el cliente.'
   } finally {
-    contextLoading.value = false
+    if (isCurrent()) contextLoading.value = false
   }
 }
 
-async function loadAiOrderDraft(conversationId: number) {
+async function loadAiOrderDraft(conversationId: number, isCurrent = () => selectedConversation.value?.id === conversationId) {
   const response = await whatsappApi.getOrderDraft(conversationId)
   const loaded = response.data ?? null
-  if (selectedConversation.value?.id === conversationId) aiOrderDraft.value = loaded
+  if (isCurrent()) aiOrderDraft.value = loaded
   return loaded
 }
 
@@ -1652,6 +1670,21 @@ async function scrollToBottom() {
   await nextTick()
   messagesEnd.value?.scrollIntoView({ block: 'end' })
 }
+const messagesContainer = ref<HTMLElement>()
+async function loadOlderMessages() {
+  const id = selectedConversation.value?.id, container = messagesContainer.value
+  if (!id || !container) return
+  const height = container.scrollHeight, top = container.scrollTop
+  try {
+    await whatsappStore.fetchMessages(id, true)
+    await nextTick()
+    if (selectedConversation.value?.id === id && container === messagesContainer.value) {
+      container.scrollTop = top + container.scrollHeight - height
+    }
+  } catch (error: any) {
+    if (selectedConversation.value?.id === id) showError('Mensajes', error.message || 'No se pudo cargar el historial.')
+  }
+}
 
 function conversationTitle(conversation: WhatsAppConversation) {
   return conversation.contactName || conversation.customerName || conversation.whatsAppUsername || conversation.phoneNumber || 'Usuario de WhatsApp'
@@ -1802,6 +1835,7 @@ onMounted(async () => {
 })
 
 onBeforeUnmount(() => {
+  conversationsGeneration++; contextGeneration++; conversationSelection++
   offSignalR('WhatsAppMessageCreated', handleRealtimeMessage)
   offSignalR('WhatsAppAttentionChanged', handleAttentionChanged)
   offSignalR('WhatsAppConversationRoutingChanged', handleConversationRoutingChanged)

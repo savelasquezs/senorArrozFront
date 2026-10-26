@@ -4,6 +4,7 @@ import { ref, computed } from 'vue'
 import { orderApi } from '@/services/MainAPI/orderApi'
 import { deliverymanApi } from '@/services/MainAPI/deliverymanApi'
 import { todayYmd } from '@/utils/datetime'
+import type { RefreshContext } from '@/utils/serialRefresh'
 import type {
     DeliverymanHistoryBranchSummary,
     DeliverymanHistoryNeighborhood,
@@ -60,8 +61,10 @@ export const useDeliveryStore = defineStore('delivery', () => {
     // ===== Acciones =====
 
     // Cargar pedidos disponibles (ready, sin asignar)
-    const loadAvailableOrders = async (branchId?: number) => {
-        console.log('🔄 Loading available orders...', { branchId })
+    let availableVersion = 0
+    const loadAvailableOrders = async (branchId?: number, context?: RefreshContext) => {
+        const version = ++availableVersion
+        const isCurrent = () => version === availableVersion && (!context || context.isCurrent())
         isLoading.value = true
         error.value = null
         try {
@@ -69,16 +72,17 @@ export const useDeliveryStore = defineStore('delivery', () => {
                 branchId,
                 page: availablePage.value,
                 pageSize: availablePageSize.value
-            })
-            console.log('📦 Available orders received:', response.items.length, response)
+            }, context?.signal)
+            if (!isCurrent()) return
             availableOrders.value = response.items
             availableTotalCount.value = response.totalCount
         } catch (err: any) {
+            if (!isCurrent()) return
             error.value = err.message
             console.error('❌ Error loading available orders:', err)
             throw err
         } finally {
-            isLoading.value = false
+            if (isCurrent()) isLoading.value = false
         }
     }
 
@@ -273,6 +277,8 @@ export const useDeliveryStore = defineStore('delivery', () => {
 
     // Limpiar estado
     const clear = () => {
+        availableVersion++
+        isLoading.value = false
         availableOrders.value = []
         availableTotalCount.value = 0
         preparationOrders.value = []
@@ -324,6 +330,7 @@ export const useDeliveryStore = defineStore('delivery', () => {
         loadAvailableOrders,
         loadPreparationOrders,
         loadHistory,
+        loadHistoryBranchSummaries,
         loadHistoryOrders,
         loadHistoryNeighborhoods,
         loadHistoryForBranch,

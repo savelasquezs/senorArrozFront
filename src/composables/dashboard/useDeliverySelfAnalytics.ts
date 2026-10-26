@@ -1,4 +1,4 @@
-import { ref, watch, computed, type Ref } from 'vue';
+import { ref, watch, computed, onScopeDispose, type Ref } from 'vue';
 import {
 	fetchDeliveryDashboardForSelf,
 	USE_DELIVERY_MOCK,
@@ -29,12 +29,19 @@ function rangeKey(range: [Date, Date]) {
 export function useDeliverySelfAnalytics(
 	dateRange: Ref<[Date, Date]>,
 	branchId: Ref<number | null>,
+	enabled: Ref<boolean> = ref(true),
 ) {
 	const payload = ref<DeliveryDashboardPayload | null>(null);
 	const loading = ref(false);
 	const error = ref<string | null>(null);
+	let generation = 0, controller: AbortController | undefined;
+	function cancel() { generation++; controller?.abort(); loading.value = false; }
+	onScopeDispose(cancel);
 
 	async function load() {
+		if (!enabled.value) return;
+		cancel();
+		const request = generation, current = new AbortController(); controller = current;
 		loading.value = true;
 		error.value = null;
 		try {
@@ -42,21 +49,24 @@ export function useDeliverySelfAnalytics(
 				payload.value = null;
 				return;
 			}
-			payload.value = await fetchDeliveryDashboardForSelf(
+			const result = await fetchDeliveryDashboardForSelf(
 				dateRange.value,
 				branchId.value,
+				current.signal,
 			);
+			if (request === generation && enabled.value) payload.value = result;
 		} catch (e) {
+			if (request !== generation) return;
 			error.value = e instanceof Error ? e.message : 'Error al cargar métricas';
 			payload.value = null;
 		} finally {
-			loading.value = false;
+			if (request === generation) loading.value = false;
 		}
 	}
 
 	watch(
-		[() => rangeKey(dateRange.value), () => branchId.value],
-		() => void load(),
+		[enabled, () => rangeKey(dateRange.value), () => branchId.value],
+		() => { if (enabled.value) void load(); else cancel(); },
 		{ immediate: true, deep: true },
 	);
 

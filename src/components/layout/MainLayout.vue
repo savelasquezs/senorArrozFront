@@ -10,19 +10,18 @@
 			<TopNavigation @toggle-sidebar="sidebarOpen = !sidebarOpen" />
 
 			<!-- Page content -->
-			<main class="flex-1 overflow-x-hidden bg-gray-50"
+			<main ref="contentElement" class="flex-1 overflow-x-hidden bg-gray-50"
 				:class="[{ 'px-6': !noCard }, noCard ? 'overflow-hidden' : 'overflow-y-auto']">
 				<div :class="noCard ? 'h-full' : ' mx-auto h-full flex flex-col'">
 					<!-- Page header -->
 
 
 					<!-- Page content wrapper -->
-					<div v-if="!noCard" class="bg-white shadow-sm rounded-2xl p-6 border border-gray-200 flex-1">
-						<slot />
+					<div :class="noCard ? 'contents' : 'bg-white shadow-sm rounded-2xl p-6 border border-gray-200 flex-1'">
+						<RouterView v-slot="{ Component, route: childRoute }">
+							<component :is="Component" :key="getRouteViewKey(childRoute.path, childRoute.fullPath, branchContext.revision)" />
+						</RouterView>
 					</div>
-
-					<!-- Direct content (sin card) -->
-					<slot v-else />
 				</div>
 			</main>
 		</div>
@@ -52,8 +51,9 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onBeforeUnmount, onMounted, watch } from 'vue';
-import { useRoute, useRouter } from 'vue-router';
+import { ref, computed, nextTick, onBeforeUnmount, onMounted, watch } from 'vue';
+import { RouterView, useRoute, useRouter } from 'vue-router';
+import { getRouteViewKey } from '@/utils/routeViewKey';
 import { useAuthStore } from '@/store/auth';
 import { useWhatsAppStore } from '@/store/whatsapp';
 import { useBranchContextStore } from '@/store/branchContext';
@@ -80,6 +80,8 @@ interface Props {
 
 const props = defineProps<Props>();
 const route = useRoute();
+const noCard = computed(() => props.noCard ?? route.meta.noCard === true);
+const hideQuickOrder = computed(() => props.hideQuickOrder ?? route.meta.hideQuickOrder === true);
 const router = useRouter();
 const authStore = useAuthStore();
 const whatsappStore = useWhatsAppStore();
@@ -92,7 +94,15 @@ const { on: onOrdersSignalR, off: offOrdersSignalR } = useSignalR(ORDERS_SIGNALR
 const { isPageVisible, isUserActive } = useNetworkActivityManager();
 
 const sidebarOpen = ref(false);
+const contentElement = ref<HTMLElement>();
+const scrollPositions = new Map<string, number>();
+watch(() => route.path, async (path, previous) => {
+	if (contentElement.value) scrollPositions.set(previous, contentElement.value.scrollTop);
+	await nextTick();
+	if (route.path === path && contentElement.value) contentElement.value.scrollTop = scrollPositions.get(path) ?? 0;
+});
 let whatsAppPollingId: number | undefined;
+let catalogPrefetchId: number | undefined;
 let previousWhatsAppLatestMessageAt: string | null = null;
 let whatsAppSummaryInitialized = false;
 let lastWhatsAppSummaryRefreshAt = 0;
@@ -271,13 +281,14 @@ onMounted(() => {
 	startWhatsAppUnreadPolling();
 	// En detalle de sucursal, el GET /Branches/:id es pesado; retrasar el prefetch evita competir por red/DB.
 	if (isBranchDetailPath(route.path)) {
-		window.setTimeout(() => prefetchOrderCatalog(), 2000);
+		catalogPrefetchId = window.setTimeout(() => prefetchOrderCatalog(), 2000);
 		return;
 	}
 	prefetchOrderCatalog();
 });
 
 onBeforeUnmount(() => {
+	window.clearTimeout(catalogPrefetchId);
 	offWhatsAppSignalR('WhatsAppMessageCreated', handleWhatsAppRealtimeMessage);
 	offOrdersSignalR('PaymentReviewRequired', handlePaymentReviewRequired);
   offOrdersSignalR('DeliveryTrackingAlertChanged', handleTrackingAlert);

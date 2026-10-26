@@ -227,9 +227,10 @@ export async function fetchDeliveryDashboard(
 export async function fetchDeliveryDashboardForSelf(
 	periodRange: [Date, Date],
 	branchId?: number | null,
+	signal?: AbortSignal,
 ): Promise<DeliveryDashboardPayload> {
 	const { from, to } = encodeDashboardRangeToApi(periodRange);
-	const raw = await dashboardApi.getDeliveryMe(from, to, branchId ?? null);
+	const raw = await dashboardApi.getDeliveryMe(from, to, branchId ?? null, signal);
 	return mapDeliveryFromApi(raw);
 }
 

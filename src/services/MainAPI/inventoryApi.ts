@@ -4,14 +4,16 @@ import type { InventoryBalance, InventoryCount, InventoryDeviationPoint, Invento
 const operationConfig = () => ({ headers: { 'Idempotency-Key': crypto.randomUUID() } })
 
 class InventoryApi extends BaseApi {
-  getAvailability(productIds: number[]) {
+  getAvailability(productIds: number[], branchId?: number | null, forOrderCreation = false) {
     const params = new URLSearchParams()
     productIds.forEach(id => params.append('productIds', String(id)))
-    return this.get<ProductAvailability[]>('/inventory/availability', { params })
+    if (branchId) params.set('branchId', String(branchId))
+    if (forOrderCreation) params.set('forOrderCreation', 'true')
+    return this.get<ProductAvailability[]>('/inventory/availability', { params, ...(forOrderCreation ? { branchScope: 'none' as const } : {}) })
   }
-  getBalances() { return this.get<InventoryBalance[]>('/inventory/balances') }
-  getMovements(take = 200) { return this.get<InventoryMovement[]>('/inventory/movements', { params: { take } }) }
-  getCounts() { return this.get<InventoryCount[]>('/inventory/counts') }
+  getBalances(signal?: AbortSignal) { return this.get<InventoryBalance[]>('/inventory/balances', { signal }) }
+  getMovements(take = 200, signal?: AbortSignal) { return this.get<InventoryMovement[]>('/inventory/movements', { params: { take }, signal }) }
+  getCounts(signal?: AbortSignal) { return this.get<InventoryCount[]>('/inventory/counts', { signal }) }
   startCount() { return this.post<InventoryCount>('/inventory/counts') }
   saveCountDraft(id: number, lines: Array<{ expenseId: number; countedQuantity: number | null }>) {
     return this.put<InventoryCount>(`/inventory/counts/${id}/draft-lines`, lines)
@@ -22,7 +24,7 @@ class InventoryApi extends BaseApi {
   adjust(payload: { expenseId: number; quantityDelta: number; reason: string; waste: boolean }) {
     return this.post<void>('/inventory/adjustments', payload, operationConfig())
   }
-  getTransfers() { return this.get<InventoryTransfer[]>('/inventory/transfers') }
+  getTransfers(signal?: AbortSignal) { return this.get<InventoryTransfer[]>('/inventory/transfers', { signal }) }
   createTransfer(payload: { sourceBranchId: number; destinationBranchId: number; lines: Array<{ expenseId: number; quantity: number }> }) {
     return this.post<InventoryTransfer>('/inventory/transfers', payload, operationConfig())
   }
@@ -37,8 +39,8 @@ class InventoryApi extends BaseApi {
   copyCatalogConfiguration(sourceExpenseId: number, targetExpenseIds: number[]) {
     return this.post<{ sourceExpenseId: number; updatedExpenseIds: number[] }>('/inventory/catalog/copy-configuration', { sourceExpenseId, targetExpenseIds })
   }
-  getReport(fromUtc: string, toUtc: string) { return this.get<InventoryReportRow[]>('/inventory/report', { params: { fromUtc, toUtc } }) }
-  getDeviation(fromUtc: string, toUtc: string) { return this.get<InventoryDeviationPoint[]>('/inventory/deviation', { params: { fromUtc, toUtc } }) }
+  getReport(fromUtc: string, toUtc: string, signal?: AbortSignal) { return this.get<InventoryReportRow[]>('/inventory/report', { params: { fromUtc, toUtc }, signal }) }
+  getDeviation(fromUtc: string, toUtc: string, signal?: AbortSignal) { return this.get<InventoryDeviationPoint[]>('/inventory/deviation', { params: { fromUtc, toUtc }, signal }) }
 }
 
 export const inventoryApi = new InventoryApi()

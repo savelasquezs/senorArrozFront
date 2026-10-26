@@ -26,7 +26,7 @@
   </div>
 </template>
 <script setup lang="ts">
-import { computed, nextTick, onMounted, ref, watch } from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import { useAuthStore } from '@/store/auth';
 import { useDeliveryStore } from '@/store/delivery';
@@ -133,9 +133,16 @@ async function loadIntegrationStatus() {
   try { const result = await integrationApi.getOperationalStatus(id); rappiConnection.value = result.data.rappi ?? null; rappiPending.value = result.data.pending; }
   catch { rappiConnection.value = null; rappiPending.value = 0; }
 }
-onMounted(() => { loadWhatsAppStatus(); void loadIntegrationStatus(); });
+let integrationTimer: ReturnType<typeof setInterval> | undefined;
+onMounted(() => {
+  loadWhatsAppStatus(); void loadIntegrationStatus();
+  integrationTimer = setInterval(() => {
+    if (document.visibilityState !== 'hidden' && navigator.onLine) void loadIntegrationStatus();
+  }, 60_000);
+});
+onBeforeUnmount(() => clearInterval(integrationTimer));
 watch(() => authStore.isAuthenticated, loadWhatsAppStatus);
-watch(() => [authStore.isAuthenticated, route.path, route.query.section, branchContext.revision], () => void loadIntegrationStatus());
+watch(() => [authStore.isAuthenticated, branchContext.revision], () => void loadIntegrationStatus());
 watch(() => route.path, path => {
   if (path.startsWith('/branches')) expandedGroups.value = { ...expandedGroups.value, Sucursales: true, 'Mi sucursal': true };
   if (path === '/deliverymen' || path.startsWith('/delivery-incidents') || path.startsWith('/delivery-alerts')) expandedGroups.value = { ...expandedGroups.value, 'Gestión Domiciliarios': true };

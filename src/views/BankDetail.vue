@@ -263,7 +263,9 @@
                     </template>
 
                     <!-- Bank Payments Table -->
-                    <div v-if="bankPayments.length > 0" class="overflow-x-auto">
+                    <p v-if="paymentsError" role="alert" class="mb-3 text-sm text-red-700">{{ paymentsError }}</p>
+                    <BaseLoading v-if="paymentsLoading" />
+                    <div v-else-if="bankPayments.length > 0" class="overflow-x-auto">
                         <table class="min-w-full divide-y divide-gray-200">
                             <thead class="bg-gray-50">
                                 <tr>
@@ -330,6 +332,7 @@
                         <h3 class="text-lg font-medium text-gray-900 mb-2">No hay pagos bancarios</h3>
                         <p class="text-gray-500">Este banco no tiene pagos registrados.</p>
                     </div>
+                    <BasePagination v-if="paymentTotal > 50" :current-page="paymentPage" :total="paymentTotal" :per-page="50" @change="changePaymentPage" />
                 </BaseCard>
             </div>
         </div>
@@ -348,7 +351,11 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { bankPaymentApi } from '@/services/MainAPI/bankPaymentApi'
+import BasePagination from '@/components/ui/BasePaginatiopn.vue'
+
+import { createLatestRead } from '@/helpers/latestRead'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { useBanksStore } from '@/store/banks'
 import { useAppsStore } from '@/store/apps'
@@ -398,6 +405,15 @@ const showBankForm = ref(false)
 const editingApp = ref<App | null>(null)
 const bankApps = ref<App[]>([])
 const bankPayments = ref<BankPayment[]>([])
+const paymentPage = ref(1)
+const paymentTotal = ref(0)
+const paymentsLoading = ref(false)
+const paymentsError = ref('')
+const paymentsRead = createLatestRead()
+onUnmounted(() => paymentsRead.invalidate())
+function changePaymentPage(page: number) { paymentPage.value = page; void fetchBankPayments() }
+function filterPayments() { paymentPage.value = 1; void fetchBankPayments() }
+
 
 // Computed
 const bank = computed(() => banksStore.currentDetail as BankDetail | null)
@@ -426,9 +442,7 @@ const formatDate = (date: string) => {
 const fetchBankData = async () => {
     const bankId = Number(route.params.id)
     if (bankId) {
-        await banksStore.fetchDetail(bankId)
-        await fetchBankApps(bankId)
-        await fetchBankPayments()
+        await Promise.allSettled([banksStore.fetchDetail(bankId), fetchBankApps(bankId), fetchBankPayments()])
     }
 }
 
@@ -442,16 +456,16 @@ const fetchBankApps = async (bankId: number) => {
 }
 
 const fetchBankPayments = async () => {
+    const request = paymentsRead.begin()
+    paymentsLoading.value = true; paymentsError.value = ''
     try {
-        await bankPaymentsStore.fetch({
-            bankId: bank.value?.id,
-            page: 1,
-            pageSize: 100,
-        })
-        bankPayments.value = bankPaymentsStore.list?.items || []
-    } catch (error) {
-        console.error('Error fetching bank payments:', error)
-    }
+        const response = await bankPaymentApi.getBankPayments({ bankId: Number(route.params.id), page: paymentPage.value, pageSize: 50 }, request.signal)
+        if (!request.isCurrent()) return
+        bankPayments.value = response.items
+        paymentTotal.value = response.totalCount
+    } catch (cause: any) {
+        if (request.isCurrent()) paymentsError.value = cause.message || 'No se pudieron cargar los pagos.'
+    } finally { if (request.isCurrent()) paymentsLoading.value = false }
 }
 
 const openCreateApp = () => {
@@ -532,7 +546,8 @@ const refreshBankDetail = async () => {
 
 const verifyPayment = async (paymentId: number) => {
     try {
-        await bankPaymentsStore.verify(paymentId)
+        paymentsRead.invalidate()
+            await bankPaymentsStore.verify(paymentId)
         success('Pago verificado', 3000, 'El pago bancario se ha verificado correctamente')
         await fetchBankPayments()
         await refreshBankDetail()
@@ -543,7 +558,8 @@ const verifyPayment = async (paymentId: number) => {
 
 const unverifyPayment = async (paymentId: number) => {
     try {
-        await bankPaymentsStore.unverify(paymentId)
+        paymentsRead.invalidate()
+            await bankPaymentsStore.unverify(paymentId)
         success('Pago desverificado', 3000, 'El pago bancario se ha desverificado correctamente')
         await fetchBankPayments()
         await refreshBankDetail()
@@ -560,6 +576,7 @@ const deleteBankPayment = async (paymentId: number) => {
         tone: 'danger',
     })) {
         try {
+            paymentsRead.invalidate()
             await bankPaymentsStore.remove(paymentId)
             success('Pago eliminado', 3000, 'El pago bancario se ha eliminado correctamente')
             await fetchBankPayments()

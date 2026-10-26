@@ -1,5 +1,5 @@
 <template>
-    <MainLayout>
+    <div class="contents">
         <div class="p-6 space-y-6">
             <!-- Header -->
             <div class="flex items-center justify-between">
@@ -154,10 +154,13 @@
             :selected-date="selectedDate"
             @close="closeOrdersModal"
         />
-    </MainLayout>
+    </div>
 </template>
 
 <script setup lang="ts">
+import { createLatestRead } from '@/helpers/latestRead'
+import { createSerialRefresh } from '@/utils/serialRefresh'
+import type { DeliveryMapOrder } from '@/types/deliveryman'
 import { ref, onMounted, onUnmounted, computed, defineAsyncComponent, nextTick, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/store/auth'
@@ -170,7 +173,6 @@ import { orderApi } from '@/services/MainAPI/orderApi'
 import type { OrderListItem } from '@/types/order'
 import type { DeliverymanStats, DeliverymanAdvance, DeliverymanDetail, SettleDeliverymanDayResultDto } from '@/types/deliveryman'
 import { useOrdersDraftsStore } from '@/store/ordersDrafts'
-import MainLayout from '@/components/layout/MainLayout.vue'
 import BaseDatePicker from '@/components/ui/BaseDatePicker.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import DeliverymanCard from '@/components/deliverymen/DeliverymanCard.vue'
@@ -287,9 +289,9 @@ const hasFreshDriverLocation = computed(() =>
  * Pedidos del día cargados por domiciliario (OnTheWay + Delivered), antes de filtrar por ruta activa.
  * El mapa solo debe mostrar pedidos de la ruta actual de cada uno (ver `mapOrders`).
  */
-const mapOrdersFetched = ref<OrderListItem[]>([])
+const mapOrdersFetched = ref<DeliveryMapOrder[]>([])
 
-const mapOrders = computed((): OrderListItem[] => {
+const mapOrders = computed((): DeliveryMapOrder[] => {
     const currentRouteOrders = ordersForCurrentDeliveryRoutes(mapOrdersFetched.value, driverLocations.value)
     const focused = focusedOrder.value
     if (!focused || focused.type !== 'delivery' || currentRouteOrders.some((order) => order.id === focused.id)) {
@@ -332,91 +334,40 @@ function mergeLastLocationFromApi(
     return next
 }
 
-async function loadMapOrdersForDeliverymen(stats: DeliverymanStats[]) {
+const mapRefresh = createSerialRefresh(async context => {
     const branchId = resolvedBranchId.value
-    if (!branchId || stats.length === 0) {
-        mapOrdersFetched.value = []
-        return
-    }
-    const fromDate = selectedDate.value
-    const toDate = selectedDate.value
-    const byId = new Map<number, OrderListItem>()
-    try {
-        const settled = await Promise.allSettled(
-            stats.map(async (stat) => {
-                const [rOnWay, rDelivered] = await Promise.allSettled([
-                    orderApi.fetchAssignedOrders(stat.deliverymanId, {
-                        page: 1,
-                        pageSize: 200,
-                        fromDate,
-                        toDate,
-                        branchId,
-                        status: 'OnTheWay',
-                        type: 'Delivery',
-                    }),
-                    orderApi.fetchAssignedOrders(stat.deliverymanId, {
-                        page: 1,
-                        pageSize: 200,
-                        fromDate,
-                        toDate,
-                        branchId,
-                        status: 'Delivered',
-                        type: 'Delivery',
-                    }),
-                ])
-                const rows: OrderListItem[] = []
-                if (rOnWay.status === 'fulfilled') rows.push(...rOnWay.value.items)
-                if (rDelivered.status === 'fulfilled') rows.push(...rDelivered.value.items)
-                return rows
-            }),
-        )
-        for (const r of settled) {
-            if (r.status !== 'fulfilled') continue
-            for (const o of r.value) {
-                byId.set(o.id, o)
+    const date = selectedDate.value
+    const stats = deliverymenStats.value
+    if (!branchId || !stats.length || !liveMapActivated.value) { mapOrdersFetched.value = []; return }
+    const ids = new Set(stats.map(stat => stat.deliverymanId))
+    const orders: DeliveryMapOrder[] = []
+    let page = 1, pages = 1
+    do {
+        const result = await deliverymanApi.getMap({ branchId, date, page, pageSize: 200 }, context.signal)
+        if (!context.isCurrent() || branchId !== resolvedBranchId.value || date !== selectedDate.value) return
+        if (page === 1) {
+            let locations = Object.fromEntries(Object.entries(driverLocations.value).filter(([id]) => ids.has(Number(id))))
+            for (const location of result.locations) {
+                const stat = stats.find(item => item.deliverymanId === location.deliverymanId)
+                if (stat) locations = mergeLastLocationFromApi(locations, stat, location)
             }
+            driverLocations.value = locations
         }
-        mapOrdersFetched.value = [...byId.values()].sort((a, b) => b.id - a.id)
-    } catch {
-        mapOrdersFetched.value = []
-    }
-}
-
-async function refreshDriverLocationsFromApi(stats: DeliverymanStats[]) {
-    if (stats.length === 0) {
-        driverLocations.value = {}
-        return
-    }
-    const idSet = new Set(stats.map((s) => s.deliverymanId))
-    const settled = await Promise.allSettled(
-        stats.map(async (stat) => {
-            const loc = await deliverymanApi.getLastLocation(stat.deliverymanId)
-            return { stat, loc }
-        })
-    )
-    let acc: Record<number, DriverLocation> = {}
-    for (const [key, loc] of Object.entries(driverLocations.value)) {
-        const id = Number(key)
-        if (idSet.has(id)) acc[id] = loc
-    }
-    for (const r of settled) {
-        if (r.status !== 'fulfilled') continue
-        const { stat, loc } = r.value
-        if (!loc) continue
-        acc = mergeLastLocationFromApi(acc, stat, loc)
-    }
-    driverLocations.value = acc
-}
+        orders.push(...result.orders.items.filter(order => order.deliveryManId != null && ids.has(order.deliveryManId)))
+        pages = result.orders.totalPages
+        if (page < pages && !result.orders.items.length) throw new Error('La página de pedidos del mapa está incompleta.')
+        page++
+    } while (page <= pages)
+    if (context.isCurrent()) mapOrdersFetched.value = orders
+})
+const loadMapOrdersForDeliverymen = (_stats?: DeliverymanStats[]) => mapRefresh.request(true)
 
 async function refreshLiveMapFromApi() {
-    if (_pollInFlight || !liveMapActivated.value || !isPageVisible.value || deliverymenStats.value.length === 0) return
+    if (_pollInFlight || !navigator.onLine || !liveMapActivated.value || !isPageVisible.value || deliverymenStats.value.length === 0) return
     _pollInFlight = true
     try {
         const list = deliverymenStats.value
-        await Promise.all([
-            refreshDriverLocationsFromApi(list),
-            loadMapOrdersForDeliverymen(list),
-        ])
+        await loadMapOrdersForDeliverymen(list)
         _lastRealtimeLocationAt = Date.now()
     } catch (err) {
         console.error('Error al sincronizar el mapa en vivo:', err)
@@ -426,7 +377,7 @@ async function refreshLiveMapFromApi() {
 }
 
 const startWatchdog = () => {
-    if (_watchdogInterval) return
+    if (_watchdogInterval || !isSelectedDateToday.value) return
     _watchdogInterval = setInterval(() => {
         if (connectionState.value === 'connected'
             && Date.now() - _lastRealtimeLocationAt < MAP_FALLBACK_STALE_MS) return
@@ -441,7 +392,6 @@ async function activateLiveMap() {
     _pollInFlight = true
     try {
         const list = deliverymenStats.value
-        await refreshDriverLocationsFromApi(list)
         await loadMapOrdersForDeliverymen(list)
         _lastRealtimeLocationAt = Date.now()
         startWatchdog()
@@ -469,7 +419,7 @@ function scheduleMapOrdersRefresh() {
 }
 
 function handleDeliverymanLocationUpdate(data: any) {
-    if (!liveMapActivated.value || !data?.deliverymanId) return
+    if (!isSelectedDateToday.value || !liveMapActivated.value || !data?.deliverymanId) return
     if (!deliverymenStats.value.some((s) => s.deliverymanId === data.deliverymanId)) return
     const stat = deliverymenStats.value.find(s => s.deliverymanId === data.deliverymanId)
     const t = new Date(data.recordedAt).getTime()
@@ -504,13 +454,17 @@ const mapOrderEvents = [
 // ─── Carga de datos ──────────────────────────────────────────────────────────
 
 // Cargar datos: getDailyOverview; mapa (ubicaciones + pedidos) solo si ya se activó
+const overviewRead = createLatestRead()
 const loadData = async () => {
+    const request = overviewRead.begin()
     loading.value = true
     try {
         const overview = await deliverymanApi.getDailyOverview({
             date: selectedDate.value,
             branchId: resolvedBranchId.value
-        })
+        }, request.signal)
+        if (!request.isCurrent()) return
+        loading.value = false
         deliverymenStatsRaw.value = overview.deliverymen
         advances.value = overview.advances
         if (liveMapActivated.value) {
@@ -520,7 +474,6 @@ const loadData = async () => {
                 mapOrdersFetched.value = []
                 stopPolling()
             } else {
-                await refreshDriverLocationsFromApi(forMap)
                 await loadMapOrdersForDeliverymen(forMap)
             }
         } else {
@@ -529,9 +482,9 @@ const loadData = async () => {
             stopPolling()
         }
     } catch (err: any) {
-        error('Error al cargar datos', err.message)
+        if (request.isCurrent()) error('Error al cargar datos', err.message)
     } finally {
-        loading.value = false
+        if (request.isCurrent()) loading.value = false
     }
 }
 
@@ -750,6 +703,8 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
+    overviewRead.invalidate()
+    mapRefresh.dispose()
     stopPolling()
     off('DeliverymanLocationUpdate', handleDeliverymanLocationUpdate)
     mapOrderEvents.forEach(eventName => off(eventName, scheduleMapOrdersRefresh))

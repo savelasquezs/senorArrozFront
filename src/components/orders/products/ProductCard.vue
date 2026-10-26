@@ -1,5 +1,6 @@
 <template>
-    <div class="product-card" :class="cardClasses" @click="handleClick">
+    <div class="product-card" :class="cardClasses" role="button" :tabindex="isDisabled ? -1 : 0" :aria-disabled="isDisabled"
+        @click="handleClick" @keydown.enter.prevent="handleClick" @keydown.space.prevent="handleClick">
         <!-- Product Name -->
         <h3 class="product-name">
             {{ product.name }}
@@ -12,7 +13,8 @@
 
         <!-- Stock Indicator -->
         <div class="stock-indicator">
-            <ProductStock :stock="product.stock" :has-unlimited-stock="hasUnlimitedStock" variant="text" size="sm" />
+            <span v-if="product.availabilityPending" class="text-xs text-amber-700">Disponibilidad pendiente</span>
+            <ProductStock v-else :stock="product.stock" :has-unlimited-stock="hasUnlimitedStock" variant="text" size="sm" />
         </div>
 
         <!-- Loading Overlay -->
@@ -64,7 +66,7 @@ const hasUnlimitedStock = computed(() => {
 })
 
 const isDisabled = computed(() => {
-    if (props.disabled || !props.product.active) {
+    if (props.disabled || !props.product.active || props.product.availabilityPending) {
         return true
     }
     if (hasUnlimitedStock.value) {

@@ -1,4 +1,5 @@
 import { ref, watch, computed, onScopeDispose, type Ref } from 'vue';
+import { createSectionSnapshot } from '@/helpers/sectionSnapshot';
 import { fetchVentasDashboard, fetchVentasProductsOnly, USE_VENTAS_MOCK,
   type VentasDashboardPayload, type VentasProductsGroupBy } from '@/services/MainAPI/dashboardSectionApi';
 import type { DashboardSectionId } from '@/views/dashboard/dashboardSectionIds';
@@ -23,6 +24,7 @@ export function useDashboardVentasSection(
   let fullController: AbortController | null = null;
   let productsController: AbortController | null = null;
   let lastScope = '';
+  const snapshot = createSectionSnapshot();
 
   function cancelPending() {
     fullLoadSeq++;
@@ -34,8 +36,10 @@ export function useDashboardVentasSection(
   }
   onScopeDispose(cancelPending);
 
-  async function loadFull() {
+  async function loadFull(force = true) {
     if (!isActive.value) return;
+    const snapshotKey = `${scopeKey()}:${productsGroupBy.value}`;
+    if (!force && data.value && snapshot.fresh(snapshotKey)) return;
     cancelPending();
     const seq = fullLoadSeq;
     const controller = new AbortController();
@@ -56,6 +60,7 @@ export function useDashboardVentasSection(
       );
       if (seq !== fullLoadSeq || !isActive.value || key !== scopeKey()) return;
       data.value = result;
+      snapshot.loaded(snapshotKey);
     } catch (e) {
       if (seq !== fullLoadSeq || !isActive.value) return;
       error.value = e instanceof Error ? e.message : 'Error al cargar Ventas';
@@ -96,10 +101,9 @@ export function useDashboardVentasSection(
   }
 
   watch([isActive, branchId, () => rangeKey(dateRange.value)], () => {
-    if (isActive.value) void loadFull();
+    if (isActive.value) void loadFull(false);
     else {
       cancelPending();
-      data.value = null;
       loading.value = false;
       refreshBusy.value = false;
     }

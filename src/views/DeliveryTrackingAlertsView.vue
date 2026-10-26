@@ -1,5 +1,5 @@
 <template>
-  <MainLayout>
+  <div class="contents">
     <div class="space-y-6 p-4 sm:p-6">
       <header class="overflow-hidden rounded-2xl border border-amber-100 bg-gradient-to-r from-amber-50 via-white to-emerald-50 p-5 sm:p-6">
         <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -98,12 +98,12 @@
         <template #footer><BaseButton variant="outline" :disabled="saving" @click="resolveOpen = false">Cancelar</BaseButton><BaseButton :loading="saving" @click="confirmResolve">Resolver alerta</BaseButton></template>
       </BaseDialog>
     </div>
-  </MainLayout>
+  </div>
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
-import MainLayout from '@/components/layout/MainLayout.vue'
+import { createLatestRead } from '@/helpers/latestRead'
+import { onMounted, onUnmounted, ref } from 'vue'
 import BaseBadge from '@/components/ui/BaseBadge.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseCard from '@/components/ui/BaseCard.vue'
@@ -160,7 +160,10 @@ function dayAfter(value: string) {
   return value ? defaultBusinessCalendar.addZonedDays(parseYmd(value), 1).toISOString() : undefined
 }
 
+const listRead = createLatestRead()
+onUnmounted(() => listRead.invalidate())
 async function loadAlerts() {
+  const request = listRead.begin()
   loading.value = true
   errorMessage.value = ''
   try {
@@ -172,13 +175,15 @@ async function loadAlerts() {
       to: dayAfter(toDate.value),
       page: page.value,
       pageSize,
-    })
+    }, request.signal)
+    if (!request.isCurrent()) return
     alerts.value = response.data.items
     totalCount.value = response.data.totalCount
   } catch (error: any) {
+    if (!request.isCurrent()) return
     errorMessage.value = error.message || 'No fue posible cargar las alertas.'
   } finally {
-    loading.value = false
+    if (request.isCurrent()) loading.value = false
   }
 }
 
@@ -219,7 +224,7 @@ function mapUrl(latitude: number | null, longitude: number | null) {
   return latitude === null || longitude === null ? null : `https://www.google.com/maps?q=${latitude},${longitude}`
 }
 
-onMounted(async () => {
+async function loadBranches() {
   if (authStore.isSuperadmin) {
     try {
       const response = await branchApi.getBranches({ Page: 1, PageSize: 200, SortBy: 'name', SortOrder: 'asc' })
@@ -228,6 +233,6 @@ onMounted(async () => {
       toast.error('No se pudieron cargar las sucursales', error.message)
     }
   }
-  await loadAlerts()
-})
+}
+onMounted(() => { void Promise.all([loadBranches(), loadAlerts()]) })
 </script>

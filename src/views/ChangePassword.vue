@@ -1,6 +1,6 @@
 <!-- src/views/ChangePassword.vue -->
 <template>
-	<MainLayout>
+	<div class="contents">
 		<div
 			class="h-screen bg-gray-50 flex flex-col items-center justify-center px-4 sm:px-6 lg:px-8"
 		>
@@ -11,10 +11,9 @@
 			</div>
 			<PasswordChangeForm />
 		</div>
-	</MainLayout>
+	</div>
 </template>
 
 <script setup lang="ts">
 import PasswordChangeForm from '@/components/auth/PasswordChangeForm.vue';
-import MainLayout from '@/components/layout/MainLayout.vue';
 </script>

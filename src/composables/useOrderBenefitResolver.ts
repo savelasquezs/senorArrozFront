@@ -1,3 +1,4 @@
+import { createSerialRefresh, type RefreshContext } from '@/utils/serialRefresh'
 import { computed, ref } from 'vue'
 import { useAuthStore } from '@/store/auth'
 import { useDailyPromotionStore } from '@/store/dailyPromotion'
@@ -14,6 +15,8 @@ const activeLoyaltyStep = ref<LoyaltyCycleStep | null>(null)
 const activeDiscountCode = ref<DiscountCode | null>(null)
 const conflictExists = ref(false)
 const isResolving = ref(false)
+let resolutionJob: ((context: RefreshContext) => Promise<void>) | undefined
+const resolutionRefresh = createSerialRefresh(context => resolutionJob?.(context))
 const cycleByBranch = new Map<number, LoyaltyCycleStep[]>()
 const cycleInFlight = new Map<number, Promise<LoyaltyCycleStep[]>>()
 
@@ -139,8 +142,8 @@ export function useOrderBenefitResolver() {
         ].join('\n')
     })
 
-    const resolveBenefits = async () => {
-        if (isResolving.value) return
+    const resolveOnce = async (context: RefreshContext) => {
+        const identity = authStore.user?.id
         const order = ordersStore.currentOrder
         if (!order) {
             activeDailyPromotion.value = null
@@ -172,6 +175,7 @@ export function useOrderBenefitResolver() {
                 resolveCustomerLoyaltyStep(branchId, customer),
             ])
 
+            if (!context.isCurrent() || ordersStore.currentOrder !== order || authStore.user?.id !== identity) return
             const eligibleDailyPromotion = promo && promotionMinimumReached(order, promo) ? promo : null
             const eligibleLoyaltyStep = loyaltyStep && loyaltyStep.isActive ? loyaltyStep : null
             const eligibleDiscountCode = discountCodeIsEligible(order, order.activeDiscountCode)
@@ -259,6 +263,11 @@ export function useOrderBenefitResolver() {
         } finally {
             isResolving.value = false
         }
+    }
+
+    const resolveBenefits = () => {
+        resolutionJob = resolveOnce
+        return resolutionRefresh.request(true)
     }
 
     const applyDailyPromotion = async () => {
