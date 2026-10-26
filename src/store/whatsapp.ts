@@ -190,7 +190,8 @@ export const useWhatsAppStore = defineStore('whatsapp', () => {
       && (messageEpochs.get(conversationId) ?? 0) === epoch
       && !abort.signal.aborted
 
-    const request: Promise<WhatsAppMessage[]> = (async () => {
+    let request!: Promise<WhatsAppMessage[]>
+    request = (async () => {
       try {
         const res = await whatsappApi.getMessages(conversationId, abort.signal)
         if (!isCurrent()) return messages.value[conversationId] ?? []
