@@ -72,9 +72,9 @@
 
                 <!-- Statistics Cards -->
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    <StatsCard title="Total Pagos" :value="appPayments.length" icon="currency" />
-                    <StatsCard title="Pagos Liquidados" :value="settledPayments.length" icon="clipboard" />
-                    <StatsCard title="Pagos Pendientes" :value="unsettledPayments.length" icon="store" />
+                    <StatsCard title="Total Pagos" :value="paymentTotal" icon="currency" />
+                    <StatsCard title="Liquidados en esta página" :value="settledPayments.length" icon="clipboard" />
+                    <StatsCard title="Pendientes en esta página" :value="unsettledPayments.length" icon="store" />
                 </div>
 
                 <!-- App Payments Section -->
@@ -104,14 +104,16 @@
                         <div class="flex items-center space-x-2">
                             <label class="text-sm font-medium text-gray-700">Estado:</label>
                             <BaseSelect v-model="paymentFilter" :options="paymentFilterOptions" placeholder="Todos"
-                                size="sm" @update:model-value="fetchAppPayments" />
+                                size="sm" @update:model-value="filterPayments" />
                         </div>
                         <BaseYmdDateRangePicker v-model:from-date="fromDate" v-model:to-date="toDate"
-                            variant="compact" @change="fetchAppPayments" />
+                            variant="compact" @change="filterPayments" />
                     </div>
 
                     <!-- App Payments Table -->
-                    <div v-if="appPayments.length > 0" class="overflow-x-auto">
+                    <p v-if="paymentsError" role="alert" class="mb-3 text-sm text-red-700">{{ paymentsError }}</p>
+                    <BaseLoading v-if="paymentsLoading" />
+                    <div v-else-if="appPayments.length > 0" class="overflow-x-auto">
                         <table class="min-w-full divide-y divide-gray-200">
                             <thead class="bg-gray-50">
                                 <tr>
@@ -199,6 +201,7 @@
                         <h3 class="text-lg font-medium text-gray-900 mb-2">No hay pagos</h3>
                         <p class="text-gray-500">Esta app no tiene pagos registrados.</p>
                     </div>
+                    <BasePagination v-if="paymentTotal > 50" :current-page="paymentPage" :total="paymentTotal" :per-page="50" @change="changePaymentPage" />
                 </BaseCard>
             </div>
         </div>
@@ -211,7 +214,11 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { appPaymentApi } from '@/services/MainAPI/appPaymentApi'
+import BasePagination from '@/components/ui/BasePaginatiopn.vue'
+
+import { createLatestRead } from '@/helpers/latestRead'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { useAppsStore } from '@/store/apps'
 import { useAppPaymentsStore } from '@/store/appPayments'
@@ -257,6 +264,15 @@ const { confirmDialog } = useDialog()
 // State
 const showAppForm = ref(false)
 const appPayments = ref<AppPayment[]>([])
+const paymentPage = ref(1)
+const paymentTotal = ref(0)
+const paymentsLoading = ref(false)
+const paymentsError = ref('')
+const paymentsRead = createLatestRead()
+onUnmounted(() => paymentsRead.invalidate())
+function changePaymentPage(page: number) { paymentPage.value = page; void fetchAppPayments() }
+function filterPayments() { paymentPage.value = 1; void fetchAppPayments() }
+
 const selectedPayments = ref<number[]>([])
 const paymentFilter = ref<string>('')
 const fromDate = ref('')
@@ -302,17 +318,18 @@ const formatDate = (date: string) => {
 const fetchAppData = async () => {
     const appId = Number(route.params.id)
     if (appId) {
-        await appsStore.fetchById(appId)
-        await fetchAppPayments()
+        await Promise.allSettled([appsStore.fetchById(appId), fetchAppPayments()])
     }
 }
 
 const fetchAppPayments = async () => {
+    const request = paymentsRead.begin()
+    paymentsLoading.value = true; paymentsError.value = ''; selectedPayments.value = []
     try {
         const filters: any = {
-            appId: app?.value?.id,
-            page: 1,
-            pageSize: 100,
+            appId: Number(route.params.id),
+            page: paymentPage.value,
+            pageSize: 50,
         }
 
         if (paymentFilter.value) {
@@ -327,11 +344,13 @@ const fetchAppPayments = async () => {
             filters.toDate = toDate.value
         }
 
-        await appPaymentsStore.fetch(filters)
-        appPayments.value = appPaymentsStore.list?.items || []
-    } catch (error) {
-        console.error('Error fetching app payments:', error)
-    }
+        const response = await appPaymentApi.getAppPayments(filters, request.signal)
+        if (!request.isCurrent()) return
+        appPayments.value = response.items
+        paymentTotal.value = response.totalCount
+    } catch (cause: any) {
+        if (request.isCurrent()) paymentsError.value = cause.message || 'No se pudieron cargar los pagos.'
+    } finally { if (request.isCurrent()) paymentsLoading.value = false }
 }
 
 const togglePaymentSelection = (paymentId: number) => {
@@ -357,8 +376,10 @@ const settlePayment = async (paymentId: number) => {
         if (payment?.expectedNetAmount != null) {
             const actualAmount = await requestActualSettlementAmount(payment.expectedNetAmount, formatCurrency)
             if (actualAmount == null) return
+            paymentsRead.invalidate()
             await appPaymentsStore.settleMultiple({ paymentIds: [paymentId], actualAmount })
         } else {
+            paymentsRead.invalidate()
             await appPaymentsStore.settle(paymentId)
         }
         success('Pago liquidado', 3000, 'El pago se ha liquidado correctamente')
@@ -381,6 +402,7 @@ const settleSelectedPayments = async () => {
                 description: `Vas a liquidar ${selectedPayments.value.length} pagos.`,
             })
             if (actualAmount == null) return
+            paymentsRead.invalidate()
             await appPaymentsStore.settleMultiple({ paymentIds: selectedPayments.value, actualAmount })
         } else {
             const confirmed = await confirmDialog({
@@ -391,9 +413,11 @@ const settleSelectedPayments = async () => {
             if (!confirmed) return
 
             if (selectedPayments.value.length === 1) {
-                await appPaymentsStore.settle(selectedPayments.value[0])
+                paymentsRead.invalidate()
+            await appPaymentsStore.settle(selectedPayments.value[0])
             } else {
-                await appPaymentsStore.settleMultiple({ paymentIds: selectedPayments.value })
+                paymentsRead.invalidate()
+            await appPaymentsStore.settleMultiple({ paymentIds: selectedPayments.value })
             }
         }
 
@@ -413,6 +437,7 @@ const unsettlePayment = async (paymentId: number) => {
         tone: 'warning',
     })) {
         try {
+            paymentsRead.invalidate()
             await appPaymentsStore.unsettle(paymentId)
             success('Pago desliquidado', 3000, 'El pago se ha desliquidado correctamente')
             await fetchAppPayments()
@@ -430,6 +455,7 @@ const deleteAppPayment = async (paymentId: number) => {
         tone: 'danger',
     })) {
         try {
+            paymentsRead.invalidate()
             await appPaymentsStore.remove(paymentId)
             success('Pago eliminado', 3000, 'El pago se ha eliminado correctamente')
             await fetchAppPayments()

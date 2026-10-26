@@ -1561,7 +1561,7 @@ export const useOrdersDraftsStore = defineStore('ordersDrafts', () => {
         try {
             const banksStore = useBanksStore()
             await banksStore.ensureListLoaded(branchId, true)
-            banks.value = banksStore.list?.items ?? []
+            banks.value = banksStore.options ?? banksStore.list?.items ?? []
         } catch (error) {
             console.error('Error loading banks:', error)
         }
@@ -1571,7 +1571,7 @@ export const useOrdersDraftsStore = defineStore('ordersDrafts', () => {
         try {
             const appsStore = useAppsStore()
             await appsStore.ensureListLoaded(branchId, true)
-            apps.value = appsStore.list?.items ?? []
+            apps.value = appsStore.options ?? appsStore.list?.items ?? []
         } catch (error) {
             console.error('Error loading apps:', error)
         }

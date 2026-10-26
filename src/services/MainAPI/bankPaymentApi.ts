@@ -14,7 +14,7 @@ import type {
 class BankPaymentApi extends BaseApi {
     // 1. Obtener pagos bancarios con filtros y paginación
     async getBankPayments(
-        filters?: BankPaymentFilters
+        filters?: BankPaymentFilters, signal?: AbortSignal
     ): Promise<PagedResult<BankPayment>> {
         // Mapear parámetros de frontend (camelCase) a backend (PascalCase)
         const params: any = {};
@@ -32,7 +32,7 @@ class BankPaymentApi extends BaseApi {
         }
 
         return this.get<PagedResult<BankPayment>>('/bankpayments', {
-            params,
+            params, signal,
         });
     }
 
