@@ -176,7 +176,7 @@
         </div>
 
         <!-- Modal para agregar producto -->
-        <AddProductModal :open="showAddProductModal" :existing-product-ids="existingProductIds"
+        <AddProductModal :open="showAddProductModal" :existing-product-ids="existingProductIds" :branch-id="branchId"
             @close="showAddProductModal = false" @product-added="handleProductAdded" />
 
         <OrderNoteDialog :model-value="noteProduct !== null" :notes="noteProduct?.notes"
@@ -218,6 +218,7 @@ import { PencilIcon, PlusIcon, TrashIcon } from '@heroicons/vue/24/outline'
 
 interface Props {
     products: OrderDetailItem[]
+    branchId?: number | null
     deliveryFee: number
     /** Mostrar fila de domicilio (incluye tarifa $0) */
     showDeliveryFeeLine?: boolean
