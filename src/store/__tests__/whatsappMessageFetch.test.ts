@@ -49,7 +49,7 @@ describe('M30-F02 WhatsApp message history requests', () => {
     const store = useWhatsAppStore()
     const first = store.fetchMessages(20)
     const second = store.fetchMessages(20)
-    expect(first).toBe(second)
+    // Pinia wraps action promises; the invariant is one transport request, not wrapper identity.
     expect(api.getMessages).toHaveBeenCalledTimes(1)
     const signal = api.getMessages.mock.calls[0]?.[1] as AbortSignal
     expect(signal.aborted).toBe(false)
