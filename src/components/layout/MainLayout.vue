@@ -1,18 +1,18 @@
 <!-- src/components/layout/MainLayout.vue -->
 <template>
-	<div class="h-screen bg-gray-50 flex">
+	<div class="h-dvh overflow-hidden bg-gray-50 flex">
 		<!-- Sidebar -->
 		<Sidebar :is-open="sidebarOpen" @close="sidebarOpen = false" />
 
 		<!-- Main content -->
-		<div :class="mainContentClasses" class="flex flex-col flex-1 min-w-0">
+		<div :class="mainContentClasses" class="flex flex-col flex-1 min-w-0 min-h-0">
 			<!-- Top navigation -->
-			<TopNavigation @toggle-sidebar="sidebarOpen = !sidebarOpen" />
+			<TopNavigation class="shrink-0" @toggle-sidebar="sidebarOpen = !sidebarOpen" />
 
 			<!-- Page content -->
-			<main ref="contentElement" class="flex-1 overflow-x-hidden bg-gray-50"
+			<main ref="contentElement" class="flex-1 min-h-0 overflow-x-hidden bg-gray-50"
 				:class="[{ 'px-6': !noCard }, noCard ? 'overflow-hidden' : 'overflow-y-auto']">
-				<div :class="noCard ? 'h-full' : ' mx-auto h-full flex flex-col'">
+				<div :class="noCard ? 'h-full min-h-0 overflow-hidden' : ' mx-auto h-full flex flex-col'">
 					<!-- Page header -->
 
 
@@ -78,7 +78,7 @@ interface Props {
 	hideQuickOrder?: boolean;
 }
 
-const props = defineProps<Props>();
+const props = withDefaults(defineProps<Props>(), { noCard: undefined, hideQuickOrder: undefined });
 const route = useRoute();
 const noCard = computed(() => props.noCard ?? route.meta.noCard === true);
 const hideQuickOrder = computed(() => props.hideQuickOrder ?? route.meta.hideQuickOrder === true);
