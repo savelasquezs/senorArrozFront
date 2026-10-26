@@ -9,8 +9,8 @@ export interface EmployeeLunchState {
 
 class EmployeeLunchApi extends BaseApi {
   me() { return this.get<EmployeeLunchState>('/employee-lunch/me', { branchScope: 'none' }); }
-  branch(date?: string, page = 1, pageSize = 50) {
-    return this.get<PagedResult<EmployeeLunchState>>('/employee-lunch/branch', { params: { date, page, pageSize } });
+  branch(date?: string, page = 1, pageSize = 50, signal?: AbortSignal) {
+    return this.get<PagedResult<EmployeeLunchState>>('/employee-lunch/branch', { params: { date, page, pageSize }, signal });
   }
   change(state: EmployeeLunchState, password: string, kitchen = false) {
     return this.post<EmployeeLunch>('/employee-lunch/' + (state.activeLunch ? 'finish' : 'start'), {
