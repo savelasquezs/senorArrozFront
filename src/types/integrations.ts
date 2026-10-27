@@ -56,6 +56,8 @@ export interface DeliveryProviderCard {
   key: string
   name: string
   available: boolean
+  environment?: 'sandbox' | 'production'
+  readyForPickupAllowed?: boolean
   connection?: RappiConnection | null
 }
 
@@ -161,6 +163,25 @@ export interface RappiExternalOrder {
   acceptedAt?: string
   piiPurgedAt?: string
   createdAt: string
+  readyForPickup?: {
+    status: string
+    attemptCount: number
+    processedAt?: string
+    updatedAt?: string
+    error?: string
+    retryable: boolean
+  } | null
+}
+
+export interface RappiWebhookDiagnostic {
+  id: number
+  eventType: string
+  status: string
+  attemptCount: number
+  createdAt: string
+  updatedAt: string
+  error?: string
+  retryable: boolean
 }
 
 export interface UpsertRappiStore {

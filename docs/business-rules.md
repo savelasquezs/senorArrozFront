@@ -1,5 +1,12 @@
 # Reglas de Negocio - Señor Arroz
 
+## Integración Rappi
+
+- El servidor determina el ambiente; la configuración muestra Sandbox o Producción y conserva tiendas e historial separados por ambiente. No se ingresan credenciales OAuth desde el navegador.
+- Cada tienda usa los identificadores entregados por Rappi. Se publica al padre seleccionado y las hijas heredan el menú. Los identificadores de tiendas con historial no se reemplazan desde el formulario.
+- La bandeja Rappi pagina pedidos y muestra diagnóstico y reintento de READY únicamente cuando el servidor lo permite. Producción requiere autorización configurada en el backend.
+- Los eventos fallidos se consultan sin payload ni contenido privado del proveedor. Solo se reintentan las operaciones que el backend declara recuperables; los reclamos legados y publicaciones ambiguas requieren revisión específica.
+
 ## Navegación y contexto de trabajo
 
 - Las pantallas autenticadas comparten una sola cabecera, menú, control de almuerzo y conexiones globales durante la navegación. Cambiar de usuario, rol o contexto global de sucursal reinicia esa shell; la renovación del token de la misma identidad no la reinicia.

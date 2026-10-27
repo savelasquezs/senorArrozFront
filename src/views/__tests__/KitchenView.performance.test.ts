@@ -86,6 +86,23 @@ beforeEach(() => {
 afterEach(() => { wrapper?.unmount() })
 
 describe('KitchenView batched requests and event refresh', () => {
+    it('refreshes a Rappi status change without announcing a content edit', async () => {
+        mount()
+        await flushPromises()
+        await wrapper.findAll('button').find(button => button.text().includes('Activar voz'))!.trigger('click')
+        await flushPromises()
+        mocks.speak.mockClear()
+        mocks.notify.mockClear()
+        mocks.getOrders.mockResolvedValue(paged([], 0))
+        await mocks.callbacks.OrderModified!({ order: { id: 1, status: 'delivered' }, modificationKind: 'status' })
+        await flushPromises()
+        expect(mocks.getOrders).toHaveBeenCalledTimes(2)
+        expect(store.list.items).toHaveLength(0)
+        expect(mocks.speak).not.toHaveBeenCalled()
+        expect(mocks.notify).not.toHaveBeenCalled()
+        expect(store.fetchById).not.toHaveBeenCalled()
+    })
+
     it('loads every page and renders embedded lines without N detail requests', async () => {
         mocks.getOrders.mockImplementation(async ({ page }) => {
             const start = page === 1 ? 1 : 101

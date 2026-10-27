@@ -704,6 +704,7 @@ const handleOrderModified = async (payload: any) => {
     const visible = prev ? KitchenService.isVisibleToActiveKitchenForAlerts(prev) : false
     if (!data?.id) return
     await refreshAfterKitchenEvent()
+    if (kind === 'status') return
     if ((prev && visible) || kitchenChanges?.scheduleChanged)
         await notifyKitchenOrderModified(data, kind, kitchenChanges, prev)
 }
