@@ -1,11 +1,12 @@
 import { BaseApi } from './baseApi'
-import type { ApiResponse } from '@/types/common'
+import type { ApiResponse, PagedResult } from '@/types/common'
 import type {
   DeliveryProviderCard,
   MetaConversionsDiagnostics,
   RappiCatalog,
   RappiConnection,
   RappiExternalOrder,
+  RappiWebhookDiagnostic,
   RappiMenuPreview,
   UpdateRappiCatalogProduct,
   UpsertRappiConnection,
@@ -62,9 +63,9 @@ class IntegrationApi extends BaseApi {
     })
   }
 
-  getRappiOrders(branchId?: number | null, signal?: AbortSignal) {
-    return this.get<ApiResponse<RappiExternalOrder[]>>('/integrations/apps/rappi/orders', {
-      params: branchId ? { branchId } : {}, signal,
+  getRappiOrders(branchId?: number | null, signal?: AbortSignal, page = 1, pageSize = 25) {
+    return this.get<ApiResponse<PagedResult<RappiExternalOrder>>>('/integrations/apps/rappi/orders', {
+      params: { ...(branchId ? { branchId } : {}), page, pageSize }, signal,
     })
   }
 
@@ -74,6 +75,20 @@ class IntegrationApi extends BaseApi {
 
   rejectRappiOrder(id: number, reason: string) {
     return this.post<ApiResponse<string>>(`/integrations/apps/rappi/orders/${id}/reject`, { reason })
+  }
+
+  retryRappiReadyForPickup(id: number) {
+    return this.post<ApiResponse<{ queued: boolean }>>(`/integrations/apps/rappi/orders/${id}/retry-ready-for-pickup`, {})
+  }
+
+  getRappiEvents(branchId?: number | null, signal?: AbortSignal, page = 1) {
+    return this.get<ApiResponse<PagedResult<RappiWebhookDiagnostic>>>('/integrations/apps/rappi/events', {
+      params: { ...(branchId ? { branchId } : {}), page, pageSize: 25 }, signal,
+    })
+  }
+
+  retryRappiWebhook(id: number) {
+    return this.post<ApiResponse<{ queued: boolean }>>(`/integrations/apps/rappi/events/${id}/retry`, {})
   }
 
   getWompi(branchId: number) {

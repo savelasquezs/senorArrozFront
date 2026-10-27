@@ -27,7 +27,7 @@
         <div v-if="provider.connection" class="mt-4 space-y-3 text-sm">
           <div class="grid grid-cols-2 gap-2">
             <p>Credenciales: <strong>{{ provider.connection.credentialsConfigured ? 'Railway configurado' : 'Faltantes' }}</strong></p>
-            <p>Ambiente: <strong>Sandbox</strong></p>
+            <p>Ambiente: <strong>{{ environment === 'production' ? 'Producción' : 'Sandbox' }}</strong></p>
             <p>Catálogo: <strong>{{ provider.connection.selectedProductCount }} seleccionado(s)</strong></p>
             <p>Publicados: <strong>{{ provider.connection.publishedProductCount }}</strong></p>
             <p>Webhooks: <strong>{{ provider.connection.webhookConfigured ? 'Completos' : 'Pendientes' }}</strong></p>
@@ -100,29 +100,33 @@
         </div>
 
         <div class="space-y-3">
-          <h4 class="font-semibold">Tiendas sandbox</h4>
-          <BaseAlert type="info">
+          <h4 class="font-semibold">Tiendas {{ environment === 'production' ? 'de producción' : 'sandbox' }}</h4>
+          <BaseAlert v-if="environment === 'sandbox'" type="info">
             POS Tester: POS <strong>SeñorArrozDevV2</strong> · INTEGRACIÓN
             <strong>SENORARROZDEVV2</strong>.
           </BaseAlert>
-          <div v-for="store in form.stores" :key="store.rappiStoreId" class="grid gap-3 rounded-lg border p-4 md:grid-cols-3">
-            <div>
-              <p class="font-medium">{{ store.name }}</p>
-              <p class="text-xs text-gray-500">{{ store.rappiStoreId }} · {{ store.isParent ? 'Padre' : 'Hija' }}</p>
-            </div>
+          <div v-for="(store, index) in form.stores" :key="index" class="grid gap-3 rounded-lg border p-4 md:grid-cols-3">
+            <BaseInput v-model="store.rappiStoreId" label="ID de tienda Rappi" required :disabled="index < (connection?.stores.length || 0)" />
+            <BaseInput v-model="store.name" label="Nombre de tienda" required />
             <BaseInput
               v-model="store.storeIntegrationId"
               label="store_integration_id"
               :placeholder="store.rappiStoreId"
             />
             <label class="flex items-center gap-2 pt-7 text-sm">
-              <input v-model="store.manualReadyForPickupEnabled" type="checkbox" class="h-4 w-4 rounded border-gray-300" />
+              <input v-model="store.manualReadyForPickupEnabled" :disabled="!readyForPickupAllowed" type="checkbox" class="h-4 w-4 rounded border-gray-300" />
               Enviar READY_FOR_PICKUP automáticamente al marcar Listo
             </label>
+            <label class="flex items-center gap-2 text-sm">
+              <input type="radio" name="rappi-parent-store" :checked="store.isParent" @change="selectParent(index)" />
+              Tienda padre del menú
+            </label>
+            <BaseButton v-if="index >= (connection?.stores.length || 0) && form.stores.length > 1" type="button" size="sm" variant="outline" @click="removeStore(index)">Quitar tienda</BaseButton>
           </div>
+          <BaseButton type="button" size="sm" variant="outline" @click="addStore">Agregar tienda hija</BaseButton>
           <p class="text-xs text-amber-700">
-            SENORARROZDEVV2 identifica la integración del POS. stores-pa confirmó un store_integration_id distinto para cada tienda.
-            READY_FOR_PICKUP continúa deshabilitado hasta autorización expresa.
+            Cada tienda requiere el store_integration_id entregado por Rappi.
+            <span v-if="!readyForPickupAllowed">READY_FOR_PICKUP requiere autorización de Rappi para producción.</span>
           </p>
         </div>
 
@@ -255,6 +259,8 @@ const { confirmDialog } = useDialog()
 const props = defineProps<{ branchId: number }>()
 const providers = ref<DeliveryProviderCard[]>([])
 const connection = ref<RappiConnection | null>(null)
+const environment = computed(() => providers.value.find(item => item.key === 'rappi')?.environment || connection.value?.environment || 'sandbox')
+const readyForPickupAllowed = computed(() => providers.value.find(item => item.key === 'rappi')?.readyForPickupAllowed ?? environment.value === 'sandbox')
 const financialApps = ref<App[]>([])
 const selectedCustomer = ref<{ id: number; name: string; phone1?: string | null } | null>(null)
 const catalog = ref<RappiCatalog | null>(null)
@@ -294,26 +300,34 @@ const commissionPercent = computed({
 function defaultStores() {
   return [
     {
-      rappiStoreId: '900173116',
-      name: 'Señor Arroz Dev1',
+      rappiStoreId: '',
+      name: '',
       isParent: true,
-      storeIntegrationId: '900173116',
-      manualReadyForPickupEnabled: false,
-    },
-    {
-      rappiStoreId: '900173117',
-      name: 'Señor Arroz Dev2',
-      isParent: false,
-      storeIntegrationId: '900173117',
+      storeIntegrationId: '',
       manualReadyForPickupEnabled: false,
     },
   ]
+}
+
+function addStore() {
+  form.stores.push({ ...defaultStores()[0]!, isParent: false })
+}
+
+function selectParent(index: number) {
+  form.stores.forEach((store, current) => { store.isParent = current === index })
+}
+
+function removeStore(index: number) {
+  const wasParent = form.stores[index]?.isParent
+  form.stores.splice(index, 1)
+  if (wasParent && form.stores.length) selectParent(0)
 }
 
 function apply(value: RappiConnection | null) {
   connection.value = value
   if (!value) {
     selectedCustomer.value = null
+    form.stores = defaultStores()
     return
   }
   selectedCustomer.value = {
@@ -476,7 +490,7 @@ async function openPreview() {
 async function publishMenu() {
   if (!(await confirmDialog({
     title: 'Publicar menú en Rappi',
-    message: '¿Publicar este menú en la tienda padre 900173116?',
+    message: `¿Publicar este menú en la tienda padre ${menuPreview.value?.storeId || ''}?`,
     confirmLabel: 'Publicar',
     tone: 'warning',
   }))) return

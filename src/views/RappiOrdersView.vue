@@ -10,6 +10,22 @@
       </div>
 
       <BaseAlert v-if="errorText" type="error">{{ errorText }}</BaseAlert>
+      <details v-if="eventsCount" class="rounded-lg border bg-white p-3">
+        <summary class="cursor-pointer font-medium">{{ eventsCount }} eventos requieren revisión</summary>
+        <div v-for="event in events" :key="event.id" class="mt-3 flex flex-wrap items-center justify-between gap-2 border-t pt-3 text-sm">
+          <div>
+            <p>{{ event.eventType }} · {{ event.status }} · {{ event.attemptCount }} intento(s)</p>
+            <p v-if="event.error" class="text-red-700">{{ event.error }}</p>
+            <p v-if="event.status === 'processing'" class="text-amber-700">Reclamo legado: revisar el resultado antes de recuperarlo.</p>
+          </div>
+          <BaseButton v-if="event.retryable" size="sm" variant="outline" :disabled="workingId !== null" @click="retryEvent(event.id)">Reintentar evento #{{ event.id }}</BaseButton>
+        </div>
+        <div v-if="eventsPages > 1" class="mt-3 flex items-center justify-end gap-2 text-sm">
+          <BaseButton size="sm" variant="outline" :disabled="loading || eventsPage <= 1" @click="changeEventsPage(eventsPage - 1)">Anterior eventos</BaseButton>
+          <span>{{ eventsPage }} / {{ eventsPages }}</span>
+          <BaseButton size="sm" variant="outline" :disabled="loading || eventsPage >= eventsPages" @click="changeEventsPage(eventsPage + 1)">Siguiente eventos</BaseButton>
+        </div>
+      </details>
       <BaseLoading v-if="loading" text="Cargando órdenes Rappi..." />
       <div v-else-if="!orders.length" class="rounded-lg border border-dashed bg-white py-16 text-center text-gray-500">
         No hay órdenes Rappi recibidas.
@@ -66,6 +82,15 @@
             </ul>
           </BaseAlert>
           <BaseAlert v-if="order.lastError" type="error" class="mt-4">{{ order.lastError }}</BaseAlert>
+          <div v-if="order.readyForPickup" class="mt-4 rounded-lg border p-3 text-sm">
+            <p>Envío de Listo: <strong>{{ readyLabel(order.readyForPickup.status) }}</strong> · {{ order.readyForPickup.attemptCount }} intento(s)</p>
+            <p v-if="order.readyForPickup.error" class="mt-1 text-red-700">{{ order.readyForPickup.error }}</p>
+            <BaseButton
+              v-if="order.readyForPickup.retryable" size="sm" variant="outline" class="mt-2"
+              :loading="workingId === order.id" :disabled="workingId !== null"
+              @click="retryReady(order.id)"
+            >Reintentar envío de Listo</BaseButton>
+          </div>
 
           <details class="mt-4 rounded-lg border p-3">
             <summary class="cursor-pointer font-medium">Productos y descuentos</summary>
@@ -121,6 +146,13 @@
           </div>
         </BaseCard>
       </div>
+      <div v-if="totalCount" class="flex flex-wrap items-center justify-between gap-3 text-sm">
+        <p>{{ totalCount }} órdenes · Página {{ page }} de {{ totalPages }}</p>
+        <div class="flex gap-2">
+          <BaseButton variant="outline" size="sm" :disabled="loading || page <= 1" @click="changePage(page - 1)">Anterior</BaseButton>
+          <BaseButton variant="outline" size="sm" :disabled="loading || page >= totalPages" @click="changePage(page + 1)">Siguiente</BaseButton>
+        </div>
+      </div>
     </div>
 
     <BaseDialog v-model="showReject" title="Rechazar orden Rappi" size="lg">
@@ -155,11 +187,18 @@ import BaseCard from '@/components/ui/BaseCard.vue'
 import BaseDialog from '@/components/ui/BaseDialog.vue'
 import BaseLoading from '@/components/ui/BaseLoading.vue'
 import { integrationApi } from '@/services/MainAPI/integrationApi'
-import type { RappiExternalOrder } from '@/types/integrations'
+import type { RappiExternalOrder, RappiWebhookDiagnostic } from '@/types/integrations'
 
 const route = useRoute()
 const router = useRouter()
 const orders = ref<RappiExternalOrder[]>([])
+const page = ref(1)
+const totalCount = ref(0)
+const totalPages = ref(1)
+const events = ref<RappiWebhookDiagnostic[]>([])
+const eventsPage = ref(1)
+const eventsPages = ref(1)
+const eventsCount = ref(0)
 const loading = ref(false)
 const workingId = ref<number | null>(null)
 const errorText = ref('')
@@ -173,14 +212,36 @@ function branchId() {
 
 const listRead = createLatestRead()
 onUnmounted(() => listRead.invalidate())
-watch(() => route.query.branchId, () => { void load() })
+watch(() => route.query.branchId, () => {
+  page.value = 1
+  eventsPage.value = 1
+  orders.value = []
+  events.value = []
+  totalCount.value = 0
+  eventsCount.value = 0
+  void load()
+})
 async function load() {
   const request = listRead.begin()
   loading.value = true
   errorText.value = ''
   try {
-    const response = await integrationApi.getRappiOrders(branchId(), request.signal)
-    if (request.isCurrent()) orders.value = response.data
+    const [response, diagnostics] = await Promise.allSettled([
+      integrationApi.getRappiOrders(branchId(), request.signal, page.value),
+      integrationApi.getRappiEvents(branchId(), request.signal, eventsPage.value),
+    ])
+    if (request.isCurrent()) {
+      if (response.status === 'fulfilled') {
+        orders.value = response.value.data.items
+        totalCount.value = response.value.data.totalCount
+        totalPages.value = Math.max(1, response.value.data.totalPages)
+      } else errorText.value = response.reason?.message || 'No fue posible cargar las órdenes Rappi.'
+      if (diagnostics.status === 'fulfilled') {
+        events.value = diagnostics.value.data.items
+        eventsCount.value = diagnostics.value.data.totalCount
+        eventsPages.value = Math.max(1, diagnostics.value.data.totalPages)
+      } else errorText.value = [errorText.value, 'No fue posible cargar los eventos Rappi.'].filter(Boolean).join(' ')
+    }
   } catch (error: any) {
     if (request.isCurrent()) errorText.value = error.message
   } finally {
@@ -232,6 +293,54 @@ function openInternalOrder(id: number) {
   void router.push(`/orders/${id}`)
 }
 
+function changePage(value: number) {
+  page.value = value
+  void load()
+}
+
+function changeEventsPage(value: number) {
+  eventsPage.value = value
+  void load()
+}
+
+async function retryEvent(id: number) {
+  if (workingId.value !== null) return
+  workingId.value = id
+  errorText.value = ''
+  try {
+    listRead.invalidate()
+    await integrationApi.retryRappiWebhook(id)
+    await load()
+  } catch (error: any) {
+    errorText.value = error.message
+  } finally {
+    workingId.value = null
+  }
+}
+
+async function retryReady(id: number) {
+  if (workingId.value !== null) return
+  workingId.value = id
+  errorText.value = ''
+  try {
+    listRead.invalidate()
+    await integrationApi.retryRappiReadyForPickup(id)
+    await load()
+  } catch (error: any) {
+    errorText.value = error.message
+  } finally {
+    workingId.value = null
+  }
+}
+
+function readyLabel(status: string) {
+  const labels: Record<string, string> = {
+    outbox_pending: 'Pendiente', outbox_processing: 'Enviando', processed: 'Enviado',
+    outbox_failed: 'Falló', outbox_skipped: 'No aplica',
+  }
+  return labels[status] || status
+}
+
 function canResolve(status: string) {
   const normalized = status.toLowerCase()
   return normalized.includes('pending')
@@ -245,6 +354,8 @@ function statusLabel(status: string) {
     pending_acceptance: 'Pendiente',
     blocked_mapping: 'Retenida',
     sync_error: 'Error de sincronización',
+    processing: 'Aceptación en proceso',
+    accepted: 'Aceptada',
     taken: 'Tomada en Rappi',
     created: 'Creada',
     rejected: 'Rechazada',
@@ -258,7 +369,7 @@ function statusLabel(status: string) {
 
 function statusClass(status: string) {
   const normalized = status.toLowerCase()
-  if (normalized.includes('created') || normalized.includes('taken')) return 'bg-green-100 text-green-700'
+  if (normalized.includes('created') || normalized.includes('taken') || normalized === 'accepted') return 'bg-green-100 text-green-700'
   if (normalized.includes('reject') || normalized.includes('cancel') || normalized.includes('expired')) return 'bg-red-100 text-red-700'
   return 'bg-amber-100 text-amber-700'
 }
