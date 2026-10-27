@@ -10,7 +10,7 @@ it('paginates beyond 100 orders and refreshes the same page after a permitted RE
   const order = {
     id: 12, externalOrderId: 'synthetic-order', status: 'accepted', total: 10000,
     validationErrors: [], lines: [], discounts: [],
-    readyForPickup: { status: 'outbox_failed', attemptCount: 10, retryable: true, error: 'Revisar envío' },
+    readyForPickup: { status: 'outbox_failed', attemptCount: 1, retryable: true, error: 'Revisar envío' },
   }
   mocks.list.mockImplementation((_branch, _signal, page) => Promise.resolve({
     data: { items: [order], totalCount: 151, page, pageSize: 25, totalPages: 7 },
@@ -41,7 +41,8 @@ it('paginates beyond 100 orders and refreshes the same page after a permitted RE
 it('keeps orders available when the independent diagnostics request fails', async () => {
   mocks.list.mockResolvedValue({ data: {
     items: [{ id: 14, externalOrderId: 'order-without-diagnostics', status: 'accepted',
-      validationErrors: [], lines: [], discounts: [], total: 18000 }],
+      validationErrors: [], lines: [], discounts: [], total: 18000,
+      readyForPickup: { status: 'outbox_review_required', attemptCount: 1, retryable: false } }],
     totalCount: 1, totalPages: 1,
   } })
   mocks.events.mockRejectedValue(new Error('Synthetic diagnostics outage'))
@@ -53,5 +54,7 @@ it('keeps orders available when the independent diagnostics request fails', asyn
   await flushPromises()
   expect(wrapper.text()).toContain('order-without-diagnostics')
   expect(wrapper.text()).toContain('No fue posible cargar los eventos Rappi.')
+  expect(wrapper.text()).toContain('Revisar en Rappi')
+  expect(wrapper.findAll('button').some(button => button.text() === 'Reintentar envío de Listo')).toBe(false)
   wrapper.unmount()
 })
