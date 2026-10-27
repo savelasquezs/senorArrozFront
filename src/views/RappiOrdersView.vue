@@ -337,6 +337,7 @@ function readyLabel(status: string) {
   const labels: Record<string, string> = {
     outbox_pending: 'Pendiente', outbox_processing: 'Enviando', processed: 'Enviado',
     outbox_failed: 'Falló', outbox_skipped: 'No aplica',
+    outbox_review_required: 'Revisar en Rappi', outbox_retry_approved: 'Reintento pendiente',
   }
   return labels[status] || status
 }
