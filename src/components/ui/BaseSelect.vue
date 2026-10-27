@@ -31,7 +31,7 @@
 					<div v-if="isOpen" ref="dropdownPanelRef"
 						class="bg-white shadow-lg max-h-60 rounded-md py-1 ring-1 ring-black ring-opacity-5 overflow-auto focus:outline-none"
 						:class="[
-							teleportDropdown ? 'fixed z-[10000]' : 'absolute z-30 left-0 right-0 w-full mt-1',
+							teleportDropdown ? 'fixed z-[10000]' : inlineDropdown ? 'relative w-full mt-1' : 'absolute z-30 left-0 right-0 w-full mt-1',
 							dropdownTextClass,
 						]"
 						:style="teleportDropdown ? floatingStyle : undefined">
@@ -127,6 +127,7 @@ interface Props {
 	createLabel?: string
 	multiple?: boolean
 	teleportDropdown?: boolean
+	inlineDropdown?: boolean
 	size?: 'md' | 'sm'
 }
 
