@@ -50,8 +50,8 @@
                             :product="product"
                             :variant="cardVariant"
                             :is-selected="isProductSelected(product)" :selection-only="selectionOnly"
-                            :disabled="disabled || disabledProductIds.includes(product.id)"
-                            :disabled-reason="disabledProductIds.includes(product.id) ? 'Ya en el pedido' : undefined"
+                            :disabled="disabled || isProductDisabled(product)"
+                            :disabled-reason="isProductDisabled(product) ? 'Ya en el pedido' : undefined"
                             @product-click="handleProductClick"
                             @product-add="handleProductAdd"
                         />
@@ -63,8 +63,8 @@
                 <div v-if="productsWithoutChich.length > 0" class="products-grid" :class="gridClasses" :style="gridStyle">
                     <ProductCard v-for="product in productsWithoutChich" :key="product.id" :product="product"
                         :variant="cardVariant" :is-selected="isProductSelected(product)" :selection-only="selectionOnly"
-                            :disabled="disabled || disabledProductIds.includes(product.id)"
-                            :disabled-reason="disabledProductIds.includes(product.id) ? 'Ya en el pedido' : undefined"
+                            :disabled="disabled || isProductDisabled(product)"
+                            :disabled-reason="isProductDisabled(product) ? 'Ya en el pedido' : undefined"
                         @product-click="handleProductClick" @product-add="handleProductAdd" />
                 </div>
 
@@ -76,8 +76,8 @@
                     <div class="products-grid" :class="gridClasses" :style="gridStyle">
                         <ProductCard v-for="product in productsWithChich" :key="product.id" :product="product"
                             :variant="cardVariant" :is-selected="isProductSelected(product)" :selection-only="selectionOnly"
-                            :disabled="disabled || disabledProductIds.includes(product.id)"
-                            :disabled-reason="disabledProductIds.includes(product.id) ? 'Ya en el pedido' : undefined"
+                            :disabled="disabled || isProductDisabled(product)"
+                            :disabled-reason="isProductDisabled(product) ? 'Ya en el pedido' : undefined"
                             @product-click="handleProductClick" @product-add="handleProductAdd" />
                     </div>
                 </div>
@@ -86,8 +86,8 @@
             <div v-else class="products-grid" :class="gridClasses" :style="gridStyle">
                 <ProductCard v-for="product in products" :key="product.id" :product="product"
                     :variant="cardVariant" :is-selected="isProductSelected(product)" :selection-only="selectionOnly"
-                            :disabled="disabled || disabledProductIds.includes(product.id)"
-                            :disabled-reason="disabledProductIds.includes(product.id) ? 'Ya en el pedido' : undefined"
+                            :disabled="disabled || isProductDisabled(product)"
+                            :disabled-reason="isProductDisabled(product) ? 'Ya en el pedido' : undefined"
                     @product-click="handleProductClick" @product-add="handleProductAdd" />
             </div>
         </div>
@@ -260,9 +260,12 @@ const skeletonCount = computed(() => {
 })
 
 // Methods
-const isProductSelected = (product: Product): boolean => {
-    return props.selectedProducts.some(p => p.id === product.id)
-}
+// Rebuild membership only when the selection changes, rather than scanning
+// selected/disabled arrays for every card in every catalog render.
+const selectedProductIds = computed(() => new Set(props.selectedProducts.map(product => product.id)))
+const disabledIdSet = computed(() => new Set(props.disabledProductIds))
+const isProductSelected = (product: Product) => selectedProductIds.value.has(product.id)
+const isProductDisabled = (product: Product) => disabledIdSet.value.has(product.id)
 
 const handleProductClick = (product: Product) => {
     emit('product-click', product)
