@@ -1502,7 +1502,9 @@ export const useOrdersDraftsStore = defineStore('ordersDrafts', () => {
                         return
                     }
                     let merged: Customer = c
-                    if (!c.addresses?.length) {
+                    // GET /customers/{id} already includes addresses (possibly an empty array).
+                    // Only older/incomplete payloads require a separate addresses request.
+                    if (!Array.isArray(c.addresses)) {
                         try {
                             const ar = await customerApi.getCustomerAddresses(id)
                             merged = {
