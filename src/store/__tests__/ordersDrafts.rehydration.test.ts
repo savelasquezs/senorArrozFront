@@ -12,14 +12,14 @@ const requests = vi.hoisted(() => ({
 
 vi.mock('@/services/MainAPI/customerApi', () => ({ customerApi: requests }))
 
-const customer = (id: number, addresses: Customer['addresses'] | undefined = []): Customer => ({
+const customer = (id: number, addresses: Customer['addresses'] | null = []): Customer => ({
     id,
     branchId: 1,
     name: `Cliente sintético ${id}`,
     active: true,
     createdAt: '',
     updatedAt: '',
-    ...(addresses === undefined ? {} : { addresses }),
+    ...(addresses === null ? {} : { addresses }),
 }) as Customer
 
 function addDraftForCustomer(id: number) {
@@ -63,7 +63,7 @@ describe('M09-F03: rehydrating customers from persisted POS drafts', () => {
 
     it('retains the compatibility fallback when an older response omits addresses', async () => {
         const address = { id: 30, customerId: 15, address: 'Dirección heredada', neighborhoodId: 1 }
-        requests.getCustomerById.mockResolvedValue({ isSuccess: true, data: customer(15, undefined) })
+        requests.getCustomerById.mockResolvedValue({ isSuccess: true, data: customer(15, null) })
         requests.getCustomerAddresses.mockResolvedValue({ isSuccess: true, data: [address] })
         const store = addDraftForCustomer(15)
 
