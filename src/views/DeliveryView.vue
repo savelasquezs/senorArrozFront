@@ -330,6 +330,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { createSerialRefresh } from '@/utils/serialRefresh'
+import { refreshAvailableOrdersIfVisible } from '@/utils/deliveryAvailableRefresh'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/store/auth'
 import { useDeliveryStore } from '@/store/delivery'
@@ -567,12 +568,14 @@ const goToRoute = async () => {
 // ─── SignalR ──────────────────────────────────────────────────
 
 const handleOrderReady = async (orderData: any) => {
-    await loadAvailableOrders()
+    // Other tabs load the current snapshot when the operator returns to Available.
+    // Avoid an expensive ready-orders HTTP read for every background SignalR event.
+    await refreshAvailableOrdersIfVisible(activeTab.value, loadAvailableOrders)
     success('Nuevo pedido disponible', 5000, `Pedido #${orderData.id}`)
 }
 
 const handleOrderAssigned = async (_orderData: any) => {
-    await loadAvailableOrders()
+    await refreshAvailableOrdersIfVisible(activeTab.value, loadAvailableOrders)
 }
 
 const handleOrderModifiedSignalR = async (payload: any) => {
