@@ -160,3 +160,4 @@ onUnmounted(() => {
     unmounted = true
     invalidateTracking()
 })
+</script>
