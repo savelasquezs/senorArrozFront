@@ -128,7 +128,10 @@ async function submit() {
   if (saved) opened.value = false;
 }
 async function openPermissions() { opened.value = false; password.value = ''; await router.push('/permisos'); }
-async function logout() { await auth.logout(); await router.push('/login'); }
+async function logout() {
+  if (!await auth.logout()) { error.value = auth.error ?? 'No se pudo cerrar sesión'; return; }
+  await router.push('/login');
+}
 function visible() { if (document.visibilityState === 'visible') void reload(); }
 function closeLunchListOutside(event: PointerEvent) {
   if (!lunchNavbarRef.value?.contains(event.target as Node)) showKitchenLunchList.value = false;
