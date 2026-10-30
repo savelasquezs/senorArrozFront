@@ -85,7 +85,7 @@ describe('M15-F02: order-scoped courier assignment modal', () => {
         old.resolve(options('Previous courier', 30))
         await flushPromises()
         expect(wrapper.text()).not.toContain('Previous courier')
-        expect(wrapper.getComponent({ name: 'BaseSelect' }).props('loading')).toBe(true)
+        expect(wrapper.get('select').attributes('disabled')).toBeDefined()
         next.resolve(options('Correct courier', 40))
         await flushPromises()
         expect(wrapper.text()).toContain('Correct courier')
@@ -104,12 +104,12 @@ describe('M15-F02: order-scoped courier assignment modal', () => {
         await wrapper.setProps({ open: true })
         old.reject(new Error('old transport failure'))
         await flushPromises()
-        expect(wrapper.getComponent({ name: 'BaseSelect' }).props('loading')).toBe(true)
+        expect(wrapper.get('select').attributes('disabled')).toBeDefined()
         expect(mocks.error).not.toHaveBeenCalled()
         fresh.resolve(options('Current courier'))
         await flushPromises()
         expect(wrapper.text()).toContain('Current courier')
-        expect(wrapper.getComponent({ name: 'BaseSelect' }).props('loading')).toBe(false)
+        expect(wrapper.get('select').attributes('disabled')).toBeUndefined()
         wrapper.unmount()
     })
 
@@ -126,7 +126,6 @@ describe('M15-F02: order-scoped courier assignment modal', () => {
     })
 
     it('a mutation resolving after switching orders does not update the new modal', async () => {
-        mocks.assign.mockReturnValue(deferred<unknown>().promise)
         const mutation = deferred<{ status: string; deliveryManId: number }>()
         mocks.assign.mockReturnValue(mutation.promise)
         const wrapper = render()
