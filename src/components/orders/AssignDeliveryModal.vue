@@ -65,7 +65,9 @@ const { success, error } = useToast()
 
 // Estado
 const loading = ref(false)
-const saving = ref(false)
+// Protect each order against duplicate PUTs even across dialog close/reopen.
+const savingOrderIds = ref<Set<number>>(new Set())
+const saving = computed(() => savingOrderIds.value.has(props.order.id))
 const deliverymen = ref<Array<{ id: number; name: string }>>([])
 const selectedDeliveryManId = ref<number | null>(props.order.deliveryManId)
 
@@ -130,7 +132,7 @@ const handleSave = async () => {
     const version = ++saveVersion
     const current = () => mounted && props.open && context === contextVersion && version === saveVersion
         && props.order.id === order.id && props.order.branchId === order.branchId
-    saving.value = true
+    savingOrderIds.value = new Set(savingOrderIds.value).add(order.id)
     try {
         let updatedOrder: Order
         if (deliveryManId === null) {
@@ -156,7 +158,9 @@ const handleSave = async () => {
     } catch (err: any) {
         if (current()) error('Error al asignar domiciliario', err.message || 'No se pudo actualizar el pedido')
     } finally {
-        if (version === saveVersion) saving.value = false
+        const pending = new Set(savingOrderIds.value)
+        pending.delete(order.id)
+        savingOrderIds.value = pending
     }
 }
 
@@ -167,7 +171,6 @@ watch(
     ([open]) => {
         contextVersion++
         saveVersion++
-        saving.value = false
         cancelOptions()
         deliverymen.value = []
         loading.value = false
