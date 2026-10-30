@@ -67,6 +67,7 @@ describe('M15-F03: assigned route board read lifecycle', () => {
         setUser(8, 2)
         expect(signal.aborted).toBe(true)
         expect(store.routeAssignedOrders).toEqual([])
+        expect(store.isLoading).toBe(false)
         pending.resolve(result(9)); await old
         expect(store.routeAssignedOrders).toEqual([])
         await store.loadRouteAssignedOrders(8)
