@@ -1,7 +1,8 @@
 // src/store/delivery.ts
 import { defineStore } from 'pinia'
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { orderApi } from '@/services/MainAPI/orderApi'
+import { useAuthStore } from '@/store/auth'
 import { deliverymanApi } from '@/services/MainAPI/deliverymanApi'
 import { todayYmd } from '@/utils/datetime'
 import type { RefreshContext } from '@/utils/serialRefresh'
@@ -48,6 +49,24 @@ export const useDeliveryStore = defineStore('delivery', () => {
 
     /** Pedidos asignados sin filtro de fecha — para "En ruta" y contadores */
     const routeAssignedOrders = ref<OrderListItem[]>([])
+
+    // The route board is shared across tabs. Never let a response from a previous
+    // session/driver or a superseded read repopulate the assigned list.
+    const authStore = useAuthStore()
+    const assignedSession = computed(() => [authStore.user?.id, authStore.user?.branchId, authStore.user?.role].join(':'))
+    let routeAssignedVersion = 0
+    let routeAssignedRequest: AbortController | null = null
+    let routeAssignedDriverId: number | null = null
+    const invalidateRouteAssigned = () => {
+        routeAssignedVersion++
+        routeAssignedRequest?.abort()
+        routeAssignedRequest = null
+    }
+    watch(assignedSession, () => {
+        invalidateRouteAssigned()
+        routeAssignedDriverId = null
+        routeAssignedOrders.value = []
+    }, { flush: 'sync' })
 
     /** Incrementa al pedir "Mi historial" desde el sidebar (DeliveryView reacciona y abre el modal). */
     const historyModalRequestId = ref(0)
@@ -215,6 +234,17 @@ export const useDeliveryStore = defineStore('delivery', () => {
     }
 
     const loadRouteAssignedOrders = async (deliveryManId: number) => {
+        invalidateRouteAssigned()
+        const controller = new AbortController()
+        routeAssignedRequest = controller
+        const version = routeAssignedVersion
+        const session = assignedSession.value
+        const isCurrent = () => version === routeAssignedVersion
+            && !controller.signal.aborted && session === assignedSession.value
+        if (routeAssignedDriverId !== deliveryManId) {
+            routeAssignedDriverId = deliveryManId
+            routeAssignedOrders.value = []
+        }
         isLoading.value = true
         error.value = null
         try {
@@ -223,13 +253,17 @@ export const useDeliveryStore = defineStore('delivery', () => {
                 pageSize: 200,
                 status: 'OnTheWay',
                 type: 'Delivery',
-            })
+            }, controller.signal)
+            if (!isCurrent()) return
             routeAssignedOrders.value = [...response.items].sort((a, b) => b.id - a.id)
         } catch (err: any) {
+            // Abort is expected on a new refresh, logout, or branch change.
+            if (!isCurrent()) return
             error.value = err.message
             throw err
         } finally {
-            isLoading.value = false
+            if (routeAssignedRequest === controller) routeAssignedRequest = null
+            if (isCurrent()) isLoading.value = false
         }
     }
 
@@ -277,6 +311,8 @@ export const useDeliveryStore = defineStore('delivery', () => {
 
     // Limpiar estado
     const clear = () => {
+        invalidateRouteAssigned()
+        routeAssignedDriverId = null
         availableVersion++
         isLoading.value = false
         availableOrders.value = []
