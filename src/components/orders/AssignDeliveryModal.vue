@@ -37,7 +37,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onMounted } from 'vue'
+import { ref, computed, watch, onBeforeUnmount } from 'vue'
 import type { OrderListItem, Order, OrderStatus } from '@/types/order'
 import { orderManagementApi } from '@/services/MainAPI/orderManagementApi'
 import { orderApi } from '@/services/MainAPI/orderApi'
@@ -86,73 +86,101 @@ const deliverymanOptions = computed<Array<{ value: number | null; label: string 
 })
 
 // Métodos
+// Each open/order/sucursal context owns one options request. Late reads from
+// an earlier dialog must never overwrite the current driver's choices.
+let optionsVersion = 0
+let contextVersion = 0
+let saveVersion = 0
+let optionsController: AbortController | null = null
+let mounted = true
+
+const cancelOptions = () => {
+    optionsVersion++
+    optionsController?.abort()
+    optionsController = null
+}
+
 const fetchDeliverymen = async () => {
+    const version = optionsVersion
+    const orderId = props.order.id
+    const branchId = props.order.branchId
+    const controller = new AbortController()
+    optionsController = controller
     loading.value = true
     deliverymen.value = []
+    const current = () => mounted && props.open && !controller.signal.aborted
+        && version === optionsVersion && props.order.id === orderId && props.order.branchId === branchId
     try {
-        const orderId = props.order.id
-        const response = await orderManagementApi.options(orderId)
-        if (props.order.id === orderId && props.open) deliverymen.value = response.deliverymen
+        const response = await orderManagementApi.options(orderId, controller.signal)
+        if (current()) deliverymen.value = response.deliverymen
     } catch (err: any) {
-        error('Error al cargar domiciliarios', err.message)
+        // Closing, switching orders or aborting HTTP is not a user-visible failure.
+        if (current()) error('Error al cargar domiciliarios', err.message || 'No se pudo consultar la lista')
     } finally {
-        loading.value = false
+        if (current()) loading.value = false
+        if (optionsController === controller) optionsController = null
     }
 }
 
 const handleSave = async () => {
+    if (saving.value || loading.value || !props.open || selectedDeliveryManId.value === props.order.deliveryManId) return
+    const order = props.order
+    const deliveryManId = selectedDeliveryManId.value
+    const context = contextVersion
+    const version = ++saveVersion
+    const current = () => mounted && props.open && context === contextVersion && version === saveVersion
+        && props.order.id === order.id && props.order.branchId === order.branchId
     saving.value = true
     try {
         let updatedOrder: Order
-        let statusChangedByBackend = false
-
-        if (selectedDeliveryManId.value === null) {
-            // Desasignar
-            updatedOrder = await orderApi.unassignDelivery(props.order.id, props.order)
-            success('Domiciliario desasignado', 5000, 'El domiciliario ha sido removido del pedido')
+        if (deliveryManId === null) {
+            updatedOrder = await orderApi.unassignDelivery(order.id, order)
         } else {
-            // Asignar — el backend ya cambia Ready → OnTheWay automáticamente, no llamar updateStatus
-            updatedOrder = await orderApi.assignDelivery(props.order.id, selectedDeliveryManId.value, props.order)
-
-            statusChangedByBackend = updatedOrder.status === 'on_the_way' && props.order.status === 'ready'
-            if (statusChangedByBackend) {
-                success('Domiciliario asignado', 5000, 'Domiciliario asignado y pedido en camino')
-            } else {
-                success('Domiciliario asignado', 5000, 'El domiciliario ha sido asignado al pedido')
-            }
+            // Ready → OnTheWay is performed by the backend; never send a second status mutation.
+            updatedOrder = await orderApi.assignDelivery(order.id, deliveryManId, order)
         }
-
-        // ✅ Emitir el pedido actualizado para actualización optimista
+        // The mutation may have completed on the server after navigation; SignalR
+        // will reconcile it. Do not emit a response into another order's modal.
+        if (!current()) return
+        const statusChangedByBackend = deliveryManId !== null && updatedOrder.status === 'on_the_way' && order.status === 'ready'
+        if (deliveryManId === null) {
+            success('Domiciliario desasignado', 5000, 'El domiciliario ha sido removido del pedido')
+        } else if (statusChangedByBackend) {
+            success('Domiciliario asignado', 5000, 'Domiciliario asignado y pedido en camino')
+        } else {
+            success('Domiciliario asignado', 5000, 'El domiciliario ha sido asignado al pedido')
+        }
         emit('updated', updatedOrder)
-
-        // Si el backend cambió el estado (Ready → OnTheWay), notificar al padre para limpiar pendingStatusChange
-        if (statusChangedByBackend) {
-            emit('statusChanged', 'on_the_way')
-        }
-
+        if (statusChangedByBackend) emit('statusChanged', 'on_the_way')
         emit('close')
     } catch (err: any) {
-        error('Error al asignar domiciliario', err.message)
+        if (current()) error('Error al asignar domiciliario', err.message || 'No se pudo actualizar el pedido')
     } finally {
-        saving.value = false
+        if (version === saveVersion) saving.value = false
     }
 }
 
-// Watchers
+// A modal can be reused for another order without unmounting. One immediate
+// watcher also avoids duplicate onMounted + watcher fetches.
 watch(
-    () => props.open,
-    (newVal) => {
-        if (newVal) {
-            selectedDeliveryManId.value = props.order.deliveryManId
-            fetchDeliverymen()
-        }
-    }
+    () => [props.open, props.order.id, props.order.branchId] as const,
+    ([open]) => {
+        contextVersion++
+        saveVersion++
+        saving.value = false
+        cancelOptions()
+        deliverymen.value = []
+        loading.value = false
+        selectedDeliveryManId.value = props.order.deliveryManId ?? null
+        if (open) void fetchDeliverymen()
+    },
+    { immediate: true },
 )
 
-// Lifecycle
-onMounted(() => {
-    if (props.open) {
-        fetchDeliverymen()
-    }
+onBeforeUnmount(() => {
+    mounted = false
+    contextVersion++
+    saveVersion++
+    cancelOptions()
 })
 </script>
