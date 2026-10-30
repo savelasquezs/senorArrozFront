@@ -1,6 +1,7 @@
 import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { useAuthStore } from '@/store/auth'
+import { useBranchContextStore } from '@/store/branchContext'
 import { useDeliveryStore } from '../delivery'
 import type { OrderListItem } from '@/types/order'
 
@@ -74,6 +75,19 @@ describe('M15-F03: assigned route board read lifecycle', () => {
         expect(store.routeAssignedOrders.map(row => row.id)).toEqual([21])
         setUser(8, 3)
         expect(store.routeAssignedOrders).toEqual([])
+    })
+
+    it('clears Superadmin assigned rows on selected branch change without replacing the user', async () => {
+        setUser(7, 1, 'Superadmin')
+        const branches = useBranchContextStore()
+        branches.selectedBranchId = 1
+        requests.fetchAssignedOrders.mockResolvedValue(result(31))
+        const store = useDeliveryStore()
+        await store.loadRouteAssignedOrders(7)
+        expect(store.routeAssignedOrders.map(row => row.id)).toEqual([31])
+        branches.selectedBranchId = 2
+        expect(store.routeAssignedOrders).toEqual([])
+        expect(store.isLoading).toBe(false)
     })
 
     it('does not retain the previous driver rows while loading another driver', async () => {
