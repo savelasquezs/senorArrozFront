@@ -66,6 +66,7 @@ export const useDeliveryStore = defineStore('delivery', () => {
         invalidateRouteAssigned()
         routeAssignedDriverId = null
         routeAssignedOrders.value = []
+        isLoading.value = false
     }, { flush: 'sync' })
 
     /** Incrementa al pedir "Mi historial" desde el sidebar (DeliveryView reacciona y abre el modal). */
