@@ -1,5 +1,11 @@
 # Reglas de Negocio - Señor Arroz
 
+## Asignación y cierre de rutas
+
+- Caja, administración y superadministración asignan y reasignan desde Pedidos. El backend retira primero las rutas anteriores ya resueltas o vacías, con auditoría, sin exigir una toma desde la app. Las rutas con entregas pendientes se conservan.
+- Una ruta cierra por regreso GPS después de haber salido, por iniciar otra ruta o por cierre de sesión, comprobando antes que no queden entregas pendientes. Un cierre no marca pedidos como entregados ni modifica cancelaciones.
+- Si hay pendientes, el servidor rechaza iniciar otra ruta o cerrar sesión hasta entregarlos o reasignarlos. La web conserva las credenciales y muestra el motivo; solo navega al login después de la confirmación del servidor.
+
 ## Integración Rappi
 
 - El servidor determina el ambiente; la configuración muestra Sandbox o Producción y conserva tiendas e historial separados por ambiente. No se ingresan credenciales OAuth desde el navegador.
