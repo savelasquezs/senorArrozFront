@@ -163,6 +163,30 @@ describe('M15-F02: order-scoped courier assignment modal', () => {
         wrapper.unmount()
     })
 
+    it('prevents a second PUT for the same order after closing and reopening during a save', async () => {
+        const pending = deferred<{ status: string; deliveryManId: number }>()
+        mocks.assign.mockReturnValue(pending.promise)
+        const wrapper = render()
+        await flushPromises()
+        await wrapper.find('select').setValue('20')
+        await button(wrapper, 'Asignar').trigger('click')
+        expect(mocks.assign).toHaveBeenCalledTimes(1)
+
+        await wrapper.setProps({ open: false })
+        await wrapper.setProps({ open: true })
+        await flushPromises()
+        await wrapper.find('select').setValue('20')
+        expect(button(wrapper, 'Asignar').attributes('disabled')).toBeDefined()
+        await button(wrapper, 'Asignar').trigger('click')
+        expect(mocks.assign).toHaveBeenCalledTimes(1)
+
+        pending.resolve({ status: 'on_the_way', deliveryManId: 20 })
+        await flushPromises()
+        expect(wrapper.emitted('updated')).toBeUndefined()
+        expect(button(wrapper, 'Asignar').attributes('disabled')).toBeUndefined()
+        wrapper.unmount()
+    })
+
     it('does not make a mutation when the current assignment is unchanged', async () => {
         const wrapper = render(order(10, 20))
         await flushPromises()
