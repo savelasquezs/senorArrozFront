@@ -1,12 +1,12 @@
 import { shallowMount, flushPromises, type VueWrapper } from '@vue/test-utils'
-import { ref } from 'vue'
-import { createPinia, setActivePinia } from 'pinia'
-import { useAuthStore } from '@/store/auth'
-import { useBranchContextStore } from '@/store/branchContext'
+import { reactive, ref } from 'vue'
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest'
 import OrderTrackingDialog from '../OrderTrackingDialog.vue'
 import type { OrderListItem } from '@/types/order'
 const mocks = vi.hoisted(() => ({ tracking: vi.fn(), detail: vi.fn() }))
+const scope = vi.hoisted(() => ({ auth: null as any, branch: null as any }))
+vi.mock('@/store/auth', () => ({ useAuthStore: () => scope.auth }))
+vi.mock('@/store/branchContext', () => ({ useBranchContextStore: () => scope.branch }))
 const visible = ref(true)
 const online = ref(true)
 let managementEvent: ((e: { orderId: number; managementVersion: number }) => void) | undefined
@@ -28,11 +28,9 @@ const mountDialog = () => wrapper = shallowMount(OrderTrackingDialog, { props: {
     DeliveryMapAsync: { props: ['orders', 'deliverymanLocations'], template: '<div data-test="map" :data-drivers="Object.keys(deliverymanLocations).join()" />' },
 } } })
 beforeEach(() => {
-    setActivePinia(createPinia())
-    const auth = useAuthStore()
-    auth.user = { id: 7, branchId: 2, role: 'Admin' } as never
-    auth.token = 'synthetic-token'
-    useBranchContextStore().selectedBranchId = 2
+    scope.auth = reactive({ user: { id: 7, branchId: 2, role: 'Admin' } as { id: number; branchId: number; role: string } | null,
+        isAuthenticated: true, isSuperadmin: false })
+    scope.branch = reactive({ selectedBranchId: 2 })
     vi.useFakeTimers()
     visible.value = true
     online.value = true
@@ -114,20 +112,21 @@ describe('resource-scoped remote tracking', () => {
     it('clears the previous GPS and polling immediately on logout', async () => {
         mountDialog(); await flushPromises()
         expect(wrapper.text()).toContain('Ubicación reciente')
-        const auth = useAuthStore(); auth.user = null; auth.token = null
+        const auth = scope.auth; auth.user = null; auth.isAuthenticated = false
         await flushPromises()
         expect(wrapper.text()).not.toContain('Ubicación reciente')
         await vi.advanceTimersByTimeAsync(90_000)
         expect(mocks.tracking).toHaveBeenCalledTimes(1)
     })
     it('cancels the old tracking GET after a Superadmin changes selected branch', async () => {
-        useAuthStore().user = { id: 7, branchId: 2, role: 'Superadmin' } as never
+        scope.auth.user = { id: 7, branchId: 2, role: 'Superadmin' }
+        scope.auth.isSuperadmin = true
         let finish!: (value: typeof snapshot) => void
         mocks.tracking.mockImplementationOnce(() => new Promise(resolve => { finish = resolve }))
             .mockResolvedValueOnce({ ...snapshot, deliveryManName: 'Otra sucursal' })
         mountDialog(); await flushPromises()
         const signal = mocks.tracking.mock.calls[0]![1] as AbortSignal
-        useBranchContextStore().selectedBranchId = 3
+        scope.branch.selectedBranchId = 3
         await flushPromises()
         expect(signal.aborted).toBe(true)
         finish({ ...snapshot, deliveryManName: 'Obsoleto' }); await flushPromises()
