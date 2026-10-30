@@ -3,6 +3,7 @@ import { defineStore } from 'pinia'
 import { ref, computed, watch } from 'vue'
 import { orderApi } from '@/services/MainAPI/orderApi'
 import { useAuthStore } from '@/store/auth'
+import { useBranchContextStore } from '@/store/branchContext'
 import { deliverymanApi } from '@/services/MainAPI/deliverymanApi'
 import { todayYmd } from '@/utils/datetime'
 import type { RefreshContext } from '@/utils/serialRefresh'
@@ -53,7 +54,11 @@ export const useDeliveryStore = defineStore('delivery', () => {
     // The route board is shared across tabs. Never let a response from a previous
     // session/driver or a superseded read repopulate the assigned list.
     const authStore = useAuthStore()
-    const assignedSession = computed(() => [authStore.user?.id, authStore.user?.branchId, authStore.user?.role].join(':'))
+    const branchContext = useBranchContextStore()
+    const assignedSession = computed(() => [
+        authStore.user?.id, authStore.user?.branchId, authStore.user?.role,
+        authStore.user?.role === 'Superadmin' ? branchContext.selectedBranchId : null,
+    ].join(':'))
     let routeAssignedVersion = 0
     let routeAssignedRequest: AbortController | null = null
     let routeAssignedDriverId: number | null = null
