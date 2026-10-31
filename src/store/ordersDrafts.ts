@@ -6,7 +6,7 @@ import { useCustomersStore } from './customers'
 import { useBanksStore } from './banks'
 import { useAppsStore } from './apps'
 import { orderApi } from '@/services/MainAPI/orderApi'
-import { customerApi } from '@/services/MainAPI/customerApi'
+import { useDraftCustomerHydration } from '@/composables/useDraftCustomerHydration'
 import type {
     DraftOrder,
     OrderTab,
@@ -59,36 +59,6 @@ type AiWhatsAppDraftPayload = WhatsAppDraftBase & {
 
 type CreateWhatsAppDraftPayload = ManualWhatsAppDraftPayload | AiWhatsAppDraftPayload
 
-/** Si falla la API al rehidratar, reconstruye un cliente mínimo desde el borrador persistido. */
-function buildFallbackCustomerForDraft(customerId: number, drafts: DraftOrder[]): Customer | null {
-    const order = drafts.find((d) => d.customerId === customerId)
-    if (!order?.customerId) return null
-    const addresses: CustomerAddress[] = []
-    if (order.addressId) {
-        addresses.push({
-            id: order.addressId,
-            customerId: order.customerId,
-            neighborhoodId: 0,
-            address: order.addressDescription ?? '',
-            additionalInfo: order.addressAdditionalInfo ?? undefined,
-            isPrimary: true,
-            createdAt: '',
-            updatedAt: '',
-            deliveryFee: order.deliveryFee ?? 0,
-        })
-    }
-    return {
-        id: order.customerId,
-        name: order.customerName ?? 'Cliente',
-        phone1: order.customerPhone ?? '',
-        branchId: 0,
-        active: true,
-        createdAt: '',
-        updatedAt: '',
-        addresses,
-    }
-}
-
 export const useOrdersDraftsStore = defineStore('ordersDrafts', () => {
     // ===== Estado =====
     const draftOrders = ref(new Map<string, DraftOrder>())
@@ -119,6 +89,9 @@ export const useOrdersDraftsStore = defineStore('ordersDrafts', () => {
         const branchContext = useBranchContextStore()
         return branchContext.selectedBranchId ?? authStore.branchId ?? null
     })
+
+    const { rehydrateCustomersFromDrafts, customerHydrationPending, customerHydrationIncomplete } =
+        useDraftCustomerHydration(draftOrders, customers, activeBranchId)
 
     const visibleDraftOrders = computed(() =>
         Array.from(draftOrders.value.values()).filter(
@@ -1101,7 +1074,6 @@ export const useOrdersDraftsStore = defineStore('ordersDrafts', () => {
             discountCodeInput: '',
             discountCodeError: null,
             selectedBenefitType: null,
-            updatedAt: new Date(),
         }
         recalculateTotals(next)
         saveToLocalStorage()
@@ -1479,50 +1451,6 @@ export const useOrdersDraftsStore = defineStore('ordersDrafts', () => {
         }
     }
 
-    /** Tras restaurar borradores: carga clientes (y direcciones) desde la API para rellenar CustomerSection. */
-    const rehydrateCustomersFromDrafts = async () => {
-        const drafts = Array.from(draftOrders.value.values())
-        const ids = [
-            ...new Set(
-                drafts
-                    .map((o) => o.customerId)
-                    .filter((id): id is number => id != null && id > 0),
-            ),
-        ]
-        if (ids.length === 0) return
-
-        await Promise.all(
-            ids.map(async (id) => {
-                try {
-                    const res = await customerApi.getCustomerById(id)
-                    const c = res.isSuccess ? res.data : null
-                    if (!c) {
-                        const fallback = buildFallbackCustomerForDraft(id, drafts)
-                        if (fallback) ensureCustomerInList(fallback)
-                        return
-                    }
-                    let merged: Customer = c
-                    if (!c.addresses?.length) {
-                        try {
-                            const ar = await customerApi.getCustomerAddresses(id)
-                            merged = {
-                                ...c,
-                                addresses: ar.isSuccess ? ar.data ?? [] : [],
-                            }
-                        } catch {
-                            merged = { ...c, addresses: [] }
-                        }
-                    }
-                    ensureCustomerInList(merged)
-                } catch (e) {
-                    console.warn('No se pudo rehidratar cliente del borrador', id, e)
-                    const fallback = buildFallbackCustomerForDraft(id, drafts)
-                    if (fallback) ensureCustomerInList(fallback)
-                }
-            }),
-        )
-    }
-
     const loadBanks = async (branchId = currentOrder.value?.branchId ?? activeBranchId.value) => {
         try {
             const banksStore = useBanksStore()
@@ -1756,6 +1684,8 @@ export const useOrdersDraftsStore = defineStore('ordersDrafts', () => {
         selectedCategoryIds,
         selectedCategory,
         customers,
+        customerHydrationPending,
+        customerHydrationIncomplete,
         banks,
         apps,
         activeBranchId,

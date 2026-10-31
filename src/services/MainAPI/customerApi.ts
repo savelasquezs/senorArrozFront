@@ -38,8 +38,17 @@ class CustomerApi extends BaseApi {
         });
     }
 
+    private async readCustomer<T>(url: string, signal?: AbortSignal): Promise<ApiResponse<T>> {
+        try { return (await this.api.get<ApiResponse<T>>(url, { signal })).data; }
+        catch (cause: any) {
+            if (signal?.aborted || cause?.code === 'ERR_CANCELED' || cause?.__CANCEL__ === true) throw cause;
+            // Restoration must distinguish a temporary failure from denied/deleted data.
+            throw Object.assign(this.handleError(cause), { status: cause?.response?.status });
+        }
+    }
+
     async getCustomerById(id: number, signal?: AbortSignal): Promise<ApiResponse<Customer>> {
-        return this.get<ApiResponse<Customer>>(`/customers/${id}`, { signal });
+        return this.readCustomer<Customer>(`/customers/${id}`, signal);
     }
 
     async getCustomerByPhone(phone: string): Promise<ApiResponse<Customer>> {
@@ -66,7 +75,7 @@ class CustomerApi extends BaseApi {
     async getCustomerAddresses(
         customerId: number, signal?: AbortSignal
     ): Promise<ApiResponse<CustomerAddress[]>> {
-        return this.get<ApiResponse<CustomerAddress[]>>(`/customers/${customerId}/addresses`, { signal });
+        return this.readCustomer<CustomerAddress[]>(`/customers/${customerId}/addresses`, signal);
     }
 
     async getCustomerAddressById(

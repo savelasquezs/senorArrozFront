@@ -1,6 +1,11 @@
 <template>
     <div class="contents">
         <div class="orders-view h-full min-h-0 overflow-hidden bg-gray-50 flex flex-col">
+            <div v-if="ordersStore.customerHydrationIncomplete" role="status" class="shrink-0 bg-amber-50 px-4 py-2 text-sm text-amber-900">
+                {{ ordersStore.customerHydrationPending ? 'Recuperando clientes de los borradores…' : 'Algunos clientes no se han podido verificar. Los datos guardados son provisionales; las tarifas del pedido no se han recalculado.' }}
+                <button type="button" class="ml-2 underline" :disabled="ordersStore.customerHydrationPending"
+                    @click="ordersStore.rehydrateCustomersFromDrafts()">Reintentar recuperación</button>
+            </div>
             <!-- Main Content -->
             <div class="flex flex-1 min-h-0 min-w-0 overflow-hidden flex-col lg:flex-row">
                 <!-- Left Panel - Products and Categories -->
