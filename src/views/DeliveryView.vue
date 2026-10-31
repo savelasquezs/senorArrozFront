@@ -172,7 +172,7 @@
                         >
                         <select
                             id="analytics-branch-filter"
-                            class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-emerald-600 focus:outline-none focus:ring-1 focus:ring-emerald-600"
+                            class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600"
                             :value="analyticsBranchId === null ? '' : String(analyticsBranchId)"
                             @change="onAnalyticsBranchChange"
                         >
@@ -198,7 +198,7 @@
                 </div>
                 <div
                     v-else-if="deliveryAnalyticsError"
-                    class="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800"
+                    class="rounded-xl border-red-200 bg-red-50 p-4 text-sm text-red-800"
                 >
                     {{ deliveryAnalyticsError }}
                 </div>
@@ -328,7 +328,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import { createSerialRefresh } from '@/utils/serialRefresh'
 import { refreshAvailableOrdersIfVisible } from '@/utils/deliveryAvailableRefresh'
 import { useRoute, useRouter } from 'vue-router'
@@ -370,7 +370,8 @@ const authStore = useAuthStore()
 const deliveryStore = useDeliveryStore()
 const { success, error, warning } = useToast()
 
-const { isConnected, on } = useSignalR(ORDERS_SIGNALR_HUB_URL)
+const { isConnected, on, off } = useSignalR(ORDERS_SIGNALR_HUB_URL)
+let mounted = false
 
 const activeTab = ref<'available' | 'preparation' | 'analytics' | 'routing' | 'route'>('available')
 const isLoading = ref(false)
@@ -503,7 +504,6 @@ const availableRefresh = createSerialRefresh(async context => {
     }
 })
 const loadAvailableOrders = () => availableRefresh.request(true)
-onUnmounted(() => availableRefresh.dispose())
 
 const loadPreparationOrders = async () => {
     try {
@@ -568,22 +568,30 @@ const goToRoute = async () => {
 // ─── SignalR ──────────────────────────────────────────────────
 
 const handleOrderReady = async (orderData: any) => {
+    if (!mounted) return
+    const owner = authStore.user?.id
     // Other tabs load the current snapshot when the operator returns to Available.
-    // Avoid an expensive ready-orders HTTP read for every background SignalR event.
     await refreshAvailableOrdersIfVisible(activeTab.value, loadAvailableOrders)
-    success('Nuevo pedido disponible', 5000, `Pedido #${orderData.id}`)
+    if (mounted && owner === authStore.user?.id) success('Nuevo pedido disponible', 5000, `Pedido #${orderData.id}`)
 }
 
 const handleOrderAssigned = async (_orderData: any) => {
-    await refreshAvailableOrdersIfVisible(activeTab.value, loadAvailableOrders)
+    if (mounted) await refreshAvailableOrdersIfVisible(activeTab.value, loadAvailableOrders)
+}
+
+const handleRoutingPlanChanged = async () => {
+    // Returning to Routing performs a fresh read through the active-tab watcher.
+    if (mounted && activeTab.value === 'routing') await loadRoutingPlan()
 }
 
 const handleOrderModifiedSignalR = async (payload: any) => {
+    if (!mounted) return
     const data = payload?.order ?? payload
     const uid = authStore.user?.id
     if (!data?.id || data.deliveryManId == null || uid == null || Number(data.deliveryManId) !== Number(uid)) return
 
     await loadRouteAssigned()
+    if (!mounted || authStore.user?.id !== uid) return
     if (activeTab.value === 'route') {
         routeOrders.value = [...deliveryStore.ordersOnTheWay]
     }
@@ -805,6 +813,26 @@ watch(
     { immediate: true }
 )
 
+// Subscribe during setup, before useSignalR starts its connection on mount.
+on('OrderReady', handleOrderReady)
+on('OrderAssigned', handleOrderAssigned)
+on('OrderModified', handleOrderModifiedSignalR)
+on('DeliveryRoutingPlanChanged', handleRoutingPlanChanged)
+on('RouteProposalClaimed', handleRoutingPlanChanged)
+watch(isConnected, connected => {
+    // A snapshot read before subscription/reconnection may have missed server events.
+    if (connected && mounted) void refreshData().catch(() => {})
+}, { flush: 'sync' })
+onBeforeUnmount(() => {
+    mounted = false
+    availableRefresh.dispose()
+    off('OrderReady', handleOrderReady)
+    off('OrderAssigned', handleOrderAssigned)
+    off('OrderModified', handleOrderModifiedSignalR)
+    off('DeliveryRoutingPlanChanged', handleRoutingPlanChanged)
+    off('RouteProposalClaimed', handleRoutingPlanChanged)
+})
+
 onMounted(async () => {
     if (
         authStore.userRole !== 'Deliveryman' &&
@@ -816,11 +844,7 @@ onMounted(async () => {
         return
     }
 
-    on('OrderReady', handleOrderReady)
-    on('OrderAssigned', handleOrderAssigned)
-    on('OrderModified', handleOrderModifiedSignalR)
-    on('DeliveryRoutingPlanChanged', () => loadRoutingPlan())
-    on('RouteProposalClaimed', () => loadRoutingPlan())
+    mounted = true
     void loadFcmTestBranches()
     if (authStore.isDeliveryman && authStore.user?.id) void deliveryStore.loadHistoryBranchSummaries(authStore.user.id).catch(() => {})
     await Promise.all([loadAvailableOrders(), loadRouteAssigned()])
