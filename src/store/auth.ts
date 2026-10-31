@@ -64,16 +64,18 @@ export const useAuthStore = defineStore('auth', () => {
 		}
 	};
 
-	const logout = async (): Promise<void> => {
+	const logout = async (): Promise<boolean> => {
+		error.value = null;
 		try {
 			if (refreshToken.value) {
 				await authApi.logout(refreshToken.value);
 			}
-		} catch (err) {
-			console.error('Error during logout:', err);
-		} finally {
-			clearAuthData();
+		} catch (err: any) {
+			error.value = err.message || 'No se pudo verificar el cierre de sesión. Inténtalo de nuevo.';
+			return false;
 		}
+		clearAuthData();
+		return true;
 	};
 
 	const refreshAccessToken = async (): Promise<boolean> => {

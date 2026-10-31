@@ -66,9 +66,11 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { useAuthStore } from '@/store/auth';
+import { useToast } from '@/composables/useToast';
 
 const authStore = useAuthStore();
 const router = useRouter();
+const { error: showError } = useToast();
 
 const open = ref(false);
 const menuRef = ref<HTMLElement>();
@@ -92,7 +94,10 @@ const avatarUrl = computed(() => {
 });
 
 const logout = async () => {
-	await authStore.logout();
+	if (!await authStore.logout()) {
+		showError('No se pudo cerrar sesión', authStore.error ?? undefined);
+		return;
+	}
 	await router.push('/login');
 };
 

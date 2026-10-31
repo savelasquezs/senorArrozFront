@@ -1,6 +1,7 @@
 // src/composables/useOrderSubmission.ts
 import { useAuthStore } from '@/store/auth'
 import { useOrdersDraftsStore } from '@/store/ordersDrafts'
+import { useInvoiceTracking } from '@/composables/useInvoiceTracking'
 import type { DraftOrder, CreateOrderDto, CreateOrderDetailDto, CreateBankPaymentDto, CreateAppPaymentDto } from '@/types/order'
 
 export function useOrderSubmission() {
@@ -141,7 +142,9 @@ export function useOrderSubmission() {
         // Persist before network I/O so timeouts/reloads reuse the SAME UUID.
         const key = ordersStore.ensurePosCreationKey(draft.tabId)
         const dto = { ...transformDraftToCreateDto(draft), posCreationKey: key }
+        const ownerId = authStore.user?.id
         const createdOrder = await ordersStore.create(dto)
+        if (dto.electronicInvoice && ownerId === authStore.user?.id) useInvoiceTracking().track(createdOrder.id)
         return createdOrder
     }
 

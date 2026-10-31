@@ -1,5 +1,11 @@
 # Reglas de Negocio - Señor Arroz
 
+## Asignación y cierre de rutas
+
+- Caja, administración y superadministración asignan y reasignan desde Pedidos. El backend retira primero las rutas anteriores ya resueltas o vacías, con auditoría, sin exigir una toma desde la app. Las rutas con entregas pendientes se conservan.
+- Una ruta cierra por regreso GPS después de haber salido, por iniciar otra ruta o por cierre de sesión, comprobando antes que no queden entregas pendientes. Un cierre no marca pedidos como entregados ni modifica cancelaciones.
+- Si hay pendientes, el servidor rechaza iniciar otra ruta o cerrar sesión hasta entregarlos o reasignarlos. La web conserva las credenciales y muestra el motivo; solo navega al login después de la confirmación del servidor.
+
 ## Integración Rappi
 
 - El servidor determina el ambiente; la configuración muestra Sandbox o Producción y conserva tiendas e historial separados por ambiente. No se ingresan credenciales OAuth desde el navegador.
@@ -571,6 +577,9 @@ Validaciones implementadas antes de enviar un pedido al backend:
 **Próximos pasos**: Ver [API Reference](./api-reference.md) para implementación técnica de estas reglas.
 
 ## Facturación electrónica
+
+- Al confirmar una factura desde el POS o el detalle, una tarjeta global y minimizable muestra el estado real y continúa al cambiar de pantalla, pedido o cliente. Solo las solicitudes iniciadas en esta sesión descargan automáticamente el PDF, una vez por seguimiento, después de la validación DIAN y de que el archivo esté disponible; un fallo de descarga permite reintentar sin emitir otro documento. Las reservas esperan la entrega. Cerrar o cambiar la sesión elimina el seguimiento y cancela sus descargas pendientes.
+- El POS no muestra el botón flotante lateral de regreso a WhatsApp, aunque el navegador conserve una conversación previa. El acceso del menú y la barra superior continúa disponible.
 
 - El detalle presenta las reglas de rechazo DIAN en líneas separadas. Reintentar una factura rechazada confirma el envío de datos corregidos con el mismo consecutivo; consultar una pendiente solo solicita reconciliación. El backend calcula el DV del NIT sin agregar requisitos al formulario.
 
