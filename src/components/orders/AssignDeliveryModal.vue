@@ -13,12 +13,17 @@
 
             <!-- Selector de domiciliario -->
             <BaseSelect v-model="selectedDeliveryManId" :options="deliverymanOptions" label="Domiciliario"
-                placeholder="Seleccionar domiciliario..." :loading="loading" value-key="value" display-key="label">
+                placeholder="Seleccionar domiciliario..." :loading="loading" :disabled="!optionsLoaded || saving"
+                value-key="value" display-key="label">
                 <template #icon>
                     <TruckIcon class="w-4 h-4" />
                 </template>
             </BaseSelect>
 
+            <p v-if="optionsError" role="alert" class="text-sm text-red-700">
+                {{ optionsError }}
+                <button type="button" class="ml-2 underline" :disabled="loading || saving" @click="reloadOptions">Reintentar</button>
+            </p>
             <p class="text-sm text-gray-500">
                 Selecciona "Sin asignar" para quitar la asignación actual
             </p>
@@ -28,7 +33,7 @@
             <BaseButton variant="secondary" @click="$emit('close')">
                 Cancelar
             </BaseButton>
-            <BaseButton variant="primary" :loading="saving" :disabled="loading || saving || selectedDeliveryManId === order.deliveryManId"
+            <BaseButton variant="primary" :loading="saving" :disabled="!optionsLoaded || loading || saving || selectedDeliveryManId === (order.deliveryManId ?? null)"
                 @click="handleSave">
                 {{ selectedDeliveryManId === null ? 'Desasignar' : 'Asignar' }}
             </BaseButton>
@@ -41,6 +46,8 @@ import { ref, computed, watch, onBeforeUnmount } from 'vue'
 import type { OrderListItem, Order, OrderStatus } from '@/types/order'
 import { orderManagementApi } from '@/services/MainAPI/orderManagementApi'
 import { orderApi } from '@/services/MainAPI/orderApi'
+import { useAuthStore } from '@/store/auth'
+import { useOrderAssignmentPendingStore } from '@/store/orderAssignmentPending'
 import { useToast } from '@/composables/useToast'
 import BaseDialog from '@/components/ui/BaseDialog.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
@@ -52,138 +59,103 @@ interface Props {
     order: OrderListItem
     pendingStatusChange?: OrderStatus
 }
-
 const props = defineProps<Props>()
-
 const emit = defineEmits<{
     close: []
     updated: [order?: Order]
     statusChanged: [status: OrderStatus]
 }>()
-
 const { success, error } = useToast()
-
-// Estado
-const loading = ref(false)
-// Protect each order against duplicate PUTs even across dialog close/reopen.
-const savingOrderIds = ref<Set<number>>(new Set())
-const saving = computed(() => savingOrderIds.value.has(props.order.id))
+const auth = useAuthStore()
+const pendingAssignments = useOrderAssignmentPendingStore()
+const sessionScope = computed(() => [auth.user?.id, auth.user?.role, auth.user?.branchId, auth.user?.accountType].join(':'))
+const loading = ref(false), optionsLoaded = ref(false), optionsError = ref('')
+const saving = computed(() => pendingAssignments.orderIds.has(props.order.id))
 const deliverymen = ref<Array<{ id: number; name: string }>>([])
-const selectedDeliveryManId = ref<number | null>(props.order.deliveryManId)
+const selectedDeliveryManId = ref<number | null>(props.order.deliveryManId ?? null)
+const deliverymanOptions = computed<Array<{ value: number | null; label: string }>>(() => [
+    { value: null, label: 'Sin asignar' },
+    ...deliverymen.value.map(user => ({ value: user.id, label: user.name })),
+])
 
-// Computed
-const deliverymanOptions = computed<Array<{ value: number | null; label: string }>>(() => {
-    const options: Array<{ value: number | null; label: string }> = [
-        { value: null, label: 'Sin asignar' }
-    ]
-
-    deliverymen.value.forEach((user) => {
-        options.push({
-            value: user.id,
-            label: user.name,
-        })
-    })
-
-    return options
-})
-
-// Métodos
-// Each open/order/sucursal context owns one options request. Late reads from
-// an earlier dialog must never overwrite the current driver's choices.
-let optionsVersion = 0
-let contextVersion = 0
-let saveVersion = 0
+let optionsVersion = 0, contextVersion = 0
 let optionsController: AbortController | null = null
 let mounted = true
-
 const cancelOptions = () => {
     optionsVersion++
     optionsController?.abort()
     optionsController = null
 }
-
 const fetchDeliverymen = async () => {
-    const version = optionsVersion
-    const orderId = props.order.id
-    const branchId = props.order.branchId
+    const version = optionsVersion, owner = sessionScope.value
+    const orderId = props.order.id, branchId = props.order.branchId
     const controller = new AbortController()
     optionsController = controller
-    loading.value = true
-    deliverymen.value = []
-    const current = () => mounted && props.open && !controller.signal.aborted
+    loading.value = true; optionsLoaded.value = false; optionsError.value = ''; deliverymen.value = []
+    const current = () => mounted && props.open && !controller.signal.aborted && owner === sessionScope.value
         && version === optionsVersion && props.order.id === orderId && props.order.branchId === branchId
     try {
         const response = await orderManagementApi.options(orderId, controller.signal)
-        if (current()) deliverymen.value = response.deliverymen
+        if (!current()) return
+        if (response.branchId != null && response.branchId !== branchId) throw new Error('La sucursal del pedido cambió. Actualiza el pedido.')
+        deliverymen.value = response.deliverymen
+        optionsLoaded.value = true
     } catch (err: any) {
-        // Closing, switching orders or aborting HTTP is not a user-visible failure.
-        if (current()) error('Error al cargar domiciliarios', err.message || 'No se pudo consultar la lista')
+        if (current()) {
+            optionsError.value = err.message || 'No se pudo consultar la lista de domiciliarios.'
+            error('Error al cargar domiciliarios', optionsError.value)
+        }
     } finally {
         if (current()) loading.value = false
         if (optionsController === controller) optionsController = null
     }
 }
+function reloadOptions() {
+    if (!mounted || !props.open || !auth.user || saving.value) return
+    cancelOptions()
+    void fetchDeliverymen()
+}
 
 const handleSave = async () => {
-    if (saving.value || loading.value || !props.open || selectedDeliveryManId.value === props.order.deliveryManId) return
-    const order = props.order
+    if (!auth.user || saving.value || loading.value || !optionsLoaded.value || !props.open
+        || selectedDeliveryManId.value === (props.order.deliveryManId ?? null)) return
     const deliveryManId = selectedDeliveryManId.value
-    const context = contextVersion
-    const version = ++saveVersion
-    const current = () => mounted && props.open && context === contextVersion && version === saveVersion
+    if (deliveryManId !== null && !deliverymen.value.some(user => user.id === deliveryManId)) return
+    // Snapshot primitives before awaiting: later SignalR changes must not change the expected version.
+    const order = { ...props.order }, context = contextVersion, owner = sessionScope.value
+    const current = () => mounted && props.open && context === contextVersion && owner === sessionScope.value
         && props.order.id === order.id && props.order.branchId === order.branchId
-    savingOrderIds.value = new Set(savingOrderIds.value).add(order.id)
     try {
-        let updatedOrder: Order
-        if (deliveryManId === null) {
-            updatedOrder = await orderApi.unassignDelivery(order.id, order)
-        } else {
-            // Ready → OnTheWay is performed by the backend; never send a second status mutation.
-            updatedOrder = await orderApi.assignDelivery(order.id, deliveryManId, order)
-        }
-        // The mutation may have completed on the server after navigation; SignalR
-        // will reconcile it. Do not emit a response into another order's modal.
-        if (!current()) return
+        const updatedOrder = await pendingAssignments.run(order.id, () => deliveryManId === null
+            ? orderApi.unassignDelivery(order.id, order)
+            : orderApi.assignDelivery(order.id, deliveryManId, order))
+        // A completed mutation remains on the server. Never cancel it or emit into another context.
+        if (!updatedOrder || !current()) return
         const statusChangedByBackend = deliveryManId !== null && updatedOrder.status === 'on_the_way' && order.status === 'ready'
-        if (deliveryManId === null) {
-            success('Domiciliario desasignado', 5000, 'El domiciliario ha sido removido del pedido')
-        } else if (statusChangedByBackend) {
-            success('Domiciliario asignado', 5000, 'Domiciliario asignado y pedido en camino')
-        } else {
-            success('Domiciliario asignado', 5000, 'El domiciliario ha sido asignado al pedido')
-        }
+        if (deliveryManId === null) success('Domiciliario desasignado', 5000, 'El domiciliario ha sido removido del pedido')
+        else if (statusChangedByBackend) success('Domiciliario asignado', 5000, 'Domiciliario asignado y pedido en camino')
+        else success('Domiciliario asignado', 5000, 'El domiciliario ha sido asignado al pedido')
         emit('updated', updatedOrder)
         if (statusChangedByBackend) emit('statusChanged', 'on_the_way')
         emit('close')
     } catch (err: any) {
         if (current()) error('Error al asignar domiciliario', err.message || 'No se pudo actualizar el pedido')
-    } finally {
-        const pending = new Set(savingOrderIds.value)
-        pending.delete(order.id)
-        savingOrderIds.value = pending
     }
 }
 
-// A modal can be reused for another order without unmounting. One immediate
-// watcher also avoids duplicate onMounted + watcher fetches.
 watch(
-    () => [props.open, props.order.id, props.order.branchId] as const,
+    () => [props.open, props.order.id, props.order.branchId, props.order.managementVersion,
+        props.order.deliveryManId, props.order.status, sessionScope.value] as const,
     ([open]) => {
         contextVersion++
-        saveVersion++
         cancelOptions()
-        deliverymen.value = []
-        loading.value = false
+        deliverymen.value = []; loading.value = false; optionsLoaded.value = false; optionsError.value = ''
         selectedDeliveryManId.value = props.order.deliveryManId ?? null
-        if (open) void fetchDeliverymen()
+        if (open && auth.user) void fetchDeliverymen()
     },
-    { immediate: true },
+    { immediate: true, flush: 'sync' },
 )
-
 onBeforeUnmount(() => {
-    mounted = false
-    contextVersion++
-    saveVersion++
-    cancelOptions()
+    mounted = false; contextVersion++; cancelOptions()
 })
 </script>
