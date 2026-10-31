@@ -578,6 +578,9 @@ Validaciones implementadas antes de enviar un pedido al backend:
 
 ## Facturación electrónica
 
+- Al confirmar una factura desde el POS o el detalle, una tarjeta global y minimizable muestra el estado real y continúa al cambiar de pantalla, pedido o cliente. Solo las solicitudes iniciadas en esta sesión descargan automáticamente el PDF, una vez por seguimiento, después de la validación DIAN y de que el archivo esté disponible; un fallo de descarga permite reintentar sin emitir otro documento. Las reservas esperan la entrega. Cerrar o cambiar la sesión elimina el seguimiento y cancela sus descargas pendientes.
+- El POS no muestra el botón flotante lateral de regreso a WhatsApp, aunque el navegador conserve una conversación previa. El acceso del menú y la barra superior continúa disponible.
+
 - El detalle presenta las reglas de rechazo DIAN en líneas separadas. Reintentar una factura rechazada confirma el envío de datos corregidos con el mismo consecutivo; consultar una pendiente solo solicita reconciliación. El backend calcula el DV del NIT sin agregar requisitos al formulario.
 
 - Más acciones → Factura electrónica despliega al pasar el puntero o al pulsarlo dos opciones: Datos de facturación y Enviar factura electrónica. Si faltan datos para una nueva factura, Enviar permanece deshabilitado y explica mediante tooltip que primero deben configurarse. Los documentos existentes conservan acceso a su avance, archivos y reenvío con el destinatario histórico, incluso si no hay un destinatario actual seleccionado o falla la disponibilidad de emisión. Crear una nueva factura abre productos, cantidades, descuentos, domicilio, pagos registrados y total antes de confirmar. Un pedido desactualizado bloquea la confirmación hasta recargarlo. El historial usa el snapshot fiscal, nunca importes actuales para representar documentos anteriores.

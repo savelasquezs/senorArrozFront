@@ -6,6 +6,7 @@ import { useAuthStore } from '@/store/auth'
 import { useOrdersDraftsStore } from '@/store/ordersDrafts'
 import { UserRole } from '@/types/auth'
 import type { DraftOrder } from '@/types/order'
+import { useInvoiceTracking } from '@/composables/useInvoiceTracking'
 
 function minimalDraft(overrides: Partial<DraftOrder>): DraftOrder {
     const now = new Date()
@@ -51,6 +52,17 @@ function minimalDraft(overrides: Partial<DraftOrder>): DraftOrder {
 }
 
 describe('useOrderSubmission', () => {
+    it.each([true, false])('inicia seguimiento del pedido creado solo si se confirmó factura: %s', async requestElectronicInvoice => {
+        const store = useOrdersDraftsStore()
+        const draft = minimalDraft({ requestElectronicInvoice, billingRecipient: { documentType: 6, identification: '123', name: 'Empresa' } })
+        store.draftOrders.set(draft.tabId, draft)
+        vi.spyOn(store, 'create').mockResolvedValue({ id: 700 } as never)
+        const tracking = useInvoiceTracking()
+        const track = vi.spyOn(tracking, 'track').mockImplementation(() => undefined as never)
+        await useOrderSubmission().submitOrder(draft)
+        if (requestElectronicInvoice) expect(track).toHaveBeenCalledWith(700)
+        else expect(track).not.toHaveBeenCalled()
+    })
     it('no rehidrata datos tributarios guardados por otro usuario', async () => {
         const auth = useAuthStore(), store = useOrdersDraftsStore()
         store.draftOrders.set('t1', minimalDraft({ billingOwnerUserId: 999, billingRecipient: { documentType: 6, identification: '123', name: 'Otra empresa' }, requestElectronicInvoice: true }))

@@ -1,11 +1,12 @@
 import { config, mount, flushPromises } from '@vue/test-utils'
-import { createPinia, setActivePinia } from 'pinia'
+import { createPinia, disposePinia, getActivePinia, setActivePinia } from 'pinia'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import OrderElectronicInvoicing from '../OrderElectronicInvoicing.vue'
 import { electronicInvoicingApi as api } from '@/services/MainAPI/electronicInvoicingApi'
 import type { InvoiceDocument } from '@/types/electronicInvoicing'
 import type { OrderDetailView } from '@/types/order'
 import { invoiceOrderSummary, invoiceSnapshotSummary } from '@/helpers/invoicePresentation'
+import { useInvoiceTracking } from '@/composables/useInvoiceTracking'
 
 vi.mock('@/services/MainAPI/electronicInvoicingApi', () => ({ electronicInvoicingApi: { recipients: vi.fn(), availability: vi.fn(), documents: vi.fn(), request: vi.fn(), documentAction: vi.fn(), download: vi.fn() } }))
 const current = { id: 1, documentType: 3, identification: '123', name: 'Nombre actual', email: 'actual@example.com', isDefault: true }
@@ -23,7 +24,7 @@ describe('Detalle fiscal del pedido', () => {
         vi.mocked(api.availability).mockResolvedValue({ data: { enabled: true } } as never)
         vi.mocked(api.documents).mockResolvedValue({ data: [documentRow] } as never)
     })
-    afterEach(() => vi.useRealTimers())
+    afterEach(() => { disposePinia(getActivePinia()!); vi.useRealTimers(); vi.restoreAllMocks() })
     it('opens the two invoice options on hover and closes them when the pointer leaves', async () => {
         const wrapper = mount(OrderElectronicInvoicing, { props: { orderId: 1, customerId: 10, status: 'taken', order } })
         await flushPromises()
@@ -137,7 +138,9 @@ describe('Detalle fiscal del pedido', () => {
         expect(confirm.textContent).toContain('Descuentos')
         const confirmButton = [...confirm.querySelectorAll('button')].find(b => b.textContent?.includes('Confirmar factura'))!
         confirmButton.click(); await flushPromises()
-        expect(api.request).toHaveBeenCalledTimes(1); expect(document.body.textContent).toContain('Solicitud guardada')
+        expect(api.request).toHaveBeenCalledTimes(1)
+        expect(document.querySelector('[role="dialog"]')).toBeNull()
+        expect(useInvoiceTracking().jobs[0]).toMatchObject({ orderId: 1, phase: 'tracking' })
         wrapper.unmount()
     })
     it('conserva el historial aunque falle la consulta de disponibilidad', async () => {
@@ -147,6 +150,26 @@ describe('Detalle fiscal del pedido', () => {
         expect((await openHistory(wrapper)).textContent).toContain('Destinatario histórico')
         expect(document.body.textContent).toContain('El historial sigue disponible')
         wrapper.unmount()
+    })
+    it('mantiene la solicitud del pedido original al cambiar de pedido durante la emisión', async () => {
+        let finish!: (value: never) => void
+        vi.mocked(api.request).mockImplementation(() => new Promise(resolve => { finish = resolve }))
+        vi.mocked(api.documents).mockResolvedValue({ data: [] } as never)
+        const wrapper = mount(OrderElectronicInvoicing, { props: { orderId: 1, customerId: 10, status: 'taken', order } })
+        await flushPromises()
+        await wrapper.get('button[aria-label="Enviar factura electrónica"]').trigger('click')
+        await flushPromises()
+        ;[...document.querySelectorAll('[role="dialog"] button')].find(button => button.textContent?.includes('Confirmar factura'))!.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+        await flushPromises()
+        expect(document.querySelector('[role="dialog"]')).toBeNull()
+        await wrapper.setProps({ orderId: 2, customerId: 20 })
+        wrapper.unmount()
+        vi.mocked(api.documents).mockResolvedValue({ data: [documentRow] } as never)
+        finish({ data: { id: documentRow.id, status: 'pending' } } as never)
+        await flushPromises()
+        expect(api.request).toHaveBeenCalledWith(1, current)
+        expect(useInvoiceTracking().jobs[0]).toMatchObject({ orderId: 1, phase: 'done' })
+        expect(api.download).toHaveBeenCalledWith(1, 'pdf', 'SETT1', expect.any(Object))
     })
     it('pausa la actualización cuando la pantalla está oculta y recupera al volver', async () => {
         vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] })

@@ -24,21 +24,12 @@
 
             <!-- Success Toast -->
             <!-- Toast component will be handled by useToast composable automatically -->
-            <button
-                v-if="whatsappReturnConversationId"
-                type="button"
-                class="fixed right-0 top-1/2 z-40 -translate-y-1/2 rounded-l-lg border border-emerald-200 bg-emerald-600 px-3 py-4 text-sm font-medium text-white shadow-lg hover:bg-emerald-700"
-                @click="openWhatsAppConversation"
-            >
-                WhatsApp
-            </button>
         </div>
     </div>
 </template>
 
 <script setup lang="ts">
-import { onMounted, onUnmounted, computed, ref, watch } from 'vue'
-import { useRouter } from 'vue-router'
+import { onMounted, computed, watch } from 'vue'
 import { useOrdersDraftsStore } from '@/store/ordersDrafts'
 import { useProductsStore } from '@/store/products'
 import { useProductCategoriesStore } from '@/store/productCategories'
@@ -56,8 +47,6 @@ const ordersStore = useOrdersDraftsStore()
 const productsStore = useProductsStore()
 const productCategoriesStore = useProductCategoriesStore()
 const authStore = useAuthStore()
-const router = useRouter()
-const whatsappReturnConversationId = ref<number | null>(null)
 
 // Catálogo ya en bootstrap (login / layout); aquí solo sincronizamos draft con Pinia.
 const ensureOrderPageData = async () => {
@@ -80,30 +69,11 @@ const refreshTotals = () => {
     // No necesita hacer nada adicional
 }
 
-const initializeData = async () => {
-    await ensureOrderPageData()
-    const conversationId = Number(localStorage.getItem('senor-arroz-whatsapp-conversation-tab') || 0)
-    whatsappReturnConversationId.value = conversationId > 0 ? conversationId : null
-}
-
-function openWhatsAppConversation() {
-    if (!whatsappReturnConversationId.value) return
-    router.push({
-        name: 'WhatsApp',
-        query: { conversationId: String(whatsappReturnConversationId.value) },
-    })
-}
-
 // Lifecycle
 onMounted(() => {
     ordersStore.setSearchQuery('')
     ordersStore.setSelectedCategoryIds(null)
-    initializeData()
-})
-
-onUnmounted(() => {
-    // Optionally save active orders to localStorage
-    // ordersStore.saveActiveOrdersToStorage()
+    void ensureOrderPageData()
 })
 </script>
 
