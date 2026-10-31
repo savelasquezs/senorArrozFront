@@ -37,6 +37,7 @@ export const useInvoiceTracking = defineStore('invoiceTracking', () => {
         if (!active.length) return
         timer = setTimeout(() => {
             for (const job of active) if (job.nextCheck <= Date.now()) void refresh(job.orderId)
+            schedule()
         }, Math.max(0, Math.min(...active.map(job => job.nextCheck)) - Date.now()))
     }
 

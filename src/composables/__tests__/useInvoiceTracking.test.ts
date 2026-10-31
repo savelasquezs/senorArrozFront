@@ -88,6 +88,21 @@ describe('Seguimiento global de facturas', () => {
         expect(api.download).toHaveBeenCalledTimes(1)
     })
 
+    it('reprograma la consulta si el temporizador llega antes del instante esperado', async () => {
+        const started = Date.now()
+        const now = vi.spyOn(Date, 'now').mockReturnValue(started)
+        try {
+            const tracking = useInvoiceTracking()
+            tracking.track(42)
+            await vi.advanceTimersByTimeAsync(0)
+            await vi.advanceTimersByTimeAsync(3000)
+            expect(api.documents).toHaveBeenCalledTimes(1)
+            now.mockReturnValue(started + 3000)
+            await vi.advanceTimersByTimeAsync(3000)
+            expect(api.documents).toHaveBeenCalledTimes(2)
+        } finally { now.mockRestore() }
+    })
+
     it('no consulta sin solicitudes ni duplica seguimientos y consultas simultáneas', async () => {
         const tracking = useInvoiceTracking()
         await vi.advanceTimersByTimeAsync(60000)
