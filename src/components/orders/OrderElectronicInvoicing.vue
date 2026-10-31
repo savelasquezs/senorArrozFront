@@ -82,6 +82,7 @@ import InvoiceProgress from './InvoiceProgress.vue'
 import { electronicInvoicingApi as api } from '@/services/MainAPI/electronicInvoicingApi'
 import { useAuthStore } from '@/store/auth'
 import { useInvoiceResources } from '@/composables/useInvoiceResources'
+import { useInvoiceTracking } from '@/composables/useInvoiceTracking'
 import { billingRecipientComplete } from '@/composables/useBillingRecipients'
 import { invoiceRecipient, invoiceStatusClass, invoiceOrderSummary, invoiceSnapshotSummary, invoiceEmailProgress, invoiceEmailTrackingPending } from '@/helpers/invoicePresentation'
 import type { OrderDetailView } from '@/types/order'
@@ -89,6 +90,7 @@ import { invoiceStatusLabels, type BillingRecipient, type InvoiceDocument } from
 const props = defineProps<{ orderId: number; customerId?: number | null; status: string; order?: OrderDetailView; stale?: boolean }>()
 const auth = useAuthStore()
 const resources = useInvoiceResources()
+const tracking = useInvoiceTracking()
 const canCredit = computed(() => auth.isSuperadmin || auth.userRole === 'Admin')
 const recipient = ref<BillingRecipient | null>(null), documents = ref<InvoiceDocument[]>([])
 const loading = ref(false), busy = ref(false), enabled = ref(false), error = ref(''), message = ref(''), requestConfirm = ref(false)
@@ -152,8 +154,16 @@ async function run(operation: () => Promise<unknown>, success: string, refresh =
     try { await operation(); if (orderId !== props.orderId) return false; if (refresh) await load(); message.value = success; return true } catch (e) { if (orderId === props.orderId) error.value = (e as Error).message; return false }
     finally { busy.value = false }
 }
-async function request() { if (!props.stale && props.order && billingRecipientComplete(recipient.value) && await run(() => api.request(props.orderId, recipient.value!), 'Solicitud guardada. El documento se procesará en segundo plano.')) { requestConfirm.value = false; showHistory.value = true } }
-function action(d: InvoiceDocument, action: 'retry' | 'email', data: unknown = null) { void run(() => api.documentAction(d.id, action, data), action === 'email' ? 'Reenvío solicitado al correo del documento original.' : d.status === 'rejected' ? 'Reintento solicitado con los datos corregidos y el mismo consecutivo.' : 'Consulta solicitada para el mismo documento.') }
+async function request() {
+    if (props.stale || !props.order || !billingRecipientComplete(recipient.value) || busy.value) return
+    const orderId = props.orderId, selectedRecipient = { ...recipient.value! }
+    requestConfirm.value = false
+    await run(() => tracking.requestInvoice(orderId, selectedRecipient), 'Solicitud guardada. El documento se procesará en segundo plano.')
+}
+async function action(d: InvoiceDocument, action: 'retry' | 'email', data: unknown = null) {
+    const orderId = props.orderId, ownerId = auth.user?.id
+    if (await run(() => api.documentAction(d.id, action, data), action === 'email' ? 'Reenvío solicitado al correo del documento original.' : d.status === 'rejected' ? 'Reintento solicitado con los datos corregidos y el mismo consecutivo.' : 'Consulta solicitada para el mismo documento.') && ownerId === auth.user?.id && action === 'retry' && d.kind === 'invoice') tracking.track(orderId, d.id)
+}
 async function resendEmail() { if (emailDocument.value && await run(() => api.documentAction(emailDocument.value!.id, 'email'), 'Correo en cola con PDF y XML.')) emailDocument.value = null }
 function download(d: InvoiceDocument, format: 'pdf' | 'xml') { void run(() => api.download(d.id, format, `${d.prefix}${d.number}`), 'Archivo descargado.', false) }
 async function authorizeCredit() {

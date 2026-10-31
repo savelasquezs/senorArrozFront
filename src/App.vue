@@ -15,6 +15,7 @@
       />
     </router-view>
     <DialogHost />
+    <InvoiceActivity />
   </div>
 </template>
 
@@ -23,6 +24,7 @@ import { onMounted, onUnmounted, ref } from 'vue'
 import { useAuthStore } from '@/store/auth'
 import { useBranchContextStore } from '@/store/branchContext'
 import DialogHost from '@/components/ui/DialogHost.vue'
+import InvoiceActivity from '@/components/orders/InvoiceActivity.vue'
 import { CHUNK_RECOVERY_EVENT } from '@/utils/chunkRecovery'
 import { safeReturnPath } from '@/helpers/employeeAccountAccess'
 

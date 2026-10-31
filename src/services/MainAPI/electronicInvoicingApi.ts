@@ -1,4 +1,5 @@
 import { BaseApi } from './baseApi'
+import type { AxiosRequestConfig } from 'axios'
 import type { ApiResponse, PagedResult } from '@/types/common'
 import type { BillingRecipient, InvoiceDocument, InvoiceIntegration, InvoiceBranding } from '@/types/electronicInvoicing'
 
@@ -19,16 +20,18 @@ class ElectronicInvoicingApi extends BaseApi {
     lookup(type: number, identification: string) {
         return this.get<ApiResponse<unknown>>(`${this.base}/recipient-lookup`, { params: { type, identification }, branchScope: 'none', timeout: 35000 })
     }
-    documents(orderId: number) { return this.get<ApiResponse<InvoiceDocument[]>>(`${this.base}/orders/${orderId}`) }
-    request(orderId: number, recipient: BillingRecipient) { return this.post<ApiResponse<unknown>>(`${this.base}/orders/${orderId}`, recipient) }
+    documents(orderId: number, config?: AxiosRequestConfig) { return this.get<ApiResponse<InvoiceDocument[]>>(`${this.base}/orders/${orderId}`, config) }
+    request(orderId: number, recipient: BillingRecipient) { return this.post<ApiResponse<{ id: number; status: string }>>(`${this.base}/orders/${orderId}`, recipient) }
     documentAction(id: number, action: 'retry' | 'email' | 'credit', data: unknown = null) {
         return this.post<ApiResponse<unknown>>(`${this.base}/documents/${id}/${action}`, data, { timeout: 35000 })
     }
-    async download(id: number, format: 'pdf' | 'xml', filename: string) {
-        const blob = await this.get<Blob>(`${this.base}/documents/${id}/${format}`, { responseType: 'blob' })
+    async download(id: number, format: 'pdf' | 'xml', filename: string, config?: AxiosRequestConfig) {
+        const blob = await this.get<Blob>(`${this.base}/documents/${id}/${format}`, { ...config, responseType: 'blob' })
+        if (config?.signal?.aborted) return
         const url = URL.createObjectURL(blob)
         const link = document.createElement('a')
-        link.href = url; link.download = `${filename}.${format}`; link.click()
+        link.href = url; link.download = `${filename}.${format}`
+        document.body.appendChild(link); link.click(); link.remove()
         setTimeout(() => URL.revokeObjectURL(url), 1000)
     }
 }
