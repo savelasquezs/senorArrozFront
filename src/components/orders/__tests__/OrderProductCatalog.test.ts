@@ -65,4 +65,41 @@ describe('shared POS catalog', () => {
         expect(wrapper.text()).toContain('No hay productos')
         wrapper.unmount()
     })
+    it('updates selected and disabled membership when the modal selection changes', async () => {
+        const wrapper = mount(OrderProductCatalog, {
+            props: { products, categories, selectionOnly: true, selectedProducts: [products[0]!], disabledProductIds: [2] },
+            global: { plugins: [createPinia()] },
+        })
+        const card = (id: number) => wrapper.findAllComponents(ProductCard)
+            .find(component => component.props('product').id === id)!
+        expect(card(1).classes()).toContain('selected')
+        expect(card(2).classes()).toContain('disabled')
+        expect(card(2).props('disabledReason')).toBe('Ya en el pedido')
+        await card(2).trigger('click')
+        expect(wrapper.emitted('product-selected')).toBeUndefined()
+
+        await wrapper.setProps({ selectedProducts: [products[2]!], disabledProductIds: [1] })
+        expect(card(1).classes()).not.toContain('selected')
+        expect(card(1).classes()).toContain('disabled')
+        expect(card(2).classes()).not.toContain('disabled')
+        expect(card(3).classes()).toContain('selected')
+        await card(2).trigger('click')
+        expect(wrapper.emitted('product-selected')?.[0]).toEqual([products[1]])
+        wrapper.unmount()
+    })
+
+    it('keeps membership correct inside grouped beverage selection', async () => {
+        const wrapper = mount(OrderProductCatalog, {
+            props: { products, categories, selectionOnly: true, selectedProducts: [products[2]!], disabledProductIds: [4] },
+            global: { plugins: [createPinia()] },
+        })
+        await wrapper.findAll('button').find(button => button.text() === 'Gaseosas')!.trigger('click')
+        await wrapper.get('.first-word-group-btn').trigger('click')
+        const cards = wrapper.findAllComponents(ProductCard)
+        expect(cards).toHaveLength(2)
+        expect(cards.find(card => card.props('product').id === 3)!.classes()).toContain('selected')
+        expect(cards.find(card => card.props('product').id === 4)!.classes()).toContain('disabled')
+        wrapper.unmount()
+    })
+
 })

@@ -11,8 +11,15 @@ export function orderCatalogCategories(products: Product[], categories: { id: nu
 export function filterOrderCatalog(products: Product[], categories: { id: number; name: string }[], query: string, categoryIds: number[] | null) {
     const terms = normalizeCategoryLabel(query).replace(/,/g, '.').split(/\s+/).filter(Boolean)
     const allowed = categoryIds?.length ? new Set(categoryIds) : null
-    const filtered = products.filter(product => product.active && (!allowed || allowed.has(product.categoryId))
-        && terms.every(term => normalizeCategoryLabel(`${product.name} ${product.categoryName ?? ''}`).replace(/,/g, '.').includes(term)))
+    const filtered = products.filter(product => {
+        if (!product.active || (allowed && !allowed.has(product.categoryId))) return false
+        if (!terms.length) return true
+        // Normalize the candidate once, not once per term on each keystroke.
+        const text = normalizeCategoryLabel(`${product.name} ${product.categoryName ?? ''}`).replace(/,/g, '.')
+        return terms.every(term => text.includes(term))
+    })
+    // Group ordering is needed only for an explicitly selected rice category.
+    if (!categoryIds?.length) return filtered
     const riceIds = getRiceCategoryIdSet(categories)
-    return categoryIds?.length && categoryIds.every(id => riceIds.has(id)) ? sortProductsByPortionOrder(filtered) : filtered
+    return categoryIds.every(id => riceIds.has(id)) ? sortProductsByPortionOrder(filtered) : filtered
 }
