@@ -1,4 +1,5 @@
 import { BaseApi } from './baseApi'
+import { resolveWhatsAppOperation } from '@/helpers/whatsappOperation'
 import type { ApiResponse } from '@/types/common'
 import type {
   UpsertWhatsAppBranchSetting,
@@ -34,6 +35,16 @@ export function whatsappWebhookUrl(): string {
 }
 
 class WhatsAppApi extends BaseApi {
+  private manualPost<T>(url: string, payload: unknown): Promise<ApiResponse<T>> {
+    const requestId = crypto.randomUUID()
+    return resolveWhatsAppOperation<T>(
+      () => this.post(url, payload, {
+        headers: { 'X-WhatsApp-Request-Id': requestId },
+        timeout: payload instanceof FormData ? 90_000 : 10_000,
+      }),
+      id => this.get(`/whatsapp/operations/${id}`, { branchScope: 'none' }),
+    )
+  }
   getTenantSettings(signal?: AbortSignal): Promise<ApiResponse<TenantWhatsAppSettings>> {
     return this.get<ApiResponse<TenantWhatsAppSettings>>('/tenant/whatsapp', { branchScope: 'none', signal })
   }
@@ -124,21 +135,21 @@ class WhatsAppApi extends BaseApi {
   }
 
   sendMessage(conversationId: number, text: string): Promise<ApiResponse<WhatsAppMessage>> {
-    return this.post<ApiResponse<WhatsAppMessage>>(`/whatsapp/conversations/${conversationId}/messages`, { text })
+    return this.manualPost<WhatsAppMessage>(`/whatsapp/conversations/${conversationId}/messages`, { text })
   }
   sendMenu(conversationId: number): Promise<ApiResponse<WhatsAppMessage>> {
-    return this.post<ApiResponse<WhatsAppMessage>>(`/whatsapp/conversations/${conversationId}/messages/menu`, {})
+    return this.manualPost<WhatsAppMessage>(`/whatsapp/conversations/${conversationId}/messages/menu`, {})
   }
 
   sendQuickReply(conversationId: number, quickReplyId: number): Promise<ApiResponse<WhatsAppMessage>> {
-    return this.post<ApiResponse<WhatsAppMessage>>(`/whatsapp/conversations/${conversationId}/messages/quick-reply`, { quickReplyId })
+    return this.manualPost<WhatsAppMessage>(`/whatsapp/conversations/${conversationId}/messages/quick-reply`, { quickReplyId })
   }
 
   sendMediaMessage(conversationId: number, file: File, caption?: string): Promise<ApiResponse<WhatsAppMessage>> {
     const fd = new FormData()
     fd.append('file', file)
     if (caption?.trim()) fd.append('caption', caption.trim())
-    return this.post<ApiResponse<WhatsAppMessage>>(`/whatsapp/conversations/${conversationId}/messages/media`, fd)
+    return this.manualPost<WhatsAppMessage>(`/whatsapp/conversations/${conversationId}/messages/media`, fd)
   }
 
   getQuickReplies(filters?: WhatsAppQuickReplyFilters): Promise<ApiResponse<WhatsAppQuickReply[]>> {
@@ -158,7 +169,7 @@ class WhatsAppApi extends BaseApi {
   }
 
   syncTemplates(branchId?: number | null): Promise<ApiResponse<WhatsAppTemplateSyncResult>> {
-    return this.post<ApiResponse<WhatsAppTemplateSyncResult>>('/whatsapp/templates/sync', { branchId: branchId || null })
+    return this.manualPost<WhatsAppTemplateSyncResult>('/whatsapp/templates/sync', { branchId: branchId || null })
   }
 
   getTemplates(filters?: WhatsAppTemplateFilters, signal?: AbortSignal): Promise<ApiResponse<WhatsAppTemplate[]>> {
@@ -166,7 +177,7 @@ class WhatsAppApi extends BaseApi {
   }
 
   sendTemplate(payload: SendWhatsAppTemplate): Promise<ApiResponse<WhatsAppTemplateSendResult>> {
-    return this.post<ApiResponse<WhatsAppTemplateSendResult>>('/whatsapp/send-template', payload)
+    return this.manualPost<WhatsAppTemplateSendResult>('/whatsapp/send-template', payload)
   }
 }
 

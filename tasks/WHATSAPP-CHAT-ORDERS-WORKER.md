@@ -1,7 +1,7 @@
 # WhatsApp: bandeja multiasesor, pedidos integrados y procesamiento independiente
 
-Fecha: 2026-10-30.
-Estado: etapas 0 y 1 en curso; contratos documentados e infraestructura implementada en rama aislada, con validación técnica de esta entrega completada; cierre operativo pendiente. Este archivo es el plan transversal de frontend y backend.
+Fecha del plan: 2026-10-30. Actualizado: 2026-10-31.
+Estado: etapas 0 y 1 cerradas técnicamente. Activación, piloto y corte productivo pertenecen a la etapa 7 y no se ejecutaron. La toma existente de pedidos entre sucursales se conserva.
 
 ## Objetivo
 
@@ -53,15 +53,15 @@ La revisión previa ejecutó siete archivos de pruebas del frontend: 41 pruebas 
 
 Dependencias: ninguna.
 
-- [ ] Verificar el estado actual de main, despliegues y esquemas; identificar trabajo local de laboratorio para no mezclarlo con esta implementación.
+- [x] Verificar el estado actual de main, despliegues y esquemas; identificar trabajo local de laboratorio para no mezclarlo con esta implementación.
 - [x] Documentar la matriz de acceso: canal central, canal de sucursal, cola sin sede, responsable asignado, supervisor y pedidos originados para otra sede.
 - [x] Revisar los controles que hoy vinculan BranchId del pedido a OperationalBranchId del chat o a la línea y documentar su adaptación acotada. Implementarla junto al borrador versionado en etapa 4; no retirar controles sin ese recurso autorizado.
 - [x] Definir contratos separados para destino del borrador, transferencia del chat, transferencia de asesor y traslado de un pedido confirmado. Resolver la diferencia con la regla actual que libera al asesor al transferir el enrutamiento.
 - [x] Definir una sesión comercial con un borrador activo inicial por conversación, versiones y una clave de confirmación estable; permitir múltiples pedidos históricos.
 - [x] Definir cómo comparten o entregan el borrador la IA, el Flow y el asesor. La confirmación de un mismo intento comercial debe materializar como máximo un pedido, cualquiera que sea su origen.
 - [x] Inventariar tareas externas y herramientas comerciales que ejecuta hoy WhatsApp. Separar cuáles van al worker y cuáles deben invocar el motor de negocio de la API principal.
-- [ ] Medir CPU, memoria, conexiones y consultas PostgreSQL, latencia p50/p95, tamaño de respuestas, backlog y volumen real de mensajes/asesores. Registrar condiciones y carga de prueba.
-- [ ] Acordar presupuestos de rendimiento reproducibles para cambio de chat, primera carga, webhook y propagación en tiempo real; registrar línea base antes de fijar objetivos definitivos.
+- [x] Medir CPU, memoria, conexiones y consultas PostgreSQL, latencia p50/p95, tamaño de respuestas, backlog y volumen real de mensajes/asesores. Registrar condiciones y carga de prueba.
+- [x] Acordar presupuestos de rendimiento reproducibles para cambio de chat, primera carga, webhook y propagación en tiempo real; registrar línea base antes de fijar objetivos definitivos.
 
 Criterio de salida: contratos y matriz documentados; escenario Santander → otra sede cubierto para línea central y línea de sucursal; línea base con evidencia medible.
 
@@ -70,17 +70,17 @@ Criterio de salida: contratos y matriz documentados; escenario Santander → otr
 Dependencias: etapa 0.
 
 - [x] Diseñar trabajo persistente y outbox reutilizando lo existente donde corresponda. Guardar evento/trabajo de forma atómica; confirmar el webhook después de su aceptación durable.
-- [ ] Mantener validación de firma, resolución segura de canal/tenant y límites de entrada en la API. Mover procesamiento prolongado, multimedia, sincronización, IA y envíos fuera de la solicitud HTTP.
+- [x] Mantener validación de firma, resolución segura de canal/tenant y límites de entrada en la API. Mover procesamiento prolongado, multimedia, sincronización, IA y envíos fuera de la solicitud HTTP.
 - [x] Implementar reclamación de trabajos en PostgreSQL con exclusión entre procesos, vencimiento recuperable, intentos limitados, próximo intento e incidencias que requieran intervención.
-- [ ] Mantener orden y exclusión por conversación, conservando concurrencia acotada entre conversaciones. Resolver tenant desde datos persistidos y ejecutar cada trabajo en su contexto autorizado.
-- [ ] Definir claves únicas por evento, mensaje, acción automática y sesión comercial; tolerar reentregas y caídas entre persistencia y notificación.
+- [x] Mantener orden y exclusión por conversación, conservando concurrencia acotada entre conversaciones. Resolver tenant desde datos persistidos y ejecutar cada trabajo en su contexto autorizado.
+- [x] Definir claves únicas de infraestructura por evento, mensaje, acción automática y solicitud manual; tolerar reentregas y caídas entre persistencia y notificación. El contrato de clave de sesión comercial está definido en etapa 0; su materialización compartida IA/Flow/asesor se implementa con el borrador en etapa 4.
 - [x] Crear el ejecutable worker y configuración por rol de proceso. Evitar que API y worker ejecuten accidentalmente los mismos consumidores al desplegar o retroceder versiones.
 - [x] Migrar las herramientas comerciales que lo requieran a un contrato interno autenticado de la API principal, reutilizando los handlers existentes. Conservar actor, sucursal de origen, permisos e idempotencia; no aceptar ese contexto desde datos públicos de Meta.
-- [ ] Revalidar modo de atención y generación/versión antes de despachar una respuesta automática; descartar trabajo invalidado por una toma humana. Implementada la comprobación durante la ejecución y en el contrato interno; falta persistir la versión asociada a la respuesta generada para conservarla tras reiniciar el worker.
+- [x] Revalidar modo de atención y generación/versión antes de despachar una respuesta automática; descartar trabajo invalidado por una toma humana. Versión persistida con el mensaje, conservada al recuperar la respuesta y comprobada también en el contrato interno.
 - [x] Comunicar los cambios del worker a la API mediante eventos persistidos. La API emite SignalR a grupos autorizados; un IHubContext dentro del worker por sí solo no alcanza a los clientes conectados a otro proceso.
 - [x] Definir entrega de eventos para la réplica actual y reconciliación por cursor. Antes de habilitar varias réplicas HTTP, asegurar fanout a todas las conexiones; una cola de consumidores competidores no sustituye broadcast.
 - [x] Mantener recuperación después de reinicios y envío de resultado incierto: conciliar antes de repetir acciones que Meta pudo haber aceptado.
-- [ ] Añadir métricas de edad del trabajo, profundidad de cola, duración, reintentos y errores sin contenido sensible en logs.
+- [x] Añadir métricas de edad del trabajo, profundidad de cola, duración, reintentos y errores sin contenido sensible en logs.
 
 Criterio de salida: API y worker arrancan por separado; reiniciar el worker no reinicia la API; el trabajo durable se recupera; se conservan orden, aislamiento, eventos y ausencia de duplicados en pruebas de caída/reentrega.
 
@@ -176,6 +176,7 @@ Dependencias: etapas anteriores aprobadas técnicamente; disponibilidad de la l�
 - [ ] Añadir configuración independiente de API y worker, límites de concurrencia, permisos mínimos y health checks separados de vida y preparación.
 - [ ] Activar primero en desarrollo/pruebas con API y worker separados. Verificar que el worker real no use transporte local del laboratorio.
 - [ ] Preparar corte coordinado de consumidores: detener o deshabilitar los anteriores, recuperar trabajos existentes y habilitar el worker sin doble procesamiento.
+- [ ] Definir retención y limpieza de objetos de multimedia sin referencias confirmadas en mensajes o trabajos; contemplar subidas a Storage cuyo alta en PostgreSQL no se confirmó.
 - [ ] Mantener flags por tenant/línea para bandeja, editor y coexistencia; la activación de la nueva pantalla no habilita por sí sola IA o Flows.
 - [ ] Ejecutar piloto con una sucursal, un destino remoto y dos asesores; ampliar después al resto de sedes y al canal global según resultados.
 - [ ] Verificar producción mediante estados y métricas, con pruebas comerciales en entorno controlado. No crear pedidos ni movimientos de caja de prueba sobre operación real sin alcance específico.
@@ -192,8 +193,8 @@ Cada entrega debe registrar aquí cambios, pruebas, evidencia, riesgos pendiente
 
 | Etapa | Estado inicial | Evidencia para cerrar |
 |---|---|---|
-| 0. Contratos y línea base | En curso: contratos listos, medición parcial | Matriz, contratos y mediciones |
-| 1. Persistencia y worker | En curso: base implementada; cierre pendiente | Dos procesos, recuperación, eventos y deduplicación |
+| 0. Contratos y línea base | Cerrada técnicamente; límites de medición documentados | Matriz, contratos y mediciones |
+| 1. Persistencia y worker | Cerrada técnicamente; activación pendiente en etapa 7 | Dos procesos, recuperación, eventos y deduplicación |
 | 2. Coexistencia | Pendiente | Línea piloto y sincronización real |
 | 3. Atención multiasesor | Pendiente | Dos asesores y conflictos controlados |
 | 4. Borradores y pedidos | Pendiente | Confirmación única y operación entre sedes |
@@ -223,17 +224,16 @@ Cada entrega debe registrar aquí cambios, pruebas, evidencia, riesgos pendiente
 - SQL puntual: `SenorArroz.Infrastructure/Scripts/add_whatsapp_processing_worker.sql`. Se generó una copia aislada del inicializador completo en `.work/local-init-completo.sql`, con la ampliación agregada. El inicializador compartido original conserva su hash SHA256 `3761248AE7E213D616200D4391AD755E022FE062314BA2229F5880599C8818C4`.
 - Verificaciones ya obtenidas durante el desarrollo: compilación de API/worker; 193 pruebas seleccionadas de WhatsApp; pruebas PostgreSQL de deduplicación, particiones, concesiones y aislamiento; prueba de procesos separados y reinicio del worker; prueba de entrega por réplica sin contenido a grupos revocados. La validación técnica final se completó y está registrada abajo; las etapas permanecen en curso por sus pendientes operativos y funcionales.
 
-### Pendientes para cerrar estas etapas
+### Pendientes de la entrega inicial — seguimiento actualizado
 
-- Completar la línea base operacional: consultas/conexiones SQL, p50/p95, volumen de asesores/mensajes y backlog en horario representativo. CPU/RAM de una hora ya registradas; no sustituyen esas mediciones.
-- Validar presupuestos con carga reproducible. Los valores del documento técnico son objetivos iniciales, no resultados ni SLA productivo.
-- Completar extracción de envíos manuales/plantillas y efectos externos que aún usan rutas actuales; conservar su contrato UX durante esa migración.
-- Persistir la versión de atención con cada respuesta automática generada y verificar recuperación después de reiniciar el worker, incluyendo IA → humano → IA. La comprobación durante la ejecución ya está implementada.
-- Completar pruebas de orden cuando cambia la identidad teléfono/BSUID de un mismo contacto, y de confirmación comercial compartida entre IA/Flow/asesor al implementar la sesión de etapa 4.
-- Completar métricas de profundidad de cola/reintentos, retención de eventos y ensayo prolongado de recuperación antes de habilitar External en producción.
-- [x] Validación técnica final: SQL idempotente/RLS, regresiones entre sucursales y arranque independiente con la versión final de los binarios.
-- Preparar el corte de consumidores y la revisión operativa de despliegue en la etapa 7. Esta entrega no declara las etapas 0/1 cerradas ni despliegue productivo completado.
-
+- [x] Línea base ampliada: CPU/RAM de 24 horas, latencia HTTP por intervalo, conexiones/counters PostgreSQL, actividad real agregada de 7 días y tamaños almacenados. SQL ejecutado solo en lectura; limitaciones de consultas individuales y de tráfico de coexistencia explícitas.
+- [x] Perfil reproducible de cola: 240 mensajes, 32 conversaciones, 2 tenants, 8 productores y 4 consumidores; relay a proxy simulado. Presupuestos de ingeniería definidos, sin declarar un SLA productivo ni medir una pantalla aún pendiente.
+- [x] Extracción de envíos manuales, productos, carta, respuestas rápidas, multimedia y plantillas con resultado durable y consulta autenticada. El binario worker no publica controladores de negocio.
+- [x] Versión de atención persistida para respuestas generadas y recibida desde el ingreso durable en conversaciones conocidas. Un cambio humano invalida el trabajo antiguo incluso antes de generar la respuesta.
+- [x] Orden teléfono/BSUID comprobado por línea y tenant. Confirmación comercial única compartida IA/Flow/asesor sigue en etapa 4, junto con su recurso versionado.
+- [x] Métricas de profundidad/edad/reintentos, retención de eventos y payloads terminales, recuperación y control de resultados inciertos.
+- [x] Aceptación de la última ampliación: mensaje pendiente antes de handoff, metadatos de ingreso y respuestas de transporte inciertas, sin fallback automático de carta. Incluye orden compartido entrada/salida y error de Storage antes de aceptar un adjunto.
+- [ ] Etapa 7: grants del rol runtime, revisión de integración del laboratorio, corte coordinado y piloto. Esta entrega no autoriza aplicar SQL, activar External ni desplegar.
 
 ### Verificación de la entrega inicial — 2026-10-31
 
@@ -252,6 +252,47 @@ Cada entrega debe registrar aquí cambios, pruebas, evidencia, riesgos pendiente
 
 Validación adicional 2026-10-31: el ensayo de procesos separados también ejecuta una herramienta comercial autenticada en la API, rechaza una versión de atención obsoleta y confirma que el estado comercial del segundo tenant permanece intacto. La ampliación de esta prueba pasó 1/1. El paquete del worker se publicó localmente en configuración Release, sin errores; esto no es un despliegue de Railway.
 
-Backend: commit 5d6da83 en feat/whatsapp-worker-stage01.
+Entrega inicial backend: commit 5d6da83 en feat/whatsapp-worker-stage01.
 
 Ramas de backend y frontend publicadas en origin como feat/whatsapp-worker-stage01; sin merge a main ni despliegue.
+
+
+### Continuación — 2026-10-31
+
+- Implementada persistencia de la versión de atención; una respuesta generada antes de un handoff no adquiere una versión nueva al reiniciar.
+- Extraídas las operaciones manuales reutilizables. En External, texto, productos, carta, respuestas rápidas, multimedia y plantillas se aceptan como trabajos durables; el frontend consulta su resultado sin repetir el POST de envío.
+- Implementada revalidación del actor, sucursal de trabajo y atención al ejecutar el envío. Resultados persistidos recuperables; envíos interrumpidos con resultado incierto requieren revisión.
+- Agregados alias de partición por línea/tenant para teléfono y BSUID, deduplicación por identidad del evento, métricas de cola y retención por lotes.
+- Regresión dirigida obtenida durante la continuación: 196 pruebas WhatsApp y 26 de frontend aprobadas. Integración PostgreSQL, benchmark y validación final en curso; no se declaran cerradas las etapas por estos resultados parciales.
+- Producción se consultó únicamente en lectura: API en main, despliegue SUCCESS, una réplica y sin cambios preparados. No se activó tracing ni se modificó configuración, esquema, consumidores o servicios.
+
+
+### Línea base y concurrencia de la continuación
+
+- Evidencia agregada y perfil serializado: `artifacts/whatsapp-stage01/production-baseline.json`, `database-baseline.json`, `queue-benchmark.json` y `manual-response-profile.json` en el backend. Los agregados no incluyen nombres, teléfonos, textos ni credenciales de producción.
+- Producción: esquema de procedencia y versiones de pedidos verificado; nuevas columnas/tablas de esta rama ausentes. No se habilitaron tracing, números, IA, Flows ni nuevos consumidores.
+- En External, 2 consumidores de IA procesan chats distintos en paralelo; PostgreSQL conserva el orden por conversación y se agenda el siguiente mensaje al terminar el anterior. Embedded conserva un consumidor.
+- Regresión completa de frontend: 996 pruebas aprobadas en 157 archivos; build con tipos aprobado. Backend general previo a la última ampliación: 1423 aprobadas y 107 omitidas; 20 escenarios PostgreSQL aprobados. La nueva aceptación final se registra al terminar, sin reutilizar estas cifras como si correspondieran a código posterior.
+
+
+### Cierre técnico — 2026-10-31
+
+- [x] Etapa 0: contratos, matriz de acceso, procedencia/destino separados, línea base de producción en solo lectura y perfil reproducible documentados.
+- [x] Etapa 1: procesamiento y envíos del chat separados de HTTP, trabajo durable, resultados recuperables, controles de atención/permisos y orden por conversación verificados.
+- [x] La toma entre sucursales conserva el motor existente, OriginBranchId, BranchId y las restricciones de gestión remota. Elegir destino del futuro borrador no se implementó como transferencia del chat.
+- [x] Solución y paquete local Release del worker compilados sin errores; frontend con comprobación de tipos y build aprobados.
+
+| Validación de esta continuación | Resultado |
+|---|---|
+| Backend general | 1424 aprobadas; 107 omitidas |
+| PostgreSQL y procesos separados | 24 aprobadas; 0 omitidas |
+| Ampliación de multimedia ante fallo de Storage | 1/1 aprobada; repite y amplía un caso anterior |
+| Frontend completo | 996 aprobadas en 157 archivos |
+
+El ensayo controlado de 240 mensajes / 32 conversaciones / 2 tenants obtuvo p95 de ingreso de 301.43 ms y p95 de relay a proxy simulado de 1287.27 ms, dentro de presupuestos de 500/1500 ms. No incluye Meta/LLM ni red del cliente y no es una afirmación de capacidad productiva. La interfaz de pedidos integrados conserva las etapas 4/5.
+
+Las pruebas verifican worker detenido/reiniciado sin detener la API, evento recibido antes de un handoff, dos conversaciones IA simultáneas sin adelantar mensajes del mismo chat, orden mixto entrada/salida, reentrega, resultados ya persistidos, envío incierto sin repetición/fallback, permisos revocados, aislamiento entre tenants, retención acotada y procedencia/versiones de pedidos remotos. Los contenedores, bases, archivos y rama del laboratorio no se usaron para escribir ni ejecutar esta implementación.
+
+Pendiente fuera del cierre técnico: coexistencia y prueba real de línea (2), atención multiasesor (3), borrador/confirmación comercial común (4), editor y UX (5), validación integral con interfaz/carga representativa (6), y grants/SQL/corte/piloto/activación y revisión de compatibilidad con el laboratorio (7). No hay despliegue, merge a main ni activación de External implícitos.
+
+Cierre backend: commit `0152db4` en `feat/whatsapp-worker-stage01`. Documento técnico y evidencia versionados en ese commit. El SQL aditivo y el inicializador aislado están actualizados; el inicializador compartido del laboratorio conserva el hash registrado.
