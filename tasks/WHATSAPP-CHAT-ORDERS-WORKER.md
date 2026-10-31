@@ -76,7 +76,7 @@ Dependencias: etapa 0.
 - [ ] Definir claves únicas por evento, mensaje, acción automática y sesión comercial; tolerar reentregas y caídas entre persistencia y notificación.
 - [x] Crear el ejecutable worker y configuración por rol de proceso. Evitar que API y worker ejecuten accidentalmente los mismos consumidores al desplegar o retroceder versiones.
 - [x] Migrar las herramientas comerciales que lo requieran a un contrato interno autenticado de la API principal, reutilizando los handlers existentes. Conservar actor, sucursal de origen, permisos e idempotencia; no aceptar ese contexto desde datos públicos de Meta.
-- [x] Revalidar modo de atención y generación/versión antes de despachar una respuesta automática; descartar trabajo invalidado por una toma humana.
+- [ ] Revalidar modo de atención y generación/versión antes de despachar una respuesta automática; descartar trabajo invalidado por una toma humana. Implementada la comprobación durante la ejecución y en el contrato interno; falta persistir la versión asociada a la respuesta generada para conservarla tras reiniciar el worker.
 - [x] Comunicar los cambios del worker a la API mediante eventos persistidos. La API emite SignalR a grupos autorizados; un IHubContext dentro del worker por sí solo no alcanza a los clientes conectados a otro proceso.
 - [x] Definir entrega de eventos para la réplica actual y reconciliación por cursor. Antes de habilitar varias réplicas HTTP, asegurar fanout a todas las conexiones; una cola de consumidores competidores no sustituye broadcast.
 - [x] Mantener recuperación después de reinicios y envío de resultado incierto: conciliar antes de repetir acciones que Meta pudo haber aceptado.
@@ -228,6 +228,7 @@ Cada entrega debe registrar aquí cambios, pruebas, evidencia, riesgos pendiente
 - Completar la línea base operacional: consultas/conexiones SQL, p50/p95, volumen de asesores/mensajes y backlog en horario representativo. CPU/RAM de una hora ya registradas; no sustituyen esas mediciones.
 - Validar presupuestos con carga reproducible. Los valores del documento técnico son objetivos iniciales, no resultados ni SLA productivo.
 - Completar extracción de envíos manuales/plantillas y efectos externos que aún usan rutas actuales; conservar su contrato UX durante esa migración.
+- Persistir la versión de atención con cada respuesta automática generada y verificar recuperación después de reiniciar el worker, incluyendo IA → humano → IA. La comprobación durante la ejecución ya está implementada.
 - Completar pruebas de orden cuando cambia la identidad teléfono/BSUID de un mismo contacto, y de confirmación comercial compartida entre IA/Flow/asesor al implementar la sesión de etapa 4.
 - Completar métricas de profundidad de cola/reintentos, retención de eventos y ensayo prolongado de recuperación antes de habilitar External en producción.
 - [x] Validación técnica final: SQL idempotente/RLS, regresiones entre sucursales y arranque independiente con la versión final de los binarios.
@@ -249,6 +250,8 @@ Cada entrega debe registrar aquí cambios, pruebas, evidencia, riesgos pendiente
 - Antes de producción: resolver los pendientes de cierre listados arriba, revisar grants de tabla/secuencia para el rol runtime, compatibilidad con el trabajo del laboratorio, retención y corte de consumidores. No hay despliegue productivo implícito en esta entrega.
 
 
-Validacion adicional 2026-10-31: el ensayo de procesos separados tambien ejecuta una herramienta comercial autenticada en la API, rechaza una version de atencion obsoleta y confirma que el estado comercial del segundo tenant permanece intacto. La ampliacion de esta prueba paso 1/1. El paquete del worker se publico localmente en configuracion Release, sin errores; esto no es un despliegue de Railway.
+Validación adicional 2026-10-31: el ensayo de procesos separados también ejecuta una herramienta comercial autenticada en la API, rechaza una versión de atención obsoleta y confirma que el estado comercial del segundo tenant permanece intacto. La ampliación de esta prueba pasó 1/1. El paquete del worker se publicó localmente en configuración Release, sin errores; esto no es un despliegue de Railway.
 
 Backend: commit 5d6da83 en feat/whatsapp-worker-stage01.
+
+Ramas de backend y frontend publicadas en origin como feat/whatsapp-worker-stage01; sin merge a main ni despliegue.
