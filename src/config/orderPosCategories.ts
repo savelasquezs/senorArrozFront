@@ -201,12 +201,12 @@ export function portionSortRank(productName: string): number {
 }
 
 export function sortProductsByPortionOrder<T extends { name: string }>(products: T[]): T[] {
-    return [...products].sort((a, b) => {
-        const ra = portionSortRank(a.name)
-        const rb = portionSortRank(b.name)
-        if (ra !== rb) return ra - rb
-        return a.name.localeCompare(b.name, 'es', { sensitivity: 'base' })
-    })
+    // Decorate once: comparisons no longer repeatedly normalize the same names.
+    return products.map(product => {
+        const name = product.name
+        return { product, name, rank: portionSortRank(name) }
+    }).sort((a, b) => a.rank - b.rank || a.name.localeCompare(b.name, 'es', { sensitivity: 'base' }))
+        .map(row => row.product)
 }
 
 export function sameCategoryIdSelection(a: number[] | null, b: number[]): boolean {

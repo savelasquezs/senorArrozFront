@@ -181,46 +181,44 @@ function formatFirstWordGroupLabel(key: string): string {
     return key.charAt(0).toUpperCase() + key.slice(1)
 }
 
-const firstWordGroupEntries = computed(() => {
-    if (!isFirstWordGroupTab.value) return []
-    const map = new Map<string, number>()
-    for (const p of products.value) {
-        const k = firstWordGroupKeyFromProductName(p.name)
-        map.set(k, (map.get(k) ?? 0) + 1)
+// Share one grouping pass between the group buttons and the selected group's cards.
+const firstWordGroups = computed(() => {
+    const groups = new Map<string, Product[]>()
+    if (!isFirstWordGroupTab.value) return groups
+    for (const product of products.value) {
+        const key = firstWordGroupKeyFromProductName(product.name)
+        const group = groups.get(key)
+        if (group) group.push(product)
+        else groups.set(key, [product])
     }
-    const rows = [...map.entries()].map(([key, count]) => ({
-        key,
-        label: formatFirstWordGroupLabel(key),
-        count,
-    }))
-    rows.sort((a, b) => a.label.localeCompare(b.label, 'es', { sensitivity: 'base' }))
-    return rows
+    return groups
 })
 
-const productsInSelectedGroup = computed(() => {
-    if (!isFirstWordGroupTab.value || selectedGroupKey.value === null) return []
-    const key = selectedGroupKey.value
-    const list = products.value.filter(p => firstWordGroupKeyFromProductName(p.name) === key)
-    return sortProductsByPortionOrder(list)
-})
+const firstWordGroupEntries = computed(() =>
+    [...firstWordGroups.value].map(([key, group]) => ({
+        key, label: formatFirstWordGroupLabel(key), count: group.length,
+    })).sort((a, b) => a.label.localeCompare(b.label, 'es', { sensitivity: 'base' })),
+)
+
+const productsInSelectedGroup = computed(() => selectedGroupKey.value === null
+    ? []
+    : sortProductsByPortionOrder(firstWordGroups.value.get(selectedGroupKey.value) ?? []))
 
 const chichRegex = /chich/i
 
-/** Paisa o Ropa vieja (una o varias categorías en la pestaña) y hay al menos un producto con chicharrón en el nombre. */
-const isSpecialCategory = computed(() => {
-    if (!selectedTabIsPaisaOrRopaVieja(posCatalog.value, selectedCategoryIds.value)) return false
-    return products.value.some(p => chichRegex.test(p.name))
+// Partition once, preserving the existing order within each section.
+const chichGroups = computed(() => {
+    const withChich: Product[] = [], withoutChich: Product[] = []
+    if (selectedTabIsPaisaOrRopaVieja(posCatalog.value, selectedCategoryIds.value)) {
+        for (const product of products.value) {
+            (chichRegex.test(product.name) ? withChich : withoutChich).push(product)
+        }
+    }
+    return { withChich, withoutChich }
 })
-
-const productsWithoutChich = computed(() => {
-    if (!isSpecialCategory.value) return []
-    return products.value.filter(product => !chichRegex.test(product.name))
-})
-
-const productsWithChich = computed(() => {
-    if (!isSpecialCategory.value) return []
-    return products.value.filter(product => chichRegex.test(product.name))
-})
+const isSpecialCategory = computed(() => chichGroups.value.withChich.length > 0)
+const productsWithoutChich = computed(() => chichGroups.value.withoutChich)
+const productsWithChich = computed(() => chichGroups.value.withChich)
 
 const gridStyle = computed(() => props.fitContainer ? { gridTemplateColumns: 'repeat(auto-fill, minmax(min(160px, 100%), 1fr))' } : undefined)
 
@@ -282,13 +280,15 @@ watch(products, (newProducts) => {
     }
 }, { immediate: true })
 
-watch(
-    () => ({ ids: selectedCategoryIds.value, productIds: products.value.map(p => p.id) }),
-    () => {
+// Replacing arrays or refreshing stock must not send the operator back to group selection.
+watch(() => [...(selectedCategoryIds.value ?? [])].sort((a, b) => a - b).join(','), () => {
+    selectedGroupKey.value = null
+})
+watch([firstWordGroups, isFirstWordGroupTab, () => props.loading], ([groups, grouped, loading]) => {
+    if (!grouped || (!loading && selectedGroupKey.value !== null && !groups.has(selectedGroupKey.value))) {
         selectedGroupKey.value = null
-    },
-    { deep: true },
-)
+    }
+})
 </script>
 
 <style scoped>
