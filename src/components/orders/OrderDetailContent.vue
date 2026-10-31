@@ -495,7 +495,6 @@
 		:pending-status-change="pendingStatusChange || undefined"
 		@close="handleAssignDeliveryModalClose"
 		@updated="handleDeliverymanUpdated"
-		@status-changed="handleStatusChanged"
 	/>
 
 	<CancelOrderModal
@@ -1217,7 +1216,6 @@ const {
 	pendingStatusChange,
 	showAssignDeliveryModal,
 	handleStatusChange: handleStatusChangeComposable,
-	executeStatusChange,
 	clearPendingStatusChange,
 } = useOrderStatusChange();
 
@@ -1853,14 +1851,6 @@ const handleAssignDeliveryModalClose = () => {
 const handleDeliverymanUpdated = (updatedOrder?: any) => {
 	if (!order.value || !updatedOrder) return;
 	updateOrderDeliveryman(updatedOrder);
-};
-
-const handleStatusChanged = async (newStatus: OrderStatus) => {
-	if (!order.value) return;
-
-	await executeStatusChange(order.value.id, newStatus, (updatedOrder) => {
-		updateOrderDeliveryman(updatedOrder);
-	}, order.value);
 };
 
 const handleOrderCancelled = (updatedOrder: Order) => {
