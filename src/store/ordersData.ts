@@ -36,11 +36,11 @@ export const useOrdersDataStore = defineStore('ordersData', () => {
         }, { ...opts, errorMessage: 'Error al cargar pedidos' })
     }
 
-    const fetchById = async (id: number, opts?: FetchOpts) => {
+    const fetchById = async (id: number, opts?: FetchOpts, signal?: AbortSignal) => {
         const request = ++detailRequest
         await run(async () => {
-            const detail = await orderApi.fetchDetail(id)
-            if (request === detailRequest) current.value = detail
+            const detail = await orderApi.fetchDetail(id, signal)
+            if (request === detailRequest && !signal?.aborted) current.value = detail
         }, { ...opts, errorMessage: 'Error al cargar el pedido' })
     }
 

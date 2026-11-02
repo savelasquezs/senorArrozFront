@@ -143,8 +143,8 @@ class OrderApi extends BaseApi {
     }
 
     // 12. Obtener detalle completo del pedido
-    async fetchDetail(id: number): Promise<OrderDetailView> {
-        return this.get<OrderDetailView>(`/orders/${id}/details`);
+    async fetchDetail(id: number, signal?: AbortSignal): Promise<OrderDetailView> {
+        return this.get<OrderDetailView>(`/orders/${id}/details`, { signal });
     }
 
     // 13. Actualizar pedido (datos básicos y productos)
