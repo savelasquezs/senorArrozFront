@@ -790,6 +790,7 @@ async function activateTab(tab: TabValue) {
     ordersRequest++
     deliverymenRequest++
     reservationsRequest++
+    abortInFlightOrderSearches()
     debouncedRefetchOrders.cancel()
     debouncedRefetchReservations.cancel()
     if (updatesTimer) { clearTimeout(updatesTimer); updatesTimer = null }
@@ -1230,15 +1231,27 @@ const toggleAdvancedFilters = () => {
 let lastOrdersFetchedAt = 0
 const inFlightOrderSearches = new Map<string, ReturnType<typeof orderApi.searchOrders>>()
 const searchControllers = new Map<string, AbortController>()
+// A canceled query must never remain joinable: an A -> B -> A filter sequence
+// must start a new A request even if the first transport ignores AbortSignal.
+function abortInFlightOrderSearches() {
+    for (const controller of searchControllers.values()) controller.abort()
+    searchControllers.clear()
+    inFlightOrderSearches.clear()
+}
 const deliverymenOptionsRequests = new Map<string, ReturnType<typeof orderApi.getDeliverymanOptions>>()
 function searchOrdersOnce(scope: TabValue, body: Record<string, unknown>) {
     // Coalesce equal queries (initial load + reconnect) without deduplicating
     // the separate deliverymen search that keeps the full driver filter updated.
     const key = JSON.stringify([workspaceBranchId.value, scope, body])
     const pending = inFlightOrderSearches.get(key)
-    if (pending) return pending
+    if (pending && !searchControllers.get(key)?.signal.aborted) return pending
+    if (pending) inFlightOrderSearches.delete(key)
     for (const [otherKey, controller] of searchControllers) {
-        if (otherKey !== key) { controller.abort(); searchControllers.delete(otherKey) }
+        if (otherKey !== key) {
+            controller.abort()
+            searchControllers.delete(otherKey)
+            inFlightOrderSearches.delete(otherKey)
+        }
     }
     const controller = new AbortController()
     searchControllers.set(key, controller)
@@ -1313,6 +1326,8 @@ const fetchOrders = async (options: { background?: boolean } = {}): Promise<Orde
 
 const onOrdersTextFilterInput = () => {
     ordersRequest++
+    // Abort immediately on typing, not after the 300 ms debounce.
+    abortInFlightOrderSearches()
     currentPage.value = 1
     debouncedRefetchOrders.schedule()
 }
@@ -2611,6 +2626,7 @@ watch(() => route.query.remoteBranchId, () => {
 })
 watch(workspaceBranchId, () => {
     // Global branch changes remount MainLayout in production; invalidate pending reads as a safeguard.
+    abortInFlightOrderSearches()
     ordersRequest++; deliverymenRequest++; reservationsRequest++; branchOptionsRequest++; branchesRequest++
     debouncedRefetchReservations.cancel()
     reservations.value = []; resTotalCount.value = 0; resCurrentPage.value = 1
@@ -2640,9 +2656,7 @@ onMounted(async () => {
 })
 onUnmounted(() => {
     mounted = false
-    searchControllers.forEach(controller => controller.abort())
-    searchControllers.clear()
-    inFlightOrderSearches.clear()
+    abortInFlightOrderSearches()
     deliverymenOptionsRequests.clear()
     ordersRequest++; deliverymenRequest++; reservationsRequest++; branchOptionsRequest++; branchesRequest++
     debouncedRefetchOrders.cancel()

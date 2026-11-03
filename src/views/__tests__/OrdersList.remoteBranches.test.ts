@@ -255,6 +255,57 @@ describe('remote order workspaces', () => {
         await vi.advanceTimersByTimeAsync(550)
         expect(mocks.search.mock.calls.length).toBeGreaterThan(previousReads)
     })
+    it('aborts an obsolete orders/search transport immediately on typing, before debounce', async () => {
+        mocks.search.mockReturnValueOnce(new Promise(() => {}))
+        mountView(); await flushPromises()
+        const signal = mocks.search.mock.calls[0]![1] as AbortSignal
+        expect(signal.aborted).toBe(false)
+        const search = wrapper.findAllComponents(BaseInput)
+            .find(input => input.attributes('placeholder')?.includes('Cliente, teléfono'))!
+        search.vm.$emit('update:modelValue', 'Ana')
+        search.vm.$emit('input')
+        await flushPromises()
+        expect(signal.aborted).toBe(true)
+        expect(mocks.search).toHaveBeenCalledTimes(1)
+    })
+
+    it('reissues the first filter in a rapid A-B-A sequence instead of reusing its aborted promise', async () => {
+        let resolveOld!: (page: any) => void
+        let resolveMiddle!: (page: any) => void
+        let firstPage = true
+        mocks.search.mockImplementation(body => {
+            if (body.searchTerm === 'B') return new Promise(resolve => { resolveMiddle = resolve })
+            if (firstPage) {
+                firstPage = false
+                return new Promise(resolve => { resolveOld = resolve })
+            }
+            return Promise.resolve(paged([local]))
+        })
+        mountView(); await flushPromises()
+        const firstSignal = mocks.search.mock.calls[0]![1] as AbortSignal
+        const search = wrapper.findAllComponents(BaseInput)
+            .find(input => input.attributes('placeholder')?.includes('Cliente, teléfono'))!
+        vi.useFakeTimers()
+        search.vm.$emit('update:modelValue', 'B')
+        search.vm.$emit('input')
+        await vi.advanceTimersByTimeAsync(320)
+        expect(mocks.search).toHaveBeenCalledTimes(2)
+        expect(firstSignal.aborted).toBe(true)
+        const secondSignal = mocks.search.mock.calls[1]![1] as AbortSignal
+        search.vm.$emit('update:modelValue', '')
+        search.vm.$emit('input')
+        await vi.advanceTimersByTimeAsync(320)
+        await flushPromises()
+        expect(secondSignal.aborted).toBe(true)
+        expect(mocks.search).toHaveBeenCalledTimes(3)
+        expect(wrapper.findComponent(OrdersTable).props('orders')).toEqual([local])
+        // Even an HTTP adapter that ignores AbortSignal must not overwrite the new A.
+        resolveOld(paged([{ ...local, id: 999 }]))
+        resolveMiddle(paged([{ ...local, id: 888 }]))
+        await flushPromises()
+        expect(wrapper.findComponent(OrdersTable).props('orders')).toEqual([local])
+    })
+
     it('does not let a late remote response overwrite the local tab', async () => {
         mountView(); await flushPromises()
         let finishRemote!: (value: any) => void
