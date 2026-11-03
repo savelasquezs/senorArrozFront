@@ -247,7 +247,8 @@ class OrderApi extends BaseApi {
             /** Con status Delivered + fechas: incluye onsite OnTheWay en el historial */
             includeOnsiteActiveInHistory?: boolean
             neighborhoodId?: number
-        }
+        },
+        signal?: AbortSignal
     ): Promise<PagedResult<OrderListItem>> {
         const params: Record<string, string | number | boolean> = {};
         if (filters?.page) params.Page = filters.page;
@@ -261,7 +262,7 @@ class OrderApi extends BaseApi {
         if (filters?.neighborhoodId != null && filters.neighborhoodId > 0)
             params.NeighborhoodId = filters.neighborhoodId;
 
-        return this.get<PagedResult<OrderListItem>>(`/orders/delivery/assigned/${deliveryManId}`, { params });
+        return this.get<PagedResult<OrderListItem>>(`/orders/delivery/assigned/${deliveryManId}`, { params, ...(signal ? { signal } : {}) });
     }
 
     /** Barrios distintos con pedidos en el historial (mismos filtros de fechas/sucursal/estado que el listado). */
