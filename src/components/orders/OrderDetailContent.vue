@@ -351,54 +351,46 @@
                 <details class="rounded-xl border border-emerald-200 bg-emerald-50/50 px-3 py-2">
                     <summary class="cursor-pointer text-sm"><span class="font-medium">Beneficio</span> · {{ appliedBenefitLabel || 'Sin beneficio aplicado' }}<span v-if="permissions.canEditOrder(order)" class="ml-2 text-xs text-emerald-700">Gestionar</span></summary>
                     <p v-if="order.appliedBenefitCode" class="mt-2 text-xs">Código: {{ order.appliedBenefitCode }}</p>
-							<div v-if="permissions.canEditOrder(order)" class="mt-3 space-y-2">
-								<div class="flex gap-2">
-									<BaseInput
-										:model-value="detailDiscountCodeInput"
-										placeholder="Codigo promocional"
-										class="flex-1"
-										@update:model-value="updateDetailDiscountCodeInput"
-										@keyup.enter="applyDiscountCodeToDetail"
-									/>
-									<BaseButton
-										variant="primary"
-										size="sm"
-										:loading="savingBenefit"
-										:disabled="!detailDiscountCodeInput.trim() || savingBenefit"
-										@click="applyDiscountCodeToDetail"
-									>
-										Aplicar
-									</BaseButton>
-								</div>
-								<div class="flex items-center justify-between gap-3">
-									<p v-if="detailBenefitError" class="text-xs text-red-600">{{ detailBenefitError }}</p>
-									<p v-else class="text-xs text-emerald-700">Solo puede quedar un beneficio por pedido.</p>
-									<BaseButton
-										v-if="order.appliedBenefitType && order.appliedBenefitType !== 'None'"
-										variant="outline"
-										size="sm"
-										:disabled="savingBenefit"
-										@click="clearDetailBenefit"
-									>
-										Quitar beneficio
-									</BaseButton>
-								</div>
-								<div v-if="canGrantManualBenefit" class="space-y-2 border-t border-emerald-200 pt-2">
-									<BaseInput v-model="detailManualBenefitReason" placeholder="Motivo obligatorio del regalo" />
-									<select v-model.number="detailManualGiftProductId" class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm">
-										<option :value="null">Producto de la categoría Regalos</option>
-										<option v-for="product in detailGiftProducts" :key="product.id" :value="product.id">{{ product.name }}</option>
-									</select>
-									<div class="flex gap-2">
-										<BaseButton size="sm" variant="outline" :disabled="savingBenefit || !detailManualBenefitReason.trim() || !detailManualGiftProductId" @click="applyManualGiftToDetail">Regalar producto</BaseButton>
-										<BaseButton v-if="canGiftDetailDelivery" size="sm" variant="outline" :disabled="savingBenefit || !detailManualBenefitReason.trim()" @click="applyManualDeliveryToDetail">Regalar domicilio</BaseButton>
-									</div>
-								</div>
-								<div v-if="order.appliedBenefitType === 'Manual'" class="text-xs text-emerald-800">
-									<p>Motivo: {{ order.manualBenefitReason }}</p>
-									<p v-if="order.manualBenefitGrantedByUserName">Otorgado por {{ order.manualBenefitGrantedByUserName }}<span v-if="order.manualBenefitGrantedAt"> · {{ formatDateTime(order.manualBenefitGrantedAt) }}</span></p>
-								</div>
-							</div>
+                    <div v-if="permissions.canEditOrder(order)" class="mt-3 space-y-2">
+                        <template v-if="order.appliedBenefitType && order.appliedBenefitType !== 'None'">
+                            <p class="text-xs text-emerald-700">Solo puede quedar un beneficio por pedido.</p>
+                            <BaseButton variant="outline" size="sm" :disabled="savingBenefit" @click="clearDetailBenefit">Quitar beneficio</BaseButton>
+                        </template>
+                        <template v-else>
+                            <select v-model="detailBenefitChoice" class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm" aria-label="Tipo de beneficio">
+                                <option v-if="canGrantManualBenefit" value="GiftProduct">Producto gratis</option>
+                                <option v-if="canGrantManualBenefit" value="PercentageDiscount">Descuento porcentual</option>
+                                <option v-if="canGrantManualBenefit && canGiftDetailDelivery" value="FreeDelivery">Domicilio gratis</option>
+                                <option value="DiscountCode">Código promocional</option>
+                            </select>
+                            <div v-if="detailBenefitChoice === 'DiscountCode'" class="flex gap-2">
+                                <BaseInput
+                                    :model-value="detailDiscountCodeInput"
+                                    placeholder="Código promocional"
+                                    class="flex-1"
+                                    @update:model-value="updateDetailDiscountCodeInput"
+                                    @keyup.enter="applyDiscountCodeToDetail"
+                                />
+                                <BaseButton variant="primary" size="sm" :loading="savingBenefit" :disabled="!detailDiscountCodeInput.trim() || savingBenefit" @click="applyDiscountCodeToDetail">Aplicar</BaseButton>
+                            </div>
+                            <div v-if="canGrantManualBenefit && detailBenefitChoice !== 'DiscountCode'" class="space-y-2">
+                                <BaseInput v-model="detailManualBenefitReason" placeholder="Motivo obligatorio del beneficio" />
+                                <select v-if="detailBenefitChoice === 'GiftProduct'" v-model.number="detailManualGiftProductId" class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm">
+                                    <option :value="null">Producto de la categoría Regalos</option>
+                                    <option v-for="product in detailGiftProducts" :key="product.id" :value="product.id">{{ product.name }}</option>
+                                </select>
+                                <BaseInput v-if="detailBenefitChoice === 'PercentageDiscount'" v-model.number="detailManualDiscountPercentage" type="number" :min="1" :max="100" label="Porcentaje de descuento" />
+                                <BaseButton v-if="detailBenefitChoice === 'GiftProduct'" size="sm" variant="outline" :disabled="savingBenefit || !detailManualBenefitReason.trim() || !detailManualGiftProductId" @click="applyManualGiftToDetail">Regalar producto</BaseButton>
+                                <BaseButton v-if="detailBenefitChoice === 'PercentageDiscount'" size="sm" variant="outline" :disabled="savingBenefit || !detailManualBenefitReason.trim() || !Number.isFinite(detailManualDiscountPercentage) || detailManualDiscountPercentage <= 0 || detailManualDiscountPercentage > 100" @click="applyManualDiscountToDetail">Aplicar descuento</BaseButton>
+                                <BaseButton v-if="detailBenefitChoice === 'FreeDelivery' && canGiftDetailDelivery" size="sm" variant="outline" :disabled="savingBenefit || !detailManualBenefitReason.trim()" @click="applyManualDeliveryToDetail">Regalar domicilio</BaseButton>
+                            </div>
+                        </template>
+                        <p v-if="detailBenefitError" class="text-xs text-red-600">{{ detailBenefitError }}</p>
+                        <div v-if="order.appliedBenefitType === 'Manual'" class="text-xs text-emerald-800">
+                            <p>Motivo: {{ order.manualBenefitReason }}</p>
+                            <p v-if="order.manualBenefitGrantedByUserName">Otorgado por {{ order.manualBenefitGrantedByUserName }}<span v-if="order.manualBenefitGrantedAt"> · {{ formatDateTime(order.manualBenefitGrantedAt) }}</span></p>
+                        </div>
+                    </div>
                 </details>
 
                 <section :id="`${detailId}-payments`" ref="paymentsSectionRef" aria-label="Pagos del pedido" tabindex="-1" class="min-w-0 scroll-mt-3 rounded-xl border border-gray-200 bg-white p-3 sm:p-4">
@@ -825,9 +817,11 @@ const detailDiscountCodeInput = ref('');
 const detailBenefitError = ref('');
 const detailManualBenefitReason = ref('');
 const detailManualGiftProductId = ref<number | null>(null);
+const detailManualDiscountPercentage = ref<number>(10);
+const detailBenefitChoice = ref<'GiftProduct' | 'PercentageDiscount' | 'FreeDelivery' | 'DiscountCode'>('DiscountCode');
 const canGrantManualBenefit = computed(() => authStore.isAdmin || authStore.isSuperadmin);
 const canSelectAnyOrderStatus = computed(() => authStore.isAdmin || authStore.isSuperadmin);
-const detailGiftProducts = computed(() => productsStore.currentProducts.filter((p) => p.active && p.categoryName.trim().toLocaleLowerCase() === 'regalos'));
+const detailGiftProducts = computed(() => productsStore.currentProducts.filter((p) => p.active && p.branchId === order.value?.branchId && p.categoryName.trim().toLocaleLowerCase() === 'regalos'));
 const canGiftDetailDelivery = computed(() => order.value?.type === 'delivery' || (order.value?.type === 'reservation' && order.value?.addressId != null));
 const showRemovePaidInStoreDetailDialog = ref(false);
 const removePaidInStoreDetailLoading = ref(false);
@@ -1039,32 +1033,69 @@ function buildApplyDiscountCodePayload(sourceOrder: OrderDetailView, code: Disco
 	};
 }
 
-function buildManualBenefitPayload(sourceOrder: OrderDetailView, rewardType: 'GiftProduct' | 'FreeDelivery', reason: string, product?: Product): UpdateOrderDto {
-	let lines = stripAppliedBenefit(sourceOrder);
-	if (rewardType === 'GiftProduct') {
-		if (!product) throw new Error('Selecciona un producto regalo.');
-		lines.push({ id: 0, productId: product.id, quantity: 1, unitPrice: 0, discount: 0, notes: `Regalo manual: ${reason}`, productName: product.name });
-	} else {
-		lines = applyFreeDeliveryCode(lines, sourceOrder);
-	}
-	return {
-		orderDetails: normalizeDetailLines(lines),
-		freeDeliveryRequested: rewardType === 'FreeDelivery',
-		appliedBenefitType: 'Manual',
-		appliedBenefitLabel: rewardType === 'GiftProduct' ? `Regalo manual: ${product!.name}` : 'Regalo manual: Domicilio gratis',
-		appliedBenefitRewardType: rewardType,
-		appliedBenefitSnapshot: JSON.stringify(product ? { giftProductId: product.id, giftProductName: product.name } : {}),
-		manualBenefitReason: reason,
-		manualBenefitGiftProductId: product?.id ?? null,
-	};
+function applyManualPercentageDiscount(lines: DetailLineDraft[], percentage: number): DetailLineDraft[] {
+    if (!Number.isFinite(percentage) || percentage <= 0 || percentage > 100) {
+        throw new Error('Indica un porcentaje válido entre 1 y 100.');
+    }
+    return lines.map((item) => {
+        if (item.unitPrice <= 0) return item;
+        const gross = Math.max(0, item.quantity) * Math.max(0, item.unitPrice);
+        const added = Math.round(gross * percentage / 100);
+        const previous = Math.max(0, Math.round(Number(item.discount ?? 0)));
+        if (previous + added > gross) {
+            throw new Error('El descuento supera el valor de un producto. Revisa los descuentos existentes.');
+        }
+        return { ...item, discount: previous + added };
+    });
+}
+
+function buildManualBenefitPayload(sourceOrder: OrderDetailView, rewardType: 'GiftProduct' | 'FreeDelivery' | 'PercentageDiscount', reason: string, product?: Product, percentage?: number): UpdateOrderDto {
+    let lines = stripAppliedBenefit(sourceOrder);
+    if (rewardType === 'GiftProduct') {
+        if (!product) throw new Error('Selecciona un producto regalo.');
+        lines.push({ id: 0, productId: product.id, quantity: 1, unitPrice: 0, discount: 0, notes: `Regalo manual: ${reason}`, productName: product.name });
+    } else if (rewardType === 'PercentageDiscount') {
+        if (orderDetailsGrossSubtotal(lines) <= 0) throw new Error('El pedido no tiene productos con valor para descontar.');
+        lines = applyManualPercentageDiscount(lines, percentage ?? 0);
+    } else {
+        lines = applyFreeDeliveryCode(lines, sourceOrder);
+    }
+    return {
+        orderDetails: normalizeDetailLines(lines),
+        freeDeliveryRequested: rewardType === 'FreeDelivery',
+        appliedBenefitType: 'Manual',
+        appliedBenefitLabel: rewardType === 'GiftProduct' ? `Regalo manual: ${product!.name}`
+            : rewardType === 'PercentageDiscount' ? `Descuento manual: ${percentage}%` : 'Regalo manual: Domicilio gratis',
+        appliedBenefitRewardType: rewardType,
+        appliedBenefitAmount: rewardType === 'PercentageDiscount' ? percentage : null,
+        appliedBenefitSnapshot: JSON.stringify(product ? { giftProductId: product.id, giftProductName: product.name }
+            : rewardType === 'PercentageDiscount' ? { discountPercentage: percentage } : {}),
+        manualBenefitReason: reason,
+        manualBenefitGiftProductId: product?.id ?? null,
+    };
 }
 
 async function applyManualGiftToDetail() {
 	if (!order.value) return;
 	const product = detailGiftProducts.value.find((p) => p.id === detailManualGiftProductId.value);
 	if (!product) return;
+    if (order.value.orderDetails.some((item) => item.productId === product.id && item.unitPrice === 0)) {
+        detailBenefitError.value = 'Este producto ya figura gratis en el pedido. Retira la línea anterior antes de concederlo como beneficio.';
+        return;
+    }
 	await updateDetailBenefit(buildManualBenefitPayload(order.value, 'GiftProduct', detailManualBenefitReason.value.trim(), product), `Se regalo ${product.name}.`);
 	detailManualBenefitReason.value = ''; detailManualGiftProductId.value = null;
+}
+
+async function applyManualDiscountToDetail() {
+    if (!order.value) return;
+    const percentage = Number(detailManualDiscountPercentage.value);
+    try {
+        const payload = buildManualBenefitPayload(order.value, 'PercentageDiscount', detailManualBenefitReason.value.trim(), undefined, percentage);
+        await updateDetailBenefit(payload, `Se aplicó un descuento del ${percentage}%.`);
+    } catch (err: unknown) {
+        detailBenefitError.value = err instanceof Error ? err.message : 'No se pudo aplicar el descuento.';
+    }
 }
 
 async function applyManualDeliveryToDetail() {
