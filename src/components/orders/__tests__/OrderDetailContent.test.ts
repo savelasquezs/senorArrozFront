@@ -284,4 +284,32 @@ describe('OrderDetailContent presentation and reservation delivery fee', () => {
         expect(wrapper.find('[aria-label="Editar horarios del pedido"]').exists()).toBe(false)
         wrapper.unmount()
     })
+    it('does not send a second status PUT when assigning an order already transitioned by the backend', async () => {
+        deps.store.current = fixture({ type: 'delivery', status: 'ready', deliveryManId: null, deliveryManName: null })
+        deps.store.updateCurrent = vi.fn((patch: Record<string, unknown>) => {
+            deps.store.current = { ...deps.store.current, ...patch }
+        })
+        const extraStatusPut = vi.spyOn(orderApi, 'updateStatus')
+        const wrapper = mountDetail()
+        await flushPromises()
+        const label = wrapper.findAll('label').find(item => item.text().trim() === 'Domiciliario')
+        expect(label).toBeDefined()
+        const pencil = label!.element.parentElement?.querySelector('button')
+        expect(pencil).not.toBeNull()
+        pencil!.click()
+        await flushPromises()
+        const modal = wrapper.getComponent({ name: 'AssignDeliveryModal' })
+        expect(modal.exists()).toBe(true)
+        const assigned = fixture({ type: 'delivery', status: 'on_the_way',
+            deliveryManId: 20, deliveryManName: 'Domiciliario sintético' })
+        modal.vm.$emit('updated', assigned)
+        modal.vm.$emit('statusChanged', 'on_the_way')
+        await flushPromises()
+        expect(extraStatusPut).not.toHaveBeenCalled()
+        expect(deps.store.updateCurrent).toHaveBeenCalledWith(expect.objectContaining({
+            deliveryManId: 20, status: 'on_the_way',
+        }))
+        wrapper.unmount()
+    })
+
 })
