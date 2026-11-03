@@ -111,7 +111,7 @@ const navigationItems = computed((): NavItem[] => [
   { name: 'Productos', to: '/products', icon: CubeIcon, roles: admins },
   { name: 'Gastos', to: '/expenses', icon: CurrencyDollarIcon, roles: office, exactPath: true },
   { name: 'Inventario', to: '/inventory', icon: ClipboardDocumentListIcon, roles: admins },
-  ...(rappiConnection.value?.ready ? [{ name: 'Apps', to: '/integrations/apps', icon: ShoppingBagIcon, roles: office,
+  ...((rappiConnection.value?.ready || (authStore.isSuperadmin && rappiConnection.value)) ? [{ name: 'Apps', to: '/integrations/apps', icon: ShoppingBagIcon, roles: office,
     children: [{ name: rappiPending.value > 0 ? `Rappi (${rappiPending.value})` : 'Rappi', to: `/integrations/apps/rappi${rappiConnection.value.branchId ? `?branchId=${rappiConnection.value.branchId}` : ''}` }] }] : []),
   { name: 'Imputación menú', to: '/expenses/menu-attribution', icon: CurrencyDollarIcon, roles: admins },
   { name: 'Cuadre de Caja', to: '/cash-register', icon: BanknotesIcon, roles: office },

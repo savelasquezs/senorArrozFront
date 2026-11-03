@@ -187,10 +187,14 @@ import BaseCard from '@/components/ui/BaseCard.vue'
 import BaseDialog from '@/components/ui/BaseDialog.vue'
 import BaseLoading from '@/components/ui/BaseLoading.vue'
 import { integrationApi } from '@/services/MainAPI/integrationApi'
+import { useAuthStore } from '@/store/auth'
+import { useBranchContextStore } from '@/store/branchContext'
 import type { RappiExternalOrder, RappiWebhookDiagnostic } from '@/types/integrations'
 
 const route = useRoute()
 const router = useRouter()
+const authStore = useAuthStore()
+const branchContext = useBranchContextStore()
 const orders = ref<RappiExternalOrder[]>([])
 const page = ref(1)
 const totalCount = ref(0)
@@ -207,12 +211,12 @@ const rejectId = ref<number | null>(null)
 const rejectReason = ref('The order has invalid items')
 
 function branchId() {
-  return route.query.branchId ? Number(route.query.branchId) : null
+  return route.query.branchId ? Number(route.query.branchId) : (authStore.isSuperadmin ? branchContext.selectedBranchId : null)
 }
 
 const listRead = createLatestRead()
 onUnmounted(() => listRead.invalidate())
-watch(() => route.query.branchId, () => {
+watch(() => [route.query.branchId, branchContext.selectedBranchId], () => {
   page.value = 1
   eventsPage.value = 1
   orders.value = []
