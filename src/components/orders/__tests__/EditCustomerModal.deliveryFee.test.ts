@@ -122,14 +122,16 @@ describe('EditCustomerModal reservation delivery fee', () => {
         wrapper.unmount()
     })
 
-    it('does not apply a pending customer response after closing the modal', async () => {
+    it('does not fetch legacy addresses from a pending response after closing the modal', async () => {
+        deps.customer = { id: 10, name: 'Cliente legado' }
         let releaseInitial!: () => void
         deps.fetchById.mockImplementationOnce(() => new Promise<void>(resolve => { releaseInitial = resolve }))
         const wrapper = mountModal()
         await wrapper.setProps({ open: false })
         releaseInitial()
         await flushPromises()
-        expect(wrapper.findComponent({ name: 'CustomerSection' }).props('selectedCustomer')).toBeNull()
+        expect(deps.fetchAddresses).not.toHaveBeenCalled()
+        expect(wrapper.findComponent({ name: 'CustomerSection' }).exists()).toBe(false)
         wrapper.unmount()
     })
 
