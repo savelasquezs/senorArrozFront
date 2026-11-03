@@ -4,7 +4,7 @@
         <div class="space-y-3">
             <div class="flex flex-wrap items-center justify-between gap-2 text-sm">
                 <span>{{ statusLabel }}<span v-if="snapshot?.deliveryManName"> · {{ snapshot.deliveryManName }}</span></span>
-                <BaseButton size="sm" variant="outline" :loading="loading" @click="refresh">Actualizar</BaseButton>
+                <BaseButton size="sm" variant="outline" :loading="loading" @click="refresh(true)">Actualizar</BaseButton>
             </div>
             <p v-if="failure" role="alert" class="text-sm text-red-700">{{ failure }}</p>
             <p v-else-if="snapshot?.location" class="text-xs text-gray-600">
@@ -24,6 +24,8 @@
 <script setup lang="ts">
 import { computed, defineAsyncComponent, onUnmounted, ref, watch } from 'vue'
 import BaseDialog from '@/components/ui/BaseDialog.vue'
+import { useAuthStore } from '@/store/auth'
+import { useBranchContextStore } from '@/store/branchContext'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import { orderManagementApi } from '@/services/MainAPI/orderManagementApi'
 import { orderApi } from '@/services/MainAPI/orderApi'
@@ -37,16 +39,28 @@ const DeliveryMapAsync = defineAsyncComponent(() => import('@/components/deliver
 const props = defineProps<{ modelValue: boolean; order: OrderListItem }>()
 const emit = defineEmits<{ 'update:modelValue': [open: boolean] }>()
 const { formatDateTime } = useFormatting()
+const auth = useAuthStore()
+const branch = useBranchContextStore()
+const sessionKey = computed(() => [
+    auth.user?.id, auth.user?.role, auth.user?.branchId,
+    auth.isAuthenticated,
+    auth.isSuperadmin ? branch.selectedBranchId : null,
+].join(':'))
+const canTrack = computed(() => auth.isAuthenticated
+    && ['Admin', 'Superadmin', 'Cashier'].includes(auth.user?.role ?? ''))
 const snapshot = ref<OrderTracking | null>(null)
 const detail = ref<OrderListItem | null>(null)
 const loading = ref(false)
 const failure = ref('')
 let generation = 0
 let inFlight = false
+let activeController: AbortController | null = null
+let refreshQueued = false
+let unmounted = false
 let timer: ReturnType<typeof setInterval> | undefined
 const { isPageVisible, isOnline } = useOrderManagementUpdates(
-    event => { if (event.orderId === props.order.id) void refresh() },
-    () => { void refresh() },
+    event => { if (event.orderId === props.order.id) void refresh(true) },
+    () => { void refresh(true) },
     () => {},
 )
 const displayedOrder = computed<OrderListItem>(() => ({
@@ -69,45 +83,81 @@ const locations = computed<Record<number, DriverLocation>>(() => {
         deliveryRouteId: tracking.deliveryRouteId,
     } }
 })
-async function refresh() {
-    if (!props.modelValue || !isPageVisible.value || !isOnline.value || inFlight) return
+// Recheck once after a management event that arrives during a slow GET.
+async function refresh(urgent = false) {
+    if (!props.modelValue || !canTrack.value || !isPageVisible.value || !isOnline.value) return
+    if (inFlight) {
+        if (urgent) refreshQueued = true
+        return
+    }
     const request = generation
     const orderId = props.order.id
+    const scope = sessionKey.value
+    const controller = new AbortController()
+    const isCurrent = () => !unmounted && !controller.signal.aborted
+        && request === generation && props.modelValue
+        && orderId === props.order.id && scope === sessionKey.value
+    activeController = controller
     loading.value = true
     inFlight = true
     try {
-        const result = await orderManagementApi.tracking(orderId)
-        if (request !== generation || orderId !== props.order.id) return
+        // Controller -> service -> EF already accepts CancellationToken.
+        const result = await orderManagementApi.tracking(orderId, controller.signal)
+        if (!isCurrent()) return
         if (result.managementVersion !== (detail.value ?? props.order).managementVersion) {
-            const current = await orderApi.fetchDetail(orderId)
-            if (request !== generation) return
+            const current = await orderApi.fetchDetail(orderId, controller.signal)
+            if (!isCurrent()) return
             detail.value = current
         }
         snapshot.value = result
         failure.value = ''
-        if (result.status !== 'on_the_way' && timer) { clearInterval(timer); timer = undefined }
-        else if (result.status === 'on_the_way' && !timer) timer = setInterval(() => { void refresh() }, 30_000)
+        if (result.status !== 'on_the_way' && timer) {
+            clearInterval(timer)
+            timer = undefined
+        } else if (result.status === 'on_the_way' && !timer) {
+            timer = setInterval(() => { void refresh() }, 30_000)
+        }
     } catch (err: unknown) {
-        if (request !== generation) return
-        snapshot.value = null // A failed poll must not leave a green live-location indication.
+        if (!isCurrent()) return
+        snapshot.value = null
         failure.value = err instanceof Error ? err.message : 'No se pudo consultar el seguimiento.'
     } finally {
-        if (request === generation) { inFlight = false; loading.value = false }
+        if (request === generation) {
+            if (activeController === controller) activeController = null
+            inFlight = false
+            loading.value = false
+            const replay = refreshQueued && isCurrent()
+            refreshQueued = false
+            if (replay) void refresh()
+        }
     }
 }
-watch(() => [props.modelValue, props.order.id] as const, ([open]) => {
+function invalidateTracking() {
     generation++
+    activeController?.abort()
+    activeController = null
+    refreshQueued = false
+    inFlight = false
     if (timer) clearInterval(timer)
     timer = undefined
-    inFlight = false
     loading.value = false
     snapshot.value = null
     detail.value = null
     failure.value = ''
-    if (open) {
-        void refresh()
-        timer = setInterval(() => { void refresh() }, 30_000)
-    }
-}, { immediate: true })
-onUnmounted(() => { generation++; if (timer) clearInterval(timer) })
+}
+watch(
+    () => [props.modelValue, props.order.id, props.order.branchId, sessionKey.value] as const,
+    ([open]) => {
+        invalidateTracking()
+        if (open && canTrack.value) {
+            void refresh()
+            timer = setInterval(() => { void refresh() }, 30_000)
+        }
+    },
+    { immediate: true, flush: 'sync' },
+)
+onUnmounted(() => {
+    unmounted = true
+    invalidateTracking()
+})
 </script>

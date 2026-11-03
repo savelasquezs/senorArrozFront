@@ -10,8 +10,8 @@ class OrderManagementApi extends BaseApi {
     options(orderId: number): Promise<OrderOperationOptions> {
         return this.get(`/orders/${orderId}/operation-options`)
     }
-    tracking(orderId: number): Promise<OrderTracking> {
-        return this.get(`/orders/${orderId}/tracking`)
+    tracking(orderId: number, signal?: AbortSignal): Promise<OrderTracking> {
+        return this.get(`/orders/${orderId}/tracking`, { signal })
     }
     reprint(orderId: number, kind: 'kitchen' | 'delivery'): Promise<ApiResponse<{ jobId: number }>> {
         return this.post(`/orders/${orderId}/print`, { kind })
