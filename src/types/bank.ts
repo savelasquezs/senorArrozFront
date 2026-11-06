@@ -194,6 +194,7 @@ export interface VerifyBankPaymentDto {
 
 // ===== APP PAYMENTS =====
 export interface AppPayment {
+    sourceReservationDepositId?: number | null
     id: number
     orderId: number
     appId: number

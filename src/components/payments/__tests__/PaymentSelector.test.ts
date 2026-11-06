@@ -79,6 +79,15 @@ function expectEditingSignal(view: VueWrapper, editing: boolean) {
 }
 
 describe('PaymentSelector compact payment flow', () => {
+    it.each(['reservation', 'onsite'] as const)('identifies receipts when effective type will be reservation: %s', (type) => {
+        const view = mountSelector({ type, reservedFor: new Date('2026-11-07T18:00:00Z') })
+        expect(view.get('[data-test="reservation-payment-hint"]').text()).toContain('abonos de esta reserva')
+    })
+    it('does not label an immediate order as a reservation', () => {
+        const view = mountSelector()
+        expect(view.find('[data-test="reservation-payment-hint"]').exists()).toBe(false)
+    })
+
     beforeEach(() => {
         localStorage.clear()
         pinia = createPinia()

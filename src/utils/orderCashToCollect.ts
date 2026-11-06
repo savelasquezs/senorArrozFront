@@ -1,5 +1,11 @@
 /** Montos con shape mínimo { amount } (persistido, borrador, API). */
-export type PaymentLike = { amount: number }
+export type PaymentLike = {
+    amount: number
+    sourceReservationDepositId?: number | null
+    isAppSettlement?: boolean
+    isReversed?: boolean
+}
+type DepositLike = { id: number; amount: number; isEffective: boolean; appId?: number | null; cashAppliedToOrder?: boolean }
 
 export function sumPaymentsAmounts(payments: PaymentLike[] | undefined | null): number {
     if (!payments?.length) return 0
@@ -12,13 +18,14 @@ export interface OrderCashInputs {
     appPayments?: PaymentLike[] | null
     /** Borrador de pedido: un solo pago app */
     appPayment?: PaymentLike | null
+    reservationDeposits?: DepositLike[] | null
 }
 
 /** Suma banco + apps (arrays) + app suelta de borrador. */
 export function sumOrderNonCashPayments(inputs: OrderCashInputs): number {
     return (
-        sumPaymentsAmounts(inputs.bankPayments) +
-        sumPaymentsAmounts(inputs.appPayments) +
+        sumPaymentsAmounts(inputs.bankPayments?.filter(p => !p.isAppSettlement)) +
+        sumPaymentsAmounts(inputs.appPayments?.filter(p => !p.isReversed)) +
         (inputs.appPayment ? Number(inputs.appPayment.amount ?? 0) : 0)
     )
 }
@@ -38,7 +45,13 @@ export function orderCashToCollect(
     }
 ): number {
     const nonCash = sumOrderNonCashPayments(inputs)
-    const remainder = orderTotal - nonCash
+    const unrepresentedDeposits = (inputs.reservationDeposits ?? []).filter(d => d.isEffective
+        ? !d.cashAppliedToOrder
+        : d.appId != null
+            ? !(inputs.appPayments ?? []).some(p => p.sourceReservationDepositId === d.id)
+            : !(inputs.bankPayments ?? []).some(p => p.sourceReservationDepositId === d.id))
+        .reduce((sum, d) => sum + Number(d.amount), 0)
+    const remainder = orderTotal - nonCash - unrepresentedDeposits
 
     if (options?.paidInStoreCash) {
         const covered =

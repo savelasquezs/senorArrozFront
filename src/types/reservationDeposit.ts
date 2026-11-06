@@ -4,6 +4,7 @@ export interface ReservationDeposit {
   branchId: number
   amount: number
   isEffective: boolean
+  cashAppliedToOrder?: boolean
   bankId?: number
   bankName?: string
   appId?: number

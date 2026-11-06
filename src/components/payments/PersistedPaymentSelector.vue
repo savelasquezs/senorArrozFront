@@ -22,6 +22,7 @@
                     <div class="flex-1">
                         <div class="flex items-center gap-2">
                             <div class="text-sm font-medium text-blue-900">{{ appPayments[0].appName }}</div>
+                            <span v-if="appPayments[0].sourceReservationDepositId" class="text-xs text-amber-700">Abono de reserva</span>
                             <!-- Badge de estado de liquidación -->
                             <span v-if="canSettle" :class="[
                                 'inline-flex items-center px-2 py-1 rounded-full text-xs font-medium',
@@ -65,11 +66,11 @@
                     </BaseButton>
 
                     <!-- Botones de edición (si tiene permisos) -->
-                    <BaseButton v-if="canEdit" @click="handleEditAppPayment(appPayments[0])" variant="ghost" size="sm"
+                    <BaseButton v-if="canEdit && !appPayments[0].sourceReservationDepositId" @click="handleEditAppPayment(appPayments[0])" variant="ghost" size="sm"
                         title="Editar monto">
                         <PencilIcon class="w-4 h-4" />
                     </BaseButton>
-                    <BaseButton v-if="canEdit" @click="handleRemoveAppPayment(appPayments[0].id)" variant="ghost"
+                    <BaseButton v-if="canEdit && !appPayments[0].sourceReservationDepositId" @click="handleRemoveAppPayment(appPayments[0].id)" variant="ghost"
                         size="sm" class="text-red-600" title="Eliminar pago">
                         <TrashIcon class="w-4 h-4" />
                     </BaseButton>

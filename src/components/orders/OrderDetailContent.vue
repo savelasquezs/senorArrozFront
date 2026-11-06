@@ -1357,6 +1357,7 @@ const cashAmount = computed(() => {
 		{
 			bankPayments: order.value.bankPayments,
 			appPayments: order.value.appPayments,
+                reservationDeposits: order.value.reservationDeposits,
 		},
 		{
 			floorAtZero: true,
@@ -1372,7 +1373,7 @@ const detailNonStoreCashRemainder = computed(() => {
 	if (!o) return 0;
 	return orderCashToCollect(
 		o.total,
-		{ bankPayments: o.bankPayments, appPayments: o.appPayments },
+		{ bankPayments: o.bankPayments, appPayments: o.appPayments, reservationDeposits: o.reservationDeposits },
 		{ floorAtZero: true },
 	);
 });

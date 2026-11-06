@@ -30,6 +30,7 @@ export function usePersistedOrderPayments(
             {
                 bankPayments: order.value.bankPayments,
                 appPayments: order.value.appPayments,
+                reservationDeposits: order.value.reservationDeposits,
             },
             {
                 floorAtZero: true,
