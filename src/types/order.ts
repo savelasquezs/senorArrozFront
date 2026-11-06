@@ -451,6 +451,7 @@ export interface OrderBankPaymentDetail {
 }
 
 export interface OrderAppPaymentDetail {
+    sourceReservationDepositId?: number | null
     id: number
     orderId: number
     appId: number

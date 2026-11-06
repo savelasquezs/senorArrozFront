@@ -63,12 +63,15 @@ export interface InvoiceOrderSummary {
 export function invoiceOrderSummary(order: OrderDetailView): InvoiceOrderSummary {
     const deposits = order.reservationDeposits ?? []
     const payments = [
-        ...(order.bankPayments ?? []).filter(p => !p.sourceReservationDepositId).map(p => ({ label: p.bankName || 'Transferencia bancaria', amount: p.amount })),
-        ...(order.appPayments ?? []).map(p => ({ label: p.appName || 'Aplicación', amount: p.amount })),
+        ...(order.bankPayments ?? []).filter(p => !p.sourceReservationDepositId && !p.isAppSettlement).map(p => ({ label: p.bankName || 'Transferencia bancaria', amount: p.amount })),
+        ...(order.appPayments ?? []).filter(p => !p.sourceReservationDepositId && !p.isReversed).map(p => ({ label: p.appName || 'Aplicación', amount: p.amount })),
         ...deposits.map(p => ({ label: `Anticipo · ${p.isEffective ? 'Efectivo' : p.bankName || p.appName || 'Transferencia'}`, amount: p.amount })),
     ]
     if (!deposits.length && order.totalDeposited > 0) payments.push({ label: 'Anticipos registrados', amount: order.totalDeposited })
-    const cash = order.paidInStoreCashAmount ?? (order.paidInStoreCash ? Math.max(0, order.total - payments.reduce((sum, p) => sum + p.amount, 0)) : 0)
+    const appliedCash = deposits.filter(d => d.cashAppliedToOrder).reduce((sum, d) => sum + d.amount, 0)
+    const cash = order.paidInStoreCashAmount != null
+        ? Math.max(0, order.paidInStoreCashAmount - appliedCash)
+        : (order.paidInStoreCash ? Math.max(0, order.total - payments.reduce((sum, p) => sum + p.amount, 0)) : 0)
     if (cash > 0) payments.push({ label: 'Efectivo en caja', amount: cash })
     return { id: order.id, total: order.total, delivery: order.deliveryFee ?? 0,
         lines: (order.orderDetails ?? []).map(p => ({ name: p.productName, quantity: p.quantity, unitPrice: p.unitPrice, discount: p.discount, notes: p.notes })),
@@ -83,10 +86,13 @@ export function invoiceSnapshotSummary(snapshot?: string): InvoiceOrderSummary |
         if (!data?.lines || !Number.isFinite(data.Total)) return null
         const payments = [
             ...(data.bankPayments ?? []).filter((p: { SourceReservationDepositId?: number }) => !p.SourceReservationDepositId).map((p: { Amount: number }) => ({ label: 'Transferencia bancaria', amount: p.Amount })),
-            ...(data.appPayments ?? []).map((p: { Amount: number }) => ({ label: 'Aplicación', amount: p.Amount })),
+            ...(data.appPayments ?? []).filter((p: { SourceReservationDepositId?: number }) => !p.SourceReservationDepositId).map((p: { Amount: number }) => ({ label: 'Aplicación', amount: p.Amount })),
             ...(data.deposits ?? []).map((p: { IsEffective: boolean; Amount: number }) => ({ label: p.IsEffective ? 'Anticipo en efectivo' : 'Anticipo por transferencia', amount: p.Amount })),
         ]
-        if (data.PaidInStoreCashAmount > 0) payments.push({ label: 'Efectivo en caja', amount: data.PaidInStoreCashAmount })
+        const appliedCash = (data.deposits ?? []).filter((p: { CashAppliedToOrder?: boolean }) => p.CashAppliedToOrder)
+            .reduce((sum: number, p: { Amount: number }) => sum + p.Amount, 0)
+        const cash = Math.max(0, (data.PaidInStoreCashAmount ?? 0) - appliedCash)
+        if (cash > 0) payments.push({ label: 'Efectivo en caja', amount: cash })
         return { id: data.Id, total: data.Total, delivery: data.DeliveryFee ?? 0,
             lines: (root.fiscalLines ?? data.lines).map((p: { name: string; Quantity: number; UnitPrice: number; Discount: number; Net?: number }) => ({ name: p.name, quantity: p.Quantity, unitPrice: p.UnitPrice, discount: p.Discount, total: p.Net })),
             payments, balance: Math.max(0, data.Total - payments.reduce((sum: number, p: { amount: number }) => sum + p.amount, 0)) }

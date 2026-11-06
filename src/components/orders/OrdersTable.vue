@@ -426,7 +426,7 @@ const showPaidInStoreQuickButton = (order: OrderListItem): boolean =>
     order.paidInStoreCash !== true &&
     orderCashToCollect(
         order.total,
-        { bankPayments: order.bankPayments, appPayments: order.appPayments },
+        { bankPayments: order.bankPayments, appPayments: order.appPayments, reservationDeposits: order.reservationDeposits },
         { floorAtZero: true },
     ) > 0
 
@@ -436,7 +436,7 @@ const showQuickPaymentActions = (order: OrderListItem): boolean =>
     permissions.canEditPayments(order) &&
     orderCashToCollect(
         order.total,
-        { bankPayments: order.bankPayments, appPayments: order.appPayments },
+        { bankPayments: order.bankPayments, appPayments: order.appPayments, reservationDeposits: order.reservationDeposits },
         { floorAtZero: true },
     ) > 0
 

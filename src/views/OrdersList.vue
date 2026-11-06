@@ -2231,7 +2231,7 @@ const handleQuickBankTransfer = async (order: OrderListItem, bankId: number) => 
     try {
         const remainingAmount = orderCashToCollect(
             order.total,
-            { bankPayments: order.bankPayments, appPayments: order.appPayments },
+            { bankPayments: order.bankPayments, appPayments: order.appPayments, reservationDeposits: order.reservationDeposits },
             { floorAtZero: true },
         )
 

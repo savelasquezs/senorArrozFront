@@ -627,3 +627,7 @@ Recordar para el cliente guarda el perfil compartido y su asociación/predetermi
 El buscador de clientes y el listado admiten empresa/NIT y muestran las empresas asociadas, conservando el alcance de sucursal. El detalle compartido del cliente muestra Factura a junto a sus datos y permite reutilizar una empresa de otro empleado. Dirección fiscal y dirección de entrega son independientes. Las búsquedas paginadas usan espera de 250 ms y descartan respuestas antiguas, de modales cerrados o de otra sesión.
 
 La disponibilidad del POS usa la sucursal operativa del borrador. La consulta forOrderCreation exige rol de gestión y sucursal activa del mismo tenant; el catálogo de productos compartido conserva sus recetas y se cruza con los saldos de esa sede. Las consultas administrativas conservan su alcance anterior.
+
+### Abonos iniciales de reservas
+
+El sidebar conserva sus medios de pago y envía una sola creación idempotente. Si el tipo efectivo enviado es reserva, el backend registra los importes recibidos como abonos y devuelve el historial. El saldo no marcado como recibido sigue pendiente. `sourceReservationDepositId` identifica copias operativas de banco/app; `cashAppliedToOrder` evita duplicar el efectivo. La factura y el cobro cuentan cada abono una sola vez.

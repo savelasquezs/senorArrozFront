@@ -1,5 +1,8 @@
 <template>
     <div ref="container" class="payment-selector">
+        <p v-if="order.type === 'reservation' || order.reservedFor" class="text-xs text-amber-700" data-test="reservation-payment-hint">
+            Los pagos recibidos se guardarán como abonos de esta reserva.
+        </p>
         <section v-for="section in sections" :key="section.type" :aria-label="section.label" class="payment-section">
             <header v-if="section.type !== 'cash'" class="payment-heading">
                 <div class="flex items-center gap-1">

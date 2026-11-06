@@ -43,3 +43,30 @@ describe('orderCashToCollect (remanente UI pagos / efectivo en tienda)', () => {
         expect(r).toBe(30_000)
     })
 })
+
+
+describe('reservation receipt coverage', () => {
+    it('counts each linked bank, app and cash receipt once', () => {
+        expect(orderCashToCollect(100_000, {
+            bankPayments: [{ amount: 20_000, sourceReservationDepositId: 1 }, { amount: 30_000, isAppSettlement: true }],
+            appPayments: [{ amount: 30_000, sourceReservationDepositId: 2 }],
+            reservationDeposits: [
+                { id: 1, amount: 20_000, isEffective: false },
+                { id: 2, amount: 30_000, isEffective: false, appId: 1 },
+                { id: 3, amount: 10_000, isEffective: true, cashAppliedToOrder: true },
+            ],
+        }, { paidInStoreCash: true, paidInStoreCashAmount: 10_000, floorAtZero: true })).toBe(40_000)
+    })
+    it('deducts unrepresented old cash and app deposits without assuming full payment', () => {
+        expect(orderCashToCollect(100_000, { reservationDeposits: [
+            { id: 1, amount: 20_000, isEffective: true },
+            { id: 2, amount: 10_000, isEffective: false, appId: 1 },
+        ] })).toBe(70_000)
+    })
+    it('does not identify two equal unrelated payments as one receipt', () => {
+        expect(orderCashToCollect(100_000, {
+            bankPayments: [{ amount: 20_000 }],
+            reservationDeposits: [{ id: 1, amount: 20_000, isEffective: false }],
+        })).toBe(60_000)
+    })
+})

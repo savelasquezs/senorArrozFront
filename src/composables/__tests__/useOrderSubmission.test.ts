@@ -52,6 +52,21 @@ function minimalDraft(overrides: Partial<DraftOrder>): DraftOrder {
 }
 
 describe('useOrderSubmission', () => {
+    it('submits scheduled initial receipts in one idempotent creation without guessing cash', async () => {
+        const store = useOrdersDraftsStore()
+        const draft = minimalDraft({ total: 100_000, reservedFor: new Date('2026-11-07T18:00:00Z'),
+            bankPayments: [{ tempId: 'bank', bankId: 1, bankName: 'Banco', amount: 30_000 }],
+            paidInStoreCash: false,
+        })
+        store.draftOrders.set(draft.tabId, draft)
+        const create = vi.spyOn(store, 'create').mockResolvedValue({ id: 701 } as never)
+        const result = await useOrderSubmission().submitOrder(draft)
+        expect(result.id).toBe(701)
+        expect(create).toHaveBeenCalledTimes(1)
+        expect(create.mock.calls[0][0]).toMatchObject({ type: 'reservation', bankPayments: [{ bankId: 1, amount: 30_000 }], paidInStoreCash: false })
+        expect(create.mock.calls[0][0].posCreationKey).toBeTruthy()
+    })
+
     it.each([true, false])('inicia seguimiento del pedido creado solo si se confirmó factura: %s', async requestElectronicInvoice => {
         const store = useOrdersDraftsStore()
         const draft = minimalDraft({ requestElectronicInvoice, billingRecipient: { documentType: 6, identification: '123', name: 'Empresa' } })
