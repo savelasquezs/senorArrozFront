@@ -1,0 +1,51 @@
+name: Reservation fix isolated preparation
+on:
+  push:
+    branches: [fix/reservation-initial-deposits-20261106]
+    paths:
+      - .github/workflows/reservation-fix-prepare.yml
+      - scripts/reservation-fix.patch
+permissions:
+  contents: write
+concurrency:
+  group: reservation-fix-preparation
+  cancel-in-progress: true
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Apply reviewed patch on the feature branch only
+        if: hashFiles('scripts/reservation-fix.patch') != ''
+        run: |
+          test "$GITHUB_REF_NAME" = fix/reservation-initial-deposits-20261106
+          git apply --index --check scripts/reservation-fix.patch
+          git apply --index scripts/reservation-fix.patch
+          git diff --cached --check
+      - uses: actions/setup-node@v4
+        if: hashFiles('scripts/reservation-fix.patch') != ''
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install, test and build
+        if: hashFiles('scripts/reservation-fix.patch') != ''
+        run: |
+          npm ci
+          npm run test:run
+          npm run build
+      - name: Commit tested source changes to feature branch
+        if: hashFiles('scripts/reservation-fix.patch') != ''
+        run: |
+          test "$GITHUB_REF_NAME" = fix/reservation-initial-deposits-20261106
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'fix: present reservation receipts and calculate unduplicated balances'
+          git push origin "HEAD:refs/heads/$GITHUB_REF_NAME"
+      - name: Archive source for review
+        run: git archive --format=tar --output=reservation-fix-source.tar HEAD
+      - uses: actions/upload-artifact@v4
+        with:
+          name: reservation-fix-source
+          path: reservation-fix-source.tar
+          retention-days: 1
