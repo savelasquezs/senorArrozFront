@@ -227,14 +227,14 @@
                         <div class="space-y-1">
                             <!-- Abonos de reserva (anticipos) -->
                             <div
-                                v-if="order.type === 'reservation' && (order.reservationDeposits?.length ?? 0) > 0"
+                                v-if="(order.reservationDeposits?.length ?? 0) > 0"
                                 class="space-y-1"
                             >
                                 <ReservationDepositCompactRow
                                     v-for="d in (order.reservationDeposits ?? [])"
                                     :key="d.id"
                                     :deposit="d"
-                                    :show-edit-remove="permissions.canEditPayments(order)"
+                                    :show-edit-remove="canEditReservationDeposit(order, d)"
                                     @edit="(dep) => emit('edit-reservation-deposit', order, dep)"
                                     @remove="(dep) => emit('remove-reservation-deposit', order, dep)"
                                 />
@@ -418,6 +418,12 @@ const { formatCurrency } = useFormatting()
 const { success, error } = useToast()
 
 const savingPaidInStoreId = ref<number | null>(null)
+
+const canEditReservationDeposit = (order: OrderListItem, deposit: ReservationDeposit): boolean =>
+    permissions.canEditPayments(order) &&
+    order.status !== 'delivered' && order.status !== 'cancelled' &&
+    !order.appPayments.some(payment => payment.sourceReservationDepositId === deposit.id &&
+        (payment.isSettled || payment.isReversed))
 
 const showPaidInStoreQuickButton = (order: OrderListItem): boolean =>
     props.enablePaidInStoreQuickAction &&

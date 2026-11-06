@@ -935,7 +935,10 @@ const maxEditBankPaymentAmount = computed(() => {
 const maxEditReservationDepositAmount = computed(() => {
     const t = editReservationDepositTarget.value
     if (!t) return 0
-    return t.order.total - t.order.totalDeposited + t.deposit.amount
+    return orderCashToCollect(t.order.total, t.order, {
+        paidInStoreCash: t.order.paidInStoreCash,
+        paidInStoreCashAmount: t.order.paidInStoreCashAmount,
+    }) + t.deposit.amount
 })
 
 // Opciones de filtros
@@ -1907,6 +1910,8 @@ const confirmRemoveReservationDeposit = async () => {
             deps.filter((d) => d.id !== t.deposit.id),
         )
         closeRemoveReservationDepositDialog()
+        await fetchOrders({ background: true })
+        if (activeTab.value === 'reservations') await fetchReservations({ background: true })
     } catch (err: any) {
         error('Error al eliminar abono', err.message)
     } finally {
@@ -1951,6 +1956,8 @@ const confirmEditReservationDeposit = async () => {
         )
         success('Abono actualizado', 4000, 'El monto fue guardado')
         closeEditReservationDepositDialog()
+        await fetchOrders({ background: true })
+        if (activeTab.value === 'reservations') await fetchReservations({ background: true })
     } catch (err: any) {
         error('Error al actualizar abono', err.message)
     } finally {
