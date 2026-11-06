@@ -29,7 +29,9 @@
     <label v-if="canUseDeliveryApp" class="flex items-start gap-3 rounded-lg border border-gray-200 px-4 py-3 text-sm">
       <input v-model="form.deliveryAppEnabled" type="checkbox" class="mt-1" />
       <span>Habilitar app de domicilios<span class="block text-xs text-gray-500 mt-1">
-        Conserva su rol en la web. Iniciar sesión en una aplicación cierra la anterior.</span></span>
+        {{ form.role === 'Cashier'
+          ? 'Conserva su rol en la web. Iniciar sesión en una aplicación cierra la anterior.'
+          : 'Permite una sesión en el panel y otra en delivery. Un nuevo acceso reemplaza la sesión anterior de esa aplicación.' }}</span></span>
     </label>
     <div v-if="showBranchSelector" class="grid grid-cols-1 md:grid-cols-2 gap-4">
       <BaseSelect v-model="form.branchId" :options="branchOptions ?? []" label="Sucursal" required
@@ -85,8 +87,10 @@ const form = reactive({ name: '', email: '', phone: '', role: '' as UserRole | '
   branchId: 0, payrollExpenseId: 0, password: '', confirmPassword: '', confirmationPassword: '' });
 const payrollExpenseOptions = ref<Array<{ value: number; label: string }>>([{ value: 0, label: 'Sin asignar' }]);
 const terminal = computed(() => form.accountType === 'terminal');
-const roleOptions = computed(() => users.availableRoles);
-const canUseDeliveryApp = computed(() => !terminal.value && (form.role === 'Admin' || form.role === 'Cashier'));
+const roleOptions = computed(() => props.user?.role === 'Superadmin' && auth.isSuperadmin
+  ? [{ value: 'Superadmin', label: 'Superadministrador' }, ...users.availableRoles]
+  : users.availableRoles);
+const canUseDeliveryApp = computed(() => !terminal.value && ['Admin', 'Superadmin', 'Cashier'].includes(form.role));
 const showBranchSelector = computed(() => auth.isSuperadmin && !!props.user && !!props.branchOptions?.length);
 const phoneValid = computed(() => /^[36]\d{9}$/.test(form.phone.trim()));
 const passwordValid = computed(() => form.password.length >= 8 && form.password.length <= 256
