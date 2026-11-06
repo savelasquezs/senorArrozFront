@@ -9,6 +9,7 @@ import EditCustomerModal from '@/components/orders/EditCustomerModal.vue'
 import BaseSelect from '@/components/ui/BaseSelect.vue'
 
 const mocks = vi.hoisted(() => ({
+    receiptUpdate: vi.fn(), receiptRemove: vi.fn(),
     search: vi.fn(), deliverymen: vi.fn(), branches: vi.fn(), options: vi.fn(), payment: vi.fn(), toast: vi.fn(), replace: vi.fn(),
     changes: {
         changed: null as null | ((event: any) => void),
@@ -27,6 +28,7 @@ vi.mock('@/store/banks', () => ({ useBanksStore: () => ({ options: localBanks, l
 vi.mock('@/store/apps', () => ({ useAppsStore: () => ({ options: localApps, list: null, ensureListLoaded: mocks.appsLoaded }) }))
 vi.mock('@/services/MainAPI/orderApi', () => ({ orderApi: { searchOrders: mocks.search, getDeliverymanOptions: mocks.deliverymen } }))
 vi.mock('@/services/MainAPI/orderManagementApi', () => ({ orderManagementApi: { remoteBranches: mocks.branches, options: mocks.options } }))
+vi.mock('@/services/MainAPI/reservationDepositApi', () => ({ reservationDepositApi: { updateAmount: mocks.receiptUpdate, remove: mocks.receiptRemove } }))
 vi.mock('@/services/MainAPI/bankPaymentApi', () => ({ bankPaymentApi: { createBankPayment: mocks.payment } }))
 vi.mock('@/composables/useToast', () => ({ useToast: () => ({ success: vi.fn(), error: mocks.toast }) }))
 vi.mock('@/composables/useOrderPermissions', () => ({ useOrderPermissions: () => ({
@@ -332,4 +334,56 @@ describe('remote order workspaces', () => {
         expect(wrapper.findComponent(ReservationsTable).props('reservations')).toEqual([updated])
     })
 
+})
+
+
+describe('receipt correction refresh', () => {
+    it.each(['edit', 'remove'] as const)('refreshes linked payments and cash after %s', async action => {
+        const deposit = { id: 91, orderId: local.id, amount: 10000, isEffective: true, cashAppliedToOrder: true }
+        const before = { ...local, status: 'ready', reservedFor: local.createdAt, totalDeposited: 10000,
+            paidInStoreCash: true, paidInStoreCashAmount: 10000, reservationDeposits: [deposit] }
+        const after = { ...before, managementVersion: 2,
+            totalDeposited: action === 'edit' ? 5000 : 0,
+            paidInStoreCash: action === 'edit', paidInStoreCashAmount: action === 'edit' ? 5000 : null,
+            reservationDeposits: action === 'edit' ? [{ ...deposit, amount: 5000 }] : [] }
+        mocks.search.mockResolvedValueOnce(paged([before])).mockResolvedValue(paged([after]))
+        mocks.receiptUpdate.mockResolvedValue({ ...deposit, amount: 5000 })
+        mocks.receiptRemove.mockResolvedValue(undefined)
+        mountView(); await flushPromises()
+        wrapper.findComponent(OrdersTable).vm.$emit(`${action}-reservation-deposit`, before, deposit)
+        await flushPromises()
+        if (action === 'edit') {
+            const input = wrapper.findAllComponents(BaseInput).find(input => input.attributes('placeholder') === 'Monto')!
+            input.vm.$emit('update:modelValue', 5000)
+            await flushPromises()
+        }
+        const label = action === 'edit' ? 'Guardar' : 'Eliminar'
+        await wrapper.findAll('button').find(button => button.text() === label)!.trigger('click')
+        await flushPromises()
+        if (action === 'edit') expect(mocks.receiptUpdate).toHaveBeenCalledWith(91, 5000, before)
+        else expect(mocks.receiptRemove).toHaveBeenCalledWith(91, before)
+        expect(wrapper.findComponent(OrdersTable).props('orders')).toEqual([after])
+        expect(mocks.search).toHaveBeenCalledTimes(2)
+    })
+})
+
+
+it('limits receipt edits by all existing cash, bank and app coverage without double counting', async () => {
+    const deposit = { id: 91, orderId: local.id, amount: 10000, isEffective: false, appId: 301 }
+    const mixed = { ...local, total: 50000, reservedFor: local.createdAt, totalDeposited: 10000,
+        paidInStoreCash: true, paidInStoreCashAmount: 5000,
+        reservationDeposits: [deposit], bankPayments: [{ id: 92, amount: 15000 }],
+        appPayments: [{ id: 93, amount: 10000, sourceReservationDepositId: 91 }] }
+    mocks.search.mockResolvedValue(paged([mixed]))
+    mountView(); await flushPromises()
+    wrapper.findComponent(OrdersTable).vm.$emit('edit-reservation-deposit', mixed, deposit)
+    await flushPromises()
+    const input = wrapper.findAllComponents(BaseInput).find(input => input.attributes('placeholder') === 'Monto')!
+    expect(input.props('max')).toBe(30000)
+    input.vm.$emit('update:modelValue', 30001)
+    await flushPromises()
+    await wrapper.findAll('button').find(button => button.text() === 'Guardar')!.trigger('click')
+    await flushPromises()
+    expect(mocks.receiptUpdate).not.toHaveBeenCalled()
+    expect(mocks.toast).toHaveBeenCalled()
 })
