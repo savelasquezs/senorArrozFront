@@ -30,6 +30,12 @@ export async function findCustomerOrdersOnSameBusinessDate(
     input: CustomerOrderDateConflictInput,
 ): Promise<CustomerOrderDateConflictItem[]> {
     const targetYmd = defaultBusinessCalendar.formatYmd(input.targetDate)
+    // SearchOrders applies Colombia-day range to CreatedAt OR ReservedFor.
+    // That includes every CreatedAt match, so we can safely narrow this check.
+    // PrepareAt has no equivalent server-side range: keep its full history scan.
+    const createdOnTargetDay = input.compareByPrepareAt
+        ? {}
+        : { fromDate: targetYmd, toDate: targetYmd }
     const pageSize = 150
     let page = 1
     let totalPages = 1
@@ -48,6 +54,7 @@ export async function findCustomerOrdersOnSameBusinessDate(
             type: null,
             status: null,
             customerId: input.customerId,
+            ...createdOnTargetDay,
         })
 
         const response = await orderApi.searchOrders(body)
