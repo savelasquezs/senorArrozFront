@@ -110,6 +110,8 @@ interface Props {
     open: boolean
     order: OrderListItem
     deleteReservationAssociatedPaymentsConfirmed?: boolean
+    /** Tipo elegido, pero aún no persistido; se guarda junto al cliente/dirección/tarifa. */
+    pendingOrderType?: Order['type'] | null
 }
 
 const props = defineProps<Props>()
@@ -190,7 +192,7 @@ const canSave = computed(() => {
     const hasDeliveryFeeChange =
         hasDelivery.value && Math.round(Number(deliveryFee.value)) !== prevFee
 
-    return hasCustomerChange || hasAddressChange || hasGuestNameChange || hasDeliveryFeeChange
+    return !!props.pendingOrderType || hasCustomerChange || hasAddressChange || hasGuestNameChange || hasDeliveryFeeChange
 })
 
 const guestNameError = computed(() => {
@@ -323,6 +325,10 @@ const saveOrderChanges = async (deleteReservationAssociatedPayments: boolean) =>
     saving.value = true
     try {
         const updateData: Record<string, unknown> = {}
+
+        // El tipo debe persistirse en la MISMA petición que la dirección y la tarifa.
+        // De lo contrario el backend todavía considera el pedido como "En el local".
+        if (props.pendingOrderType) updateData.type = props.pendingOrderType
 
         if (selectedCustomerId.value !== props.order.customerId) {
             updateData.customerId = selectedCustomerId.value

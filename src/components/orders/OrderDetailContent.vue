@@ -473,6 +473,7 @@
 		v-if="showEditCustomerModal && order"
 		:open="showEditCustomerModal"
 		:order="order"
+		:pending-order-type="pendingOrderType"
 		:delete-reservation-associated-payments-confirmed="
 			pendingDeleteReservationAssociations
 		"
@@ -2031,32 +2032,14 @@ const handleCustomerUpdated = async (
 	const orderAny = updatedOrder as any;
 	const snapshot = paymentSnapshotBefore ?? captureOrderPaymentSnapshot();
 
-	// Si había un cambio de tipo pendiente, guardarlo junto con los datos del cliente
+	// El modal ya guardó tipo + cliente + dirección + tarifa en una única petición.
+	// No volver a enviar la actualización: el segundo PATCH puede duplicar efectos.
 	if (pendingOrderType.value) {
-		try {
-			// ✅ Enviar tipo + datos del cliente en una sola petición
-			const finalUpdate = await ordersDataStore.update(order.value!.id, {
-				type: pendingOrderType.value,
-				customerId: orderAny.customerId,
-				addressId: orderAny.addressId,
-				guestName: orderAny.guestName,
-				deliveryFee: orderAny.deliveryFee,
-				...(pendingDeleteReservationAssociations.value
-					? { deleteReservationAssociatedPayments: true }
-					: {}),
-			});
-
-			// Actualización optimista con la respuesta del backend
-			updateOrderCustomer(finalUpdate);
-
-			// Limpiar estado temporal
-			pendingOrderType.value = null;
-			originalOrderType.value = null;
-			pendingDeleteReservationAssociations.value = false;
-			await promptBankSyncIfNeeded(snapshot);
-		} catch (err: any) {
-			error('Error al actualizar pedido', err.message);
-		}
+		updateOrderCustomer(orderAny);
+		pendingOrderType.value = null;
+		originalOrderType.value = null;
+		pendingDeleteReservationAssociations.value = false;
+		await promptBankSyncIfNeeded(snapshot);
 	} else {
 		// Actualización normal (sin cambio de tipo) - usar handler unificado
 		handleModalUpdated({
