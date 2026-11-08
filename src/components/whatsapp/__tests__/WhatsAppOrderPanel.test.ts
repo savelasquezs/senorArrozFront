@@ -37,7 +37,7 @@ beforeEach(() => {
   setActivePinia(pinia)
   deps.stores.clear()
   deps.error = ''
-  const order = { id: 501, type: 'delivery', customerName: 'Cliente', total: 26000, deliveryFee: 6000, addressDescription: 'Calle de prueba',
+  const order = { id: 501, type: 'delivery', customerName: 'Cliente', total: 26000, deliveryFee: 6000, addressId: 31, addressDescription: 'Calle de prueba',
     orderDetails: [{ productId: 88, productName: 'Arroz', quantity: 2, unitPrice: 10000, discount: 0, notes: 'Sin cebolla' }] }
   deps.create.mockReset().mockResolvedValue(order)
   deps.getById.mockReset().mockResolvedValue(order)
@@ -146,5 +146,20 @@ it('keeps the confirmed order when sending fails and retries only the WhatsApp m
   expect(deps.create).toHaveBeenCalledTimes(1)
   expect(deps.send).toHaveBeenCalledTimes(2)
   expect(wrapper.text()).toContain('Confirmación enviada por WhatsApp.')
+  wrapper.unmount()
+})
+
+it.each([{ addressId: 31, label: 'Entrega programada:' }, { addressId: undefined, label: 'Recogida programada:' }])('confirms scheduled orders in Colombia: $label', async ({ addressId, label }) => {
+  const order = await deps.getById()
+  deps.create.mockResolvedValueOnce({ ...order, type: 'reservation', addressId, reservedFor: '2026-11-11T19:00:00Z' })
+  const wrapper = panel()
+  await flushPromises()
+  await wrapper.get('button').trigger('click')
+  await flushPromises()
+  const message = deps.send.mock.calls[0]![1]
+  expect(message).toContain(label)
+  if (!addressId) { expect(message).not.toContain('Dirección:'); expect(message).not.toContain('Domicilio:') }
+  expect(message).toContain('11 de noviembre de 2026')
+  expect(message).not.toContain('Tiempo estimado:')
   wrapper.unmount()
 })
