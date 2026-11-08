@@ -631,3 +631,12 @@ La disponibilidad del POS usa la sucursal operativa del borrador. La consulta fo
 ### Abonos iniciales de reservas
 
 El sidebar conserva sus medios de pago y envía una sola creación idempotente. Si el tipo efectivo enviado es reserva, el backend registra los importes recibidos como abonos y devuelve el historial. El saldo no marcado como recibido sigue pendiente. `sourceReservationDepositId` identifica copias operativas de banco/app; `cashAppliedToOrder` evita duplicar el efectivo. La factura y el cobro cuentan cada abono una sola vez.
+
+## Pedidos completos desde WhatsApp
+
+- El chat reutiliza `OrderSidebar`, catálogo, cliente, dirección, sucursal destino, beneficios, horarios, pagos y facturación del POS. Confirmar y gestionar el pedido conservan la vista del chat.
+- Al crear el pedido se envía su confirmación por la misma conversación con los valores guardados por el servidor. Si el mensaje falla, se conserva el pedido y se permite revisar el chat y reenviar solo el mensaje.
+- Cada conversación conserva su borrador local por usuario; los borradores del POS permanecen independientes. Un reintento conserva `posCreationKey` y un pedido confirmado exige iniciar explícitamente otro pedido.
+- Una línea central sin destino exige seleccionar la sucursal que prepara. La línea, la sucursal del asesor y el destino del pedido permanecen independientes. Los cambios del motor de IA siguen en el experimento.
+- El cajero puede editar la tarifa de domicilio de pedidos no entregados, incluidos los que van en camino; no puede hacerlo en pedidos entregados, cancelados, pendientes de pago en línea ni de Rappi.
+- Los regalos manuales siguen reservados a Admin/Superadmin, con motivo y auditoría. El selector usa el catálogo compartido del restaurante y permite agregar un regalo a un pedido sin beneficio; impide repetir una línea gratuita ya presente.

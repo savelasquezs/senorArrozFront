@@ -90,7 +90,7 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from 'vue'
 import { CheckIcon, PencilIcon, PlusIcon, XMarkIcon } from '@heroicons/vue/24/outline'
-import { useOrdersDraftsStore } from '@/store/ordersDrafts'
+import { useOrderEditorStore as useOrdersDraftsStore } from '@/composables/useOrderEditor'
 import { useOrderPayments } from '@/composables/useOrderPayments'
 import { formatCurrency } from '@/composables/useFormatting'
 import { orderCashToCollect, sumOrderNonCashPayments } from '@/utils/orderCashToCollect'

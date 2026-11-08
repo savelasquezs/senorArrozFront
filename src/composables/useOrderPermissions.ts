@@ -58,14 +58,15 @@ export function useOrderPermissions() {
     }
 
     /**
-     * Tarifa de domicilio en detalle: delivery y reservas con dirección, solo Admin y Superadmin.
+     * Tarifa de domicilio en detalle: cajero hasta la entrega; administradores conservan correcciones históricas.
      * Mismas reglas de “mismo día” que canEditOrder para pedidos entregados.
      */
     const canEditDeliveryFee = (order: OrderListItem | OrderDetailView): boolean => {
         if (order.externalFulfillmentProvider === 'rappi') return false
         const role = authStore.userRole
-        if (role !== 'Admin' && role !== 'Superadmin') return false
         if (!hasOrderDelivery(order)) return false
+        if (role === 'Cashier') return !['delivered', 'cancelled', 'awaiting_payment'].includes(order.status)
+        if (role !== 'Admin' && role !== 'Superadmin') return false
         if (order.status === 'cancelled') return role === 'Superadmin'
         if (role === 'Superadmin') return true
         if (order.status === 'delivered') return isSameDay(order.createdAt)

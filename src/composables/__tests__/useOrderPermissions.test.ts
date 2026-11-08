@@ -66,10 +66,25 @@ describe('useOrderPermissions — canEditDeliveryFee', () => {
         expect(canEditDeliveryFee(baseOrder({ type: 'onsite' }))).toBe(false)
     })
 
-    it.each([UserRole.CASHIER, UserRole.KITCHEN, UserRole.DELIVERYMAN])('mantiene restricción de %s en detalle', role => {
+    it.each([UserRole.KITCHEN, UserRole.DELIVERYMAN])('mantiene restricción de %s en detalle', role => {
         const auth = useAuthStore()
         auth.user = { ...auth.user!, role }
         expect(useOrderPermissions().canEditDeliveryFee(baseOrder({ addressId: 12 }))).toBe(false)
+    })
+
+    it.each(['taken', 'in_preparation', 'ready', 'on_the_way'] as const)('permite al cajero editar domicilio antes de entregar: %s', status => {
+        const auth = useAuthStore()
+        auth.user = { ...auth.user!, role: UserRole.CASHIER }
+        const { canEditDeliveryFee } = useOrderPermissions()
+        expect(canEditDeliveryFee(baseOrder({ type: 'delivery', status }))).toBe(true)
+        expect(canEditDeliveryFee(baseOrder({ addressId: 12, status }))).toBe(true)
+        expect(canEditDeliveryFee(baseOrder({ status }))).toBe(false)
+    })
+
+    it.each(['delivered', 'cancelled', 'awaiting_payment'] as const)('impide al cajero cambiar domicilio en %s', status => {
+        const auth = useAuthStore()
+        auth.user = { ...auth.user!, role: UserRole.CASHIER }
+        expect(useOrderPermissions().canEditDeliveryFee(baseOrder({ type: 'delivery', status, createdAt: new Date().toISOString() }))).toBe(false)
     })
 
     it('conserva restricciones de integración, cancelación e históricos', () => {
@@ -329,7 +344,7 @@ describe('useOrderPermissions - ready a in_preparation', () => {
         expect(getAllowedStatusTransitions('ready')).toContain('in_preparation')
     })
 
-    it.each([UserRole.CASHIER, UserRole.KITCHEN, UserRole.DELIVERYMAN])(
+    it.each([UserRole.KITCHEN, UserRole.DELIVERYMAN])(
         'no permite el retroceso al rol %s',
         (role) => {
             const auth = useAuthStore()

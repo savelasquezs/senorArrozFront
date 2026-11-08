@@ -90,12 +90,17 @@
         </div>
       </div>
 
-      <div
-        v-else
-        class="relative flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-[340px_minmax(0,1fr)]"
-        :class="selectedConversation && !contextPanelCollapsed ? 'xl:grid-cols-[340px_minmax(0,1fr)_360px]' : ''"
-      >
-        <aside class="min-h-0 border-r border-gray-200 bg-white flex flex-col">
+      <div v-else class="flex min-h-0 flex-1 flex-col">
+        <nav class="flex shrink-0 gap-2 border-b bg-white px-3 py-2 xl:hidden" aria-label="Vista de atención">
+          <BaseButton size="sm" variant="outline" @click="mobilePane = 'inbox'">Conversaciones</BaseButton>
+          <BaseButton size="sm" variant="outline" :disabled="!selectedConversation" @click="mobilePane = 'chat'">Chat</BaseButton>
+          <BaseButton size="sm" variant="outline" :disabled="!selectedConversation" @click="mobilePane = 'order'; contextPanelCollapsed = false">Pedido</BaseButton>
+        </nav>
+        <div ref="columnsContainer" class="whatsapp-columns relative grid min-h-0 flex-1 grid-cols-1"
+          :class="{ 'with-order': selectedConversation && !contextPanelCollapsed }"
+          :style="{ '--inbox-width': `${leftWidth}px`, '--order-width': `${rightWidth}px` }">
+        <aside class="relative min-h-0 border-r border-gray-200 bg-white flex flex-col" :class="{ 'max-xl:hidden': mobilePane !== 'inbox' }">
+          <div role="separator" tabindex="0" aria-label="Ancho de conversaciones" aria-orientation="vertical" :aria-valuenow="leftWidth" class="absolute -right-1 top-0 z-10 hidden h-full w-2 cursor-col-resize touch-none xl:block" @pointerdown="resize($event, 'left')" @keydown.left.prevent="step('left', -20)" @keydown.right.prevent="step('left', 20)" />
           <div class="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
             <span class="text-sm font-medium text-gray-700">Conversaciones</span>
             <BaseButton variant="ghost" size="sm" :loading="whatsappStore.isLoadingConversations" @click="reloadConversations">
@@ -150,7 +155,7 @@
           </WhatsAppInboxTabs>
         </aside>
 
-        <section class="min-h-0 flex flex-col bg-gray-50">
+        <section class="min-h-0 flex flex-col bg-gray-50" :class="{ 'max-xl:hidden': mobilePane !== 'chat' }">
           <div v-if="selectedConversation" class="border-b border-gray-200 bg-white px-4 py-3 flex items-start justify-between gap-3">
             <div>
             <p class="font-semibold text-gray-900">{{ conversationTitle(selectedConversation) }}</p>
@@ -198,7 +203,7 @@
               </BaseButton>
               <BaseButton v-if="selectedConversation.attentionMode !== 'closed'" variant="danger" size="sm" :loading="changingAttention" @click="changeAttention('close')">Cerrar conversación</BaseButton>
               <BaseButton v-else size="sm" :loading="changingAttention" @click="changeAttention('reopen')">Reabrir conversación</BaseButton>
-              <BaseButton variant="ghost" size="sm" @click="contextPanelCollapsed = !contextPanelCollapsed">{{ contextPanelCollapsed ? 'Abrir pedido' : 'Contraer' }}</BaseButton>
+              <BaseButton variant="ghost" size="sm" @click="contextPanelCollapsed = !contextPanelCollapsed; mobilePane = contextPanelCollapsed ? 'chat' : 'order'">{{ contextPanelCollapsed ? 'Abrir pedido' : 'Contraer' }}</BaseButton>
             </div>
           </div>
 
@@ -372,18 +377,23 @@
           v-if="selectedConversation && contextPanelCollapsed"
           type="button"
           class="absolute right-0 top-1/2 z-10 -translate-y-1/2 rounded-l-lg border border-emerald-200 bg-emerald-600 px-3 py-4 text-sm font-medium text-white shadow-lg hover:bg-emerald-700"
-          @click="contextPanelCollapsed = false"
+          @click="contextPanelCollapsed = false; mobilePane = 'order'"
         >
           Pedido
         </button>
 
-        <aside v-if="selectedConversation && !contextPanelCollapsed" class="min-h-0 border-l border-gray-200 bg-white flex flex-col">
+        <aside v-if="selectedConversation" v-show="!contextPanelCollapsed" data-test="whatsapp-order-column" class="relative min-h-0 border-l border-gray-200 bg-white flex flex-col" :class="{ 'max-xl:hidden': mobilePane !== 'order' }">
+          <div role="separator" tabindex="0" aria-label="Ancho del pedido" aria-orientation="vertical" :aria-valuenow="rightWidth" class="absolute -left-1 top-0 z-10 hidden h-full w-2 cursor-col-resize touch-none xl:block" @pointerdown="resize($event, 'right')" @keydown.left.prevent="step('right', 20)" @keydown.right.prevent="step('right', -20)" />
           <div class="border-b border-gray-100 px-4 py-3">
-            <p class="text-sm font-semibold text-gray-900">Contexto del pedido</p>
+            <p class="text-sm font-semibold text-gray-900">Pedido</p>
             <p class="mt-0.5 text-xs text-gray-500">{{ conversationIdentityLabel(selectedConversation) }}</p>
           </div>
 
-          <div class="flex-1 min-h-0 overflow-y-auto p-4 space-y-4">
+          <WhatsAppOrderPanel v-if="isManualOrderContext && selectedCustomer && !contextLoading"
+            :key="`${authStore.user?.id}:${selectedConversation.id}`"
+            class="min-h-0 flex-1" :conversation="selectedConversation" :customer="selectedCustomer"
+            :address="selectedAddress" :initial-draft="aiOrderDraft" />
+          <div v-else class="flex-1 min-h-0 overflow-y-auto p-4 space-y-4">
             <div v-if="contextLoading">
               <BaseLoading text="Cargando cliente..." />
             </div>
@@ -517,6 +527,7 @@
             </template>
           </div>
         </aside>
+        </div>
       </div>
 
       <BaseDialog v-model="showQuickRepliesModal" title="Respuestas rápidas" size="4xl">
@@ -679,7 +690,8 @@ import WhatsAppAiStatusStrip from '@/components/whatsapp/WhatsAppAiStatusStrip.v
 import WhatsAppInboxTabs from '@/components/whatsapp/WhatsAppInboxTabs.vue'
 import { useWhatsAppStore } from '@/store/whatsapp'
 import { useAuthStore } from '@/store/auth'
-import { useOrdersDraftsStore } from '@/store/ordersDrafts'
+import WhatsAppOrderPanel from '@/components/whatsapp/WhatsAppOrderPanel.vue'
+import { useResizableColumns } from '@/composables/useResizableColumns'
 import { customerApi } from '@/services/MainAPI/customerApi'
 import { whatsappApi } from '@/services/MainAPI/whatsappApi'
 import { useToast } from '@/composables/useToast'
@@ -714,7 +726,6 @@ import { buildWhatsAppInboxSections, whatsappConversationBranchLabel } from '@/u
 
 const whatsappStore = useWhatsAppStore()
 const authStore = useAuthStore()
-const ordersStore = useOrdersDraftsStore()
 const router = useRouter()
 const route = useRoute()
 const { success, error: showError } = useToast()
@@ -749,6 +760,9 @@ const showCustomerSelector = ref(false)
 const takingOrder = ref(false)
 const sendingAddressConfirmation = ref(false)
 const contextPanelCollapsed = ref(false)
+const mobilePane = ref<'inbox' | 'chat' | 'order'>('inbox')
+const columnsContainer = ref<HTMLElement>()
+const { leftWidth, rightWidth, resize, step } = useResizableColumns(columnsContainer)
 const showQuickRepliesModal = ref(false)
 const editingQuickReply = ref<WhatsAppQuickReply | null>(null)
 const quickReplySaving = ref(false)
@@ -1167,6 +1181,7 @@ function startRealtimeFallback() {
 }
 
 async function selectConversation(conversation: WhatsAppConversation) {
+  mobilePane.value = 'chat'
   const selection = ++conversationSelection
   selectedConversation.value = conversation
   showCustomerSelector.value = false
@@ -1236,8 +1251,11 @@ async function loadConversationContext(conversation: WhatsAppConversation) {
     contextLoading.value = true
     addressSelectionNote.value = ''
     const mode = whatsappOrderContextMode(conversation.attentionMode)
-    const loadedDraft = mode === 'ai'
-      ? await loadAiOrderDraft(conversation.id, isCurrent)
+    const loadedDraft = mode === 'ai' || mode === 'manual'
+      ? await loadAiOrderDraft(conversation.id, isCurrent).catch(cause => {
+          if (mode === 'ai') throw cause
+          return null
+        })
       : null
     if (!isCurrent()) return
     if (!conversation.customerId) return
@@ -1254,7 +1272,7 @@ async function loadConversationContext(conversation: WhatsAppConversation) {
     }
 
     selectedCustomer.value = { ...customer, addresses }
-    selectedAddress.value = mode === 'ai'
+    selectedAddress.value = loadedDraft?.selectedAddressId || mode === 'ai'
       ? loadedDraft?.selectedAddressId
         ? addresses.find(a => a.id === loadedDraft.selectedAddressId) ?? null
         : null
@@ -1559,35 +1577,12 @@ async function createCustomerFromConversation(data: CustomerFormData) {
 }
 
 async function takeOrderFromWhatsApp() {
-  if (!selectedConversation.value || !selectedCustomer.value || !canTakeOrderFromWhatsApp.value) return
+  if (!selectedConversation.value) return
+  takingOrder.value = true
   try {
-    takingOrder.value = true
-    const draftOrder = isManualOrderContext.value
-      ? selectedAddress.value
-        ? ordersStore.createOrReuseWhatsAppDraft({
-            mode: 'manual',
-            conversationId: selectedConversation.value.id,
-            branchId: selectedConversation.value.operationalBranchId ?? selectedConversation.value.branchId,
-            customer: selectedCustomer.value,
-            address: selectedAddress.value,
-          })
-        : null
-      : isAiOrderContext.value && aiOrderDraft.value
-        ? ordersStore.createOrReuseWhatsAppDraft({
-            mode: 'ai',
-            conversationId: selectedConversation.value.id,
-            branchId: selectedConversation.value.operationalBranchId ?? selectedConversation.value.branchId,
-            customer: selectedCustomer.value,
-            address: selectedAddress.value,
-            draft: aiOrderDraft.value,
-          })
-        : null
-    if (!draftOrder) {
-      showError('Pedido', ordersStore.error || 'No se pudo crear el borrador.')
-      return
-    }
-    localStorage.setItem('senor-arroz-whatsapp-conversation-tab', String(selectedConversation.value.id))
-    await router.push({ name: 'OrdersNew' })
+    await changeAttention('take')
+    contextPanelCollapsed.value = false
+    mobilePane.value = 'order'
   } finally {
     takingOrder.value = false
   }
@@ -1886,3 +1881,10 @@ watch([isPageVisible, isUserActive], ([visible, active], [wasVisible, wasActive]
   }
 })
 </script>
+
+<style scoped>
+@media (min-width: 1280px) {
+  .whatsapp-columns { grid-template-columns: var(--inbox-width) minmax(260px, 1fr); }
+  .whatsapp-columns.with-order { grid-template-columns: var(--inbox-width) minmax(260px, 1fr) var(--order-width); }
+}
+</style>

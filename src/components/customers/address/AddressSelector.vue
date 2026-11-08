@@ -135,7 +135,7 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
 import { useCustomersStore } from '@/store/customers'
-import { useOrdersDraftsStore } from '@/store/ordersDrafts'
+import { useOrderEditorStore as useOrdersDraftsStore } from '@/composables/useOrderEditor'
 import { useOrdersDataStore } from '@/store/ordersData'
 import { useBranchContextStore } from '@/store/branchContext'
 import { useAuthStore } from '@/store/auth'

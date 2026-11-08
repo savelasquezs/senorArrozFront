@@ -1,5 +1,5 @@
 // src/composables/useOrderItems.ts
-import { useOrdersDraftsStore } from '@/store/ordersDrafts'
+import { useOrderEditorStore as useOrdersDraftsStore } from '@/composables/useOrderEditor'
 import { useOrderTabs } from '@/composables/useOrderTabs'
 import { useOrderBenefitResolver } from '@/composables/useOrderBenefitResolver'
 import type { Product, OrderItem } from '@/types/order'

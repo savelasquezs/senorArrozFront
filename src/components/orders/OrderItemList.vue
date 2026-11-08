@@ -74,7 +74,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
-import { useOrdersDraftsStore } from '@/store/ordersDrafts'
+import { useOrderEditorStore as useOrdersDraftsStore } from '@/composables/useOrderEditor'
 import { useBranchPosSettingsStore } from '@/store/branchPosSettings'
 import { useOrderItems } from '@/composables/useOrderItems'
 import { useFormatting } from '@/composables/useFormatting'

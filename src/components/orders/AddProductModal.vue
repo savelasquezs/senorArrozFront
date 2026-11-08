@@ -44,7 +44,7 @@
                         <BaseButton variant="secondary" size="sm" @click="requestClose">Cancelar</BaseButton>
                         <BaseButton variant="primary" size="sm" class="flex-1" :disabled="!canApply" @click="applySelection">Añadir a la edición</BaseButton>
                     </div>
-                    <p class="text-xs text-gray-500">El pedido se guarda al pulsar «Guardar cambios» en el detalle.</p>
+                    <p class="text-xs text-gray-500">{{ saveHint ?? 'El pedido se guarda al pulsar «Guardar cambios» en el detalle.' }}</p>
                 </footer>
             </section>
         </div>
@@ -64,7 +64,7 @@ import { useFormatting } from '@/composables/useFormatting'
 import { useOrderProductSelection } from '@/composables/useOrderProductSelection'
 import type { OrderProductAddition } from '@/types/order'
 
-const props = defineProps<{ open: boolean; existingProductIds: number[]; branchId?: number | null; disabled?: boolean }>()
+const props = defineProps<{ open: boolean; existingProductIds: number[]; branchId?: number | null; disabled?: boolean; saveHint?: string }>()
 const emit = defineEmits<{ close: []; 'products-added': [products: OrderProductAddition[]] }>()
 const productsStore = useProductsStore()
 const categoriesStore = useProductCategoriesStore()

@@ -6,10 +6,10 @@ import OrderDetailContent from '../OrderDetailContent.vue'
 import { useOrderManagementUpdates } from '@/composables/useOrderManagementUpdates'
 import { orderApi } from '@/services/MainAPI/orderApi'
 
-const deps = vi.hoisted(() => ({ store: {} as Record<string, any>, update: vi.fn(), options: vi.fn() }))
+const deps = vi.hoisted(() => ({ store: {} as Record<string, any>, update: vi.fn(), options: vi.fn(), catalog: [] as any[] }))
 vi.mock('@/store/ordersData', () => ({ useOrdersDataStore: () => deps.store }))
 vi.mock('@/store/auth', () => ({ useAuthStore: () => ({ userRole: 'Admin', isAdmin: true, branchId: 1 }) }))
-vi.mock('@/store/products', () => ({ useProductsStore: () => ({ currentProducts: [], ensureCatalogLoaded: vi.fn() }) }))
+vi.mock('@/store/products', () => ({ useProductsStore: () => ({ currentProducts: [], get catalogProducts() { return deps.catalog }, ensureCatalogLoaded: vi.fn().mockResolvedValue(undefined) }) }))
 vi.mock('@/store/branchContext', () => ({ useBranchContextStore: () => ({ selectedBranchId: 1 }) }))
 vi.mock('@/services/MainAPI/orderManagementApi', () => ({ orderManagementApi: { options: deps.options } }))
 vi.mock('@/composables/useOrderManagementUpdates', () => ({ useOrderManagementUpdates: vi.fn() }))
@@ -38,6 +38,7 @@ function mountDetail() {
 
 describe('OrderDetailContent presentation and reservation delivery fee', () => {
     beforeEach(() => {
+        deps.catalog = []
         deps.options.mockResolvedValue({ banks: [], apps: [], deliverymen: [], maxFreeDeliveryDiscount: 0 })
         deps.update.mockReset().mockImplementation(async (_id, payload) => {
             deps.store.current = { ...deps.store.current, ...payload, total: payload.deliveryFee === undefined ? deps.store.current.total : 85400 + payload.deliveryFee }
@@ -47,6 +48,40 @@ describe('OrderDetailContent presentation and reservation delivery fee', () => {
         vi.spyOn(orderApi, 'fetchDetail').mockResolvedValue(fixture())
     })
     afterEach(() => vi.restoreAllMocks())
+
+    it('adds a gift from the shared catalog to an order that has never received one', async () => {
+        deps.catalog = [{ id: 90, name: 'Papas', price: 2000, active: true, categoryName: 'Regalos', branchId: 2 }]
+        const wrapper = mountDetail()
+        await flushPromises()
+        await wrapper.get('select[aria-label="Tipo de beneficio"]').setValue('GiftProduct')
+        await wrapper.get('input[placeholder="Motivo obligatorio del beneficio"]').setValue('Cortesia')
+        const select = wrapper.findAll('select').find(select => select.find('option[value="90"]').exists())!
+        await select.setValue('90')
+        await wrapper.findAll('button').find(button => button.text() === 'Regalar producto')!.trigger('click')
+        await flushPromises()
+        expect(deps.update).toHaveBeenCalledWith(81, expect.objectContaining({
+            appliedBenefitType: 'Manual', appliedBenefitRewardType: 'GiftProduct',
+            manualBenefitGiftProductId: 90, manualBenefitReason: 'Cortesia',
+            orderDetails: expect.arrayContaining([expect.objectContaining({ productId: 90, quantity: 1, unitPrice: 0 })]),
+        }))
+        expect(deps.store.current.total).toBe(105400)
+        wrapper.unmount()
+    })
+
+    it('rejects a second free line for a gift already present in the order', async () => {
+        deps.catalog = [{ id: 90, name: 'Papas', price: 2000, active: true, categoryName: 'Regalos', branchId: 2 }]
+        deps.store.current.orderDetails.push({ id: 2, productId: 90, productName: 'Papas', quantity: 1, unitPrice: 0, discount: 0, subtotal: 0 })
+        const wrapper = mountDetail()
+        await flushPromises()
+        await wrapper.get('select[aria-label="Tipo de beneficio"]').setValue('GiftProduct')
+        await wrapper.get('input[placeholder="Motivo obligatorio del beneficio"]').setValue('Cortesia')
+        await wrapper.findAll('select').find(select => select.find('option[value="90"]').exists())!.setValue('90')
+        await wrapper.findAll('button').find(button => button.text() === 'Regalar producto')!.trigger('click')
+        await flushPromises()
+        expect(wrapper.text()).toContain('Este producto ya figura gratis')
+        expect(deps.update).not.toHaveBeenCalled()
+        wrapper.unmount()
+    })
 
     it('preserves an open notes draft when returning to an unchanged order', async () => {
         deps.store.current = fixture({ notes: 'Nota original' })

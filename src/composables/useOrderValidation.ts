@@ -1,6 +1,6 @@
 // src/composables/useOrderValidation.ts
 import { computed, type ComputedRef } from 'vue'
-import { useOrdersDraftsStore } from '@/store/ordersDrafts'
+import { useOrderEditorStore as useOrdersDraftsStore } from '@/composables/useOrderEditor'
 import type { DraftOrder, ValidationResult } from '@/types/order'
 import { sumOrderNonCashPayments } from '@/utils/orderCashToCollect'
 
@@ -20,6 +20,8 @@ export function useOrderValidation(): UseOrderValidationReturn {
 
     const validateOrder = (order: DraftOrder): ValidationResult => {
         const errors: string[] = []
+
+        if (!order.branchId || order.branchId <= 0) errors.push('Selecciona la sucursal que prepara el pedido')
 
         // Validaciones comunes a todos los tipos
         if (order.orderItems.length === 0) {

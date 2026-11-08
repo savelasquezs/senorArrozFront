@@ -12,7 +12,7 @@ function page(path: string, name: string, component: RouteRecordSingleView['comp
   roles?: string[], requiresAuth = true): RouteRecordRaw {
   return { path, name, component, meta: { requiresAuth, requiresRole: roles, title,
     noCard: ['Dashboard', 'OrdersNew', 'OrderDetail', 'WhatsApp', 'WhatsAppTemplates'].includes(name),
-    hideQuickOrder: ['Dashboard', 'EmployeeLunches', 'EmployeeLeaves', 'EmployeeLeaveDetail', 'Inventario'].includes(name),
+    hideQuickOrder: ['Dashboard', 'WhatsApp', 'EmployeeLunches', 'EmployeeLeaves', 'EmployeeLeaveDetail', 'Inventario'].includes(name),
   } };
 }
 const routes: RouteRecordRaw[] = [

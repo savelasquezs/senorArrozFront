@@ -1,5 +1,5 @@
 // src/composables/useOrderPayments.ts
-import { useOrdersDraftsStore } from '@/store/ordersDrafts'
+import { useOrderEditorStore as useOrdersDraftsStore } from '@/composables/useOrderEditor'
 import type { OrderAppPayment, OrderBankPayment } from '@/types/order'
 
 export function useOrderPayments() {
