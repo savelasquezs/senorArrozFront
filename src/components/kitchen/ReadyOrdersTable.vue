@@ -50,7 +50,8 @@
                             {{ formatElapsedTime(order) }}
                         </td>
                         <td class="px-3 sm:px-4 md:px-6 py-3 sm:py-4 whitespace-nowrap">
-                            <BaseButton @click="$emit('reprint', order.id)" variant="outline" size="sm">
+                            <BaseButton @click="$emit('reprint', order.id)" variant="outline" size="sm"
+                                :loading="reprintingOrderIds?.has(order.id) ?? false">
                                 <span class="flex items-center gap-1 sm:gap-2">
                                     <PrinterIcon class="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                                     <span class="hidden sm:inline">Reimprimir</span>
@@ -91,6 +92,7 @@ interface Props {
     orders: OrderListItem[]
     orderItemsMap: Map<number, OrderDetailItem[]>
     canReturnToPreparation?: boolean
+    reprintingOrderIds?: ReadonlySet<number>
 }
 
 const props = defineProps<Props>()
