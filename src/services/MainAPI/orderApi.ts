@@ -1,5 +1,6 @@
 // src/services/MainAPI/orderApi.ts
 import { BaseApi } from './baseApi';
+import { normalizeOrderBenefits } from '@/helpers/orderBenefits';
 import { orderMutationConfig, type OrderMutationSnapshot } from './orderMutation';
 import type {
     PagedResult,
@@ -144,7 +145,7 @@ class OrderApi extends BaseApi {
 
     // 12. Obtener detalle completo del pedido
     async fetchDetail(id: number): Promise<OrderDetailView> {
-        return this.get<OrderDetailView>(`/orders/${id}/details`);
+        return normalizeOrderBenefits(await this.get<OrderDetailView>(`/orders/${id}/details`));
     }
 
     // 13. Actualizar pedido (datos básicos y productos)
