@@ -6,9 +6,9 @@ import OrderDetailContent from '../OrderDetailContent.vue'
 import { useOrderManagementUpdates } from '@/composables/useOrderManagementUpdates'
 import { orderApi } from '@/services/MainAPI/orderApi'
 
-const deps = vi.hoisted(() => ({ store: {} as Record<string, any>, update: vi.fn(), options: vi.fn(), catalog: [] as any[] }))
+const deps = vi.hoisted(() => ({ store: {} as Record<string, any>, update: vi.fn(), options: vi.fn(), catalog: [] as any[], role: 'Admin' }))
 vi.mock('@/store/ordersData', () => ({ useOrdersDataStore: () => deps.store }))
-vi.mock('@/store/auth', () => ({ useAuthStore: () => ({ userRole: 'Admin', isAdmin: true, branchId: 1 }) }))
+vi.mock('@/store/auth', () => ({ useAuthStore: () => ({ get userRole() { return deps.role }, get isAdmin() { return deps.role === 'Admin' }, get isCashier() { return deps.role === 'Cashier' }, branchId: 1 }) }))
 vi.mock('@/store/products', () => ({ useProductsStore: () => ({ currentProducts: [], get catalogProducts() { return deps.catalog }, ensureCatalogLoaded: vi.fn().mockResolvedValue(undefined) }) }))
 vi.mock('@/store/branchContext', () => ({ useBranchContextStore: () => ({ selectedBranchId: 1 }) }))
 vi.mock('@/services/MainAPI/orderManagementApi', () => ({ orderManagementApi: { options: deps.options } }))
@@ -38,6 +38,7 @@ function mountDetail() {
 
 describe('OrderDetailContent presentation and reservation delivery fee', () => {
     beforeEach(() => {
+        deps.role = 'Admin'
         deps.catalog = []
         deps.options.mockResolvedValue({ banks: [], apps: [], deliverymen: [], maxFreeDeliveryDiscount: 0 })
         deps.update.mockReset().mockImplementation(async (_id, payload) => {
@@ -49,10 +50,16 @@ describe('OrderDetailContent presentation and reservation delivery fee', () => {
     })
     afterEach(() => vi.restoreAllMocks())
 
-    it('adds a gift from the shared catalog to an order that has never received one', async () => {
+    it.each(['Admin', 'Cashier'])('%s adds a gift from the shared catalog to an order that has never received one', async role => {
+        deps.role = role
         deps.catalog = [{ id: 90, name: 'Papas', price: 2000, active: true, categoryName: 'Regalos', branchId: 2 }]
         const wrapper = mountDetail()
         await flushPromises()
+        if (role === 'Cashier') {
+            const choices = wrapper.get('select[aria-label="Tipo de beneficio"]').text()
+            expect(choices).not.toContain('Descuento porcentual')
+            expect(wrapper.find('option[value="FreeDelivery"]').exists()).toBe(false)
+        }
         await wrapper.get('select[aria-label="Tipo de beneficio"]').setValue('GiftProduct')
         await wrapper.get('input[placeholder="Motivo obligatorio del beneficio"]').setValue('Cortesia')
         const select = wrapper.findAll('select').find(select => select.find('option[value="90"]').exists())!

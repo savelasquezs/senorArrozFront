@@ -358,7 +358,7 @@
                         </template>
                         <template v-else>
                             <select v-model="detailBenefitChoice" class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm" aria-label="Tipo de beneficio">
-                                <option v-if="canGrantManualBenefit" value="GiftProduct">Producto gratis</option>
+                                <option v-if="canGrantManualGift" value="GiftProduct">Producto gratis</option>
                                 <option v-if="canGrantManualBenefit" value="PercentageDiscount">Descuento porcentual</option>
                                 <option v-if="canGrantManualBenefit && canGiftDetailDelivery" value="FreeDelivery">Domicilio gratis</option>
                                 <option value="DiscountCode">Código promocional</option>
@@ -373,7 +373,7 @@
                                 />
                                 <BaseButton variant="primary" size="sm" :loading="savingBenefit" :disabled="!detailDiscountCodeInput.trim() || savingBenefit" @click="applyDiscountCodeToDetail">Aplicar</BaseButton>
                             </div>
-                            <div v-if="canGrantManualBenefit && detailBenefitChoice !== 'DiscountCode'" class="space-y-2">
+                            <div v-if="(detailBenefitChoice === 'GiftProduct' ? canGrantManualGift : canGrantManualBenefit) && detailBenefitChoice !== 'DiscountCode'" class="space-y-2">
                                 <BaseInput v-model="detailManualBenefitReason" placeholder="Motivo obligatorio del beneficio" />
                                 <select v-if="detailBenefitChoice === 'GiftProduct'" v-model.number="detailManualGiftProductId" class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm">
                                     <option :value="null">Producto de la categoría Regalos</option>
@@ -819,6 +819,7 @@ const detailManualBenefitReason = ref('');
 const detailManualGiftProductId = ref<number | null>(null);
 const detailManualDiscountPercentage = ref<number>(10);
 const detailBenefitChoice = ref<'GiftProduct' | 'PercentageDiscount' | 'FreeDelivery' | 'DiscountCode'>('DiscountCode');
+const canGrantManualGift = computed(() => permissions.canGrantManualGift());
 const canGrantManualBenefit = computed(() => authStore.isAdmin || authStore.isSuperadmin);
 const canSelectAnyOrderStatus = computed(() => authStore.isAdmin || authStore.isSuperadmin);
 const detailGiftProducts = computed(() => productsStore.catalogProducts.filter((p) => p.active && p.categoryName.trim().toLocaleLowerCase() === 'regalos'));
@@ -1545,7 +1546,7 @@ async function loadOperationOptions() {
 }
 watch(() => order.value?.id, () => { void loadOperationOptions(); }, { immediate: true });
 onMounted(() => {
-    if (canGrantManualBenefit.value) void productsStore.ensureCatalogLoaded(order.value?.branchId).catch(() => { detailBenefitError.value = 'No se pudieron cargar los regalos. Reabre el pedido para reintentar.'; });
+    if (canGrantManualGift.value) void productsStore.ensureCatalogLoaded(order.value?.branchId).catch(() => { detailBenefitError.value = 'No se pudieron cargar los regalos. Reabre el pedido para reintentar.'; });
 });
 const isRemoteOrder = computed(() => {
     const workspace = authStore.isSuperadmin ? branchContext.selectedBranchId : authStore.branchId;

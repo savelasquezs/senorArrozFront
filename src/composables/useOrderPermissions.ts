@@ -9,6 +9,7 @@ import type { OrderDetailView } from '@/types/order'
  */
 export function useOrderPermissions() {
     const authStore = useAuthStore()
+    const canGrantManualGift = () => ['Admin', 'Superadmin', 'Cashier'].includes(authStore.userRole ?? '')
 
     /**
      * Verifica si el pedido fue creado el mismo día (hora local de Colombia)
@@ -364,6 +365,7 @@ export function useOrderPermissions() {
     }
 
     return {
+        canGrantManualGift,
         isSameDay,
         canEditOrder,
         canEditDeliveryFee,

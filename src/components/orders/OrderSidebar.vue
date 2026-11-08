@@ -128,8 +128,8 @@
                                 </div>
                                 <p v-if="discountCodeError" class="text-xs text-red-600">{{ discountCodeError }}</p>
                             </div>
-                            <div v-if="canGrantManualBenefit" class="space-y-2 border-t border-gray-100 pt-3">
-                                <label class="block text-xs font-medium text-gray-700">Regalo administrativo</label>
+                            <div v-if="canGrantManualGift" class="space-y-2 border-t border-gray-100 pt-3">
+                                <label class="block text-xs font-medium text-gray-700">Regalo de producto</label>
                                 <BaseInput v-model="manualBenefitReason" placeholder="Motivo obligatorio" />
                                 <select v-model.number="manualGiftProductId" class="w-full rounded-md border border-gray-300 px-3 py-2 text-xs">
                                     <option :value="null">Selecciona un producto de Regalos</option>
@@ -137,7 +137,7 @@
                                 </select>
                                 <div class="flex gap-2">
                                     <BaseButton variant="outline" size="sm" :disabled="!manualBenefitReason.trim() || !manualGiftProductId" @click="applyManualGift">Regalar producto</BaseButton>
-                                    <BaseButton v-if="canGiftDelivery" variant="outline" size="sm" :disabled="!manualBenefitReason.trim()" @click="applyManualDelivery">Regalar domicilio</BaseButton>
+                                    <BaseButton v-if="canGrantManualBenefit && canGiftDelivery" variant="outline" size="sm" :disabled="!manualBenefitReason.trim()" @click="applyManualDelivery">Regalar domicilio</BaseButton>
                                 </div>
                             </div>
                         </div>
@@ -330,6 +330,7 @@ import { useInvoiceResources } from '@/composables/useInvoiceResources'
 import type { BillingRecipient } from '@/types/electronicInvoicing'
 import { computed, defineAsyncComponent, ref, watch } from 'vue'
 import { useOrderEditorContext } from '@/composables/useOrderEditor'
+import { useOrderPermissions } from '@/composables/useOrderPermissions'
 import { generatePosCreationKey } from '@/utils/posCreationKey'
 import type { OrderProductAddition } from '@/types/order'
 const AddProductModal = defineAsyncComponent(() => import('./AddProductModal.vue'))
@@ -457,6 +458,8 @@ const hasAppliedBenefit = computed(() => {
     const type = currentOrder.value?.appliedBenefitType
     return !!type && type !== 'None'
 })
+const permissions = useOrderPermissions()
+const canGrantManualGift = computed(() => permissions.canGrantManualGift())
 const canGrantManualBenefit = computed(() => authStore.isAdmin || authStore.isSuperadmin)
 const giftProducts = computed(() => productsStore.catalogProducts.filter((p) => p.active && p.categoryName.trim().toLocaleLowerCase() === 'regalos'))
 const canGiftDelivery = computed(() => currentOrder.value?.type === 'delivery' || (currentOrder.value?.type === 'reservation' && currentOrder.value?.addressId != null))
@@ -588,7 +591,7 @@ async function removeDiscountCode() {
 
 function toggleDraftBenefitForm() {
     showDraftBenefitForm.value = !showDraftBenefitForm.value
-    if (showDraftBenefitForm.value && canGrantManualBenefit.value) void productsStore.ensureCatalogLoaded()
+    if (showDraftBenefitForm.value && canGrantManualGift.value) void productsStore.ensureCatalogLoaded(currentOrder.value?.branchId)
 }
 
 function applyManualGift() {
