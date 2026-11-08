@@ -1,5 +1,6 @@
+import { createOrderDraft } from '@/helpers/orderDraft'
 // src/composables/useOrderTabs.ts
-import { useOrdersDraftsStore } from '@/store/ordersDrafts'
+import { useOrderEditorStore as useOrdersDraftsStore } from '@/composables/useOrderEditor'
 import type { DraftOrder, OrderType } from '@/types/order'
 
 export function useOrderTabs() {
@@ -11,68 +12,7 @@ export function useOrderTabs() {
         const tabId = `tab-${Date.now()}-${store.nextTabNumber}`
         const tabName = `Pedido ${store.nextTabNumber}`
 
-        const newOrder: DraftOrder = {
-            tabId,
-            tabName,
-            workspaceBranchId: store.activeBranchId,
-            branchId: store.activeBranchId,
-            source: null,
-            whatsappConversationId: null,
-            type: 'delivery',
-            customerId: null,
-            customerName: null,
-            customerPhone: null,
-            guestName: null,
-            addressId: null,
-            addressDescription: null,
-            addressAdditionalInfo: null,
-            deliveryFee: 0,
-            freeDeliveryRequested: false,
-            reservedFor: null,
-            prepareAt: null,
-            isLater: false,
-            notes: '',
-            orderItems: [],
-            bankPayments: [],
-            appPayment: null,
-            subtotal: 0,
-            total: 0,
-            discountTotal: 0,
-            createdAt: new Date(),
-            updatedAt: new Date(),
-            paidInStoreCash: false,
-            selectedBenefitType: null,
-            appliedBenefitType: null,
-            appliedBenefitSourceId: null,
-            appliedBenefitCode: null,
-            appliedBenefitLabel: null,
-            appliedBenefitRewardType: null,
-            appliedBenefitAmount: null,
-            appliedBenefitSnapshot: null,
-            appliedDailyPromotionId: null,
-            appliedDailyPromotionType: null,
-            appliedDailyPromotionGiftProductId: null,
-            appliedDailyPromotionGiftProductName: null,
-            appliedDailyPromotionDiscountPercentage: null,
-            appliedDailyPromotionDiscountScope: null,
-            ignoredDailyPromotionId: null,
-            appliedLoyaltyStepId: null,
-            appliedLoyaltyStepIndex: null,
-            appliedLoyaltyRewardType: null,
-            appliedLoyaltyGiftProductId: null,
-            appliedLoyaltyGiftProductName: null,
-            appliedLoyaltyDiscountPercentage: null,
-            ignoredLoyaltyStepId: null,
-            discountCodeInput: '',
-            activeDiscountCode: null,
-            discountCodeError: null,
-            appliedDiscountCodeId: null,
-            appliedDiscountCodeCode: null,
-            appliedDiscountCodeType: null,
-            appliedDiscountCodeGiftProductId: null,
-            appliedDiscountCodeGiftProductName: null,
-            appliedDiscountCodeDiscountPercentage: null,
-        }
+        const newOrder = createOrderDraft(tabId, tabName, store.activeBranchId)
 
         store.draftOrders.set(tabId, newOrder)
         store.currentTabId = tabId

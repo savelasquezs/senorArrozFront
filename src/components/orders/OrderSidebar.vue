@@ -1,7 +1,7 @@
 <template>
-    <div class="order-sidebar bg-white border-l border-gray-200 h-full flex flex-col min-h-0">
+    <div class="order-sidebar bg-white border-l border-gray-200 h-full flex flex-col min-h-0" :class="{ 'order-sidebar--embedded': editor }">
         <!-- Header -->
-        <div class="px-2 py-1 border-b border-gray-200 flex-shrink-0">
+        <div v-if="!editor" class="px-2 py-1 border-b border-gray-200 flex-shrink-0">
             <!-- Order Tabs -->
             <OrderTabs />
         </div>
@@ -31,6 +31,7 @@
                     :error="guestNameTouched ? guestNameError : ''" @blur="guestNameTouched = true"
                     @update:model-value="value => updateGuestName(String(value || ''))" />
 
+                <BaseButton v-if="editor" size="sm" variant="outline" class="w-full" @click="handleAddProducts">Agregar productos</BaseButton>
                 <OrderItemList ref="itemList" compact :tab-id="currentTabId || ''" @add-products="handleAddProducts" />
                     <div
                         v-if="hasAppliedBenefit"
@@ -200,7 +201,7 @@
         </div>
         <footer v-if="currentOrder" class="shrink-0 border-t border-gray-200 bg-white px-3 py-3" data-test="sidebar-footer">
             <BaseButton v-if="currentOrder.whatsappConversationId" @click="sendWhatsAppConfirmation" variant="outline" size="sm"
-                class="mb-2 w-full" :loading="isSendingWhatsAppConfirmation">Enviar confirmación por WhatsApp</BaseButton>
+                class="mb-2 w-full" :loading="isSendingWhatsAppConfirmation">Enviar resumen previo por WhatsApp</BaseButton>
             <div class="flex items-center gap-2">
                 <div class="mr-auto min-w-0 tabular-nums">
                     <span class="block text-xs text-gray-500">Total · {{ currentOrder.orderItems.reduce((sum, item) => sum + item.quantity, 0) }} uds.</span>
@@ -217,10 +218,15 @@
                 <BaseButton @click="handleSubmitOrder" variant="primary" size="sm" class="h-10 shrink-0"
                     :loading="isSubmittingOrder || checkingInvoiceAvailability || isCheckingDuplicateOrderDate"
                     :disabled="submitButtonDisabled" :title="submitButtonTooltip">
-                    <PaperAirplaneIcon class="h-4 w-4" />Enviar Pedido
+                    <PaperAirplaneIcon class="h-4 w-4" />{{ editor ? 'Confirmar pedido' : 'Enviar Pedido' }}
                 </BaseButton>
             </div>
         </footer>
+        <p v-if="editor && orderErrors.length" class="px-3 py-2 text-xs text-amber-800" role="status">{{ orderErrors.join('. ') }}</p>
+        <AddProductModal v-if="editor && showProductModal" :open="showProductModal" :branch-id="currentOrder?.branchId"
+            save-hint="Los productos se guardan en el borrador. Confirma el pedido al terminar."
+            :existing-product-ids="currentOrder?.orderItems.map(item => item.productId) ?? []"
+            @close="showProductModal = false" @products-added="addSelectedProducts" />
         <OrderNoteDialog v-model="showNoteDialog" :notes="currentOrder?.notes" title="Notas del pedido"
             label="Indicaciones para preparar o entregar este pedido" :save="saveDraftNotes" />
 
@@ -322,7 +328,13 @@ import BillingRecipientAccess from '@/components/customers/BillingRecipientAcces
 import { billingRecipientComplete } from '@/composables/useBillingRecipients'
 import { useInvoiceResources } from '@/composables/useInvoiceResources'
 import type { BillingRecipient } from '@/types/electronicInvoicing'
-import { computed, ref, watch } from 'vue'
+import { computed, defineAsyncComponent, ref, watch } from 'vue'
+import { useOrderEditorContext } from '@/composables/useOrderEditor'
+import { generatePosCreationKey } from '@/utils/posCreationKey'
+import type { OrderProductAddition } from '@/types/order'
+const AddProductModal = defineAsyncComponent(() => import('./AddProductModal.vue'))
+const editor = useOrderEditorContext()
+const showProductModal = ref(false)
 import { useOrderPersistence } from '@/composables/useOrderPersistence'
 import { useOrderValidation } from '@/composables/useOrderValidation'
 import { useOrderTabs } from '@/composables/useOrderTabs'
@@ -446,7 +458,7 @@ const hasAppliedBenefit = computed(() => {
     return !!type && type !== 'None'
 })
 const canGrantManualBenefit = computed(() => authStore.isAdmin || authStore.isSuperadmin)
-const giftProducts = computed(() => productsStore.currentProducts.filter((p) => p.active && p.categoryName.trim().toLocaleLowerCase() === 'regalos'))
+const giftProducts = computed(() => productsStore.catalogProducts.filter((p) => p.active && p.categoryName.trim().toLocaleLowerCase() === 'regalos'))
 const canGiftDelivery = computed(() => currentOrder.value?.type === 'delivery' || (currentOrder.value?.type === 'reservation' && currentOrder.value?.addressId != null))
 
 const appliedBenefitText = computed(() => {
@@ -745,12 +757,26 @@ const updateGuestName = (name: string) => {
 }
 
 const handleAddProducts = () => {
-    // This would focus on the product grid or open a product selector
+    if (editor) showProductModal.value = true
+}
+
+function addSelectedProducts(products: OrderProductAddition[]) {
+    const order = currentOrder.value
+    if (!order) return
+    order.orderItems.push(...products.map(item => ({
+        tempId: generatePosCreationKey(), productId: item.productId, productName: item.productName,
+        productPrice: item.unitPrice, quantity: item.quantity, unitPrice: item.unitPrice,
+        discount: item.discount, notes: item.notes ?? '', freeDeliveryDiscount: 0,
+        subtotal: item.quantity * item.unitPrice - item.discount,
+    })))
+    ordersStore.recalculateTotals(order)
+    ordersStore.saveToLocalStorage()
+    showProductModal.value = false
 }
 
 async function sendWhatsAppConfirmation() {
     const order = currentOrder.value
-    if (!order?.whatsappConversationId) return
+    if (!order?.whatsappConversationId || (editor && !editor.canSubmit())) return
     if (order.orderItems.length === 0) {
         showError('WhatsApp', 'Agrega productos antes de enviar la confirmación.')
         return
@@ -764,9 +790,9 @@ async function sendWhatsAppConfirmation() {
             branchPosSettings.posCopyMessageEtaPhrase,
         )
         await whatsappApi.sendMessage(order.whatsappConversationId, message)
-        success('Confirmación enviada', 2500, 'El cliente recibió el resumen por WhatsApp.')
+        success('Resumen previo enviado', 2500, 'El cliente recibió el resumen por WhatsApp.')
         localStorage.setItem('senor-arroz-whatsapp-conversation-tab', String(order.whatsappConversationId))
-        await router.push({ name: 'WhatsApp', query: { conversationId: String(order.whatsappConversationId) } })
+        if (!editor) await router.push({ name: 'WhatsApp', query: { conversationId: String(order.whatsappConversationId) } })
     } catch (error: any) {
         showError('WhatsApp', error?.message || 'No se pudo enviar la confirmación.')
     } finally {
@@ -822,7 +848,7 @@ async function performSubmitOrder(order: DraftOrder, tabToClose: string | null) 
     isSubmittingOrder.value = true
     try {
         await submitOrder(order)
-        if (tabToClose) {
+        if (tabToClose && !editor) {
             closeTab(tabToClose)
         }
         success('Pedido creado exitosamente', 3000)
@@ -1048,6 +1074,7 @@ watch(
 
 <style scoped>
 .order-sidebar { width: var(--order-sidebar-width); flex-shrink: 0; }
+.order-sidebar--embedded { width: 100%; min-width: 0; max-width: 100%; }
 .sidebar-summary { display: flex; align-items: center; gap: 0.5rem; min-height: 28px; cursor: pointer; list-style: none; font-size: 0.8125rem; font-weight: 500; color: #374151; border-radius: 6px; }
 .sidebar-summary:hover { color: #047857; }
 .sidebar-summary:focus-visible { outline: 2px solid #059669; outline-offset: 3px; }

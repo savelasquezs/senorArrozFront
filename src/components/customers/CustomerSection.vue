@@ -103,7 +103,7 @@ import { computed, useId } from 'vue'
 import type { Customer, CustomerAddress } from '@/types/customer'
 
 // Stores y composables (condicionales según modo)
-import { useOrdersDraftsStore } from '@/store/ordersDrafts'
+import { useOrderEditorStore as useOrdersDraftsStore } from '@/composables/useOrderEditor'
 import { useOrderTabs } from '@/composables/useOrderTabs'
 
 // Components

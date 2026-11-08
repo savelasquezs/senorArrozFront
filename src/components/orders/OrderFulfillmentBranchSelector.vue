@@ -30,7 +30,7 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import BaseSelect from '@/components/ui/BaseSelect.vue'
 import { branchApi } from '@/services/MainAPI/branchApi'
-import { useOrdersDraftsStore } from '@/store/ordersDrafts'
+import { useOrderEditorStore as useOrdersDraftsStore } from '@/composables/useOrderEditor'
 import { useToast } from '@/composables/useToast'
 import type { DraftOrder } from '@/types/order'
 import type { BranchOption } from '@/store/branchContext'

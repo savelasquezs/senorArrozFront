@@ -1,18 +1,20 @@
 // src/composables/useOrderPersistence.ts
 import { onMounted, onUnmounted } from 'vue'
-import { useOrdersDraftsStore } from '@/store/ordersDrafts'
+import { useOrderEditorContext } from '@/composables/useOrderEditor'
+import { useOrderEditorStore as useOrdersDraftsStore } from '@/composables/useOrderEditor'
 import { useOrderTabs } from '@/composables/useOrderTabs'
 
 export function useOrderPersistence() {
+    const embedded = useOrderEditorContext()
     const ordersStore = useOrdersDraftsStore()
     const { createNewTab } = useOrderTabs()
 
     // Cargar datos al montar el componente
     onMounted(async () => {
-        if (ordersStore.draftOrders.size === 0) {
+        if (!embedded && ordersStore.draftOrders.size === 0) {
             ordersStore.loadFromLocalStorage()
 
-            if (ordersStore.draftOrders.size === 0) {
+            if (!embedded && ordersStore.draftOrders.size === 0) {
                 createNewTab()
             } else {
                 await ordersStore.rehydrateCustomersFromDrafts()

@@ -59,7 +59,8 @@ type AiWhatsAppDraftPayload = WhatsAppDraftBase & {
 
 type CreateWhatsAppDraftPayload = ManualWhatsAppDraftPayload | AiWhatsAppDraftPayload
 
-export const useOrdersDraftsStore = defineStore('ordersDrafts', () => {
+export const defineOrderDraftStore = (id: string) => defineStore(id, () => {
+    const storageKey = id === 'ordersDrafts' ? 'senor-arroz-draft-orders' : `senor-arroz-draft-orders:${useAuthStore().user?.id}:${id}`
     // ===== Estado =====
     const draftOrders = ref(new Map<string, DraftOrder>())
     watch(() => useAuthStore().user?.id, (id) => {
@@ -1308,7 +1309,7 @@ export const useOrdersDraftsStore = defineStore('ordersDrafts', () => {
         }
 
         try {
-            localStorage.setItem('senor-arroz-draft-orders', JSON.stringify(state))
+            localStorage.setItem(storageKey, JSON.stringify(state))
         } catch (error) {
             console.warn('Error saving to localStorage:', error)
         }
@@ -1316,7 +1317,7 @@ export const useOrdersDraftsStore = defineStore('ordersDrafts', () => {
 
     const loadFromLocalStorage = () => {
         try {
-            const stored = localStorage.getItem('senor-arroz-draft-orders')
+            const stored = localStorage.getItem(storageKey)
             if (!stored) return
 
             const data: StoredOrdersState = JSON.parse(stored)
@@ -1326,7 +1327,7 @@ export const useOrdersDraftsStore = defineStore('ordersDrafts', () => {
             // Verificar TTL (24 horas)
             const TTL_HOURS = 24
             if (now.getTime() - lastSaved.getTime() > TTL_HOURS * 60 * 60 * 1000) {
-                localStorage.removeItem('senor-arroz-draft-orders')
+                localStorage.removeItem(storageKey)
                 return
             }
 
@@ -1337,7 +1338,7 @@ export const useOrdersDraftsStore = defineStore('ordersDrafts', () => {
                 ...order,
                 billingRecipient: order.billingOwnerUserId === authStore.user?.id ? order.billingRecipient : null,
                 requestElectronicInvoice: order.billingOwnerUserId === authStore.user?.id ? order.requestElectronicInvoice : undefined,
-                branchId: order.branchId ?? legacyBranchId,
+                branchId: order.whatsappConversationId != null ? order.branchId ?? null : order.branchId ?? legacyBranchId,
                 workspaceBranchId: order.workspaceBranchId ?? order.branchId ?? legacyBranchId,
                 source: order.source ?? null,
                 whatsappConversationId: order.whatsappConversationId ?? null,
@@ -1447,7 +1448,7 @@ export const useOrdersDraftsStore = defineStore('ordersDrafts', () => {
             activateBranch(activeBranchId.value)
         } catch (error) {
             console.warn('Error loading from localStorage:', error)
-            localStorage.removeItem('senor-arroz-draft-orders')
+            localStorage.removeItem(storageKey)
         }
     }
 
@@ -1743,3 +1744,4 @@ export const useOrdersDraftsStore = defineStore('ordersDrafts', () => {
         create
     }
 })
+export const useOrdersDraftsStore = defineOrderDraftStore('ordersDrafts')

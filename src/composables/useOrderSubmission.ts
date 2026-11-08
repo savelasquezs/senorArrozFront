@@ -1,10 +1,12 @@
 // src/composables/useOrderSubmission.ts
 import { useAuthStore } from '@/store/auth'
-import { useOrdersDraftsStore } from '@/store/ordersDrafts'
+import { useOrderEditorContext } from '@/composables/useOrderEditor'
+import { useOrderEditorStore as useOrdersDraftsStore } from '@/composables/useOrderEditor'
 import { useInvoiceTracking } from '@/composables/useInvoiceTracking'
 import type { DraftOrder, CreateOrderDto, CreateOrderDetailDto, CreateBankPaymentDto, CreateAppPaymentDto } from '@/types/order'
 
 export function useOrderSubmission() {
+    const editor = useOrderEditorContext()
     const authStore = useAuthStore()
     const ordersStore = useOrdersDraftsStore()
 
@@ -14,7 +16,7 @@ export function useOrderSubmission() {
     const transformDraftToCreateDto = (draft: DraftOrder): CreateOrderDto => {
         // Get user and branch info
         const takenById = authStore.user?.id
-        const branchId = draft.branchId || authStore.branchId
+        const branchId = draft.whatsappConversationId ? draft.branchId : draft.branchId || authStore.branchId
 
         if (!takenById || !branchId) {
             throw new Error('Usuario o sucursal no disponible')
@@ -139,12 +141,14 @@ export function useOrderSubmission() {
      * Submit the current draft order
      */
     const submitOrder = async (draft: DraftOrder) => {
+        if (editor && !editor.canSubmit()) throw new Error('Toma la conversación antes de confirmar el pedido.')
         // Persist before network I/O so timeouts/reloads reuse the SAME UUID.
         const key = ordersStore.ensurePosCreationKey(draft.tabId)
         const dto = { ...transformDraftToCreateDto(draft), posCreationKey: key }
         const ownerId = authStore.user?.id
         const createdOrder = await ordersStore.create(dto)
         if (dto.electronicInvoice && ownerId === authStore.user?.id) useInvoiceTracking().track(createdOrder.id)
+        editor?.onCreated(createdOrder)
         return createdOrder
     }
 

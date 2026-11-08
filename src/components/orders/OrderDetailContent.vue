@@ -821,7 +821,7 @@ const detailManualDiscountPercentage = ref<number>(10);
 const detailBenefitChoice = ref<'GiftProduct' | 'PercentageDiscount' | 'FreeDelivery' | 'DiscountCode'>('DiscountCode');
 const canGrantManualBenefit = computed(() => authStore.isAdmin || authStore.isSuperadmin);
 const canSelectAnyOrderStatus = computed(() => authStore.isAdmin || authStore.isSuperadmin);
-const detailGiftProducts = computed(() => productsStore.currentProducts.filter((p) => p.active && p.branchId === order.value?.branchId && p.categoryName.trim().toLocaleLowerCase() === 'regalos'));
+const detailGiftProducts = computed(() => productsStore.catalogProducts.filter((p) => p.active && p.categoryName.trim().toLocaleLowerCase() === 'regalos'));
 const canGiftDetailDelivery = computed(() => order.value?.type === 'delivery' || (order.value?.type === 'reservation' && order.value?.addressId != null));
 const showRemovePaidInStoreDetailDialog = ref(false);
 const removePaidInStoreDetailLoading = ref(false);
@@ -1545,7 +1545,7 @@ async function loadOperationOptions() {
 }
 watch(() => order.value?.id, () => { void loadOperationOptions(); }, { immediate: true });
 onMounted(() => {
-    if (canGrantManualBenefit.value) void productsStore.ensureCatalogLoaded();
+    if (canGrantManualBenefit.value) void productsStore.ensureCatalogLoaded(order.value?.branchId).catch(() => { detailBenefitError.value = 'No se pudieron cargar los regalos. Reabre el pedido para reintentar.'; });
 });
 const isRemoteOrder = computed(() => {
     const workspace = authStore.isSuperadmin ? branchContext.selectedBranchId : authStore.branchId;
