@@ -1338,7 +1338,7 @@ export const defineOrderDraftStore = (id: string) => defineStore(id, () => {
                 ...order,
                 billingRecipient: order.billingOwnerUserId === authStore.user?.id ? order.billingRecipient : null,
                 requestElectronicInvoice: order.billingOwnerUserId === authStore.user?.id ? order.requestElectronicInvoice : undefined,
-                branchId: order.branchId ?? legacyBranchId,
+                branchId: order.whatsappConversationId != null ? order.branchId ?? null : order.branchId ?? legacyBranchId,
                 workspaceBranchId: order.workspaceBranchId ?? order.branchId ?? legacyBranchId,
                 source: order.source ?? null,
                 whatsappConversationId: order.whatsappConversationId ?? null,

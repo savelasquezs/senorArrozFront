@@ -125,11 +125,16 @@ it('requires an explicit destination for an unrouted central conversation', asyn
   const wrapper = panel()
   await flushPromises()
   deps.stores.get(44).currentOrder.branchId = null
-  await wrapper.get('button').trigger('click')
+  deps.stores.get(44).saveToLocalStorage()
+  wrapper.unmount()
+  const restored = panel()
+  await flushPromises()
+  expect(deps.stores.get(44).currentOrder.branchId).toBeNull()
+  await restored.get('button').trigger('click')
   await flushPromises()
   expect(deps.create).not.toHaveBeenCalled()
   expect(deps.error).toContain('sucursal no disponible')
-  wrapper.unmount()
+  restored.unmount()
 })
 
 it('keeps the confirmed order when sending fails and retries only the WhatsApp message', async () => {
