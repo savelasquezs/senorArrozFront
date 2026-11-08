@@ -375,6 +375,7 @@
         <!-- Modales -->
         <EditCustomerModal v-if="showEditCustomerModal && selectedOrder" :open="showEditCustomerModal"
             :order="selectedOrder"
+            :pending-order-type="pendingOrderType"
             :delete-reservation-associated-payments-confirmed="pendingDeleteReservationAssociations"
             @close="handleCustomerModalClose" @updated="handleOrderUpdated" />
 
@@ -2162,70 +2163,20 @@ const handleCustomerModalClose = () => {
 
 const handleOrderUpdated = async (updatedOrder?: Order) => {
     if (updatedOrder) {
-        const orderAny = updatedOrder as any // Acceso a todos los campos del backend
-
-        // ✅ ACTUALIZACIÓN OPTIMISTA - actualizar en la lista local
-        const index = orders.value.findIndex(o => o.id === orderAny.id)
+        // La conversión (tipo, cliente, dirección y tarifa) ya se guardó
+        // atómicamente desde EditCustomerModal. No repetir la llamada API.
+        updateOrderInList(updatedOrder)
+        const index = orders.value.findIndex(o => o.id === updatedOrder.id)
         if (index !== -1) {
-            // Si había un cambio de tipo pendiente, guardarlo junto con los datos del cliente
-            if (pendingOrderType.value) {
-                try {
-                    // ✅ Enviar tipo + datos del cliente en una sola petición
-                    const finalUpdate = await orderApi.update(selectedOrder.value!.id, {
-                        type: pendingOrderType.value,
-                        customerId: orderAny.customerId,
-                        addressId: orderAny.addressId,
-                        guestName: orderAny.guestName,
-                        deliveryFee: orderAny.deliveryFee,
-                        ...(pendingDeleteReservationAssociations.value
-                            ? { deleteReservationAssociatedPayments: true }
-                            : {}),
-                    }, selectedOrder.value!)
-
-                    // Actualización optimista con la respuesta del backend
-                    orders.value[index] = {
-                        ...orders.value[index],
-                        type: finalUpdate.type,
-                        typeDisplayName: getOrderTypeDisplayName(finalUpdate.type),
-                        customerId: finalUpdate.customerId || null,
-                        customerName: finalUpdate.customerName || null,
-                        customerPhone: finalUpdate.customerPhone || null,
-                        addressId: finalUpdate.addressId || null,
-                        addressDescription: finalUpdate.addressDescription || null,
-                        addressAdditionalInfo: (finalUpdate as any).addressAdditionalInfo ?? null,
-                        guestName: finalUpdate.guestName || null,
-                        deliveryFee: finalUpdate.deliveryFee ?? null,
-                        // ✅ INCLUIR TOTALES DEL BACKEND
-                        subtotal: finalUpdate.subtotal || 0,
-                        discountTotal: finalUpdate.discountTotal || 0,
-                        total: finalUpdate.total || 0,
-                        updatedAt: finalUpdate.updatedAt
-                    }
-
-                    // Limpiar estado temporal
-                    pendingOrderType.value = null
-                    originalOrderType.value = null
-                    pendingDeleteReservationAssociations.value = false
-                } catch (err: any) {
-                    error('Error al actualizar pedido', err.message)
-                }
-            } else {
-                // Actualización normal - usar handler unificado
-                updateOrderInList(updatedOrder)
-                // Actualizar selectedOrder con la referencia del pedido en la lista (evita referencias obsoletas)
-                const updatedIndex = orders.value.findIndex(o => o.id === orderAny.id)
-                if (updatedIndex !== -1) {
-                    selectedOrder.value = orders.value[updatedIndex] as OrderListItem
-                }
-            }
+            selectedOrder.value = orders.value[index] as OrderListItem
         }
 
-        // ✅ Cerrar modales después de actualizar exitosamente
+        pendingOrderType.value = null
+        originalOrderType.value = null
+        pendingDeleteReservationAssociations.value = false
         showEditCustomerModal.value = false
         showAssignDeliveryModal.value = false
-    }
-    // Solo recargar si no se proporcionó el pedido actualizado
-    if (!updatedOrder) {
+    } else {
         fetchOrders()
     }
 }
