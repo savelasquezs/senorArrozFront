@@ -13,7 +13,7 @@ import type { WhatsAppConversation, WhatsAppOrderDraft } from '@/types/whatsapp'
 import { UserRole } from '@/types/auth'
 
 const deps = vi.hoisted(() => ({ create: vi.fn(), send: vi.fn(), getById: vi.fn(), stores: new Map<number, any>(), error: '' }))
-vi.mock('@/services/MainAPI/orderApi', () => ({ orderApi: { createOrder: deps.create, getOrderById: deps.getById } }))
+vi.mock('@/services/MainAPI/orderApi', () => ({ orderApi: { createOrder: deps.create, fetchDetail: deps.getById } }))
 vi.mock('@/services/MainAPI/whatsappApi', () => ({ whatsappApi: { sendMessage: deps.send } }))
 vi.mock('@/store/banks', () => ({ useBanksStore: () => ({ ensureListLoaded: vi.fn(), options: [] }) }))
 vi.mock('@/store/apps', () => ({ useAppsStore: () => ({ ensureListLoaded: vi.fn(), options: [] }) }))
@@ -39,7 +39,7 @@ beforeEach(() => {
   deps.error = ''
   const order = { id: 501, type: 'delivery', customerName: 'Cliente', total: 26000, deliveryFee: 6000, addressId: 31, addressDescription: 'Calle de prueba',
     orderDetails: [{ productId: 88, productName: 'Arroz', quantity: 2, unitPrice: 10000, discount: 0, notes: 'Sin cebolla' }] }
-  deps.create.mockReset().mockResolvedValue(order)
+  deps.create.mockReset().mockResolvedValue({ ...order, orderDetails: undefined })
   deps.getById.mockReset().mockResolvedValue(order)
   deps.send.mockReset().mockResolvedValue(undefined)
   useAuthStore().user = { id: 7, name: 'Caja', role: UserRole.CASHIER, branchId: 1, branchName: 'Origen', email: '', phone: '', active: true }
@@ -68,6 +68,7 @@ it('confirms inside the chat using the destination tariff and preserves the sepa
   expect(deps.create).toHaveBeenCalledWith(expect.objectContaining({ branchId: 2, whatsappConversationId: 44, deliveryFee: 6000,
     orderDetails: [expect.objectContaining({ productId: 88, quantity: 2, notes: 'Sin cebolla' })], posCreationKey: expect.any(String) }))
   expect(wrapper.text()).toContain('Pedido tomado · #501')
+  expect(deps.getById).toHaveBeenCalledWith(501)
   expect(deps.send).toHaveBeenCalledWith(44, expect.stringContaining('Tu pedido #501 quedó confirmado:'))
   expect(wrapper.text()).toContain('Confirmación enviada por WhatsApp.')
   expect(pos.currentTabId).toBe('pos')
@@ -156,7 +157,7 @@ it('keeps the confirmed order when sending fails and retries only the WhatsApp m
 
 it.each([{ addressId: 31, label: 'Entrega programada:' }, { addressId: undefined, label: 'Recogida programada:' }])('confirms scheduled orders in Colombia: $label', async ({ addressId, label }) => {
   const order = await deps.getById()
-  deps.create.mockResolvedValueOnce({ ...order, type: 'reservation', addressId, reservedFor: '2026-11-11T19:00:00Z' })
+  deps.getById.mockResolvedValueOnce({ ...order, type: 'reservation', addressId, reservedFor: '2026-11-11T19:00:00Z' })
   const wrapper = panel()
   await flushPromises()
   await wrapper.get('button').trigger('click')

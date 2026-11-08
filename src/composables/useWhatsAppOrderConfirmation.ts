@@ -1,4 +1,4 @@
-import type { DraftOrder, Order } from '@/types/order'
+import type { DraftOrder, Order, OrderDetailView } from '@/types/order'
 import { orderItemSubtotal } from '@/helpers/orderItem'
 import { hasOrderDelivery } from '@/helpers/orderDeliveryFee'
 
@@ -11,7 +11,7 @@ const scheduledTime = new Intl.DateTimeFormat('es-CO', {
   timeZone: 'America/Bogota', day: 'numeric', month: 'long', year: 'numeric', hour: 'numeric', minute: '2-digit',
 })
 
-export function buildWhatsAppOrderConfirmationMessage(order: DraftOrder | Order, etaPhrase = '30-45 min', confirmed = false): string {
+export function buildWhatsAppOrderConfirmationMessage(order: DraftOrder | Order | OrderDetailView, etaPhrase = '30-45 min', confirmed = false): string {
   const delivery = hasOrderDelivery(order)
   const customerName = (order.customerName || order.guestName || '').trim()
   const greeting = customerName ? `${customerName} 😊` : 'Hola 😊'

@@ -105,15 +105,15 @@ function orderCreated(order: Order) {
   store.draftOrders.clear()
   store.currentTabId = null
   store.saveToLocalStorage()
-  void sendConfirmation(order)
+  void sendConfirmation()
 }
 
-async function sendConfirmation(created?: Order) {
+async function sendConfirmation() {
   if (!createdOrderId.value || !editable.value || sendingConfirmation.value || confirmationSent.value) return
   sendingConfirmation.value = true
   confirmationError.value = ''
   try {
-    const order = created ?? await orderApi.getOrderById(createdOrderId.value)
+    const order = await orderApi.fetchDetail(createdOrderId.value)
     await whatsappApi.sendMessage(props.conversation.id, buildWhatsAppOrderConfirmationMessage(order, undefined, true))
     confirmationSent.value = true
     localStorage.setItem(`${receiptKey}:message`, String(order.id))

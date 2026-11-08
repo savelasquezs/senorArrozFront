@@ -6,8 +6,9 @@ import OrderSidebar from '../OrderSidebar.vue'
 import { provideOrderEditor } from '@/composables/useOrderEditor'
 import { createOrderDraft } from '@/helpers/orderDraft'
 import { useOrdersDraftsStore } from '@/store/ordersDrafts'
+import { useProductsStore } from '@/store/products'
 
-vi.mock('@/store/auth', () => ({ useAuthStore: () => ({ user: { id: 7 }, branchId: 1 }) }))
+vi.mock('@/store/auth', () => ({ useAuthStore: () => ({ user: { id: 7 }, branchId: 1, userRole: 'Cashier', isCashier: true }) }))
 vi.mock('vue-router', () => ({ useRouter: () => ({ push: vi.fn() }) }))
 vi.mock('@/composables/useOrderBenefitResolver', async () => {
   const { ref } = await import('vue')
@@ -46,5 +47,11 @@ it('uses the existing sidebar, product modal and payment selector on a scoped dr
   expect(pos.currentTabId).toBe('pos')
   expect(pos.currentOrder?.orderItems).toEqual([])
   expect(wrapper.text()).toContain('Confirmar pedido')
+  const loadCatalog = vi.spyOn(useProductsStore(), 'ensureCatalogLoaded').mockResolvedValue(undefined)
+  await wrapper.findAll('button').find(button => button.text() === 'Agregar')!.trigger('click')
+  await flushPromises()
+  expect(loadCatalog).toHaveBeenCalledWith(2)
+  expect(wrapper.text()).toContain('Regalar producto')
+  expect(wrapper.text()).not.toContain('Regalar domicilio')
   wrapper.unmount()
 })
