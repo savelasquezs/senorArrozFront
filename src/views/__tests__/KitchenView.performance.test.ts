@@ -250,4 +250,61 @@ describe('KitchenView batched requests and event refresh', () => {
         expect(localStorage.getItem(`senor-arroz:kitchen-voice:10:1:${defaultBusinessCalendar.todayYmd()}`)).toBe('41')
     })
 
+    it('sends only one status PUT and one reload for repeated preparation clicks while pending', async () => {
+        mount()
+        await flushPromises()
+        let release!: () => void
+        const pending = new Promise<void>(resolve => { release = resolve })
+        store.updateStatus.mockReturnValueOnce(pending)
+        const grid = wrapper.findComponent(OrderCardGrid)
+
+        grid.vm.$emit('change-status', [1], 'in_preparation')
+        grid.vm.$emit('change-status', [1], 'in_preparation')
+        expect(store.updateStatus).toHaveBeenCalledTimes(1)
+        expect(store.updateStatus).toHaveBeenCalledWith(1, 'in_preparation')
+        expect(mocks.getOrders).toHaveBeenCalledTimes(1)
+
+        release()
+        await flushPromises()
+        expect(mocks.getOrders).toHaveBeenCalledTimes(2)
+
+        // The lock is temporary, not a permanent prohibition on future actions.
+        grid.vm.$emit('change-status', [1], 'in_preparation')
+        await flushPromises()
+        expect(store.updateStatus).toHaveBeenCalledTimes(2)
+    })
+
+    it('releases the preparation guard when the API rejects, allowing retry', async () => {
+        mount()
+        await flushPromises()
+        store.updateStatus.mockRejectedValueOnce(new Error('conflicto'))
+        const grid = wrapper.findComponent(OrderCardGrid)
+        grid.vm.$emit('change-status', [1], 'in_preparation')
+        await flushPromises()
+        expect(mocks.error).toHaveBeenCalledWith('Error al cambiar estado', 'conflicto')
+
+        grid.vm.$emit('change-status', [1], 'in_preparation')
+        await flushPromises()
+        expect(store.updateStatus).toHaveBeenCalledTimes(2)
+        expect(mocks.getOrders).toHaveBeenCalledTimes(2) // initial load + successful retry
+    })
+
+    it('does not block preparing a different order while one request is pending', async () => {
+        mocks.getOrders.mockResolvedValue(paged([order(1), order(2)], 2))
+        mount()
+        await flushPromises()
+        let release!: () => void
+        const pending = new Promise<void>(resolve => { release = resolve })
+        store.updateStatus.mockReturnValueOnce(pending)
+        const grid = wrapper.findComponent(OrderCardGrid)
+
+        grid.vm.$emit('change-status', [1], 'in_preparation')
+        grid.vm.$emit('change-status', [2], 'in_preparation')
+        expect(store.updateStatus).toHaveBeenCalledTimes(2)
+        expect(store.updateStatus).toHaveBeenNthCalledWith(1, 1, 'in_preparation')
+        expect(store.updateStatus).toHaveBeenNthCalledWith(2, 2, 'in_preparation')
+        release()
+        await flushPromises()
+    })
+
 })
