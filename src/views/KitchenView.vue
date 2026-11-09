@@ -760,15 +760,27 @@ const handleChangeStatus = (orderIds: number[], newStatus: OrderStatus) => {
     }
 }
 
+// A second click while an order is still being prepared must not repeat its
+// transactional mutation (EF/SQL, inventory consumption, audit and SignalR).
+// Scope the guard to this kitchen instance; don't block different orders.
+const preparingOrderIdsInFlight = new Set<number>()
+
 const executeStatusChange = async (orderIds: number[], newStatus: OrderStatus) => {
+    const idsToUpdate = newStatus === 'in_preparation'
+        ? [...new Set(orderIds)].filter(id => !preparingOrderIdsInFlight.has(id))
+        : orderIds
+    if (idsToUpdate.length === 0) return
+    if (newStatus === 'in_preparation')
+        idsToUpdate.forEach(id => preparingOrderIdsInFlight.add(id))
+
     try {
         isLoading.value = true
 
-        for (const orderId of orderIds) {
+        for (const orderId of idsToUpdate) {
             await ordersStore.updateStatus(orderId, newStatus)
         }
 
-        success(`${orderIds.length} pedido(s) actualizado(s)`, 5000)
+        success(`${idsToUpdate.length} pedido(s) actualizado(s)`, 5000)
         await loadOrders()
 
         if (cardGridRef.value) {
@@ -777,6 +789,8 @@ const executeStatusChange = async (orderIds: number[], newStatus: OrderStatus) =
     } catch (err: any) {
         error('Error al cambiar estado', err.message)
     } finally {
+        if (newStatus === 'in_preparation')
+            idsToUpdate.forEach(id => preparingOrderIdsInFlight.delete(id))
         isLoading.value = false
     }
 }
