@@ -1,5 +1,5 @@
 <template>
-    <BaseDialog :model-value="isOpen" @update:model-value="$emit('close')" title="Confirmar cambio a Listo">
+    <BaseDialog :model-value="isOpen" :dismissible="!isLoading" @update:model-value="requestClose" title="Confirmar cambio a Listo">
         <div class="space-y-4">
             <p class="text-gray-700">¿Estás seguro de marcar los siguientes pedidos como listos?</p>
             <p v-if="chainTakenToReady" class="text-sm text-amber-800 bg-amber-50 border border-amber-100 rounded-md px-3 py-2">
@@ -36,7 +36,7 @@
 
         <template #footer>
             <div class="flex gap-3 justify-end">
-                <BaseButton @click="$emit('close')" variant="outline" :disabled="isLoading">
+                <BaseButton @click="requestClose" variant="outline" :disabled="isLoading">
                     Cancelar
                 </BaseButton>
                 <BaseButton @click="confirmAndUpdate" variant="success" :loading="isLoading">
@@ -77,6 +77,12 @@ const ordersStore = useOrdersDataStore()
 const { success, error } = useToast()
 const isLoading = ref(false)
 
+// Prevent duplicate updates before Vue has rendered the disabled button.
+// Do not dismiss the dialog while a multi-order transition is in progress.
+const requestClose = () => {
+    if (!isLoading.value) emit('close')
+}
+
 const getOrderItems = (orderId: number): OrderDetailItem[] => {
     return props.orderItemsMap.get(orderId) || []
 }
@@ -92,8 +98,9 @@ const getStatusForId = (id: number): OrderListItem['status'] | undefined => {
 }
 
 const confirmAndUpdate = async () => {
+    if (isLoading.value || !props.isOpen) return
+    isLoading.value = true
     try {
-        isLoading.value = true
 
         const ids = props.orders.map((o) => o.id)
         if (props.chainTakenToReady) {
