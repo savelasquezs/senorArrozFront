@@ -1,13 +1,15 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { shallowMount, flushPromises, type VueWrapper } from '@vue/test-utils'
-import { reactive, ref } from 'vue'
+import { mount as fullMount, shallowMount, flushPromises, type VueWrapper } from '@vue/test-utils'
+import { nextTick, reactive, ref } from 'vue'
 import KitchenView from '@/views/KitchenView.vue'
 import OrderCardGrid from '@/components/kitchen/OrderCardGrid.vue'
+import ReadyOrdersTable from '@/components/kitchen/ReadyOrdersTable.vue'
 import { defaultBusinessCalendar } from '@/utils/datetime'
 
 const mocks = vi.hoisted(() => ({
     getOrders: vi.fn(), fetchDetail: vi.fn(), searchOrders: vi.fn(), summary: vi.fn(), voiceEvents: vi.fn(),
     speak: vi.fn(), notify: vi.fn(), error: vi.fn(), push: vi.fn(),
+    enqueueKitchenJob: vi.fn(),
     callbacks: {} as Record<string, (...args: any[]) => Promise<void>>,
 }))
 const store = reactive({
@@ -45,7 +47,7 @@ vi.mock('@/composables/useToast', () => ({ useToast: () => ({
     success: vi.fn(), error: mocks.error,
 }) }))
 vi.mock('@/services/MainAPI/printJobsApi', () => ({ printJobsApi: {
-    enqueueKitchenJob: vi.fn(),
+    enqueueKitchenJob: mocks.enqueueKitchenJob,
 } }))
 
 const line = (orderId: number, count = 1, notes: string | null = null) => ({
@@ -82,10 +84,66 @@ beforeEach(() => {
     mocks.voiceEvents.mockResolvedValue({ cursor: 0, hasMore: false, events: [] })
     localStorage.clear()
     mocks.getOrders.mockImplementation(async () => paged([order(1)], 1))
+    mocks.enqueueKitchenJob.mockResolvedValue({ isSuccess: true, data: { jobId: 1 } })
 })
 afterEach(() => { wrapper?.unmount() })
 
 describe('KitchenView batched requests and event refresh', () => {
+    it('sends only one kitchen reprint per order while pending, then allows a later intentional reprint', async () => {
+        mocks.getOrders.mockResolvedValue(paged([{ ...order(1), status: 'ready' }], 1))
+        let finish!: (value: any) => void
+        const pending = new Promise(resolve => { finish = resolve })
+        mocks.enqueueKitchenJob.mockReset()
+            .mockReturnValueOnce(pending)
+            .mockResolvedValue({ isSuccess: true, data: { jobId: 2 } })
+        mount()
+        await flushPromises()
+        await wrapper.findAll('button').find(b => b.text().includes('Pedidos Listos'))!.trigger('click')
+        const table = wrapper.findComponent(ReadyOrdersTable)
+        table.vm.$emit('reprint', 1)
+        table.vm.$emit('reprint', 1)
+        expect(mocks.enqueueKitchenJob).toHaveBeenCalledTimes(1)
+        expect(mocks.enqueueKitchenJob).toHaveBeenCalledWith(1, [1])
+        await nextTick()
+        expect(table.props('reprintingOrderIds')).toEqual(new Set([1]))
+
+        finish({ isSuccess: true, data: { jobId: 1 } })
+        await flushPromises()
+        expect(table.props('reprintingOrderIds')).toEqual(new Set())
+        table.vm.$emit('reprint', 1)
+        await flushPromises()
+        expect(mocks.enqueueKitchenJob).toHaveBeenCalledTimes(2)
+    })
+
+    it('releases kitchen reprint after API failure so a later request can succeed', async () => {
+        mocks.getOrders.mockResolvedValue(paged([{ ...order(1), status: 'ready' }], 1))
+        mocks.enqueueKitchenJob.mockRejectedValueOnce(new Error('fallo temporal'))
+            .mockResolvedValue({ isSuccess: true, data: { jobId: 2 } })
+        mount()
+        await flushPromises()
+        await wrapper.findAll('button').find(b => b.text().includes('Pedidos Listos'))!.trigger('click')
+        const table = wrapper.findComponent(ReadyOrdersTable)
+        table.vm.$emit('reprint', 1)
+        await flushPromises()
+        expect(table.props('reprintingOrderIds')).toEqual(new Set())
+        expect(mocks.error).toHaveBeenCalledWith('Reimpresión', 'fallo temporal')
+        table.vm.$emit('reprint', 1)
+        await flushPromises()
+        expect(mocks.enqueueKitchenJob).toHaveBeenCalledTimes(2)
+    })
+
+    it('disables only the row whose kitchen reprint is pending', () => {
+        const ready = [1, 2].map(id => ({ ...order(id), status: 'ready' }))
+        const table = fullMount(ReadyOrdersTable, {
+            props: { orders: ready as any, orderItemsMap: new Map(), reprintingOrderIds: new Set([1]) },
+        })
+        const rows = table.findAll('tbody tr')
+        expect(rows).toHaveLength(2)
+        expect(rows[0]!.find('button').attributes('disabled')).toBeDefined()
+        expect(rows[1]!.find('button').attributes('disabled')).toBeUndefined()
+        table.unmount()
+    })
+
     it('refreshes a Rappi status change without announcing a content edit', async () => {
         mount()
         await flushPromises()
