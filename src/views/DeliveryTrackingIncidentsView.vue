@@ -18,13 +18,29 @@
     </header>
 
     <BaseCard padding="lg">
-      <div class="mb-5 flex items-center gap-2"><FunnelIcon class="h-5 w-5 text-emerald-600" /><div><h2 class="font-semibold text-gray-900">Filtrar casos</h2><p class="text-xs text-gray-500">Consulta por estado de revisión y periodo de captura.</p></div></div>
-      <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div class="mb-5 flex items-center gap-2"><FunnelIcon class="h-5 w-5 text-emerald-600" /><div><h2 class="font-semibold text-gray-900">Filtrar casos</h2><p class="text-xs text-gray-500">Consulta por sucursal, domiciliario, tipo de caso, estado y periodo de captura.</p></div></div>
+      <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-6">
         <label v-if="authStore.isSuperadmin" class="text-sm font-medium text-gray-700">
           Sucursal
           <select v-model="branchId" class="mt-1.5 w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100">
             <option value="">Todas</option>
             <option v-for="branch in branches" :key="branch.id" :value="String(branch.id)">{{ branch.name }}</option>
+          </select>
+        </label>
+        <label class="text-sm font-medium text-gray-700">
+          Domiciliario
+          <select v-model="deliverymanId" :disabled="filterOptionsLoading || Boolean(filterOptionsError) || !filterOptions.deliverymen.length"
+            class="mt-1.5 w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 disabled:bg-gray-50 disabled:text-gray-400">
+            <option value="">Todos</option>
+            <option v-for="deliveryman in filterOptions.deliverymen" :key="deliveryman.id" :value="String(deliveryman.id)">{{ deliveryman.name }}</option>
+          </select>
+        </label>
+        <label class="text-sm font-medium text-gray-700">
+          Tipo de caso
+          <select v-model="incidentType" :disabled="filterOptionsLoading || Boolean(filterOptionsError) || !availableIncidentTypes.length"
+            class="mt-1.5 w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 disabled:bg-gray-50 disabled:text-gray-400">
+            <option value="">Todos</option>
+            <option v-for="option in availableIncidentTypes" :key="option.value" :value="option.value">{{ option.label }}</option>
           </select>
         </label>
         <label class="text-sm font-medium text-gray-700">
@@ -35,8 +51,9 @@
           </select>
         </label>
         <BaseYmdDateRangePicker v-model:from-date="fromDate" v-model:to-date="toDate"
-          label="Periodo" class="lg:col-span-2" />
+          label="Periodo" class="sm:col-span-2 lg:col-span-2" />
       </div>
+      <p v-if="filterOptionsError" class="mt-2 text-xs text-red-600">{{ filterOptionsError }}</p>
       <div class="mt-4 flex justify-end">
         <BaseButton @click="applyFilters"><MagnifyingGlassIcon class="h-4 w-4" /> Aplicar filtros</BaseButton>
       </div>
@@ -313,7 +330,9 @@ import {
   type DeliveryIncidentReviewStatus,
   type DeliveryStayClassification,
   type DeliveryTrackingIncidentDetail,
+  type DeliveryTrackingIncidentFilterOptions,
   type DeliveryTrackingIncidentListItem,
+  type DeliveryTrackingIncidentType,
   type DeliveryPlaybackResponse,
 } from '@/services/MainAPI/deliveryTrackingIncidentsApi'
 
@@ -335,6 +354,11 @@ const page = ref(1)
 const pageSize = 20
 const totalCount = ref(0)
 const branchId = ref('')
+const deliverymanId = ref('')
+const incidentType = ref<DeliveryTrackingIncidentType | ''>('')
+const filterOptions = ref<DeliveryTrackingIncidentFilterOptions>({ deliverymen: [], typesByDeliveryman: [] })
+const filterOptionsLoading = ref(false)
+const filterOptionsError = ref('')
 const reviewStatus = ref<DeliveryIncidentReviewStatus | ''>('pending')
 const toDate = ref(defaultBusinessCalendar.todayYmd())
 const fromDate = ref(defaultBusinessCalendar.formatYmd(defaultBusinessCalendar.addZonedDays(Date.now(), -6)))
@@ -387,6 +411,19 @@ const reviewStatusOptions: Array<{ value: DeliveryIncidentReviewStatus; label: s
   { value: 'closed_without_action', label: 'Cerrado sin acción' },
   { value: 'referred_to_disciplinary_process', label: 'Remitido a proceso disciplinario' },
 ]
+const incidentTypeOptions: Array<{ value: DeliveryTrackingIncidentType; label: string }> = [
+  { value: 'stay', label: 'Permanencia' },
+  { value: 'tracking_interruption', label: 'Interrupción de seguimiento' },
+  { value: 'location_disabled', label: 'Ubicación apagada' },
+  { value: 'route_deviation', label: 'Desviación de ruta' },
+]
+const availableIncidentTypes = computed(() => incidentTypeOptions.filter(option =>
+  filterOptions.value.typesByDeliveryman.some(entry =>
+    entry.incidentType === option.value
+    && (!deliverymanId.value || entry.deliverymanId === Number(deliverymanId.value))
+  )
+))
+
 const classificationOptions: Array<{ value: DeliveryStayClassification; label: string }> = [
   { value: 'branch', label: 'Sucursal' },
   { value: 'order_destination', label: 'Destino del pedido' },
@@ -416,6 +453,33 @@ function colombiaDayAfter(value: string): string | undefined {
   return value ? defaultBusinessCalendar.addZonedDays(parseYmd(value), 1).toISOString() : undefined
 }
 
+const filterOptionsRead = createLatestRead()
+async function loadFilterOptions() {
+  const request = filterOptionsRead.begin()
+  filterOptionsLoading.value = true
+  filterOptionsError.value = ''
+  try {
+    const response = await deliveryTrackingIncidentsApi.getFilterOptions({
+      branchId: branchId.value ? Number(branchId.value) : undefined,
+      reviewStatus: reviewStatus.value || undefined,
+      from: colombiaDateStart(fromDate.value),
+      to: colombiaDayAfter(toDate.value),
+    }, request.signal)
+    if (!request.isCurrent()) return
+    filterOptions.value = response.data
+    if (deliverymanId.value && !response.data.deliverymen.some(x => String(x.id) === deliverymanId.value))
+      deliverymanId.value = ''
+    if (incidentType.value && !availableIncidentTypes.value.some(x => x.value === incidentType.value))
+      incidentType.value = ''
+  } catch (error: any) {
+    if (!request.isCurrent()) return
+    filterOptions.value = { deliverymen: [], typesByDeliveryman: [] }
+    filterOptionsError.value = error.message || 'No fue posible cargar los filtros disponibles.'
+  } finally {
+    if (request.isCurrent()) filterOptionsLoading.value = false
+  }
+}
+
 const deliverymenRead = createLatestRead()
 const listRead = createLatestRead(), detailRead = createLatestRead(), contextRead = createLatestRead(), explorerRead = createLatestRead()
 async function loadIncidents() {
@@ -425,6 +489,8 @@ async function loadIncidents() {
   try {
     const response = await deliveryTrackingIncidentsApi.getAll({
       branchId: branchId.value ? Number(branchId.value) : undefined,
+      deliverymanId: deliverymanId.value ? Number(deliverymanId.value) : undefined,
+      incidentType: incidentType.value || undefined,
       reviewStatus: reviewStatus.value || undefined,
       from: colombiaDateStart(fromDate.value),
       to: colombiaDayAfter(toDate.value),
@@ -708,11 +774,15 @@ function orderStatusLabel(value: string | null) { return ({ OnTheWay: 'En camino
 
 
 onMounted(async () => {
-  await Promise.all([loadBranches().catch((error: any) => toast.error('No se pudieron cargar las sucursales', error.message)), loadIncidents()])
+  await Promise.all([
+    loadBranches().catch((error: any) => toast.error('No se pudieron cargar las sucursales', error.message)),
+    loadFilterOptions(),
+    loadIncidents(),
+  ])
 })
 
 onUnmounted(() => {
-  deliverymenRead.invalidate(); listRead.invalidate(); detailRead.invalidate(); contextRead.invalidate(); explorerRead.invalidate()
+  filterOptionsRead.invalidate(); deliverymenRead.invalidate(); listRead.invalidate(); detailRead.invalidate(); contextRead.invalidate(); explorerRead.invalidate()
   if (liveRefreshTimer != null) window.clearInterval(liveRefreshTimer)
 })
 
@@ -724,6 +794,20 @@ watch(detailOpen, value => {
 watch(explorerOpen, value => {
   if (!value) { explorerLiveFollow.value = false; explorerRead.invalidate(); explorerLoading.value = false }
   updateLiveRefreshTimer()
+})
+
+watch(branchId, () => {
+  deliverymanId.value = ''
+  incidentType.value = ''
+  void loadFilterOptions()
+})
+
+watch(deliverymanId, () => {
+  incidentType.value = ''
+})
+
+watch([reviewStatus, fromDate, toDate], () => {
+  void loadFilterOptions()
 })
 
 watch(explorerBranchId, () => {
