@@ -31,9 +31,16 @@ export type DeliveryInterruptionCause =
 
 export type DeliveryInterruptionCertainty = 'confirmed_by_device' | 'technical_evidence' | 'not_determined'
 
+export type DeliveryTrackingIncidentType = 'stay' | 'route_deviation' | 'location_disabled' | 'tracking_interruption'
+
+export interface DeliveryTrackingIncidentFilterOptions {
+  deliverymen: Array<{ id: number; name: string }>
+  typesByDeliveryman: Array<{ deliverymanId: number; incidentType: DeliveryTrackingIncidentType }>
+}
+
 export interface DeliveryTrackingIncidentListItem {
   id: number
-  incidentType: 'stay' | 'route_deviation' | 'location_disabled' | 'tracking_interruption'
+  incidentType: DeliveryTrackingIncidentType
   branchId: number
   branchName: string
   deliverymanId: number
@@ -88,7 +95,7 @@ export interface DeliveryIncidentDeviceEventEvidence {
 
 export interface DeliveryTrackingIncidentDetail {
   id: number
-  incidentType: 'stay' | 'route_deviation' | 'location_disabled' | 'tracking_interruption'
+  incidentType: DeliveryTrackingIncidentType
   branchId: number
   branchName: string
   deliverymanId: number
@@ -133,6 +140,7 @@ export interface DeliveryTrackingIncidentDetail {
 export interface DeliveryTrackingIncidentFilters {
   branchId?: number
   deliverymanId?: number
+  incidentType?: DeliveryTrackingIncidentType
   reviewStatus?: DeliveryIncidentReviewStatus
   from?: string
   to?: string
@@ -240,6 +248,10 @@ export interface DeliveryPlaybackFilters {
 class DeliveryTrackingIncidentsApi extends BaseApi {
   getAll(filters: DeliveryTrackingIncidentFilters, signal?: AbortSignal): Promise<ApiResponse<PagedResult<DeliveryTrackingIncidentListItem>>> {
     return this.get('/delivery-tracking-incidents', { params: filters, signal })
+  }
+
+  getFilterOptions(filters: Pick<DeliveryTrackingIncidentFilters, 'branchId' | 'reviewStatus' | 'from' | 'to'>, signal?: AbortSignal): Promise<ApiResponse<DeliveryTrackingIncidentFilterOptions>> {
+    return this.get('/delivery-tracking-incidents/filter-options', { params: filters, signal })
   }
 
   getById(id: number, signal?: AbortSignal): Promise<ApiResponse<DeliveryTrackingIncidentDetail>> {
