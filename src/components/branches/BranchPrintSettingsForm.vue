@@ -357,18 +357,19 @@ async function submit() {
 }
 
 async function onRotateClick() {
-    if (
-        !(await confirmDialog({
+    // Bloquear también mientras el diálogo de confirmación está abierto:
+    // dos confirmaciones sucesivas invalidarían el primer token mostrado.
+    if (rotating.value) return
+    rotating.value = true
+    try {
+        const confirmed = await confirmDialog({
             title: 'Generar nuevo token',
             message: '¿Generar un nuevo token? Los equipos que usen el token anterior dejarán de conectarse hasta actualizarlo.',
             confirmLabel: 'Generar token',
             tone: 'warning',
-        }))
-    ) {
-        return
-    }
-    rotating.value = true
-    try {
+        })
+        if (!confirmed) return
+
         const res = await branchApi.rotateBranchAgentToken(props.branchId)
         revealedToken.value = res.data.plainToken
         showTokenModal.value = true
