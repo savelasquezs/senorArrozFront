@@ -617,16 +617,16 @@ const syncVoiceEvents = (): Promise<void> => {
     return run
 }
 
-// Combine events received in the same JavaScript turn before beginning an HTTP refresh.
+// Coalesce events in the same JS turn, but do not swallow events received
+// during an HTTP read: loadOrders() queues one follow-up snapshot in that case.
 let scheduledEventRefresh: Promise<void> | null = null
 const refreshAfterKitchenEvent = (): Promise<void> => {
     if (scheduledEventRefresh) return scheduledEventRefresh
-    const pending = Promise.resolve().then(() => loadOrders())
+    const pending = Promise.resolve().then(() => {
+        scheduledEventRefresh = null
+        return loadOrders()
+    })
     scheduledEventRefresh = pending
-    void pending.then(
-        () => { if (scheduledEventRefresh === pending) scheduledEventRefresh = null },
-        () => { if (scheduledEventRefresh === pending) scheduledEventRefresh = null },
-    )
     return pending
 }
 

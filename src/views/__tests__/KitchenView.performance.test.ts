@@ -138,6 +138,33 @@ describe('KitchenView batched requests and event refresh', () => {
         expect(cache.get(1)?.[0]?.quantity).toBe(3)
     })
 
+    it('re-reads once after an order event arrives during an in-flight kitchen snapshot', async () => {
+        mount()
+        await flushPromises()
+        expect(mocks.getOrders).toHaveBeenCalledTimes(1)
+
+        let resolveStale!: (value: ReturnType<typeof paged>) => void
+        const staleResponse = new Promise<ReturnType<typeof paged>>(resolve => { resolveStale = resolve })
+        mocks.getOrders.mockImplementationOnce(() => staleResponse)
+        mocks.getOrders.mockResolvedValue(paged([order(1, 4)], 1))
+
+        const firstEvent = mocks.callbacks.NewOrder!({ id: 1 })
+        await Promise.resolve() // Begin GET; its snapshot will be stale.
+        expect(mocks.getOrders).toHaveBeenCalledTimes(2)
+        const secondEvent = mocks.callbacks.NewOrder!({ id: 1 })
+        await Promise.resolve()
+        // An event during the request must not initiate a concurrent GET.
+        expect(mocks.getOrders).toHaveBeenCalledTimes(2)
+
+        resolveStale(paged([order(1, 1)], 1))
+        await Promise.all([firstEvent, secondEvent])
+        await flushPromises()
+        expect(mocks.getOrders).toHaveBeenCalledTimes(3)
+        const cache = wrapper.findComponent(OrderCardGrid).props('orderItemsMap') as Map<number, any[]>
+        expect(cache.get(1)?.[0]?.quantity).toBe(4)
+        expect(store.list.items[0].kitchenDetails[0].quantity).toBe(4)
+    })
+
     it('loads the selected-day summary without scanning historical order pages', async () => {
         mocks.summary.mockResolvedValue([{
             id: 1, status: 'taken', prepareAt: null,
