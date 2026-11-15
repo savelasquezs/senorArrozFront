@@ -1,17 +1,23 @@
-import { createSerialRefresh } from './serialRefresh'
+import { createSerialRefresh, type RefreshContext } from './serialRefresh'
 
-/**
- * Routing events can arrive together or while the inbox is being fetched.
- * Share one read per burst and perform one trailing read for events received
- * during the active HTTP request, so the final list reflects the last event.
- */
-export function createWhatsAppRoutingRefresh(reload: () => Promise<void>) {
-  const queue = createSerialRefresh(async () => {
-    await reload()
-  })
+/** One inbox read per burst, plus a fresh read for invalidations received during it. */
+export function createWhatsAppRoutingRefresh(reload: (context: RefreshContext) => Promise<void>) {
+  let queue = createSerialRefresh(reload)
+  let scope = '', disposed = false
+
+  function cancel() {
+    queue.dispose()
+    if (!disposed) queue = createSerialRefresh(reload)
+  }
 
   return {
-    invalidate: () => queue.request(true),
-    dispose: () => queue.dispose(),
+    invalidate: (nextScope = '') => {
+      if (disposed) return Promise.resolve()
+      // A new filter/session must not wait for an obsolete request to finish.
+      if (nextScope !== scope) { cancel(); scope = nextScope }
+      return queue.request(true)
+    },
+    cancel,
+    dispose: () => { disposed = true; queue.dispose() },
   }
 }

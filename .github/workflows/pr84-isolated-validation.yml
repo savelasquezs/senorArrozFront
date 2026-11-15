@@ -1,0 +1,56 @@
+name: PR84 isolated edit and validation
+on:
+  push:
+    branches: [work/pr84-routing-review-20261115]
+permissions:
+  contents: write
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Apply exact checked edits in isolated checkout
+        run: |
+          sed -i 's/await whatsappStore.refreshStatus()/await whatsappStore.ensureStatus()/g' scripts/pr84-review-edit.py
+          python scripts/pr84-review-edit.py
+      - name: Stage source objects for connector review (no refs or branches updated)
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const paths = ['src/views/WhatsAppView.vue','src/store/whatsapp.ts','src/utils/whatsappRoutingRefresh.ts','src/views/__tests__/WhatsAppView.routing.test.ts','src/utils/__tests__/whatsappRoutingRefresh.test.ts'];
+            const entries = [];
+            for (const path of paths) {
+              const { data } = await github.rest.git.createBlob({ ...context.repo, content: fs.readFileSync(path, 'utf8'), encoding: 'utf-8' });
+              entries.push({ path, mode: '100644', type: 'blob', sha: data.sha });
+            }
+            fs.writeFileSync('pr84-source-objects.json', JSON.stringify(entries, null, 2));
+            core.info(JSON.stringify(entries));
+      - name: Install
+        run: npm ci
+      - name: Build and typecheck
+        env:
+          VITE_API_URL: https://api.example.invalid
+        run: npm run build
+      - name: Regression tests
+        run: npm run test:run
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: pr84-validated-source
+          path: |
+            pr84-source-objects.json
+            src/views/WhatsAppView.vue
+            src/store/whatsapp.ts
+            src/utils/whatsappRoutingRefresh.ts
+            src/views/__tests__/WhatsAppView.routing.test.ts
+            src/utils/__tests__/whatsappRoutingRefresh.test.ts
+          retention-days: 3
