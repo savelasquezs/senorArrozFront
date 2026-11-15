@@ -1,0 +1,30 @@
+name: Checklist workspace
+on:
+  push:
+    branches: [feat/operational-checklist-20261115]
+    paths: [.github/workflows/checklist-workspace.yml]
+permissions:
+  contents: read
+jobs:
+  workspace:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Prepare source and test dependencies
+        run: |
+          mkdir -p /tmp/checklist-workspace
+          git archive HEAD | gzip > /tmp/checklist-workspace/source.tar.gz
+          tar -czf /tmp/checklist-workspace/dependencies.tar.gz node_modules
+      - uses: actions/upload-artifact@v4
+        with:
+          name: checklist-workspace
+          path: /tmp/checklist-workspace/*.tar.gz
+          retention-days: 1
