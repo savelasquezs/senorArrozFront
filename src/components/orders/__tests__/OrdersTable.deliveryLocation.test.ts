@@ -96,6 +96,43 @@ describe('OrdersTable delivery location actions', () => {
         vi.stubGlobal('navigator', { clipboard: { writeText } })
     })
 
+    it('muestra y copia el usuario de WhatsApp cuando no hay teléfono', async () => {
+        const wrapper = mountTable(order({ customerPhone: null, customerWhatsAppUsername: '@cliente_arroz' }))
+        expect(wrapper.text()).toContain('@cliente_arroz')
+        expect(wrapper.find('[title="Copiar teléfono"]').exists()).toBe(false)
+        await wrapper.get('[title="Copiar usuario WhatsApp"]').trigger('click')
+        expect(writeText).toHaveBeenCalledExactlyOnceWith('@cliente_arroz')
+        expect(toastMocks.success).toHaveBeenCalledWith('Usuario WhatsApp copiado', 2500, '@cliente_arroz')
+        expect(wrapper.emitted('edit-customer')).toBeUndefined()
+    })
+
+    it('prioriza el teléfono cuando existen ambos contactos', async () => {
+        const wrapper = mountTable(order({ customerWhatsAppUsername: '@cliente_arroz' }))
+        await wrapper.get('[title="Copiar teléfono"]').trigger('click')
+        expect(writeText).toHaveBeenCalledExactlyOnceWith('3001234567')
+        expect(wrapper.find('[title="Copiar usuario WhatsApp"]').exists()).toBe(false)
+    })
+
+    it('normaliza el usuario cuando el teléfono está vacío', async () => {
+        const wrapper = mountTable(order({ customerPhone: '  ', customerWhatsAppUsername: ' Cliente_Arroz ' }))
+        await wrapper.get('[title="Copiar usuario WhatsApp"]').trigger('click')
+        expect(writeText).toHaveBeenCalledExactlyOnceWith('@cliente_arroz')
+    })
+
+    it('oculta copiar con una API anterior sin contacto', () => {
+        const wrapper = mountTable(order({ customerPhone: null }))
+        expect(wrapper.find('[title="Copiar teléfono"]').exists()).toBe(false)
+        expect(wrapper.find('[title="Copiar usuario WhatsApp"]').exists()).toBe(false)
+    })
+
+    it('informa el rechazo del portapapeles sin afirmar éxito', async () => {
+        writeText.mockRejectedValueOnce(new Error('denied'))
+        const wrapper = mountTable(order({ customerPhone: null, customerWhatsAppUsername: '@cliente_arroz' }))
+        await wrapper.get('[title="Copiar usuario WhatsApp"]').trigger('click')
+        expect(toastMocks.error).toHaveBeenCalledOnce()
+        expect(toastMocks.success).not.toHaveBeenCalled()
+    })
+
     it('enlaza un domicilio en camino con pedido, sucursal y fecha', () => {
         const wrapper = mountTable(order())
         const link = wrapper.get('[aria-label="Ver ubicación del pedido 567"]')

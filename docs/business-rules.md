@@ -634,6 +634,8 @@ El sidebar conserva sus medios de pago y envía una sola creación idempotente. 
 
 ## Pedidos completos desde WhatsApp
 
+- La tabla de pedidos muestra y permite copiar el teléfono del cliente o, cuando está vacío, su `customerWhatsAppUsername` con `@`. La ausencia del campo en un backend anterior conserva el comportamiento existente y no habilita llamadas con un usuario de WhatsApp.
+
 - El chat reutiliza `OrderSidebar`, catálogo, cliente, dirección, sucursal destino, beneficios, horarios, pagos y facturación del POS. Confirmar y gestionar el pedido conservan la vista del chat.
 - Al crear el pedido se envía su confirmación por la misma conversación con los valores guardados por el servidor. Si el mensaje falla, se conserva el pedido y se permite revisar el chat y reenviar solo el mensaje.
 - Cada conversación conserva su borrador local por usuario; los borradores del POS permanecen independientes. Un reintento conserva `posCreationKey` y un pedido confirmado exige iniciar explícitamente otro pedido.
