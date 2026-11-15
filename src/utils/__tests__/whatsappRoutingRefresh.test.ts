@@ -10,8 +10,7 @@ function deferred() {
 describe('WhatsApp routing SignalR refresh', () => {
   it('coalesces several routing events in one tick into one inbox reload', async () => {
     const reload = vi.fn().mockResolvedValue(undefined)
-    const reportError = vi.fn()
-    const refresh = createWhatsAppRoutingRefresh(reload, reportError)
+    const refresh = createWhatsAppRoutingRefresh(reload)
 
     const first = refresh.invalidate()
     refresh.invalidate()
@@ -19,7 +18,6 @@ describe('WhatsApp routing SignalR refresh', () => {
     await first
 
     expect(reload).toHaveBeenCalledTimes(1)
-    expect(reportError).not.toHaveBeenCalled()
   })
 
   it('queues exactly one trailing reload for events arriving during an HTTP read', async () => {
@@ -32,7 +30,7 @@ describe('WhatsApp routing SignalR refresh', () => {
       if (reload.mock.calls.length === 1) await gate.promise
       running -= 1
     })
-    const refresh = createWhatsAppRoutingRefresh(reload, vi.fn())
+    const refresh = createWhatsAppRoutingRefresh(reload)
 
     const first = refresh.invalidate()
     await Promise.resolve()
@@ -46,14 +44,12 @@ describe('WhatsApp routing SignalR refresh', () => {
     expect(maximumConcurrent).toBe(1)
   })
 
-  it('reports request failures, permits another invalidation, and stops after unmount', async () => {
-    const reportError = vi.fn()
+  it('propagates request failures, permits another invalidation, and stops after unmount', async () => {
     const error = new Error('temporary network issue')
     const reload = vi.fn().mockRejectedValueOnce(error).mockResolvedValue(undefined)
-    const refresh = createWhatsAppRoutingRefresh(reload, reportError)
+    const refresh = createWhatsAppRoutingRefresh(reload)
 
-    await refresh.invalidate()
-    expect(reportError).toHaveBeenCalledWith(error)
+    await expect(refresh.invalidate()).rejects.toThrow(error)
     await refresh.invalidate()
     expect(reload).toHaveBeenCalledTimes(2)
 
