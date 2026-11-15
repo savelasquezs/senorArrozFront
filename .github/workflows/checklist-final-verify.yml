@@ -1,0 +1,35 @@
+name: Final checklist frontend integration
+on:
+  push:
+    branches: [feat/operational-checklist-20261115]
+    paths: [.github/workflows/checklist-final-verify.yml]
+permissions:
+  contents: read
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Verify integration with current main without pushing or deploying
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git rev-parse HEAD origin/main | tee validated-refs.txt
+          git merge --no-commit --no-ff origin/main
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm ci
+      - run: npm run build
+      - name: Full frontend suite
+        run: npx vitest run --reporter=default --reporter=json --outputFile=test-results.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: checklist-frontend-final-evidence
+          path: |
+            validated-refs.txt
+            test-results.json
