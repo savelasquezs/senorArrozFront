@@ -993,7 +993,9 @@ function handleConversationRoutingChanged(payload: WhatsAppConversationRoutingCh
   if (selectedConversation.value?.id === payload.conversation.id) {
     selectedConversation.value = payload.conversation
   }
-  void routingRefresh.invalidate()
+  void routingRefresh.invalidate().catch(error => {
+    console.error('No se pudo actualizar la bandeja tras un cambio de ruta WhatsApp', error)
+  })
 }
 
 function handleAiProcessingChanged(payload: WhatsAppAiProcessingChangedPayload) {
@@ -1160,10 +1162,7 @@ async function reloadConversations() {
   await selectConversationFromRoute()
 }
 
-const routingRefresh = createWhatsAppRoutingRefresh(
-  reloadConversations,
-  error => console.error('No se pudo actualizar la bandeja tras un cambio de ruta WhatsApp', error),
-)
+const routingRefresh = createWhatsAppRoutingRefresh(reloadConversations)
 
 let realtimeFallbackId: number | undefined
 let fallbackRunning = false
