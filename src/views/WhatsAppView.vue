@@ -940,7 +940,8 @@ async function changeOperationalBranch(event: Event) {
     const updated = await whatsappStore.updateOperationalBranch(conversation.id, branchId)
     if (!updated) return
     selectedConversation.value = updated
-    await reloadConversations()
+    // Share the same refresh with the routing event emitted by this mutation.
+    await routingRefresh.invalidate()
     if (selectedConversation.value?.id === updated.id) await loadConversationContext(updated)
     success('Sucursal operativa actualizada', 2200)
   } catch (error: any) {
