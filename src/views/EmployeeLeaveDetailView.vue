@@ -78,7 +78,7 @@
       </template>
     </section>
     <EmployeeLeaveForm v-if="detail" v-model="editing" :detail="detail" @saved="reload" />
-    <BaseDialog v-model="actionOpen" :title="actionTitle" size="xl" scroll-body :show-close-button="!confirming" :close-on-backdrop="!confirming">
+    <BaseDialog v-model="actionOpen" :title="actionTitle" size="3xl" scroll-body :show-close-button="!confirming" :close-on-backdrop="!confirming">
       <form :id="actionFormId" class="space-y-4" @submit.prevent="confirmPreparedAction">
         <p class="leave-help">{{ detail?.request.applicantName }} · {{ kind?.label }}</p>
         <template v-if="actionType === 'upload'"><p v-if="replacement" class="leave-alert">Reemplazarás {{ replacement.fileName }}. La aprobación y el documento anterior se conservan.</p>
@@ -93,11 +93,18 @@
               <BaseDateTimePicker v-if="setDue" v-model="supportDue" label="Plazo acordado" :disabled="confirming" /></template>
           </template>
           <div><label :for="`${actionFormId}-reason`" class="leave-label">Motivo / observaciones <span class="text-red-500">*</span></label>
-            <textarea :id="`${actionFormId}-reason`" v-model="action.reason" class="leave-input" required maxlength="1000" rows="3" :disabled="confirming" placeholder="Escribe una respuesta clara para el trabajador…" /></div>
+            <textarea :id="`${actionFormId}-reason`" v-model="action.reason" class="leave-input resize-y" required rows="9" :disabled="confirming"
+              :aria-invalid="reasonTooLong" :aria-describedby="`${actionFormId}-reason-help`" placeholder="Escribe una respuesta clara para el trabajador…" />
+            <div class="mt-2 flex flex-wrap items-start justify-between gap-2">
+              <p v-if="reasonTooLong" :id="`${actionFormId}-reason-help`" class="leave-error" role="alert">El motivo no puede superar los 500 caracteres. Reduce el texto para continuar.</p>
+              <p v-else :id="`${actionFormId}-reason-help`" class="leave-help">Máximo 500 caracteres.</p>
+              <span class="text-xs tabular-nums" :class="reasonTooLong ? 'text-red-700' : 'text-gray-500'">{{ reasonLength }} / 500</span>
+            </div>
+          </div>
         </template>
         <p v-if="actionError" class="leave-error" role="alert">{{ actionError }}</p>
       </form>
-      <template #footer><BaseButton variant="secondary" :disabled="confirming" @click="actionOpen = false">Cancelar</BaseButton><BaseButton :form="actionFormId" type="submit" :disabled="confirming || changed">Confirmar con contraseña</BaseButton></template>
+      <template #footer><BaseButton variant="secondary" :disabled="confirming" @click="actionOpen = false">Cancelar</BaseButton><BaseButton :form="actionFormId" type="submit" :disabled="confirming || changed || reasonTooLong">Confirmar con contraseña</BaseButton></template>
     </BaseDialog>
     <PasswordConfirmation v-model="confirming" :description="confirmationDescription" :action="confirmAction" />
   </div>
@@ -130,6 +137,8 @@ const action = reactive<Omit<LeaveAction, 'password'>>({ version: 0, reason: '' 
 const paidChoice = ref('no'), setDue = ref(false), supportDue = ref(''), selectedFile = ref<LeaveAttachment>(), replacement = ref<LeaveAttachment>();
 const pendingFiles = ref<LeavePendingFile[]>([]);
 const paidOptions = [{ id: 'yes', name: 'Remunerado' }, { id: 'no', name: 'No remunerado' }];
+const reasonLength = computed(() => action.reason.trim().length);
+const reasonTooLong = computed(() => reasonLength.value > 500);
 let generation = 0, historyGeneration = 0, actionOwner: number | undefined;
 let historyController: AbortController | undefined;
 const publicId = computed(() => String(route.params.publicId));
@@ -218,6 +227,7 @@ function confirmPreparedAction() {
   if (confirming.value || changed.value) return;
   if (actionType.value === 'upload' && pendingFiles.value.length !== 1) { actionError.value = 'Selecciona el documento que deseas enviar.'; return; }
   if (actionType.value !== 'upload' && !action.reason.trim()) { actionError.value = 'Escribe el motivo de la operación.'; return; }
+  if (reasonTooLong.value) { actionError.value = 'El motivo no puede superar los 500 caracteres.'; return; }
   if (setDue.value) { try { colombiaUtc(supportDue.value); } catch { actionError.value = 'Revisa la fecha del plazo.'; return; } }
   confirming.value = true;
 }
