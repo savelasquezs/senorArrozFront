@@ -192,6 +192,7 @@ export interface Order {
     customerId?: number
     customerName?: string
     customerPhone?: string
+    customerWhatsAppUsername?: string | null
     guestName?: string
     addressId?: number
     addressDescription?: string
@@ -319,6 +320,7 @@ export interface OrderListItem {
     customerId: number | null
     customerName: string | null
     customerPhone: string | null
+    customerWhatsAppUsername?: string | null
     addressId: number | null
     addressDescription: string | null
     /** Referencia / apto / info adicional de la dirección (API: addressAdditionalInfo) */

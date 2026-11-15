@@ -151,15 +151,16 @@
                                     {{ orderListRecipientDisplayName(order) }}
                                 </div>
                                 <span v-else class="text-sm text-gray-400 italic hover:underline">Sin nombre</span>
-                                <div v-if="order.customerPhone" class="text-sm text-gray-500 tabular-nums truncate">
-                                    {{ order.customerPhone }}
+                                <div v-if="orderCustomerContact(order)" class="text-sm text-gray-500 tabular-nums truncate">
+                                    {{ orderCustomerContact(order)?.value }}
                                 </div>
                             </button>
-                            <button v-if="order.customerPhone"
+                            <button v-if="orderCustomerContact(order)"
                                 type="button"
                                 class="flex-shrink-0 p-0.5 rounded text-gray-400 hover:text-emerald-600 hover:bg-emerald-50 transition-colors"
-                                title="Copiar teléfono"
-                                @click.stop="copyCustomerPhone(order)">
+                                :title="orderCustomerContact(order)?.isPhone ? 'Copiar teléfono' : 'Copiar usuario WhatsApp'"
+                                :aria-label="orderCustomerContact(order)?.isPhone ? 'Copiar teléfono' : 'Copiar usuario WhatsApp'"
+                                @click.stop="copyCustomerContact(order)">
                                 <ClipboardDocumentIcon class="w-4 h-4" />
                             </button>
                         </div>
@@ -360,6 +361,7 @@ import { useToast } from '@/composables/useToast'
 import { orderApi } from '@/services/MainAPI/orderApi'
 import { orderCashToCollect, sumPaymentsAmounts } from '@/utils/orderCashToCollect'
 import { buildDeliveryInquiryMessage } from '@/utils/deliveryInquiryMessage'
+import { orderCustomerContact } from '@/helpers/orderCustomerContact'
 import {
     ArrowsUpDownIcon,
     ChevronUpIcon,
@@ -475,14 +477,14 @@ async function quickMarkPaidInStore(order: OrderListItem) {
     }
 }
 
-async function copyCustomerPhone(order: OrderListItem) {
-    const phone = order.customerPhone?.trim()
-    if (!phone) return
+async function copyCustomerContact(order: OrderListItem) {
+    const contact = orderCustomerContact(order)
+    if (!contact) return
     try {
-        await navigator.clipboard.writeText(phone)
-        success('Teléfono copiado', 2500, phone)
+        await navigator.clipboard.writeText(contact.value)
+        success(contact.isPhone ? 'Teléfono copiado' : 'Usuario WhatsApp copiado', 2500, contact.value)
     } catch {
-        error('No se pudo copiar', 'Permite el acceso al portapapeles o copia el número manualmente.')
+        error('No se pudo copiar', 'Permite el acceso al portapapeles o copia el contacto manualmente.')
     }
 }
 
