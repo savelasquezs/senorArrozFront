@@ -50,6 +50,7 @@
 					<span class="whitespace-nowrap">Nuevo pedido</span>
 				</RouterLink>
 			</template>
+			<OperationalChecklist v-if="canAccessOrders" />
 			<EmployeeLunchControl />
 			<UserMenu />
 		</div>
@@ -71,6 +72,7 @@ import Breadcrumbs from './Breadcrumbs.vue';
 import BranchSelector from './BranchSelector.vue';
 import UserMenu from './UserMenu.vue';
 import EmployeeLunchControl from '@/components/users/EmployeeLunchControl.vue';
+import OperationalChecklist from '@/components/operationalChecklist/OperationalChecklist.vue';
 import DailyPromotionModal from '@/components/dailyPromotion/DailyPromotionModal.vue';
 import { useAuthStore } from '@/store/auth';
 import { useWhatsAppStore } from '@/store/whatsapp';
