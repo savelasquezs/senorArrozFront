@@ -156,11 +156,14 @@ export const useWhatsAppStore = defineStore('whatsapp', () => {
     return request
   }
 
-  function fetchConversations(filters?: WhatsAppConversationFilters): Promise<WhatsAppConversation[]> {
+  function fetchConversations(filters?: WhatsAppConversationFilters, signal?: AbortSignal): Promise<WhatsAppConversation[]> {
+    if (signal?.aborted) return Promise.resolve(conversations.value)
     const key = JSON.stringify(filters ?? {})
-    if (conversationRequest?.key === key) return conversationRequest.promise
+    if (conversationRequest?.key === key && !conversationRequest.abort.signal.aborted) return conversationRequest.promise
     conversationRequest?.abort.abort()
     const abort = new AbortController(), scope = messageScope
+    const cancel = () => abort.abort()
+    signal?.addEventListener('abort', cancel, { once: true })
     const revisions = new Map(messageRevisions)
     const isCurrent = () => scope === messageScope && !abort.signal.aborted
     const promise = (async () => {
@@ -180,7 +183,8 @@ export const useWhatsAppStore = defineStore('whatsapp', () => {
       error.value = err.message || 'No se pudieron cargar las conversaciones'
       throw err
     } finally {
-      if (isCurrent()) { isLoadingConversations.value = false; conversationRequest = null }
+      signal?.removeEventListener('abort', cancel)
+      if (conversationRequest?.abort === abort) { isLoadingConversations.value = false; conversationRequest = null }
     }
     })()
     conversationRequest = { key, abort, promise }
@@ -194,7 +198,9 @@ export const useWhatsAppStore = defineStore('whatsapp', () => {
   }
 
   async function updateOperationalBranch(conversationId: number, branchId: number | null) {
+    const scope = messageScope
     const res = await whatsappApi.updateOperationalBranch(conversationId, branchId)
+    if (scope !== messageScope) return null
     const conversation = conversations.value.find(x => x.id === conversationId)
     if (conversation && res.data) Object.assign(conversation, res.data)
     return res.data

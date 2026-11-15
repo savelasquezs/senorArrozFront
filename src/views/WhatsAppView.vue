@@ -91,6 +91,9 @@
       </div>
 
       <div v-else class="flex min-h-0 flex-1 flex-col">
+        <p v-if="inboxError" role="alert" class="border-b border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-900">
+          {{ inboxError }} <button type="button" class="ml-2 underline" @click="reloadConversations">Reintentar</button>
+        </p>
         <nav class="flex shrink-0 gap-2 border-b bg-white px-3 py-2 xl:hidden" aria-label="Vista de atención">
           <BaseButton size="sm" variant="outline" @click="mobilePane = 'inbox'">Conversaciones</BaseButton>
           <BaseButton size="sm" variant="outline" :disabled="!selectedConversation" @click="mobilePane = 'chat'">Chat</BaseButton>
@@ -699,6 +702,7 @@ import { useDialog } from '@/composables/useDialog'
 import { useSignalR } from '@/composables/useSignalR'
 import { useNetworkActivityManager } from '@/composables/useNetworkActivityManager'
 import { createWhatsAppRoutingRefresh } from '@/utils/whatsappRoutingRefresh'
+import type { RefreshContext } from '@/utils/serialRefresh'
 import { WHATSAPP_SIGNALR_HUB_URL } from '@/config/signalr'
 import type {
   WhatsAppAiDiagnostics,
@@ -740,6 +744,7 @@ const {
 const { isPageVisible, isUserActive } = useNetworkActivityManager()
 const loadingStatus = ref(true)
 const statusLoadError = ref('')
+const inboxError = ref('')
 const selectedConversation = ref<WhatsAppConversation | null>(null)
 const selectedCustomer = ref<Customer | null>(null)
 const selectedAddress = ref<CustomerAddress | null>(null)
@@ -783,6 +788,13 @@ const imagePreview = ref<WhatsAppMessage | null>(null)
 const showAiDiagnosticsDialog = ref(false)
 let searchTimeout: number | undefined
 let aiDiagnosticsPollingId: number | undefined
+let viewActive = true
+const sessionKey = computed(() => JSON.stringify([
+  authStore.user?.id, authStore.user?.role, authStore.user?.branchId, authStore.user?.accountType,
+]))
+const inboxScope = computed(() => JSON.stringify([
+  sessionKey.value, selectedBranchId.value, search.value.trim(), unreadOnly.value,
+]))
 
 const currentMessages = computed<WhatsAppMessage[]>(() =>
   selectedConversation.value ? (whatsappStore.messages[selectedConversation.value.id] ?? []) : []
@@ -916,39 +928,47 @@ async function changeAttention(action: 'take' | 'return-to-ai' | 'pause-ai' | 'c
 
 async function changeOperationalBranch(event: Event) {
   const conversation = selectedConversation.value
-  if (!conversation) return
+  if (!conversation || changingOperationalBranch.value || !viewActive) return
   const input = event.target as HTMLSelectElement
   const selectedValue = Number(input.value)
   const branchId = selectedValue > 0 ? selectedValue : null
-  if (branchId === conversation.operationalBranchId) return
+  const previousBranchId = conversation.operationalBranchId
+  if (branchId === previousBranchId) return
+  const session = sessionKey.value, selection = conversationSelection
+  const current = () => viewActive && session === sessionKey.value
+  const stillSelected = () => current() && selection === conversationSelection
+    && selectedConversation.value?.id === conversation.id
 
-  if (conversation.operationalBranchId && branchId) {
-    const confirmed = await confirmDialog({
-      title: 'Transferir conversación',
-      message: 'La conversación cambiará de sucursal y se liberará el asesor asignado. ¿Deseas continuar?',
-      confirmLabel: 'Transferir',
-      tone: 'warning',
-    })
-    if (!confirmed) {
-      input.value = String(conversation.operationalBranchId)
-      return
-    }
-  }
-
+  changingOperationalBranch.value = true
   try {
-    changingOperationalBranch.value = true
+    if (previousBranchId && branchId) {
+      const confirmed = await confirmDialog({
+        title: 'Transferir conversación',
+        message: 'La conversación cambiará de sucursal y se liberará el asesor asignado. ¿Deseas continuar?',
+        confirmLabel: 'Transferir',
+        tone: 'warning',
+      })
+      if (!confirmed) {
+        if (stillSelected()) input.value = String(selectedConversation.value?.operationalBranchId ?? 0)
+        return
+      }
+      if (!stillSelected() || selectedConversation.value?.operationalBranchId !== previousBranchId) return
+    }
     const updated = await whatsappStore.updateOperationalBranch(conversation.id, branchId)
-    if (!updated) return
-    selectedConversation.value = updated
-    // Share the same refresh with the routing event emitted by this mutation.
-    await routingRefresh.invalidate()
-    if (selectedConversation.value?.id === updated.id) await loadConversationContext(updated)
+    if (!updated || !current()) return
+    if (stillSelected()) selectedConversation.value = updated
     success('Sucursal operativa actualizada', 2200)
+    // A failed GET cannot undo a confirmed PUT or report it as an unsuccessful transfer.
+    const refreshed = await reloadConversations()
+    if (current() && !refreshed && inboxError.value) {
+      showError('Sucursal actualizada', 'El cambio se guardó, pero no se pudo actualizar la bandeja. Pulsa Reintentar.')
+    }
   } catch (error: any) {
-    input.value = String(conversation.operationalBranchId ?? 0)
+    if (!current()) return
+    if (stillSelected()) input.value = String(selectedConversation.value?.operationalBranchId ?? previousBranchId ?? 0)
     showError('Sucursal operativa', error.message || 'No se pudo actualizar la sucursal.')
   } finally {
-    changingOperationalBranch.value = false
+    if (current()) changingOperationalBranch.value = false
   }
 }
 async function resetConversationForTesting() {
@@ -993,9 +1013,7 @@ function handleConversationRoutingChanged(payload: WhatsAppConversationRoutingCh
   if (selectedConversation.value?.id === payload.conversation.id) {
     selectedConversation.value = payload.conversation
   }
-  void routingRefresh.invalidate().catch(error => {
-    console.error('No se pudo actualizar la bandeja tras un cambio de ruta WhatsApp', error)
-  })
+  void reloadConversations()
 }
 
 function handleAiProcessingChanged(payload: WhatsAppAiProcessingChangedPayload) {
@@ -1052,10 +1070,13 @@ function stopAiDiagnosticsPolling() {
 }
 
 async function retryWhatsAppStatus() {
+  if (!viewActive) return
+  const session = sessionKey.value
   loadingStatus.value = true
   statusLoadError.value = ''
   try {
     await whatsappStore.ensureStatus()
+    if (!viewActive || session !== sessionKey.value) return
     if (whatsappStore.enabled) {
       void whatsappStore.fetchQuickReplies().catch(() => {})
       void whatsappStore.fetchOperationalBranches().catch(() => {})
@@ -1143,15 +1164,19 @@ const slashQuickReplyMatches = computed(() => {
 })
 
 let conversationsGeneration = 0, contextGeneration = 0, conversationSelection = 0
-async function reloadConversations() {
+async function readConversations(context: RefreshContext) {
+  if (!viewActive || !whatsappStore.enabled) return
   const generation = ++conversationsGeneration
   const previousSelected = selectedConversation.value
-  await Promise.all([whatsappStore.fetchConversations({
+  // Both reads must settle before a trailing invalidation: Promise.all can reject
+  // while the other shared request is still running and cause reuse of an old snapshot.
+  const results = await Promise.allSettled([whatsappStore.fetchConversations({
     branchId: selectedBranchId.value || undefined,
     search: search.value.trim() || undefined,
     unreadOnly: unreadOnly.value || undefined,
-  }), whatsappStore.fetchUnreadSummary()])
-  if (generation !== conversationsGeneration) return
+  }, context.signal), whatsappStore.fetchUnreadSummary()])
+  if (!viewActive || !context.isCurrent() || generation !== conversationsGeneration) return
+  if (results[0].status === 'rejected') throw results[0].reason
   if (previousSelected && selectedConversation.value?.id === previousSelected.id) {
     const refreshed = whatsappStore.conversations.find(c => c.id === previousSelected.id)
     selectedConversation.value = refreshed
@@ -1160,9 +1185,22 @@ async function reloadConversations() {
         : null)
   }
   await selectConversationFromRoute()
+  if (results[1].status === 'rejected') throw results[1].reason
 }
 
-const routingRefresh = createWhatsAppRoutingRefresh(reloadConversations)
+const routingRefresh = createWhatsAppRoutingRefresh(readConversations)
+async function reloadConversations(): Promise<boolean> {
+  if (!viewActive) return false
+  const scope = inboxScope.value
+  inboxError.value = ''
+  try {
+    await routingRefresh.invalidate(scope)
+    return viewActive && scope === inboxScope.value
+  } catch {
+    if (viewActive && scope === inboxScope.value) inboxError.value = 'No se pudo actualizar la bandeja. Intenta nuevamente.'
+    return false
+  }
+}
 
 let realtimeFallbackId: number | undefined
 let fallbackRunning = false
@@ -1174,19 +1212,20 @@ function stopRealtimeFallback() {
 }
 
 function startRealtimeFallback() {
-  if (realtimeFallbackId || connectionState.value === 'connected') return
+  if (!viewActive || realtimeFallbackId || connectionState.value === 'connected') return
   realtimeFallbackId = window.setInterval(async () => {
     if (!whatsappStore.enabled || !isPageVisible.value || !isUserActive.value || !navigator.onLine || fallbackRunning) return
     fallbackRunning = true
     try {
     const activeId = selectedConversation.value?.id
     await reloadConversations()
-    if (activeId && selectedConversation.value?.id === activeId) await whatsappStore.fetchMessages(activeId)
+    if (viewActive && activeId && selectedConversation.value?.id === activeId) await whatsappStore.fetchMessages(activeId)
     } catch {} finally { fallbackRunning = false }
   }, 15_000)
 }
 
 async function selectConversation(conversation: WhatsAppConversation) {
+  if (!viewActive) return
   mobilePane.value = 'chat'
   const selection = ++conversationSelection
   selectedConversation.value = conversation
@@ -1246,8 +1285,12 @@ async function handleRealtimeMessage(payload: WhatsAppRealtimeMessagePayload) {
 }
 
 async function loadConversationContext(conversation: WhatsAppConversation) {
-  const generation = ++contextGeneration
-  const isCurrent = () => generation === contextGeneration && selectedConversation.value?.id === conversation.id
+  if (!viewActive) return
+  const generation = ++contextGeneration, session = sessionKey.value
+  const branchId = conversation.operationalBranchId ?? conversation.branchId
+  const isCurrent = () => viewActive && session === sessionKey.value && generation === contextGeneration
+    && selectedConversation.value?.id === conversation.id
+    && (selectedConversation.value.operationalBranchId ?? selectedConversation.value.branchId) === branchId
   selectedCustomer.value = null
   selectedAddress.value = null
   aiOrderDraft.value = null
@@ -1271,7 +1314,7 @@ async function loadConversationContext(conversation: WhatsAppConversation) {
     if (!customer) return
 
     let addresses: CustomerAddress[] = customer.addresses ?? []
-    if (addresses.length === 0) {
+    if (!Array.isArray(customer.addresses)) {
       const addressRes = await customerApi.getCustomerAddresses(customer.id)
       if (!isCurrent()) return
       addresses = addressRes.data ?? []
@@ -1705,7 +1748,7 @@ async function linkExistingCustomer(customer: Customer) {
     const refreshedCustomer = await customerApi.getCustomerById(customer.id)
     const resolvedCustomer = refreshedCustomer.data ?? customer
     let addresses = resolvedCustomer.addresses ?? []
-    if (addresses.length === 0) {
+    if (!Array.isArray(resolvedCustomer.addresses)) {
       const addressRes = await customerApi.getCustomerAddresses(customer.id)
       addresses = addressRes.data ?? []
     }
@@ -1836,6 +1879,7 @@ onMounted(async () => {
 })
 
 onBeforeUnmount(() => {
+  viewActive = false
   routingRefresh.dispose()
   conversationsGeneration++; contextGeneration++; conversationSelection++
   offSignalR('WhatsAppMessageCreated', handleRealtimeMessage)
@@ -1846,6 +1890,36 @@ onBeforeUnmount(() => {
   stopRealtimeFallback()
   if (searchTimeout) window.clearTimeout(searchTimeout)
 })
+
+watch(inboxScope, () => {
+  routingRefresh.cancel()
+  conversationsGeneration++
+  inboxError.value = ''
+}, { flush: 'sync' })
+
+watch(sessionKey, () => {
+  selectedConversation.value = null
+  draft.value = ''
+  clearSelectedFile()
+  changingOperationalBranch.value = false
+  if (viewActive && authStore.user) void retryWhatsAppStatus()
+}, { flush: 'sync' })
+
+watch(() => [selectedConversation.value?.id,
+  selectedConversation.value?.operationalBranchId ?? selectedConversation.value?.branchId] as const,
+([id, branchId], [oldId, oldBranchId]) => {
+  if (!id) {
+    contextGeneration++
+    selectedCustomer.value = null
+    selectedAddress.value = null
+    aiOrderDraft.value = null
+    contextLoading.value = false
+  } else if (id === oldId && branchId !== oldBranchId && selectedConversation.value) {
+    // Covers both local PUT responses and remote routing events, including mutations
+    // of the selected store object, without refreshing unrelated conversations.
+    void loadConversationContext(selectedConversation.value)
+  }
+}, { flush: 'sync' })
 
 watch(
   () => route.query.conversationId,
@@ -1867,6 +1941,8 @@ watch(showAiDiagnosticsDialog, (open) => {
 })
 
 watch(connectionState, (current, previous) => {
+  if (!viewActive) return
+  if (current === 'connected' && previous !== 'connected' && whatsappStore.enabled) void reloadConversations()
   if (current === 'connected') stopRealtimeFallback()
   else startRealtimeFallback()
   if (current === 'connected'
