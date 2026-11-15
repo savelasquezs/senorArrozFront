@@ -698,6 +698,7 @@ import { useToast } from '@/composables/useToast'
 import { useDialog } from '@/composables/useDialog'
 import { useSignalR } from '@/composables/useSignalR'
 import { useNetworkActivityManager } from '@/composables/useNetworkActivityManager'
+import { createWhatsAppRoutingRefresh } from '@/utils/whatsappRoutingRefresh'
 import { WHATSAPP_SIGNALR_HUB_URL } from '@/config/signalr'
 import type {
   WhatsAppAiDiagnostics,
@@ -991,7 +992,7 @@ function handleConversationRoutingChanged(payload: WhatsAppConversationRoutingCh
   if (selectedConversation.value?.id === payload.conversation.id) {
     selectedConversation.value = payload.conversation
   }
-  void reloadConversations()
+  void routingRefresh.invalidate()
 }
 
 function handleAiProcessingChanged(payload: WhatsAppAiProcessingChangedPayload) {
@@ -1157,6 +1158,11 @@ async function reloadConversations() {
   }
   await selectConversationFromRoute()
 }
+
+const routingRefresh = createWhatsAppRoutingRefresh(
+  reloadConversations,
+  error => console.error('No se pudo actualizar la bandeja tras un cambio de ruta WhatsApp', error),
+)
 
 let realtimeFallbackId: number | undefined
 let fallbackRunning = false
@@ -1830,6 +1836,7 @@ onMounted(async () => {
 })
 
 onBeforeUnmount(() => {
+  routingRefresh.dispose()
   conversationsGeneration++; contextGeneration++; conversationSelection++
   offSignalR('WhatsAppMessageCreated', handleRealtimeMessage)
   offSignalR('WhatsAppAttentionChanged', handleAttentionChanged)
