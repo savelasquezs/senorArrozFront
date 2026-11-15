@@ -5,16 +5,9 @@ import { createSerialRefresh } from './serialRefresh'
  * Share one read per burst and perform one trailing read for events received
  * during the active HTTP request, so the final list reflects the last event.
  */
-export function createWhatsAppRoutingRefresh(
-  reload: () => Promise<void>,
-  reportError: (error: unknown) => void,
-) {
+export function createWhatsAppRoutingRefresh(reload: () => Promise<void>) {
   const queue = createSerialRefresh(async () => {
-    try {
-      await reload()
-    } catch (error) {
-      reportError(error)
-    }
+    await reload()
   })
 
   return {
