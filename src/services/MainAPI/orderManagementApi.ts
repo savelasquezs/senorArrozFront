@@ -7,8 +7,8 @@ class OrderManagementApi extends BaseApi {
     remoteBranches(): Promise<RemoteOrderBranch[]> {
         return this.get('/orders/remote-branches')
     }
-    options(orderId: number): Promise<OrderOperationOptions> {
-        return this.get(`/orders/${orderId}/operation-options`)
+    options(orderId: number, signal?: AbortSignal): Promise<OrderOperationOptions> {
+        return this.get(`/orders/${orderId}/operation-options`, { signal })
     }
     tracking(orderId: number): Promise<OrderTracking> {
         return this.get(`/orders/${orderId}/tracking`)
