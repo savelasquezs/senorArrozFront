@@ -132,4 +132,22 @@ describe('Sidebar Rappi status polling M40-F05', () => {
     expect(wrapper.text()).toContain('Rappi (4)')
     wrapper.unmount()
   })
+  it('starts a fresh GET after logout and login while the old request is pending', async () => {
+    const previous = deferred(), fresh = deferred()
+    api.getOperationalStatus.mockReturnValueOnce(previous.promise).mockReturnValueOnce(fresh.promise)
+    const wrapper = mountSidebar()
+    harness.auth.isAuthenticated = false
+    await nextTick()
+    harness.auth.isAuthenticated = true
+    await nextTick()
+    expect(api.getOperationalStatus).toHaveBeenCalledTimes(2)
+    fresh.resolve(status(1, 5))
+    await flush()
+    previous.resolve(status(1, 11))
+    await flush()
+    expect(wrapper.text()).toContain('Rappi (5)')
+    expect(wrapper.text()).not.toContain('Rappi (11)')
+    wrapper.unmount()
+  })
+
 })
