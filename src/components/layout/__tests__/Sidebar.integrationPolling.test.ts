@@ -42,6 +42,11 @@ async function flush() {
   await Promise.resolve()
   await nextTick()
 }
+async function expandApps(wrapper: ReturnType<typeof mountSidebar>) {
+  const button = wrapper.findAll('button').find(item => item.text().trim() === 'Apps')
+  if (!button) throw new Error('Apps menu missing')
+  await button.trigger('click')
+}
 
 describe('Sidebar Rappi status polling M40-F05', () => {
   beforeEach(() => {
@@ -72,6 +77,7 @@ describe('Sidebar Rappi status polling M40-F05', () => {
     expect(api.getOperationalStatus).toHaveBeenCalledTimes(1)
     first.resolve(status(1, 3))
     await flush()
+    await expandApps(wrapper)
     expect(wrapper.text()).toContain('Rappi (3)')
     wrapper.unmount()
   })
@@ -86,6 +92,7 @@ describe('Sidebar Rappi status polling M40-F05', () => {
     expect(api.getOperationalStatus).toHaveBeenNthCalledWith(2, 2)
     current.resolve(status(2, 2))
     await flush()
+    await expandApps(wrapper)
     expect(wrapper.text()).toContain('Rappi (2)')
     old.resolve(status(1, 9))
     await flush()
@@ -129,6 +136,7 @@ describe('Sidebar Rappi status polling M40-F05', () => {
     await nextTick()
     await flush()
     expect(api.getOperationalStatus).toHaveBeenCalledTimes(2)
+    await expandApps(wrapper)
     expect(wrapper.text()).toContain('Rappi (4)')
     wrapper.unmount()
   })
@@ -145,6 +153,7 @@ describe('Sidebar Rappi status polling M40-F05', () => {
     await flush()
     previous.resolve(status(1, 11))
     await flush()
+    await expandApps(wrapper)
     expect(wrapper.text()).toContain('Rappi (5)')
     expect(wrapper.text()).not.toContain('Rappi (11)')
     wrapper.unmount()
