@@ -34,7 +34,7 @@ function status(branchId: number, pending: number) {
 function mountSidebar() {
   return shallowMount(Sidebar, {
     props: { isOpen: true },
-    global: { stubs: { 'router-link': { template: '<a><slot /></a>' } },
+    global: { stubs: { 'router-link': { template: '<a><slot /></a>' } } },
   })
 }
 async function flush() {
