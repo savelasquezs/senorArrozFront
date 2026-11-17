@@ -132,7 +132,7 @@ async function loadIntegrationStatus() {
   const id = authStore.isAuthenticated && office.includes(authStore.userRole || '')
     ? (authStore.isSuperadmin ? branchContext.selectedBranchId : authStore.user?.branchId) : null;
   if (!id) {
-    integrationGeneration++; integrationBranchId = null;
+    integrationGeneration++; integrationBranchId = null; integrationInFlight = null;
     rappiConnection.value = null; rappiPending.value = 0;
     return;
   }
