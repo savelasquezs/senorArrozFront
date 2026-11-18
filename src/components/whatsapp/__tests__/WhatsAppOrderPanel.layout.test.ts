@@ -10,6 +10,7 @@ vi.mock('@/composables/useWhatsAppCommercialDraft', async () => {
   return { useWhatsAppCommercialDraft: (conversation: { value: WhatsAppConversation }) => {
     const state = {
       session: ref({ sessionId: conversation.value.id, status: 'active', internalNotes: [] }),
+      draft: ref(null), canApplyProductSuggestion: ref(true),
       loading: ref(false), syncing: ref(false), error: ref(''), saveState: ref('saved'),
       commercialStatus: ref('in_progress'), editable: ref(true), owned: ref(true),
       load: vi.fn().mockResolvedValue(undefined), start: vi.fn(), flush: vi.fn().mockResolvedValue(undefined),

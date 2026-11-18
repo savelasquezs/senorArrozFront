@@ -321,7 +321,7 @@
 </template>
 
 <script setup lang="ts">
-import { generatePosCreationKey } from '@/utils/posCreationKey'
+import { appendOrderProducts } from '@/helpers/orderDraft'
 
 import { useOrderPermissions } from '@/composables/useOrderPermissions'
 import { useOrderEditorContext } from '@/composables/useOrderEditor'
@@ -779,12 +779,7 @@ const handleAddProducts = () => {
 function addSelectedProducts(products: OrderProductAddition[]) {
     const order = currentOrder.value
     if (!order) return
-    order.orderItems.push(...products.map(item => ({
-        tempId: generatePosCreationKey(), productId: item.productId, productName: item.productName,
-        productPrice: item.unitPrice, quantity: item.quantity, unitPrice: item.unitPrice,
-        discount: item.discount, notes: item.notes ?? '', freeDeliveryDiscount: 0,
-        subtotal: item.quantity * item.unitPrice - item.discount,
-    })))
+    appendOrderProducts(order, products)
     ordersStore.recalculateTotals(order)
     ordersStore.saveToLocalStorage()
     showProductModal.value = false

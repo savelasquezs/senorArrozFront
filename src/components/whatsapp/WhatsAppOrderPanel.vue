@@ -59,7 +59,7 @@
 </template>
 
 <script setup lang="ts">
-import { defineAsyncComponent, onActivated, onBeforeUnmount, onDeactivated, onMounted, ref, toRef, watch } from 'vue'
+import { computed, defineAsyncComponent, onActivated, onBeforeUnmount, onDeactivated, onMounted, ref, toRef, watch } from 'vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseDialog from '@/components/ui/BaseDialog.vue'
 import BaseLoading from '@/components/ui/BaseLoading.vue'
@@ -67,7 +67,7 @@ import OrderSidebar from '@/components/orders/OrderSidebar.vue'
 import { useWhatsAppCommercialDraft } from '@/composables/useWhatsAppCommercialDraft'
 import { useOrdersDataStore } from '@/store/ordersData'
 import type { OrderDetailView } from '@/types/order'
-import type { WhatsAppCommercialDraft, WhatsAppConversation, WhatsAppMessage } from '@/types/whatsapp'
+import type { WhatsAppCommercialDraft, WhatsAppConversation, WhatsAppMessage, WhatsAppProductSuggestion, WhatsAppProductSuggestionState } from '@/types/whatsapp'
 
 const props = defineProps<{ conversation: WhatsAppConversation; initialDraft?: Promise<WhatsAppCommercialDraft | null | undefined>; controlsTarget?: HTMLElement | null; canSendChoices?: boolean }>()
 const OrderDetailContent = defineAsyncComponent(() => import('@/components/orders/OrderDetailContent.vue'))
@@ -75,9 +75,23 @@ const emit = defineEmits<{
   change: [draft: WhatsAppCommercialDraft]
   'draft-message': [conversationId: number, text: string]
   'addresses-sent': [conversationId: number, messages: WhatsAppMessage[]]
+  'product-suggestion-state': [state: WhatsAppProductSuggestionState]
 }>()
-const { session, loading, syncing, error, saveState, commercialStatus, editable, owned, load, start, flush, action, refreshStatus, reconcile, sendAddressChoices, sendProductChoices } = useWhatsAppCommercialDraft(toRef(props, 'conversation'), props.initialDraft)
-defineExpose({ reconcile: () => run(() => reconcile(true)), sendProductChoices })
+const { session, draft, loading, syncing, error, saveState, commercialStatus, editable, owned, load, start, flush, action, refreshStatus, reconcile, sendAddressChoices, sendProductChoices, canApplyProductSuggestion, addProductSuggestion } = useWhatsAppCommercialDraft(toRef(props, 'conversation'), props.initialDraft)
+defineExpose({
+  reconcile: () => run(() => reconcile(true)), sendProductChoices,
+  applyProductSuggestion: (messageId: number, suggestion: WhatsAppProductSuggestion) =>
+    run(() => addProductSuggestion(messageId, suggestion, () => active.value)),
+})
+const productSuggestionState = computed<WhatsAppProductSuggestionState>(() => ({
+  conversationId: props.conversation.id,
+  branchId: draft.value?.branchId ?? null,
+  version: session.value?.version ?? null,
+  canApply: canApplyProductSuggestion.value,
+  applied: new Set(draft.value?.orderItems.filter(item => item.whatsAppSuggestionMessageId)
+    .map(item => `${item.whatsAppSuggestionMessageId}:${item.productId}`)),
+}))
+watch(productSuggestionState, value => emit('product-suggestion-state', value), { immediate: true })
 const noteText = ref(''), showReload = ref(false), showNew = ref(false), showCancel = ref(false), showOrder = ref(false), showNotes = ref(false)
 const persistedOrder = ref<OrderDetailView | null>(null)
 const sendingChoices = ref(false)
@@ -122,6 +136,7 @@ onMounted(() => { void run(() => load()) })
 let activatedOnce = false
 onActivated(() => {
   active.value = true
+  emit('product-suggestion-state', productSuggestionState.value)
   if (activatedOnce) void run(reconcile)
   activatedOnce = true
 })

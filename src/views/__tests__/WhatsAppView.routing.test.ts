@@ -10,11 +10,11 @@ const m = vi.hoisted(() => ({
   route: null as unknown as { query: Record<string, string> },
   rows: [] as WhatsAppConversation[],
   handlers: new Map<string, (payload: unknown) => void>(),
-  confirm: vi.fn(), success: vi.fn(), error: vi.fn(), reconcile: vi.fn(), sendProductChoices: vi.fn(),
+  confirm: vi.fn(), success: vi.fn(), error: vi.fn(), reconcile: vi.fn(), sendProductChoices: vi.fn(), applyProductSuggestion: vi.fn(),
   api: { getStatus: vi.fn(), getConversations: vi.fn(), getUnreadSummary: vi.fn(), getOperationalBranches: vi.fn(),
     getInboxLabels: vi.fn(), getInboxSummary: vi.fn(), setInboxLabel: vi.fn(),
     getQuickReplies: vi.fn(), getMessagesPage: vi.fn(), getOrderDraft: vi.fn(), updateOperationalBranch: vi.fn(), linkConversationCustomer: vi.fn(),
-    sendMessage: vi.fn(), getCommercialProductGroups: vi.fn() },
+    sendMessage: vi.fn(), sendQuickReply: vi.fn(), getCommercialProductGroups: vi.fn(), getProductSuggestions: vi.fn() },
   customer: { getCustomerById: vi.fn(), getCustomerAddresses: vi.fn() },
 }))
 vi.mock('@/services/MainAPI/whatsappApi', () => ({ whatsappApi: {
@@ -87,7 +87,11 @@ function mountView(realTabs = false) {
     KeepAlive: { template: '<slot />' },
     WhatsAppInboxTabs: !realTabs,
     BaseDialog: { props: ['modelValue', 'title'], template: '<div v-if="modelValue" :aria-label="title"><slot /></div>' },
-    WhatsAppOrderPanel: { methods: { reconcile: m.reconcile, sendProductChoices: m.sendProductChoices }, template: '<div />' },
+    WhatsAppOrderPanel: { props: ['conversation'], mounted() {
+      this.$emit('product-suggestion-state', { conversationId: this.conversation.id, branchId: null, version: null,
+        canApply: true, applied: new Set() })
+    }, methods: { reconcile: m.reconcile, sendProductChoices: m.sendProductChoices,
+      applyProductSuggestion: m.applyProductSuggestion }, template: '<div />' },
   } } })
   wrappers.push(wrapper)
   return { wrapper, vm: wrapper.vm as unknown as View }
@@ -119,6 +123,7 @@ describe('M38-F04 view + real Pinia store integration', () => {
     m.api.getOperationalBranches.mockResolvedValue(reply([{ id: 1, name: 'Uno' }, { id: 2, name: 'Dos' }]))
     m.api.getQuickReplies.mockResolvedValue(reply([]))
     m.api.getCommercialProductGroups.mockResolvedValue(reply([]))
+    m.api.getProductSuggestions.mockResolvedValue(reply({ branchId: 1, messages: [] }))
     m.api.getMessagesPage.mockResolvedValue(reply({ items: [], nextCursor: null, hasMore: false }))
     m.api.getOrderDraft.mockImplementation(async (id: number) => reply({ conversationId: id,
       branchId: m.rows.find(row => row.id === id)?.operationalBranchId ?? 1, items: [], activities: [], total: 0 }))
@@ -269,6 +274,88 @@ describe('M38-F04 view + real Pinia store integration', () => {
     expect(m.sendProductChoices).toHaveBeenCalledExactlyOnceWith(2)
     expect(m.api.sendMessage).not.toHaveBeenCalled()
     expect(composer.element.value).toBe('')
+  })
+
+  it('uses Tab for one catalog name match and keeps the command on a simulated send failure', async () => {
+    m.api.getCommercialProductGroups.mockResolvedValue(reply([
+      { id: 2, name: 'Arroz Paisa con Chicharrón', isRice: true, shortcut: 'paisacon' },
+      { id: 6, name: 'Arroz Paisa', isRice: true, shortcut: 'paisasin' },
+    ]))
+    m.sendProductChoices.mockRejectedValueOnce(new Error('No se pudo enviar')).mockResolvedValueOnce([])
+    const { wrapper, vm } = mountView()
+    await flushPromises()
+    await vm.selectConversation({ ...m.rows[0], customerServiceWindowExpiresAt: '2099-01-01T00:00:00Z' })
+    const composer = wrapper.get<HTMLTextAreaElement>('textarea[placeholder="Escribe un mensaje"]')
+    for (const query of ['/zzz', '/paisa']) {
+      await composer.setValue(query)
+      const tab = new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true })
+      composer.element.dispatchEvent(tab)
+      expect(tab.defaultPrevented).toBe(false)
+    }
+    expect(m.sendProductChoices).not.toHaveBeenCalled()
+    await composer.setValue('/conchi')
+    const backward = new KeyboardEvent('keydown', { key: 'Tab', shiftKey: true, bubbles: true, cancelable: true })
+    composer.element.dispatchEvent(backward)
+    expect(backward.defaultPrevented).toBe(false)
+    await composer.trigger('keydown', { key: 'Tab' })
+    await flushPromises()
+    expect(composer.element.value).toBe('/conchi')
+    await composer.trigger('keydown', { key: 'Tab' })
+    await flushPromises()
+    expect(m.sendProductChoices.mock.calls).toEqual([[2], [2]])
+    expect(composer.element.value).toBe('')
+  })
+
+  it('sends a unique saved reply with Tab and does not send an ambiguous conchi match', async () => {
+    m.api.getQuickReplies.mockResolvedValue(reply([
+      { id: 12, branchId: 1, shortcut: 'horarios', messageTemplate: 'Abrimos a las 11', isActive: true, usageCount: 0 },
+    ]))
+    m.api.getCommercialProductGroups.mockResolvedValue(reply([
+      { id: 2, name: 'Arroz Paisa con Chicharrón', isRice: true, shortcut: 'paisacon' },
+      { id: 1, name: 'Arroz Ropa Vieja con Chicharrón', isRice: true, shortcut: 'ropaviejacon' },
+    ]))
+    m.api.sendQuickReply.mockResolvedValueOnce(reply(null))
+    const { wrapper, vm } = mountView()
+    await flushPromises()
+    await vm.selectConversation({ ...m.rows[0], customerServiceWindowExpiresAt: '2099-01-01T00:00:00Z' })
+    const composer = wrapper.get<HTMLTextAreaElement>('textarea[placeholder="Escribe un mensaje"]')
+    await composer.setValue('/conchi')
+    await composer.trigger('keydown', { key: 'Tab' })
+    expect(m.sendProductChoices).not.toHaveBeenCalled()
+    expect(m.api.sendQuickReply).not.toHaveBeenCalled()
+    await composer.setValue('/hora')
+    await composer.trigger('keydown', { key: 'Tab' })
+    await flushPromises()
+    expect(m.api.sendQuickReply).toHaveBeenCalledExactlyOnceWith(1, 12)
+    expect(composer.element.value).toBe('')
+  })
+
+  it('shows product actions on each eligible message and only prepares a price reply in the composer', async () => {
+    const inbound = { conversationId: 1, direction: 'inbound', type: 'text', timestamp: '2026-11-18T13:00:00Z' }
+    m.api.getMessagesPage.mockResolvedValue(reply({ items: [
+      { ...inbound, id: 90, textBody: 'dos ropa vieja súper con chicharrón' },
+      { ...inbound, id: 91, textBody: '¿Cuánto cuesta el paisa dúo?' },
+      { ...inbound, id: 92, isHistorical: true, textBody: 'ropa vieja' },
+      { ...inbound, id: 93, direction: 'outbound', textBody: 'paisa dúo' },
+    ], nextCursor: null, hasMore: false }))
+    const add = { kind: 'add', productId: 5, name: 'Ropa vieja Súper', quantity: 2, unitPrice: 66000, available: true, reply: null }
+    m.api.getProductSuggestions.mockResolvedValue(reply({ branchId: 1, messages: [
+      { messageId: 90, suggestions: [add] },
+      { messageId: 91, suggestions: [{ kind: 'reply', productId: 8, reply: 'Paisa Dúo cuesta $ 31.000.' }] },
+    ] }))
+    const { wrapper, vm } = mountView()
+    await flushPromises()
+    await vm.selectConversation({ ...m.rows[0], customerServiceWindowExpiresAt: '2099-01-01T00:00:00Z' })
+    await flushPromises()
+    expect(m.api.getProductSuggestions).toHaveBeenCalledWith(1, [90, 91], expect.anything())
+    const addButton = wrapper.get('[data-message-id="90"] button')
+    expect(addButton.text()).toContain('Agregar 2 × Ropa vieja Súper')
+    await addButton.trigger('click')
+    expect(m.applyProductSuggestion).toHaveBeenCalledExactlyOnceWith(90, add)
+    await wrapper.get('[data-message-id="91"] button').trigger('click')
+    expect(wrapper.get<HTMLTextAreaElement>('textarea[placeholder="Escribe un mensaje"]').element.value)
+      .toBe('Paisa Dúo cuesta $ 31.000.')
+    expect(m.api.sendMessage).not.toHaveBeenCalled()
   })
 
   it('retains a fresh read when a routing event arrives during the initial GET', async () => {

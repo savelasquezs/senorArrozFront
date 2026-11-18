@@ -14,6 +14,7 @@ export type AppliedBenefitType = 'DailyPromotion' | 'Loyalty' | 'DiscountCode' |
 
 export interface OrderItem {
     whatsAppProductChoice?: WhatsAppProductChoice
+    whatsAppSuggestionMessageId?: number
     tempId: string
     productId: number
     productName: string
@@ -513,6 +514,7 @@ export interface CreateOrderDto {
 
 export interface CreateOrderDetailDto {
     whatsAppProductChoice?: WhatsAppProductChoice | null
+    whatsAppSuggestionMessageId?: number | null
     productId: number
     quantity: number
     unitPrice: number

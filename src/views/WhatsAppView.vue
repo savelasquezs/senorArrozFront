@@ -324,6 +324,30 @@
                   <p v-else-if="message.type !== 'text' && !message.mediaUrl" class="text-sm opacity-80">
                     {{ mediaFallbackLabel(message) }}
                   </p>
+                  <div v-if="productSuggestions.get(message.id)?.length" class="mt-2 flex flex-wrap gap-1.5" aria-label="Sugerencias de productos">
+                    <template v-for="suggestion in productSuggestions.get(message.id)" :key="suggestion.productId ?? suggestion.reply">
+                      <button
+                        v-if="suggestion.kind === 'add'"
+                        type="button"
+                        class="rounded border border-emerald-200 bg-emerald-50 px-2 py-1 text-left text-xs font-semibold text-emerald-800 hover:bg-emerald-100 disabled:opacity-65"
+                        :disabled="isSuggestionApplied(message.id, suggestion) || !suggestion.available || !currentSuggestionState?.canApply || suggestionBranch !== visibleSuggestionBranch"
+                        @click="addProductSuggestion(message.id, suggestion)"
+                      >
+                        {{ isSuggestionApplied(message.id, suggestion) ? 'Agregado' : !suggestionBranch ? 'Elige la sucursal' : suggestion.available ? 'Agregar' : 'Sin disponibilidad' }}
+                        {{ suggestion.quantity }} × {{ suggestion.name }} · $ {{ suggestion.unitPrice?.toLocaleString('es-CO') }}
+                      </button>
+                      <button
+                        v-else-if="suggestion.reply"
+                        type="button"
+                        class="rounded border border-gray-200 px-2 py-1 text-xs font-semibold text-gray-700 hover:bg-gray-100 disabled:opacity-65"
+                        :title="suggestion.reply"
+                        :disabled="!canSend"
+                        @click="draftOrderMessage(message.conversationId, suggestion.reply)"
+                      >
+                        {{ suggestion.kind === 'clarify' ? 'Preparar pregunta' : 'Preparar respuesta' }}
+                      </button>
+                    </template>
+                  </div>
                   <div class="mt-1 flex items-center justify-end gap-2 text-[11px]" :class="message.direction === 'outbound' ? 'text-emerald-50' : 'text-gray-400'">
                     <span v-if="message.source === 'businessApp'">Celular · </span><span v-if="message.isHistorical">Historial · </span><span>{{ formatTime(message.timestamp) }}</span>
                     <span v-if="message.direction === 'outbound'">{{ statusLabel(message.status) }}</span>
@@ -394,6 +418,7 @@
                   class="min-h-[44px] flex-1 resize-none rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-emerald-500 focus:ring-emerald-500"
                   placeholder="Escribe un mensaje"
                   @keydown.enter.exact.prevent="sendMessage"
+                  @keydown.tab="sendUniqueQuickReply"
                   :disabled="!canSend"
                 />
                 <BaseButton type="submit" :loading="sending || sendingProductChoices" :disabled="!canSend || (!draft.trim() && !selectedFile)" :icon="PaperAirplaneIcon">
@@ -404,13 +429,14 @@
                 v-if="slashQuickReplyMatches.length"
                 class="mt-2 max-h-52 overflow-y-auto rounded-lg border border-gray-200 bg-gray-50 p-2 shadow-sm"
               >
+                <p v-if="uniqueQuickReply" class="px-2 pb-1 text-xs text-gray-500">Tab para enviar</p>
                 <button
                   v-for="reply in slashQuickReplyMatches"
                   :key="reply.key"
                   type="button"
                   class="flex w-full items-start gap-3 rounded-md px-2 py-1.5 text-left hover:bg-white"
                   :disabled="sending || sendingProductChoices || !canSend"
-                  @click="reply.group ? sendCatalogQuickReply(reply.group) : reply.saved && sendQuickReply(reply.saved)"
+                  @click="chooseQuickReply(reply)"
                 >
                   <span class="shrink-0 rounded bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-800">/{{ reply.shortcut }}</span>
                   <span class="min-w-0 flex-1 truncate text-xs text-gray-600">{{ reply.preview }}</span>
@@ -434,7 +460,8 @@
           <div role="separator" tabindex="0" aria-label="Ancho del pedido" aria-orientation="vertical" :aria-valuenow="rightWidth" class="absolute -left-1 top-0 z-10 hidden h-full w-2 cursor-col-resize touch-none xl:block" @pointerdown="resize($event, 'right')" @keydown.left.prevent="step('right', 20)" @keydown.right.prevent="step('right', -20)" />
           <KeepAlive :key="editorScope" :max="8">
             <WhatsAppOrderPanel ref="commercialPanel" :key="`${authStore.user?.id}:${selectedConversation.id}`" :conversation="selectedConversation" :initial-draft="prefetchedDraft" :controls-target="commercialControlsTarget"
-              :can-send-choices="canSend" @change="commercialChanged" @draft-message="draftOrderMessage" @addresses-sent="addressesSent" />
+              :can-send-choices="canSend" @change="commercialChanged" @draft-message="draftOrderMessage" @addresses-sent="addressesSent"
+              @product-suggestion-state="setProductSuggestionState" />
           </KeepAlive>
         </aside>
         </div>
@@ -640,6 +667,7 @@ import { useWhatsAppStore } from '@/store/whatsapp'
 import { useAuthStore } from '@/store/auth'
 import { useBranchContextStore } from '@/store/branchContext'
 import { useWhatsAppComposer } from '@/composables/useWhatsAppComposer'
+import { useWhatsAppProductSuggestions } from '@/composables/useWhatsAppProductSuggestions'
 import { useDebouncedCallback } from '@/composables/useDebouncedCallback'
 import { formatMessageTime as formatTime } from '@/composables/useFormatting'
 import type { WhatsAppAttentionAction, WhatsAppInboxKey } from '@/types/whatsapp'
@@ -663,6 +691,8 @@ import type {
   WhatsAppInboxLabel,
   WhatsAppInboxSummary,
   WhatsAppProductChoiceGroup,
+  WhatsAppProductSuggestion,
+  WhatsAppProductSuggestionState,
   WhatsAppQuickReply,
   WhatsAppRealtimeMessagePayload,
 } from '@/types/whatsapp'
@@ -748,6 +778,8 @@ const sendingProductChoices = ref(false)
 const productChoicesError = ref('')
 const productChoiceGroupId = ref(0)
 const productChoiceGroups = ref<WhatsAppProductChoiceGroup[]>([])
+const savedQuickRepliesReady = ref(false)
+const catalogQuickRepliesReady = ref(false)
 const riceChoiceGroups = computed(() => productChoiceGroups.value.filter(group => group.isRice))
 const additionChoiceGroups = computed(() => productChoiceGroups.value.filter(group => !group.isRice))
 const catalogQuickRepliesByShortcut = computed(() => {
@@ -786,6 +818,34 @@ const inboxScope = computed(() => JSON.stringify([
 const currentMessages = computed<WhatsAppMessage[]>(() =>
   selectedConversation.value ? (whatsappStore.messages[selectedConversation.value.id] ?? []) : []
 )
+const panelSuggestionState = shallowRef<WhatsAppProductSuggestionState | null>(null)
+const currentSuggestionState = computed(() => panelSuggestionState.value?.conversationId === selectedConversation.value?.id
+  ? panelSuggestionState.value : null)
+function setProductSuggestionState(state: WhatsAppProductSuggestionState) {
+  if (selectedConversation.value?.id !== state.conversationId) return
+  const current = panelSuggestionState.value
+  if (current?.conversationId === state.conversationId && current.branchId === state.branchId
+    && current.version === state.version && current.canApply === state.canApply
+    && current.applied.size === state.applied.size && [...state.applied].every(key => current.applied.has(key))) return
+  panelSuggestionState.value = state
+}
+const { byMessage: productSuggestions, branchId: suggestionBranch, reload: reloadProductSuggestions } =
+  useWhatsAppProductSuggestions(computed(() => selectedConversation.value?.id),
+    computed(() => `${editorScope.value}:${selectedConversation.value?.operationalBranchId ?? ''}`),
+    computed(() => currentSuggestionState.value?.version), currentMessages)
+const visibleSuggestionBranch = computed(() => currentSuggestionState.value?.branchId ?? (
+  selectedConversation.value?.isCentralChannel ? selectedConversation.value.operationalBranchId ?? 0 : selectedConversation.value?.branchId ?? 0))
+
+function isSuggestionApplied(messageId: number, suggestion: WhatsAppProductSuggestion) {
+  return currentSuggestionState.value?.applied.has(`${messageId}:${suggestion.productId}`) === true
+}
+
+async function addProductSuggestion(messageId: number, suggestion: WhatsAppProductSuggestion) {
+  const id = selectedConversation.value?.id
+  if (!id || suggestionBranch.value !== visibleSuggestionBranch.value) return
+  await commercialPanel.value?.applyProductSuggestion(messageId, suggestion)
+  if (selectedConversation.value?.id === id) await reloadProductSuggestions()
+}
 
 const diagnosticsBranchId = computed(() =>
   selectedConversation.value?.operationalBranchId
@@ -1082,7 +1142,7 @@ async function retryWhatsAppStatus() {
     await whatsappStore.ensureStatus()
     if (!viewActive || session !== sessionKey.value) return
     if (whatsappStore.enabled) {
-      void whatsappStore.fetchQuickReplies().catch(() => {})
+      void loadSavedQuickReplies().catch(() => {})
       void loadInboxLabels().catch(() => {})
       void loadProductChoiceGroups().catch(() => {})
       void whatsappStore.fetchOperationalBranches().catch(() => {})
@@ -1125,7 +1185,7 @@ const activeQuickRepliesForConversation = computed(() => {
 
 const topQuickReplies = computed(() => activeQuickRepliesForConversation.value.slice(0, 6))
 
-const slashQuickReplyMatches = computed(() => {
+const filteredQuickReplies = computed(() => {
   const value = draft.value.trim()
   if (!value.startsWith('/') || /\s/.test(value) || selectedFile.value) return []
   const query = normalizeQuickReplyShortcut(value)
@@ -1136,8 +1196,24 @@ const slashQuickReplyMatches = computed(() => {
     ...activeQuickRepliesForConversation.value.map(saved => ({
       saved, group: null, key: `saved-${saved.id}`, shortcut: saved.shortcut, preview: saved.messageTemplate,
     })),
-  ].filter(reply => reply.shortcut.includes(query)).slice(0, 12)
+  ].filter(reply => reply.group ? matchesCatalogQuickReply(reply.group, query) : reply.shortcut.includes(query))
 })
+const slashQuickReplyMatches = computed(() => filteredQuickReplies.value.slice(0, 12))
+const uniqueQuickReply = computed(() => filteredQuickReplies.value.length === 1
+  && normalizeQuickReplyShortcut(draft.value) && savedQuickRepliesReady.value && catalogQuickRepliesReady.value
+  && !whatsappStore.isLoadingQuickReplies && !loadingProductChoices.value
+  && canSend.value && !sending.value && !sendingProductChoices.value ? filteredQuickReplies.value[0] : undefined)
+
+function chooseQuickReply(reply: (typeof filteredQuickReplies.value)[number]) {
+  if (reply.group) return sendCatalogQuickReply(reply.group)
+  if (reply.saved) return sendQuickReply(reply.saved)
+}
+
+function sendUniqueQuickReply(event: KeyboardEvent) {
+  if (!uniqueQuickReply.value || event.shiftKey || event.ctrlKey || event.altKey || event.metaKey || event.isComposing) return
+  event.preventDefault()
+  if (!event.repeat) void chooseQuickReply(uniqueQuickReply.value)
+}
 
 const inboxLabelStyles: Record<string, { name: string; color: string }> = {
   supplier: { name: 'Proveedor', color: 'bg-violet-700 text-white' },
@@ -1371,6 +1447,12 @@ function normalizeQuickReplyShortcut(value: string) {
   return value.trim().replace(/^\/+/, '').trim().toLowerCase()
 }
 
+function matchesCatalogQuickReply(group: WhatsAppProductChoiceGroup, query: string) {
+  const compact = (value: string) => value.normalize('NFD').toLowerCase().replace(/[^a-z0-9]/g, '')
+  const term = compact(query)
+  return !!group.shortcut?.includes(query) || (!!term && compact(group.name).includes(term))
+}
+
 function findQuickReplyCommand(value: string) {
   const trimmed = value.trim()
   if (!trimmed.startsWith('/') || /\s/.test(trimmed)) return null
@@ -1379,7 +1461,7 @@ function findQuickReplyCommand(value: string) {
 }
 
 async function sendQuickReply(reply: WhatsAppQuickReply) {
-  if (!canSend.value) return
+  if (!canSend.value || sending.value || sendingProductChoices.value) return
   if (!selectedConversation.value) return
   try {
     sending.value = true
@@ -1403,7 +1485,14 @@ function defaultQuickReplyBranchId() {
 }
 
 async function loadQuickReplies() {
-  await Promise.all([whatsappStore.fetchQuickReplies(), loadProductChoiceGroups()])
+  await Promise.all([loadSavedQuickReplies(), loadProductChoiceGroups()])
+}
+
+async function loadSavedQuickReplies() {
+  const scope = sessionKey.value
+  savedQuickRepliesReady.value = false
+  await whatsappStore.fetchQuickReplies()
+  if (viewActive && scope === sessionKey.value) savedQuickRepliesReady.value = true
 }
 
 function resetQuickReplyForm() {
@@ -1505,7 +1594,10 @@ function loadProductChoiceGroups() {
   const controller = new AbortController()
   loadingProductChoices.value = true
   const promise = whatsappApi.getCommercialProductGroups(controller.signal).then(response => {
-    if (!controller.signal.aborted) productChoiceGroups.value = response.data ?? []
+    if (!controller.signal.aborted) {
+      productChoiceGroups.value = response.data ?? []
+      catalogQuickRepliesReady.value = true
+    }
   }).finally(() => {
     if (productChoicesRequest?.controller === controller) {
       productChoicesRequest = undefined
@@ -1530,10 +1622,10 @@ async function openProductChoices() {
 
 function sendCatalogQuickReply(group: WhatsAppProductChoiceGroup) {
   showQuickRepliesModal.value = false
-  return sendProductOptions(group.id, group.shortcut ?? '')
+  return sendProductOptions(group.id, group)
 }
 
-async function sendProductOptions(groupId: number, shortcut?: string) {
+async function sendProductOptions(groupId: number, group?: WhatsAppProductChoiceGroup) {
   const conversationId = selectedConversation.value?.id
   const panel = commercialPanel.value
   if (!conversationId || !panel || !canSend.value || sending.value || sendingProductChoices.value || !groupId) return
@@ -1543,8 +1635,8 @@ async function sendProductOptions(groupId: number, shortcut?: string) {
   const text = draft.value.trim()
   try {
     const messages = await panel.sendProductChoices(groupId)
-    if (shortcut && text.startsWith('/') && !/\s/.test(text) && !selectedFile.value
-      && shortcut.includes(normalizeQuickReplyShortcut(text))) clearSent(conversationId, text, null)
+    if (group && text.startsWith('/') && !/\s/.test(text) && !selectedFile.value
+      && matchesCatalogQuickReply(group, normalizeQuickReplyShortcut(text))) clearSent(conversationId, text, null)
     if (selectedConversation.value?.id === conversationId) showProductChoices.value = false
     await choiceMessagesSent(conversationId, messages, 'Opciones de producto enviadas')
   } catch (error) {
@@ -1857,6 +1949,8 @@ watch(sessionKey, () => {
   productChoicesRequest = undefined
   loadingProductChoices.value = false
   productChoiceGroups.value = []
+  catalogQuickRepliesReady.value = false
+  savedQuickRepliesReady.value = false
   selectedConversation.value = null
   draft.value = ''
   clearSelectedFile()

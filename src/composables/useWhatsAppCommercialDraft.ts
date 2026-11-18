@@ -8,9 +8,9 @@ import { useAuthStore } from '@/store/auth'
 import { useBranchContextStore } from '@/store/branchContext'
 import { provideOrderEditor } from './useOrderEditor'
 import { useOrderSubmission } from './useOrderSubmission'
-import { createOrderDraft } from '@/helpers/orderDraft'
+import { appendOrderProducts, createOrderDraft } from '@/helpers/orderDraft'
 import type { DraftOrder, Order } from '@/types/order'
-import type { WhatsAppCommercialDraft, WhatsAppConversation } from '@/types/whatsapp'
+import type { WhatsAppCommercialDraft, WhatsAppConversation, WhatsAppProductSuggestion } from '@/types/whatsapp'
 
 interface RetainedDraft {
   session: WhatsAppCommercialDraft | null
@@ -41,6 +41,9 @@ export function useWhatsAppCommercialDraft(conversation: Ref<WhatsAppConversatio
   const { transformDraftToCreateDto } = useOrderSubmission()
   const owned = computed(() => conversation.value.attentionMode === 'human' && conversation.value.assignedUserId === auth.user?.id)
   const editable = computed(() => owned.value && session.value?.status === 'active' && !loading.value && !syncing.value && saveState.value !== 'conflict')
+  const addingSuggestion = ref(false)
+  const canApplyProductSuggestion = computed(() => !addingSuggestion.value
+    && (editable.value || !session.value && owned.value && !loading.value && !syncing.value))
   let applying = false, disposed = false, timer: ReturnType<typeof setTimeout> | undefined
   let pendingSave: Promise<void> | null = null
   let generation = 0
@@ -89,6 +92,7 @@ export function useWhatsAppCommercialDraft(conversation: Ref<WhatsAppConversatio
         appliedBenefitSnapshot: dto.appliedBenefitSnapshot, manualBenefitReason: dto.manualBenefitReason,
         manualBenefitGiftProductId: dto.manualBenefitGiftProductId,
         orderItems: dto.orderDetails.map(item => ({ ...item, whatsAppProductChoice: item.whatsAppProductChoice ?? undefined,
+          whatsAppSuggestionMessageId: item.whatsAppSuggestionMessageId ?? undefined,
           tempId: item.whatsAppProductChoice?.key ?? generatePosCreationKey(), productName: item.whatsAppProductChoice?.name ?? `Producto ${item.productId}`,
           productPrice: item.unitPrice, discount: automaticDiscount ? 0 : item.discount ?? 0, freeDeliveryDiscount: 0,
           notes: item.notes ?? '',
@@ -227,6 +231,55 @@ export function useWhatsAppCommercialDraft(conversation: Ref<WhatsAppConversatio
     finally { finishLoading() }
   }
 
+  async function addProductSuggestion(messageId: number, suggestion: WhatsAppProductSuggestion, isActive: () => boolean) {
+    if (!canApplyProductSuggestion.value || suggestion.kind !== 'add' || !suggestion.productId) return
+    const productId = suggestion.productId
+    if (draft.value?.orderItems.some(item => item.productId === productId && item.whatsAppSuggestionMessageId === messageId)) return
+    addingSuggestion.value = true
+    error.value = ''
+    try {
+      if (!session.value) {
+        await start()
+        await settleDraftReconciliation(isActive)
+      }
+      if (!isActive() || !editable.value || disposed) return
+      await flush()
+      const branchId = draft.value?.branchId
+      const attempt = session.value?.sessionId
+      if (!branchId || branchId <= 0) throw new Error('Elige la sucursal que prepara el pedido.')
+      const { data } = await whatsappApi.getProductSuggestions(conversationId, [messageId])
+      await settleDraftReconciliation(isActive)
+      if (!isActive() || disposed || !owned.value) return
+      const current = draft.value
+      if (!editable.value || current?.branchId !== branchId || session.value?.sessionId !== attempt)
+        throw new Error('El borrador cambió. Vuelve a seleccionar la sugerencia.')
+      const verified = data?.messages.find(message => message.messageId === messageId)?.suggestions
+        .find(option => option.kind === 'add' && option.productId === productId)
+      if (data?.branchId !== branchId || !verified?.name || verified.unitPrice === null
+        || verified.unitPrice !== suggestion.unitPrice || verified.quantity !== suggestion.quantity) {
+        throw new Error('La sugerencia o su precio cambió. Revisa la opción actualizada.')
+      }
+      if (!verified.available) throw new Error('No hay inventario suficiente en la sucursal que prepara.')
+      const [item] = appendOrderProducts(current, [{ id: 0, productId, productName: verified.name, productDescription: '',
+        unitPrice: verified.unitPrice, quantity: verified.quantity, discount: 0, notes: '', whatsAppSuggestionMessageId: messageId }])
+      editor.recalculateTotals(current)
+      try {
+        await flush()
+      } catch (cause) {
+        const latest = draft.value
+        if (latest && session.value?.sessionId === attempt && [400, 422].includes((cause as { status?: number }).status ?? 0)) {
+          const index = latest.orderItems.findIndex(line => line.tempId === item!.tempId)
+          if (index >= 0) latest.orderItems.splice(index, 1)
+          editor.recalculateTotals(latest)
+          if (snapshot() === savedSnapshot) saveState.value = 'saved'
+        }
+        throw cause
+      }
+    } finally {
+      addingSuggestion.value = false
+    }
+  }
+
   function finishLoading() {
     loading.value = false
     if (queuedReconciliation && !disposed && auth.user?.id === userId) {
@@ -252,7 +305,8 @@ export function useWhatsAppCommercialDraft(conversation: Ref<WhatsAppConversatio
     const additions = appended.flatMap(item => {
       const choice = item.whatsAppProductChoice!
       if (chosen.has(choice.key)) return []
-      return [{ ...item, whatsAppProductChoice: choice, tempId: choice.key, productName: choice.name,
+      return [{ ...item, whatsAppProductChoice: choice, whatsAppSuggestionMessageId: item.whatsAppSuggestionMessageId ?? undefined,
+        tempId: choice.key, productName: choice.name,
         productPrice: item.unitPrice, discount: item.discount ?? 0, freeDeliveryDiscount: 0,
         subtotal: item.unitPrice * item.quantity, notes: item.notes ?? '' }]
     })
@@ -321,6 +375,10 @@ export function useWhatsAppCommercialDraft(conversation: Ref<WhatsAppConversatio
   }
 
   let reconciliation: Promise<void> | null = null
+  async function settleDraftReconciliation(isActive: () => boolean) {
+    while (reconciliation && isActive() && !disposed) await reconciliation
+  }
+
   function reconcile(force = false): Promise<void> {
     if (force) syncing.value = true
     if (reconciliation) { queuedReconciliation ||= force; return reconciliation }
@@ -419,7 +477,7 @@ export function useWhatsAppCommercialDraft(conversation: Ref<WhatsAppConversatio
     retireClean()
     generation++
   })
-  return { editor, session, draft, loading, syncing, error, saveState, commercialStatus, editable, owned, load, start, flush, action, submit, refreshStatus, reconcile, sendAddressChoices, sendProductChoices }
+  return { editor, session, draft, loading, syncing, error, saveState, commercialStatus, editable, owned, load, start, flush, action, submit, refreshStatus, reconcile, sendAddressChoices, sendProductChoices, canApplyProductSuggestion, addProductSuggestion }
 }
 
 function message(cause: unknown) { return cause instanceof Error ? cause.message : 'No se pudo guardar el pedido. Reintenta.' }

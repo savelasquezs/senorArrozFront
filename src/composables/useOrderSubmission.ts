@@ -36,6 +36,8 @@ export function useOrderSubmission() {
             notes: item.notes || undefined,
             ...(draft.whatsappConversationId && item.whatsAppProductChoice
                 ? { whatsAppProductChoice: item.whatsAppProductChoice } : {}),
+            ...(draft.whatsappConversationId && item.whatsAppSuggestionMessageId
+                ? { whatsAppSuggestionMessageId: item.whatsAppSuggestionMessageId } : {}),
         }))
 
         // Transform bank payments
