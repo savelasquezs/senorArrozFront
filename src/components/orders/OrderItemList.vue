@@ -214,10 +214,10 @@ const handleDeliveryFeeChange = () => {
     }
 }
 
-async function copyOrderSummaryToClipboard() {
+function buildOrderSummary() {
     const o = currentOrder.value
-    if (!o) return
-    const msg = buildPosOrderCopyMessage({
+    if (!o) return ''
+    return buildPosOrderCopyMessage({
         orderType: o.type,
         isLater: o.isLater === true,
         addressId: o.addressId,
@@ -234,6 +234,11 @@ async function copyOrderSummaryToClipboard() {
         benefitDiscountPercentage: resolveBenefitDiscountPercentage(o),
         etaPhrase: branchPosSettings.posCopyMessageEtaPhrase,
     })
+}
+
+async function copyOrderSummaryToClipboard() {
+    const msg = buildOrderSummary()
+    if (!msg) return
     try {
         await navigator.clipboard.writeText(msg)
         success('Copiado', 2500, 'Mensaje listo para pegar.')
@@ -266,7 +271,7 @@ const handleClearAll = async () => {
 }
 
 
-defineExpose({ copyOrderSummaryToClipboard })
+defineExpose({ buildOrderSummary, copyOrderSummaryToClipboard })
 </script>
 
 <style scoped>

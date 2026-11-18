@@ -62,7 +62,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch, onBeforeUnmount } from 'vue'
+import { computed, defineAsyncComponent, ref, watch, onBeforeUnmount } from 'vue'
 import { useCustomersStore } from '@/store/customers'
 import { useAuthStore } from '@/store/auth'
 import { useBranchContextStore } from '@/store/branchContext'
@@ -73,7 +73,7 @@ import { isLikelyPhoneNumber, normalizePhoneForSearch } from '@/utils/phoneInput
 import BaseInput from '@/components/ui/BaseInput.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseDialog from '@/components/ui/BaseDialog.vue'
-import CustomerForm from '@/components/customers/CustomerForm.vue'
+const CustomerForm = defineAsyncComponent(() => import('@/components/customers/CustomerForm.vue'))
 import { MagnifyingGlassIcon, UserCircleIcon, UserPlusIcon, PlusIcon, ChevronRightIcon, CheckCircleIcon } from '@heroicons/vue/24/outline'
 
 interface Props {

@@ -1,6 +1,6 @@
 // src/composables/useOrderSubmission.ts
-import { useAuthStore } from '@/store/auth'
 import { useOrderEditorContext } from '@/composables/useOrderEditor'
+import { useAuthStore } from '@/store/auth'
 import { useOrderEditorStore as useOrdersDraftsStore } from '@/composables/useOrderEditor'
 import { useInvoiceTracking } from '@/composables/useInvoiceTracking'
 import type { DraftOrder, CreateOrderDto, CreateOrderDetailDto, CreateBankPaymentDto, CreateAppPaymentDto } from '@/types/order'
@@ -33,7 +33,9 @@ export function useOrderSubmission() {
                 (item.loyaltyDiscount || 0) +
                 (item.discountCodeDiscount || 0) +
                 (item.freeDeliveryDiscount || 0),
-            notes: item.notes || undefined
+            notes: item.notes || undefined,
+            ...(draft.whatsappConversationId && item.whatsAppProductChoice
+                ? { whatsAppProductChoice: item.whatsAppProductChoice } : {}),
         }))
 
         // Transform bank payments
@@ -141,14 +143,14 @@ export function useOrderSubmission() {
      * Submit the current draft order
      */
     const submitOrder = async (draft: DraftOrder) => {
-        if (editor && !editor.canSubmit()) throw new Error('Toma la conversación antes de confirmar el pedido.')
+        if (editor) return editor.submit(draft)
         // Persist before network I/O so timeouts/reloads reuse the SAME UUID.
         const key = ordersStore.ensurePosCreationKey(draft.tabId)
         const dto = { ...transformDraftToCreateDto(draft), posCreationKey: key }
         const ownerId = authStore.user?.id
         const createdOrder = await ordersStore.create(dto)
         if (dto.electronicInvoice && ownerId === authStore.user?.id) useInvoiceTracking().track(createdOrder.id)
-        editor?.onCreated(createdOrder)
+
         return createdOrder
     }
 

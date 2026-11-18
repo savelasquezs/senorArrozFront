@@ -1,0 +1,416 @@
+# WhatsApp: bandeja multiasesor, pedidos integrados y procesamiento independiente
+
+Fecha del plan: 2026-10-30. Actualizado: 2026-11-05.
+Estado: etapas 0/1 cerradas técnicamente; etapa 2 implementada localmente con aceptación real de Meta pendiente; etapas 3, 4 y 5 implementadas y validadas localmente. Activación, piloto y corte productivo pertenecen a la etapa 7 y no se ejecutaron. Se conserva la toma de pedidos entre sucursales.
+
+## Objetivo
+
+Atender las líneas global y de sucursales desde una bandeja compartida, tomar y soltar conversaciones, completar pedidos sin salir del chat y conservar la toma de pedidos entre sucursales. Separar el procesamiento de WhatsApp del proceso HTTP principal para administrar sus recursos, recuperación y despliegue de forma independiente.
+
+## Decisiones aprobadas
+
+- Mantener una API principal de negocio y extraer un ejecutable/servicio worker de WhatsApp, preferentemente dentro de la solución C# existente. La primera entrega no incorpora otra API pública completa de chats.
+- Mantener un único motor de clientes, cotización, pedidos, beneficios, pagos, inventario, cocina e impresión. El worker no implementa un segundo motor comercial.
+- Mantener PostgreSQL como fuente de verdad y primera opción para trabajo persistente y outbox; no añadir un broker o una segunda base de datos sin una necesidad comprobada.
+- Reutilizar los componentes, helpers y composables del POS. Separar el núcleo del editor de su presentación y del pedido activo global; evitar copiar OrderSidebar.
+- Guardar los borradores manuales en el servidor. El almacenamiento del navegador será una ayuda de recuperación, no la autoridad compartida.
+- Conservar el número global por API y habilitar coexistencia oficial App Business + Cloud API en los números de sucursal elegibles. La conexión de cada línea debe validarse; la configuración actual no acredita coexistencia.
+
+## Reglas que deben conservarse
+
+1. Línea de WhatsApp, asesor, sucursal de trabajo/origen, enrutamiento de la conversación y sucursal de preparación del pedido son conceptos distintos.
+2. Un cajero de Santander puede conservar la conversación y tomar el pedido para otra sucursal autorizada. El número propio de una sucursal tampoco obliga a preparar allí todos sus pedidos.
+3. OriginBranchId se determina en el servidor desde la sucursal de trabajo. BranchId define preparación, inventario, rutas, impresión, venta y cobro. No se cambia la sucursal global del usuario para tomar un pedido remoto.
+4. Cambiar el destino del borrador no transfiere la conversación ni libera al asesor. Una transferencia explícita del enrutamiento del chat conserva sus reglas actuales; ambas acciones deben tener contratos distintos.
+5. Una conversación puede conservar pedidos históricos de diferentes sucursales. El destino pertenece a cada pedido; no se fija para siempre desde el chat.
+6. Una transferencia de atención o de enrutamiento no modifica silenciosamente la sucursal de un pedido ya confirmado. Su traslado utiliza el flujo existente de gestión de pedidos.
+7. Permisos por tenant, rol, conversación y pedido se validan en el servidor. La toma entre sucursales no concede acceso general a caja, bancos, usuarios, GPS ni conversaciones ajenas.
+8. Transferir el chat no cambia el número remitente. Un cliente que escribe a dos líneas tiene conversaciones distintas y puede compartir su identidad comercial autorizada.
+9. Cambiar de chat, cerrar una pestaña o perder conexión no libera automáticamente la atención. Soltar, transferir, cerrar y devolver a IA son acciones independientes.
+10. Estado de atención, progreso del pedido, mensajes no leídos y necesidad de respuesta se calculan por separado. Leer no equivale a atender.
+11. Pedido tomado exige un pedido confirmado por el servidor. Crear el pedido y entregar su confirmación por WhatsApp son resultados independientes.
+12. Laboratorio, sandbox y evaluaciones permanecen aislados. Este plan no convierte sus cambios locales o resultados históricos en comportamiento productivo validado.
+
+## Base identificada y puntos de entrada
+
+Trabajo de etapas 0/1: backend en C:/Users/LENOVO/Documents/ChatGPT/Señor arroz real/.work/whatsapp-api y frontend/plan en C:/Users/LENOVO/Documents/ChatGPT/Señor arroz real/.work/whatsapp-front. Ambos usan feat/whatsapp-worker-stage01 desde origin/main. El checkout C:/Users/LENOVO/source/repos/SenorArroz/senorArrozAPI contiene el laboratorio y no debe usarse para editar esta implementación.
+
+| Área | Puntos de entrada |
+|---|---|
+| Pantalla y bandejas | src/views/WhatsAppView.vue, src/utils/whatsappInbox.ts |
+| Estado, contratos y solicitudes | src/store/whatsapp.ts, src/types/whatsapp.ts, src/services/MainAPI/whatsappApi.ts |
+| Borradores y editor POS | src/store/ordersDrafts.ts, src/components/orders/OrderSidebar.vue, src/components/orders/OrderProductCatalog.vue |
+| Lógica reutilizable | src/composables/useOrderSubmission.ts, useOrderValidation.ts, useOrderItems.ts y helpers de pedidos |
+| Confirmaciones | src/composables/useWhatsAppOrderConfirmation.ts y acción de envío en OrderSidebar.vue |
+| Entrada HTTP y atención | SenorArroz.API/Controllers/WhatsAppController.cs, SenorArroz.Domain/Services/WhatsAppAttentionService.cs |
+| Procesamiento y eventos | SenorArroz.API/Services/WhatsAppAiWorkQueue.cs, WhatsAppAutomaticMessageSender.cs, WhatsAppNotificationService.cs, WhatsAppCommerceFlowService.cs, SenorArroz.API/Hubs/WhatsAppHub.cs |
+| Pedidos y persistencia | SenorArroz.Application/Features/Orders/Commands/CreateOrderHandler.cs, WhatsAppConversation.cs y configuraciones EF relacionadas |
+| Reglas y esquema | docs/BUSINESS_RULES.md, docs/PROJECT_MAP.md, docs/DATABASE_MAP.md, docs/MULTITENANT_PLAN.md, local-init-completo.sql |
+
+La revisión previa ejecutó siete archivos de pruebas del frontend: 41 pruebas aprobadas. Es una referencia de la base actual, no una validación de las funciones de este plan.
+
+## Etapa 0 — Contratos, permisos y línea base
+
+Dependencias: ninguna.
+
+- [x] Verificar el estado actual de main, despliegues y esquemas; identificar trabajo local de laboratorio para no mezclarlo con esta implementación.
+- [x] Documentar la matriz de acceso: canal central, canal de sucursal, cola sin sede, responsable asignado, supervisor y pedidos originados para otra sede.
+- [x] Revisar los controles que hoy vinculan BranchId del pedido a OperationalBranchId del chat o a la línea y documentar su adaptación acotada. Implementarla junto al borrador versionado en etapa 4; no retirar controles sin ese recurso autorizado.
+- [x] Definir contratos separados para destino del borrador, transferencia del chat, transferencia de asesor y traslado de un pedido confirmado. Resolver la diferencia con la regla actual que libera al asesor al transferir el enrutamiento.
+- [x] Definir una sesión comercial con un borrador activo inicial por conversación, versiones y una clave de confirmación estable; permitir múltiples pedidos históricos.
+- [x] Definir cómo comparten o entregan el borrador la IA, el Flow y el asesor. La confirmación de un mismo intento comercial debe materializar como máximo un pedido, cualquiera que sea su origen.
+- [x] Inventariar tareas externas y herramientas comerciales que ejecuta hoy WhatsApp. Separar cuáles van al worker y cuáles deben invocar el motor de negocio de la API principal.
+- [x] Medir CPU, memoria, conexiones y consultas PostgreSQL, latencia p50/p95, tamaño de respuestas, backlog y volumen real de mensajes/asesores. Registrar condiciones y carga de prueba.
+- [x] Acordar presupuestos de rendimiento reproducibles para cambio de chat, primera carga, webhook y propagación en tiempo real; registrar línea base antes de fijar objetivos definitivos.
+
+Criterio de salida: contratos y matriz documentados; escenario Santander → otra sede cubierto para línea central y línea de sucursal; línea base con evidencia medible.
+
+## Etapa 1 — Trabajo persistente y extracción del worker
+
+Dependencias: etapa 0.
+
+- [x] Diseñar trabajo persistente y outbox reutilizando lo existente donde corresponda. Guardar evento/trabajo de forma atómica; confirmar el webhook después de su aceptación durable.
+- [x] Mantener validación de firma, resolución segura de canal/tenant y límites de entrada en la API. Mover procesamiento prolongado, multimedia, sincronización, IA y envíos fuera de la solicitud HTTP.
+- [x] Implementar reclamación de trabajos en PostgreSQL con exclusión entre procesos, vencimiento recuperable, intentos limitados, próximo intento e incidencias que requieran intervención.
+- [x] Mantener orden y exclusión por conversación, conservando concurrencia acotada entre conversaciones. Resolver tenant desde datos persistidos y ejecutar cada trabajo en su contexto autorizado.
+- [x] Definir claves únicas de infraestructura por evento, mensaje, acción automática y solicitud manual; tolerar reentregas y caídas entre persistencia y notificación. El contrato de clave de sesión comercial está definido en etapa 0; su materialización compartida IA/Flow/asesor se implementa con el borrador en etapa 4.
+- [x] Crear el ejecutable worker y configuración por rol de proceso. Evitar que API y worker ejecuten accidentalmente los mismos consumidores al desplegar o retroceder versiones.
+- [x] Migrar las herramientas comerciales que lo requieran a un contrato interno autenticado de la API principal, reutilizando los handlers existentes. Conservar actor, sucursal de origen, permisos e idempotencia; no aceptar ese contexto desde datos públicos de Meta.
+- [x] Revalidar modo de atención y generación/versión antes de despachar una respuesta automática; descartar trabajo invalidado por una toma humana. Versión persistida con el mensaje, conservada al recuperar la respuesta y comprobada también en el contrato interno.
+- [x] Comunicar los cambios del worker a la API mediante eventos persistidos. La API emite SignalR a grupos autorizados; un IHubContext dentro del worker por sí solo no alcanza a los clientes conectados a otro proceso.
+- [x] Definir entrega de eventos para la réplica actual y reconciliación por cursor. Antes de habilitar varias réplicas HTTP, asegurar fanout a todas las conexiones; una cola de consumidores competidores no sustituye broadcast.
+- [x] Mantener recuperación después de reinicios y envío de resultado incierto: conciliar antes de repetir acciones que Meta pudo haber aceptado.
+- [x] Añadir métricas de edad del trabajo, profundidad de cola, duración, reintentos y errores sin contenido sensible en logs.
+
+Criterio de salida: API y worker arrancan por separado; reiniciar el worker no reinicia la API; el trabajo durable se recupera; se conservan orden, aislamiento, eventos y ausencia de duplicados en pruebas de caída/reentrega.
+
+## Etapa 2 — Coexistencia y múltiples líneas
+
+Dependencias: etapas 0 y 1. Si faltan permisos externos de Meta, avanzar en las etapas independientes usando transporte de prueba.
+
+- [ ] Verificar propiedad, elegibilidad y permisos de la aplicación o proveedor para conectar una línea Business existente mediante coexistencia oficial.
+- [x] Implementar la conexión guiada y diagnóstico por línea: pendiente, conectada, sincronizando, degradada o desconectada. Conservar el canal global API existente.
+- [x] Procesar los eventos oficiales aplicables de mensajes del celular, historial y contactos, incluidos smb_message_echoes, history y smb_app_state_sync, según el contrato vigente verificado al implementar.
+- [x] Separar mensajes históricos de mensajes nuevos: importar historial no debe disparar IA, ausencia, avisos ni pedidos nuevos.
+- [x] Deduplicar por canal e identidad del mensaje. No fusionar conversaciones de números distintos ni atribuir un mensaje del celular a un empleado sin evidencia.
+- [x] Identificar intervenciones desde la app Business, notificar al responsable y aplicar la política de pausa de automatización. La exclusividad del sistema no bloquea el envío desde el celular.
+- [x] Mostrar ventana de atención y plantillas disponibles según reglas vigentes de Meta; obtener su estado desde el servidor.
+- [ ] Validar multimedia, límites de sincronización, recuperación de desconexión y requisitos operativos con una línea piloto.
+
+Implementación: conexión guiada con sesión cifrada y de un solo uso, validación de activos/permisos en servidor, sincronización durable, diagnóstico, ecos, contactos, historial y desconexión. Ventana calculada en servidor y plantillas aprobadas enviadas desde la propia conversación sin cambiar de número. Verificación de elegibilidad y piloto real pendientes; no se acredita aprobación de Meta con las pruebas simuladas.
+
+Avance del piloto Santander, 18 de noviembre de 2026. El registro alojado por Meta reprodujo `#1690130`. Graph confirmó `CLOUD_API`, `is_on_biz_app=true` y el número conectado. La recuperación local suscribió la app, habilitó el callback por teléfono y rotó a una credencial de usuario del sistema. El envío requirió acceso total del usuario técnico a la cuenta de mensajería de Santander. Graph verificó la suscripción de la línea central y el callback general en Railway.
+
+Aceptación de mensajería de texto en vivo. El hilo local 1836 registró `COEX-1811-PC` como entrada de Cloud API, un eco `businessApp` y `COEX-1811-POS` desde la cola de envío del POS. Meta confirmó **Leído** para este último. El mismo destinatario conserva el hilo central 38. Historial y contactos figuran como **Omitida** en el piloto. Siguen pendientes la aceptación del recorrido comercial completo y el despliegue de etapa 7.
+
+Criterio de salida: mensajes de entrada, salida por API y salida desde el celular aparecen correctamente en el mismo canal; historial sin efectos comerciales; limitaciones reales registradas.
+
+## Etapa 3 — Atención multiasesor y bandejas
+
+Dependencias: etapas 0 y 1.
+
+- [x] Sustituir la clasificación ambigua por vistas Libres, Míos, Equipo y Cerrados. Sin sede operativa es un filtro de enrutamiento separado.
+- [x] Implementar toma atómica y versionada en PostgreSQL. Dos asesores que toman simultáneamente obtienen un único responsable; el otro recibe conflicto con el estado actualizado.
+- [x] Eliminar la reasignación implícita al enviar mensajes. Verificar responsabilidad y permisos también en respuestas rápidas, menú, multimedia, cambios de cliente y acciones comerciales.
+- [x] Implementar Soltar, Transferir asesor, Transferir enrutamiento, Cerrar, Reabrir y Devolver a IA con autorización, auditoría y eventos diferenciados.
+- [x] Dar lectura o supervisión según permisos sin permitir edición paralela del borrador. Una toma forzada autorizada debe ser explícita y auditable.
+- [x] Modelar necesidad de respuesta humana con independencia de UnreadCount y de los marcadores de lectura individuales o compartidos definidos en la etapa 0.
+- [x] Notificar al responsable y grupos anteriores/nuevos sin seguir entregando contenido a usuarios que perdieron acceso.
+- [x] Preservar selección, filtros y atención al cambiar de chat, perder conexión o volver a la aplicación.
+
+Validación local: toma simultánea de dos asesores contra PostgreSQL, versiones obsoletas, auditoría, transferencia, supervisión, envío sin apropiación y pedido remoto conservado. Prueba con dos navegadores/celulares pendiente en validación integral y piloto; no se declara una prueba real de Meta.
+
+Criterio de salida: pruebas simultáneas de dos asesores; toma, liberación y transferencia sin apropiación silenciosa ni pérdida de acceso legítimo al pedido remoto.
+
+## Etapa 4 — Borrador comercial compartido y pedidos entre sucursales
+
+Dependencias: etapas 0, 1 y 3.
+
+- [x] Persistir el borrador completo por sesión/conversación: cliente, destino, modalidad, dirección, productos, indicaciones, beneficios, programación, pagos y datos de facturación cuando correspondan.
+- [x] Guardar automáticamente con versión; rechazar escrituras obsoletas y evitar que una respuesta tardía sobrescriba otro chat. Mostrar guardado pendiente, guardado correcto y conflicto.
+- [x] Conservar el borrador al transferir o soltar; no aplicar el límite de cinco pestañas del POS al número de conversaciones con borrador.
+- [x] Aplicar selección de sucursal de preparación sin transferir chat ni asesor. Revalidar catálogo, precios, disponibilidad, cobertura, domicilio, beneficios y medios de pago del destino; explicar cambios antes de confirmar.
+- [x] Reutilizar clientes por tenant, CustomerPhone y AddressBranch; evitar resolver identidad o cobertura únicamente por la sucursal de origen del cliente.
+- [x] Confirmar mediante el motor existente, validando permisos, versión, responsable y clave comercial compartida dentro de la operación transaccional. Doble clic, timeout o confirmación concurrente de IA/Flow/asesor deben devolver el mismo resultado comercial.
+- [x] Conservar OriginBranchId y BranchId y todas las reglas de cocina, impresión, inventario y cobro en destino. No mover dinero ni modificar el contexto global del cajero.
+- [x] Actualizar el estado comercial y vincular el pedido confirmado antes de encolar su mensaje. Diferenciar resumen previo de confirmación real; retirar el texto de pedido confirmado sobre borradores.
+- [x] Mostrar Pedido tomado · número de pedido aunque el mensaje de confirmación esté pendiente o falle; reintentar el envío sin crear otro pedido.
+- [x] Reutilizar gestión remota con versiones del pedido confirmado; un conflicto no se resuelve reenviando silenciosamente con una versión nueva.
+- [x] Definir continuidad tras cierre, cancelación y nuevo pedido; conservar historial sin reutilizar la clave de un pedido anterior.
+
+Criterio de salida: cajero de Santander toma desde cualquiera de sus líneas autorizadas un pedido para otra sede; mantiene el chat, cambia de conversación y recupera el borrador; confirmación única y operación comercial en destino verificadas.
+
+## Etapa 5 — Editor integrado y experiencia de atención
+
+Dependencias: etapas 3 y 4; etapa 2 para pruebas reales de coexistencia.
+
+- [x] Extraer el núcleo reutilizable del editor para recibir un identificador de borrador explícito. Mantener el POS funcionando con sus pestañas sin acoplar el chat a currentTabId.
+- [x] Crear el panel compacto de pedido usando catálogo, líneas, cliente/dirección, pagos, beneficios, programación y validación existentes. Extraer lógica compartida a helpers/composables cuando corresponda.
+- [x] Implementar tres columnas ajustables en escritorio y navegación conversación/pedido en pantallas pequeñas; conservar mensajes y edición al alternar.
+- [x] Mostrar línea remitente, responsable, sucursal de atención y sucursal que prepara. Dar especial visibilidad al pedido para otra sucursal.
+- [x] Mantener total y Confirmar pedido visibles, indicando requisitos faltantes sin sacar al asesor del chat.
+- [x] Conservar borrador de mensaje y adjuntos por conversación para evitar envíos al contacto equivocado al cambiar de chat. Capturar destinatario e identificador antes de cualquier operación asíncrona.
+- [x] Mantener respuestas rápidas, multimedia y menú; incluir notas internas diferenciadas que nunca se envíen a Meta como mensajes al cliente.
+- [x] Mostrar distintivos comerciales: Sin iniciar, En proceso, Esperando cliente, Pedido tomado y Sin venta/Cancelado. No convertir todas las consultas informativas en ventas pendientes.
+- [x] Agrupar Requieren acción, Esperando cliente y Gestionados. Los pedidos por completar permanecen arriba de los gestionados; una nueva pregunta sobre un pedido tomado vuelve a requerir atención sin crear un borrador automáticamente.
+- [x] Preservar scroll al cargar historial y ofrecer Nuevos mensajes cuando el asesor no esté al final. Mostrar errores recuperables y estados de conexión/guardado.
+
+Criterio de salida: completar un pedido con todas las opciones aplicables sin abandonar el chat; cambiar entre dos conversaciones sin mezclar cliente, mensaje, adjuntos, sucursal, productos o pagos; regresión del POS aprobada.
+
+### Validación local de etapas 4 y 5 — 2026-11-05
+
+- Se reutiliza `OrderSidebar` con contexto de borrador explícito, `AddProductModal`, `CustomerSection`, dirección, pagos, beneficios, programación, facturación, `OrderNoteDialog`, `BaseDialog` y `OrderDetailContent`. La conversación no cambia la pestaña activa del POS.
+- Borrador común en `whatsapp_commerce_session`, autoguardado CAS, revisión de atención, confirmación transaccional única, vínculo al pedido y outbox independiente. IA/Flow no reemplazan borradores avanzados editados por asesor.
+- Pedidos remotos comprobados en PostgreSQL desechable: origen 1, preparación 2, responsable y línea conservados, dos confirmaciones concurrentes devuelven un solo pedido y un solo mensaje pendiente. Conflictos de guardado se rechazan sin perder la versión ganadora.
+- Backend general: 1.450 aprobadas, 107 omitidas por requisitos de otras integraciones. Aceptación final focalizada: 86 aprobadas y 1 omitida; incluye esquema idempotente, backfill de vínculo histórico, concurrencia y regresión de Flow. La prueba de consumidores IA se sincronizó explícitamente para eliminar una carrera en su comprobación.
+- Frontend completo: 161 archivos, 1.014 pruebas aprobadas. Las pruebas añadidas posteriormente del editor incrustado y la rehidratación de beneficios también pasaron; aceptación final focalizada: 13 aprobadas. Compilaciones frontend/backend aprobadas.
+- Pendiente operativo: revisión visual en dispositivos y piloto autorizado con líneas reales; aceptación Meta, SQL productivo, activación y despliegue siguen fuera de esta ejecución local.
+- Contrato y esquema: backend `docs/WHATSAPP_SHARED_DRAFT_EDITOR.md` y `SenorArroz.Infrastructure/Scripts/add_whatsapp_shared_draft.sql`. Evidencia: `artifacts/whatsapp-stage45/validation.json`.
+
+## Etapa 6 — Rendimiento y validación integral
+
+Dependencias: etapas 1 a 5 para aceptación completa. Medir y corregir durante cada etapa, no solo al final.
+
+- [x] Reemplazar el corte actual de 200 conversaciones por paginación con cursor y orden estable. Aplicar permisos, prioridad y filtros en el servidor antes del límite; un pendiente antiguo debe seguir siendo accesible.
+- [x] Optimizar proyecciones e índices a partir de consultas medidas. Evitar N+1 al mostrar responsables, último mensaje, borrador y pedido asociado.
+- [x] Usar eventos incrementales y una conexión compartida por hub; reconciliar al reconectar. Mantener fallback condicionado por visibilidad, actividad y estado de conexión.
+- [x] Limitar caché de conversaciones y mensajes; cancelar solicitudes obsoletas y deduplicar carga. Virtualizar cuando la medición lo justifique.
+- [x] Cargar miniaturas y multimedia bajo demanda, reservar dimensiones y conservar el proveedor de almacenamiento vigente salvo necesidad documentada.
+- [x] Ejecutar pruebas de integración PostgreSQL para toma simultánea, versiones, reclamación de trabajo, aislamiento, doble confirmación y recuperación tras caída.
+- [x] Probar con dos asesores/navegadores: cambio de destino, transferencia, envío concurrente, pérdida de red, respuesta tardía y reentrega del mismo evento. Matriz local con adaptadores; exclusión/idempotencia del envío durable comprobadas en PostgreSQL.
+- [x] Validar localmente los contratos de IA, Flow, ecos del celular y asesor: sesión/motor compartidos, deduplicación, versiones y descarte de automatización obsoleta. Cubierto por pruebas de coexistencia, Flow, orquestador y confirmación concurrente PostgreSQL; son comprobaciones locales complementarias.
+- [ ] Aceptación externa de etapas 2/7: probar el recorrido integral de IA, Flow, celular Business y asesor con una línea real. Las simulaciones locales no acreditan este recorrido.
+- [x] Probar acceso denegado entre tenants, sucursales sin autorización y usuarios que perdieron la asignación, tanto por HTTP como por eventos.
+- [x] Medir con la carga acordada el p95 del POS junto con el del chat, CPU/RAM, conexiones, bloqueo SQL, edad de cola y propagación de eventos. Comparar contra la línea base y los presupuestos de la etapa 0. Presupuestos locales de POS y UI cumplidos; no constituyen SLA productivo.
+- [x] Ejecutar checks requeridos de frontend y backend, build y pruebas funcionales afectadas. Registrar comandos, ambiente, resultados y limitaciones; no reutilizar cifras históricas como evidencia nueva.
+
+Criterio de salida: matriz funcional aprobada con evidencia, sin duplicados en los escenarios de concurrencia y sin regresión material del POS bajo la carga acordada.
+
+### Cierre técnico local de etapa 6 — 2026-11-05
+
+- Bandeja: cursor autorizado de 50/100 filas, prioridad antes del límite, proyección en dos consultas sin secretos ni estado IA completo. Prueba PostgreSQL de 262 conversaciones, seis páginas sin duplicados y pendiente antiguo recuperable.
+- Caché: 300 conversaciones, 12 historiales, 500 mensajes por historial y ocho editores. Cancelación, deduplicación y retorno a recientes sin huecos. Mensajes reutilizados durante quince segundos y editor durante cinco; no leídos, vencimiento, eventos y reconexión exigen conciliación. Usuario, rol, sucursal de trabajo y conversación delimitan los editores; destino de preparación independiente. Los borradores limpios expulsados se liberan y los cambios pendientes se conservan.
+- PostgreSQL local desechable: 31 pruebas aprobadas en esta ejecución. General backend: 1.450 aprobadas y 107 omitidas. HTTP MVC real verifica permisos y confirmación concurrente única con origen 1/preparación 2.
+- Aceptación backend conservada: 35 aprobadas, incluyendo índices idempotentes; no hubo cambios de backend en la optimización UI. Frontend final: 1.032 pruebas aprobadas en 163 archivos, 479,91 s; 69 pruebas afectadas aprobadas antes del recorrido visual. Build con vue-tsc/Vite aprobado. Las suites se solapan y no se suman.
+- Dos navegadores aislados: transferencia, antiguo responsable bloqueado, recuperación de guardado, aislamiento por chat, revisión y un pedido remoto. Respuesta de envío retenida hasta cambiar de chat sin borrar el otro texto; HTTP y evento comparten una burbuja. Historial de 650 mensajes con ventana de 500, doce cargas con ancla a 0 px de desplazamiento y evento reentregado sin duplicados ni robo de scroll. Vista real y componentes existentes; transporte BaseApi/SSE sintético. Capturas finales móvil/tableta/escritorio inspeccionadas, sin desborde ni error antiguo después del reintento.
+- Perfil final aislado y calentado POS: p95 165,19 → 127,99 ms; chat HTTP 91,59 ms; ingreso 45,17 ms; cola muestreada de 0,663 s, diez conexiones y cero esperas de bloqueo. Resultado bajo el presupuesto local; no acredita capacidad productiva. Se conserva el fallo inicial sin calentamiento.
+- Perfil UI final: primera carga p95 1.480,8 ms en treinta contextos nuevos y cambio cacheado p95 86,8 ms en treinta cambios; presupuestos locales de 1.500/150 ms cumplidos. Se conservan todas las muestras, incluida una apertura de 1.592,6 ms, y los perfiles fallidos anteriores. La apertura exige cincuenta filas, mensajes, horarios y confirmación habilitada, más dos frames; el cambio exige chat/editor y dos frames. Sin tests/build de esta tarea durante la medición; se observó actividad de otro checkout en el equipo compartido. El margen de apertura es pequeño: repetir en dispositivos y red del piloto antes de fijar un SLA.
+- Optimización: primera lectura comercial autorizada anticipada, hidratación paralela y eliminación del antiguo contexto con consultas duplicadas. Filas y formateadores reutilizados; ruta/asesores agrupados con el debounce existente. Cambio de responsable bloquea edición hasta conciliar; lecturas tardías y actualizaciones consecutivas no pisan cambios locales. El enlace inicial tardío no reemplaza una selección manual posterior.
+- Se reutilizan OrderSidebar, BaseInput, BaseDialog y los modales de productos, cliente, dirección y facturación. Horarios comunes nativos; calendario de reservas, formularios y modales bajo demanda. El paquete inicial del ensayo pasa de 647.078 a 559.010 bytes. Los diálogos cacheados liberan overlay/foco al desactivarse. El navegador verifica horarios remotos, sugerencia de entrega, calendario existente y actualización de filas memoizadas; capturas finales estables inspeccionadas.
+- Tras fallar el controlador visible, el usuario autorizó continuar por los medios disponibles. La revisión automatizada y la inspección de capturas se completaron; no se afirmó controlar su pestaña integrada. La vista local permanece disponible con datos de prueba. PostgreSQL temporal quedó detenido.
+- Detalle backend: docs/WHATSAPP_STAGE6_VALIDATION.md y artifacts/whatsapp-stage6/. Evidencia frontend: test-results/whatsapp-stage6/. Etapa 6 cerrada técnicamente en local. Sin push, despliegue ni pruebas sobre Meta, celular o pedidos reales; aceptación externa de coexistencia y piloto conservada en etapas 2/7.
+
+### Revisión con chats guardados — 2026-11-05
+
+- Cinco escenarios de la selección `new20-20261031`: 02, 11, 16, 18 y 20. Respaldo verificado por SHA256 y 66 mensajes originales. Teléfonos originales conservados únicamente en los archivos locales ignorados; informe versionable con números enmascarados.
+- Pedidos locales 901–905: Trío único sin la adición retirada ($47.000), transferencia pendiente ($52.000), tres cajas ($179.000), cambio a efectivo con devolución de $50.000 ($36.000) y dos Súper reservados ($153.000). La reserva usa mañana a las 17:00, con preparación a las 16:00; la fecha es una adaptación explícita del histórico.
+- Alta de cliente con el formulario existente y teléfono precargado, importación local de su dirección archivada, edición con OrderSidebar, selector de productos, pagos/notas, revisión y detalle compartido. El caso de tres cajas pasa a otro asesor conservando origen Santander y preparación Manrique. Transferencia sin verificar; efectivo no marcado como cobrado. Cinco reintentos de confirmación conservan cinco pedidos.
+- Reinicio comprobado: se conservan cinco pedidos, tres borradores anteriores y 2.160 mensajes anteriores. Estado privado persistido en `.work/coexistence-visual-state.json`; escenarios en `.work/coexistence-real-scenarios.json`. El modo con estos datos escucha en loopback por defecto. Las capturas con datos personales permanecen en `.work/coexistence-captures/`.
+- El controlador de la pestaña integrada volvió a fallar al iniciar; se usó Chromium automatizado separado sobre el mismo servidor local. No se afirma controlar la pestaña visible. Sin errores de página en los recorridos completados. Informe: `test-results/whatsapp-stage6/saved-chat-scenarios.json`.
+- Alcance: pruebas del asesor con componentes reales y transporte BaseApi/SSE simulado; precios del catálogo de laboratorio guardado el 31 de octubre, cobertura sintética sin coordenadas/geocodificación verificada. No se evaluó el modelo de IA ni se registraron pedidos en la API/base productiva ni se enviaron mensajes reales. La aceptación externa de etapas 2/7 sigue pendiente.
+
+### Base local del laboratorio — revisión 2026-11-05
+
+- Fuente localizada y consultada exclusivamente en lectura: contenedor `senorarroz-whatsapp-postgres`, `127.0.0.1:15434`, base `senor_arroz_whatsapp_dev`. La configuración existente `senor-arroz-whatsapp-local` usa el rol runtime `whatsapp_local`; las credenciales permanecen en User Secrets.
+- Datos observados: 15.615 clientes, 16.024 direcciones, 95 productos, 8.639 pedidos, 127 conversaciones y 1.360 mensajes. Los cinco teléfonos de los escenarios se resuelven sin ambigüedad mediante `customer_phone` y cada cliente tiene una dirección. Santander conserva ID 1 y Manrique ID 2.
+- La fuente documentada es una copia de producción del 29 de octubre con actividad local hasta el 31. Última actualización de producto observada: 23 de octubre. Los seis productos usados conservan los mismos precios del catálogo guardado. No se ha verificado una actualización desde producción al 5 de noviembre.
+- La fuente sirve para probar con datos comerciales completos, pero el esquema todavía no es compatible con la API nueva: faltan columnas de atención, coexistencia, cola durable y borrador compartido. Cuatro conversaciones antiguas tienen varias sesiones activas (38: seis, 41: tres, 48: tres, 52: dos), por lo que el preflight de `add_whatsapp_shared_draft.sql` rechaza la migración sin conciliación. No hay grupos duplicados de líneas ni de IDs de mensajes Meta.
+- [x] Preparar respaldo y ensayo aislado de compatibilidad; conservar el laboratorio compartido y su historial. Respaldo custom de 13.237.285 bytes con SHA256 verificado y restauración en contenedor/volumen independientes. Se archivaron 14 sesiones ya vencidas, sin pedido/pago pendiente, y se marcaron expiradas únicamente en la copia.
+- [x] Aplicar las ampliaciones de procesamiento, coexistencia, borrador y paginación, con grants del rol runtime: dos pasadas idempotentes correctas. API real 5089 y aplicación completa 4182, login JWT normal, sin consumidores ni transporte externo; red Docker interna para API/PostgreSQL.
+- Auditoría backend: `artifacts/whatsapp-stage6/local-database-readiness.json`. En esta revisión no se cambió la conexión de la vista ni se modificaron esquema o registros de la base. Los cinco pedidos del simulador continúan separados de PostgreSQL.
+
+### Validación de la copia local — 2026-11-05
+
+- Base nueva `senor_arroz_coexistence_local`; aplicación real en `http://127.0.0.1:4182/whatsapp`, mediante `node scripts/whatsapp_local_review.mjs`. PostgreSQL solo es accesible en la red Docker interna. El simulador anterior 4179 permanece separado.
+- Cinco pedidos reales de la copia, creados desde el navegador: 9543 ($47.000), 9544 ($52.000), 9545 ($153.000), 9546 ($36.000), 9547 ($179.000). Los teléfonos encontraron clientes y direcciones ya existentes. Los 66 mensajes fuente se agruparon en 44 filas históricas y cinco entradas nuevas de simulación.
+- Transferencia entre asesores 29/30; pedido 9547 conserva origen Santander y preparación Manrique. Se adaptó a recogida porque la dirección guardada no tiene cobertura de entrega Manrique. No se inventaron cobertura ni saldos de inventario. La reserva usa 6-nov a las 17:00, preparación 16:00, America/Bogota. Bancolombia sin verificar; cambio a efectivo sin marcar cobrado.
+- Corregida la cotización entre sucursales reutilizando la disponibilidad del catálogo compartido del POS, con inventario del destino. Pasaron 56 pruebas backend; dos cubren saldo insuficiente/suficiente en destino. Antiguo responsable bloqueado con 409 y editor deshabilitado. Diez reintentos concurrentes conservaron cinco pedidos y cinco outbox pendientes con cero intentos.
+- Revisión del detalle existente en 1600×1100 y 390×844, sin desborde horizontal ni errores de página en la sesión final. Hubo errores transitorios durante el reinicio local de API. La apertura solicitada en el panel del usuario respondió `queued`; se usó Chromium automatizado separado.
+- Huellas y cantidades de todas las filas originales de clientes, direcciones, productos y pedidos coinciden con la fuente. La copia contiene 8.644 pedidos. Evidencia backend `artifacts/whatsapp-stage6/local-copy-validation.json` y `docs/WHATSAPP_STAGE6_VALIDATION.md`. Respaldo/credenciales/capturas privados en `.work/coexistence-local/` del backend; `runtime.private.json` contiene `QaPassword` para los dos usuarios `coexistence.asesor1@example.invalid` y `coexistence.asesor2@example.invalid`.
+- Sin actualización desde producción, despliegue ni envío a clientes. Se conserva la fecha de origen del laboratorio (29 de octubre) y su actividad hasta el 31.
+
+### Reorganización del espacio de toma de pedidos — 2026-11-05
+
+Plan ejecutado sobre la interfaz y la copia locales:
+
+- [x] Integrar búsqueda, filtros, conexión y herramientas en la bandeja; retirar la barra general que ocupaba altura por encima de las tres columnas.
+- [x] Presentar línea, responsable y sede de atención de forma compacta en la cabecera del chat; agrupar acciones operativas en Gestionar chat sin cambiar sus permisos ni alcance.
+- [x] Mover estado comercial, guardado y Sin venta a la cabecera de la conversación, conservando una sola instancia de `useWhatsAppCommercialDraft` y la revisión previa de cancelación. Reutilizar `BaseDialog` para las notas internas.
+- [x] Dar a `OrderSidebar` toda la columna desde arriba: quitar el título integrado y el aviso duplicado de preparación. Conservar el selector de sucursal, productos, pagos, validaciones y pie de confirmación existentes. Eliminar la consulta de sucursales usada solo por el aviso retirado.
+- [x] Ocultar el + flotante únicamente en WhatsApp mediante la configuración existente `hideQuickOrder`. Conservar el pedido montado al contraerlo y retirar controles teletransportados al desactivar un chat cacheado.
+- [x] Revisar Chrome con API/PostgreSQL reales en escritorio y móvil: editor alineado con el inicio del área principal en escritorio; en móvil, bajo las pestañas de navegación, sin desborde ni + flotante. Sin venta mantiene su diálogo y sigue disponible con el pedido contraído; otra conversación conserva la restricción del responsable.
+- [x] Typecheck y build local correctos; 1.033 pruebas aprobadas en 164 archivos. Prueba de ubicación/KeepAlive y regresión del editor integrado incluidas. Evidencia sin datos personales: `test-results/whatsapp-stage6/order-sidebar-layout.json`; capturas privadas en `.work/whatsapp-layout-*.png`.
+
+El borrador del operador conserva el carbonara Dúo de $33.000 para recoger en Manrique, con atención Santander. No se confirma ni se cancela durante la revisión; sin cambios en producción.
+
+## Etapa 7 — Despliegue gradual y recuperación
+
+Dependencias: etapas anteriores aprobadas técnicamente; disponibilidad de la línea piloto.
+
+- [ ] Actualizar BUSINESS_RULES, PROJECT_MAP, DATABASE_MAP y contratos conforme se implemente cada etapa. Conservar este checklist como seguimiento transversal.
+- [ ] Preparar scripts SQL aditivos/idempotentes y actualizar local-init-completo.sql. Aplicar y verificar el esquema antes del código que lo necesita; seguir el procedimiento vigente del repositorio.
+- [ ] Añadir configuración independiente de API y worker, límites de concurrencia, permisos mínimos y health checks separados de vida y preparación.
+- [ ] Activar primero en desarrollo/pruebas con API y worker separados. Verificar que el worker real no use transporte local del laboratorio.
+- [ ] Preparar corte coordinado de consumidores: detener o deshabilitar los anteriores, recuperar trabajos existentes y habilitar el worker sin doble procesamiento.
+- [ ] Definir retención y limpieza de objetos de multimedia sin referencias confirmadas en mensajes o trabajos; contemplar subidas a Storage cuyo alta en PostgreSQL no se confirmó.
+- [ ] Mantener flags por tenant/línea para bandeja, editor y coexistencia; la activación de la nueva pantalla no habilita por sí sola IA o Flows.
+- [ ] Ejecutar piloto con una sucursal, un destino remoto y dos asesores; ampliar después al resto de sedes y al canal global según resultados.
+- [ ] Verificar producción mediante estados y métricas, con pruebas comerciales en entorno controlado. No crear pedidos ni movimientos de caja de prueba sobre operación real sin alcance específico.
+- [ ] Documentar rollback: desactivar nueva interfaz o pausar worker, conservar mensajes/borradores/trabajos, reasignar consumidores sin solapamiento y mantener conciliación de envíos inciertos. No eliminar esquema ni datos para retroceder.
+- [ ] Registrar versiones desplegadas, salud, cola y resultados del piloto. Separar implementación local, publicación y validación productiva en el cierre de cada etapa.
+
+Criterio de salida: piloto verificado y despliegue gradual con ruta de recuperación comprobada; atención y pedidos entre sucursales conservados.
+
+## Orden de ejecución y seguimiento
+
+0 → 1 → 2 → 3 → 4 → 5 → 6 → 7. Si la conexión de Meta está pendiente, continuar 3, 4 y 5 con transporte de prueba después de 1, dejando pendiente la aceptación real de 2.
+
+Cada entrega debe registrar aquí cambios, pruebas, evidencia, riesgos pendientes y estado de publicación. No marcar una etapa completa únicamente porque compile o porque exista una pantalla.
+
+| Etapa | Estado actual | Evidencia para cerrar |
+|---|---|---|
+| 0. Contratos y línea base | Cerrada técnicamente; límites de medición documentados | Matriz, contratos y mediciones |
+| 1. Persistencia y worker | Cerrada técnicamente; activación pendiente en etapa 7 | Dos procesos, recuperación, eventos y deduplicación |
+| 2. Coexistencia | Implementada localmente; aceptación Meta/piloto pendiente | Línea piloto y sincronización real |
+| 3. Atención multiasesor | Implementada y validada localmente | Dos asesores y conflictos controlados |
+| 4. Borradores y pedidos | Implementada y validada localmente | Confirmación única y operación entre sedes |
+| 5. Editor y UX | Implementada y revisada localmente | Pedido completo dentro del chat y regresión POS |
+| 6. Rendimiento y validación | Cerrada técnicamente en local; aceptación real de coexistencia en 2/7 | Matriz funcional, presupuestos locales y regresión aprobados |
+| 7. Despliegue gradual | Pendiente | Versiones, piloto y recuperación |
+
+## Mejoras posteriores, fuera de la primera entrega
+
+- Evaluar autoasignación por disponibilidad/carga después de medir la toma manual.
+- Evaluar una API independiente de conversaciones cuando existan necesidades demostradas de despliegue, clientes o escalado separados.
+- Evaluar un broker/backplane adicional si PostgreSQL o el fanout entre múltiples réplicas dejan de cubrir los objetivos medidos.
+- Evaluar edición colaborativa de un mismo borrador solo si aparece una necesidad operativa; inicialmente existe un responsable editor y supervisión autorizada.
+
+
+## Avance de implementación — etapas 0 y 1
+
+- Rama aislada en ambos repositorios: `feat/whatsapp-worker-stage01`.
+- Bases remotas: backend `d4435e7`, frontend `e2d1087`. Checkouts de trabajo: `.work/whatsapp-api` y `.work/whatsapp-front` dentro del espacio de esta conversación.
+- El checkout original del backend conserva su rama del laboratorio y sus cambios locales. No se copiaron esos cambios a esta rama ni se utilizaron sus bases para las pruebas.
+- Contratos, matriz de permisos, inventario de responsabilidades, configuración y línea base parcial: `docs/WHATSAPP_PROCESSING_STAGE01.md` en la rama del backend.
+- Se conserva `OriginBranchId`/`BranchId` y el motor de pedidos actual. Cambiar destino del borrador y transferir el enrutamiento del chat quedan expresamente separados en los contratos.
+- Implementados: webhook validado con aceptación durable, particiones por línea/contacto, payload cifrado, deduplicación, reclamación PostgreSQL, concesiones con token, reintentos acotados y revisión de resultados inciertos.
+- Implementados: ejecutable y Dockerfile del worker, modos Embedded/External, separación de consumidores, herramientas comerciales mediante API interna autenticada y relay SignalR con confirmación por réplica y revisión de grupos autorizados.
+- Implementadas señales PostgreSQL LISTEN/NOTIFY para despertar trabajo después de persistir, con respaldo periódico. Las señales no son la fuente de verdad.
+- El modo por defecto continúa Embedded. External y el SQL se probaron únicamente en contenedores desechables. No se activaron, ejecutaron ni desplegaron estos cambios en producción.
+- SQL puntual: `SenorArroz.Infrastructure/Scripts/add_whatsapp_processing_worker.sql`. Se generó una copia aislada del inicializador completo en `.work/local-init-completo.sql`, con la ampliación agregada. El inicializador compartido original conserva su hash SHA256 `3761248AE7E213D616200D4391AD755E022FE062314BA2229F5880599C8818C4`.
+- Verificaciones ya obtenidas durante el desarrollo: compilación de API/worker; 193 pruebas seleccionadas de WhatsApp; pruebas PostgreSQL de deduplicación, particiones, concesiones y aislamiento; prueba de procesos separados y reinicio del worker; prueba de entrega por réplica sin contenido a grupos revocados. La validación técnica final se completó y está registrada abajo; las etapas permanecen en curso por sus pendientes operativos y funcionales.
+
+### Pendientes de la entrega inicial — seguimiento actualizado
+
+- [x] Línea base ampliada: CPU/RAM de 24 horas, latencia HTTP por intervalo, conexiones/counters PostgreSQL, actividad real agregada de 7 días y tamaños almacenados. SQL ejecutado solo en lectura; limitaciones de consultas individuales y de tráfico de coexistencia explícitas.
+- [x] Perfil reproducible de cola: 240 mensajes, 32 conversaciones, 2 tenants, 8 productores y 4 consumidores; relay a proxy simulado. Presupuestos de ingeniería definidos, sin declarar un SLA productivo ni medir una pantalla aún pendiente.
+- [x] Extracción de envíos manuales, productos, carta, respuestas rápidas, multimedia y plantillas con resultado durable y consulta autenticada. El binario worker no publica controladores de negocio.
+- [x] Versión de atención persistida para respuestas generadas y recibida desde el ingreso durable en conversaciones conocidas. Un cambio humano invalida el trabajo antiguo incluso antes de generar la respuesta.
+- [x] Orden teléfono/BSUID comprobado por línea y tenant. Confirmación comercial única compartida IA/Flow/asesor sigue en etapa 4, junto con su recurso versionado.
+- [x] Métricas de profundidad/edad/reintentos, retención de eventos y payloads terminales, recuperación y control de resultados inciertos.
+- [x] Aceptación de la última ampliación: mensaje pendiente antes de handoff, metadatos de ingreso y respuestas de transporte inciertas, sin fallback automático de carta. Incluye orden compartido entrada/salida y error de Storage antes de aceptar un adjunto.
+- [ ] Etapa 7: grants del rol runtime, revisión de integración del laboratorio, corte coordinado y piloto. Esta entrega no autoriza aplicar SQL, activar External ni desplegar.
+
+### Verificación de la entrega inicial — 2026-10-31
+
+| Comprobación | Resultado |
+|---|---|
+| Regresión general | 1420 aprobadas; 107 omitidas |
+| PostgreSQL y procesos separados | 9 aprobadas; 0 omitidas |
+
+- Compilación de la solución y ejecutable del worker sin errores. Los warnings observados corresponden a código previo, fuera de esta entrega.
+- Las pruebas PostgreSQL incluyen deduplicación, exclusión y orden de particiones, recuperación de concesión, rechazo de un propietario vencido, dos tenants, entrega por réplica, grupos revocados y aplicación real del SQL dos veces sobre el esquema anterior.
+- Se verifica que la API acepte trabajo con el worker apagado; que al arrancar procese el trabajo y encole IA inmediatamente, con el barrido de recuperación configurado a 300 segundos; y que reiniciarlo no duplique el mensaje ni detenga la API.
+- Se verifica autenticación del contrato interno y límite de tamaño de solicitudes, sin usar cuentas o mensajes reales de WhatsApp.
+- Las regresiones entre sucursales preservan control de versión y procedencia. Los handlers de creación/gestión de pedidos no se sustituyeron.
+- Antes de producción: resolver los pendientes de cierre listados arriba, revisar grants de tabla/secuencia para el rol runtime, compatibilidad con el trabajo del laboratorio, retención y corte de consumidores. No hay despliegue productivo implícito en esta entrega.
+
+
+Validación adicional 2026-10-31: el ensayo de procesos separados también ejecuta una herramienta comercial autenticada en la API, rechaza una versión de atención obsoleta y confirma que el estado comercial del segundo tenant permanece intacto. La ampliación de esta prueba pasó 1/1. El paquete del worker se publicó localmente en configuración Release, sin errores; esto no es un despliegue de Railway.
+
+Entrega inicial backend: commit 5d6da83 en feat/whatsapp-worker-stage01.
+
+Ramas de backend y frontend publicadas en origin como feat/whatsapp-worker-stage01; sin merge a main ni despliegue.
+
+
+### Continuación — 2026-10-31
+
+- Implementada persistencia de la versión de atención; una respuesta generada antes de un handoff no adquiere una versión nueva al reiniciar.
+- Extraídas las operaciones manuales reutilizables. En External, texto, productos, carta, respuestas rápidas, multimedia y plantillas se aceptan como trabajos durables; el frontend consulta su resultado sin repetir el POST de envío.
+- Implementada revalidación del actor, sucursal de trabajo y atención al ejecutar el envío. Resultados persistidos recuperables; envíos interrumpidos con resultado incierto requieren revisión.
+- Agregados alias de partición por línea/tenant para teléfono y BSUID, deduplicación por identidad del evento, métricas de cola y retención por lotes.
+- Regresión dirigida obtenida durante la continuación: 196 pruebas WhatsApp y 26 de frontend aprobadas. Integración PostgreSQL, benchmark y validación final en curso; no se declaran cerradas las etapas por estos resultados parciales.
+- Producción se consultó únicamente en lectura: API en main, despliegue SUCCESS, una réplica y sin cambios preparados. No se activó tracing ni se modificó configuración, esquema, consumidores o servicios.
+
+
+### Línea base y concurrencia de la continuación
+
+- Evidencia agregada y perfil serializado: `artifacts/whatsapp-stage01/production-baseline.json`, `database-baseline.json`, `queue-benchmark.json` y `manual-response-profile.json` en el backend. Los agregados no incluyen nombres, teléfonos, textos ni credenciales de producción.
+- Producción: esquema de procedencia y versiones de pedidos verificado; nuevas columnas/tablas de esta rama ausentes. No se habilitaron tracing, números, IA, Flows ni nuevos consumidores.
+- En External, 2 consumidores de IA procesan chats distintos en paralelo; PostgreSQL conserva el orden por conversación y se agenda el siguiente mensaje al terminar el anterior. Embedded conserva un consumidor.
+- Regresión completa de frontend: 996 pruebas aprobadas en 157 archivos; build con tipos aprobado. Backend general previo a la última ampliación: 1423 aprobadas y 107 omitidas; 20 escenarios PostgreSQL aprobados. La nueva aceptación final se registra al terminar, sin reutilizar estas cifras como si correspondieran a código posterior.
+
+
+### Cierre técnico — 2026-10-31
+
+- [x] Etapa 0: contratos, matriz de acceso, procedencia/destino separados, línea base de producción en solo lectura y perfil reproducible documentados.
+- [x] Etapa 1: procesamiento y envíos del chat separados de HTTP, trabajo durable, resultados recuperables, controles de atención/permisos y orden por conversación verificados.
+- [x] La toma entre sucursales conserva el motor existente, OriginBranchId, BranchId y las restricciones de gestión remota. Elegir destino del futuro borrador no se implementó como transferencia del chat.
+- [x] Solución y paquete local Release del worker compilados sin errores; frontend con comprobación de tipos y build aprobados.
+
+| Validación de esta continuación | Resultado |
+|---|---|
+| Backend general | 1424 aprobadas; 107 omitidas |
+| PostgreSQL y procesos separados | 24 aprobadas; 0 omitidas |
+| Ampliación de multimedia ante fallo de Storage | 1/1 aprobada; repite y amplía un caso anterior |
+| Frontend completo | 996 aprobadas en 157 archivos |
+
+El ensayo controlado de 240 mensajes / 32 conversaciones / 2 tenants obtuvo p95 de ingreso de 301.43 ms y p95 de relay a proxy simulado de 1287.27 ms, dentro de presupuestos de 500/1500 ms. No incluye Meta/LLM ni red del cliente y no es una afirmación de capacidad productiva. La interfaz de pedidos integrados conserva las etapas 4/5.
+
+Las pruebas verifican worker detenido/reiniciado sin detener la API, evento recibido antes de un handoff, dos conversaciones IA simultáneas sin adelantar mensajes del mismo chat, orden mixto entrada/salida, reentrega, resultados ya persistidos, envío incierto sin repetición/fallback, permisos revocados, aislamiento entre tenants, retención acotada y procedencia/versiones de pedidos remotos. Los contenedores, bases, archivos y rama del laboratorio no se usaron para escribir ni ejecutar esta implementación.
+
+Pendiente fuera del cierre técnico: coexistencia y prueba real de línea (2), atención multiasesor (3), borrador/confirmación comercial común (4), editor y UX (5), validación integral con interfaz/carga representativa (6), y grants/SQL/corte/piloto/activación y revisión de compatibilidad con el laboratorio (7). No hay despliegue, merge a main ni activación de External implícitos.
+
+Cierre backend: commit `0152db4` en `feat/whatsapp-worker-stage01`. Documento técnico y evidencia versionados en ese commit. El SQL aditivo y el inicializador aislado están actualizados; el inicializador compartido del laboratorio conserva el hash registrado.
+
+
+## Entrega local — etapas 2 y 3 — 2026-11-05
+
+- Se mantuvieron los worktrees y la rama `feat/whatsapp-worker-stage01`, sin copiar cambios del laboratorio ni tocar producción.
+- Etapa 2: conexión guiada oficial, sesiones de quince minutos ligadas a usuario/tenant/sucursal, canje y permisos verificados por servidor, suscripción de cuenta, diagnóstico y sincronización única. Se verifican campos de webhook y ambas plataformas; no se registra de nuevo el número.
+- Se importan historial y contactos sin efectos comerciales ni mensajes nuevos; se deduplica dentro de cada canal y se completa multimedia histórica sobre el mismo mensaje. Los ecos del celular no suplantan empleados y pausan la automatización. Se procesa `PARTNER_REMOVED`.
+- La ventana de atención se calcula desde el último ingreso nuevo. Las plantillas aprobadas se consultan y envían dentro del chat usando su línea original, tanto central como de sucursal, con cola durable en External.
+- Etapa 3: vistas Libres/Míos/Equipo/Cerrados con filtro de enrutamiento separado; toma y transiciones con revisión esperada, toma forzada de supervisor con motivo, liberación, transferencias, cierre/reapertura y devolución a IA. Se elimina la toma implícita al enviar.
+- Se revalida responsabilidad en envíos, adjuntos, plantillas, cliente y acciones comerciales. Leer no resuelve la necesidad de respuesta. La auditoría se conserva fuera de la limpieza de payloads de transporte.
+- Eventos Embedded y relay respetan grupos actuales y solo invalidan los destinatarios revocados. El frontend conserva filtros, selección y borradores por conversación; las respuestas tardías no alteran otra conversación ni retroceden atención.
+- Backend: `docs/WHATSAPP_COEXISTENCE_ATTENTION.md`; SQL `add_whatsapp_coexistence_attention.sql`; resultados agregados en `artifacts/whatsapp-stage23/validation.json`. El inicializador aislado incorpora el SQL; el inicializador compartido del laboratorio no se modifica.
+- La validación PostgreSQL usa un cluster nuevo local de PostgreSQL 17, en loopback, con bases desechables por escenario. Docker no estaba disponible. No se usaron las bases del laboratorio ni de producción.
+- Pendientes externos de etapa 2: permisos/aprobación de Meta, aplicación configurada, elegibilidad y prueba real de una línea con historial/multimedia y celular. Despliegue, SQL productivo, activación de External y piloto permanecen en etapa 7.
+- Etapas 4–7 pendientes. Se mantiene el alcance de borrador comercial/editor para sus etapas correspondientes y la separación entre línea, asesor, origen y sucursal de preparación.
+
+
+### Validación final local — 2026-11-05
+
+| Comprobación | Resultado |
+|---|---|
+| Backend general | 1.444 aprobadas; 107 omitidas; 0 fallos |
+| PostgreSQL, API/worker separados y recuperación | 26 aprobadas; 0 omitidas; 0 fallos |
+| Regresión dirigida final de coexistencia/atención/SQL | 40 aprobadas; incluye escenarios ya contados en otras suites |
+| Frontend completo | 1.008 aprobadas en 160 archivos |
+| Regresión dirigida final de frontend | 78 aprobadas en 17 archivos; incluidas en la suite completa |
+| Compilación API/worker y frontend con tipos | Aprobadas |
+| Revisión de whitespace de ambos repositorios | Aprobada |
+
+El ensayo sintético de 240 mensajes / 32 conversaciones / 2 tenants obtuvo p95 de ingreso de 45,98 ms y relay simulado de 349,84 ms, bajo presupuestos de 500/1.500 ms. No incluye Meta, LLM, POS ni red del cliente, ni acredita aceptación productiva. Se conservaron intactas las evidencias históricas de etapas 0/1; la evidencia de esta ejecución está en `artifacts/whatsapp-stage23/` del backend.
+
+El cluster temporal PostgreSQL 17.6 quedó detenido. Cada base de escenario y sus roles de prueba propios se limpiaron al terminar; los archivos del cluster y logs permanecen en `.work`, excluidos localmente del versionado. No hubo despliegue, SQL productivo, activación de External ni mensajes reales de WhatsApp. La etapa 2 conserva pendientes los dos ítems externos de elegibilidad/permisos y piloto de línea real.
+
+### Piloto Santander en desarrollo
+
+- Canal central terminado en 3904 en Railway. El callback alterno se limita al número Business de Santander y la propia API rechaza sustituir un callback por número preexistente.
+- La app de Meta tiene la configuración Santander Cloud API (1437433648065760), SDK autorizado para https://localhost:4183 y eventos messages, smb_message_echoes y account_update. Se conservó el callback principal.
+- PostgreSQL aislado en 127.0.0.1:15439. Se archivaron 14 sesiones activas vencidas sin checkout ni pedido asociado. En la copia local, 102 conversaciones del antiguo registro por sucursal del central 3904 se conservaron en canales inactivos para evitar atribuirlas al 4655. El canal central activo se conserva. Los cuatro scripts del módulo se verificaron en dos pasadas. El rol runtime no omite RLS.
+- Los destinos y la clave de Meta se almacenan en archivos DPAPI en el perfil local de Windows. Iniciar API, worker y frontend desde el script start-whatsapp-coexistence-pilot.ps1 del backend con sus roles respectivos. Web usa localhost:4183 con TLS y el gateway 127.0.0.1:5091 publica únicamente /api/whatsapp/webhook.
+- Tras autorizar en el celular, usar el identificador Graph verificado de Santander y la URL pública HTTPS como PhoneNumberId y CallbackUrl al arrancar API y worker. Activar el callback por número desde el panel de sucursal. Restaurarlo desde el mismo panel antes de cerrar el túnel.
+- El piloto usa dos destinatarios autorizados y solo mensajes nuevos. Los contactos e historial quedan omitidos. Las confirmaciones comerciales nuevas salen como PRUEBA DE DESARROLLO. El canal central y los pedidos productivos quedan fuera de los envíos del piloto.
+- El primer intento que mostró el error Meta 1690130 usó la configuración anterior 2284579898782348. En el POS local se verificó la sesión 1437433648065760 con Cloud API exclusivo y se hizo explícita la versión v4 en el frontend. Repetir el registro desde una ventana nueva y comprobar que Meta ofrece la cuenta existente.

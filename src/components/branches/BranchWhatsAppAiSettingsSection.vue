@@ -1,5 +1,6 @@
 <template>
   <div class="space-y-6">
+    <WhatsAppCoexistencePanel :key="branchId" :branch-id="branchId" />
     <BaseCard>
       <BranchWhatsAppSettingsForm :branch-id="branchId" @saved="handleWhatsAppSettingsSaved" />
     </BaseCard>
@@ -26,6 +27,7 @@
 
 <script setup lang="ts">
 import BaseCard from '@/components/ui/BaseCard.vue'
+import WhatsAppCoexistencePanel from '@/components/whatsapp/WhatsAppCoexistencePanel.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import BranchAiSettingsForm from '@/components/branches/BranchAiSettingsForm.vue'
 import BranchWhatsAppSettingsForm from '@/components/whatsapp/BranchWhatsAppSettingsForm.vue'

@@ -10,8 +10,8 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
-import BillingRecipientModal from './BillingRecipientModal.vue'
+import { computed, defineAsyncComponent, ref, watch } from 'vue'
+const BillingRecipientModal = defineAsyncComponent(() => import('./BillingRecipientModal.vue'))
 import { billingRecipientComplete, useBillingRecipients } from '@/composables/useBillingRecipients'
 import { useInvoiceResources } from '@/composables/useInvoiceResources'
 import type { BillingRecipient } from '@/types/electronicInvoicing'

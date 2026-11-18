@@ -28,9 +28,50 @@ export const useWhatsAppStore = defineStore('whatsapp', () => {
   const status = ref<WhatsAppStatus | null>(null)
   const unreadSummary = ref<WhatsAppUnreadSummary>({ totalUnread: 0, unreadConversations: 0, latestMessageAt: null })
   const conversations = ref<WhatsAppConversation[]>([])
+  const hasMoreConversations = ref(false)
+  const conversationWindowed = ref(false)
+  const activeConversationId = ref<number | null>(null)
+  let nextConversationCursor: string | null = null
+  let conversationFilters: WhatsAppConversationFilters | undefined
+  const messageUse = new Map<number, number>()
+  const messageReadAt = new Map<number, number>()
+  let cacheClock = 0
+  const maxConversations = 300, maxMessageThreads = 12, maxMessages = 500
+
+  function boundConversations(preferTail = false) {
+    if (conversations.value.length <= maxConversations) return
+    const pinned = conversations.value.find(x => x.id === activeConversationId.value)
+    conversations.value = preferTail ? conversations.value.slice(-maxConversations) : conversations.value.slice(0, maxConversations)
+    if (pinned && !conversations.value.some(x => x.id === pinned.id)) conversations.value[0] = pinned
+    conversationWindowed.value = true
+  }
+
+  function touchMessages(id: number) {
+    messageUse.set(id, ++cacheClock)
+    for (const [candidate] of [...messageUse].sort((a, b) => a[1] - b[1])) {
+      if (messageUse.size <= maxMessageThreads) break
+      if (candidate === activeConversationId.value || candidate === id) continue
+      invalidateMessageRequest(candidate)
+      delete messages.value[candidate]
+      delete aiDiagnosticsByConversation.value[candidate]
+      messageUse.delete(candidate)
+      messageRevisions.delete(candidate)
+      messageEpochs.delete(candidate)
+    }
+  }
+
+  function activateConversation(id: number) {
+    const previous = activeConversationId.value
+    activeConversationId.value = id
+    if (previous && previous !== id) {
+      messageRequests.get(previous)?.abort.abort()
+      olderMessageRequests.get(previous)?.abort.abort()
+    }
+    touchMessages(id)
+  }
   const operationalBranches = ref<WhatsAppOperationalBranchOption[]>([])
   const messages = ref<Record<number, WhatsAppMessage[]>>({})
-  const messageHistory = ref<Record<number, { nextCursor: string | null; hasMore: boolean }>>({})
+  const messageHistory = ref<Record<number, { nextCursor: string | null; hasMore: boolean; hasMoreRecent?: boolean }>>({})
   const olderMessagesLoading = ref<Record<number, boolean>>({})
   const quickReplies = ref<WhatsAppQuickReply[]>([])
   const aiDiagnosticsByBranch = ref<Record<number, WhatsAppAiDiagnostics>>({})
@@ -58,6 +99,7 @@ export const useWhatsAppStore = defineStore('whatsapp', () => {
   }
 
   function invalidateMessageRequest(conversationId: number) {
+    messageReadAt.delete(conversationId)
     const pending = messageRequests.get(conversationId)
     messageRequests.delete(conversationId)
     pending?.abort.abort()
@@ -156,9 +198,14 @@ export const useWhatsAppStore = defineStore('whatsapp', () => {
     return request
   }
 
-  function fetchConversations(filters?: WhatsAppConversationFilters, signal?: AbortSignal): Promise<WhatsAppConversation[]> {
+  function fetchConversations(filters?: WhatsAppConversationFilters, moreOrSignal: boolean | AbortSignal = false): Promise<WhatsAppConversation[]> {
+    const more = moreOrSignal === true
+    const signal = typeof moreOrSignal === 'boolean' ? undefined : moreOrSignal
     if (signal?.aborted) return Promise.resolve(conversations.value)
-    const key = JSON.stringify(filters ?? {})
+    if (more && !hasMoreConversations.value) return Promise.resolve(conversations.value)
+    const selectedFilters = more ? conversationFilters : filters
+    const cursor = more ? nextConversationCursor ?? undefined : undefined
+    const key = JSON.stringify({ filters: selectedFilters ?? {}, cursor })
     if (conversationRequest?.key === key && !conversationRequest.abort.signal.aborted) return conversationRequest.promise
     conversationRequest?.abort.abort()
     const abort = new AbortController(), scope = messageScope
@@ -170,13 +217,22 @@ export const useWhatsAppStore = defineStore('whatsapp', () => {
       try {
       isLoadingConversations.value = true
       error.value = null
-      const res = await whatsappApi.getConversations(filters, abort.signal)
+      const res = await whatsappApi.getConversationPage(selectedFilters, abort.signal, cursor)
       if (!isCurrent()) return conversations.value
-      const byId = new Map((res.data ?? []).map(item => [item.id, item]))
+      if (!more) conversationWindowed.value = false
+      conversationFilters = selectedFilters
+      nextConversationCursor = res.data.nextCursor
+      hasMoreConversations.value = res.data.hasMore
+      const byId = new Map((more ? conversations.value : []).map(item => [item.id, item]))
+      for (const item of res.data.items) byId.set(item.id, item)
       for (const current of conversations.value) {
-        if (messageRevisions.get(current.id) !== revisions.get(current.id)) byId.set(current.id, current)
+        if (messageRevisions.get(current.id) === revisions.get(current.id)) continue
+        const pageItem = byId.get(current.id)
+        if (selectedFilters?.label && !pageItem) continue
+        byId.set(current.id, pageItem?.labels ? { ...current, labels: pageItem.labels } : current)
       }
       conversations.value = [...byId.values()]
+      boundConversations(more)
       return conversations.value
     } catch (err: any) {
       if (!isCurrent()) return conversations.value
@@ -196,20 +252,34 @@ export const useWhatsAppStore = defineStore('whatsapp', () => {
     operationalBranches.value = res.data ?? []
     return operationalBranches.value
   }
+  async function fetchConversation(id: number): Promise<WhatsAppConversation | null> {
+    const scope = messageScope, epoch = messageEpochs.get(id) ?? 0
+    const response = await whatsappApi.getConversation(id)
+    if (scope !== messageScope || epoch !== (messageEpochs.get(id) ?? 0) || !response.data) return null
+    applyAttentionChanged(response.data)
+    return conversations.value.find(c => c.id === id) ?? null
+  }
 
   async function updateOperationalBranch(conversationId: number, branchId: number | null) {
     const scope = messageScope
-    const res = await whatsappApi.updateOperationalBranch(conversationId, branchId)
+    const res = await whatsappApi.updateOperationalBranch(conversationId, branchId, conversations.value.find(x => x.id === conversationId)?.attentionRevision ?? 0)
     if (scope !== messageScope) return null
     const conversation = conversations.value.find(x => x.id === conversationId)
     if (conversation && res.data) Object.assign(conversation, res.data)
     return res.data
   }
 
-  function fetchMessages(conversationId: number, older = false): Promise<WhatsAppMessage[]> {
+  function fetchMessages(conversationId: number, older = false, recent = false, preferCached = false): Promise<WhatsAppMessage[]> {
+    touchMessages(conversationId)
     const requests = older ? olderMessageRequests : messageRequests
     const inFlight = requests.get(conversationId)
-    if (inFlight) return inFlight.promise
+    if (inFlight && !inFlight.abort.signal.aborted) return inFlight.promise
+    if (preferCached && !older && !recent && messages.value[conversationId]?.length
+      && !messageHistory.value[conversationId]?.hasMoreRecent
+      && !conversations.value.find(value => value.id === conversationId)?.unreadCount
+      && messageReadAt.has(conversationId)
+      && Date.now() - (messageReadAt.get(conversationId) ?? 0) < 15000)
+      return Promise.resolve(messages.value[conversationId])
     const before = older ? messageHistory.value[conversationId]?.nextCursor : undefined
     if (older && !before) return Promise.resolve(messages.value[conversationId] ?? [])
 
@@ -227,11 +297,13 @@ export const useWhatsAppStore = defineStore('whatsapp', () => {
     let request!: Promise<WhatsAppMessage[]>
     request = (async () => {
       try {
-        const existingIds = new Set((messages.value[conversationId] ?? []).map(item => item.id))
+        const resetWindow = !older && (recent || messageHistory.value[conversationId]?.hasMoreRecent)
+        const beforeIds = new Set((messages.value[conversationId] ?? []).map(item => item.id))
+        const existingIds = resetWindow ? new Set<number>() : beforeIds
         let res = await whatsappApi.getMessagesPage(conversationId, abort.signal, before ?? undefined)
         const fetched = [...(res.data?.items ?? [])]
         let overlaps = fetched.some(item => existingIds.has(item.id))
-        while (!older && existingIds.size && !overlaps && res.data.hasMore && res.data.nextCursor && isCurrent()) {
+        while (!older && fetched.length < maxMessages && existingIds.size && !overlaps && res.data.hasMore && res.data.nextCursor && isCurrent()) {
           res = await whatsappApi.getMessagesPage(conversationId, abort.signal, res.data.nextCursor)
           fetched.push(...res.data.items)
           overlaps = res.data.items.some(item => existingIds.has(item.id))
@@ -244,12 +316,16 @@ export const useWhatsAppStore = defineStore('whatsapp', () => {
         const byId = new Map(fetched.map(message => [message.id, message]))
         if (changedDuringRequest || older || overlaps) {
           for (const current of messages.value[conversationId] ?? []) {
+            if (resetWindow && beforeIds.has(current.id)) continue
             if (changedDuringRequest || older || !byId.has(current.id)) byId.set(current.id, current)
           }
         }
-        messages.value[conversationId] = sortMessages([...byId.values()])
+        const sorted = sortMessages([...byId.values()])
+        messages.value[conversationId] = older ? sorted.slice(0, maxMessages) : sorted.slice(-maxMessages)
+        if (!older) messageReadAt.set(conversationId, Date.now())
         if (older || !messageHistory.value[conversationId] || !overlaps) {
-          messageHistory.value[conversationId] = { nextCursor: res.data.nextCursor, hasMore: res.data.hasMore }
+          messageHistory.value[conversationId] = { nextCursor: res.data.nextCursor, hasMore: res.data.hasMore,
+            ...(older && (sorted.length > maxMessages || messageHistory.value[conversationId]?.hasMoreRecent) ? { hasMoreRecent: true } : {}) }
         }
 
         const diagnostics = aiDiagnosticsByConversation.value[conversationId]
@@ -300,11 +376,17 @@ export const useWhatsAppStore = defineStore('whatsapp', () => {
     return message
   }
 
-  async function changeAttention(conversationId: number, action: 'take' | 'return-to-ai' | 'pause-ai' | 'request-human' | 'close' | 'reopen') {
-    const res = await whatsappApi.changeAttention(conversationId, action)
+  async function changeAttention(conversationId: number, action: import('@/types/whatsapp').WhatsAppAttentionAction, targetUserId?: number, reason?: string) {
     const conversation = conversations.value.find(x => x.id === conversationId)
-    if (conversation && res.data) Object.assign(conversation, res.data)
-    return res.data
+    try {
+      const res = await whatsappApi.changeAttention(conversationId, action, conversation?.attentionRevision ?? 0, targetUserId, reason)
+      if (conversation && res.data && (res.data.attentionRevision ?? 0) >= (conversation.attentionRevision ?? 0)) Object.assign(conversation, res.data)
+      return res.data
+    } catch (error) {
+      const current = await whatsappApi.getAttention(conversationId).catch(() => null)
+      if (conversation && current?.data) Object.assign(conversation, current.data)
+      throw error
+    }
   }
 
   async function resetConversationForTesting(conversationId: number) {
@@ -318,15 +400,22 @@ export const useWhatsAppStore = defineStore('whatsapp', () => {
   }
 
   function applyAttentionChanged(conversation: WhatsAppConversation) {
+    markMessageChanged(conversation.id)
     const current = conversations.value.find(x => x.id === conversation.id)
+    if (current && (conversation.attentionRevision ?? 0) < (current.attentionRevision ?? 0)) return
     if (current) Object.assign(current, conversation)
     else conversations.value.unshift(conversation)
+    boundConversations()
   }
 
   async function sendMenu(conversationId: number) {
     const res = await whatsappApi.sendMenu(conversationId)
     if (res.data) upsertMessage(conversationId, res.data)
     return res.data
+  }
+
+  function applySentMessages(conversationId: number, sent: WhatsAppMessage[]) {
+    for (const message of sent) upsertMessage(conversationId, message)
   }
 
   async function sendQuickReply(conversationId: number, quickReplyId: number) {
@@ -423,6 +512,7 @@ export const useWhatsAppStore = defineStore('whatsapp', () => {
   }
 
   function upsertMessage(conversationId: number, message: WhatsAppMessage) {
+    touchMessages(conversationId)
     const knownProcessing = aiDiagnosticsByConversation.value[conversationId]?.recentMessages.find(
       processing => processing.messageId === message.id,
     )
@@ -434,7 +524,7 @@ export const useWhatsAppStore = defineStore('whatsapp', () => {
     const updated = index >= 0
       ? existing.map(x => x.id === enrichedMessage.id ? enrichedMessage : x)
       : [...existing, enrichedMessage]
-    messages.value[conversationId] = sortMessages(updated)
+    messages.value[conversationId] = sortMessages(updated).slice(-maxMessages)
     markMessageChanged(conversationId)
   }
 
@@ -559,12 +649,17 @@ export const useWhatsAppStore = defineStore('whatsapp', () => {
       incomingConversation.unreadCount = 0
     }
 
+    if (existingConversation && (incomingConversation.attentionRevision ?? 0) < (existingConversation.attentionRevision ?? 0)) {
+      upsertMessage(incomingMessage.conversationId, incomingMessage)
+      return
+    }
     if (existingConversation) {
       Object.assign(existingConversation, incomingConversation)
     } else {
       conversations.value = [incomingConversation, ...conversations.value]
     }
 
+    boundConversations()
     conversations.value = [...conversations.value].sort(
       (a, b) =>
         new Date(b.lastMessageAt ?? b.updatedAt ?? b.createdAt).getTime()
@@ -598,6 +693,14 @@ export const useWhatsAppStore = defineStore('whatsapp', () => {
     }
   }
 
+  function forgetConversation(id: number) {
+    invalidateMessageRequest(id)
+    conversations.value = conversations.value.filter(c => c.id !== id)
+    delete messages.value[id]
+    delete aiDiagnosticsByConversation.value[id]
+    markMessageChanged(id)
+  }
+
   function clear() {
     conversationRequest?.abort.abort()
     conversationRequest = null
@@ -618,6 +721,12 @@ export const useWhatsAppStore = defineStore('whatsapp', () => {
     status.value = null
     isLoadingStatus.value = false
     conversations.value = []
+    nextConversationCursor = null
+    hasMoreConversations.value = false
+    conversationWindowed.value = false
+    activeConversationId.value = null
+    messageUse.clear()
+    messageReadAt.clear()
     operationalBranches.value = []
     messages.value = {}
     quickReplies.value = []
@@ -635,6 +744,9 @@ export const useWhatsAppStore = defineStore('whatsapp', () => {
     status,
     unreadSummary,
     conversations,
+    hasMoreConversations,
+    conversationWindowed,
+    activateConversation,
     operationalBranches,
     messages,
     messageHistory,
@@ -658,20 +770,24 @@ export const useWhatsAppStore = defineStore('whatsapp', () => {
     fetchUnreadSummary,
     fetchAiDiagnostics,
     fetchConversations,
+    fetchConversation,
     fetchOperationalBranches,
     updateOperationalBranch,
     fetchMessages,
     sendMessage,
     changeAttention,
+    forgetConversation,
     resetConversationForTesting,
     applyAttentionChanged,
     sendMenu,
+    applySentMessages,
     sendQuickReply,
     sendMediaMessage,
     fetchQuickReplies,
     saveQuickReply,
     deleteQuickReply,
     applyRealtimeMessage,
+    upsertMessage,
     applyAiProcessingChanged,
     clear,
   }

@@ -216,6 +216,14 @@ export interface WhatsAppQuickReplyFilters {
 }
 
 export interface WhatsAppConversation {
+  labels?: string[]
+  commercialStatus?: string
+  commercialOrderId?: number | null
+  senderLine?: string | null
+  attentionRevision?: number
+  needsHumanResponse?: boolean
+  lastCustomerMessageAt?: string | null
+  customerServiceWindowExpiresAt?: string | null
   id: number
   branchId: number
   branchName?: string | null
@@ -246,12 +254,16 @@ export interface WhatsAppConversation {
 }
 
 export type WhatsAppAttentionMode = 'ai' | 'human' | 'waitingForHuman' | 'paused' | 'closed'
-export interface WhatsAppAttention { conversationId: number; attentionMode: WhatsAppAttentionMode; attentionReason?: string | null; assignedUserId?: number | null; assignedUserName?: string | null; aiPausedAt?: string | null; humanAssignedAt?: string | null; closedAt?: string | null; attentionModeUpdatedAt: string; attentionModeUpdatedByUserId?: number | null }
+export interface WhatsAppAttention { attentionRevision?: number; needsHumanResponse?: boolean; conversationId: number; attentionMode: WhatsAppAttentionMode; attentionReason?: string | null; assignedUserId?: number | null; assignedUserName?: string | null; aiPausedAt?: string | null; humanAssignedAt?: string | null; closedAt?: string | null; attentionModeUpdatedAt: string; attentionModeUpdatedByUserId?: number | null }
 export interface WhatsAppAttentionChangedPayload { branchId: number; conversation: WhatsAppConversation }
 export interface WhatsAppConversationRoutingChangedPayload { branchId: number; previousOperationalBranchId?: number | null; conversation: WhatsAppConversation }
 export interface WhatsAppOperationalBranchOption { id: number; name: string }
 
 export interface WhatsAppMessage {
+  draftAddressApplied?: boolean
+  draftProductApplied?: boolean
+  source?: string
+  isHistorical?: boolean
   id: number
   conversationId: number
   whatsAppMessageId?: string | null
@@ -271,7 +283,26 @@ export interface WhatsAppMessage {
   aiProcessing?: WhatsAppAiProcessing | null
 }
 
+export interface WhatsAppProductChoiceGroup {
+  id: number
+  name: string
+  isRice: boolean
+  shortcut?: string | null
+}
+
+export interface WhatsAppConversationTemplate {
+  metaTemplateId: string
+  name: string
+  language: string
+  category: string
+  status: string
+  componentsJson: string
+}
+
 export interface WhatsAppConversationFilters {
+  label?: string
+  inbox?: WhatsAppInboxKey
+  unroutedOnly?: boolean
   branchId?: number
   search?: string
   status?: WhatsAppConversation['status']
@@ -344,3 +375,33 @@ export interface UpdateTenantWhatsAppChannel {
   isActive: boolean
   flowEnabled: boolean
 }
+
+export type WhatsAppInboxKey = 'free' | 'mine' | 'team' | 'closed'
+export interface WhatsAppInboxLabel { key: string; name: string; editable: boolean }
+export type WhatsAppInboxSummary = Record<WhatsAppInboxKey, { pendingOrders: number; unreadConversations: number }>
+export type WhatsAppAttentionAction = 'take' | 'force-take' | 'release' | 'transfer' | 'return-to-ai' | 'pause-ai' | 'request-human' | 'close' | 'reopen'
+
+export interface WhatsAppCommercialDraft {
+  sessionId: number
+  attemptId: string
+  conversationId: number
+  version: number
+  status: string
+  commercialStatus: string
+  order: import('./order').CreateOrderDto
+  editor: import('./order').DraftOrder | null
+  orderId: number | null
+  checkoutId: string | null
+  confirmationStatus: string | null
+  confirmationError: string | null
+  internalNotes: { userId: number; text: string; createdAt: string }[]
+}
+export interface WhatsAppDraftWrite {
+  sessionId: number; expectedVersion: number; attentionVersion: number
+  order?: import('./order').CreateOrderDto
+  editor?: import('./order').DraftOrder
+  commercialStatus?: string
+  note?: string
+}
+
+export interface WhatsAppConversationPage { items: WhatsAppConversation[]; nextCursor: string | null; hasMore: boolean }

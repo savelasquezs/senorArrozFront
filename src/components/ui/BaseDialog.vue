@@ -2,7 +2,7 @@
 	<Teleport to="body">
 		<Transition name="dialog">
 			<div
-				v-if="modelValue"
+                v-if="modelValue && active"
 				class="fixed inset-0 flex items-center justify-center"
 				:class="[zClass, mobileFullScreen ? 'p-0 sm:p-4' : 'p-4']"
 			>
@@ -57,7 +57,7 @@ let previousBodyOverflow = '';
 </script>
 
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, ref, useId, watch } from 'vue';
+import { computed, nextTick, onActivated, onBeforeUnmount, onDeactivated, ref, useId, watch } from 'vue';
 import { XMarkIcon } from '@heroicons/vue/24/outline';
 
 interface Props {
@@ -94,6 +94,9 @@ const emit = defineEmits<{
 
 const titleId = useId();
 const dialogElement = ref<HTMLElement | null>(null);
+const active = ref(true);
+onActivated(() => { active.value = true; });
+onDeactivated(() => { active.value = false; });
 const dialogId = Symbol();
 let opener: HTMLElement | null = null;
 const isTop = () => dialogStack[dialogStack.length - 1] === dialogId;
@@ -132,7 +135,7 @@ async function focusInitial() {
 	if (props.modelValue && isTop()) (dialogElement.value?.querySelector<HTMLElement>(props.initialFocus || '[autofocus], [data-autofocus], input:not(:disabled), select:not(:disabled), textarea:not(:disabled)') ?? controls()[0] ?? dialogElement.value)?.focus();
 }
 watch(() => props.focusKey, focusInitial);
-watch(() => props.modelValue, async open => {
+watch(() => props.modelValue && active.value, async open => {
 	if (!open) { release(); return; }
 	opener = document.activeElement as HTMLElement | null;
 	if (!dialogStack.length) { previousBodyOverflow = document.body.style.overflow; document.body.style.overflow = 'hidden'; }

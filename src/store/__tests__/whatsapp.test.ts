@@ -6,6 +6,7 @@ import type { WhatsAppAiDiagnostics, WhatsAppAiProcessing, WhatsAppMessage } fro
 const { whatsappApiMock } = vi.hoisted(() => ({
   whatsappApiMock: {
     getStatus: vi.fn(),
+    getConversation: vi.fn(),
     getAiDiagnostics: vi.fn(),
     getOperationalBranches: vi.fn(),
     resetConversationForTesting: vi.fn(),
@@ -209,6 +210,28 @@ describe('WhatsApp operational branch', () => {
     vi.clearAllMocks()
   })
 
+  it('resolves a direct link outside the currently loaded inbox without marking it read', async () => {
+    const store = useWhatsAppStore()
+    whatsappApiMock.getConversation.mockResolvedValue({ data: { id: 20, assignedUserId: 7, attentionMode: 'human', attentionRevision: 3, unreadCount: 4 } })
+    const selected = await store.fetchConversation(20)
+    expect(selected).toMatchObject({ id: 20, attentionRevision: 3, unreadCount: 4 })
+    expect(whatsappApiMock.getConversation).toHaveBeenCalledWith(20)
+  })
+
+  it('cannot restore a conversation from an old session or revoked in-flight request', async () => {
+    const store = useWhatsAppStore()
+    let complete!: (value: unknown) => void
+    whatsappApiMock.getConversation.mockReturnValue(new Promise(resolve => { complete = resolve }))
+    const pending = store.fetchConversation(20)
+    store.forgetConversation(20)
+    complete({ data: { id: 20, attentionRevision: 1 } })
+    expect(await pending).toBeNull(); expect(store.conversations).toEqual([])
+    whatsappApiMock.getConversation.mockReturnValue(new Promise(resolve => { complete = resolve }))
+    const previousSession = store.fetchConversation(20)
+    store.clear(); complete({ data: { id: 20 } })
+    expect(await previousSession).toBeNull(); expect(store.conversations).toEqual([])
+  })
+
   it('loads operational branches and applies the central conversation update', async () => {
     const store = useWhatsAppStore()
     const conversation = {
@@ -235,7 +258,7 @@ describe('WhatsApp operational branch', () => {
     await store.updateOperationalBranch(conversation.id, 2)
 
     expect(store.operationalBranches).toEqual([{ id: 2, name: 'Manrique' }])
-    expect(whatsappApiMock.updateOperationalBranch).toHaveBeenCalledWith(20, 2)
+    expect(whatsappApiMock.updateOperationalBranch).toHaveBeenCalledWith(20, 2, 0)
     expect(store.conversations[0].operationalBranchId).toBe(2)
     expect(store.conversations[0].assignedUserId).toBe(7)
   })

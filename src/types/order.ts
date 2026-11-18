@@ -13,6 +13,7 @@ export type OrderStatus = 'awaiting_payment' | 'taken' | 'in_preparation' | 'rea
 export type AppliedBenefitType = 'DailyPromotion' | 'Loyalty' | 'DiscountCode' | 'Manual' | 'None'
 
 export interface OrderItem {
+    whatsAppProductChoice?: WhatsAppProductChoice
     tempId: string
     productId: number
     productName: string
@@ -511,11 +512,17 @@ export interface CreateOrderDto {
 }
 
 export interface CreateOrderDetailDto {
+    whatsAppProductChoice?: WhatsAppProductChoice | null
     productId: number
     quantity: number
     unitPrice: number
     discount?: number
     notes?: string
+}
+
+export interface WhatsAppProductChoice {
+    key: string
+    name: string
 }
 
 export interface CreateBankPaymentDto {

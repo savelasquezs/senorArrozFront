@@ -628,6 +628,13 @@ El buscador de clientes y el listado admiten empresa/NIT y muestran las empresas
 
 La disponibilidad del POS usa la sucursal operativa del borrador. La consulta forOrderCreation exige rol de gestión y sucursal activa del mismo tenant; el catálogo de productos compartido conserva sus recetas y se cruza con los saldos de esa sede. Las consultas administrativas conservan su alcance anterior.
 
+## Pedidos de WhatsApp y reutilización del editor
+
+La línea de WhatsApp, el responsable, su sucursal de trabajo, el enrutamiento del chat y la sucursal que prepara se conservan por separado. Transferir el asesor o reutilizar un panel cacheado no cambia el destino del pedido. La confirmación usa la sesión comercial versionada y el motor existente, con revisión previa y una única creación; cambiar de chat no borra el mensaje ni los cambios pendientes de otra conversación.
+
+Línea, responsable, atención, estado comercial y Sin venta se presentan en la cabecera de la conversación. Sin venta conserva la revisión previa y los permisos del responsable; contraer el pedido no elimina esta acción ni su borrador. Las notas internas se abren desde esa cabecera y nunca se envían al cliente. La sucursal que prepara o donde se recoge se elige exclusivamente en el selector del pedido, sin duplicar avisos sobre el editor. En esta vista no se muestra el botón flotante para crear pedidos POS.
+
+En el local y domicilio usan campos nativos de hora dentro de `BaseInput`. Las reservas conservan el calendario compartido. Se mantienen la sugerencia de entrega una hora después de preparar, el mínimo de cuarenta minutos y la validación del día operativo; si la sugerencia cruza el día se exige elegir una hora válida. La caché no evita verificar la versión al confirmar ni concede permisos de otro contexto de trabajo.
 ### Abonos iniciales de reservas
 
 El sidebar conserva sus medios de pago y envía una sola creación idempotente. Si el tipo efectivo enviado es reserva, el backend registra los importes recibidos como abonos y devuelve el historial. El saldo no marcado como recibido sigue pendiente. `sourceReservationDepositId` identifica copias operativas de banco/app; `cashAppliedToOrder` evita duplicar el efectivo. La factura y el cobro cuentan cada abono una sola vez.

@@ -31,7 +31,7 @@
                     :error="guestNameTouched ? guestNameError : ''" @blur="guestNameTouched = true"
                     @update:model-value="value => updateGuestName(String(value || ''))" />
 
-                <BaseButton v-if="editor" size="sm" variant="outline" class="w-full" @click="handleAddProducts">Agregar productos</BaseButton>
+                <BaseButton v-if="editor" type="button" size="sm" variant="outline" class="w-full" @click="handleAddProducts">Agregar productos</BaseButton>
                 <OrderItemList ref="itemList" compact :tab-id="currentTabId || ''" @add-products="handleAddProducts" />
                     <div
                         v-if="hasAppliedBenefit"
@@ -163,15 +163,13 @@
                         <div class="grid grid-cols-2 gap-2">
                             <div class="min-w-0">
                                 <label class="mb-1 block text-xs text-gray-600">Preparar</label>
-                                <VueDatePicker :model-value="prepareAtLocal" time-picker :auto-apply="true" :input-attrs="{ clearable: false }"
-                                    :teleport="true" :floating="{ strategy: 'fixed' }" :aria-labels="{ input: 'Hora de preparación' }"
-                                    placeholder="Hora" @update:model-value="onPrepareAtInput" />
+                                <BaseInput :model-value="formatOrderTime(prepareAtLocal)" type="time" step="60" size="sm"
+                                    aria-label="Hora de preparación" @update:model-value="value => onPrepareAtInput(parseOrderTime(value))" />
                             </div>
                             <div class="min-w-0">
                                 <label class="mb-1 block text-xs text-gray-600">Entregar</label>
-                                <VueDatePicker :model-value="reservedForLocal" time-picker :auto-apply="true" :input-attrs="{ clearable: false }"
-                                    :teleport="true" :floating="{ strategy: 'fixed' }" :aria-labels="{ input: 'Hora de entrega' }"
-                                    placeholder="Hora" @update:model-value="onReservedForInput" />
+                                <BaseInput :model-value="formatOrderTime(reservedForLocal)" type="time" step="60" size="sm"
+                                    aria-label="Hora de entrega" @update:model-value="value => onReservedForInput(parseOrderTime(value))" />
                             </div>
                         </div>
                         <p v-if="scheduleError" role="alert" class="mt-1 text-xs text-red-700">{{ scheduleError }}</p>
@@ -200,19 +198,19 @@
             </div>
         </div>
         <footer v-if="currentOrder" class="shrink-0 border-t border-gray-200 bg-white px-3 py-3" data-test="sidebar-footer">
-            <BaseButton v-if="currentOrder.whatsappConversationId" @click="sendWhatsAppConfirmation" variant="outline" size="sm"
+            <BaseButton v-if="currentOrder.whatsappConversationId && !editor" @click="sendWhatsAppConfirmation" variant="outline" size="sm"
                 class="mb-2 w-full" :loading="isSendingWhatsAppConfirmation">Enviar resumen previo por WhatsApp</BaseButton>
             <div class="flex items-center gap-2">
                 <div class="mr-auto min-w-0 tabular-nums">
                     <span class="block text-xs text-gray-500">Total · {{ currentOrder.orderItems.reduce((sum, item) => sum + item.quantity, 0) }} uds.</span>
                     <strong class="text-xl font-semibold text-emerald-700">{{ formatCurrency(currentOrder.total) }}</strong>
                 </div>
-                <button v-if="showCopyAddressesButton" type="button" class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50 hover:text-emerald-700"
-                    aria-label="Copiar direcciones" title="Copiar direcciones" @click="copyDeliveryAddressesText">
+                <button v-if="showCopyAddressesButton" type="button" class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50 hover:text-emerald-700 disabled:opacity-40"
+                    :aria-label="addressActionLabel" :title="addressActionLabel" :disabled="chatActions && !canSendAddressChoices" @click="handleAddressAction">
                     <MapPinIcon class="h-4 w-4" />
                 </button>
                 <button type="button" class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50 hover:text-emerald-700 disabled:opacity-40"
-                    aria-label="Copiar mensaje del pedido" title="Copiar mensaje" :disabled="!currentOrder.orderItems.length" @click="itemList?.copyOrderSummaryToClipboard()">
+                    :aria-label="summaryActionLabel" :title="summaryActionLabel" :disabled="!currentOrder.orderItems.length" @click="handleSummaryAction">
                     <ClipboardDocumentIcon class="h-4 w-4" />
                 </button>
                 <BaseButton @click="handleSubmitOrder" variant="primary" size="sm" class="h-10 shrink-0"
@@ -223,8 +221,7 @@
             </div>
         </footer>
         <p v-if="editor && orderErrors.length" class="px-3 py-2 text-xs text-amber-800" role="status">{{ orderErrors.join('. ') }}</p>
-        <AddProductModal v-if="editor && showProductModal" :open="showProductModal" :branch-id="currentOrder?.branchId"
-            save-hint="Los productos se guardan en el borrador. Confirma el pedido al terminar."
+        <AddProductModal v-if="editor && showProductModal" save-hint="Los productos se guardan en el borrador. Confirma el pedido al terminar." :open="showProductModal" :branch-id="currentOrder?.branchId"
             :existing-product-ids="currentOrder?.orderItems.map(item => item.productId) ?? []"
             @close="showProductModal = false" @products-added="addSelectedProducts" />
         <OrderNoteDialog v-model="showNoteDialog" :notes="currentOrder?.notes" title="Notas del pedido"
@@ -318,32 +315,34 @@
                 <BaseButton :disabled="!!invoiceAvailabilityError || checkingInvoiceAvailability" @click="confirmInvoiceSubmit(true)">Enviar pedido y factura</BaseButton>
             </div>
         </BaseDialog>
-        <CustomerDetailModal v-if="selectedCustomer" :show="showCustomerDetail" :customer="selectedCustomer"
+        <CustomerDetailModal v-if="selectedCustomer && showCustomerDetail" :show="showCustomerDetail" :customer="selectedCustomer"
             @close="closeCustomerDetail" @customer-updated="handleCustomerUpdated" />
     </div>
 </template>
 
 <script setup lang="ts">
+import { generatePosCreationKey } from '@/utils/posCreationKey'
+
+import { useOrderPermissions } from '@/composables/useOrderPermissions'
+import { useOrderEditorContext } from '@/composables/useOrderEditor'
+const AddProductModal = defineAsyncComponent(() => import('./AddProductModal.vue'))
+import type { OrderProductAddition } from '@/types/order'
+const editor = useOrderEditorContext()
+const props = defineProps<{ chatActions?: boolean; canSendAddressChoices?: boolean }>()
+const emit = defineEmits<{ 'send-address-choices': []; 'draft-message': [text: string] }>()
+const showProductModal = ref(false)
+
 import BillingRecipientAccess from '@/components/customers/BillingRecipientAccess.vue'
 import { billingRecipientComplete } from '@/composables/useBillingRecipients'
 import { useInvoiceResources } from '@/composables/useInvoiceResources'
 import type { BillingRecipient } from '@/types/electronicInvoicing'
 import { computed, defineAsyncComponent, ref, watch } from 'vue'
-import { useOrderEditorContext } from '@/composables/useOrderEditor'
-import { useOrderPermissions } from '@/composables/useOrderPermissions'
-import { generatePosCreationKey } from '@/utils/posCreationKey'
-import type { OrderProductAddition } from '@/types/order'
-const AddProductModal = defineAsyncComponent(() => import('./AddProductModal.vue'))
-const editor = useOrderEditorContext()
-const showProductModal = ref(false)
 import { useOrderPersistence } from '@/composables/useOrderPersistence'
 import { useOrderValidation } from '@/composables/useOrderValidation'
 import { useOrderTabs } from '@/composables/useOrderTabs'
 import { useOrderSubmission } from '@/composables/useOrderSubmission'
 import { useOrderBenefitResolver } from '@/composables/useOrderBenefitResolver'
 import { findCustomerOrdersOnSameBusinessDate, type CustomerOrderDateConflictItem } from '@/composables/useCustomerOrderDateConflict'
-import { VueDatePicker } from '@vuepic/vue-datepicker';
-import '@vuepic/vue-datepicker/dist/main.css'
 import { useRouter } from 'vue-router'
 
 import { useToast } from '@/composables/useToast'
@@ -367,7 +366,7 @@ import OrderTabs from '@/components/orders/OrderTabs.vue'
 import OrderItemList from '@/components/orders/OrderItemList.vue'
 import CustomerSection from '@/components/customers/CustomerSection.vue'
 import OrderFulfillmentBranchSelector from '@/components/orders/OrderFulfillmentBranchSelector.vue'
-import CustomerDetailModal from '@/components/customers/CustomerDetailModal.vue'
+const CustomerDetailModal = defineAsyncComponent(() => import('@/components/customers/CustomerDetailModal.vue'))
 import PaymentSelector from '@/components/payments/PaymentSelector.vue'
 
 // Icons
@@ -380,8 +379,8 @@ import {
 } from '@heroicons/vue/24/outline'
 import type { LocalHour } from '@/types/common'
 import { DateTimeService } from '@/services/domain/DateTimeService'
-import OrderScheduleFields from './OrderScheduleFields.vue'
-import { orderScheduleError, suggestedOrderDelivery } from '@/helpers/orderSchedule'
+const OrderScheduleFields = defineAsyncComponent(() => import('./OrderScheduleFields.vue'))
+import { formatOrderTime, parseOrderTime, orderScheduleError, suggestedOrderDelivery } from '@/helpers/orderSchedule'
 
 
 
@@ -484,6 +483,20 @@ const showCopyAddressesButton = computed(() => {
     if (!o || (o.type !== 'delivery' && o.type !== 'reservation')) return false
     return o.customerId != null && o.customerId > 0
 })
+
+const addressActionLabel = computed(() => props.chatActions ? 'Enviar opciones de dirección por WhatsApp' : 'Copiar direcciones')
+const summaryActionLabel = computed(() => props.chatActions ? 'Editar mensaje del pedido en el chat' : 'Copiar mensaje del pedido')
+
+function handleAddressAction() {
+    if (props.chatActions) emit('send-address-choices')
+    else void copyDeliveryAddressesText()
+}
+
+function handleSummaryAction() {
+    if (!props.chatActions) { void itemList.value?.copyOrderSummaryToClipboard(); return }
+    const text = itemList.value?.buildOrderSummary()
+    if (text) emit('draft-message', text)
+}
 
 function formatAddressLineForCopy(a: CustomerAddress): string {
     const street = (a.address || '').trim()
@@ -779,7 +792,7 @@ function addSelectedProducts(products: OrderProductAddition[]) {
 
 async function sendWhatsAppConfirmation() {
     const order = currentOrder.value
-    if (!order?.whatsappConversationId || (editor && !editor.canSubmit())) return
+    if (!order?.whatsappConversationId || editor) return
     if (order.orderItems.length === 0) {
         showError('WhatsApp', 'Agrega productos antes de enviar la confirmación.')
         return
@@ -1081,7 +1094,7 @@ watch(
 .sidebar-summary { display: flex; align-items: center; gap: 0.5rem; min-height: 28px; cursor: pointer; list-style: none; font-size: 0.8125rem; font-weight: 500; color: #374151; border-radius: 6px; }
 .sidebar-summary:hover { color: #047857; }
 .sidebar-summary:focus-visible { outline: 2px solid #059669; outline-offset: 3px; }
-.sidebar-schedule :deep(.dp__input) { min-height: 32px; padding-top: 5px; padding-bottom: 5px; border-color: #e5e7eb; border-radius: 6px; font-size: 12px; }
-@media (pointer: coarse) { .sidebar-schedule :deep(.dp__input) { min-height: 40px; font-size: 16px; } }
+.sidebar-schedule :deep(.dp__input), .sidebar-schedule :deep(input[type="time"]) { min-width: 0; min-height: 32px; padding-top: 5px; padding-bottom: 5px; border-color: #e5e7eb; border-radius: 6px; font-size: 12px; }
+@media (pointer: coarse) { .sidebar-schedule :deep(.dp__input), .sidebar-schedule :deep(input[type="time"]) { min-height: 40px; font-size: 16px; } }
 @media (max-width: 1023px) { .order-sidebar { width: 100%; min-height: 0; flex: 1; } }
 </style>
