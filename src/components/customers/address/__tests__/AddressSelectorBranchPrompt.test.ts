@@ -45,7 +45,6 @@ vi.mock('@/composables/useToast', () => ({
 }))
 
 import AddressSelector from '@/components/customers/address/AddressSelector.vue'
-import CustomerAddressForm from '@/components/customers/address/CustomerAddressForm.vue'
 import AddressDeliveryFeeDialog from '@/components/customers/address/AddressDeliveryFeeDialog.vue'
 
 describe('AddressSelector branch coverage', () => {
@@ -100,11 +99,14 @@ describe('AddressSelector branch coverage', () => {
         const wrapper = shallowMount(AddressSelector, {
             props: { customerId: 7, mode: 'draft' },
             // Shallow BaseDialog hides its slot by default; render it to inspect the form props.
-            global: { stubs: { BaseDialog: { template: '<div><slot /></div>' } } },
+            global: { stubs: {
+                BaseDialog: { template: '<div><slot /></div>' },
+                CustomerAddressForm: { name: 'CustomerAddressForm', props: ['allowBranchSelection', 'forOrderAddress'], template: '<div />' },
+            } },
         })
         await flushPromises()
-        expect(wrapper.getComponent(CustomerAddressForm).props('allowBranchSelection')).toBe(false)
-        expect(wrapper.getComponent(CustomerAddressForm).props('forOrderAddress')).toBe(true)
+        expect(wrapper.getComponent({ name: 'CustomerAddressForm' }).props('allowBranchSelection')).toBe(false)
+        expect(wrapper.getComponent({ name: 'CustomerAddressForm' }).props('forOrderAddress')).toBe(true)
     })
 
     it('calculates coverage for whichever operational branch is selected, without switching the order', async () => {
@@ -155,7 +157,10 @@ describe('AddressSelector branch coverage', () => {
     it('opens editing from the shared address text and clears only the selection', async () => {
         const wrapper = shallowMount(AddressSelector, {
             props: { customerId: 7, selectedAddress: 11, mode: 'persisted', operationBranchId: 1 },
-            global: { stubs: { BaseDialog: { props: ['modelValue'], template: '<div v-if="modelValue"><slot /></div>' } } },
+            global: { stubs: {
+                BaseDialog: { props: ['modelValue'], template: '<div v-if="modelValue"><slot /></div>' },
+                CustomerAddressForm: { name: 'CustomerAddressForm', props: ['addressId'], template: '<div />' },
+            } },
         })
         await flushPromises()
         expect(wrapper.get('[aria-label="Cambiar dirección"]').exists()).toBe(true)
@@ -163,7 +168,7 @@ describe('AddressSelector branch coverage', () => {
         expect(address.element.tagName).toBe('BUTTON')
         expect(address.text()).toContain('Calle 1 # 2-03')
         await address.trigger('click')
-        expect(wrapper.getComponent(CustomerAddressForm).props('addressId')).toBe(11)
+        expect(wrapper.getComponent({ name: 'CustomerAddressForm' }).props('addressId')).toBe(11)
         await wrapper.get('[aria-label="Quitar dirección"]').trigger('click')
         expect(wrapper.emitted('addressSelected')?.at(-1)).toEqual([undefined])
         expect(dependencies.customersStore.addresses).toHaveLength(2)

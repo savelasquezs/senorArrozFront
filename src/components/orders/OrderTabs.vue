@@ -40,7 +40,7 @@
 
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
-import { useOrdersDraftsStore } from '@/store/ordersDrafts'
+import { useOrderEditorStore as useOrdersDraftsStore } from '@/composables/useOrderEditor'
 import { useOrderTabs } from '@/composables/useOrderTabs'
 
 // Components

@@ -1,5 +1,16 @@
 import { TZDate } from '@date-fns/tz'
 import { defaultBusinessCalendar } from '@/utils/datetime'
+import type { LocalHour } from '@/types/common'
+
+export function formatOrderTime(time: LocalHour | null | undefined): string {
+    return time ? `${String(time.hours).padStart(2, '0')}:${String(time.minutes).padStart(2, '0')}` : ''
+}
+
+export function parseOrderTime(value: string | number | null): LocalHour | null {
+    if (typeof value !== 'string' || !/^\d{2}:\d{2}$/.test(value)) return null
+    const [hours, minutes] = value.split(':').map(Number)
+    return hours! < 24 && minutes! < 60 ? { hours: hours!, minutes: minutes!, seconds: 0 } : null
+}
 
 export function orderScheduleDate(day: string, time: string): Date | null {
     if (!/^\d{4}-\d{2}-\d{2}$/.test(day) || !/^\d{2}:\d{2}$/.test(time)) return null

@@ -12,9 +12,14 @@
           :class="activeKey === tab.key
             ? 'border-emerald-600 bg-emerald-50 text-emerald-800'
             : 'border-transparent text-gray-600 hover:bg-gray-50 hover:text-gray-900'"
-          @click="activeKey = tab.key"
+          @click="selectTab(tab.key)"
         >
           <span>{{ tab.label }}</span>
+          <span v-if="tab.pendingOrders > 0"
+            class="inline-flex items-center gap-1 rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-bold leading-none text-amber-900"
+            :title="`${tab.pendingOrders} conversaciones sin pedido`">
+            {{ tab.pendingOrders > 99 ? '99+' : tab.pendingOrders }} sin pedido
+          </span>
           <span
             v-if="tab.unreadConversations > 0"
             class="inline-flex min-w-5 items-center justify-center rounded-full bg-emerald-600 px-1.5 py-0.5 text-[10px] font-bold leading-none text-white"
@@ -39,95 +44,20 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed } from 'vue'
 import type { WhatsAppInboxSection } from '@/utils/whatsappInbox'
-
-type InboxKey = WhatsAppInboxSection['key']
-
-interface InboxTab extends WhatsAppInboxSection {
-  unreadConversations: number
-}
-
+import type { WhatsAppInboxKey, WhatsAppInboxSummary } from '@/types/whatsapp'
 const props = withDefaults(defineProps<{
-  sections: WhatsAppInboxSection[]
-  selectedConversationId?: number | null
-  loading?: boolean
-  isSuperadmin?: boolean
-}>(), {
-  selectedConversationId: null,
-  loading: false,
-  isSuperadmin: false,
-})
-
-const activeKey = ref<InboxKey>('unassigned')
-const initialized = ref(false)
-
-const sectionMap = computed(() => new Map(props.sections.map(section => [section.key, section])))
-
-const tabs = computed<InboxTab[]>(() => {
-  const unassigned = sectionMap.value.get('unassigned')
-  const branch = sectionMap.value.get('branch')
-  const assigned = sectionMap.value.get('assigned')
-
-  const result: WhatsAppInboxSection[] = [
-    unassigned ?? { key: 'unassigned', label: 'Sin asignar', conversations: [] },
-    branch ?? { key: 'branch', label: props.isSuperadmin ? 'Sucursales' : 'Mi sucursal', conversations: [] },
-  ]
-
-  if (!props.isSuperadmin && assigned?.conversations.length) result.push(assigned)
-
-  return result.map(section => ({
-    ...section,
-    unreadConversations: section.conversations.filter(conversation => conversation.unreadCount > 0).length,
-  }))
-})
-
-const activeTab = computed(() =>
-  tabs.value.find(tab => tab.key === activeKey.value) ?? tabs.value[0] ?? null,
-)
-
-function tabForConversation(conversationId: number | null | undefined) {
-  if (!conversationId) return null
-  return tabs.value.find(tab => tab.conversations.some(conversation => conversation.id === conversationId)) ?? null
-}
-
-const selectedConversationTabKey = computed<InboxKey | null>(() =>
-  tabForConversation(props.selectedConversationId)?.key ?? null,
-)
-
-function bestAvailableTab() {
-  return tabs.value.find(tab => tab.conversations.length > 0)?.key
-    ?? tabs.value[0]?.key
-    ?? 'unassigned'
-}
-
-watch(
-  tabs,
-  () => {
-    if (!initialized.value) {
-      activeKey.value = selectedConversationTabKey.value ?? bestAvailableTab()
-      initialized.value = true
-      return
-    }
-
-    if (!tabs.value.some(tab => tab.key === activeKey.value)) {
-      activeKey.value = bestAvailableTab()
-    }
-  },
-  { immediate: true, deep: true },
-)
-
-watch(
-  () => props.selectedConversationId,
-  () => {
-    const key = selectedConversationTabKey.value
-    if (key) activeKey.value = key
-  },
-)
-
-watch(selectedConversationTabKey, (current, previous) => {
-  if (current && previous && activeKey.value === previous) {
-    activeKey.value = current
-  }
-})
+  sections: WhatsAppInboxSection[]; modelValue?: WhatsAppInboxKey;
+  counts?: WhatsAppInboxSummary | null;
+  selectedConversationId?: number | null; loading?: boolean; isSuperadmin?: boolean
+}>(), { modelValue: 'free', loading: false })
+const emit = defineEmits<{ 'update:modelValue': [value: WhatsAppInboxKey] }>()
+const activeKey = computed(() => props.modelValue)
+const tabs = computed(() => props.sections.map(section => ({ ...section,
+  pendingOrders: props.counts?.[section.key]?.pendingOrders ?? 0,
+  unreadConversations: props.counts?.[section.key]?.unreadConversations ?? 0,
+})))
+const activeTab = computed(() => tabs.value.find(tab => tab.key === activeKey.value))
+function selectTab(key: WhatsAppInboxKey) { emit('update:modelValue', key) }
 </script>

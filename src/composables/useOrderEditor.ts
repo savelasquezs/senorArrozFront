@@ -1,26 +1,26 @@
 import { getCurrentInstance, inject, provide, type InjectionKey } from 'vue'
 import { defineOrderDraftStore, useOrdersDraftsStore } from '@/store/ordersDrafts'
-import type { Order } from '@/types/order'
+import type { DraftOrder, Order } from '@/types/order'
 
+type EditorStore = ReturnType<typeof useOrdersDraftsStore>
 interface OrderEditorContext {
-  store: ReturnType<typeof useOrdersDraftsStore>
-  onCreated: (order: Order) => void
-  canSubmit: () => boolean
+  store: EditorStore
+  draftId: string
+  submit: (draft: DraftOrder) => Promise<Order>
 }
-
 const editorKey: InjectionKey<OrderEditorContext> = Symbol('order-editor')
 
 export function useOrderEditorContext() {
   return getCurrentInstance() ? inject(editorKey, null) : null
 }
 
-export function useOrderEditorStore() {
+export function useOrderEditorStore(): EditorStore {
   return useOrderEditorContext()?.store ?? useOrdersDraftsStore()
 }
 
-export function provideOrderEditor(id: string, onCreated: OrderEditorContext['onCreated'], canSubmit = () => true) {
-  const store = defineOrderDraftStore(`order-editor:${id}`)()
-  store.maxTabs = 1
-  provide(editorKey, { store, onCreated, canSubmit })
+export function provideOrderEditor(draftId: string, submit: OrderEditorContext['submit']) {
+  const store = defineOrderDraftStore(`order-editor:${draftId}`, false)()
+  store.maxTabs = Number.MAX_SAFE_INTEGER
+  provide(editorKey, { store, draftId, submit })
   return store
 }

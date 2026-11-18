@@ -1,63 +1,6 @@
 <template>
   <div class="contents">
     <div class="h-full min-h-0 bg-gray-50 flex flex-col">
-      <div class="border-b border-gray-200 bg-white px-4 py-3 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-        <div>
-          <h1 class="text-xl font-semibold text-gray-900 flex items-center gap-2">
-            <ChatBubbleLeftRightIcon class="w-6 h-6 text-emerald-600" />
-            WhatsApp
-          </h1>
-          <p class="text-sm text-gray-500">Conversaciones de WhatsApp Cloud API</p>
-        </div>
-        <div v-if="whatsappStore.enabled" class="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end">
-          <button
-            v-if="diagnosticsBranchId"
-            type="button"
-            class="inline-flex items-center justify-center gap-2 rounded-lg border px-3 py-2 text-sm font-semibold transition-colors"
-            :class="aiStatusChipClasses"
-            :title="currentAiDiagnostics?.summary || whatsappStore.aiDiagnosticsError || 'Abrir actividad de la IA'"
-            @click="openAiDiagnostics"
-          >
-            <CpuChipIcon class="h-4 w-4" />
-            <span class="max-w-52 truncate">{{ aiStatusChipLabel }}</span>
-            <span v-if="currentAiDiagnostics?.pendingCount" class="rounded-full bg-white/70 px-1.5 py-0.5 text-[10px]">
-              {{ currentAiDiagnostics.pendingCount }}
-            </span>
-          </button>
-          <span
-            class="inline-flex items-center justify-center gap-1.5 rounded-lg px-2.5 py-2 text-xs font-semibold"
-            :class="signalRStatusClasses"
-            :title="signalRError || signalRStatusLabel"
-          >
-            <span class="h-2 w-2 rounded-full" :class="signalRDotClass" />
-            {{ signalRStatusLabel }}
-          </span>
-          <BaseButton variant="secondary" size="sm" @click="openQuickRepliesModal">
-            Respuestas rápidas
-          </BaseButton>
-          <select
-            v-if="showBranchFilter"
-            v-model="selectedBranchId"
-            class="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm focus:border-emerald-500 focus:ring-emerald-500"
-            @change="reloadConversations"
-          >
-            <option :value="0">Todas las sucursales</option>
-            <option v-for="branch in branchOptions" :key="branch.id" :value="branch.id">{{ branch.label }}</option>
-          </select>
-          <input
-            v-model="search"
-            type="search"
-            class="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-emerald-500 focus:ring-emerald-500"
-            placeholder="Buscar teléfono o nombre"
-            @input="onSearchInput"
-          />
-          <label class="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700">
-            <input v-model="unreadOnly" type="checkbox" class="h-4 w-4 rounded border-gray-300 text-emerald-600" @change="reloadConversations" />
-            No leídos
-          </label>
-        </div>
-      </div>
-
       <div
         v-if="statusLoadError && whatsappStore.status"
         class="flex items-center justify-between gap-3 border-b border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-900"
@@ -102,29 +45,69 @@
         <div ref="columnsContainer" class="whatsapp-columns relative grid min-h-0 flex-1 grid-cols-1"
           :class="{ 'with-order': selectedConversation && !contextPanelCollapsed }"
           :style="{ '--inbox-width': `${leftWidth}px`, '--order-width': `${rightWidth}px` }">
+
         <aside class="relative min-h-0 border-r border-gray-200 bg-white flex flex-col" :class="{ 'max-xl:hidden': mobilePane !== 'inbox' }">
           <div role="separator" tabindex="0" aria-label="Ancho de conversaciones" aria-orientation="vertical" :aria-valuenow="leftWidth" class="absolute -right-1 top-0 z-10 hidden h-full w-2 cursor-col-resize touch-none xl:block" @pointerdown="resize($event, 'left')" @keydown.left.prevent="step('left', -20)" @keydown.right.prevent="step('left', 20)" />
-          <div class="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
-            <span class="text-sm font-medium text-gray-700">Conversaciones</span>
-            <BaseButton variant="ghost" size="sm" :loading="whatsappStore.isLoadingConversations" @click="reloadConversations">
-              Actualizar
-            </BaseButton>
+          <div class="shrink-0 space-y-2 border-b border-gray-100 p-3">
+            <div class="flex items-center justify-between gap-2">
+              <h1 class="flex min-w-0 items-center gap-1.5 text-base font-semibold text-gray-900"><ChatBubbleLeftRightIcon class="h-5 w-5 shrink-0 text-emerald-600" />WhatsApp</h1>
+              <span class="inline-flex items-center gap-1 rounded-md px-1.5 py-1 text-[10px] font-medium" :class="signalRStatusClasses" :title="signalRError || signalRStatusLabel">
+                <span class="h-1.5 w-1.5 rounded-full" :class="signalRDotClass" />{{ signalRStatusLabel }}
+              </span>
+              <BaseButton variant="ghost" size="sm" :loading="whatsappStore.isLoadingConversations" @click="reloadConversations">Actualizar</BaseButton>
+            </div>
+            <input v-model="search" type="search" class="w-full rounded-lg border border-gray-300 px-3 py-2 text-xs focus:border-emerald-500 focus:ring-emerald-500"
+              placeholder="Buscar teléfono o nombre" @input="onSearchInput" />
+            <div class="flex items-start gap-2">
+            <details class="min-w-0 flex-1 text-xs text-gray-600">
+              <summary class="cursor-pointer py-1 font-medium">Filtros y herramientas<span v-if="unreadOnly || unroutedOnly || selectedBranchId || selectedLabel" class="ml-1 text-emerald-700"> · activos</span></summary>
+              <div class="mt-2 space-y-2">
+                <select v-if="showBranchFilter" v-model="selectedBranchId" class="w-full rounded-lg border border-gray-300 bg-white px-2 py-1.5 text-xs" @change="reloadConversations">
+                  <option :value="0">Todas las sucursales</option><option v-for="branch in branchOptions" :key="branch.id" :value="branch.id">{{ branch.label }}</option>
+                </select>
+                <div class="flex flex-wrap gap-x-3 gap-y-2">
+                  <label class="inline-flex items-center gap-1.5"><input v-model="unroutedOnly" type="checkbox" @change="reloadConversations" />Sin sede operativa</label>
+                  <label class="inline-flex items-center gap-1.5"><input v-model="unreadOnly" type="checkbox" @change="reloadConversations" />No leídos</label>
+                </div>
+                <select v-model="selectedLabel" aria-label="Filtrar por etiqueta" class="w-full rounded-lg border border-gray-300 bg-white px-2 py-1.5 text-xs">
+                  <option value="">Todas las etiquetas</option>
+                  <option v-for="label in inboxLabels" :key="label.key" :value="label.key">{{ label.name }}</option>
+                </select>
+                <BaseButton variant="secondary" size="sm" @click="openQuickRepliesModal">Respuestas rápidas</BaseButton>
+                <button v-if="diagnosticsBranchId" type="button" class="inline-flex max-w-full items-center gap-1.5 rounded-lg border px-2 py-1.5 text-xs font-medium"
+                  :class="aiStatusChipClasses" :title="currentAiDiagnostics?.summary || whatsappStore.aiDiagnosticsError || 'Abrir actividad de la IA'" @click="openAiDiagnostics">
+                  <CpuChipIcon class="h-4 w-4 shrink-0" /><span class="truncate">{{ aiStatusChipLabel }}</span>
+                  <span v-if="currentAiDiagnostics?.pendingCount" class="rounded bg-white/70 px-1">{{ currentAiDiagnostics.pendingCount }}</span>
+                </button>
+              </div>
+            </details>
+            <BaseButton v-if="canResetTaken" variant="ghost" size="sm" class="shrink-0" :loading="resettingTaken"
+              title="Quita las etiquetas de días anteriores en esta bandeja" @click="resetTakenLabels">Limpiar Tomado</BaseButton>
+            </div>
           </div>
           <WhatsAppInboxTabs
+            v-model="activeInbox"
             :sections="inboxSections"
+            :counts="inboxCounts"
             :selected-conversation-id="selectedConversation?.id"
             :loading="whatsappStore.isLoadingConversations"
             :is-superadmin="authStore.isSuperadmin"
           >
             <template #default="{ conversations }">
-              <button
-                v-for="conversation in conversations"
+              <div
+                v-for="(conversation, conversationIndex) in conversations"
+                v-memo="[...Object.values(conversation), inboxLabelNames, selectedLabel, selectedConversation?.id === conversation.id, conversationIndex === 0 || commercialGroup(conversations[conversationIndex - 1]!) !== commercialGroup(conversation), Math.floor(clockNow / 60_000)]"
                 :key="conversation.id"
-                type="button"
-                class="w-full border-b border-gray-100 px-3 py-2 text-left hover:bg-gray-50"
+                class="relative w-full border-b border-gray-100 px-3 py-2 text-left hover:bg-gray-50"
                 :class="selectedConversation?.id === conversation.id ? 'bg-emerald-50' : conversation.attentionMode === 'waitingForHuman' ? 'bg-amber-50 ring-1 ring-inset ring-amber-300' : 'bg-white'"
-                @click="selectConversation(conversation)"
               >
+                <button
+                  type="button"
+                  class="absolute inset-0 z-10 w-full focus-visible:outline focus-visible:-outline-offset-2 focus-visible:outline-emerald-600"
+                  :aria-label="`Abrir chat con ${conversationTitle(conversation)} (${conversationIdentityLabel(conversation)})`"
+                  @click="selectConversation(conversation)"
+                />
+                <p v-if="conversationIndex === 0 || commercialGroup(conversations[conversationIndex - 1]!) !== commercialGroup(conversation)" class="mb-2 text-[10px] font-semibold uppercase tracking-wide text-gray-500">{{ commercialGroup(conversation) }}</p>
                 <div class="flex items-center justify-between gap-2">
                   <div class="flex min-w-0 flex-1 items-baseline gap-1.5">
                     <span class="min-w-0 truncate text-sm font-semibold text-gray-950">{{ conversationTitle(conversation) }}</span>
@@ -135,6 +118,19 @@
                     {{ conversation.unreadCount }}
                   </span>
                 </div>
+                <span v-if="conversation.labels?.length" class="mt-1.5 flex flex-wrap gap-1.5" data-test="inbox-conversation-labels">
+                  <button
+                    v-for="key in conversation.labels"
+                    :key="key"
+                    type="button"
+                    class="relative z-20 hover:opacity-80 focus-visible:outline focus-visible:outline-offset-2 focus-visible:outline-gray-900"
+                    :class="[inboxLabelClasses(key), { 'ring-2 ring-gray-700 ring-offset-1': selectedLabel === key }]"
+                    :aria-pressed="selectedLabel === key"
+                    @click="selectedLabel = selectedLabel === key ? '' : key"
+                  >
+                    {{ inboxLabelName(key) }}
+                  </button>
+                </span>
                 <div class="mt-1 flex min-w-0 items-baseline gap-2 text-xs">
                   <span
                     class="min-w-0 flex-1 truncate"
@@ -151,64 +147,102 @@
                 </div>
                 <div class="mt-1 flex items-center justify-between gap-2">
                   <span class="rounded-full px-2 py-0.5 text-[10px] font-semibold" :class="attentionBadgeClass(conversation.attentionMode)" :title="attentionTooltip(conversation)">{{ attentionLabel(conversation) }}</span>
-                  <span class="min-w-0 truncate text-[10px] font-medium text-gray-500">{{ whatsappConversationBranchLabel(conversation) }}</span>
+                  <span class="min-w-0 truncate text-[10px] font-medium text-gray-500">{{ commercialLabel(conversation) }} · {{ whatsappConversationBranchLabel(conversation) }}</span>
                 </div>
-              </button>
+              </div>
             </template>
           </WhatsAppInboxTabs>
+          <div v-if="whatsappStore.hasMoreConversations || whatsappStore.conversationWindowed" class="flex shrink-0 flex-wrap gap-2 border-t p-2">
+            <BaseButton v-if="whatsappStore.hasMoreConversations" size="sm" variant="outline" :loading="whatsappStore.isLoadingConversations" @click="loadMoreConversations">Cargar más conversaciones</BaseButton>
+            <BaseButton v-if="whatsappStore.conversationWindowed" size="sm" variant="ghost" @click="reloadConversations">Volver al inicio</BaseButton>
+          </div>
         </aside>
 
         <section class="min-h-0 flex flex-col bg-gray-50" :class="{ 'max-xl:hidden': mobilePane !== 'chat' }">
-          <div v-if="selectedConversation" class="border-b border-gray-200 bg-white px-4 py-3 flex items-start justify-between gap-3">
-            <div>
-            <p class="font-semibold text-gray-900">{{ conversationTitle(selectedConversation) }}</p>
-            <p class="text-sm text-gray-500">
-              {{ conversationIdentityLabel(selectedConversation) }}
-              <span v-if="selectedConversation.isCentralChannel"> · {{ selectedConversation.operationalBranchName || 'Sin asignar' }}</span>
-              <span v-else-if="selectedConversation.branchName"> · {{ selectedConversation.branchName }}</span>
-            </p>
-            <label v-if="canAssignOperationalBranch" class="mt-2 flex items-center gap-2 text-xs font-medium text-gray-600">
-              Sucursal operativa
-              <select
-                class="rounded-md border border-gray-300 bg-white px-2 py-1 text-sm text-gray-900 focus:border-emerald-500 focus:ring-emerald-500"
-                :value="selectedConversation.operationalBranchId ?? 0"
-                :disabled="changingOperationalBranch"
-                @change="changeOperationalBranch"
-              >
-                <option :value="0">Sin asignar</option>
-                <option v-for="branch in whatsappStore.operationalBranches" :key="branch.id" :value="branch.id">{{ branch.name }}</option>
-              </select>
-            </label>
+          <header v-if="selectedConversation" class="shrink-0 space-y-2 border-b border-gray-200 bg-white px-3 py-2" data-test="whatsapp-chat-header">
+            <div class="flex items-start justify-between gap-2">
+              <div class="min-w-0">
+                <p class="truncate text-sm font-semibold text-gray-900">{{ conversationTitle(selectedConversation) }}</p>
+                <p class="text-xs text-gray-500">{{ conversationIdentityLabel(selectedConversation) }}</p>
+              </div>
+              <div class="flex shrink-0 items-start gap-1.5">
+                <BaseButton v-if="canTakeAttention" size="sm" :loading="changingAttention" @click="changeAttention('take')">Tomar conversación</BaseButton>
+                <details class="relative" data-test="whatsapp-chat-actions">
+                  <summary class="cursor-pointer list-none rounded-lg border border-gray-200 px-2 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50">Gestionar chat</summary>
+                  <div class="absolute right-0 top-full z-20 mt-1 flex max-h-[70dvh] w-72 max-w-[calc(100vw-2rem)] flex-col gap-2 overflow-y-auto rounded-xl border border-gray-200 bg-white p-3 shadow-lg">
+                    <label v-if="canAssignOperationalBranch" class="mt-2 flex items-center gap-2 text-xs font-medium text-gray-600">
+                      Sucursal operativa
+                      <select
+                        class="rounded-md border border-gray-300 bg-white px-2 py-1 text-sm text-gray-900 focus:border-emerald-500 focus:ring-emerald-500"
+                        :value="selectedConversation.operationalBranchId ?? 0"
+                        :disabled="changingOperationalBranch"
+                        @change="changeOperationalBranch"
+                      >
+                        <option :value="0">Sin asignar</option>
+                        <option v-for="branch in whatsappStore.operationalBranches" :key="branch.id" :value="branch.id">{{ branch.name }}</option>
+                      </select>
+                    </label>
+                      <BaseButton v-if="ownsConversation" size="sm" variant="secondary" :loading="changingAttention" @click="changeAttention('release')">Soltar</BaseButton>
+                      <BaseButton v-if="canReturnToAi" variant="secondary" size="sm" :loading="changingAttention" @click="changeAttention('return-to-ai')">Devolver a la IA</BaseButton>
+                      <template v-if="ownsConversation">
+                        <select v-model="transferTarget" aria-label="Asesor destino" class="rounded border px-2 py-1 text-sm">
+                          <option :value="0">Transferir a asesor…</option>
+                          <option v-for="advisor in advisors.filter(a => a.id !== authStore.user?.id)" :key="advisor.id" :value="advisor.id">{{ advisor.name }}</option>
+                        </select>
+                        <BaseButton size="sm" variant="secondary" :disabled="!transferTarget" :loading="changingAttention" @click="changeAttention('transfer')">Transferir asesor</BaseButton>
+                      </template>
+                      <template v-if="canForceTake">
+                        <input v-model="takeoverReason" maxlength="500" placeholder="Motivo de toma forzada" aria-label="Motivo de toma forzada" class="rounded border px-2 py-1 text-sm" />
+                        <BaseButton size="sm" variant="danger" :disabled="!takeoverReason.trim()" :loading="changingAttention" @click="changeAttention('force-take')">Tomar de forma forzada</BaseButton>
+                      </template>
+                      <BaseButton v-if="canPauseAi" variant="secondary" size="sm" :loading="changingAttention" @click="changeAttention('pause-ai')">Pausar IA</BaseButton>
+                      <BaseButton
+                        v-if="canResetTestContext"
+                        variant="secondary"
+                        size="sm"
+                        :loading="resettingConversation"
+                        :disabled="changingAttention"
+                        :icon="ArrowPathIcon"
+                        title="Borra mensajes y carrito de IA, pero conserva el cliente y sus direcciones"
+                        @click="resetConversationForTesting"
+                      >
+                        Reiniciar prueba
+                      </BaseButton>
+                      <BaseButton
+                        variant="secondary"
+                        size="sm"
+                        :title="latestFailureReason || 'Ver fallos, transferencias y reintentos de la IA'"
+                        @click="openAiDiagnostics"
+                      >
+                        Fallos IA<span v-if="failureActivityCount"> ({{ failureActivityCount }})</span>
+                      </BaseButton>
+                      <BaseButton v-if="ownsConversation" variant="danger" size="sm" :loading="changingAttention" @click="changeAttention('close')">Cerrar conversación</BaseButton>
+                      <BaseButton v-if="selectedConversation.attentionMode === 'closed'" size="sm" :loading="changingAttention" @click="changeAttention('reopen')">Reabrir conversación</BaseButton>
+                  </div>
+                </details>
+                <BaseButton variant="ghost" size="sm" @click="contextPanelCollapsed = !contextPanelCollapsed">{{ contextPanelCollapsed ? 'Abrir pedido' : 'Contraer' }}</BaseButton>
+              </div>
             </div>
-            <div class="flex flex-wrap justify-end gap-2">
-              <BaseButton v-if="canTakeAttention" size="sm" :loading="changingAttention" @click="changeAttention('take')">Tomar conversación</BaseButton>
-              <BaseButton v-if="canReturnToAi" variant="secondary" size="sm" :loading="changingAttention" @click="changeAttention('return-to-ai')">Devolver a la IA</BaseButton>
-              <BaseButton v-if="canPauseAi" variant="secondary" size="sm" :loading="changingAttention" @click="changeAttention('pause-ai')">Pausar IA</BaseButton>
-              <BaseButton
-                v-if="canResetTestContext"
-                variant="secondary"
-                size="sm"
-                :loading="resettingConversation"
-                :disabled="changingAttention"
-                :icon="ArrowPathIcon"
-                title="Borra mensajes y carrito de IA, pero conserva el cliente y sus direcciones"
-                @click="resetConversationForTesting"
-              >
-                Reiniciar prueba
-              </BaseButton>
-              <BaseButton
-                variant="secondary"
-                size="sm"
-                :title="latestFailureReason || 'Ver fallos, transferencias y reintentos de la IA'"
-                @click="openAiDiagnostics"
-              >
-                Fallos IA<span v-if="failureActivityCount"> ({{ failureActivityCount }})</span>
-              </BaseButton>
-              <BaseButton v-if="selectedConversation.attentionMode !== 'closed'" variant="danger" size="sm" :loading="changingAttention" @click="changeAttention('close')">Cerrar conversación</BaseButton>
-              <BaseButton v-else size="sm" :loading="changingAttention" @click="changeAttention('reopen')">Reabrir conversación</BaseButton>
-              <BaseButton variant="ghost" size="sm" @click="contextPanelCollapsed = !contextPanelCollapsed; mobilePane = contextPanelCollapsed ? 'chat' : 'order'">{{ contextPanelCollapsed ? 'Abrir pedido' : 'Contraer' }}</BaseButton>
+            <div class="flex flex-wrap gap-x-3 gap-y-1 text-[11px] leading-4 text-gray-500" data-test="whatsapp-chat-context">
+              <span><span class="font-medium">Línea</span> {{ selectedConversation.senderLine || (selectedConversation.isCentralChannel ? 'WhatsApp central' : selectedConversation.branchName) }}</span>
+              <span><span class="font-medium">Responsable</span> {{ selectedConversation.assignedUserName || (selectedConversation.assignedUserId ? `Asesor #${selectedConversation.assignedUserId}` : 'Sin asignar') }}</span>
+              <span><span class="font-medium">Atención</span> {{ (selectedConversation.isCentralChannel ? selectedConversation.operationalBranchName : selectedConversation.branchName) || 'Sin sede operativa' }}</span>
             </div>
-          </div>
+            <div class="flex flex-wrap items-center gap-1.5" aria-label="Etiquetas de la conversación">
+              <span v-for="key in selectedConversation.labels" :key="key" :class="inboxLabelClasses(key)">{{ inboxLabelName(key) }}</span>
+              <details v-if="canEditInboxLabels && editableInboxLabels.length" class="relative">
+                <summary class="cursor-pointer rounded border border-gray-200 px-2 py-0.5 text-xs text-gray-700">Etiquetas</summary>
+                <div class="absolute left-0 z-20 mt-1 min-w-40 space-y-1 rounded border bg-white p-2 shadow">
+                  <label v-for="label in editableInboxLabels" :key="label.key" class="flex cursor-pointer items-center gap-2 text-xs text-gray-700">
+                    <input type="checkbox" :checked="selectedConversation.labels?.includes(label.key)" :disabled="changingInboxLabel"
+                      @change="setInboxLabel(label.key, $event)" />
+                    {{ label.name }}
+                  </label>
+                </div>
+              </details>
+            </div>
+            <div ref="commercialControlsTarget" class="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px]" data-test="whatsapp-commercial-controls" />
+          </header>
 
           <WhatsAppAiStatusStrip
             v-if="selectedConversation"
@@ -225,8 +259,9 @@
             </div>
           </div>
           <template v-else>
-            <div ref="messagesContainer" class="flex-1 min-h-0 overflow-y-auto px-4 py-4 space-y-3">
+            <div ref="messagesContainer" @scroll="trackMessageScroll" class="flex-1 min-h-0 overflow-y-auto px-4 py-4 space-y-3">
               <p v-if="whatsappStore.isLoadingMessages && !currentMessages.length" role="status" class="text-center text-sm text-gray-500">Cargando mensajes…</p>
+              <BaseButton v-if="whatsappStore.messageHistory[selectedConversation.id]?.hasMoreRecent" size="sm" variant="outline" class="mx-auto" @click="showRecentMessages">Volver a los recientes</BaseButton>
               <button v-if="whatsappStore.messageHistory[selectedConversation.id]?.hasMore" type="button"
                 class="mx-auto block rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm disabled:opacity-50"
                 :disabled="whatsappStore.olderMessagesLoading[selectedConversation.id]" @click="loadOlderMessages">
@@ -235,6 +270,7 @@
               <div
                 v-for="message in currentMessages"
                 :key="message.id"
+                :data-message-id="message.id"
                 class="flex"
                 :class="message.direction === 'outbound' ? 'justify-end' : 'justify-start'"
               >
@@ -251,7 +287,7 @@
                       @click="openImagePreview(message)"
                     >
                       <img
-                        loading="lazy" decoding="async"
+                        loading="lazy" decoding="async" width="256" height="192"
                         :src="message.mediaUrl"
                         :alt="message.mediaFileName || 'Imagen de WhatsApp'"
                         class="max-h-80 max-w-full cursor-zoom-in object-contain"
@@ -289,7 +325,7 @@
                     {{ mediaFallbackLabel(message) }}
                   </p>
                   <div class="mt-1 flex items-center justify-end gap-2 text-[11px]" :class="message.direction === 'outbound' ? 'text-emerald-50' : 'text-gray-400'">
-                    <span>{{ formatTime(message.timestamp) }}</span>
+                    <span v-if="message.source === 'businessApp'">Celular · </span><span v-if="message.isHistorical">Historial · </span><span>{{ formatTime(message.timestamp) }}</span>
                     <span v-if="message.direction === 'outbound'">{{ statusLabel(message.status) }}</span>
                   </div>
                   <div
@@ -309,17 +345,24 @@
               </div>
               <div ref="messagesEnd" />
             </div>
+            <BaseButton v-if="newMessageCount" class="mx-auto mb-2" size="sm" variant="outline" @click="showRecentMessages">Nuevos mensajes · {{ newMessageCount }}</BaseButton>
 
             <form class="border-t border-gray-200 bg-white p-3" @submit.prevent="sendMessage">
-              <p v-if="selectedConversation.attentionMode === 'closed'" class="mb-2 rounded-lg bg-gray-100 p-2 text-sm text-gray-600">La conversación está cerrada. Reábrela para enviar mensajes.</p>
-              <div v-if="topQuickReplies.length" class="mb-2 flex flex-wrap items-center gap-2">
+              <p v-if="!ownsConversation" class="mb-2 rounded-lg bg-gray-100 p-2 text-sm text-gray-600">Toma la conversación para responder. Si pertenece a otro asesor, puedes consultarla sin modificarla.</p>
+              <p v-if="ownsConversation && !serviceWindowOpen" class="mb-2 rounded bg-amber-50 p-2 text-sm text-amber-900">La ventana de atención de 24 horas está cerrada. Usa una plantilla aprobada para iniciar el contacto.</p>
+              <p v-else-if="ownsConversation" class="mb-2 text-xs text-gray-500">Ventana de atención hasta {{ new Date(selectedConversation.customerServiceWindowExpiresAt!).toLocaleString('es-CO') }}</p>
+              <WhatsAppConversationTemplates v-if="ownsConversation" :key="selectedConversation.id" :conversation-id="selectedConversation.id" />
+              <div v-if="ownsConversation || topQuickReplies.length" class="mb-2 flex flex-wrap items-center gap-2">
                 <span class="text-xs font-medium text-gray-500">Rápidas</span>
+                <button v-if="ownsConversation" type="button"
+                  class="rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-800 hover:bg-emerald-100 disabled:opacity-50"
+                  :disabled="sending || sendingProductChoices || !canSend" @click="openProductChoices">Elegir presentación</button>
                 <button
                   v-for="reply in topQuickReplies"
                   :key="reply.id"
                   type="button"
                   class="rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-800 hover:bg-emerald-100 disabled:opacity-50"
-                  :disabled="sending"
+                  :disabled="sending || sendingProductChoices || !canSend"
                   :title="reply.messageTemplate"
                   @click="sendQuickReply(reply)"
                 >
@@ -336,7 +379,7 @@
                 </button>
               </div>
               <div class="flex items-end gap-2">
-                <BaseButton type="button" variant="secondary" :loading="sendingMenu" :disabled="sending || selectedConversation.attentionMode === 'closed'" @click="sendMenu">
+                <BaseButton type="button" variant="secondary" :loading="sendingMenu" :disabled="sending || !canSend" @click="sendMenu">
                   Enviar carta
                 </BaseButton>
                 <input ref="fileInput" type="file" class="hidden" @change="onFileSelected" />
@@ -344,31 +387,33 @@
                   Archivo
                 </BaseButton>
                 <textarea
+                  ref="messageInput"
                   v-model="draft"
                   rows="2"
                   maxlength="4096"
                   class="min-h-[44px] flex-1 resize-none rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-emerald-500 focus:ring-emerald-500"
                   placeholder="Escribe un mensaje"
                   @keydown.enter.exact.prevent="sendMessage"
-                  :disabled="selectedConversation.attentionMode === 'closed'"
+                  :disabled="!canSend"
                 />
-                <BaseButton type="submit" :loading="sending" :disabled="selectedConversation.attentionMode === 'closed' || (!draft.trim() && !selectedFile)" :icon="PaperAirplaneIcon">
+                <BaseButton type="submit" :loading="sending || sendingProductChoices" :disabled="!canSend || (!draft.trim() && !selectedFile)" :icon="PaperAirplaneIcon">
                   Enviar
                 </BaseButton>
               </div>
               <div
                 v-if="slashQuickReplyMatches.length"
-                class="mt-2 rounded-lg border border-gray-200 bg-gray-50 p-2 shadow-sm"
+                class="mt-2 max-h-52 overflow-y-auto rounded-lg border border-gray-200 bg-gray-50 p-2 shadow-sm"
               >
                 <button
                   v-for="reply in slashQuickReplyMatches"
-                  :key="reply.id"
+                  :key="reply.key"
                   type="button"
                   class="flex w-full items-start gap-3 rounded-md px-2 py-1.5 text-left hover:bg-white"
-                  @click="sendQuickReply(reply)"
+                  :disabled="sending || sendingProductChoices || !canSend"
+                  @click="reply.group ? sendCatalogQuickReply(reply.group) : reply.saved && sendQuickReply(reply.saved)"
                 >
                   <span class="shrink-0 rounded bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-800">/{{ reply.shortcut }}</span>
-                  <span class="min-w-0 flex-1 truncate text-xs text-gray-600">{{ reply.messageTemplate }}</span>
+                  <span class="min-w-0 flex-1 truncate text-xs text-gray-600">{{ reply.preview }}</span>
                 </button>
               </div>
               <p v-if="sendError" class="mt-2 text-sm text-red-600">{{ sendError }}</p>
@@ -387,151 +432,37 @@
 
         <aside v-if="selectedConversation" v-show="!contextPanelCollapsed" data-test="whatsapp-order-column" class="relative min-h-0 border-l border-gray-200 bg-white flex flex-col" :class="{ 'max-xl:hidden': mobilePane !== 'order' }">
           <div role="separator" tabindex="0" aria-label="Ancho del pedido" aria-orientation="vertical" :aria-valuenow="rightWidth" class="absolute -left-1 top-0 z-10 hidden h-full w-2 cursor-col-resize touch-none xl:block" @pointerdown="resize($event, 'right')" @keydown.left.prevent="step('right', 20)" @keydown.right.prevent="step('right', -20)" />
-          <div class="border-b border-gray-100 px-4 py-3">
-            <p class="text-sm font-semibold text-gray-900">Pedido</p>
-            <p class="mt-0.5 text-xs text-gray-500">{{ conversationIdentityLabel(selectedConversation) }}</p>
-          </div>
-
-          <WhatsAppOrderPanel v-if="isManualOrderContext && selectedCustomer && !contextLoading"
-            :key="`${authStore.user?.id}:${selectedConversation.id}`"
-            class="min-h-0 flex-1" :conversation="selectedConversation" :customer="selectedCustomer"
-            :address="selectedAddress" :initial-draft="aiOrderDraft" />
-          <div v-else class="flex-1 min-h-0 overflow-y-auto p-4 space-y-4">
-            <div v-if="contextLoading">
-              <BaseLoading text="Cargando cliente..." />
-            </div>
-
-            <template v-else>
-              <div v-if="selectedCustomer" class="space-y-3">
-                <div class="rounded-lg border border-emerald-200 bg-emerald-50 p-3">
-                  <p class="text-sm font-semibold text-emerald-950">{{ selectedCustomer.name }}</p>
-                  <p v-if="selectedCustomer.whatsAppUsername" class="mt-1 text-sm font-medium text-emerald-800">{{ selectedCustomer.whatsAppUsername }}</p>
-                  <p v-if="selectedCustomer.phone1" class="mt-1 text-sm text-emerald-800">{{ selectedCustomer.phone1 }}</p>
-                  <p v-if="selectedCustomer.phone2" class="text-sm text-emerald-800">{{ selectedCustomer.phone2 }}</p>
-                  <BaseButton v-if="isManualOrderContext" class="mt-2" size="sm" variant="outline" @click="showCustomerSelector = !showCustomerSelector">
-                    Cambiar cliente asociado
-                  </BaseButton>
-                </div>
-
-                <CustomerSelector v-if="showCustomerSelector && isManualOrderContext" :branch-id="selectedConversation.branchId" @customer-selected="linkExistingCustomer" />
-
-                <section v-if="isAiOrderContext" class="space-y-3 rounded-xl border border-gray-200 bg-gray-50 p-3">
-                  <div class="flex items-center justify-between gap-2">
-                    <div>
-                      <p class="text-sm font-semibold text-gray-900">Draft construido por la IA</p>
-                      <p class="text-xs text-gray-500">Se actualiza con cada herramienta ejecutada.</p>
-                    </div>
-                    <span class="rounded-full px-2 py-1 text-[11px] font-semibold" :class="aiDraftOrderTypeClass">
-                      {{ aiDraftOrderTypeLabel }}
-                    </span>
-                  </div>
-
-                  <div v-if="aiOrderDraft?.items.length" class="space-y-2">
-                    <div
-                      v-for="item in aiOrderDraft.items"
-                      :key="item.productId"
-                      class="rounded-lg border border-gray-200 bg-white px-3 py-2"
-                    >
-                      <div class="flex items-start justify-between gap-3">
-                        <div class="min-w-0">
-                          <p class="truncate text-sm font-semibold text-gray-900">{{ item.quantity }} × {{ item.name }}</p>
-                          <p v-if="item.notes" class="mt-0.5 text-xs text-gray-500">{{ item.notes }}</p>
-                          <p v-if="!item.available" class="mt-0.5 text-xs font-semibold text-red-700">No disponible actualmente</p>
-                        </div>
-                        <span class="shrink-0 text-sm font-semibold text-gray-800">{{ formatMoney(item.subtotal) }}</span>
-                      </div>
-                    </div>
-                  </div>
-                  <p v-else class="rounded-lg border border-dashed border-gray-300 bg-white p-3 text-center text-xs text-gray-500">
-                    La IA todavía no ha agregado productos.
-                  </p>
-
-                  <dl class="space-y-1 border-t border-gray-200 pt-2 text-sm">
-                    <div class="flex justify-between"><dt class="text-gray-600">Subtotal</dt><dd class="font-medium">{{ formatMoney(aiOrderDraft?.subtotal || 0) }}</dd></div>
-                    <div v-if="aiOrderDraft?.orderType === 'delivery'" class="flex justify-between"><dt class="text-gray-600">Domicilio</dt><dd class="font-medium">{{ formatMoney(aiOrderDraft.deliveryFee) }}</dd></div>
-                    <div class="flex justify-between text-base"><dt class="font-semibold text-gray-900">Total</dt><dd class="font-bold text-emerald-700">{{ formatMoney(aiOrderDraft?.total || 0) }}</dd></div>
-                  </dl>
-
-                  <div v-if="aiOrderDraft?.activities.length" class="border-t border-gray-200 pt-2">
-                    <p class="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">Decisiones y cambios</p>
-                    <ol class="space-y-2">
-                      <li v-for="activity in aiOrderDraft.activities.slice(0, 8)" :key="`${activity.timestamp}-${activity.message}`" class="flex gap-2 text-xs text-gray-700">
-                        <span class="mt-1 h-2 w-2 shrink-0 rounded-full bg-emerald-500" />
-                        <span>{{ activity.message }}</span>
-                      </li>
-                    </ol>
-                  </div>
-                </section>
-
-                <AddressSelector
-                  v-if="canManageOrderContext"
-                  :customer-id="selectedCustomer.id"
-                  :branch-id="selectedCustomer.branchId"
-                  :selected-address="selectedAddress?.id || undefined"
-                  mode="persisted"
-                  @address-selected="onContextAddressSelected"
-                />
-
-                <p v-if="addressSelectionNote" class="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-900">
-                  {{ addressSelectionNote }}
-                </p>
-
-                <BaseButton
-                  v-if="canManageOrderContext"
-                  class="w-full"
-                  variant="outline"
-                  :disabled="!selectedCustomerAddresses.length || sendingAddressConfirmation"
-                  :loading="sendingAddressConfirmation"
-                  @click="sendAddressConfirmationRequest"
-                >
-                  Confirmar dirección por WhatsApp
-                </BaseButton>
-
-                <BaseButton
-                  class="w-full"
-                  variant="primary"
-                  :disabled="!canTakeOrderFromWhatsApp || takingOrder"
-                  :loading="takingOrder"
-                  @click="takeOrderFromWhatsApp"
-                >
-                  Tomar pedido
-                </BaseButton>
-
-                <p v-if="isBlockedOrderContext" class="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950">
-                  Toma la conversación para gestionar manualmente el cliente, sus direcciones y el pedido.
-                </p>
-              </div>
-
-              <div v-else-if="isManualOrderContext" class="space-y-3">
-                <div class="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950">
-                  No encontramos un cliente con esta identidad. Busca uno existente o crea un cliente para continuar.
-                </div>
-                <CustomerSelector :branch-id="selectedConversation.branchId" @customer-selected="linkExistingCustomer" />
-                <div class="flex items-center gap-2 text-xs text-gray-400"><span class="h-px flex-1 bg-gray-200" />o crea uno nuevo<span class="h-px flex-1 bg-gray-200" /></div>
-                <CustomerForm
-                  :initial-phone="initialCustomerPhone"
-                  :initial-username="selectedConversation.whatsAppUsername || ''"
-                  :initial-branch-id="selectedConversation.branchId"
-                  submit-button-text="Crear cliente"
-                  :loading="creatingCustomer"
-                  @submit="createCustomerFromConversation"
-                />
-              </div>
-
-              <div v-else-if="isAiOrderContext" class="rounded-lg border border-violet-200 bg-violet-50 p-3 text-sm text-violet-950">
-                La IA está construyendo el contexto del cliente y del pedido.
-              </div>
-
-              <div v-else class="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950">
-                Toma la conversación para crear o vincular el cliente y gestionar el pedido.
-              </div>
-
-              <p v-if="contextError" class="text-sm text-red-600">{{ contextError }}</p>
-            </template>
-          </div>
+          <KeepAlive :key="editorScope" :max="8">
+            <WhatsAppOrderPanel ref="commercialPanel" :key="`${authStore.user?.id}:${selectedConversation.id}`" :conversation="selectedConversation" :initial-draft="prefetchedDraft" :controls-target="commercialControlsTarget"
+              :can-send-choices="canSend" @change="commercialChanged" @draft-message="draftOrderMessage" @addresses-sent="addressesSent" />
+          </KeepAlive>
         </aside>
         </div>
       </div>
+
+      <BaseDialog v-model="showProductChoices" title="Enviar opciones de producto" size="sm">
+        <form class="space-y-3" @submit.prevent="sendProductOptions(productChoiceGroupId)">
+          <p v-if="loadingProductChoices" role="status" class="text-sm text-gray-500">Cargando catálogo…</p>
+          <p v-else-if="!productChoiceGroups.length && !productChoicesError" class="text-sm text-gray-500">No hay presentaciones configuradas.</p>
+          <label v-if="productChoiceGroups.length" class="block text-sm text-gray-700">
+            Producto
+            <select v-model.number="productChoiceGroupId" :disabled="sendingProductChoices"
+              class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2">
+              <option :value="0" disabled>Elige un arroz o una adición</option>
+              <optgroup v-if="riceChoiceGroups.length" label="Arroces">
+                <option v-for="group in riceChoiceGroups" :key="group.id" :value="group.id">{{ group.name }}</option>
+              </optgroup>
+              <optgroup v-if="additionChoiceGroups.length" label="Adiciones">
+                <option v-for="group in additionChoiceGroups" :key="group.id" :value="group.id">{{ group.name }}</option>
+              </optgroup>
+            </select>
+          </label>
+          <p v-if="productChoicesError" role="alert" class="text-sm text-red-700">{{ productChoicesError }}</p>
+          <div class="flex justify-end">
+            <BaseButton type="submit" :loading="sendingProductChoices" :disabled="!productChoiceGroupId || !canSend || loadingProductChoices">Enviar opciones</BaseButton>
+          </div>
+        </form>
+      </BaseDialog>
 
       <BaseDialog v-model="showQuickRepliesModal" title="Respuestas rápidas" size="4xl">
         <div class="grid gap-4 lg:grid-cols-[minmax(0,1fr)_340px]">
@@ -543,6 +474,15 @@
               </BaseButton>
             </div>
             <div class="max-h-[420px] overflow-y-auto divide-y divide-gray-100">
+              <div v-if="catalogQuickReplies.length" class="space-y-2 px-3 py-3">
+                <h3 class="text-sm font-semibold text-gray-800">Catálogo</h3>
+                <div v-for="group in catalogQuickReplies" :key="group.id" class="flex items-center gap-2">
+                  <span class="rounded bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-800">/{{ group.shortcut }}</span>
+                  <span class="min-w-0 flex-1 text-sm text-gray-700">{{ group.name }}</span>
+                  <BaseButton v-if="canSend" size="sm" variant="ghost" :disabled="sending || sendingProductChoices"
+                    @click="sendCatalogQuickReply(group)">Enviar</BaseButton>
+                </div>
+              </div>
               <div
                 v-for="reply in whatsappStore.quickReplies"
                 :key="reply.id"
@@ -564,7 +504,7 @@
                   <BaseButton size="sm" variant="danger" @click="removeQuickReply(reply)">Eliminar</BaseButton>
                 </div>
               </div>
-              <div v-if="!whatsappStore.isLoadingQuickReplies && !whatsappStore.quickReplies.length" class="p-6 text-center text-sm text-gray-500">
+              <div v-if="!loadingProductChoices && !whatsappStore.isLoadingQuickReplies && !catalogQuickReplies.length && !whatsappStore.quickReplies.length" class="p-6 text-center text-sm text-gray-500">
                 No hay respuestas rápidas creadas.
               </div>
             </div>
@@ -624,6 +564,7 @@
       </BaseDialog>
 
       <WhatsAppAiDiagnosticsDialog
+        v-if="showAiDiagnosticsDialog"
         v-model="showAiDiagnosticsDialog"
         :diagnostics="currentAiDiagnostics"
         :loading="whatsappStore.aiDiagnosticsLoadingCount > 0"
@@ -668,7 +609,13 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { useResizableColumns } from '@/composables/useResizableColumns'
+import { commercialGroup, commercialLabel } from '@/utils/whatsappInbox'
+
+import WhatsAppOrderPanel from '@/components/whatsapp/WhatsAppOrderPanel.vue'
+import type { WhatsAppCommercialDraft } from '@/types/whatsapp'
+
+import { computed, defineAsyncComponent, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
   ChatBubbleLeftRightIcon,
@@ -685,17 +632,17 @@ import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseDialog from '@/components/ui/BaseDialog.vue'
 import BaseInput from '@/components/ui/BaseInput.vue'
 import BaseLoading from '@/components/ui/BaseLoading.vue'
-import CustomerForm from '@/components/customers/CustomerForm.vue'
-import CustomerSelector from '@/components/customers/CustomerSelector.vue'
-import AddressSelector from '@/components/customers/address/AddressSelector.vue'
-import WhatsAppAiDiagnosticsDialog from '@/components/whatsapp/WhatsAppAiDiagnosticsDialog.vue'
+const WhatsAppAiDiagnosticsDialog = defineAsyncComponent(() => import('@/components/whatsapp/WhatsAppAiDiagnosticsDialog.vue'))
 import WhatsAppAiStatusStrip from '@/components/whatsapp/WhatsAppAiStatusStrip.vue'
 import WhatsAppInboxTabs from '@/components/whatsapp/WhatsAppInboxTabs.vue'
+import WhatsAppConversationTemplates from '@/components/whatsapp/WhatsAppConversationTemplates.vue'
 import { useWhatsAppStore } from '@/store/whatsapp'
 import { useAuthStore } from '@/store/auth'
-import WhatsAppOrderPanel from '@/components/whatsapp/WhatsAppOrderPanel.vue'
-import { useResizableColumns } from '@/composables/useResizableColumns'
-import { customerApi } from '@/services/MainAPI/customerApi'
+import { useBranchContextStore } from '@/store/branchContext'
+import { useWhatsAppComposer } from '@/composables/useWhatsAppComposer'
+import { useDebouncedCallback } from '@/composables/useDebouncedCallback'
+import { formatMessageTime as formatTime } from '@/composables/useFormatting'
+import type { WhatsAppAttentionAction, WhatsAppInboxKey } from '@/types/whatsapp'
 import { whatsappApi } from '@/services/MainAPI/whatsappApi'
 import { useToast } from '@/composables/useToast'
 import { useDialog } from '@/composables/useDialog'
@@ -713,11 +660,12 @@ import type {
   WhatsAppConversation,
   WhatsAppConversationRoutingChangedPayload,
   WhatsAppMessage,
-  WhatsAppOrderDraft,
+  WhatsAppInboxLabel,
+  WhatsAppInboxSummary,
+  WhatsAppProductChoiceGroup,
   WhatsAppQuickReply,
   WhatsAppRealtimeMessagePayload,
 } from '@/types/whatsapp'
-import type { Customer, CustomerAddress, CustomerFormData } from '@/types/customer'
 import {
   aiDiagnosticsTone,
   aiProcessingTone,
@@ -725,12 +673,12 @@ import {
   aiValueLabel,
   sortAiProcessing,
 } from '@/utils/whatsappAiDiagnostics'
-import { whatsappOrderContextMode } from '@/utils/whatsappOrderContextMode'
 import { matchesWhatsAppUsername } from '@/utils/whatsappIdentity'
-import { buildWhatsAppInboxSections, whatsappConversationBranchLabel } from '@/utils/whatsappInbox'
+import { buildWhatsAppInboxSections, canReadWhatsAppRouting, whatsappConversationBranchLabel } from '@/utils/whatsappInbox'
 
 const whatsappStore = useWhatsAppStore()
 const authStore = useAuthStore()
+const workContext = useBranchContextStore()
 const router = useRouter()
 const route = useRoute()
 const { success, error: showError } = useToast()
@@ -746,30 +694,71 @@ const loadingStatus = ref(true)
 const statusLoadError = ref('')
 const inboxError = ref('')
 const selectedConversation = ref<WhatsAppConversation | null>(null)
-const selectedCustomer = ref<Customer | null>(null)
-const selectedAddress = ref<CustomerAddress | null>(null)
-const aiOrderDraft = ref<WhatsAppOrderDraft | null>(null)
-const selectedBranchId = ref(0)
+const editorScope = computed(() => `${authStore.user?.id}:${authStore.user?.role}:${workContext.selectedBranchId ?? authStore.branchId}`)
+const initialDraft = shallowRef<{ id: number; scope: string; request: Promise<WhatsAppCommercialDraft | null | undefined> } | null>(null)
+const prefetchedDraft = computed(() => initialDraft.value?.id === selectedConversation.value?.id && initialDraft.value?.scope === editorScope.value ? initialDraft.value?.request : undefined)
+const commercialPanel = ref<InstanceType<typeof WhatsAppOrderPanel> | null>(null)
+const commercialControlsTarget = ref<HTMLElement | null>(null)
+const selectionRoute = useDebouncedCallback(() => {
+  const id = selectedConversation.value?.id
+  if (id) void router.replace({ query: { ...route.query, conversationId: String(id) } })
+}, 250)
+const selectedBranchId = ref(Number(route.query.whatsappBranch || 0))
+const activeInbox = ref<WhatsAppInboxKey>(['free', 'mine', 'team', 'closed'].includes(String(route.query.inbox)) ? route.query.inbox as WhatsAppInboxKey : 'free')
+const unroutedOnly = ref(route.query.unrouted === 'true')
+const selectedLabel = ref(typeof route.query.label === 'string' ? route.query.label : '')
+const inboxLabels = ref<WhatsAppInboxLabel[]>([])
+const inboxCounts = shallowRef<WhatsAppInboxSummary | null>(null)
+const inboxLabelNames = computed(() => new Map(inboxLabels.value.map(label => [label.key, label.name])))
+const editableInboxLabels = computed(() => inboxLabels.value.filter(label => label.editable))
+const changingInboxLabel = ref(false)
+const resettingTaken = ref(false)
+const canEditInboxLabels = computed(() => {
+  const chat = selectedConversation.value
+  return !!chat && (authStore.isAdmin || authStore.isSuperadmin
+    || (chat.attentionMode !== 'closed' && (!chat.assignedUserId || chat.assignedUserId === authStore.user?.id)))
+})
+const getInboxBranch = () => selectedBranchId.value || undefined
+const canResetTaken = computed(() => authStore.isSuperadmin
+  ? !!selectedBranchId.value !== unroutedOnly.value
+  : !!authStore.user?.branchId && !unroutedOnly.value)
+let countRequest = 0
+const advisors = ref<{ id: number; name: string }[]>([])
+const transferTarget = ref(0), takeoverReason = ref('')
+const clockNow = ref(Date.now())
+const windowTimer = window.setInterval(() => { clockNow.value = Date.now() }, 30_000)
 const search = ref('')
 const unreadOnly = ref(false)
-const draft = ref('')
-const selectedFile = ref<File | null>(null)
+const { draft, selectedFile, clearSent } = useWhatsAppComposer(computed(() => selectedConversation.value?.id ?? null))
+const messageInput = ref<HTMLTextAreaElement | null>(null)
 const fileInput = ref<HTMLInputElement | null>(null)
 const sending = ref(false)
 const sendingMenu = ref(false)
 const changingAttention = ref(false)
 const changingOperationalBranch = ref(false)
 const resettingConversation = ref(false)
-const contextLoading = ref(false)
-const creatingCustomer = ref(false)
-const showCustomerSelector = ref(false)
-const takingOrder = ref(false)
-const sendingAddressConfirmation = ref(false)
 const contextPanelCollapsed = ref(false)
 const mobilePane = ref<'inbox' | 'chat' | 'order'>('inbox')
 const columnsContainer = ref<HTMLElement>()
 const { leftWidth, rightWidth, resize, step } = useResizableColumns(columnsContainer)
 const showQuickRepliesModal = ref(false)
+const showProductChoices = ref(false)
+const loadingProductChoices = ref(false)
+const sendingProductChoices = ref(false)
+const productChoicesError = ref('')
+const productChoiceGroupId = ref(0)
+const productChoiceGroups = ref<WhatsAppProductChoiceGroup[]>([])
+const riceChoiceGroups = computed(() => productChoiceGroups.value.filter(group => group.isRice))
+const additionChoiceGroups = computed(() => productChoiceGroups.value.filter(group => !group.isRice))
+const catalogQuickRepliesByShortcut = computed(() => {
+  const groups = new Map<string, WhatsAppProductChoiceGroup>()
+  for (const group of productChoiceGroups.value) {
+    if (group.shortcut && !groups.has(group.shortcut)) groups.set(group.shortcut, group)
+  }
+  return groups
+})
+const catalogQuickReplies = computed(() => [...catalogQuickRepliesByShortcut.value.values()])
+let productChoicesRequest: { controller: AbortController; promise: Promise<void> } | undefined
 const editingQuickReply = ref<WhatsAppQuickReply | null>(null)
 const quickReplySaving = ref(false)
 const quickReplyError = ref('')
@@ -781,8 +770,6 @@ const quickReplyForm = ref({
   isActive: true,
 })
 const sendError = ref('')
-const contextError = ref('')
-const addressSelectionNote = ref('')
 const messagesEnd = ref<HTMLElement | null>(null)
 const imagePreview = ref<WhatsAppMessage | null>(null)
 const showAiDiagnosticsDialog = ref(false)
@@ -793,7 +780,7 @@ const sessionKey = computed(() => JSON.stringify([
   authStore.user?.id, authStore.user?.role, authStore.user?.branchId, authStore.user?.accountType,
 ]))
 const inboxScope = computed(() => JSON.stringify([
-  sessionKey.value, selectedBranchId.value, search.value.trim(), unreadOnly.value,
+  sessionKey.value, selectedBranchId.value, search.value.trim(), unreadOnly.value, activeInbox.value, unroutedOnly.value, selectedLabel.value,
 ]))
 
 const currentMessages = computed<WhatsAppMessage[]>(() =>
@@ -876,18 +863,22 @@ const signalRDotClass = computed(() => connectionState.value === 'connected'
     ? 'animate-pulse bg-amber-500'
     : 'bg-red-500')
 
-const canTakeAttention = computed(() => !!selectedConversation.value && ['ai', 'waitingForHuman', 'paused'].includes(selectedConversation.value.attentionMode))
-const canReturnToAi = computed(() => !!selectedConversation.value && ['human', 'waitingForHuman', 'paused'].includes(selectedConversation.value.attentionMode))
-const canPauseAi = computed(() => selectedConversation.value?.attentionMode === 'ai')
+const ownsConversation = computed(() => selectedConversation.value?.attentionMode === 'human' && selectedConversation.value.assignedUserId === authStore.user?.id)
+const serviceWindowOpen = computed(() => !!selectedConversation.value?.customerServiceWindowExpiresAt && Date.parse(selectedConversation.value.customerServiceWindowExpiresAt) > clockNow.value)
+const canSend = computed(() => ownsConversation.value && serviceWindowOpen.value)
+const canTakeAttention = computed(() => !!selectedConversation.value && selectedConversation.value.attentionMode !== 'closed' && !selectedConversation.value.assignedUserId)
+const canReturnToAi = computed(() => ownsConversation.value)
+const canPauseAi = computed(() => selectedConversation.value?.attentionMode === 'ai' && !selectedConversation.value.assignedUserId)
+const canForceTake = computed(() => !!selectedConversation.value?.assignedUserId && !ownsConversation.value && (authStore.isSuperadmin || authStore.isAdmin))
 const canResetTestContext = computed(() => authStore.isSuperadmin || authStore.isAdmin)
-const canAssignOperationalBranch = computed(() => !!selectedConversation.value?.isCentralChannel)
+const canAssignOperationalBranch = computed(() => !!selectedConversation.value?.isCentralChannel && ownsConversation.value)
 const inboxSections = computed(() => buildWhatsAppInboxSections(
-  whatsappStore.conversations,
+  selectedLabel.value ? whatsappStore.conversations.filter(chat => chat.labels?.includes(selectedLabel.value)) : whatsappStore.conversations,
   authStore.user?.id,
   authStore.user?.branchId,
   authStore.isSuperadmin,
 ))
-function attentionLabel(conversation: WhatsAppConversation) { const labels: Record<WhatsAppAttentionMode, string> = { ai: 'Atendida por IA', human: 'Atendida por una persona', waitingForHuman: 'Esperando asesor', paused: 'IA pausada', closed: 'Conversación cerrada' }; const label = labels[conversation.attentionMode] || labels.human; return conversation.attentionMode === 'human' && conversation.assignedUserName ? `${label}: ${conversation.assignedUserName}` : label }
+function attentionLabel(conversation: WhatsAppConversation) { if (conversation.attentionMode === 'human' && !conversation.assignedUserId) return 'Sin responsable'; const labels: Record<WhatsAppAttentionMode, string> = { ai: 'Atendida por IA', human: 'Atendida por una persona', waitingForHuman: 'Esperando asesor', paused: 'IA pausada', closed: 'Conversación cerrada' }; const label = labels[conversation.attentionMode] || labels.human; return conversation.attentionMode === 'human' && conversation.assignedUserName ? `${label}: ${conversation.assignedUserName}` : label }
 function attentionBadgeClass(mode: WhatsAppAttentionMode) { return { ai: 'bg-violet-100 text-violet-700', human: 'bg-blue-100 text-blue-700', waitingForHuman: 'bg-amber-200 text-amber-900', paused: 'bg-gray-200 text-gray-700', closed: 'bg-red-100 text-red-700' }[mode] }
 function attentionTooltip(conversation: WhatsAppConversation) {
   if (conversation.attentionMode !== 'waitingForHuman') return attentionLabel(conversation)
@@ -907,17 +898,19 @@ function aiProcessingReason(processing: WhatsAppAiProcessing) {
   const reason = processing.technicalDetail || processing.detail
   return reason ? `${processing.title}: ${reason}` : processing.title
 }
-async function changeAttention(action: 'take' | 'return-to-ai' | 'pause-ai' | 'close' | 'reopen') {
+async function changeAttention(action: WhatsAppAttentionAction) {
   if (!selectedConversation.value) return
   try {
     changingAttention.value = true
     const conversationId = selectedConversation.value.id
-    await whatsappStore.changeAttention(conversationId, action)
+    await whatsappStore.changeAttention(conversationId, action, transferTarget.value || undefined, takeoverReason.value || undefined)
+    if (selectedConversation.value?.id !== conversationId) return
+    activeInbox.value = action === 'close' ? 'closed' : ['take', 'force-take'].includes(action) ? 'mine' : action === 'transfer' ? 'team' : 'free'
     const refreshed = whatsappStore.conversations.find(x => x.id === conversationId)
     if (refreshed) {
       selectedConversation.value = refreshed
-      await loadConversationContext(refreshed)
     }
+    await reloadConversations()
     await refreshAiDiagnostics()
   } catch (error: any) {
     showError('Atención', error.message || 'No se pudo cambiar el estado.')
@@ -990,8 +983,6 @@ async function resetConversationForTesting() {
       ?? conversation
     draft.value = ''
     sendError.value = ''
-    contextError.value = ''
-    addressSelectionNote.value = ''
     success('Prueba reiniciada', 3000, 'El próximo mensaje del cliente iniciará una conversación nueva para la IA.')
   } catch (error: any) {
     showError('Reiniciar prueba', error.message || 'No se pudo reiniciar la conversación.')
@@ -1002,16 +993,29 @@ async function resetConversationForTesting() {
 function handleAttentionChanged(payload: WhatsAppAttentionChangedPayload) {
   if (!payload?.conversation?.id) return
   whatsappStore.applyAttentionChanged(payload.conversation)
+  scheduleInboxLabelsRefresh()
   if (selectedConversation.value?.id !== payload.conversation.id) return
   selectedConversation.value = whatsappStore.conversations.find(x => x.id === payload.conversation.id)
     ?? payload.conversation
-  void loadConversationContext(selectedConversation.value)
+  void commercialPanel.value?.reconcile()
 }
 
 function handleConversationRoutingChanged(payload: WhatsAppConversationRoutingChangedPayload) {
   if (!payload?.conversation?.id) return
-  if (selectedConversation.value?.id === payload.conversation.id) {
+  if (!payload.conversation.attentionMode) {
+    if (canReadWhatsAppRouting(payload.conversation, payload.branchId, authStore.user?.id, authStore.user?.branchId, authStore.isSuperadmin)) {
+      void reloadConversations()
+      return
+    }
+    whatsappStore.forgetConversation(payload.conversation.id)
+    if (selectedConversation.value?.id === payload.conversation.id) {
+      selectedConversation.value = null
+    }
+  } else if (selectedConversation.value?.id === payload.conversation.id
+      && (payload.conversation.attentionRevision ?? 0) >= (selectedConversation.value.attentionRevision ?? 0)) {
+    whatsappStore.applyAttentionChanged(payload.conversation)
     selectedConversation.value = payload.conversation
+    void commercialPanel.value?.reconcile()
   }
   void reloadConversations()
 }
@@ -1021,7 +1025,7 @@ function handleAiProcessingChanged(payload: WhatsAppAiProcessingChangedPayload) 
   if (selectedConversation.value?.attentionMode === 'ai'
     && selectedConversation.value.id === payload.processing.conversationId
     && ['completed', 'transferredtohuman', 'failed'].includes(normalizedAiValue(payload.processing.status))) {
-    void loadConversationContext(selectedConversation.value)
+    void commercialPanel.value?.reconcile()
   }
 }
 
@@ -1079,15 +1083,18 @@ async function retryWhatsAppStatus() {
     if (!viewActive || session !== sessionKey.value) return
     if (whatsappStore.enabled) {
       void whatsappStore.fetchQuickReplies().catch(() => {})
+      void loadInboxLabels().catch(() => {})
+      void loadProductChoiceGroups().catch(() => {})
       void whatsappStore.fetchOperationalBranches().catch(() => {})
       await reloadConversations()
     } else {
       stopAiDiagnosticsPolling()
     }
   } catch (error: any) {
-    statusLoadError.value = error.message || 'No se pudo consultar el estado de WhatsApp.'
+    if (viewActive && session === sessionKey.value)
+      statusLoadError.value = error.message || 'No se pudo consultar el estado de WhatsApp.'
   } finally {
-    loadingStatus.value = false
+    if (viewActive && session === sessionKey.value) loadingStatus.value = false
   }
 }
 
@@ -1096,43 +1103,6 @@ function aiMessageStatusClasses(processing: WhatsAppAiProcessing) {
 }
 
 const showBranchFilter = computed(() => whatsappStore.enabledBranchIds.length > 1)
-
-const initialCustomerPhone = computed(() => {
-  const digits = selectedConversation.value?.phoneNumber?.replace(/\D/g, '') ?? ''
-  return digits.length > 10 ? digits.slice(-10) : digits
-})
-
-const selectedCustomerAddresses = computed(() => selectedCustomer.value?.addresses ?? [])
-const orderContextMode = computed(() =>
-  whatsappOrderContextMode(selectedConversation.value?.attentionMode),
-)
-const isAiOrderContext = computed(() => orderContextMode.value === 'ai')
-const isManualOrderContext = computed(() => orderContextMode.value === 'manual')
-const isBlockedOrderContext = computed(() => orderContextMode.value === 'blocked')
-const canManageOrderContext = computed(() =>
-  isAiOrderContext.value || isManualOrderContext.value,
-)
-const canTakeAiDraftOrder = computed(() => {
-  if (!selectedCustomer.value || !aiOrderDraft.value?.items.length) return false
-  return aiOrderDraft.value.orderType === 'onsite'
-    || (aiOrderDraft.value.orderType === 'delivery' && !!aiOrderDraft.value.selectedAddressId)
-})
-const canTakeOrderFromWhatsApp = computed(() => {
-  if (!selectedCustomer.value) return false
-  if (isManualOrderContext.value) return !!selectedAddress.value
-  if (isAiOrderContext.value) return canTakeAiDraftOrder.value
-  return false
-})
-const aiDraftOrderTypeLabel = computed(() => aiOrderDraft.value?.orderType === 'delivery'
-  ? (aiOrderDraft.value.selectedAddressId ? 'Domicilio' : 'Domicilio · falta dirección')
-  : aiOrderDraft.value?.orderType === 'onsite' ? 'Recoger en local' : 'Tipo pendiente')
-const aiDraftOrderTypeClass = computed(() => aiOrderDraft.value?.orderType === 'delivery'
-  ? 'bg-blue-100 text-blue-800'
-  : aiOrderDraft.value?.orderType === 'onsite' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-900')
-
-function formatMoney(value: number) {
-  return new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(value || 0)
-}
 
 const branchOptions = computed(() => {
   const labels = new Map<number, string>()
@@ -1148,7 +1118,8 @@ const branchOptions = computed(() => {
 const activeQuickRepliesForConversation = computed(() => {
   if (!selectedConversation.value) return []
   return whatsappStore.quickReplies
-    .filter(reply => reply.isActive && reply.branchId === selectedConversation.value?.branchId)
+    .filter(reply => reply.isActive && reply.branchId === selectedConversation.value?.branchId
+      && !catalogQuickRepliesByShortcut.value.has(reply.shortcut))
     .sort((a, b) => b.usageCount - a.usageCount || a.shortcut.localeCompare(b.shortcut))
 })
 
@@ -1156,39 +1127,126 @@ const topQuickReplies = computed(() => activeQuickRepliesForConversation.value.s
 
 const slashQuickReplyMatches = computed(() => {
   const value = draft.value.trim()
-  if (!value.startsWith('/') || value.length < 2 || selectedFile.value) return []
+  if (!value.startsWith('/') || /\s/.test(value) || selectedFile.value) return []
   const query = normalizeQuickReplyShortcut(value)
-  return activeQuickRepliesForConversation.value
-    .filter(reply => reply.shortcut.includes(query))
-    .slice(0, 8)
+  return [
+    ...catalogQuickReplies.value.map(group => ({
+      group, saved: null, key: `catalog-${group.id}`, shortcut: group.shortcut ?? '', preview: group.name,
+    })),
+    ...activeQuickRepliesForConversation.value.map(saved => ({
+      saved, group: null, key: `saved-${saved.id}`, shortcut: saved.shortcut, preview: saved.messageTemplate,
+    })),
+  ].filter(reply => reply.shortcut.includes(query)).slice(0, 12)
 })
 
-let conversationsGeneration = 0, contextGeneration = 0, conversationSelection = 0
+const inboxLabelStyles: Record<string, { name: string; color: string }> = {
+  supplier: { name: 'Proveedor', color: 'bg-violet-700 text-white' },
+  pending: { name: 'Pendiente', color: 'bg-amber-300 text-amber-950' },
+  taken: { name: 'Tomado', color: 'bg-emerald-700 text-white' },
+  payment_pending: { name: 'Pendiente de pago', color: 'bg-rose-700 text-white' },
+}
+
+function inboxLabelName(key: string) {
+  return inboxLabelNames.value.get(key) ?? inboxLabelStyles[key]?.name
+    ?? (key.startsWith('branch:') ? `Sucursal ${key.slice('branch:'.length)}` : key)
+}
+
+function inboxLabelClasses(key: string) {
+  return [
+    'rounded-md px-2 py-0.5 text-xs font-bold leading-4',
+    inboxLabelStyles[key]?.color ?? (key.startsWith('branch:') ? 'bg-blue-700 text-white' : 'bg-slate-700 text-white'),
+  ]
+}
+
+async function loadInboxLabels() {
+  const scope = sessionKey.value
+  const result = await whatsappApi.getInboxLabels()
+  if (viewActive && scope === sessionKey.value) inboxLabels.value = result.data ?? []
+}
+
+async function refreshInboxTotals(signal?: AbortSignal) {
+  const request = ++countRequest
+  const scope = sessionKey.value, branchId = getInboxBranch(), unrouted = unroutedOnly.value
+  const result = await whatsappApi.getInboxSummary(branchId, unrouted, signal)
+  if (viewActive && !signal?.aborted && request === countRequest && scope === sessionKey.value
+    && branchId === getInboxBranch() && unrouted === unroutedOnly.value) inboxCounts.value = result.data ?? null
+}
+
+const inboxTotalsRefresh = useDebouncedCallback(() => {
+  if (whatsappStore.enabled) void refreshInboxTotals().catch(() => {})
+}, 350)
+const inboxLabelsRefresh = useDebouncedCallback(() => {
+  if (whatsappStore.enabled) void reloadConversations()
+}, 350)
+
+function scheduleInboxLabelsRefresh() {
+  inboxTotalsRefresh.cancel()
+  inboxLabelsRefresh.schedule()
+}
+
+async function setInboxLabel(key: string, event: Event) {
+  const input = event.target as HTMLInputElement
+  const chat = selectedConversation.value
+  if (!chat || !canEditInboxLabels.value || changingInboxLabel.value) return
+  changingInboxLabel.value = true
+  try {
+    const result = await whatsappApi.setInboxLabel(chat.id, key, input.checked)
+    const labels = result.data ?? []
+    const row = whatsappStore.conversations.find(item => item.id === chat.id)
+    if (row) row.labels = labels
+    if (selectedConversation.value?.id === chat.id) selectedConversation.value.labels = labels
+    await reloadConversations()
+  } catch (error) {
+    if (selectedConversation.value?.id === chat.id) input.checked = selectedConversation.value.labels?.includes(key) ?? false
+    showError('Etiquetas', error instanceof Error ? error.message : 'No se pudo cambiar la etiqueta.')
+  } finally { changingInboxLabel.value = false }
+}
+
+async function resetTakenLabels() {
+  if (!canResetTaken.value || resettingTaken.value) return
+  resettingTaken.value = true
+  try {
+    await whatsappApi.resetTakenLabels(getInboxBranch(), unroutedOnly.value)
+    await reloadConversations()
+    success('Etiquetas Tomado de días anteriores retiradas', 2500)
+  } catch (error) {
+    showError('Limpiar Tomado', error instanceof Error ? error.message : 'No se pudo limpiar la etiqueta.')
+  } finally { resettingTaken.value = false }
+}
+
+let conversationsGeneration = 0, conversationSelection = 0
 async function readConversations(context: RefreshContext) {
   if (!viewActive || !whatsappStore.enabled) return
   const generation = ++conversationsGeneration
   const previousSelected = selectedConversation.value
-  // Both reads must settle before a trailing invalidation: Promise.all can reject
-  // while the other shared request is still running and cause reuse of an old snapshot.
+  const initialSelection = !previousSelected && route.query.conversationId
+    ? selectConversationFromRoute() : Promise.resolve()
   const results = await Promise.allSettled([whatsappStore.fetchConversations({
     branchId: selectedBranchId.value || undefined,
     search: search.value.trim() || undefined,
     unreadOnly: unreadOnly.value || undefined,
-  }, context.signal), whatsappStore.fetchUnreadSummary()])
+    inbox: activeInbox.value,
+    unroutedOnly: unroutedOnly.value || undefined,
+    label: selectedLabel.value || undefined,
+  }, context.signal), whatsappStore.fetchUnreadSummary(), refreshInboxTotals(context.signal), initialSelection])
   if (!viewActive || !context.isCurrent() || generation !== conversationsGeneration) return
-  if (results[0].status === 'rejected') throw results[0].reason
   if (previousSelected && selectedConversation.value?.id === previousSelected.id) {
     const refreshed = whatsappStore.conversations.find(c => c.id === previousSelected.id)
-    selectedConversation.value = refreshed
-      ?? (previousSelected.isCentralChannel && previousSelected.assignedUserId === authStore.user?.id
-        ? previousSelected
-        : null)
+    if (refreshed) selectedConversation.value = refreshed
+    else if (previousSelected.labels?.length || selectedLabel.value) {
+      const detail = await whatsappApi.getConversation(previousSelected.id).catch(() => null)
+      if (context.isCurrent() && generation === conversationsGeneration && selectedConversation.value?.id === previousSelected.id
+        && detail?.data?.labels) selectedConversation.value.labels = detail.data.labels
+    }
   }
-  await selectConversationFromRoute()
-  if (results[1].status === 'rejected') throw results[1].reason
+  if (!selectionRoute.isPending()) await selectConversationFromRoute()
+  for (const result of results) {
+    if (result.status === 'rejected') throw result.reason
+  }
 }
 
 const routingRefresh = createWhatsAppRoutingRefresh(readConversations)
+
 async function reloadConversations(): Promise<boolean> {
   if (!viewActive) return false
   const scope = inboxScope.value
@@ -1197,7 +1255,8 @@ async function reloadConversations(): Promise<boolean> {
     await routingRefresh.invalidate(scope)
     return viewActive && scope === inboxScope.value
   } catch {
-    if (viewActive && scope === inboxScope.value) inboxError.value = 'No se pudo actualizar la bandeja. Intenta nuevamente.'
+    if (viewActive && scope === inboxScope.value)
+      inboxError.value = 'No se pudo actualizar la bandeja. Intenta nuevamente.'
     return false
   }
 }
@@ -1211,6 +1270,12 @@ function stopRealtimeFallback() {
   realtimeFallbackId = undefined
 }
 
+async function reconcileWhatsApp() {
+  const id = selectedConversation.value?.id
+  await reloadConversations()
+  if (id && selectedConversation.value?.id === id) await whatsappStore.fetchMessages(id)
+  await commercialPanel.value?.reconcile()
+}
 function startRealtimeFallback() {
   if (!viewActive || realtimeFallbackId || connectionState.value === 'connected') return
   realtimeFallbackId = window.setInterval(async () => {
@@ -1219,32 +1284,51 @@ function startRealtimeFallback() {
     try {
     const activeId = selectedConversation.value?.id
     await reloadConversations()
-    if (viewActive && activeId && selectedConversation.value?.id === activeId) await whatsappStore.fetchMessages(activeId)
+    if (viewActive && activeId && selectedConversation.value?.id === activeId) {
+      await whatsappStore.fetchMessages(activeId)
+      if (selectedConversation.value?.id === activeId) await commercialPanel.value?.reconcile()
+    }
     } catch {} finally { fallbackRunning = false }
   }, 15_000)
 }
 
+async function loadMoreConversations() {
+  try { await whatsappStore.fetchConversations(undefined, true) }
+  catch (error: any) { showError('Conversaciones', error.message || 'No se pudo cargar la siguiente página.') }
+}
 async function selectConversation(conversation: WhatsAppConversation) {
   if (!viewActive) return
   mobilePane.value = 'chat'
   const selection = ++conversationSelection
+  mobilePane.value = 'chat'
+  whatsappStore.activateConversation(conversation.id)
   selectedConversation.value = conversation
-  showCustomerSelector.value = false
-  void router.replace({ query: { ...route.query, conversationId: String(conversation.id) } })
-  await Promise.allSettled([whatsappStore.fetchMessages(conversation.id), loadConversationContext(conversation)])
+  selectionRoute.cancel()
+  if (route.query.conversationId !== String(conversation.id)) selectionRoute.schedule()
+  await whatsappStore.fetchMessages(conversation.id, false, false, true).catch(() => {})
+  inboxTotalsRefresh.schedule()
   if (selection === conversationSelection) await scrollToBottom()
 }
 
 async function selectConversationFromRoute() {
   const id = Number(route.query.conversationId || 0)
+  const selection = conversationSelection
   if (!id || selectedConversation.value?.id === id) return
-  const conversation = whatsappStore.conversations.find(c => c.id === id)
+  let conversation = whatsappStore.conversations.find(c => c.id === id) ?? null
+  if (!conversation) {
+    try { conversation = await whatsappStore.fetchConversation(id) }
+    catch { return }
+    if (Number(route.query.conversationId) !== id || selection !== conversationSelection) return
+  }
+  if (conversation) activeInbox.value = conversation.attentionMode === 'closed' ? 'closed'
+    : conversation.assignedUserId === authStore.user?.id ? 'mine' : conversation.assignedUserId ? 'team' : 'free'
   if (conversation) {
     await selectConversation(conversation)
   }
 }
 
 function conversationMatchesCurrentFilters(conversation: WhatsAppConversation) {
+  if (selectedLabel.value && !conversation.labels?.includes(selectedLabel.value)) return false
   if (selectedBranchId.value && (conversation.isCentralChannel
     ? conversation.operationalBranchId !== selectedBranchId.value
     : conversation.branchId !== selectedBranchId.value)) return false
@@ -1265,10 +1349,10 @@ function conversationMatchesCurrentFilters(conversation: WhatsAppConversation) {
 
 async function handleRealtimeMessage(payload: WhatsAppRealtimeMessagePayload) {
   if (!payload?.conversation?.id || !payload?.message?.id) return
+  inboxTotalsRefresh.schedule()
 
   const activeConversationId = selectedConversation.value?.id ?? null
   const isActiveConversation = activeConversationId === payload.conversation.id
-  const previousCustomerId = isActiveConversation ? selectedConversation.value?.customerId : null
   if (!isActiveConversation && !conversationMatchesCurrentFilters(payload.conversation)) return
 
   whatsappStore.applyRealtimeMessage(payload, activeConversationId)
@@ -1278,203 +1362,9 @@ async function handleRealtimeMessage(payload: WhatsAppRealtimeMessagePayload) {
   const refreshed = whatsappStore.conversations.find(c => c.id === payload.conversation.id)
   if (refreshed) {
     selectedConversation.value = refreshed
-    if (refreshed.customerId !== previousCustomerId) void loadConversationContext(refreshed)
   }
+  if (payload.message.draftAddressApplied || payload.message.draftProductApplied) await commercialPanel.value?.reconcile()
 
-  await scrollToBottom()
-}
-
-async function loadConversationContext(conversation: WhatsAppConversation) {
-  if (!viewActive) return
-  const generation = ++contextGeneration, session = sessionKey.value
-  const branchId = conversation.operationalBranchId ?? conversation.branchId
-  const isCurrent = () => viewActive && session === sessionKey.value && generation === contextGeneration
-    && selectedConversation.value?.id === conversation.id
-    && (selectedConversation.value.operationalBranchId ?? selectedConversation.value.branchId) === branchId
-  selectedCustomer.value = null
-  selectedAddress.value = null
-  aiOrderDraft.value = null
-  contextError.value = ''
-
-  try {
-    contextLoading.value = true
-    addressSelectionNote.value = ''
-    const mode = whatsappOrderContextMode(conversation.attentionMode)
-    const loadedDraft = mode === 'ai' || mode === 'manual'
-      ? await loadAiOrderDraft(conversation.id, isCurrent).catch(cause => {
-          if (mode === 'ai') throw cause
-          return null
-        })
-      : null
-    if (!isCurrent()) return
-    if (!conversation.customerId) return
-    const customerRes = await customerApi.getCustomerById(conversation.customerId)
-    if (!isCurrent()) return
-    const customer = customerRes.data
-    if (!customer) return
-
-    let addresses: CustomerAddress[] = customer.addresses ?? []
-    if (!Array.isArray(customer.addresses)) {
-      const addressRes = await customerApi.getCustomerAddresses(customer.id)
-      if (!isCurrent()) return
-      addresses = addressRes.data ?? []
-    }
-
-    selectedCustomer.value = { ...customer, addresses }
-    selectedAddress.value = loadedDraft?.selectedAddressId || mode === 'ai'
-      ? loadedDraft?.selectedAddressId
-        ? addresses.find(a => a.id === loadedDraft.selectedAddressId) ?? null
-        : null
-      : mode === 'manual'
-        ? addresses.find(a => a.isPrimary) ?? addresses[0] ?? null
-        : null
-  } catch (error: any) {
-    if (isCurrent()) contextError.value = error.message || 'No se pudo cargar el cliente.'
-  } finally {
-    if (isCurrent()) contextLoading.value = false
-  }
-}
-
-async function loadAiOrderDraft(conversationId: number, isCurrent = () => selectedConversation.value?.id === conversationId) {
-  const response = await whatsappApi.getOrderDraft(conversationId)
-  const loaded = response.data ?? null
-  if (isCurrent()) aiOrderDraft.value = loaded
-  return loaded
-}
-
-async function onContextAddressSelected(address?: CustomerAddress) {
-  selectedAddress.value = address ?? null
-  addressSelectionNote.value = address ? 'Dirección seleccionada para el pedido.' : ''
-  if (address && selectedCustomer.value) {
-    const addresses = selectedCustomer.value.addresses ?? []
-    const exists = addresses.some(a => a.id === address.id)
-    selectedCustomer.value = {
-      ...selectedCustomer.value,
-      addresses: exists
-        ? addresses.map(a => a.id === address.id ? address : a)
-        : [...addresses, address],
-    }
-  }
-  if (selectedConversation.value?.attentionMode === 'ai') {
-    try {
-      await whatsappApi.updateOrderDraftFulfillment(selectedConversation.value.id, 'delivery', address?.id)
-      await loadAiOrderDraft(selectedConversation.value.id)
-    } catch (error: any) {
-      contextError.value = error.message || 'No se pudo actualizar la dirección del draft.'
-    }
-  }
-}
-
-function normalizeText(value?: string | null) {
-  return (value || '')
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/[^a-z0-9#\- ]+/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim()
-}
-
-function inferAddressFromChatText(text: string, addresses: CustomerAddress[]) {
-  const validAddresses = addresses.filter(a => a.address?.trim())
-  if (validAddresses.length === 0) return null
-
-  const normalized = normalizeText(text)
-  const numeric = normalized.match(/^(?:opcion\s*)?#?\s*(\d+)\b/)
-  if (numeric) {
-    const index = Number(numeric[1]) - 1
-    if (index >= 0 && index < validAddresses.length) return validAddresses[index]
-  }
-
-  if (
-    validAddresses.length === 1 &&
-    /\b(si|ok|okay|dale|correcto|confirmo|esa|esta|ahi|alli|alli es)\b/.test(normalized)
-  ) {
-    return validAddresses[0]
-  }
-
-  return validAddresses.find(address => {
-    const addressText = normalizeText(address.address)
-    const neighborhood = normalizeText(address.neighborhoodName || address.neighborhood?.name)
-    const fullLine = normalizeText(formatAddressLineForWhatsApp(address))
-    return (
-      (addressText.length >= 8 && normalized.includes(addressText.slice(0, Math.min(addressText.length, 18)))) ||
-      (neighborhood.length >= 4 && normalized.includes(neighborhood)) ||
-      (fullLine.length >= 8 && fullLine.includes(normalized) && normalized.length >= 6)
-    )
-  }) ?? null
-}
-
-function selectAddressFromChatText(text: string, manual = false) {
-  if (!selectedCustomer.value) return false
-  const address = inferAddressFromChatText(text, selectedCustomerAddresses.value)
-  if (!address) {
-    if (manual) {
-      contextError.value = 'No pude relacionar esa respuesta con una dirección guardada.'
-    }
-    return false
-  }
-
-  selectedAddress.value = address
-  addressSelectionNote.value = `Dirección seleccionada desde el chat: ${formatAddressLineForWhatsApp(address)}`
-  contextError.value = ''
-  return true
-}
-
-function latestInboundTextMessage() {
-  return [...currentMessages.value]
-    .reverse()
-    .find(message => message.direction === 'inbound' && message.type === 'text' && message.textBody?.trim())
-}
-
-function applyAddressSelectionFromLatestInboundMessage() {
-  if (!selectedCustomer.value || selectedCustomerAddresses.value.length === 0) return
-  const latest = latestInboundTextMessage()
-  if (!latest) return
-  selectAddressFromChatText(latest.textBody)
-}
-
-function formatAddressLineForWhatsApp(address: CustomerAddress): string {
-  const street = (address.address || '').trim()
-  const extra = (address.additionalInfo || '').trim()
-  const neighborhood = (address.neighborhoodName || address.neighborhood?.name || '').trim()
-  const main = [street, extra].filter(Boolean).join(', ')
-  return neighborhood ? `${main}, ${neighborhood}` : main
-}
-
-function buildAddressConfirmationText(addresses: CustomerAddress[]) {
-  const validAddresses = addresses.filter(a => a.address?.trim())
-  if (validAddresses.length === 0) return ''
-  if (validAddresses.length === 1) {
-    return `¿Entregamos en esta dirección?\n${formatAddressLineForWhatsApp(validAddresses[0])}`
-  }
-
-  return [
-    '¿Dónde entregamos?',
-    ...validAddresses.map((address, index) => `${index + 1}- ${formatAddressLineForWhatsApp(address)}`),
-  ].join('\n')
-}
-
-async function sendAddressConfirmationRequest() {
-  if (!selectedConversation.value || !selectedCustomer.value) return
-  const text = buildAddressConfirmationText(selectedCustomerAddresses.value)
-  if (!text) {
-    contextError.value = 'El cliente no tiene direcciones guardadas.'
-    return
-  }
-
-  try {
-    sendingAddressConfirmation.value = true
-    contextError.value = ''
-    await whatsappStore.sendMessage(selectedConversation.value.id, text)
-    await scrollToBottom()
-    success('Mensaje enviado', 2500, 'Se solicitó confirmación de dirección por WhatsApp.')
-  } catch (error: any) {
-    contextError.value = error.message || 'No se pudo enviar la confirmación de dirección.'
-    showError('WhatsApp', contextError.value)
-  } finally {
-    sendingAddressConfirmation.value = false
-  }
 }
 
 function normalizeQuickReplyShortcut(value: string) {
@@ -1489,13 +1379,15 @@ function findQuickReplyCommand(value: string) {
 }
 
 async function sendQuickReply(reply: WhatsAppQuickReply) {
+  if (!canSend.value) return
   if (!selectedConversation.value) return
   try {
     sending.value = true
     sendError.value = ''
-    await whatsappStore.sendQuickReply(selectedConversation.value.id, reply.id)
-    draft.value = ''
-    await scrollToBottom()
+    const conversationId = selectedConversation.value.id, text = draft.value.trim(), file = selectedFile.value
+    await whatsappStore.sendQuickReply(conversationId, reply.id)
+    clearSent(conversationId, text, file)
+    if (selectedConversation.value?.id === conversationId) await scrollToBottom()
   } catch (error: any) {
     sendError.value = error.message || 'No se pudo enviar la respuesta rápida.'
   } finally {
@@ -1511,7 +1403,7 @@ function defaultQuickReplyBranchId() {
 }
 
 async function loadQuickReplies() {
-  await whatsappStore.fetchQuickReplies()
+  await Promise.all([whatsappStore.fetchQuickReplies(), loadProductChoiceGroups()])
 }
 
 function resetQuickReplyForm() {
@@ -1580,65 +1472,106 @@ async function removeQuickReply(reply: WhatsAppQuickReply) {
   }
 }
 
-async function createCustomerFromConversation(data: CustomerFormData) {
-  if (!selectedConversation.value || selectedConversation.value.attentionMode !== 'human') return
-  try {
-    creatingCustomer.value = true
-    contextError.value = ''
-    const res = await customerApi.createCustomer({
-      name: data.name,
-      phone1: data.phone1,
-      phone2: data.phone2,
-      whatsAppUsername: data.whatsAppUsername || selectedConversation.value.whatsAppUsername,
-      branchId: selectedConversation.value.branchId,
-      initialAddress: data.initialAddress
-        ? {
-            neighborhoodId: data.initialAddress.neighborhoodId,
-            address: data.initialAddress.address,
-            additionalInfo: data.initialAddress.additionalInfo,
-            latitude: data.initialAddress.latitude ?? 0,
-            longitude: data.initialAddress.longitude ?? 0,
-            isPrimary: data.initialAddress.isPrimary ?? true,
-            deliveryFee: data.initialAddress.deliveryFee,
-          }
-        : undefined,
-    })
-    const customer = res.data
-    if (!customer?.id) throw new Error('No se pudo crear el cliente.')
-
-    let addresses = customer.addresses ?? []
-    if (addresses.length === 0) {
-      const addressRes = await customerApi.getCustomerAddresses(customer.id)
-      addresses = addressRes.data ?? []
+async function draftOrderMessage(conversationId: number, text: string) {
+  if (selectedConversation.value?.id !== conversationId || !ownsConversation.value) return
+  mobilePane.value = 'chat'
+  const existing = draft.value.trimEnd()
+  if (!existing.endsWith(text)) {
+    const next = existing.trim() ? `${existing}\n\n${text}` : text
+    if (next.length > 4096) {
+      sendError.value = 'Reduce el texto actual para agregar el mensaje del pedido.'
+      return
     }
+    draft.value = next
+  }
+  sendError.value = ''
+  await nextTick()
+  if (selectedConversation.value?.id === conversationId) messageInput.value?.focus()
+}
 
-    const linked = await whatsappApi.linkConversationCustomer(selectedConversation.value.id, customer.id)
-    selectedConversation.value = linked.data ?? { ...selectedConversation.value, customerId: customer.id, customerName: customer.name }
-    selectedCustomer.value = { ...customer, addresses }
-    selectedAddress.value = addresses.find(a => a.isPrimary) ?? addresses[0] ?? null
-    success('Cliente creado', 2500, 'La conversación quedó vinculada al cliente.')
-  } catch (error: any) {
-    contextError.value = error.message || 'No se pudo crear el cliente.'
-    showError('Cliente', contextError.value)
-  } finally {
-    creatingCustomer.value = false
+async function addressesSent(conversationId: number, messages: WhatsAppMessage[]) {
+  await choiceMessagesSent(conversationId, messages, 'Opciones de dirección enviadas')
+}
+
+async function choiceMessagesSent(conversationId: number, messages: WhatsAppMessage[], notice: string) {
+  whatsappStore.applySentMessages(conversationId, messages)
+  if (selectedConversation.value?.id !== conversationId) return
+  success(notice, 2500)
+  await scrollToBottom()
+}
+
+function loadProductChoiceGroups() {
+  if (productChoicesRequest) return productChoicesRequest.promise
+  const controller = new AbortController()
+  loadingProductChoices.value = true
+  const promise = whatsappApi.getCommercialProductGroups(controller.signal).then(response => {
+    if (!controller.signal.aborted) productChoiceGroups.value = response.data ?? []
+  }).finally(() => {
+    if (productChoicesRequest?.controller === controller) {
+      productChoicesRequest = undefined
+      loadingProductChoices.value = false
+    }
+  })
+  productChoicesRequest = { controller, promise }
+  return promise
+}
+
+async function openProductChoices() {
+  if (!selectedConversation.value || !canSend.value || sendingProductChoices.value) return
+  productChoiceGroupId.value = 0
+  productChoicesError.value = ''
+  showProductChoices.value = true
+  try {
+    await loadProductChoiceGroups()
+  } catch (error) {
+    if (showProductChoices.value) productChoicesError.value = error instanceof Error ? error.message : 'No se pudo cargar el catálogo.'
   }
 }
 
-async function takeOrderFromWhatsApp() {
-  if (!selectedConversation.value) return
-  takingOrder.value = true
+function sendCatalogQuickReply(group: WhatsAppProductChoiceGroup) {
+  showQuickRepliesModal.value = false
+  return sendProductOptions(group.id, group.shortcut ?? '')
+}
+
+async function sendProductOptions(groupId: number, shortcut?: string) {
+  const conversationId = selectedConversation.value?.id
+  const panel = commercialPanel.value
+  if (!conversationId || !panel || !canSend.value || sending.value || sendingProductChoices.value || !groupId) return
+  sendingProductChoices.value = true
+  productChoicesError.value = ''
+  sendError.value = ''
+  const text = draft.value.trim()
   try {
-    await changeAttention('take')
-    contextPanelCollapsed.value = false
-    mobilePane.value = 'order'
+    const messages = await panel.sendProductChoices(groupId)
+    if (shortcut && text.startsWith('/') && !/\s/.test(text) && !selectedFile.value
+      && shortcut.includes(normalizeQuickReplyShortcut(text))) clearSent(conversationId, text, null)
+    if (selectedConversation.value?.id === conversationId) showProductChoices.value = false
+    await choiceMessagesSent(conversationId, messages, 'Opciones de producto enviadas')
+  } catch (error) {
+    if (selectedConversation.value?.id === conversationId) {
+      const failure = error instanceof Error ? error.message : 'No se pudieron enviar las presentaciones.'
+      if (showProductChoices.value) productChoicesError.value = failure
+      else sendError.value = failure
+    }
   } finally {
-    takingOrder.value = false
+    sendingProductChoices.value = false
   }
 }
 
 async function sendMessage() {
+  if (!canSend.value || sending.value || sendingProductChoices.value) return
   if (!selectedConversation.value || (!draft.value.trim() && !selectedFile.value)) return
+  const textToSend = draft.value.trim()
+  if (!selectedFile.value && textToSend.startsWith('/') && !/\s/.test(textToSend)) {
+    const conversationId = selectedConversation.value.id
+    await productChoicesRequest?.promise.catch(() => {})
+    if (selectedConversation.value?.id !== conversationId || draft.value.trim() !== textToSend || !canSend.value) return
+    const group = catalogQuickRepliesByShortcut.value.get(normalizeQuickReplyShortcut(textToSend))
+    if (group) {
+      await sendCatalogQuickReply(group)
+      return
+    }
+  }
   const quickReply = !selectedFile.value ? findQuickReplyCommand(draft.value) : null
   if (quickReply) {
     await sendQuickReply(quickReply)
@@ -1648,14 +1581,10 @@ async function sendMessage() {
   try {
     sending.value = true
     sendError.value = ''
-    const text = draft.value.trim()
-    if (selectedFile.value) {
-      await whatsappStore.sendMediaMessage(selectedConversation.value.id, selectedFile.value, text)
-      clearSelectedFile()
-    } else {
-      await whatsappStore.sendMessage(selectedConversation.value.id, text)
-    }
-    draft.value = ''
+    const text = draft.value.trim(), conversationId = selectedConversation.value.id, file = selectedFile.value
+    if (file) await whatsappStore.sendMediaMessage(conversationId, file, text)
+    else await whatsappStore.sendMessage(conversationId, text)
+    clearSent(conversationId, text, file)
     await scrollToBottom()
   } catch (error: any) {
     sendError.value = error.message || 'No se pudo enviar el mensaje.'
@@ -1665,6 +1594,7 @@ async function sendMessage() {
 }
 
 async function sendMenu() {
+  if (!canSend.value) return
   if (!selectedConversation.value) return
   try {
     sendingMenu.value = true
@@ -1710,20 +1640,74 @@ function onSearchInput() {
   }, 350)
 }
 
+function commercialChanged(draft: WhatsAppCommercialDraft) {
+  const patch = { commercialStatus: draft.commercialStatus, commercialOrderId: draft.orderId }
+  const conversation = whatsappStore.conversations.find(conversation => conversation.id === draft.conversationId)
+  if (conversation) Object.assign(conversation, patch)
+  if (selectedConversation.value?.id === draft.conversationId) Object.assign(selectedConversation.value, patch)
+}
+
+const newMessageCount = ref(0), atMessageBottom = ref(true)
+let messageScrollTop = 0
+function trackMessageScroll() {
+  const container = messagesContainer.value
+  if (!container?.clientHeight) return
+  messageScrollTop = container.scrollTop
+  atMessageBottom.value = container.scrollHeight - container.scrollTop - container.clientHeight < 80
+  if (atMessageBottom.value) newMessageCount.value = 0
+}
+watch(() => {
+  const latest = currentMessages.value[currentMessages.value.length - 1]
+  return [selectedConversation.value?.id, latest?.id, latest?.timestamp] as const
+}, async (current, previous) => {
+  if (current[0] !== previous?.[0]) { newMessageCount.value = 0; messageScrollTop = 0; atMessageBottom.value = true; return }
+  if (!previous?.[1] || current[1] === previous[1]) return
+  if (current[2] && previous[2] && (Date.parse(current[2]) < Date.parse(previous[2])
+    || current[2] === previous[2] && current[1]! < previous[1])) return
+  if (atMessageBottom.value) await scrollToBottom()
+  else newMessageCount.value++
+})
 async function scrollToBottom() {
+  newMessageCount.value = 0
+  atMessageBottom.value = true
+  const id = selectedConversation.value?.id
   await nextTick()
-  messagesEnd.value?.scrollIntoView({ block: 'end' })
+  if (selectedConversation.value?.id === id && messagesContainer.value) messagesContainer.value.scrollTop = messagesContainer.value.scrollHeight
 }
 const messagesContainer = ref<HTMLElement>()
+const messageResizeObserver = new ResizeObserver(() => {
+  const container = messagesContainer.value
+  if (!container?.clientHeight) return
+  container.scrollTop = atMessageBottom.value ? container.scrollHeight : messageScrollTop
+})
+watch(messagesContainer, container => {
+  messageResizeObserver.disconnect()
+  if (container) messageResizeObserver.observe(container)
+}, { flush: 'post' })
+onBeforeUnmount(() => messageResizeObserver.disconnect())
+async function showRecentMessages() {
+  const id = selectedConversation.value?.id
+  if (!id) return
+  try {
+    if (whatsappStore.messageHistory[id]?.hasMoreRecent) await whatsappStore.fetchMessages(id, false, true)
+    if (selectedConversation.value?.id === id) await scrollToBottom()
+  } catch (error: any) { showError('Mensajes', error.message || 'No se pudieron cargar los mensajes recientes.') }
+}
 async function loadOlderMessages() {
   const id = selectedConversation.value?.id, container = messagesContainer.value
   if (!id || !container) return
   const height = container.scrollHeight, top = container.scrollTop
+  const visibleTop = container.getBoundingClientRect().top
+  const anchor = [...container.querySelectorAll<HTMLElement>('[data-message-id]')].find(element => element.getBoundingClientRect().bottom >= visibleTop)
+  const anchorId = anchor?.dataset.messageId, anchorTop = anchor?.getBoundingClientRect().top
   try {
     await whatsappStore.fetchMessages(id, true)
     await nextTick()
     if (selectedConversation.value?.id === id && container === messagesContainer.value) {
-      container.scrollTop = top + container.scrollHeight - height
+      const restored = anchorId ? container.querySelector<HTMLElement>(`[data-message-id="${anchorId}"]`) : null
+      container.scrollTop = restored && anchorTop != null
+        ? top + restored.getBoundingClientRect().top - anchorTop
+        : top + container.scrollHeight - height
     }
   } catch (error: any) {
     if (selectedConversation.value?.id === id) showError('Mensajes', error.message || 'No se pudo cargar el historial.')
@@ -1734,48 +1718,10 @@ function conversationTitle(conversation: WhatsAppConversation) {
   return conversation.contactName || conversation.customerName || conversation.whatsAppUsername || conversation.phoneNumber || 'Usuario de WhatsApp'
 }
 
-async function linkExistingCustomer(customer: Customer) {
-  if (!selectedConversation.value || selectedConversation.value.attentionMode !== 'human') return
-  try {
-    creatingCustomer.value = true
-    contextError.value = ''
-    const linked = await whatsappApi.linkConversationCustomer(selectedConversation.value.id, customer.id)
-    selectedConversation.value = linked.data ?? {
-      ...selectedConversation.value,
-      customerId: customer.id,
-      customerName: customer.name,
-    }
-    const refreshedCustomer = await customerApi.getCustomerById(customer.id)
-    const resolvedCustomer = refreshedCustomer.data ?? customer
-    let addresses = resolvedCustomer.addresses ?? []
-    if (!Array.isArray(resolvedCustomer.addresses)) {
-      const addressRes = await customerApi.getCustomerAddresses(customer.id)
-      addresses = addressRes.data ?? []
-    }
-    selectedCustomer.value = { ...resolvedCustomer, addresses }
-    selectedAddress.value = addresses.find(address => address.isPrimary) ?? addresses[0] ?? null
-    showCustomerSelector.value = false
-    await reloadConversations()
-    success('Cliente asociado', 2500, 'La conversación quedó vinculada al cliente seleccionado.')
-  } catch (error: any) {
-    contextError.value = error.message || 'No se pudo asociar el cliente.'
-    showError('Cliente', contextError.value)
-  } finally {
-    creatingCustomer.value = false
-  }
-}
-
 function formatPhone(phone?: string | null) {
   if (!phone) return ''
   if (phone.startsWith('57') && phone.length === 12) return `+57 ${phone.slice(2, 5)} ${phone.slice(5, 8)} ${phone.slice(8)}`
   return phone.startsWith('+') ? phone : `+${phone}`
-}
-
-function formatConversationPhone(phone?: string | null) {
-  if (!phone) return ''
-  const digits = phone.replace(/\D/g, '')
-  if (digits.startsWith('57') && digits.length === 12) return digits.slice(2)
-  return digits || phone
 }
 
 function conversationIdentityLabel(conversation: WhatsAppConversation) {
@@ -1825,10 +1771,6 @@ function formatRelativeConversationTime(value?: string | null) {
   return diffYears <= 1 ? 'hace un ano' : `hace ${diffYears} anos`
 }
 
-function formatTime(value: string) {
-  return new Intl.DateTimeFormat('es-CO', { hour: '2-digit', minute: '2-digit' }).format(parseUtcDate(value))
-}
-
 function parseUtcDate(value: string) {
   // Older API versions omitted the UTC designator for PostgreSQL timestamps.
   return new Date(/(?:Z|[+-]\d{2}:?\d{2})$/i.test(value) ? value : `${value}Z`)
@@ -1870,9 +1812,13 @@ function mediaFallbackLabel(message: WhatsAppMessage) {
 }
 
 onMounted(async () => {
+  const id = Number(route.query.conversationId)
+  if (Number.isInteger(id) && id > 0) initialDraft.value = { id, scope: editorScope.value,
+    request: whatsappApi.getCommercialDraft(id).then(response => response.data ?? null).catch(() => undefined) }
   onSignalR('WhatsAppMessageCreated', handleRealtimeMessage)
   onSignalR('WhatsAppAttentionChanged', handleAttentionChanged)
   onSignalR('WhatsAppConversationRoutingChanged', handleConversationRoutingChanged)
+  onSignalR('WhatsAppInboxChanged', scheduleInboxLabelsRefresh)
   onSignalR('WhatsAppAiProcessingChanged', handleAiProcessingChanged)
   await retryWhatsAppStatus()
   startRealtimeFallback()
@@ -1880,11 +1826,16 @@ onMounted(async () => {
 
 onBeforeUnmount(() => {
   viewActive = false
+  productChoicesRequest?.controller.abort()
   routingRefresh.dispose()
-  conversationsGeneration++; contextGeneration++; conversationSelection++
+  inboxTotalsRefresh.cancel()
+  inboxLabelsRefresh.cancel()
+  window.clearInterval(windowTimer)
+  conversationsGeneration++; conversationSelection++
   offSignalR('WhatsAppMessageCreated', handleRealtimeMessage)
   offSignalR('WhatsAppAttentionChanged', handleAttentionChanged)
   offSignalR('WhatsAppConversationRoutingChanged', handleConversationRoutingChanged)
+  offSignalR('WhatsAppInboxChanged', scheduleInboxLabelsRefresh)
   offSignalR('WhatsAppAiProcessingChanged', handleAiProcessingChanged)
   stopAiDiagnosticsPolling()
   stopRealtimeFallback()
@@ -1898,6 +1849,14 @@ watch(inboxScope, () => {
 }, { flush: 'sync' })
 
 watch(sessionKey, () => {
+  inboxTotalsRefresh.cancel()
+  inboxLabelsRefresh.cancel()
+  inboxCounts.value = null
+  inboxLabels.value = []
+  productChoicesRequest?.controller.abort()
+  productChoicesRequest = undefined
+  loadingProductChoices.value = false
+  productChoiceGroups.value = []
   selectedConversation.value = null
   draft.value = ''
   clearSelectedFile()
@@ -1905,25 +1864,10 @@ watch(sessionKey, () => {
   if (viewActive && authStore.user) void retryWhatsAppStatus()
 }, { flush: 'sync' })
 
-watch(() => [selectedConversation.value?.id,
-  selectedConversation.value?.operationalBranchId ?? selectedConversation.value?.branchId] as const,
-([id, branchId], [oldId, oldBranchId]) => {
-  if (!id) {
-    contextGeneration++
-    selectedCustomer.value = null
-    selectedAddress.value = null
-    aiOrderDraft.value = null
-    contextLoading.value = false
-  } else if (id === oldId && branchId !== oldBranchId && selectedConversation.value) {
-    // Covers both local PUT responses and remote routing events, including mutations
-    // of the selected store object, without refreshing unrelated conversations.
-    void loadConversationContext(selectedConversation.value)
-  }
-}, { flush: 'sync' })
-
 watch(
   () => route.query.conversationId,
   () => {
+    selectionRoute.cancel()
     void selectConversationFromRoute()
   }
 )
@@ -1941,9 +1885,10 @@ watch(showAiDiagnosticsDialog, (open) => {
 })
 
 watch(connectionState, (current, previous) => {
-  if (!viewActive) return
-  if (current === 'connected' && previous !== 'connected' && whatsappStore.enabled) void reloadConversations()
-  if (current === 'connected') stopRealtimeFallback()
+  if (current === 'connected') {
+    stopRealtimeFallback()
+    if (previous !== 'connected' && whatsappStore.enabled) void reconcileWhatsApp()
+  }
   else startRealtimeFallback()
   if (current === 'connected'
     && previous !== 'connected'
@@ -1962,6 +1907,30 @@ watch([isPageVisible, isUserActive], ([visible, active], [wasVisible, wasActive]
     && (!wasVisible || !wasActive)) {
     void refreshAiDiagnostics()
   }
+})
+watch([activeInbox, selectedLabel], () => { if (whatsappStore.enabled) void reloadConversations() })
+watch([selectedBranchId, unroutedOnly], () => { inboxCounts.value = null })
+watch([activeInbox, selectedBranchId, unroutedOnly, selectedLabel], () => {
+  void router.replace({ query: { ...route.query, inbox: activeInbox.value, whatsappBranch: selectedBranchId.value || undefined,
+    unrouted: unroutedOnly.value ? 'true' : undefined, label: selectedLabel.value || undefined } })
+})
+watch(() => Math.floor((clockNow.value - 5 * 3_600_000) / 86_400_000), scheduleInboxLabelsRefresh)
+watch(() => Math.floor(clockNow.value / 60_000), () => {
+  if (isPageVisible.value && isUserActive.value) inboxTotalsRefresh.schedule()
+})
+const loadSelectedAdvisors = useDebouncedCallback(async () => {
+  const id = selectedConversation.value?.id
+  if (!id) return
+  try {
+    const response = await whatsappApi.getAdvisors(id)
+    if (selectedConversation.value?.id === id) advisors.value = response.data ?? []
+  } catch {}
+}, 200)
+watch(() => selectedConversation.value?.id, id => {
+  showProductChoices.value = false
+  advisors.value = []; transferTarget.value = 0; takeoverReason.value = ''
+  loadSelectedAdvisors.cancel()
+  if (id) loadSelectedAdvisors.schedule()
 })
 </script>
 

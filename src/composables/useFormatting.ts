@@ -7,6 +7,22 @@
 import type { OrderStatus } from '@/types/order'
 import { defaultBusinessCalendar } from '@/utils/datetime'
 
+const currencyFormatter = new Intl.NumberFormat('es-CO', {
+    style: 'currency', currency: 'COP', minimumFractionDigits: 0, maximumFractionDigits: 2,
+})
+const numberFormatter = new Intl.NumberFormat('es-CO')
+
+const messageTimeFormatter = new Intl.DateTimeFormat('es-CO', {
+    hour: '2-digit', minute: '2-digit', timeZone: defaultBusinessCalendar.timeZone,
+})
+
+export const formatMessageTime = (value: Date | string): string => {
+    const date = typeof value === 'string'
+        ? new Date(/(?:Z|[+-]\d{2}:?\d{2})$/i.test(value) ? value : `${value}Z`)
+        : value
+    return Number.isFinite(date.getTime()) ? messageTimeFormatter.format(date) : ''
+}
+
 /** Clave en `statusTimes` del backend (C# guarda `InPreparation` → `inpreparation`). */
 export const orderStatusToStatusTimesKey = (status: OrderStatus): string => {
     if (status === 'in_preparation') return 'inpreparation'
@@ -53,19 +69,14 @@ export const formatDurationInCurrentStatus = (isoDate: string, nowMs: number = D
  * Formatea un número como moneda colombiana
  */
 export const formatCurrency = (amount: number): string => {
-    return new Intl.NumberFormat('es-CO', {
-        style: 'currency',
-        currency: 'COP',
-        minimumFractionDigits: 0,
-        maximumFractionDigits: 2,
-    }).format(amount)
+    return currencyFormatter.format(amount)
 }
 
 /**
  * Formatea un número con separadores de miles
  */
 export const formatNumber = (number: number): string => {
-    return new Intl.NumberFormat('es-CO').format(number)
+    return numberFormatter.format(number)
 }
 
 /**
@@ -221,6 +232,7 @@ export const useFormatting = () => {
         formatShortMonthYear,
         formatTime,
         formatTime12h,
+        formatMessageTime,
         formatTimeAgo,
         formatTimeAgoCalendar,
         formatDurationInCurrentStatus,

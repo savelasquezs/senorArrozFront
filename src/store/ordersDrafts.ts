@@ -59,7 +59,38 @@ type AiWhatsAppDraftPayload = WhatsAppDraftBase & {
 
 type CreateWhatsAppDraftPayload = ManualWhatsAppDraftPayload | AiWhatsAppDraftPayload
 
-export const defineOrderDraftStore = (id: string) => defineStore(id, () => {
+/** Si falla la API al rehidratar, reconstruye un cliente mínimo desde el borrador persistido. */
+function buildFallbackCustomerForDraft(customerId: number, drafts: DraftOrder[]): Customer | null {
+    const order = drafts.find((d) => d.customerId === customerId)
+    if (!order?.customerId) return null
+    const addresses: CustomerAddress[] = []
+    if (order.addressId) {
+        addresses.push({
+            id: order.addressId,
+            customerId: order.customerId,
+            neighborhoodId: 0,
+            address: order.addressDescription ?? '',
+            additionalInfo: order.addressAdditionalInfo ?? undefined,
+            isPrimary: true,
+            createdAt: '',
+            updatedAt: '',
+            deliveryFee: order.deliveryFee ?? 0,
+        })
+    }
+    return {
+        id: order.customerId,
+        name: order.customerName ?? 'Cliente',
+        phone1: order.customerPhone ?? '',
+        branchId: 0,
+        active: true,
+        createdAt: '',
+        updatedAt: '',
+        addresses,
+    }
+}
+
+export const defineOrderDraftStore = (id: string, persistent = true) => defineStore(id, () => {
+
     const storageKey = id === 'ordersDrafts' ? 'senor-arroz-draft-orders' : `senor-arroz-draft-orders:${useAuthStore().user?.id}:${id}`
     // ===== Estado =====
     const draftOrders = ref(new Map<string, DraftOrder>())
@@ -1301,6 +1332,7 @@ export const defineOrderDraftStore = (id: string) => defineStore(id, () => {
 
     // Persistence - COPIAR líneas 524-563
     const saveToLocalStorage = () => {
+        if (!persistent) return
         const state: StoredOrdersState = {
             draftOrders: Array.from(draftOrders.value.values()),
             currentTabId: currentTabId.value,
@@ -1316,6 +1348,7 @@ export const defineOrderDraftStore = (id: string) => defineStore(id, () => {
     }
 
     const loadFromLocalStorage = () => {
+        if (!persistent) return
         try {
             const stored = localStorage.getItem(storageKey)
             if (!stored) return
@@ -1744,4 +1777,5 @@ export const defineOrderDraftStore = (id: string) => defineStore(id, () => {
         create
     }
 })
+
 export const useOrdersDraftsStore = defineOrderDraftStore('ordersDrafts')

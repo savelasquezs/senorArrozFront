@@ -429,6 +429,24 @@ npm run preview      # Preview del build
 - **Performance**: Core Web Vitals
 - **Errors**: Global error handling
 
+### WhatsApp y editor compartido
+
+La bandeja pagina 50 conversaciones por solicitud y limita la ventana a 300. Conserva doce historiales de hasta 500 mensajes, cancela lecturas obsoletas y reconcilia eventos mediante la conexión SignalR existente. Las filas sin cambios reutilizan su renderizado; sus dependencias incluyen todos los campos de la conversación, selección, agrupación y minuto del reloj.
+
+`WhatsAppOrderPanel` reutiliza `OrderSidebar` y sus componentes de productos, cliente, dirección, pagos y validación. `KeepAlive` conserva hasta ocho paneles por usuario, rol y sucursal de trabajo. Los stores y borradores retenidos usan ese mismo alcance más la conversación; los cambios pendientes sobreviven al desmontaje. El destino de preparación pertenece al pedido y no modifica este contexto.
+
+La grilla ocupa el área completa bajo la navegación principal. Búsqueda, filtros y herramientas se agrupan en la bandeja; línea, responsable y sede de atención pertenecen a la cabecera del chat. `WhatsAppOrderPanel` mantiene la única instancia del borrador y usa `Teleport` para ubicar allí estado comercial, guardado, Sin venta y acceso a las notas internas. Sus controles se retiran al desactivar el panel cacheado. Contraer el pedido conserva el panel montado y sus controles de conversación. Las notas reutilizan `BaseDialog`; los controles operativos se agrupan en Gestionar chat.
+
+El `OrderSidebar` integrado no agrega título ni barras de conversación; comienza en el borde superior de su columna y conserva su propio selector de destino y pie de confirmación. La ruta WhatsApp reutiliza `hideQuickOrder` para ocultar el botón flotante, sin alterar otras pantallas. Se elimina la consulta de sucursales que alimentaba el aviso de destino duplicado.
+
+La primera lectura autorizada del borrador se anticipa en paralelo al estado de WhatsApp. La hidratación de cliente y contexto operativo también es paralela. Activar un panel reutiliza la versión consultada durante cinco segundos; los eventos y la reconexión fuerzan conciliación. Una lectura tardía no reemplaza cambios locales y los eventos recibidos durante otra consulta solicitan una lectura posterior. Adquirir responsabilidad bloquea la edición hasta conciliar la versión compartida.
+
+Horarios comunes reutilizan `BaseInput` nativo de hora y los helpers de programación; el calendario existente de reservas se importa al usarlo. Formularios de cliente/dirección, destinatario fiscal, selector de productos, detalle del cliente/pedido y diagnóstico de IA se cargan al abrirlos. `BaseDialog` retira su overlay y libera el foco mientras su panel está desactivado.
+
+La pantalla se muestra al resolver el estado de WhatsApp. La bandeja, mensajes y editor continúan en paralelo; una respuesta tardía del enlace inicial no reemplaza una selección manual más reciente.
+
+Validación local reproducible y límites: [plan WhatsApp](../tasks/WHATSAPP-CHAT-ORDERS-WORKER.md) y `test-results/whatsapp-stage6/`. El harness usa build estático comprimido y adaptadores sintéticos; no conecta Meta ni habilita el worker productivo.
+
 ---
 
 **Próximos pasos**: Ver [Development Guide](./development.md) para setup y convenciones de desarrollo.

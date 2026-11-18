@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import {
     formatCurrency,
     formatNumber,
+    formatMessageTime,
     formatDateTime,
     formatDateShort,
     truncateText,
@@ -9,6 +10,13 @@ import {
 } from '@/composables/useFormatting'
 
 describe('useFormatting', () => {
+    it('formats chat timestamps in the business timezone including legacy UTC strings', () => {
+        const expected = formatMessageTime('2026-11-05T17:20:00Z')
+        expect(expected).toContain('12:20')
+        expect(formatMessageTime('2026-11-05T17:20:00')).toBe(expected)
+        expect(formatMessageTime('2026-11-05T19:20:00+02:00')).toBe(expected)
+        expect(formatMessageTime('invalid')).toBe('')
+    })
     describe('formatCurrency', () => {
         it('formats Colombian peso currency correctly', () => {
             expect(formatCurrency(10000)).toMatch(/^\$\s?10\.000$/)

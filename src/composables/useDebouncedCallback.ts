@@ -23,5 +23,5 @@ export function useDebouncedCallback(fn: () => void, ms: number) {
 
     onScopeDispose(() => cancel())
 
-    return { schedule, cancel }
+    return { schedule, cancel, isPending: () => timer != null }
 }

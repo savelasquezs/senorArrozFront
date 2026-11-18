@@ -133,7 +133,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue'
+import { ref, computed, defineAsyncComponent, watch } from 'vue'
 import { useCustomersStore } from '@/store/customers'
 import { useOrderEditorStore as useOrdersDraftsStore } from '@/composables/useOrderEditor'
 import { useOrdersDataStore } from '@/store/ordersData'
@@ -148,7 +148,7 @@ import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseBadge from '@/components/ui/BaseBadge.vue'
 import BaseLoading from '@/components/ui/BaseLoading.vue'
 import BaseDialog from '@/components/ui/BaseDialog.vue'
-import CustomerAddressForm from '@/components/customers/address/CustomerAddressForm.vue'
+const CustomerAddressForm = defineAsyncComponent(() => import('@/components/customers/address/CustomerAddressForm.vue'))
 import AddressDeliveryFeeDialog from '@/components/customers/address/AddressDeliveryFeeDialog.vue'
 
 import {
