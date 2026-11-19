@@ -400,7 +400,15 @@ export interface UpdateTenantWhatsAppChannel {
 }
 
 export type WhatsAppInboxKey = 'free' | 'mine' | 'team' | 'closed'
-export interface WhatsAppInboxLabel { key: string; name: string; editable: boolean }
+export type WhatsAppInboxLabelColor = 'violet' | 'amber' | 'orange' | 'emerald' | 'blue' | 'teal' | 'rose' | 'slate'
+export interface WhatsAppInboxLabelDefinition { name: string; color: WhatsAppInboxLabelColor }
+export interface WhatsAppInboxLabel {
+  key: string
+  name: string
+  editable: boolean
+  color?: WhatsAppInboxLabelColor | null
+  custom?: boolean
+}
 export type WhatsAppInboxSummary = Record<WhatsAppInboxKey, { pendingOrders: number; unreadConversations: number }>
 export type WhatsAppAttentionAction = 'take' | 'force-take' | 'release' | 'transfer' | 'return-to-ai' | 'pause-ai' | 'request-human' | 'close' | 'reopen'
 

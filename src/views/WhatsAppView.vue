@@ -73,7 +73,9 @@
                   <option value="">Todas las etiquetas</option>
                   <option v-for="label in inboxLabels" :key="label.key" :value="label.key">{{ label.name }}</option>
                 </select>
-                <BaseButton variant="secondary" size="sm" @click="openQuickRepliesModal">Respuestas rápidas</BaseButton>
+                <BaseButton variant="secondary" size="sm" @click="showInboxLabelManager = true">Gestionar etiquetas</BaseButton>
+                <BaseButton v-if="!selectedConversation" variant="secondary" size="sm" @click="openQuickRepliesModal">Respuestas rápidas</BaseButton>
+                <BaseButton variant="secondary" size="sm" @click="showClosedDayReplies = true">Responder por descanso</BaseButton>
                 <button v-if="diagnosticsBranchId" type="button" class="inline-flex max-w-full items-center gap-1.5 rounded-lg border px-2 py-1.5 text-xs font-medium"
                   :class="aiStatusChipClasses" :title="currentAiDiagnostics?.summary || whatsappStore.aiDiagnosticsError || 'Abrir actividad de la IA'" @click="openAiDiagnostics">
                   <CpuChipIcon class="h-4 w-4 shrink-0" /><span class="truncate">{{ aiStatusChipLabel }}</span>
@@ -96,7 +98,7 @@
             <template #default="{ conversations }">
               <div
                 v-for="(conversation, conversationIndex) in conversations"
-                v-memo="[...Object.values(conversation), inboxLabelNames, selectedLabel, selectedConversation?.id === conversation.id, conversationIndex === 0 || commercialGroup(conversations[conversationIndex - 1]!) !== commercialGroup(conversation), Math.floor(clockNow / 60_000)]"
+                v-memo="[...Object.values(conversation), inboxLabelsByKey, selectedLabel, selectedConversation?.id === conversation.id, conversationIndex === 0 || commercialGroup(conversations[conversationIndex - 1]!) !== commercialGroup(conversation), Math.floor(clockNow / 60_000)]"
                 :key="conversation.id"
                 class="relative w-full border-b border-gray-100 px-3 py-2 text-left hover:bg-gray-50"
                 :class="selectedConversation?.id === conversation.id ? 'bg-emerald-50' : conversation.attentionMode === 'waitingForHuman' ? 'bg-amber-50 ring-1 ring-inset ring-amber-300' : 'bg-white'"
@@ -159,17 +161,53 @@
         </aside>
 
         <section class="min-h-0 flex flex-col bg-gray-50" :class="{ 'max-xl:hidden': mobilePane !== 'chat' }">
-          <header v-if="selectedConversation" class="shrink-0 space-y-2 border-b border-gray-200 bg-white px-3 py-2" data-test="whatsapp-chat-header">
-            <div class="flex items-start justify-between gap-2">
-              <div class="min-w-0">
-                <p class="truncate text-sm font-semibold text-gray-900">{{ conversationTitle(selectedConversation) }}</p>
-                <p class="text-xs text-gray-500">{{ conversationIdentityLabel(selectedConversation) }}</p>
+          <header v-if="selectedConversation" :key="selectedConversation.id"
+            class="chat-header relative z-10 min-w-0 shrink-0 border-b border-gray-200 bg-white px-2 py-1" data-test="whatsapp-chat-header">
+            <div class="flex min-h-8 items-center justify-between gap-1.5">
+              <div class="flex min-w-0 flex-1 items-baseline gap-1.5">
+                <p class="truncate whitespace-nowrap text-sm font-semibold text-gray-900" :class="{ 'max-w-[55%]': chatIdentity }" :title="conversationTitle(selectedConversation)">
+                  {{ conversationTitle(selectedConversation) }}
+                </p>
+                <p v-if="chatIdentity" class="chat-identity truncate whitespace-nowrap text-xs text-gray-500" :title="chatIdentity">
+                  {{ chatIdentity }}
+                </p>
               </div>
-              <div class="flex shrink-0 items-start gap-1.5">
-                <BaseButton v-if="canTakeAttention" size="sm" :loading="changingAttention" @click="changeAttention('take')">Tomar conversación</BaseButton>
-                <details class="relative" data-test="whatsapp-chat-actions">
-                  <summary class="cursor-pointer list-none rounded-lg border border-gray-200 px-2 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50">Gestionar chat</summary>
-                  <div class="absolute right-0 top-full z-20 mt-1 flex max-h-[70dvh] w-72 max-w-[calc(100vw-2rem)] flex-col gap-2 overflow-y-auto rounded-xl border border-gray-200 bg-white p-3 shadow-lg">
+              <div class="flex shrink-0 items-center gap-0.5 sm:gap-1">
+                <div ref="commercialSaveTarget" class="flex shrink-0 items-center text-[11px]" data-test="whatsapp-commercial-save" />
+                <BaseButton v-if="canTakeAttention" size="xs" aria-label="Tomar conversación" title="Tomar conversación"
+                  class="chat-take whitespace-nowrap" :loading="changingAttention" @click="changeAttention('take')">
+                  <UserPlusIcon class="chat-action-icon h-4 w-4" aria-hidden="true" />
+                  <span class="chat-action-label">Tomar conversación</span>
+                </BaseButton>
+                <details class="chat-menu relative" name="whatsapp-chat-tools" @keydown.esc.stop="closeInboxLabelMenu">
+                  <summary class="chat-tool" aria-label="Etiquetas" title="Etiquetas">
+                    <TagIcon class="chat-action-icon h-4 w-4" aria-hidden="true" />
+                    <span class="chat-action-label">Etiquetas</span>
+                    <span v-if="selectedConversation.labels?.length" class="chat-label-count text-[10px] text-emerald-700">{{ selectedConversation.labels.length }}</span>
+                    <span v-for="key in selectedConversation.labels?.slice(0, 2)" :key="key" class="chat-label-chip max-w-24 truncate" :class="inboxLabelClasses(key)">{{ inboxLabelName(key) }}</span>
+                    <span v-if="(selectedConversation.labels?.length ?? 0) > 2" class="chat-label-chip text-[10px] text-emerald-700">+{{ (selectedConversation.labels?.length ?? 0) - 2 }}</span>
+                  </summary>
+                  <section class="chat-menu-panel absolute right-0 top-full z-20 mt-2 w-80 max-w-[calc(100vw-2rem)] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl" aria-label="Etiquetas de la conversación">
+                    <div class="flex items-center justify-between gap-2 border-b border-emerald-100 bg-emerald-50/70 px-3 py-2.5">
+                      <h2 class="flex items-center gap-2 text-sm font-bold text-emerald-950">
+                        <TagIcon class="h-4 w-4 text-emerald-700" aria-hidden="true" />Etiquetas
+                      </h2>
+                      <BaseButton size="sm" class="gap-1" @click="openInboxLabelEditor()">
+                        <PlusIcon class="h-4 w-4" aria-hidden="true" />Nueva etiqueta
+                      </BaseButton>
+                    </div>
+                    <WhatsAppInboxLabelList class="max-h-[min(22rem,52dvh)] overflow-y-auto overscroll-contain p-2"
+                      :labels="chatInboxLabels" :applied="selectedConversation.labels" :can-assign="canEditInboxLabels"
+                      :busy="changingInboxLabel || savingInboxLabel" @toggle="setInboxLabel" @edit="openInboxLabelEditor" @remove="removeInboxLabel" />
+                  </section>
+                </details>
+                <details class="chat-menu relative" name="whatsapp-chat-tools" data-test="whatsapp-chat-actions">
+                  <summary class="chat-tool" aria-label="Gestionar chat" title="Gestionar chat">
+                    <EllipsisHorizontalIcon class="chat-action-icon h-5 w-5" aria-hidden="true" />
+                    <span class="chat-action-label">Gestionar chat</span>
+                  </summary>
+                  <div class="chat-menu-panel absolute right-0 top-full z-20 mt-1 flex max-h-[70dvh] w-72 max-w-[calc(100vw-2rem)] flex-col gap-2 overflow-y-auto rounded-xl border border-gray-200 bg-white p-3 shadow-lg">
+                    <div ref="commercialControlsTarget" class="flex flex-wrap items-center gap-1 empty:hidden" data-test="whatsapp-commercial-controls" />
                     <label v-if="canAssignOperationalBranch" class="mt-2 flex items-center gap-2 text-xs font-medium text-gray-600">
                       Sucursal operativa
                       <select
@@ -220,37 +258,18 @@
                       <BaseButton v-if="selectedConversation.attentionMode === 'closed'" size="sm" :loading="changingAttention" @click="changeAttention('reopen')">Reabrir conversación</BaseButton>
                   </div>
                 </details>
-                <BaseButton variant="ghost" size="sm" @click="contextPanelCollapsed = !contextPanelCollapsed">{{ contextPanelCollapsed ? 'Abrir pedido' : 'Contraer' }}</BaseButton>
+                <BaseTooltip :icon="InformationCircleIcon" label="Información de la conversación" :text="chatInfoText" compact />
+                <WhatsAppAiStatusStrip :diagnostics="chatAiDiagnostics" :processing="latestAiProcessing"
+                  :answered="chatAiAnswered" :error="chatAiDiagnostics ? null : whatsappStore.aiDiagnosticsError"
+                  @open="openAiDiagnostics" />
+                <BaseButton variant="ghost" size="sm" icon-only class="chat-order-toggle"
+                  :icon="contextPanelCollapsed ? ChevronDoubleLeftIcon : ChevronDoubleRightIcon"
+                  :aria-label="contextPanelCollapsed ? 'Abrir pedido' : 'Contraer pedido'"
+                  :title="contextPanelCollapsed ? 'Abrir pedido' : 'Contraer pedido'"
+                  @click="contextPanelCollapsed = !contextPanelCollapsed" />
               </div>
             </div>
-            <div class="flex flex-wrap gap-x-3 gap-y-1 text-[11px] leading-4 text-gray-500" data-test="whatsapp-chat-context">
-              <span><span class="font-medium">Línea</span> {{ selectedConversation.senderLine || (selectedConversation.isCentralChannel ? 'WhatsApp central' : selectedConversation.branchName) }}</span>
-              <span><span class="font-medium">Responsable</span> {{ selectedConversation.assignedUserName || (selectedConversation.assignedUserId ? `Asesor #${selectedConversation.assignedUserId}` : 'Sin asignar') }}</span>
-              <span><span class="font-medium">Atención</span> {{ (selectedConversation.isCentralChannel ? selectedConversation.operationalBranchName : selectedConversation.branchName) || 'Sin sede operativa' }}</span>
-            </div>
-            <div class="flex flex-wrap items-center gap-1.5" aria-label="Etiquetas de la conversación">
-              <span v-for="key in selectedConversation.labels" :key="key" :class="inboxLabelClasses(key)">{{ inboxLabelName(key) }}</span>
-              <details v-if="canEditInboxLabels && editableInboxLabels.length" class="relative">
-                <summary class="cursor-pointer rounded border border-gray-200 px-2 py-0.5 text-xs text-gray-700">Etiquetas</summary>
-                <div class="absolute left-0 z-20 mt-1 min-w-40 space-y-1 rounded border bg-white p-2 shadow">
-                  <label v-for="label in editableInboxLabels" :key="label.key" class="flex cursor-pointer items-center gap-2 text-xs text-gray-700">
-                    <input type="checkbox" :checked="selectedConversation.labels?.includes(label.key)" :disabled="changingInboxLabel"
-                      @change="setInboxLabel(label.key, $event)" />
-                    {{ label.name }}
-                  </label>
-                </div>
-              </details>
-            </div>
-            <div ref="commercialControlsTarget" class="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px]" data-test="whatsapp-commercial-controls" />
           </header>
-
-          <WhatsAppAiStatusStrip
-            v-if="selectedConversation"
-            :diagnostics="currentAiDiagnostics"
-            :processing="latestAiProcessing"
-            :error="currentAiDiagnostics ? null : whatsappStore.aiDiagnosticsError"
-            @open="openAiDiagnostics"
-          />
 
           <div v-if="!selectedConversation" class="flex-1 grid place-items-center p-6 text-center text-gray-500">
             <div>
@@ -376,7 +395,7 @@
               <p v-if="ownsConversation && !serviceWindowOpen" class="mb-2 rounded bg-amber-50 p-2 text-sm text-amber-900">La ventana de atención de 24 horas está cerrada. Usa una plantilla aprobada para iniciar el contacto.</p>
               <p v-else-if="ownsConversation" class="mb-2 text-xs text-gray-500">Ventana de atención hasta {{ new Date(selectedConversation.customerServiceWindowExpiresAt!).toLocaleString('es-CO') }}</p>
               <WhatsAppConversationTemplates v-if="ownsConversation" :key="selectedConversation.id" :conversation-id="selectedConversation.id" />
-              <div v-if="ownsConversation || topQuickReplies.length" class="mb-2 flex flex-wrap items-center gap-2">
+              <div class="mb-2 flex flex-wrap items-center gap-2">
                 <span class="text-xs font-medium text-gray-500">Rápidas</span>
                 <button v-if="ownsConversation" type="button"
                   class="rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-800 hover:bg-emerald-100 disabled:opacity-50"
@@ -391,6 +410,11 @@
                   @click="sendQuickReply(reply)"
                 >
                   /{{ reply.shortcut }}
+                </button>
+                <button type="button" aria-label="Crear o editar respuestas rápidas" title="Crear o editar respuestas rápidas"
+                  class="inline-flex h-7 w-7 items-center justify-center rounded-full border border-emerald-300 text-emerald-800 hover:bg-emerald-50 focus-visible:outline-emerald-600"
+                  @click="openQuickRepliesModal">
+                  <PlusIcon class="h-4 w-4" aria-hidden="true" />
                 </button>
               </div>
               <div v-if="selectedFile" class="mb-2 flex items-center justify-between gap-3 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-900">
@@ -459,7 +483,7 @@
         <aside v-if="selectedConversation" v-show="!contextPanelCollapsed" data-test="whatsapp-order-column" class="relative min-h-0 border-l border-gray-200 bg-white flex flex-col" :class="{ 'max-xl:hidden': mobilePane !== 'order' }">
           <div role="separator" tabindex="0" aria-label="Ancho del pedido" aria-orientation="vertical" :aria-valuenow="rightWidth" class="absolute -left-1 top-0 z-10 hidden h-full w-2 cursor-col-resize touch-none xl:block" @pointerdown="resize($event, 'right')" @keydown.left.prevent="step('right', 20)" @keydown.right.prevent="step('right', -20)" />
           <KeepAlive :key="editorScope" :max="8">
-            <WhatsAppOrderPanel ref="commercialPanel" :key="`${authStore.user?.id}:${selectedConversation.id}`" :conversation="selectedConversation" :initial-draft="prefetchedDraft" :controls-target="commercialControlsTarget"
+            <WhatsAppOrderPanel ref="commercialPanel" :key="`${authStore.user?.id}:${selectedConversation.id}`" :conversation="selectedConversation" :initial-draft="prefetchedDraft" :controls-target="commercialControlsTarget" :save-target="commercialSaveTarget"
               :can-send-choices="canSend" @change="commercialChanged" @draft-message="draftOrderMessage" @addresses-sent="addressesSent"
               @product-suggestion-state="setProductSuggestionState" />
           </KeepAlive>
@@ -487,6 +511,55 @@
           <p v-if="productChoicesError" role="alert" class="text-sm text-red-700">{{ productChoicesError }}</p>
           <div class="flex justify-end">
             <BaseButton type="submit" :loading="sendingProductChoices" :disabled="!productChoiceGroupId || !canSend || loadingProductChoices">Enviar opciones</BaseButton>
+          </div>
+        </form>
+      </BaseDialog>
+
+      <WhatsAppClosedDayReplies v-if="showClosedDayReplies" :key="sessionKey + ':' + selectedBranchId"
+        v-model="showClosedDayReplies" :branch-id="selectedBranchId || undefined" @sent="reloadConversations" />
+
+      <BaseDialog v-model="showInboxLabelManager" title="Gestionar etiquetas" :icon="TagIcon" size="sm">
+        <div class="space-y-3">
+          <WhatsAppInboxLabelList v-if="customInboxLabels.length" :labels="customInboxLabels" :busy="savingInboxLabel"
+            @edit="openInboxLabelEditor" @remove="removeInboxLabel" />
+          <p v-else class="rounded-xl bg-slate-50 p-4 text-sm text-slate-600">Todavía no hay etiquetas personalizadas.</p>
+        </div>
+        <template #footer>
+          <BaseButton class="gap-1.5" @click="openInboxLabelEditor()"><PlusIcon class="h-4 w-4" aria-hidden="true" />Nueva etiqueta</BaseButton>
+        </template>
+      </BaseDialog>
+
+      <BaseDialog v-model="showInboxLabelEditor" :title="editingInboxLabelKey ? 'Editar etiqueta' : 'Nueva etiqueta'"
+        :icon="TagIcon" size="sm" z-class="z-[60]" :dismissible="!savingInboxLabel">
+        <form class="space-y-5" @submit.prevent="saveInboxLabel">
+          <label class="block text-sm font-semibold text-slate-800">
+            Nombre
+            <input v-model="inboxLabelDraft.name" data-autofocus type="text" required maxlength="40" placeholder="Nombre de la etiqueta"
+              class="mt-1.5 block w-full rounded-xl border border-slate-300 px-3 py-2.5 text-sm font-normal focus:border-emerald-600 focus:ring-emerald-600" />
+          </label>
+          <fieldset>
+            <legend class="text-sm font-semibold text-slate-800">Color</legend>
+            <div class="mt-2.5 grid grid-cols-4 justify-items-center gap-2.5 sm:grid-cols-8 sm:gap-2">
+              <label v-for="(swatch, color) in inboxLabelPalette" :key="color" :title="swatch.name" class="cursor-pointer">
+                <input v-model="inboxLabelDraft.color" type="radio" name="whatsapp-label-color" :value="color" class="peer sr-only" />
+                <span class="grid h-8 w-8 place-items-center rounded-full ring-offset-2 transition-transform hover:scale-105 peer-checked:ring-2 peer-checked:ring-slate-800 peer-focus-visible:ring-2 peer-focus-visible:ring-emerald-700"
+                  :class="swatch.style">
+                  <CheckIcon v-if="inboxLabelDraft.color === color" class="h-4 w-4" aria-hidden="true" />
+                  <span class="sr-only">{{ swatch.name }}</span>
+                </span>
+              </label>
+            </div>
+          </fieldset>
+          <div class="flex items-center justify-between gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5">
+            <span class="inline-flex min-w-0 items-center gap-1.5 rounded-md px-2 py-1 text-xs font-bold" :class="inboxLabelPalette[inboxLabelDraft.color].style">
+              <TagIcon class="h-3.5 w-3.5 shrink-0" aria-hidden="true" /><span class="truncate">{{ inboxLabelDraft.name.trim() || 'Vista previa' }}</span>
+            </span>
+            <span class="shrink-0 text-xs text-slate-600">{{ inboxLabelPalette[inboxLabelDraft.color].name }}</span>
+          </div>
+          <p v-if="inboxLabelEditorError" role="alert" class="text-sm font-medium text-rose-800">{{ inboxLabelEditorError }}</p>
+          <div class="flex justify-end gap-2">
+            <BaseButton variant="secondary" :disabled="savingInboxLabel" @click="showInboxLabelEditor = false">Cancelar</BaseButton>
+            <BaseButton type="submit" :loading="savingInboxLabel" :disabled="!inboxLabelDraft.name.trim()">Guardar etiqueta</BaseButton>
           </div>
         </form>
       </BaseDialog>
@@ -637,7 +710,7 @@
 
 <script setup lang="ts">
 import { useResizableColumns } from '@/composables/useResizableColumns'
-import { commercialGroup, commercialLabel } from '@/utils/whatsappInbox'
+import { commercialGroup, commercialLabel, fixedInboxLabelStyles, inboxLabelColor, inboxLabelPalette } from '@/utils/whatsappInbox'
 
 import WhatsAppOrderPanel from '@/components/whatsapp/WhatsAppOrderPanel.vue'
 import type { WhatsAppCommercialDraft } from '@/types/whatsapp'
@@ -647,22 +720,33 @@ import { useRoute, useRouter } from 'vue-router'
 import {
   ChatBubbleLeftRightIcon,
   ChatBubbleOvalLeftEllipsisIcon,
+  ChevronDoubleLeftIcon,
+  ChevronDoubleRightIcon,
   ArrowPathIcon,
+  CheckIcon,
   CpuChipIcon,
   DocumentIcon,
+  EllipsisHorizontalIcon,
   ExclamationTriangleIcon,
+  InformationCircleIcon,
   PaperClipIcon,
   PaperAirplaneIcon,
+  PlusIcon,
+  TagIcon,
+  UserPlusIcon,
   XMarkIcon,
 } from '@heroicons/vue/24/outline'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseDialog from '@/components/ui/BaseDialog.vue'
 import BaseInput from '@/components/ui/BaseInput.vue'
 import BaseLoading from '@/components/ui/BaseLoading.vue'
+import BaseTooltip from '@/components/ui/BaseTooltip.vue'
 const WhatsAppAiDiagnosticsDialog = defineAsyncComponent(() => import('@/components/whatsapp/WhatsAppAiDiagnosticsDialog.vue'))
 import WhatsAppAiStatusStrip from '@/components/whatsapp/WhatsAppAiStatusStrip.vue'
 import WhatsAppInboxTabs from '@/components/whatsapp/WhatsAppInboxTabs.vue'
+import WhatsAppInboxLabelList from '@/components/whatsapp/WhatsAppInboxLabelList.vue'
 import WhatsAppConversationTemplates from '@/components/whatsapp/WhatsAppConversationTemplates.vue'
+import WhatsAppClosedDayReplies from '@/components/whatsapp/WhatsAppClosedDayReplies.vue'
 import { useWhatsAppStore } from '@/store/whatsapp'
 import { useAuthStore } from '@/store/auth'
 import { useBranchContextStore } from '@/store/branchContext'
@@ -689,6 +773,7 @@ import type {
   WhatsAppConversationRoutingChangedPayload,
   WhatsAppMessage,
   WhatsAppInboxLabel,
+  WhatsAppInboxLabelDefinition,
   WhatsAppInboxSummary,
   WhatsAppProductChoiceGroup,
   WhatsAppProductSuggestion,
@@ -729,6 +814,7 @@ const initialDraft = shallowRef<{ id: number; scope: string; request: Promise<Wh
 const prefetchedDraft = computed(() => initialDraft.value?.id === selectedConversation.value?.id && initialDraft.value?.scope === editorScope.value ? initialDraft.value?.request : undefined)
 const commercialPanel = ref<InstanceType<typeof WhatsAppOrderPanel> | null>(null)
 const commercialControlsTarget = ref<HTMLElement | null>(null)
+const commercialSaveTarget = ref<HTMLElement | null>(null)
 const selectionRoute = useDebouncedCallback(() => {
   const id = selectedConversation.value?.id
   if (id) void router.replace({ query: { ...route.query, conversationId: String(id) } })
@@ -739,9 +825,18 @@ const unroutedOnly = ref(route.query.unrouted === 'true')
 const selectedLabel = ref(typeof route.query.label === 'string' ? route.query.label : '')
 const inboxLabels = ref<WhatsAppInboxLabel[]>([])
 const inboxCounts = shallowRef<WhatsAppInboxSummary | null>(null)
-const inboxLabelNames = computed(() => new Map(inboxLabels.value.map(label => [label.key, label.name])))
-const editableInboxLabels = computed(() => inboxLabels.value.filter(label => label.editable))
+const inboxLabelsByKey = computed(() => new Map(inboxLabels.value.map(label => [label.key, label])))
+const chatInboxLabels = computed(() => inboxLabels.value.filter(label =>
+  label.custom || (label.editable && canEditInboxLabels.value) || selectedConversation.value?.labels?.includes(label.key)))
+const customInboxLabels = computed(() => inboxLabels.value.filter(label => label.custom))
 const changingInboxLabel = ref(false)
+const savingInboxLabel = ref(false)
+const showInboxLabelManager = ref(false)
+const showInboxLabelEditor = ref(false)
+const editingInboxLabelKey = ref('')
+const inboxLabelDraft = ref<WhatsAppInboxLabelDefinition>({ name: '', color: 'violet' })
+const inboxLabelEditorError = ref('')
+let inboxLabelCatalogRequest = 0
 const resettingTaken = ref(false)
 const canEditInboxLabels = computed(() => {
   const chat = selectedConversation.value
@@ -772,6 +867,7 @@ const mobilePane = ref<'inbox' | 'chat' | 'order'>('inbox')
 const columnsContainer = ref<HTMLElement>()
 const { leftWidth, rightWidth, resize, step } = useResizableColumns(columnsContainer)
 const showQuickRepliesModal = ref(false)
+const showClosedDayReplies = ref(false)
 const showProductChoices = ref(false)
 const loadingProductChoices = ref(false)
 const sendingProductChoices = ref(false)
@@ -873,9 +969,32 @@ const currentAiDiagnostics = computed<WhatsAppAiDiagnostics | null>(() => {
   )[0] ?? null
 })
 
-const latestAiProcessing = computed(() =>
-  sortAiProcessing(currentAiDiagnostics.value?.recentMessages ?? [])[0] ?? null,
-)
+const chatIdentity = computed(() => {
+  const conversation = selectedConversation.value
+  if (!conversation) return ''
+  const name = conversationTitle(conversation)
+  const username = conversation.whatsAppUsername
+  const phone = formatPhone(conversation.phoneNumber)
+  return [username !== name ? username : '', conversation.phoneNumber !== name ? phone : ''].filter(Boolean).join(' · ')
+})
+const chatInfoText = computed(() => {
+  const conversation = selectedConversation.value
+  if (!conversation) return ''
+  const line = conversation.senderLine || (conversation.isCentralChannel ? 'WhatsApp central' : conversation.branchName)
+  const owner = conversation.assignedUserName || (conversation.assignedUserId ? `Asesor #${conversation.assignedUserId}` : 'Sin asignar')
+  const branch = (conversation.isCentralChannel ? conversation.operationalBranchName : conversation.branchName) || 'Sin sede operativa'
+  return `Línea · ${line || 'Sin línea'}\nResponsable · ${owner}\nAtención · ${branch}`
+})
+const chatAiDiagnostics = computed(() => {
+  const id = selectedConversation.value?.id
+  return id ? whatsappStore.aiDiagnosticsByConversation[id] : null
+})
+const chatAiActivities = computed(() => sortAiProcessing([
+  ...(chatAiDiagnostics.value?.recentMessages ?? []),
+  ...currentMessages.value.flatMap(message => message.aiProcessing ? [message.aiProcessing] : []),
+]))
+const latestAiProcessing = computed(() => chatAiActivities.value[0] ?? null)
+const chatAiAnswered = computed(() => chatAiActivities.value.some(item => item.status === 'completed' || item.status === 'sent'))
 
 const failureActivities = computed(() => sortAiProcessing(
   currentAiDiagnostics.value?.recentMessages.filter(isFailureActivity) ?? [],
@@ -1215,29 +1334,99 @@ function sendUniqueQuickReply(event: KeyboardEvent) {
   if (!event.repeat) void chooseQuickReply(uniqueQuickReply.value)
 }
 
-const inboxLabelStyles: Record<string, { name: string; color: string }> = {
-  supplier: { name: 'Proveedor', color: 'bg-violet-700 text-white' },
-  pending: { name: 'Pendiente', color: 'bg-amber-300 text-amber-950' },
-  taken: { name: 'Tomado', color: 'bg-emerald-700 text-white' },
-  payment_pending: { name: 'Pendiente de pago', color: 'bg-rose-700 text-white' },
-}
-
 function inboxLabelName(key: string) {
-  return inboxLabelNames.value.get(key) ?? inboxLabelStyles[key]?.name
+  return inboxLabelsByKey.value.get(key)?.name ?? fixedInboxLabelStyles[key]?.name
     ?? (key.startsWith('branch:') ? `Sucursal ${key.slice('branch:'.length)}` : key)
 }
 
 function inboxLabelClasses(key: string) {
   return [
     'rounded-md px-2 py-0.5 text-xs font-bold leading-4',
-    inboxLabelStyles[key]?.color ?? (key.startsWith('branch:') ? 'bg-blue-700 text-white' : 'bg-slate-700 text-white'),
+    inboxLabelColor(key, inboxLabelsByKey.value.get(key)?.color),
   ]
 }
 
 async function loadInboxLabels() {
+  const request = ++inboxLabelCatalogRequest
   const scope = sessionKey.value
   const result = await whatsappApi.getInboxLabels()
-  if (viewActive && scope === sessionKey.value) inboxLabels.value = result.data ?? []
+  if (viewActive && scope === sessionKey.value && request === inboxLabelCatalogRequest) {
+    inboxLabels.value = result.data ?? []
+    if (selectedLabel.value.startsWith('custom:') && !inboxLabelsByKey.value.has(selectedLabel.value)) selectedLabel.value = ''
+  }
+}
+
+function refreshInboxLabelCatalog() {
+  if (!whatsappStore.enabled) return
+  void loadInboxLabels().then(scheduleInboxLabelsRefresh).catch(() => {})
+}
+
+function closeInboxLabelMenu(event: KeyboardEvent) {
+  const menu = event.currentTarget as HTMLDetailsElement
+  if (!menu.open) return
+  menu.open = false
+  menu.querySelector('summary')?.focus()
+}
+
+function openInboxLabelEditor(label?: WhatsAppInboxLabel) {
+  editingInboxLabelKey.value = label?.key ?? ''
+  inboxLabelDraft.value = { name: label?.name ?? '', color: label?.color ?? 'violet' }
+  inboxLabelEditorError.value = ''
+  showInboxLabelEditor.value = true
+}
+
+async function saveInboxLabel() {
+  if (savingInboxLabel.value || !inboxLabelDraft.value.name.trim()) return
+  const scope = sessionKey.value
+  const key = editingInboxLabelKey.value
+  const definition = { ...inboxLabelDraft.value, name: inboxLabelDraft.value.name.trim() }
+  savingInboxLabel.value = true
+  inboxLabelEditorError.value = ''
+  try {
+    const response = key ? await whatsappApi.updateInboxLabel(key, definition) : await whatsappApi.createInboxLabel(definition)
+    if (!viewActive || scope !== sessionKey.value) return
+    if (response.data) {
+      const label = response.data
+      inboxLabels.value = [...inboxLabels.value.filter(item => item.key !== label.key), label]
+    }
+    showInboxLabelEditor.value = false
+    refreshInboxLabelCatalog()
+  } catch (error) {
+    if (viewActive && scope === sessionKey.value)
+      inboxLabelEditorError.value = error instanceof Error ? error.message : 'No se pudo guardar la etiqueta.'
+  } finally {
+    if (scope === sessionKey.value) savingInboxLabel.value = false
+  }
+}
+
+async function removeInboxLabel(label: WhatsAppInboxLabel) {
+  if (!label.custom || savingInboxLabel.value) return
+  const scope = sessionKey.value
+  const confirmed = await confirmDialog({
+    title: 'Borrar etiqueta',
+    message: `Se quitará «${label.name}» de todos los chats que la tienen.`,
+    confirmLabel: 'Borrar etiqueta',
+    tone: 'danger',
+  })
+  if (!confirmed || !viewActive || scope !== sessionKey.value || savingInboxLabel.value) return
+  savingInboxLabel.value = true
+  try {
+    await whatsappApi.deleteInboxLabel(label.key)
+    if (!viewActive || scope !== sessionKey.value) return
+    inboxLabels.value = inboxLabels.value.filter(item => item.key !== label.key)
+    for (const chat of whatsappStore.conversations) {
+      if (chat.labels?.includes(label.key)) chat.labels = chat.labels.filter(key => key !== label.key)
+    }
+    const activeChat = selectedConversation.value
+    if (activeChat?.labels?.includes(label.key)) activeChat.labels = activeChat.labels.filter(key => key !== label.key)
+    if (selectedLabel.value === label.key) selectedLabel.value = ''
+    refreshInboxLabelCatalog()
+  } catch (error) {
+    if (viewActive && scope === sessionKey.value)
+      showError('Etiquetas', error instanceof Error ? error.message : 'No se pudo borrar la etiqueta.')
+  } finally {
+    if (scope === sessionKey.value) savingInboxLabel.value = false
+  }
 }
 
 async function refreshInboxTotals(signal?: AbortSignal) {
@@ -1263,19 +1452,22 @@ function scheduleInboxLabelsRefresh() {
 async function setInboxLabel(key: string, event: Event) {
   const input = event.target as HTMLInputElement
   const chat = selectedConversation.value
+  const scope = sessionKey.value
   if (!chat || !canEditInboxLabels.value || changingInboxLabel.value) return
   changingInboxLabel.value = true
   try {
     const result = await whatsappApi.setInboxLabel(chat.id, key, input.checked)
+    if (!viewActive || scope !== sessionKey.value) return
     const labels = result.data ?? []
     const row = whatsappStore.conversations.find(item => item.id === chat.id)
     if (row) row.labels = labels
     if (selectedConversation.value?.id === chat.id) selectedConversation.value.labels = labels
     await reloadConversations()
   } catch (error) {
+    if (!viewActive || scope !== sessionKey.value) return
     if (selectedConversation.value?.id === chat.id) input.checked = selectedConversation.value.labels?.includes(key) ?? false
     showError('Etiquetas', error instanceof Error ? error.message : 'No se pudo cambiar la etiqueta.')
-  } finally { changingInboxLabel.value = false }
+  } finally { if (scope === sessionKey.value) changingInboxLabel.value = false }
 }
 
 async function resetTakenLabels() {
@@ -1348,7 +1540,7 @@ function stopRealtimeFallback() {
 
 async function reconcileWhatsApp() {
   const id = selectedConversation.value?.id
-  await reloadConversations()
+  await Promise.all([reloadConversations(), loadInboxLabels().catch(() => {})])
   if (id && selectedConversation.value?.id === id) await whatsappStore.fetchMessages(id)
   await commercialPanel.value?.reconcile()
 }
@@ -1359,7 +1551,7 @@ function startRealtimeFallback() {
     fallbackRunning = true
     try {
     const activeId = selectedConversation.value?.id
-    await reloadConversations()
+    await Promise.all([reloadConversations(), loadInboxLabels().catch(() => {})])
     if (viewActive && activeId && selectedConversation.value?.id === activeId) {
       await whatsappStore.fetchMessages(activeId)
       if (selectedConversation.value?.id === activeId) await commercialPanel.value?.reconcile()
@@ -1911,6 +2103,7 @@ onMounted(async () => {
   onSignalR('WhatsAppAttentionChanged', handleAttentionChanged)
   onSignalR('WhatsAppConversationRoutingChanged', handleConversationRoutingChanged)
   onSignalR('WhatsAppInboxChanged', scheduleInboxLabelsRefresh)
+  onSignalR('WhatsAppInboxLabelCatalogChanged', refreshInboxLabelCatalog)
   onSignalR('WhatsAppAiProcessingChanged', handleAiProcessingChanged)
   await retryWhatsAppStatus()
   startRealtimeFallback()
@@ -1928,6 +2121,7 @@ onBeforeUnmount(() => {
   offSignalR('WhatsAppAttentionChanged', handleAttentionChanged)
   offSignalR('WhatsAppConversationRoutingChanged', handleConversationRoutingChanged)
   offSignalR('WhatsAppInboxChanged', scheduleInboxLabelsRefresh)
+  offSignalR('WhatsAppInboxLabelCatalogChanged', refreshInboxLabelCatalog)
   offSignalR('WhatsAppAiProcessingChanged', handleAiProcessingChanged)
   stopAiDiagnosticsPolling()
   stopRealtimeFallback()
@@ -1941,6 +2135,12 @@ watch(inboxScope, () => {
 }, { flush: 'sync' })
 
 watch(sessionKey, () => {
+  showClosedDayReplies.value = false
+  showQuickRepliesModal.value = false
+  showInboxLabelManager.value = false
+  showInboxLabelEditor.value = false
+  savingInboxLabel.value = false
+  changingInboxLabel.value = false
   inboxTotalsRefresh.cancel()
   inboxLabelsRefresh.cancel()
   inboxCounts.value = null
@@ -2029,6 +2229,34 @@ watch(() => selectedConversation.value?.id, id => {
 </script>
 
 <style scoped>
+.chat-header { container: whatsapp-header / inline-size; }
+.chat-tool {
+  display: inline-flex; align-items: center; gap: .25rem; height: 1.75rem; padding: 0 .375rem;
+  cursor: pointer; list-style: none; white-space: nowrap; border: 1px solid var(--color-gray-200);
+  border-radius: .5rem; font-size: .75rem; font-weight: 500; color: var(--color-gray-700);
+}
+.chat-tool:hover { background: var(--color-gray-50); }
+.chat-tool:focus-visible { outline: 2px solid var(--color-emerald-600); outline-offset: 1px; }
+.chat-tool::-webkit-details-marker { display: none; }
+.chat-action-icon, .chat-label-chip { display: none; }
+.chat-header :deep(.chat-order-toggle) { width: 1.75rem; height: 1.75rem; }
+@container whatsapp-header (max-width: 46rem) {
+  .chat-header :deep(.chat-save-label) {
+    position: absolute; clip-path: inset(50%); width: 1px; height: 1px; overflow: hidden;
+  }
+}
+@container whatsapp-header (min-width: 46rem) {
+  .chat-label-chip { display: inline-flex; }
+  .chat-label-count { display: none; }
+}
+@container whatsapp-header (max-width: 35rem) {
+  .chat-action-label { display: none; }
+  .chat-action-icon { display: inline-block; }
+  .chat-header :deep(.chat-take) { width: 1.75rem; height: 1.75rem; padding: 0; }
+  .chat-tool { justify-content: center; min-width: 1.75rem; padding: 0 .25rem; }
+  .chat-menu { position: static; }
+  .chat-menu-panel { right: .5rem; max-width: calc(100% - 1rem); }
+}
 @media (min-width: 1280px) {
   .whatsapp-columns { grid-template-columns: var(--inbox-width) minmax(260px, 1fr); }
   .whatsapp-columns.with-order { grid-template-columns: var(--inbox-width) minmax(260px, 1fr) var(--order-width); }
