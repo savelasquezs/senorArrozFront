@@ -7,11 +7,12 @@ import type { Customer } from '@/types/customer'
 import type { CustomerSuggestion, CustomerSuggestionPage } from '@/services/MainAPI/customerLookupApi'
 
 const mocks = vi.hoisted(() => ({
-    search: vi.fn(), getCustomer: vi.fn(), create: vi.fn(), showError: vi.fn(), success: vi.fn(),
+    search: vi.fn(), getCustomer: vi.fn(), findByPhone: vi.fn(), linkCustomer: vi.fn(), create: vi.fn(), showError: vi.fn(), success: vi.fn(),
     auth: null as unknown as { user: { id: number; role: string; branchId: number; accountType: string } | null },
     branch: null as unknown as { selectedBranchId: number },
 }))
-vi.mock('@/services/MainAPI/customerLookupApi', () => ({ customerLookupApi: { search: mocks.search, getCustomer: mocks.getCustomer } }))
+vi.mock('@/services/MainAPI/customerLookupApi', () => ({ customerLookupApi: { search: mocks.search, getCustomer: mocks.getCustomer, findByPhone: mocks.findByPhone } }))
+vi.mock('@/services/MainAPI/whatsappApi', () => ({ whatsappApi: { linkConversationCustomer: mocks.linkCustomer } }))
 vi.mock('@/store/customers', () => ({ useCustomersStore: () => ({ create: mocks.create }) }))
 vi.mock('@/composables/useToast', () => ({ useToast: () => ({ success: mocks.success, error: mocks.showError }) }))
 vi.mock('@/store/auth', async () => {
@@ -78,6 +79,41 @@ describe('M06-F01 customer lookup', () => {
         pending.resolve(page()); await flushPromises()
         expect(wrapper.text()).toContain('No se encontró cliente')
         expect(wrapper.text()).toContain('Crear Cliente')
+    })
+    it('prefills a WhatsApp customer and links a matching phone from the same form', async () => {
+        const wrapper = shallowMount(CustomerSelector, {
+            props: { branchId: 1, whatsappContact: { id: 44, contactName: 'Ana del chat', whatsAppUsername: '@ana_nueva', attentionRevision: 6 } },
+            global: { stubs: {
+                ...stubs,
+                BaseDialog: { props: ['modelValue'], template: '<div v-if="modelValue" role="dialog"><slot /></div>' },
+                CustomerForm: {
+                    name: 'CustomerForm',
+                    props: ['initialPhone', 'initialUsername', 'initialName', 'hideSubmit'],
+                    template: "<input aria-label='Teléfono nuevo' @input=\"$emit('phone-change', $event.target.value)\"><slot name='phone-match' />",
+                },
+            } },
+        })
+        wrappers.push(wrapper)
+        expect((wrapper.get('input').element as HTMLInputElement).value).toBe('@ana_nueva')
+        vi.advanceTimersByTime(400); await flushPromises()
+        await button(wrapper, 'Crear cliente').trigger('click')
+        await flushPromises()
+        const form = wrapper.findComponent({ name: 'CustomerForm' })
+        expect(form.props('initialName')).toBe('Ana del chat')
+        expect(form.props('initialUsername')).toBe('@ana_nueva')
+        const found = { ...suggestion('Ana existente', 124), active: true, addresses: [{ id: 2 }] }
+        mocks.findByPhone.mockResolvedValue(found)
+        mocks.linkCustomer.mockResolvedValue({ data: { whatsAppUsername: '@ana_nueva' } })
+        await wrapper.get('input[aria-label="Teléfono nuevo"]').setValue('3001234567')
+        vi.advanceTimersByTime(250); await flushPromises()
+        expect(mocks.findByPhone).toHaveBeenCalledExactlyOnceWith('3001234567', expect.any(AbortSignal))
+        expect(form.props('hideSubmit')).toBe(true)
+        await button(wrapper, 'Actualizar usuario y seleccionar').trigger('click')
+        await flushPromises()
+        expect(mocks.linkCustomer).toHaveBeenCalledExactlyOnceWith(44, 124, { phoneNumber: '3001234567', expectedAttentionVersion: 6 })
+        expect(wrapper.emitted('customerSelected')?.[0]?.[0]).toMatchObject({ ...found, whatsAppUsername: '@ana_nueva' })
+        expect(wrapper.find('[role="dialog"]').exists()).toBe(false)
+        expect(mocks.create).not.toHaveBeenCalled()
     })
     it('shows a recoverable error, not an invitation to create a customer', async () => {
         mocks.search.mockRejectedValueOnce(new Error('HTTP failure')).mockResolvedValueOnce(page([suggestion()]))

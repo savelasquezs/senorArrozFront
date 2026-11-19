@@ -310,13 +310,49 @@
                 v-for="message in currentMessages"
                 :key="message.id"
                 :data-message-id="message.id"
-                class="flex"
+                class="group/message flex"
                 :class="message.direction === 'outbound' ? 'justify-end' : 'justify-start'"
               >
                 <div
-                  class="max-w-[78%] rounded-lg px-3 py-2 shadow-sm"
+                  class="relative max-w-[78%] rounded-lg px-3 py-2 shadow-sm"
                   :class="message.direction === 'outbound' ? 'bg-emerald-600 text-white' : 'bg-white border border-gray-200 text-gray-900'"
                 >
+                  <WhatsAppMessageActions v-if="ownsConversation && !finishingAttention && !message.hiddenSource"
+                    class="wa-message-toolbar" :class="message.direction === 'outbound' ? 'right-2' : 'left-2'"
+                    :can-send="canSend && !!message.whatsAppMessageId && message.status !== 'failed'" :open="reactionPickerId === message.id"
+                    :outbound="message.direction === 'outbound'" :busy="messageActionId === message.id" :current-reaction="message.businessReaction"
+                    @reply="startMessageReply(message)" @toggle="reactionPickerId = reactionPickerId === message.id ? null : message.id"
+                    @react="emoji => reactToMessage(message, emoji)" @hide="hideMessage(message)" />
+                  <p v-if="message.hiddenSource" class="text-sm italic opacity-80">
+                    {{ message.hiddenSource === 'pos' ? 'Mensaje oculto en el POS' : 'Mensaje eliminado desde WhatsApp Business' }}
+                  </p>
+                  <template v-else>
+                    <button v-if="message.replyToWhatsAppMessageId" type="button"
+                      class="mb-2 block w-full rounded-md border-l-[3px] border-emerald-300 bg-black/5 px-2 py-1.5 text-left text-xs hover:bg-black/10"
+                      :disabled="!quotedMessage(message)" @click="focusQuotedMessage(message)">
+                      <span class="block font-semibold">{{ quotedMessage(message)?.direction === 'outbound' ? 'Señor Arroz' : 'Mensaje citado' }}</span>
+                      <span class="block truncate opacity-85">{{ messageSummary(quotedMessage(message)) }}</span>
+                    </button>
+                    <a v-if="message.location" :href="mapLink(message.location)" target="_blank" rel="noopener noreferrer"
+                      class="mb-1 flex max-w-xs items-center gap-2.5 rounded-xl border border-current/15 bg-black/5 p-2.5 transition-colors hover:bg-black/10">
+                      <span class="grid size-9 shrink-0 place-items-center rounded-lg bg-emerald-50 text-emerald-700"><MapPinIcon class="h-5 w-5" aria-hidden="true" /></span>
+                      <span class="min-w-0">
+                        <span class="block text-sm font-semibold">{{ message.location.name || 'Ubicación compartida' }}</span>
+                        <span v-if="message.location.address" class="block break-words text-xs opacity-80">{{ message.location.address }}</span>
+                        <span class="block text-xs font-medium underline">Abrir mapa</span>
+                      </span>
+                    </a>
+                    <div v-else-if="message.contacts?.length" class="space-y-1.5">
+                      <div v-for="(contact, index) in message.contacts" :key="index"
+                        class="flex max-w-xs items-start gap-2.5 rounded-xl border border-current/15 bg-black/5 p-2.5">
+                        <UserCircleIcon class="h-8 w-8 shrink-0 opacity-80" aria-hidden="true" />
+                        <div class="min-w-0">
+                          <p class="break-words text-sm font-semibold">{{ contact.name }}</p>
+                          <a v-for="phone in contact.phones" :key="phone" :href="`tel:${phone.replace(/[^+\d]/g, '')}`"
+                            class="block break-all text-xs underline">{{ phone }}</a>
+                        </div>
+                      </div>
+                    </div>
                   <div v-if="message.mediaUrl" class="mb-2">
                     <button
                       v-if="message.type === 'image' || message.type === 'sticker'"
@@ -359,8 +395,8 @@
                       <span v-if="message.mediaFileSize" class="text-xs opacity-80">{{ formatFileSize(message.mediaFileSize) }}</span>
                     </a>
                   </div>
-                  <p v-if="message.textBody" class="whitespace-pre-wrap break-words text-sm">{{ message.textBody }}</p>
-                  <p v-else-if="message.type !== 'text' && !message.mediaUrl" class="text-sm opacity-80">
+                  <p v-if="message.textBody && !message.location && !message.contacts?.length" class="whitespace-pre-wrap break-words text-sm">{{ message.textBody }}</p>
+                  <p v-else-if="message.type !== 'text' && !message.mediaUrl && !message.location && !message.contacts?.length" class="text-sm opacity-80">
                     {{ mediaFallbackLabel(message) }}
                   </p>
                   <div v-if="productSuggestions.get(message.id)?.length" class="mt-2 flex flex-wrap gap-1.5" aria-label="Sugerencias de productos">
@@ -387,12 +423,17 @@
                       </button>
                     </template>
                   </div>
+                  <div v-if="message.customerReaction || message.businessReaction" class="mt-1.5 flex gap-1" aria-label="Reacciones">
+                    <span v-if="message.customerReaction" :key="`customer-${message.customerReaction}`" class="wa-reaction" title="Reacción del cliente">{{ message.customerReaction }}</span>
+                    <span v-if="message.businessReaction" :key="`business-${message.businessReaction}`" class="wa-reaction" title="Reacción de Señor Arroz">{{ message.businessReaction }}</span>
+                  </div>
+                  </template>
                   <div class="mt-1 flex items-center justify-end gap-2 text-[11px]" :class="message.direction === 'outbound' ? 'text-emerald-50' : 'text-gray-400'">
                     <span v-if="message.source === 'businessApp'">Celular · </span><span v-if="message.isHistorical">Historial · </span><span>{{ formatTime(message.timestamp) }}</span>
                     <span v-if="message.direction === 'outbound'">{{ statusLabel(message.status) }}</span>
                   </div>
                   <div
-                    v-if="message.direction === 'inbound' && message.aiProcessing"
+                    v-if="!message.hiddenSource && message.direction === 'inbound' && message.aiProcessing"
                     class="mt-2 flex flex-wrap items-center gap-1.5 rounded-md px-2 py-1.5 text-[11px] font-medium"
                     :class="aiMessageStatusClasses(message.aiProcessing)"
                     role="status"
@@ -438,6 +479,15 @@
                   @click="openQuickRepliesModal">
                   <PlusIcon class="h-4 w-4" aria-hidden="true" />
                 </button>
+              </div>
+              <div v-if="replyTarget" class="mb-2 flex items-center gap-2 rounded-lg border-l-[3px] border-emerald-500 bg-emerald-50 px-2.5 py-1.5 text-xs text-emerald-950">
+                <ArrowUturnLeftIcon class="h-4 w-4 shrink-0 text-emerald-700" aria-hidden="true" />
+                <div class="min-w-0 flex-1">
+                  <span class="block font-semibold">{{ replyTarget.direction === 'outbound' ? 'Señor Arroz' : conversationTitle(selectedConversation) }}</span>
+                  <span class="block truncate">{{ messageSummary(replyTarget) }}</span>
+                </div>
+                <button type="button" class="grid size-7 shrink-0 place-items-center rounded-md hover:bg-emerald-100"
+                  aria-label="Quitar cita" title="Quitar cita" @click="replyTarget = null"><XMarkIcon class="h-4 w-4" aria-hidden="true" /></button>
               </div>
               <div v-if="selectedFile" class="mb-2 flex items-center justify-between gap-3 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-900">
                 <div class="min-w-0">
@@ -773,11 +823,13 @@ import { useResizableColumns } from '@/composables/useResizableColumns'
 import { commercialGroup, commercialLabel, fixedInboxLabelStyles, inboxLabelColor, inboxLabelPalette } from '@/utils/whatsappInbox'
 
 import WhatsAppOrderPanel from '@/components/whatsapp/WhatsAppOrderPanel.vue'
+import WhatsAppMessageActions from '@/components/whatsapp/WhatsAppMessageActions.vue'
 import type { WhatsAppCommercialDraft } from '@/types/whatsapp'
 
 import { computed, defineAsyncComponent, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
+  ArrowUturnLeftIcon,
   ChatBubbleLeftRightIcon,
   ChatBubbleOvalLeftEllipsisIcon,
   ChevronDoubleLeftIcon,
@@ -792,11 +844,13 @@ import {
   ExclamationTriangleIcon,
   FunnelIcon,
   InformationCircleIcon,
+  MapPinIcon,
   MoonIcon,
   PaperClipIcon,
   PaperAirplaneIcon,
   PlusIcon,
   TagIcon,
+  UserCircleIcon,
   UserPlusIcon,
   WrenchScrewdriverIcon,
   XMarkIcon,
@@ -926,6 +980,8 @@ const { draft, selectedFile, clearSent } = useWhatsAppComposer(computed(() => se
 const messageInput = ref<HTMLTextAreaElement | null>(null)
 const fileInput = ref<HTMLInputElement | null>(null)
 const sending = ref(false)
+const replyTarget = ref<WhatsAppMessage | null>(null)
+const reactionPickerId = ref<number | null>(null), messageActionId = ref<number | null>(null)
 const sendingMenu = ref(false)
 const changingAttention = ref(false)
 const changingOperationalBranch = ref(false)
@@ -1510,7 +1566,7 @@ const topQuickReplies = computed(() => activeQuickRepliesForConversation.value.s
 
 const filteredQuickReplies = computed(() => {
   const value = draft.value.trim()
-  if (!value.startsWith('/') || /\s/.test(value) || selectedFile.value) return []
+  if (replyTarget.value || !value.startsWith('/') || /\s/.test(value) || selectedFile.value) return []
   const query = normalizeQuickReplyShortcut(value)
   const matches = [
     ...catalogQuickReplies.value.map(group => ({
@@ -1825,6 +1881,11 @@ function conversationMatchesCurrentFilters(conversation: WhatsAppConversation, l
 
 async function handleRealtimeMessage(payload: WhatsAppRealtimeMessagePayload) {
   if (!payload?.conversation?.id || !payload?.message?.id) return
+  if (payload.message.isUpdate) {
+    whatsappStore.applyRealtimeMessage(payload)
+    if (payload.message.hiddenSource && replyTarget.value?.id === payload.message.id) replyTarget.value = null
+    return
+  }
   inboxTotalsRefresh.schedule()
 
   const activeConversationId = selectedConversation.value?.id ?? null
@@ -2121,11 +2182,70 @@ async function sendProductOptions(groupId: number, group?: WhatsAppProductChoice
   }
 }
 
+function quotedMessage(message: WhatsAppMessage) {
+  return currentMessages.value.find(item => item.whatsAppMessageId === message.replyToWhatsAppMessageId)
+}
+
+function focusQuotedMessage(message: WhatsAppMessage) {
+  const quoted = quotedMessage(message)
+  if (quoted) messagesContainer.value?.querySelector(`[data-message-id="${quoted.id}"]`)?.scrollIntoView({ block: 'center' })
+}
+
+function messageSummary(message?: WhatsAppMessage | null) {
+  if (!message) return 'Mensaje anterior'
+  if (message.hiddenSource) return 'Mensaje oculto'
+  return message.location?.name || message.contacts?.[0]?.name || message.textBody.trim()
+    || message.mediaFileName || mediaFallbackLabel(message)
+}
+
+function mapLink(location: NonNullable<WhatsAppMessage['location']>) {
+  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${location.latitude},${location.longitude}`)}`
+}
+
+function startMessageReply(message: WhatsAppMessage) {
+  if (!canSend.value || !message.whatsAppMessageId || message.hiddenSource || selectedConversation.value?.id !== message.conversationId) return
+  replyTarget.value = message
+  reactionPickerId.value = null
+  void nextTick(() => messageInput.value?.focus())
+}
+
+async function reactToMessage(message: WhatsAppMessage, emoji: string) {
+  if (!canSend.value || messageActionId.value !== null || selectedConversation.value?.id !== message.conversationId) return
+  messageActionId.value = message.id
+  try {
+    const result = await whatsappApi.reactToMessage(message.conversationId, message.id, emoji)
+    if (result.data) whatsappStore.applyMessageUpdate(result.data)
+    if (reactionPickerId.value === message.id) reactionPickerId.value = null
+  } catch (cause) {
+    showError('Reacción', cause instanceof Error ? cause.message : 'No se pudo enviar la reacción.')
+  } finally { messageActionId.value = null }
+}
+
+async function hideMessage(message: WhatsAppMessage) {
+  if (!ownsConversation.value || messageActionId.value !== null || selectedConversation.value?.id !== message.conversationId) return
+  messageActionId.value = message.id
+  try {
+    const confirmed = await confirmDialog({
+      title: 'Ocultar en el POS',
+      message: 'El contenido quedará oculto para el equipo en esta conversación de POS.',
+      confirmLabel: 'Ocultar mensaje',
+      tone: 'warning',
+    })
+    if (!confirmed || !viewActive || !ownsConversation.value || selectedConversation.value?.id !== message.conversationId) return
+    const result = await whatsappApi.hideMessage(message.conversationId, message.id)
+    if (result.data) whatsappStore.applyMessageUpdate(result.data)
+    if (replyTarget.value?.id === message.id) replyTarget.value = null
+    if (reactionPickerId.value === message.id) reactionPickerId.value = null
+  } catch (cause) {
+    showError('Ocultar mensaje', cause instanceof Error ? cause.message : 'No se pudo ocultar el mensaje.')
+  } finally { messageActionId.value = null }
+}
+
 async function sendMessage() {
   if (!canSend.value || sending.value || sendingProductChoices.value || preparingQuickReply.value) return
   if (!selectedConversation.value || (!draft.value.trim() && !selectedFile.value)) return
   const textToSend = draft.value.trim()
-  if (!selectedFile.value && textToSend.startsWith('/') && !/\s/.test(textToSend)) {
+  if (!replyTarget.value && !selectedFile.value && textToSend.startsWith('/') && !/\s/.test(textToSend)) {
     const conversationId = selectedConversation.value.id
     await productChoicesRequest?.promise.catch(() => {})
     if (selectedConversation.value?.id !== conversationId || draft.value.trim() !== textToSend || !canSend.value) return
@@ -2150,8 +2270,11 @@ async function sendMessage() {
     sending.value = true
     sendError.value = ''
     const text = draft.value.trim(), conversationId = selectedConversation.value.id, file = selectedFile.value
-    if (file) await whatsappStore.sendMediaMessage(conversationId, file, text)
-    else await whatsappStore.sendMessage(conversationId, text)
+    const target = replyTarget.value
+    const replyId = target?.conversationId === conversationId ? target.id : undefined
+    if (file) await whatsappStore.sendMediaMessage(conversationId, file, text, replyId)
+    else await whatsappStore.sendMessage(conversationId, text, replyId)
+    if (replyTarget.value === target) replyTarget.value = null
     clearSent(conversationId, text, file)
     await scrollToBottom()
   } catch (error: any) {
@@ -2375,6 +2498,8 @@ function mediaFallbackLabel(message: WhatsAppMessage) {
     video: 'Video sin vista previa',
     document: message.mediaFileName || 'Documento sin vista previa',
     sticker: 'Sticker sin vista previa',
+    location: 'Ubicación compartida',
+    contacts: 'Contacto compartido',
   }
   return labels[message.type] || 'Archivo sin vista previa'
 }
@@ -2507,6 +2632,8 @@ const loadSelectedAdvisors = useDebouncedCallback(async () => {
   } catch {}
 }, 200)
 watch(() => selectedConversation.value?.id, id => {
+  replyTarget.value = null
+  reactionPickerId.value = null
   showProductChoices.value = false
   advisors.value = []; transferTarget.value = 0
   loadSelectedAdvisors.cancel()
@@ -2515,6 +2642,39 @@ watch(() => selectedConversation.value?.id, id => {
 </script>
 
 <style scoped>
+.wa-message-toolbar {
+  position: absolute;
+  z-index: 5;
+  top: -.9rem;
+  transition: opacity 140ms ease;
+}
+@media (hover: hover) and (pointer: fine) {
+  .wa-message-toolbar { opacity: 0; pointer-events: none; }
+  .group\/message:hover .wa-message-toolbar, .wa-message-toolbar:focus-within, .wa-message-toolbar.is-open {
+    opacity: 1;
+    pointer-events: auto;
+  }
+}
+.wa-reaction {
+  display: inline-grid;
+  place-items: center;
+  min-width: 1.65rem;
+  min-height: 1.45rem;
+  border: 1px solid var(--color-emerald-100);
+  border-radius: .625rem;
+  background: white;
+  padding: 0 .25rem;
+  font-size: .9rem;
+  animation: wa-reaction-in 180ms ease both;
+}
+@keyframes wa-reaction-in {
+  from { transform: scale(.75); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .wa-reaction { animation: none; }
+  .wa-message-toolbar { transition: none; }
+}
 .inbox-control {
   display: flex; align-items: center; gap: .375rem; min-height: 2.25rem; padding: .375rem .5rem;
   border: 1px solid var(--color-slate-200); border-radius: .625rem; cursor: pointer;
