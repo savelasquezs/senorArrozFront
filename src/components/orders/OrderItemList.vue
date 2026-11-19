@@ -309,11 +309,11 @@ defineExpose({ buildOrderSummary, copyOrderSummaryToClipboard })
     display: flex;
     justify-content: flex-end;
     padding-top: 0.25rem;
-    border-top: 1px solid #f3f4f6;
+    border-top: 1px solid var(--wa-line, #f3f4f6);
 }
 
 .totals-summary {
-    background-color: #f9fafb;
+    background-color: var(--wa-raised, #f9fafb);
     border-radius: 0.5rem;
     padding: 0.5rem 0.625rem;
     display: flex;
@@ -328,7 +328,7 @@ defineExpose({ buildOrderSummary, copyOrderSummaryToClipboard })
 }
 
 .total-line {
-    border-top: 1px solid #e5e7eb;
+    border-top: 1px solid var(--wa-line, #e5e7eb);
     padding-top: 0.25rem;
     margin-top: 0.25rem;
 }

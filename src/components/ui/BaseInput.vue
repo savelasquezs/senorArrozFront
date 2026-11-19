@@ -8,7 +8,10 @@
 
 		<!-- Input wrapper -->
 		<div class="relative">
-			<input :id="inputId" :type="type" v-model="inputValue" :placeholder="placeholder" :required="required" :aria-label="ariaLabel"
+			<BaseTimePicker v-if="type === 'time' || type === 'datetime-local'" v-model="inputValue"
+				:input-id="inputId" :label="ariaLabel || label" :placeholder="placeholder" :required="required" :disabled="disabled"
+				:invalid="!!error" :with-date="type === 'datetime-local'" :compact="size === 'sm'" />
+			<input v-else :id="inputId" :type="type" v-model="inputValue" :placeholder="placeholder" :required="required" :aria-label="ariaLabel"
 				:disabled="disabled" :class="inputClasses" @blur="onBlur" @focus="onFocus" :minlength="minlength"
 				:maxlength="maxlength" :min="min" :max="max" :step="step" @keyup.enter="onEnter" />
 			<div v-if="$slots.icon"
@@ -33,6 +36,7 @@
 
 <script setup lang="ts">
 import { computed, useSlots, useId } from 'vue'
+import BaseTimePicker from './BaseTimePicker.vue'
 
 interface Props {
 	// Aceptamos string | number | null para modelValue

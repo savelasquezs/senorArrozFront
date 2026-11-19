@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { computed, ref, watch } from 'vue'
 import { useAuthStore } from '@/store/auth'
 import { whatsappApi } from '@/services/MainAPI/whatsappApi'
+import { compareWhatsAppConversationActivity } from '@/utils/whatsappInbox'
 import type {
   WhatsAppConversation,
   WhatsAppConversationFilters,
@@ -229,7 +230,7 @@ export const useWhatsAppStore = defineStore('whatsapp', () => {
         const pageItem = byId.get(current.id)
         if (messageRevisions.get(current.id) === revisions.get(current.id)
           && (!pageItem || (pageItem.attentionRevision ?? 0) >= (current.attentionRevision ?? 0))) continue
-        if (selectedFilters?.label && !pageItem) continue
+        if ((selectedFilters?.label || selectedFilters?.search) && !pageItem) continue
         byId.set(current.id, pageItem?.labels ? { ...current, labels: pageItem.labels } : current)
       }
       conversations.value = [...byId.values()]
@@ -662,12 +663,14 @@ export const useWhatsAppStore = defineStore('whatsapp', () => {
     const thread = messages.value[message.conversationId]
     const current = thread?.find(item => item.id === message.id)
     if (current?.hiddenSource && !message.hiddenSource) return
+    if (current?.editedAt && message.editedAt && Date.parse(current.editedAt) > Date.parse(message.editedAt)) return
     if (current) upsertMessage(message.conversationId, message)
-    if (!message.hiddenSource) return
+    if (!message.hiddenSource && !message.editedAt) return
     const row = conversations.value.find(item => item.id === message.conversationId)
     if (row && row.lastMessageAt === message.timestamp && (!thread?.length || thread[thread.length - 1]?.id === message.id))
       row.lastMessagePreview = latestConversation?.lastMessagePreview
-        ?? (message.hiddenSource === 'pos' ? 'Mensaje oculto en el POS' : 'Mensaje eliminado desde WhatsApp Business')
+        ?? (message.hiddenSource === 'pos' ? 'Mensaje oculto en el POS'
+          : message.hiddenSource ? 'Mensaje eliminado desde WhatsApp Business' : message.textBody)
   }
 
   function applyRealtimeMessage(payload: WhatsAppRealtimeMessagePayload, activeConversationId?: number | null) {
@@ -695,12 +698,8 @@ export const useWhatsAppStore = defineStore('whatsapp', () => {
       conversations.value = [incomingConversation, ...conversations.value]
     }
 
+    conversations.value = [...conversations.value].sort(compareWhatsAppConversationActivity)
     boundConversations()
-    conversations.value = [...conversations.value].sort(
-      (a, b) =>
-        new Date(b.lastMessageAt ?? b.updatedAt ?? b.createdAt).getTime()
-        - new Date(a.lastMessageAt ?? a.updatedAt ?? a.createdAt).getTime(),
-    )
 
     upsertMessage(incomingMessage.conversationId, incomingMessage)
 

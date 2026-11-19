@@ -1,6 +1,6 @@
 <template>
   <div class="flex min-h-0 flex-1 flex-col">
-    <div class="shrink-0 border-b border-gray-100 bg-white px-1">
+    <div v-if="!searchAll" class="shrink-0 border-b border-gray-100 bg-white px-1">
       <div class="flex flex-wrap" role="tablist" aria-label="Bandejas de WhatsApp">
         <button
           v-for="tab in tabs"
@@ -27,14 +27,15 @@
         </button>
       </div>
     </div>
+    <p v-else class="border-b border-gray-200 px-2.5 py-1.5 text-xs font-semibold text-gray-600">Resultados de todas las bandejas</p>
 
     <div class="min-h-0 flex-1 overflow-y-auto">
-      <slot :conversations="activeTab?.conversations ?? []" :active-key="activeKey" />
+      <slot :conversations="visibleConversations" :active-key="activeKey" />
       <div
-        v-if="!loading && (activeTab?.conversations.length ?? 0) === 0"
+        v-if="!loading && visibleConversations.length === 0"
         class="p-6 text-center text-sm text-gray-500"
       >
-        No hay conversaciones en esta bandeja.
+        {{ searchAll ? 'No hay conversaciones que coincidan.' : 'No hay conversaciones en esta bandeja.' }}
       </div>
     </div>
   </div>
@@ -42,12 +43,12 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
-import type { WhatsAppInboxSection } from '@/utils/whatsappInbox'
+import { compareWhatsAppConversationActivity, type WhatsAppInboxSection } from '@/utils/whatsappInbox'
 import type { WhatsAppInboxKey, WhatsAppInboxSummary } from '@/types/whatsapp'
 const props = withDefaults(defineProps<{
   sections: WhatsAppInboxSection[]; modelValue?: WhatsAppInboxKey;
   counts?: WhatsAppInboxSummary | null;
-  selectedConversationId?: number | null; loading?: boolean; isSuperadmin?: boolean
+  selectedConversationId?: number | null; loading?: boolean; isSuperadmin?: boolean; searchAll?: boolean
 }>(), { modelValue: 'free', loading: false })
 const emit = defineEmits<{ 'update:modelValue': [value: WhatsAppInboxKey] }>()
 const activeKey = computed(() => props.modelValue)
@@ -56,6 +57,9 @@ const tabs = computed(() => props.sections.map(section => ({ ...section,
   unreadConversations: props.counts?.[section.key]?.unreadConversations ?? 0,
 })))
 const activeTab = computed(() => tabs.value.find(tab => tab.key === activeKey.value))
+const visibleConversations = computed(() => props.searchAll
+  ? props.sections.flatMap(section => section.conversations).sort(compareWhatsAppConversationActivity)
+  : activeTab.value?.conversations ?? [])
 function selectTab(key: WhatsAppInboxKey) { emit('update:modelValue', key) }
 </script>
 

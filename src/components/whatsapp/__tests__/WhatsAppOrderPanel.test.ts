@@ -13,8 +13,9 @@ import { UserRole } from '@/types/auth'
 
 const api = vi.hoisted(() => ({
   getCommercialDraft: vi.fn(), startCommercialDraft: vi.fn(), saveCommercialDraft: vi.fn(),
-  commercialDraftAction: vi.fn(),
+  commercialDraftAction: vi.fn(), getCommercialHistory: vi.fn(),
 }))
+const details = vi.hoisted(() => ({ fetchById: vi.fn(), current: null as { id: number } | null }))
 const customer = vi.hoisted(() => ({ getCustomerById: vi.fn(), getCustomerAddresses: vi.fn() }))
 vi.mock('@/services/MainAPI/whatsappApi', () => ({ whatsappApi: api }))
 vi.mock('@/services/MainAPI/customerApi', () => ({ customerApi: customer }))
@@ -22,6 +23,7 @@ vi.mock('@/store/banks', () => ({ useBanksStore: () => ({ ensureListLoaded: vi.f
 vi.mock('@/store/apps', () => ({ useAppsStore: () => ({ ensureListLoaded: vi.fn(), options: [] }) }))
 vi.mock('@/store/branchPosSettings', () => ({ useBranchPosSettingsStore: () => ({ ensureForBranch: vi.fn(), maxFreeDeliveryDiscount: 0 }) }))
 vi.mock('@/store/products', () => ({ useProductsStore: () => ({ ensureCatalogLoaded: vi.fn(), catalogProducts: [] }) }))
+vi.mock('@/store/ordersData', () => ({ useOrdersDataStore: () => details }))
 
 const Editor = defineComponent({ setup() {
   editor = useOrderEditorStore()
@@ -53,6 +55,9 @@ beforeEach(() => {
   shared = session()
   api.getCommercialDraft.mockImplementation(async () => ({ data: shared }))
   api.saveCommercialDraft.mockResolvedValue({ data: { ...shared, version: 4 } })
+  api.getCommercialHistory.mockResolvedValue({ data: [] })
+  details.current = null
+  details.fetchById.mockImplementation(async (id: number) => { details.current = { id } })
   api.commercialDraftAction.mockImplementation(async (_id, action) => {
     shared = { ...shared, status: 'completed', orderId: 501, confirmationStatus: action === 'retry-message' ? 'sent' : null }
     return { data: shared }
@@ -70,7 +75,7 @@ async function panel(overrides: Partial<WhatsAppConversation> = {}) {
       conversation: { id: 44, branchId: 9, isCentralChannel: true, operationalBranchId: 2,
         attentionMode: 'human', assignedUserId: 7, attentionRevision: 6, ...overrides } as WhatsAppConversation,
     },
-    global: { plugins: [pinia], stubs: { OrderSidebar: Editor, BaseDialog: Dialog } },
+    global: { plugins: [pinia], stubs: { OrderSidebar: Editor, BaseDialog: Dialog, OrderDetailContent: true } },
   })
   wrapper = mounted
   await flushPromises()
@@ -114,6 +119,33 @@ it('blocks the editor for an observer', async () => {
   await panel({ assignedUserId: 8 })
   expect(wrapper!.get('fieldset').attributes('disabled')).toBeDefined()
   expect(api.commercialDraftAction).not.toHaveBeenCalled()
+})
+
+it('opens a previous order and discards only the active attempt when explicitly confirmed', async () => {
+  api.getCommercialHistory.mockResolvedValue({ data: [
+    { id: 81, orderId: null, createdAt: '2026-11-19T12:00:00Z' },
+    { id: 80, orderId: 501, createdAt: '2026-11-18T12:00:00Z' },
+  ] })
+  api.commercialDraftAction.mockResolvedValue({ data: { ...shared, status: 'cancelled', commercialStatus: 'no_sale', version: 4 } })
+  const view = await panel()
+  const row = view.get('.order-history details')
+  ;(row.element as HTMLDetailsElement).open = true
+  await row.trigger('toggle')
+  await flushPromises()
+  await row.get('li button').trigger('click')
+  await flushPromises()
+  expect(details.fetchById).toHaveBeenCalledExactlyOnceWith(501)
+  expect(editor.currentOrder?.orderItems[0]?.quantity).toBe(2)
+  expect(api.commercialDraftAction).not.toHaveBeenCalled()
+
+  await click('Descartar borrador')
+  await view.findAll('[role="dialog"] button').find(button => button.text() === 'Descartar borrador')!.trigger('click')
+  await flushPromises()
+  expect(api.commercialDraftAction).toHaveBeenCalledExactlyOnceWith(44, 'cancel', {
+    sessionId: 81, expectedVersion: 3, attentionVersion: 6, note: undefined,
+  })
+  expect(view.find('fieldset').exists()).toBe(false)
+  expect(view.text()).toContain('Pedido #501')
 })
 
 it('opens a legacy first draft automatically only for the person attending', async () => {

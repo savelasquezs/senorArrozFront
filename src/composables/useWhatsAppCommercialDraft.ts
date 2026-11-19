@@ -436,10 +436,19 @@ export function useWhatsAppCommercialDraft(conversation: Ref<WhatsAppConversatio
 
   async function action(name: 'cancel' | 'note' | 'retry-message', note?: string) {
     if (syncing.value) throw new Error('Espera a que termine de actualizarse el pedido.')
-    await flush()
+    if (name === 'cancel') {
+      clearTimeout(timer)
+      if (pendingSave) await pendingSave.catch(() => {})
+      clearTimeout(timer)
+    } else {
+      await flush()
+    }
     const result = await whatsappApi.commercialDraftAction(conversationId, name, { ...versions(), note })
-    session.value = result.data!
-    if (name === 'cancel') commercialStatus.value = 'no_sale'
+    if (name === 'cancel') {
+      if (!disposed && auth.user?.id === userId) await apply(result.data!)
+    } else {
+      session.value = result.data!
+    }
   }
 
   async function sendAddressChoices() {

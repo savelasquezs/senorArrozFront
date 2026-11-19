@@ -219,8 +219,8 @@ watch(() => props.item.discount, () => {
 
 <style scoped>
 .order-item-compact {
-    background-color: white;
-    border: 1px solid #e5e7eb;
+    background-color: var(--wa-panel, white);
+    border: 1px solid var(--wa-line, #e5e7eb);
     border-radius: 0.5rem;
     padding: 0.5rem 0.625rem;
     transition: all 0.2s;
@@ -228,7 +228,7 @@ watch(() => props.item.discount, () => {
 
 .order-item-compact:hover {
     box-shadow: 0 2px 4px 0 rgb(0 0 0 / 0.05);
-    border-color: #d1d5db;
+    border-color: var(--wa-input-line, #d1d5db);
 }
 
 .product-name {

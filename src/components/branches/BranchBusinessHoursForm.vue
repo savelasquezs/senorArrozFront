@@ -20,10 +20,10 @@
           </div>
           <div class="flex flex-col gap-3 sm:flex-row sm:items-end">
             <label class="text-xs font-medium text-gray-700">Apertura
-              <input v-model="bulkOpenTime" type="time" class="mt-1 block rounded-lg border-gray-300 bg-white text-sm focus:border-emerald-500 focus:ring-emerald-500" />
+              <BaseTimePicker v-model="bulkOpenTime" label="Apertura" class="mt-1" />
             </label>
             <label class="text-xs font-medium text-gray-700">Cierre
-              <input v-model="bulkCloseTime" type="time" class="mt-1 block rounded-lg border-gray-300 bg-white text-sm focus:border-emerald-500 focus:ring-emerald-500" />
+              <BaseTimePicker v-model="bulkCloseTime" label="Cierre" class="mt-1" />
             </label>
             <BaseButton variant="outline" :icon="ArrowPathIcon" @click="applyToAll">Aplicar a todos</BaseButton>
           </div>
@@ -45,8 +45,8 @@
           <button type="button" class="relative inline-flex w-28 items-center rounded-full px-2 py-1 text-xs font-medium transition-colors" :class="hour.isClosed ? 'bg-gray-200 text-gray-700' : 'bg-emerald-100 text-emerald-700'" @click="toggleClosed(hour)">
             <span class="mr-2 h-3 w-3 rounded-full" :class="hour.isClosed ? 'bg-gray-500' : 'bg-emerald-500'" />{{ hour.isClosed ? 'Cerrado' : 'Abierto' }}
           </button>
-          <label class="text-xs font-medium text-gray-500"><span class="md:hidden">Apertura</span><input v-model="hour.openTime" type="time" :disabled="hour.isClosed" class="mt-1 block w-full rounded-lg border-gray-300 bg-white text-sm text-gray-900 disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-400 md:mt-0" /></label>
-          <label class="text-xs font-medium text-gray-500"><span class="md:hidden">Cierre</span><input v-model="hour.closeTime" type="time" :disabled="hour.isClosed" class="mt-1 block w-full rounded-lg border-gray-300 bg-white text-sm text-gray-900 disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-400 md:mt-0" /></label>
+          <label class="text-xs font-medium text-gray-500"><span class="md:hidden">Apertura</span><BaseTimePicker :model-value="hour.openTime ?? ''" :label="`Apertura del ${dayLabel(hour.dayOfWeek)}`" :disabled="hour.isClosed" @update:model-value="hour.openTime = $event || null" /></label>
+          <label class="text-xs font-medium text-gray-500"><span class="md:hidden">Cierre</span><BaseTimePicker :model-value="hour.closeTime ?? ''" :label="`Cierre del ${dayLabel(hour.dayOfWeek)}`" :disabled="hour.isClosed" @update:model-value="hour.closeTime = $event || null" /></label>
         </div>
       </div>
 
@@ -61,6 +61,7 @@ import { computed, onMounted, ref } from 'vue'
 import { ArrowPathIcon, CalendarDaysIcon, CheckIcon, ClockIcon } from '@heroicons/vue/24/outline'
 import BaseCard from '@/components/ui/BaseCard.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
+import BaseTimePicker from '@/components/ui/BaseTimePicker.vue'
 import { branchBusinessHoursApi, type BranchBusinessHour } from '@/services/MainAPI/branchBusinessHoursApi'
 
 const props=defineProps<{branchId:number}>()

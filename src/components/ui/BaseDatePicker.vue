@@ -8,6 +8,7 @@
 			:max-date="maxDate"
 			:min-date="minDate"
 			:time-config="{ enableTimePicker: false }"
+			:dark="theme === 'dark'"
 			:formats="{ input: format }"
 			:auto-apply="autoApply"
 			:input-attrs="{ clearable, id: inputId }"
@@ -29,9 +30,11 @@ import { VueDatePicker, type FloatingConfig } from '@vuepic/vue-datepicker'
 import { es } from 'date-fns/locale'
 import '@vuepic/vue-datepicker/dist/main.css'
 import { defaultBusinessCalendar } from '@/utils/datetime'
+import { injectWhatsAppTheme } from '@/composables/useWhatsAppTheme'
 
 const esLocale = es
 const inputId = useId()
+const theme = injectWhatsAppTheme()
 
 const props = withDefaults(
 	defineProps<{

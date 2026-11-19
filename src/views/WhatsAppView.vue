@@ -65,7 +65,7 @@
           <div class="wa-inbox-header">
             <h2 class="text-xs font-semibold leading-4">Conversaciones</h2>
             <input v-model="search" type="search" class="wa-inbox-search" aria-label="Buscar conversaciones"
-              placeholder="Buscar teléfono o nombre" @input="onSearchInput" />
+              placeholder="Nombre, teléfono o usuario" @input="onSearchInput" />
             <div class="relative flex flex-wrap gap-1.5">
               <details name="whatsapp-inbox-controls" class="group" @keydown.esc.stop="closeDetailsMenu">
                 <summary class="inbox-control" :class="{ 'border-emerald-300 bg-emerald-50 text-emerald-900': inboxFilterCount }">
@@ -113,13 +113,14 @@
             :sections="inboxSections"
             :counts="inboxCounts"
             :selected-conversation-id="selectedConversation?.id"
-            :loading="whatsappStore.isLoadingConversations"
+            :loading="whatsappStore.isLoadingConversations || (searchTerm !== loadedSearch && !inboxError)"
+            :search-all="!!searchTerm"
             :is-superadmin="authStore.isSuperadmin"
           >
             <template #default="{ conversations }">
               <div
-                v-for="(conversation, conversationIndex) in conversations"
-                v-memo="[...Object.values(conversation), inboxLabelsByKey, selectedLabel, selectedConversation?.id === conversation.id, conversationIndex === 0 || commercialGroup(conversations[conversationIndex - 1]!) !== commercialGroup(conversation), Math.floor(clockNow / 60_000)]"
+                v-for="conversation in conversations"
+                v-memo="[...Object.values(conversation), inboxLabelsByKey, selectedLabel, selectedConversation?.id === conversation.id, !!searchTerm, authStore.user?.id, Math.floor(clockNow / 60_000)]"
                 :key="conversation.id"
                 class="wa-conversation"
                 :class="{ 'wa-conversation-selected': selectedConversation?.id === conversation.id, 'wa-conversation-waiting': conversation.attentionMode === 'waitingForHuman' }"
@@ -130,9 +131,12 @@
                   :aria-label="`Abrir chat con ${conversationTitle(conversation)} (${conversationIdentityLabel(conversation)})`"
                   @click="selectConversation(conversation)"
                 />
-                <p v-if="conversationIndex === 0 || commercialGroup(conversations[conversationIndex - 1]!) !== commercialGroup(conversation)" class="mb-2 text-[10px] font-semibold uppercase tracking-wide text-gray-500">{{ commercialGroup(conversation) }}</p>
                 <div class="wa-conversation-top">
-                  <span class="truncate text-xs font-semibold" :title="conversationIdentityLabel(conversation)">{{ conversationTitle(conversation) }}</span>
+                  <div class="flex min-w-0 items-center gap-1.5">
+                    <WhatsAppContactAvatar :name="conversationTitle(conversation)" :url="conversation.profilePhotoUrl"
+                      @open="url => openContactPhoto(conversation, url)" />
+                    <span class="truncate text-xs font-semibold" :title="conversationIdentityLabel(conversation)">{{ conversationTitle(conversation) }}</span>
+                  </div>
                   <div v-if="conversation.labels?.length" class="wa-conversation-tags" data-test="inbox-conversation-labels">
                     <button v-for="key in conversation.labels.slice(0, 2)" :key="key" type="button" class="wa-tag"
                       :class="inboxLabelColor(key, inboxLabelsByKey.get(key)?.color)"
@@ -164,12 +168,13 @@
                 </div>
                 <div class="mt-1 flex items-center justify-between gap-2">
                   <span class="rounded-full px-2 py-0.5 text-[10px] font-semibold" :class="attentionBadgeClass(conversation.attentionMode)" :title="attentionTooltip(conversation)">{{ attentionLabel(conversation) }}</span>
-                  <span class="min-w-0 truncate text-[10px] font-medium text-gray-500">{{ commercialLabel(conversation) }} · {{ whatsappConversationBranchLabel(conversation) }}</span>
+                  <span v-if="searchTerm" class="wa-inbox-source">{{ whatsappInboxLabels[whatsappConversationInbox(conversation, authStore.user?.id)] }}</span>
+                  <span class="min-w-0 truncate text-[10px] font-medium text-gray-500" :title="commercialGroup(conversation)">{{ commercialLabel(conversation) }} · {{ whatsappConversationBranchLabel(conversation) }}</span>
                 </div>
               </div>
             </template>
           </WhatsAppInboxTabs>
-          <div v-if="whatsappStore.hasMoreConversations || whatsappStore.conversationWindowed" class="flex shrink-0 flex-wrap gap-2 border-t p-2">
+          <div v-if="searchTerm === loadedSearch && (whatsappStore.hasMoreConversations || whatsappStore.conversationWindowed)" class="flex shrink-0 flex-wrap gap-2 border-t p-2">
             <BaseButton v-if="whatsappStore.hasMoreConversations" size="sm" variant="outline" :loading="whatsappStore.isLoadingConversations" @click="loadMoreConversations">Cargar más conversaciones</BaseButton>
             <BaseButton v-if="whatsappStore.conversationWindowed" size="sm" variant="ghost" @click="reloadConversations">Volver al inicio</BaseButton>
           </div>
@@ -179,7 +184,9 @@
           <header v-if="selectedConversation" :key="selectedConversation.id"
             class="chat-header relative z-10 min-w-0 shrink-0 border-b border-gray-200 bg-white px-2 py-1" data-test="whatsapp-chat-header">
             <div class="flex min-h-8 items-center justify-between gap-1.5">
-              <div class="flex min-w-0 flex-1 items-baseline gap-1.5">
+              <div class="flex min-w-0 flex-1 items-center gap-1.5">
+                <WhatsAppContactAvatar class="chat-avatar" :name="conversationTitle(selectedConversation)" :url="selectedConversation.profilePhotoUrl"
+                  @open="url => selectedConversation && openContactPhoto(selectedConversation, url)" />
                 <p class="truncate whitespace-nowrap text-sm font-semibold text-gray-900" :class="{ 'max-w-[55%]': chatIdentity }" :title="conversationTitle(selectedConversation)">
                   {{ conversationTitle(selectedConversation) }}
                 </p>
@@ -308,10 +315,14 @@
                 v-for="(message, messageIndex) in currentMessages"
                 :key="message.id"
                 :data-message-id="message.id"
-                class="flex"
+                class="wa-message-row flex"
                 :class="message.direction === 'outbound' ? 'justify-end' : 'justify-start'"
               >
                 <div class="wa-message-stack" :class="{ 'wa-outbound': message.direction === 'outbound' }">
+                  <BaseTooltip v-if="!message.hiddenSource && message.direction === 'inbound' && message.aiProcessing"
+                    class="wa-ai-message-marker" :data-tone="aiProcessingTone(message.aiProcessing)" :icon="CpuChipIcon" compact
+                    :label="message.aiProcessing.title || aiValueLabel(message.aiProcessing.status)"
+                    :text="aiMessageTooltip(message.aiProcessing)" />
                   <div class="wa-bubble" :class="{ 'wa-bubble-tail': endsMessageGroup(message, currentMessages[messageIndex + 1]) }">
                     <WhatsAppMessageActions v-if="ownsConversation && !finishingAttention && !message.hiddenSource"
                       :can-send="canSend && !!message.whatsAppMessageId && message.status !== 'failed'" :open="reactionPickerId === message.id"
@@ -394,6 +405,7 @@
                       <span v-else-if="message.type !== 'text' && !message.mediaUrl && !message.location && !message.contacts?.length" class="opacity-80">{{ mediaFallbackLabel(message) }}</span>
                       <span class="wa-message-meta">
                         <span v-if="message.source === 'businessApp'">Celular ·</span><span v-if="message.isHistorical">Historial ·</span>
+                        <span v-if="message.editedAt && !message.hiddenSource">Editado ·</span>
                         <time :datetime="message.timestamp">{{ formatTime(message.timestamp) }}</time>
                         <template v-if="message.direction === 'outbound'">
                           <ExclamationCircleIcon v-if="message.status === 'failed'" class="size-3 text-red-700" role="img" :aria-label="statusLabel(message.status)" />
@@ -407,19 +419,6 @@
                     <div v-if="!message.hiddenSource && (message.customerReaction || message.businessReaction)" class="wa-reactions" aria-label="Reacciones">
                       <span v-if="message.customerReaction" :key="`customer-${message.customerReaction}`" class="wa-reaction" title="Reacción del cliente">{{ message.customerReaction }}</span>
                       <span v-if="message.businessReaction" :key="`business-${message.businessReaction}`" class="wa-reaction" title="Reacción de Señor Arroz">{{ message.businessReaction }}</span>
-                    </div>
-                    <div
-                      v-if="!message.hiddenSource && message.direction === 'inbound' && message.aiProcessing"
-                      class="mt-1 flex flex-wrap items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] font-medium"
-                      :class="aiMessageStatusClasses(message.aiProcessing)"
-                      role="status"
-                      :title="aiProcessingReason(message.aiProcessing)"
-                    >
-                      <CpuChipIcon class="size-3 shrink-0" />
-                      <span>{{ message.aiProcessing.title || aiValueLabel(message.aiProcessing.status) }}</span>
-                      <span v-if="message.aiProcessing.willRetry" class="opacity-80">
-                        · intento {{ message.aiProcessing.attempts }}/{{ message.aiProcessing.maxAttempts }}
-                      </span>
                     </div>
                   </div>
                   <div v-if="!message.hiddenSource && productSuggestions.get(message.id)?.length" class="wa-suggestions" aria-label="Sugerencias de productos">
@@ -787,36 +786,11 @@
         @refresh="refreshAiDiagnostics(true)"
       />
 
-      <Teleport to="body">
-        <div
-          v-if="imagePreview"
-          class="fixed inset-0 z-50 flex flex-col bg-black/90"
-          role="dialog"
-          aria-modal="true"
-          @click="closeImagePreview"
-        >
-          <div class="flex items-center justify-end px-4 py-3">
-            <button
-              type="button"
-              class="rounded-full bg-white/10 p-2 text-white hover:bg-white/20 focus:outline-none focus:ring-2 focus:ring-white/60"
-              title="Cerrar"
-              @click.stop="closeImagePreview"
-            >
-              <XMarkIcon class="h-6 w-6" />
-            </button>
-          </div>
-          <div class="grid min-h-0 flex-1 place-items-center px-4 pb-4" @click.stop>
-            <img
-              :src="imagePreview.mediaUrl || ''"
-              :alt="imagePreview.mediaFileName || 'Imagen de WhatsApp'"
-              class="max-h-[84vh] max-w-[96vw] rounded-lg object-contain shadow-2xl"
-            />
-          </div>
-          <p v-if="imagePreview.mediaFileName" class="px-4 pb-4 text-center text-sm font-medium text-white/80">
-            {{ imagePreview.mediaFileName }}
-          </p>
-        </div>
-      </Teleport>
+      <BaseDialog :model-value="!!imagePreview" :title="imagePreview?.label" size="6xl"
+        @update:model-value="visible => !visible && closeImagePreview()">
+        <img v-if="imagePreview" :src="imagePreview.url" :alt="imagePreview.label" referrerpolicy="no-referrer"
+          class="mx-auto max-h-[72vh] max-w-full rounded-lg object-contain" />
+      </BaseDialog>
     </div>
   </div>
 </template>
@@ -827,6 +801,7 @@ import { commercialGroup, commercialLabel, fixedInboxLabelStyles, inboxLabelColo
 
 import WhatsAppOrderPanel from '@/components/whatsapp/WhatsAppOrderPanel.vue'
 import WhatsAppMessageActions from '@/components/whatsapp/WhatsAppMessageActions.vue'
+import WhatsAppContactAvatar from '@/components/whatsapp/WhatsAppContactAvatar.vue'
 import type { WhatsAppCommercialDraft } from '@/types/whatsapp'
 
 import { computed, defineAsyncComponent, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue'
@@ -918,7 +893,8 @@ import {
   sortAiProcessing,
 } from '@/utils/whatsappAiDiagnostics'
 import { matchesWhatsAppUsername } from '@/utils/whatsappIdentity'
-import { buildWhatsAppInboxSections, canReadWhatsAppRouting, whatsappConversationBranchLabel } from '@/utils/whatsappInbox'
+import { buildWhatsAppInboxSections, canReadWhatsAppRouting, whatsappConversationBranchLabel, whatsappConversationInbox, whatsappInboxLabels } from '@/utils/whatsappInbox'
+import { normalizePhoneForSearch } from '@/utils/phoneInput'
 
 const whatsappStore = useWhatsAppStore()
 const authStore = useAuthStore()
@@ -985,6 +961,8 @@ const confirmingClose = ref(false), finishingAttention = ref(false)
 const clockNow = ref(Date.now())
 const windowTimer = window.setInterval(() => { clockNow.value = Date.now() }, 30_000)
 const search = ref('')
+const searchTerm = computed(() => search.value.trim())
+const loadedSearch = ref('')
 const unreadOnly = ref(false)
 const { draft, selectedFile, clearSent } = useWhatsAppComposer(computed(() => selectedConversation.value?.id ?? null))
 const messageInput = ref<HTMLTextAreaElement | null>(null)
@@ -1045,7 +1023,7 @@ const quickReplyForm = ref({
 })
 const sendError = ref('')
 const messagesEnd = ref<HTMLElement | null>(null)
-const imagePreview = ref<WhatsAppMessage | null>(null)
+const imagePreview = ref<{ url: string; label: string } | null>(null)
 const showAiDiagnosticsDialog = ref(false)
 let searchTimeout: number | undefined
 let aiDiagnosticsPollingId: number | undefined
@@ -1220,7 +1198,8 @@ const canTakeOver = computed(() => selectedConversation.value?.attentionMode ===
 const canResetTestContext = computed(() => authStore.isSuperadmin || authStore.isAdmin)
 const canAssignOperationalBranch = computed(() => !!selectedConversation.value?.isCentralChannel && ownsConversation.value)
 const inboxSections = computed(() => buildWhatsAppInboxSections(
-  selectedLabel.value ? whatsappStore.conversations.filter(chat => chat.labels?.includes(selectedLabel.value)) : whatsappStore.conversations,
+  searchTerm.value !== loadedSearch.value ? [] : selectedLabel.value
+    ? whatsappStore.conversations.filter(chat => chat.labels?.includes(selectedLabel.value)) : whatsappStore.conversations,
   authStore.user?.id,
   authStore.user?.branchId,
   authStore.isSuperadmin,
@@ -1547,8 +1526,9 @@ async function retryWhatsAppStatus() {
   }
 }
 
-function aiMessageStatusClasses(processing: WhatsAppAiProcessing) {
-  return aiToneClasses[aiProcessingTone(processing)].badge
+function aiMessageTooltip(processing: WhatsAppAiProcessing) {
+  const description = aiProcessingReason(processing) || aiValueLabel(processing.status)
+  return processing.willRetry ? `${description}\nIntento ${processing.attempts}/${processing.maxAttempts}` : description
 }
 
 const showBranchFilter = computed(() => whatsappStore.enabledBranchIds.length > 1)
@@ -1780,18 +1760,20 @@ let conversationsGeneration = 0, conversationSelection = 0
 async function readConversations(context: RefreshContext) {
   if (!viewActive || !whatsappStore.enabled) return
   const generation = ++conversationsGeneration
+  const requestedSearch = searchTerm.value
   const previousSelected = selectedConversation.value
   const initialSelection = !previousSelected && route.query.conversationId
     ? selectConversationFromRoute() : Promise.resolve()
   const results = await Promise.allSettled([whatsappStore.fetchConversations({
     branchId: selectedBranchId.value || undefined,
-    search: search.value.trim() || undefined,
+    search: requestedSearch || undefined,
     unreadOnly: unreadOnly.value || undefined,
-    inbox: activeInbox.value,
+    inbox: requestedSearch ? undefined : activeInbox.value,
     unroutedOnly: unroutedOnly.value || undefined,
     label: selectedLabel.value || undefined,
   }, context.signal), whatsappStore.fetchUnreadSummary(), refreshInboxTotals(context.signal), initialSelection])
   if (!viewActive || !context.isCurrent() || generation !== conversationsGeneration) return
+  if (results[0]?.status === 'fulfilled') loadedSearch.value = requestedSearch
   if (previousSelected && selectedConversation.value?.id === previousSelected.id) {
     const refreshed = whatsappStore.conversations.find(c => c.id === previousSelected.id)
     if (refreshed) selectedConversation.value = refreshed
@@ -1856,7 +1838,10 @@ function startRealtimeFallback() {
 
 async function loadMoreConversations() {
   try { await whatsappStore.fetchConversations(undefined, true) }
-  catch (error: any) { showError('Conversaciones', error.message || 'No se pudo cargar la siguiente página.') }
+  catch (error: any) {
+    if (error.status === 400 && await reloadConversations()) return
+    showError('Conversaciones', error.message || 'No se pudo cargar la siguiente página.')
+  }
 }
 async function selectConversation(conversation: WhatsAppConversation) {
   if (!viewActive) return
@@ -1889,7 +1874,7 @@ async function selectConversationFromRoute() {
   }
 }
 
-function conversationMatchesCurrentFilters(conversation: WhatsAppConversation, label = selectedLabel.value) {
+function conversationMatchesCurrentFilters(conversation: WhatsAppConversation, label = selectedLabel.value, confirmedSearchMatch = false) {
   if (label && !conversation.labels?.includes(label)) return false
   if (unroutedOnly.value && (!conversation.isCentralChannel || conversation.operationalBranchId)) return false
   if (selectedBranchId.value && (conversation.isCentralChannel
@@ -1897,16 +1882,20 @@ function conversationMatchesCurrentFilters(conversation: WhatsAppConversation, l
     : conversation.branchId !== selectedBranchId.value)) return false
   if (unreadOnly.value && conversation.unreadCount <= 0) return false
 
-  const term = search.value.trim().toLowerCase()
+  if (confirmedSearchMatch) return true
+  const term = searchTerm.value.toLowerCase()
   if (!term) return true
   if (matchesWhatsAppUsername(conversation.whatsAppUsername, term)) return true
+  if (/^\+?[\d\s().-]+$/.test(term)) {
+    const digits = normalizePhoneForSearch(term)
+    if (digits && normalizePhoneForSearch(conversation.phoneNumber ?? '').includes(digits)) return true
+  }
 
   return [
     conversation.phoneNumber,
     conversation.whatsAppUsername,
     conversation.contactName,
     conversation.customerName,
-    conversation.branchName,
   ].some(value => (value || '').toLowerCase().includes(term))
 }
 
@@ -1914,14 +1903,24 @@ async function handleRealtimeMessage(payload: WhatsAppRealtimeMessagePayload) {
   if (!payload?.conversation?.id || !payload?.message?.id) return
   if (payload.message.isUpdate) {
     whatsappStore.applyRealtimeMessage(payload)
-    if (payload.message.hiddenSource && replyTarget.value?.id === payload.message.id) replyTarget.value = null
+    if (replyTarget.value?.id === payload.message.id) {
+      if (payload.message.hiddenSource) replyTarget.value = null
+      else if (payload.message.editedAt) replyTarget.value = payload.message
+    }
     return
   }
   inboxTotalsRefresh.schedule()
 
   const activeConversationId = selectedConversation.value?.id ?? null
   const isActiveConversation = activeConversationId === payload.conversation.id
-  if (!isActiveConversation && !conversationMatchesCurrentFilters(payload.conversation)) return
+  const confirmedSearchMatch = !!searchTerm.value && searchTerm.value === loadedSearch.value
+    && whatsappStore.conversations.some(row => row.id === payload.conversation.id)
+  if (searchTerm.value && !confirmedSearchMatch) {
+    onSearchInput()
+    if (isActiveConversation) whatsappStore.upsertMessage(payload.conversation.id, payload.message)
+    return
+  }
+  if (!isActiveConversation && !conversationMatchesCurrentFilters(payload.conversation, selectedLabel.value, confirmedSearchMatch)) return
 
   whatsappStore.applyRealtimeMessage(payload, activeConversationId)
 
@@ -2348,7 +2347,11 @@ function clearSelectedFile() {
 
 function openImagePreview(message: WhatsAppMessage) {
   if (!message.mediaUrl) return
-  imagePreview.value = message
+  imagePreview.value = { url: message.mediaUrl, label: message.mediaFileName || 'Imagen de WhatsApp' }
+}
+
+function openContactPhoto(conversation: WhatsAppConversation, url: string) {
+  imagePreview.value = { url, label: `Foto de ${conversationTitle(conversation)}` }
 }
 
 function closeImagePreview() {
@@ -2683,6 +2686,11 @@ watch(() => selectedConversation.value?.id, id => {
 
 <style scoped>
 .wa-workspace { background: var(--wa-canvas); }
+.chat-avatar { --wa-avatar-size: 1.625rem; }
+.wa-inbox-source {
+  flex: none; border-radius: .25rem; padding: .125rem .25rem;
+  background: var(--wa-selected); color: var(--wa-focus); font-size: .625rem; font-weight: 700;
+}
 .wa-workspace :deep(:focus-visible) { outline-color: var(--wa-focus); }
 @media (hover: hover) and (pointer: fine) {
   .wa-bubble:hover :deep(.message-actions) { opacity: 1; pointer-events: auto; transform: translateY(-50%); }
@@ -2749,7 +2757,24 @@ watch(() => selectedConversation.value?.id, id => {
   font-size: .625rem; font-weight: 700; font-variant-numeric: tabular-nums;
 }
 .wa-thread { background: radial-gradient(ellipse at top right, var(--wa-selected), transparent 65%), var(--wa-canvas); }
-.wa-message-stack { display: grid; min-width: 0; max-width: min(86%, calc(100% - 5.25rem)); gap: .25rem; }
+.wa-message-row:has(.wa-ai-message-marker) { padding-inline-start: .875rem; }
+.wa-message-stack { position: relative; display: grid; min-width: 0; max-width: min(86%, calc(100% - 5.25rem)); gap: .25rem; }
+.wa-ai-message-marker { position: absolute; inset-inline-start: -1.375rem; top: .3125rem; }
+.wa-ai-message-marker :deep(button) {
+  width: 1.125rem; height: 1.125rem; color: var(--wa-muted);
+  transition: transform 140ms ease, color 140ms ease, background-color 140ms ease;
+}
+.wa-ai-message-marker :deep(button:hover), .wa-ai-message-marker :deep(button:focus-visible) {
+  background: var(--wa-raised); transform: scale(1.12);
+}
+.wa-ai-message-marker :deep(svg) { width: .875rem; height: .875rem; }
+.wa-ai-message-marker[data-tone="success"] :deep(button) { color: var(--wa-action); }
+.wa-ai-message-marker[data-tone="warning"] :deep(button) { color: var(--wa-warning); }
+.wa-ai-message-marker[data-tone="danger"] :deep(button) { color: var(--color-red-700); }
+@media (prefers-reduced-motion: reduce) {
+  .wa-ai-message-marker :deep(button) { transition: none; }
+  .wa-ai-message-marker :deep(button:hover), .wa-ai-message-marker :deep(button:focus-visible) { transform: none; }
+}
 .wa-bubble {
   --bubble-fill: var(--wa-panel); --bubble-line: var(--wa-line);
   position: relative; justify-self: start; min-width: 0; max-width: 100%; border-radius: .8125rem;
