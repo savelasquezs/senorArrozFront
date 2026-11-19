@@ -11,7 +11,8 @@ const m = vi.hoisted(() => ({
   rows: [] as WhatsAppConversation[],
   handlers: new Map<string, (payload: unknown) => void>(),
   confirm: vi.fn(), success: vi.fn(), error: vi.fn(), reconcile: vi.fn(), sendProductChoices: vi.fn(), applyProductSuggestion: vi.fn(),
-  api: { getStatus: vi.fn(), getConversations: vi.fn(), getUnreadSummary: vi.fn(), getOperationalBranches: vi.fn(),
+  hasDraftProducts: false, saveBeforeFinishing: vi.fn(),
+  api: { getStatus: vi.fn(), getConversations: vi.fn(), getConversation: vi.fn(), getUnreadSummary: vi.fn(), getOperationalBranches: vi.fn(),
     getInboxLabels: vi.fn(), getInboxSummary: vi.fn(), setInboxLabel: vi.fn(),
     getQuickReplies: vi.fn(), createQuickReply: vi.fn(), updateQuickReply: vi.fn(), getMessagesPage: vi.fn(), getOrderDraft: vi.fn(), updateOperationalBranch: vi.fn(), linkConversationCustomer: vi.fn(),
     sendMessage: vi.fn(), sendQuickReply: vi.fn(), previewQuickReply: vi.fn(), changeAttention: vi.fn(), getAttention: vi.fn(),
@@ -88,10 +89,10 @@ function mountView(realTabs = false) {
     KeepAlive: { template: '<slot />' },
     WhatsAppInboxTabs: !realTabs,
     BaseDialog: { props: ['modelValue', 'title'], template: '<div v-if="modelValue" :aria-label="title"><slot /></div>' },
-    WhatsAppOrderPanel: { props: ['conversation'], mounted() {
+    WhatsAppOrderPanel: { props: ['conversation'], data: () => ({ hasDraftProducts: m.hasDraftProducts }), mounted() {
       this.$emit('product-suggestion-state', { conversationId: this.conversation.id, branchId: null, version: null,
         canApply: true, applied: new Set() })
-    }, methods: { reconcile: m.reconcile, sendProductChoices: m.sendProductChoices,
+    }, methods: { reconcile: m.reconcile, sendProductChoices: m.sendProductChoices, saveBeforeFinishing: m.saveBeforeFinishing,
       applyProductSuggestion: m.applyProductSuggestion }, template: '<div />' },
   } } })
   wrappers.push(wrapper)
@@ -114,6 +115,8 @@ describe('M38-F04 view + real Pinia store integration', () => {
     vi.clearAllMocks()
     for (const mock of [...Object.values(m.api), ...Object.values(m.customer)]) mock.mockReset()
     m.confirm.mockReset().mockResolvedValue(true)
+    m.hasDraftProducts = false
+    m.saveBeforeFinishing.mockReset().mockResolvedValue(undefined)
     m.handlers.clear(); m.route.query = {}; m.state.value = 'connected'; m.rows = [conversation(), conversation(2)]
     m.api.getStatus.mockResolvedValue(reply({ enabled: true, branchIds: [1, 2] }))
     m.api.getConversations.mockImplementation(async () => reply(m.rows.map(row => ({ ...row }))))
@@ -351,6 +354,167 @@ describe('M38-F04 view + real Pinia store integration', () => {
     await flushPromises()
     expect(m.route.query.inbox).toBe('mine')
     expect(wrapper.get<HTMLTextAreaElement>('textarea[placeholder="Escribe un mensaje"]').element.readOnly).toBe(false)
+  })
+
+  it('lets a cashier retake a team chat only after confirming the current advisor', async () => {
+    useAuthStore().user!.role = 'Cashier'
+    const other = { ...conversation(), assignedUserId: 8, assignedUserName: 'Caja 2', attentionRevision: 3,
+      customerServiceWindowExpiresAt: '2099-01-01T00:00:00Z' }
+    m.rows = [other]
+    m.route.query = { inbox: 'team' }
+    const { wrapper, vm } = mountView()
+    await flushPromises()
+    await vm.selectConversation(other)
+    const take = wrapper.get('button[aria-label="Retomar conversación"]')
+    expect(wrapper.get<HTMLTextAreaElement>('textarea[placeholder="Escribe un mensaje"]').element.disabled).toBe(true)
+    m.confirm.mockResolvedValueOnce(false)
+    await take.trigger('click')
+    await flushPromises()
+    expect(m.api.changeAttention).not.toHaveBeenCalled()
+    m.api.changeAttention.mockImplementationOnce(async () => {
+      m.rows = [{ ...other, assignedUserId: 7, assignedUserName: 'Test', attentionRevision: 4 }]
+      return reply(m.rows[0])
+    })
+    await take.trigger('click')
+    await flushPromises()
+    expect(m.confirm).toHaveBeenLastCalledWith(expect.objectContaining({ message: expect.stringContaining('Caja 2') }))
+    expect(m.api.changeAttention).toHaveBeenCalledExactlyOnceWith(1, 'takeover', 3, undefined, undefined)
+    expect(m.route.query.inbox).toBe('mine')
+    expect(wrapper.get<HTMLTextAreaElement>('textarea[placeholder="Escribe un mensaje"]').element.disabled).toBe(false)
+  })
+
+  it('uses the confirmed revision even if another advisor takes the chat while the dialog is open', async () => {
+    const other = { ...conversation(), assignedUserId: 8, assignedUserName: 'Caja 2', attentionRevision: 3 }
+    m.rows = [other]
+    const confirmation = deferred<boolean>()
+    m.confirm.mockReturnValueOnce(confirmation.promise)
+    m.api.changeAttention.mockRejectedValueOnce(new Error('La conversación cambió.'))
+    const { wrapper, vm } = mountView()
+    await flushPromises()
+    await vm.selectConversation(other)
+    await wrapper.get('button[aria-label="Retomar conversación"]').trigger('click')
+    const reassigned = { ...other, assignedUserId: 9, assignedUserName: 'Caja 3', attentionRevision: 4 }
+    routing(reassigned)
+    m.api.getAttention.mockResolvedValue(reply(reassigned))
+    confirmation.resolve(true)
+    await flushPromises()
+    expect(m.api.changeAttention).toHaveBeenCalledExactlyOnceWith(1, 'takeover', 3, undefined, undefined)
+    expect(vm.selectedConversation?.assignedUserId).toBe(9)
+  })
+
+  it('closes an attended chat and refreshes the counter without reloading the list or thread', async () => {
+    const active = { ...conversation(), labels: ['pending'], attentionRevision: 3,
+      customerServiceWindowExpiresAt: '2099-01-01T00:00:00Z' }
+    const delayed = { ...active }
+    const closed = { ...active, attentionMode: 'closed' as const, status: 'closed' as const, assignedUserId: null, attentionRevision: 4 }
+    m.rows = [active, conversation(2)]
+    m.route.query = { inbox: 'mine' }
+    const { wrapper, vm } = mountView(true)
+    await flushPromises()
+    await vm.selectConversation(active)
+    const messages = wrapper.get('[data-test="whatsapp-chat-messages"]').element
+    const other = wrapper.get('button[aria-label^="Abrir chat con Chat 2"]').element
+    const requests = m.api.getConversations.mock.calls.length
+    const messagesRequests = m.api.getMessagesPage.mock.calls.length
+    expect(wrapper.get('[role="tab"][aria-selected="true"]').text()).toContain('1 sin pedido')
+    m.api.changeAttention.mockResolvedValue(reply({ conversationId: 1, attentionMode: 'closed', assignedUserId: null, attentionRevision: 4 }))
+    m.api.getInboxSummary.mockResolvedValue(reply({ mine: { pendingOrders: 0, unreadConversations: 0 } }))
+    await wrapper.get('button[aria-label="Marcar como atendida"]').trigger('click')
+    await flushPromises()
+    for (const event of ['WhatsAppConversationRoutingChanged', 'WhatsAppAttentionChanged'])
+      m.handlers.get(event)?.({ branchId: 1, previousOperationalBranchId: 1, conversation: { ...closed, labels: undefined } })
+    for (const event of ['WhatsAppConversationRoutingChanged', 'WhatsAppAttentionChanged'])
+      m.handlers.get(event)?.({ branchId: 1, previousOperationalBranchId: 1, conversation: delayed })
+    await vi.advanceTimersByTimeAsync(400)
+    await flushPromises()
+    expect(m.confirm).not.toHaveBeenCalled()
+    expect(m.api.changeAttention).toHaveBeenCalledExactlyOnceWith(1, 'close', 3, undefined, 'Atención finalizada desde el POS')
+    expect(wrapper.get('[role="tab"][aria-selected="true"]').text()).toBe('Míos')
+    expect(wrapper.find('button[aria-label^="Abrir chat con Chat 1"]').exists()).toBe(false)
+    expect(wrapper.get('button[aria-label^="Abrir chat con Chat 2"]').element).toBe(other)
+    expect(wrapper.get('[data-test="whatsapp-chat-messages"]').element).toBe(messages)
+    expect(wrapper.text()).toContain('Conversación atendida.')
+    expect(vm.selectedConversation?.labels).toEqual(['pending'])
+    expect(m.api.getConversations).toHaveBeenCalledTimes(requests)
+    expect(m.api.getMessagesPage).toHaveBeenCalledTimes(messagesRequests)
+    expect(m.reconcile).not.toHaveBeenCalled()
+  })
+
+  it('confirms a nonempty draft and only closes after it is saved', async () => {
+    m.hasDraftProducts = true
+    const { wrapper, vm } = mountView()
+    await flushPromises()
+    await vm.selectConversation(m.rows[0]!)
+    const check = wrapper.get('button[aria-label="Marcar como atendida"]')
+    m.confirm.mockResolvedValueOnce(false)
+    await check.trigger('click')
+    await flushPromises()
+    expect(m.confirm).toHaveBeenCalledWith(expect.objectContaining({ message: expect.stringContaining('borrador con productos') }))
+    expect(m.saveBeforeFinishing).not.toHaveBeenCalled()
+    const save = deferred<void>()
+    m.saveBeforeFinishing.mockReturnValueOnce(save.promise)
+    m.api.changeAttention.mockResolvedValue(reply({ attentionMode: 'closed', assignedUserId: null, attentionRevision: 1 }))
+    await check.trigger('click')
+    await flushPromises()
+    expect(m.api.changeAttention).not.toHaveBeenCalled()
+    save.resolve()
+    await flushPromises()
+    expect(m.api.changeAttention).toHaveBeenCalledTimes(1)
+    expect(vm.selectedConversation?.attentionMode).toBe('closed')
+  })
+
+  it('reads only the affected row when a chat enters a filtered closed inbox', async () => {
+    m.rows = []
+    m.route.query = { inbox: 'closed', label: 'supplier' }
+    const { wrapper } = mountView(true)
+    await flushPromises()
+    const requests = m.api.getConversations.mock.calls.length
+    const closed = { ...conversation(), status: 'closed', attentionMode: 'closed', assignedUserId: null, attentionRevision: 4 }
+    m.api.getConversation.mockResolvedValue(reply({ ...closed, labels: ['supplier'] }))
+    const payload = { branchId: 1, previousOperationalBranchId: 1, conversation: closed }
+    m.handlers.get('WhatsAppConversationRoutingChanged')?.(payload)
+    m.handlers.get('WhatsAppAttentionChanged')?.(payload)
+    await vi.advanceTimersByTimeAsync(400)
+    await flushPromises()
+    expect(m.api.getConversation).toHaveBeenCalledExactlyOnceWith(1)
+    expect(m.api.getConversations).toHaveBeenCalledTimes(requests)
+    expect(wrapper.find('button[aria-label^="Abrir chat con Chat 1"]').exists()).toBe(true)
+  })
+
+  it('keeps a chat open when the draft cannot be saved', async () => {
+    m.hasDraftProducts = true
+    m.saveBeforeFinishing.mockRejectedValueOnce(new Error('El borrador cambió.'))
+    const { wrapper, vm } = mountView()
+    await flushPromises()
+    await vm.selectConversation(m.rows[0]!)
+    await wrapper.get('button[aria-label="Marcar como atendida"]').trigger('click')
+    await flushPromises()
+    expect(m.api.changeAttention).not.toHaveBeenCalled()
+    expect(m.error).toHaveBeenCalledWith('Atención', 'El borrador cambió.')
+    expect(vm.selectedConversation?.assignedUserId).toBe(7)
+  })
+
+  it('releases a chat to Libres without reloading or replacing the current tab', async () => {
+    const active = { ...conversation(), attentionRevision: 3 }
+    m.rows = [active, conversation(2)]
+    m.route.query = { inbox: 'mine' }
+    const { wrapper, vm } = mountView(true)
+    await flushPromises()
+    await vm.selectConversation(active)
+    const requests = m.api.getConversations.mock.calls.length
+    const free = { ...active, attentionMode: 'waitingForHuman' as const, assignedUserId: null, attentionRevision: 4 }
+    m.api.changeAttention.mockResolvedValue(reply(free))
+    m.api.getInboxSummary.mockResolvedValue(reply({ free: { pendingOrders: 1, unreadConversations: 0 } }))
+    await wrapper.get('[data-test="whatsapp-chat-actions"]').findAll('button').find(button => button.text() === 'Soltar')!.trigger('click')
+    await flushPromises()
+    m.handlers.get('WhatsAppConversationRoutingChanged')?.({ branchId: 1, previousOperationalBranchId: 1, conversation: free })
+    await vi.advanceTimersByTimeAsync(400)
+    await flushPromises()
+    expect(vm.selectedConversation?.attentionMode).toBe('waitingForHuman')
+    expect(wrapper.get('[role="tab"][aria-selected="true"]').text()).toBe('Míos')
+    expect(wrapper.findAll('[role="tab"]').find(tab => tab.text().includes('Libres'))?.text()).toContain('1 sin pedido')
+    expect(wrapper.find('button[aria-label^="Abrir chat con Chat 1"]').exists()).toBe(false)
+    expect(m.api.getConversations).toHaveBeenCalledTimes(requests)
   })
 
   it('prioritizes the exact editable conchi shortcut and inserts its quote without sending', async () => {
