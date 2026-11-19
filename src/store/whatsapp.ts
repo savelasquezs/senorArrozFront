@@ -376,15 +376,23 @@ export const useWhatsAppStore = defineStore('whatsapp', () => {
     return message
   }
 
-  async function changeAttention(conversationId: number, action: import('@/types/whatsapp').WhatsAppAttentionAction, targetUserId?: number, reason?: string) {
-    const conversation = conversations.value.find(x => x.id === conversationId)
+  async function changeAttention(conversationId: number, action: import('@/types/whatsapp').WhatsAppAttentionAction,
+    targetUserId?: number, reason?: string, selected?: WhatsAppConversation) {
+    const row = conversations.value.find(x => x.id === conversationId)
+    const conversation = selected?.id === conversationId && (selected.attentionRevision ?? 0) > (row?.attentionRevision ?? -1)
+      ? selected : row
     try {
       const res = await whatsappApi.changeAttention(conversationId, action, conversation?.attentionRevision ?? 0, targetUserId, reason)
-      if (conversation && res.data && (res.data.attentionRevision ?? 0) >= (conversation.attentionRevision ?? 0)) Object.assign(conversation, res.data)
+      for (const target of new Set([row, conversation])) {
+        if (target && res.data && (res.data.attentionRevision ?? 0) >= (target.attentionRevision ?? 0)) Object.assign(target, res.data)
+      }
       return res.data
     } catch (error) {
       const current = await whatsappApi.getAttention(conversationId).catch(() => null)
-      if (conversation && current?.data) Object.assign(conversation, current.data)
+      for (const target of new Set([row, conversation])) {
+        if (target && current?.data && (current.data.attentionRevision ?? 0) >= (target.attentionRevision ?? 0))
+          Object.assign(target, current.data)
+      }
       throw error
     }
   }
@@ -472,12 +480,14 @@ export const useWhatsAppStore = defineStore('whatsapp', () => {
     branchId?: number | null
     shortcut: string
     messageTemplate: string
+    replyMode?: import('@/types/whatsapp').WhatsAppQuickReplyMode
     isActive: boolean
   }) {
     const body = {
       branchId: payload.branchId,
       shortcut: payload.shortcut,
       messageTemplate: payload.messageTemplate,
+      replyMode: payload.replyMode,
       isActive: payload.isActive,
     }
     const res = payload.id

@@ -13,8 +13,9 @@ const m = vi.hoisted(() => ({
   confirm: vi.fn(), success: vi.fn(), error: vi.fn(), reconcile: vi.fn(), sendProductChoices: vi.fn(), applyProductSuggestion: vi.fn(),
   api: { getStatus: vi.fn(), getConversations: vi.fn(), getUnreadSummary: vi.fn(), getOperationalBranches: vi.fn(),
     getInboxLabels: vi.fn(), getInboxSummary: vi.fn(), setInboxLabel: vi.fn(),
-    getQuickReplies: vi.fn(), getMessagesPage: vi.fn(), getOrderDraft: vi.fn(), updateOperationalBranch: vi.fn(), linkConversationCustomer: vi.fn(),
-    sendMessage: vi.fn(), sendQuickReply: vi.fn(), getCommercialProductGroups: vi.fn(), getProductSuggestions: vi.fn() },
+    getQuickReplies: vi.fn(), createQuickReply: vi.fn(), updateQuickReply: vi.fn(), getMessagesPage: vi.fn(), getOrderDraft: vi.fn(), updateOperationalBranch: vi.fn(), linkConversationCustomer: vi.fn(),
+    sendMessage: vi.fn(), sendQuickReply: vi.fn(), previewQuickReply: vi.fn(), changeAttention: vi.fn(), getAttention: vi.fn(),
+    getCommercialProductGroups: vi.fn(), getProductSuggestions: vi.fn() },
   customer: { getCustomerById: vi.fn(), getCustomerAddresses: vi.fn() },
 }))
 vi.mock('@/services/MainAPI/whatsappApi', () => ({ whatsappApi: {
@@ -328,6 +329,115 @@ describe('M38-F04 view + real Pinia store integration', () => {
     await flushPromises()
     expect(m.api.sendQuickReply).toHaveBeenCalledExactlyOnceWith(1, 12)
     expect(composer.element.value).toBe('')
+  })
+
+  it('takes a free conversation from the read-only composer exactly once', async () => {
+    const free = { ...conversation(), assignedUserId: null, attentionMode: 'waitingForHuman' as const,
+      attentionRevision: 3, customerServiceWindowExpiresAt: '2099-01-01T00:00:00Z' }
+    m.rows = [free]
+    const result = deferred<ReturnType<typeof reply<Partial<WhatsAppConversation>>>>()
+    m.api.changeAttention.mockReturnValue(result.promise)
+    const { wrapper, vm } = mountView()
+    await flushPromises()
+    await vm.selectConversation(free)
+    const input = wrapper.get<HTMLTextAreaElement>('textarea[placeholder="Doble clic para tomar la conversación"]')
+    expect(input.element.readOnly).toBe(true)
+    expect(input.element.disabled).toBe(false)
+    await input.trigger('dblclick')
+    await input.trigger('dblclick')
+    expect(m.api.changeAttention).toHaveBeenCalledExactlyOnceWith(1, 'take', 3, undefined, undefined)
+    m.rows = [{ ...free, assignedUserId: 7, attentionMode: 'human', attentionRevision: 4 }]
+    result.resolve(reply(m.rows[0]!))
+    await flushPromises()
+    expect(m.route.query.inbox).toBe('mine')
+    expect(wrapper.get<HTMLTextAreaElement>('textarea[placeholder="Escribe un mensaje"]').element.readOnly).toBe(false)
+  })
+
+  it('prioritizes the exact editable conchi shortcut and inserts its quote without sending', async () => {
+    m.api.getQuickReplies.mockResolvedValue(reply([
+      { id: 13, branchId: 1, shortcut: 'conchi', messageTemplate: '', replyMode: 'chicharron_quote', isActive: true, usageCount: 0 },
+    ]))
+    m.api.getCommercialProductGroups.mockResolvedValue(reply([
+      { id: 2, name: 'Arroz Paisa con Chicharrón', isRice: true, shortcut: 'paisacon' },
+      { id: 1, name: 'Arroz Ropa Vieja con Chicharrón', isRice: true, shortcut: 'ropaviejacon' },
+    ]))
+    const text = 'Arroz Paisa Súper\nCon chicharrón: $ 77.000\nSin chicharrón: $ 66.000'
+    m.api.previewQuickReply.mockResolvedValue(reply({ text }))
+    const { wrapper, vm } = mountView()
+    await flushPromises()
+    await vm.selectConversation({ ...m.rows[0]!, customerServiceWindowExpiresAt: '2099-01-01T00:00:00Z' })
+    const input = wrapper.get<HTMLTextAreaElement>('textarea[placeholder="Escribe un mensaje"]')
+    await input.setValue('/con')
+    const tab = new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true })
+    input.element.dispatchEvent(tab)
+    expect(tab.defaultPrevented).toBe(false)
+    expect(m.api.previewQuickReply).not.toHaveBeenCalled()
+    await input.setValue('/conchi')
+    expect(wrapper.text()).toContain('Tab para preparar')
+    await input.trigger('keydown', { key: 'Tab' })
+    await flushPromises()
+    expect(m.api.previewQuickReply).toHaveBeenCalledExactlyOnceWith(1, 13, undefined)
+    expect(input.element.value).toBe(text)
+    expect(m.api.sendQuickReply).not.toHaveBeenCalled()
+    expect(m.api.sendMessage).not.toHaveBeenCalled()
+    expect(m.sendProductChoices).not.toHaveBeenCalled()
+  })
+
+  it('persists the selected quick reply mode when creating and editing a shortcut', async () => {
+    const store = useWhatsAppStore()
+    const definition = { branchId: 1, shortcut: 'conchi', messageTemplate: '', replyMode: 'chicharron_quote' as const, isActive: true }
+    m.api.createQuickReply.mockResolvedValue(reply({ ...definition, id: 13, usageCount: 0 }))
+    await store.saveQuickReply(definition)
+    expect(m.api.createQuickReply).toHaveBeenCalledExactlyOnceWith(definition)
+
+    const edited = { ...definition, replyMode: 'draft' as const, messageTemplate: 'Hola {{nombre_cliente}}' }
+    m.api.updateQuickReply.mockResolvedValue(reply({ ...edited, id: 13, usageCount: 0 }))
+    await store.saveQuickReply({ ...edited, id: 13 })
+    expect(m.api.updateQuickReply).toHaveBeenCalledExactlyOnceWith(13, edited)
+    expect(store.quickReplies[0]?.replyMode).toBe('draft')
+  })
+
+  it('opens the quote size picker and discards its late result after switching conversations', async () => {
+    m.api.getQuickReplies.mockResolvedValue(reply([
+      { id: 13, branchId: 1, shortcut: 'conchi', messageTemplate: '', replyMode: 'chicharron_quote', isActive: true, usageCount: 0 },
+    ]))
+    const response = deferred<ReturnType<typeof reply<{ text: string }>>>()
+    m.api.previewQuickReply.mockResolvedValueOnce(reply({ family: 'paisa', presentations: [
+      { family: 'paisa', size: 'personal' }, { family: 'paisa', size: 'super' }, { family: 'ropa vieja', size: 'duo' },
+    ] })).mockReturnValueOnce(response.promise)
+    const { wrapper, vm } = mountView()
+    await flushPromises()
+    const open = '2099-01-01T00:00:00Z'
+    await vm.selectConversation({ ...m.rows[0]!, customerServiceWindowExpiresAt: open })
+    const input = wrapper.get<HTMLTextAreaElement>('textarea[placeholder="Escribe un mensaje"]')
+    await input.setValue('/conchi')
+    await input.trigger('keydown', { key: 'Tab' })
+    await flushPromises()
+    const dialog = wrapper.get('[aria-label="Cotizar con y sin chicharrón"]')
+    const selects = dialog.findAll('select')
+    expect((selects[0]!.element as HTMLSelectElement).value).toBe('paisa')
+    await selects[1]!.setValue('super')
+    await dialog.get('form').trigger('submit')
+    expect(m.api.previewQuickReply).toHaveBeenLastCalledWith(1, 13, { family: 'paisa', size: 'super' })
+    await vm.selectConversation({ ...m.rows[1]!, customerServiceWindowExpiresAt: open })
+    await wrapper.get('textarea[placeholder="Escribe un mensaje"]').setValue('Otro cliente')
+    response.resolve(reply({ text: 'Cotización del chat anterior' }))
+    await flushPromises()
+    expect(wrapper.get<HTMLTextAreaElement>('textarea[placeholder="Escribe un mensaje"]').element.value).toBe('Otro cliente')
+    expect(m.api.sendMessage).not.toHaveBeenCalled()
+  })
+
+  it('keeps Limpiar Tomado in tools and resets active filters separately', async () => {
+    const { wrapper } = mountView()
+    await flushPromises()
+    const filters = wrapper.get('[aria-label="Filtros de la bandeja"]')
+    const tools = wrapper.get('[aria-label="Herramientas de la bandeja"]')
+    expect(filters.text()).not.toContain('Limpiar Tomado')
+    expect(tools.text()).toContain('Limpiar Tomado')
+    await filters.get('select[aria-label="Filtrar por etiqueta"]').setValue('supplier')
+    await filters.findAll('button').find(button => button.text() === 'Restablecer filtros')!.trigger('click')
+    await flushPromises()
+    expect(m.api.getConversations).toHaveBeenLastCalledWith(expect.objectContaining({ label: undefined }), expect.anything())
   })
 
   it('shows product actions on each eligible message and only prepares a price reply in the composer', async () => {

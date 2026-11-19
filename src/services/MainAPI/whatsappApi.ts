@@ -19,6 +19,8 @@ import type {
   WhatsAppProductSuggestions,
   WhatsAppOrderDraft,
   WhatsAppQuickReply,
+  WhatsAppQuickReplyPresentation,
+  WhatsAppQuickReplyPreview,
   WhatsAppQuickReplyFilters,
   WhatsAppTemplate,
   WhatsAppTemplateFilters,
@@ -272,6 +274,12 @@ class WhatsAppApi extends BaseApi {
 
   getQuickReplies(filters?: WhatsAppQuickReplyFilters): Promise<ApiResponse<WhatsAppQuickReply[]>> {
     return this.get<ApiResponse<WhatsAppQuickReply[]>>('/whatsapp/quick-replies', { params: filters })
+  }
+
+  previewQuickReply(conversationId: number, replyId: number, presentation: Partial<WhatsAppQuickReplyPresentation> = {}) {
+    return this.post<ApiResponse<WhatsAppQuickReplyPreview>>(
+      `/whatsapp/conversations/${conversationId}/quick-replies/${replyId}/preview`, presentation,
+    )
   }
 
   createQuickReply(payload: UpsertWhatsAppQuickReply): Promise<ApiResponse<WhatsAppQuickReply>> {
