@@ -41,7 +41,7 @@
     </div>
     <template v-else>
       <fieldset :disabled="!editable || finishingAttention" class="min-h-0 min-w-0 w-full flex-1 overflow-hidden border-0 p-0 disabled:opacity-65">
-        <OrderSidebar chat-actions :can-send-address-choices="canSendChoices && !sendingChoices"
+        <OrderSidebar chat-actions :whatsapp-contact="conversation" :can-send-address-choices="canSendChoices && !sendingChoices"
           @send-address-choices="sendChoices" @draft-message="text => emit('draft-message', conversation.id, text)" />
       </fieldset>
     </template>

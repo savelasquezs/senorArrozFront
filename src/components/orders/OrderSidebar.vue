@@ -16,6 +16,7 @@
             </div>
             <div v-else class="space-y-3 p-3">
                 <CustomerSection compact :selected-customer="getCustomer(currentOrder.customerId)"
+                    :whatsapp-contact="whatsappContact"
                     :selected-address="getAddress(currentOrder.addressId, getCustomer(currentOrder.customerId))"
                     :order-type="currentOrder.type" :operation-branch-id="currentOrder.branchId ?? undefined" mode="draft"
                     @view-customer-detail="handleViewCustomerDetail">
@@ -328,7 +329,7 @@ import { useOrderEditorContext } from '@/composables/useOrderEditor'
 const AddProductModal = defineAsyncComponent(() => import('./AddProductModal.vue'))
 import type { OrderProductAddition } from '@/types/order'
 const editor = useOrderEditorContext()
-const props = defineProps<{ chatActions?: boolean; canSendAddressChoices?: boolean }>()
+const props = defineProps<{ chatActions?: boolean; canSendAddressChoices?: boolean; whatsappContact?: import('@/types/whatsapp').WhatsAppContactPrefill }>()
 const emit = defineEmits<{ 'send-address-choices': []; 'draft-message': [text: string] }>()
 const showProductModal = ref(false)
 

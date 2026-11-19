@@ -250,12 +250,20 @@ class WhatsAppApi extends BaseApi {
     return this.delete<ApiResponse<WhatsAppConversation>>(`/whatsapp/conversations/${conversationId}/test-context`)
   }
 
-  linkConversationCustomer(conversationId: number, customerId: number): Promise<ApiResponse<WhatsAppConversation>> {
-    return this.post<ApiResponse<WhatsAppConversation>>(`/whatsapp/conversations/${conversationId}/customer`, { customerId })
+  linkConversationCustomer(conversationId: number, customerId: number, match?: { phoneNumber?: string; expectedAttentionVersion?: number }): Promise<ApiResponse<WhatsAppConversation>> {
+    return this.post<ApiResponse<WhatsAppConversation>>(`/whatsapp/conversations/${conversationId}/customer`, { customerId, ...match })
   }
 
-  sendMessage(conversationId: number, text: string): Promise<ApiResponse<WhatsAppMessage>> {
-    return this.manualPost<WhatsAppMessage>(`/whatsapp/conversations/${conversationId}/messages`, { text })
+  sendMessage(conversationId: number, text: string, replyToMessageId?: number): Promise<ApiResponse<WhatsAppMessage>> {
+    return this.manualPost<WhatsAppMessage>(`/whatsapp/conversations/${conversationId}/messages`, { text, replyToMessageId })
+  }
+
+  reactToMessage(conversationId: number, messageId: number, emoji: string) {
+    return this.manualPost<WhatsAppMessage>(`/whatsapp/conversations/${conversationId}/messages/${messageId}/reaction`, { emoji })
+  }
+
+  hideMessage(conversationId: number, messageId: number) {
+    return this.post<ApiResponse<WhatsAppMessage>>(`/whatsapp/conversations/${conversationId}/messages/${messageId}/hide`, {})
   }
   sendMenu(conversationId: number): Promise<ApiResponse<WhatsAppMessage>> {
     return this.manualPost<WhatsAppMessage>(`/whatsapp/conversations/${conversationId}/messages/menu`, {})
@@ -265,10 +273,11 @@ class WhatsAppApi extends BaseApi {
     return this.manualPost<WhatsAppMessage>(`/whatsapp/conversations/${conversationId}/messages/quick-reply`, { quickReplyId })
   }
 
-  sendMediaMessage(conversationId: number, file: File, caption?: string): Promise<ApiResponse<WhatsAppMessage>> {
+  sendMediaMessage(conversationId: number, file: File, caption?: string, replyToMessageId?: number): Promise<ApiResponse<WhatsAppMessage>> {
     const fd = new FormData()
     fd.append('file', file)
     if (caption?.trim()) fd.append('caption', caption.trim())
+    if (replyToMessageId) fd.append('replyToMessageId', String(replyToMessageId))
     return this.manualPost<WhatsAppMessage>(`/whatsapp/conversations/${conversationId}/messages/media`, fd)
   }
 

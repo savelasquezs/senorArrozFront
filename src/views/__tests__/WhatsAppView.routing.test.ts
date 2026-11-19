@@ -16,6 +16,7 @@ const m = vi.hoisted(() => ({
     getInboxLabels: vi.fn(), getInboxSummary: vi.fn(), setInboxLabel: vi.fn(),
     getQuickReplies: vi.fn(), createQuickReply: vi.fn(), updateQuickReply: vi.fn(), getMessagesPage: vi.fn(), getOrderDraft: vi.fn(), updateOperationalBranch: vi.fn(), linkConversationCustomer: vi.fn(),
     sendMessage: vi.fn(), sendQuickReply: vi.fn(), previewQuickReply: vi.fn(), changeAttention: vi.fn(), getAttention: vi.fn(),
+    reactToMessage: vi.fn(), hideMessage: vi.fn(),
     getCommercialProductGroups: vi.fn(), getProductSuggestions: vi.fn() },
   customer: { getCustomerById: vi.fn(), getCustomerAddresses: vi.fn() },
 }))
@@ -88,6 +89,7 @@ function mountView(realTabs = false) {
     BaseButton: { props: ['loading', 'disabled'], template: '<button :disabled="loading || disabled"><slot /></button>' },
     KeepAlive: { template: '<slot />' },
     WhatsAppInboxTabs: !realTabs,
+    WhatsAppMessageActions: false,
     BaseDialog: { props: ['modelValue', 'title'], template: '<div v-if="modelValue" :aria-label="title"><slot /></div>' },
     WhatsAppOrderPanel: { props: ['conversation'], data: () => ({ hasDraftProducts: m.hasDraftProducts }), mounted() {
       this.$emit('product-suggestion-state', { conversationId: this.conversation.id, branchId: null, version: null,
@@ -481,6 +483,47 @@ describe('M38-F04 view + real Pinia store integration', () => {
     expect(wrapper.find('button[aria-label^="Abrir chat con Chat 1"]').exists()).toBe(true)
   })
 
+  it('renders shared cards, sends a quoted reply and updates reactions and hidden messages in place', async () => {
+    const chat = { ...conversation(), customerServiceWindowExpiresAt: '2099-01-01T00:00:00Z' }
+    m.rows = [chat]
+    const location = { id: 98, conversationId: 1, direction: 'inbound', type: 'location', status: 'received',
+      textBody: 'Ubicación compartida', location: { latitude: 6.2, longitude: -75.5, name: 'Punto de prueba' },
+      whatsAppMessageId: 'wamid.location', timestamp: '2026-11-19T12:00:00Z', createdAt: '2026-11-19T12:00:00Z' }
+    const contact = { ...location, id: 99, type: 'contacts', location: undefined, whatsAppMessageId: 'wamid.contact',
+      contacts: [{ name: 'Contacto de prueba', phones: ['+57 300 123 4567'] }] }
+    m.api.getMessagesPage.mockResolvedValue(reply({ items: [location, contact], hasMore: false, nextCursor: null }))
+    const { wrapper, vm } = mountView()
+    await flushPromises()
+    await vm.selectConversation(chat)
+    expect(wrapper.get('a[href*="maps/search"]').attributes('href')).toContain('6.2%2C-75.5')
+    expect(wrapper.get('a[href="tel:+573001234567"]').text()).toBe('+57 300 123 4567')
+    const bubble = () => wrapper.get('[data-message-id="98"]')
+    const element = bubble().element
+    await bubble().get('button[aria-label="Reaccionar"]').trigger('click')
+    m.api.reactToMessage.mockResolvedValue(reply({ ...location, businessReaction: '👍' }))
+    await bubble().get('button[aria-label="Me gusta"]').trigger('click')
+    await flushPromises()
+    expect(m.api.reactToMessage).toHaveBeenCalledExactlyOnceWith(1, 98, '👍')
+    expect(bubble().get('[aria-label="Reacciones"]').text()).toContain('👍')
+    expect(bubble().element).toBe(element)
+    await bubble().get('button[aria-label="Responder a este mensaje"]').trigger('click')
+    expect(wrapper.get('button[aria-label="Quitar cita"]').exists()).toBe(true)
+    const input = wrapper.get('textarea[placeholder="Escribe un mensaje"]')
+    await input.setValue('Gracias por la ubicación')
+    m.api.sendMessage.mockResolvedValue(reply({ ...location, id: 100, direction: 'outbound', type: 'text', location: undefined,
+      replyToWhatsAppMessageId: 'wamid.location', textBody: 'Gracias por la ubicación', whatsAppMessageId: 'wamid.reply', status: 'sent' }))
+    await input.trigger('keydown', { key: 'Enter' })
+    await flushPromises()
+    expect(m.api.sendMessage).toHaveBeenCalledExactlyOnceWith(1, 'Gracias por la ubicación', 98)
+    expect(wrapper.get('[data-message-id="100"]').text()).toContain('Punto de prueba')
+    m.api.hideMessage.mockResolvedValue(reply({ ...location, hiddenSource: 'pos', textBody: '', location: undefined }))
+    await bubble().get('button[aria-label="Ocultar en el POS"]').trigger('click')
+    await flushPromises()
+    expect(m.api.hideMessage).toHaveBeenCalledExactlyOnceWith(1, 98)
+    expect(bubble().text()).toContain('Mensaje oculto en el POS')
+    expect(bubble().element).toBe(element)
+  })
+
   it('keeps a chat open when the draft cannot be saved', async () => {
     m.hasDraftProducts = true
     m.saveBeforeFinishing.mockRejectedValueOnce(new Error('El borrador cambió.'))
@@ -622,11 +665,11 @@ describe('M38-F04 view + real Pinia store integration', () => {
     await vm.selectConversation({ ...m.rows[0], customerServiceWindowExpiresAt: '2099-01-01T00:00:00Z' })
     await flushPromises()
     expect(m.api.getProductSuggestions).toHaveBeenCalledWith(1, [90, 91], expect.anything())
-    const addButton = wrapper.get('[data-message-id="90"] button')
+    const addButton = wrapper.get('[data-message-id="90"] [aria-label="Sugerencias de productos"] button')
     expect(addButton.text()).toContain('Agregar 2 × Ropa vieja Súper')
     await addButton.trigger('click')
     expect(m.applyProductSuggestion).toHaveBeenCalledExactlyOnceWith(90, add)
-    await wrapper.get('[data-message-id="91"] button').trigger('click')
+    await wrapper.get('[data-message-id="91"] [aria-label="Sugerencias de productos"] button').trigger('click')
     expect(wrapper.get<HTMLTextAreaElement>('textarea[placeholder="Escribe un mensaje"]').element.value)
       .toBe('Paisa Dúo cuesta $ 31.000.')
     expect(m.api.sendMessage).not.toHaveBeenCalled()

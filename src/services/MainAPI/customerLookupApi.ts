@@ -36,5 +36,13 @@ export class CustomerLookupApi extends BaseApi {
             return this.read<Customer>(`/customers/${id}`, undefined, signal);
         }
     }
+
+    async findByPhone(phone: string, signal?: AbortSignal): Promise<Customer | null> {
+        try { return await this.read<Customer>(`/customers/by-phone/${encodeURIComponent(phone)}`, undefined, signal); }
+        catch (cause: any) {
+            if (!signal?.aborted && cause.status === 404) return null;
+            throw cause;
+        }
+    }
 }
 export const customerLookupApi = new CustomerLookupApi();

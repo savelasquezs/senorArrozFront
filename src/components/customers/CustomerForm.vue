@@ -29,6 +29,7 @@
             </BaseInput>
         </div>
 
+        <slot name="phone-match" />
         <p class="-mt-4 text-xs text-gray-500">Indica al menos un teléfono principal o un usuario de WhatsApp.</p>
 
         <!-- Secondary Phone -->
@@ -105,7 +106,7 @@
                 Cancelar
             </BaseButton>
 
-            <BaseButton type="submit" variant="primary" :loading="loading" :disabled="!isFormValid">
+            <BaseButton v-if="!hideSubmit" type="submit" variant="primary" :loading="loading" :disabled="!isFormValid || verifyingPhone">
                 {{ submitButtonText || (customer ? 'Actualizar' : 'Crear') + ' Cliente' }}
             </BaseButton>       
         </div>
@@ -144,6 +145,9 @@ interface Props {
     canSelectBranch?: boolean
     allowAddressBranchSelection?: boolean
     initialPhone?: string
+    initialName?: string
+    verifyingPhone?: boolean
+    hideSubmit?: boolean
     initialUsername?: string
     initialBranchId?: number
     initialAddressBranchId?: number
@@ -165,6 +169,7 @@ const props = withDefaults(defineProps<Props>(), {
 const emit = defineEmits<{
     submit: [data: CustomerFormData]
     cancel: []
+    'phone-change': [value: string]
 }>()
 
 const authStore = useAuthStore()
@@ -172,7 +177,7 @@ const branchContext = useBranchContextStore()
 const dirtyTrackingReady = ref(false)
 
 const form = reactive({
-    name: '',
+    name: props.initialName ?? '',
     phone1: '',
     phone2: '',
     whatsAppUsername: '',
@@ -407,6 +412,7 @@ const validateForm = () => {
 }
 
 const handleSubmit = () => {
+    if (props.hideSubmit || props.verifyingPhone || props.loading) return
     validateForm()
 
     if (!isFormValid.value) {
@@ -436,6 +442,7 @@ watch(
     },
     { deep: true },
 )
+watch(() => form.phone1, phone => emit('phone-change', phone), { immediate: true })
 
 // Watch for customer prop changes to populate form
 watch(() => props.customer, (newCustomer) => {
@@ -448,7 +455,7 @@ watch(() => props.customer, (newCustomer) => {
         form.active = newCustomer.active
     } else {
         // Reset form for new customer
-        form.name = ''
+        form.name = props.initialName ?? ''
         form.phone1 = ''
         form.phone2 = ''
         form.whatsAppUsername = ''

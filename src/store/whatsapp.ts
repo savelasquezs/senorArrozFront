@@ -363,8 +363,9 @@ export const useWhatsAppStore = defineStore('whatsapp', () => {
     return request
   }
 
-  async function sendMessage(conversationId: number, text: string) {
-    const res = await whatsappApi.sendMessage(conversationId, text)
+  async function sendMessage(conversationId: number, text: string, replyToMessageId?: number) {
+    const res = replyToMessageId ? await whatsappApi.sendMessage(conversationId, text, replyToMessageId)
+      : await whatsappApi.sendMessage(conversationId, text)
     const message = res.data
     if (message) {
       upsertMessage(conversationId, message)
@@ -452,8 +453,9 @@ export const useWhatsAppStore = defineStore('whatsapp', () => {
     return message
   }
 
-  async function sendMediaMessage(conversationId: number, file: File, caption?: string) {
-    const res = await whatsappApi.sendMediaMessage(conversationId, file, caption)
+  async function sendMediaMessage(conversationId: number, file: File, caption?: string, replyToMessageId?: number) {
+    const res = replyToMessageId ? await whatsappApi.sendMediaMessage(conversationId, file, caption, replyToMessageId)
+      : await whatsappApi.sendMediaMessage(conversationId, file, caption)
     const message = res.data
     if (message) {
       upsertMessage(conversationId, message)
@@ -523,6 +525,8 @@ export const useWhatsAppStore = defineStore('whatsapp', () => {
       video: 'Video',
       document: 'Documento',
       sticker: 'Sticker',
+      location: 'Ubicación compartida',
+      contacts: 'Contacto compartido',
     }
     return labels[type] || 'Archivo'
   }
@@ -654,7 +658,23 @@ export const useWhatsAppStore = defineStore('whatsapp', () => {
     return [...items].sort((a, b) => utcTimestamp(a.timestamp) - utcTimestamp(b.timestamp) || a.id - b.id)
   }
 
+  function applyMessageUpdate(message: WhatsAppMessage, latestConversation?: WhatsAppConversation) {
+    const thread = messages.value[message.conversationId]
+    const current = thread?.find(item => item.id === message.id)
+    if (current?.hiddenSource && !message.hiddenSource) return
+    if (current) upsertMessage(message.conversationId, message)
+    if (!message.hiddenSource) return
+    const row = conversations.value.find(item => item.id === message.conversationId)
+    if (row && row.lastMessageAt === message.timestamp && (!thread?.length || thread[thread.length - 1]?.id === message.id))
+      row.lastMessagePreview = latestConversation?.lastMessagePreview
+        ?? (message.hiddenSource === 'pos' ? 'Mensaje oculto en el POS' : 'Mensaje eliminado desde WhatsApp Business')
+  }
+
   function applyRealtimeMessage(payload: WhatsAppRealtimeMessagePayload, activeConversationId?: number | null) {
+    if (payload.message.isUpdate) {
+      applyMessageUpdate(payload.message, payload.conversation)
+      return
+    }
     const incomingConversation = { ...payload.conversation }
     const incomingMessage = payload.message
     const existingConversation = conversations.value.find(c => c.id === incomingConversation.id)
@@ -803,6 +823,7 @@ export const useWhatsAppStore = defineStore('whatsapp', () => {
     saveQuickReply,
     deleteQuickReply,
     applyRealtimeMessage,
+    applyMessageUpdate,
     upsertMessage,
     applyAiProcessingChanged,
     clear,

@@ -28,6 +28,7 @@
 
 
             <CustomerSelector :required="orderType === 'delivery'"
+                :whatsapp-contact="props.whatsappContact"
                 :initial-address-branch-id="props.mode === 'draft' ? props.operationBranchId : undefined"
                 :for-order-address="props.mode === 'draft'"
                 :allow-address-branch-selection="props.mode !== 'draft'"
@@ -122,6 +123,7 @@ import {
 
 
 interface Props {
+    whatsappContact?: import('@/types/whatsapp').WhatsAppContactPrefill
     orderType: 'onsite' | 'delivery' | 'reservation'
     selectedCustomer?: Customer | null
     selectedAddress?: CustomerAddress | null

@@ -270,12 +270,20 @@ export interface WhatsAppConversation {
 }
 
 export type WhatsAppAttentionMode = 'ai' | 'human' | 'waitingForHuman' | 'paused' | 'closed'
+export type WhatsAppContactPrefill = Pick<WhatsAppConversation, 'id' | 'contactName' | 'phoneNumber' | 'whatsAppUsername' | 'attentionRevision'>
 export interface WhatsAppAttention { attentionRevision?: number; needsHumanResponse?: boolean; conversationId: number; attentionMode: WhatsAppAttentionMode; attentionReason?: string | null; assignedUserId?: number | null; assignedUserName?: string | null; aiPausedAt?: string | null; humanAssignedAt?: string | null; closedAt?: string | null; attentionModeUpdatedAt: string; attentionModeUpdatedByUserId?: number | null }
 export interface WhatsAppAttentionChangedPayload { branchId: number; conversation: WhatsAppConversation }
 export interface WhatsAppConversationRoutingChangedPayload { branchId: number; previousOperationalBranchId?: number | null; conversation: WhatsAppConversation }
 export interface WhatsAppOperationalBranchOption { id: number; name: string }
 
 export interface WhatsAppMessage {
+  isUpdate?: boolean
+  hiddenSource?: 'pos' | 'businessApp' | null
+  replyToWhatsAppMessageId?: string | null
+  location?: { latitude: number; longitude: number; name?: string | null; address?: string | null } | null
+  contacts?: Array<{ name: string; phones: string[] }> | null
+  customerReaction?: string | null
+  businessReaction?: string | null
   draftAddressApplied?: boolean
   draftProductApplied?: boolean
   source?: string
@@ -284,7 +292,7 @@ export interface WhatsAppMessage {
   conversationId: number
   whatsAppMessageId?: string | null
   direction: 'inbound' | 'outbound'
-  type: 'text' | 'image' | 'audio' | 'video' | 'document' | 'sticker'
+  type: 'text' | 'image' | 'audio' | 'video' | 'document' | 'sticker' | 'location' | 'contacts'
   textBody: string
   mediaId?: string | null
   mediaUrl?: string | null
