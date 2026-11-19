@@ -9,6 +9,7 @@
     panel-class="global-dialog-host-panel"
     :initial-focus="activeDialog?.type === 'prompt' ? 'input' : '[data-dialog-cancel]'"
     :focus-key="activeDialog?.id"
+    :whatsapp-theme="activeDialog?.options.whatsappTheme"
     @update:model-value="handleOpenChange"
   >
     <div v-if="activeDialog" class="space-y-4">

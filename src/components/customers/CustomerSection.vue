@@ -7,7 +7,7 @@
                 <label v-for="option in orderTypeOptions" :key="option.value" class="relative min-w-0 cursor-pointer">
                     <input type="radio" :name="typeInputName" :value="option.value" :checked="orderType === option.value" class="peer sr-only"
                         @change="handleOrderTypeChanged(option.value)" />
-                    <span class="flex min-h-8 items-center justify-center gap-1.5 rounded-lg px-2 text-xs font-medium text-gray-500 transition peer-checked:bg-white peer-checked:text-emerald-700 peer-checked:shadow-sm peer-focus-visible:outline peer-focus-visible:outline-2 peer-focus-visible:outline-emerald-600 hover:text-gray-900">
+                    <span class="flex min-h-8 items-center justify-center gap-1.5 rounded-lg px-2 text-xs font-medium text-gray-500 transition peer-checked:bg-[var(--wa-outgoing,white)] peer-checked:text-emerald-700 peer-checked:shadow-sm peer-focus-visible:outline peer-focus-visible:outline-2 peer-focus-visible:outline-emerald-600 hover:text-gray-900">
                         <component :is="option.icon" class="h-4 w-4 shrink-0" />{{ option.label }}
                     </span>
                 </label>

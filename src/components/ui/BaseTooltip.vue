@@ -8,7 +8,7 @@
     </button>
     <Teleport to="body">
       <Transition name="hint">
-        <div v-if="opened" :id="id" ref="tooltip" role="tooltip" class="fixed z-[12000] w-72 max-w-[calc(100vw-24px)] rounded-xl bg-slate-900 px-3.5 py-3 text-xs font-normal leading-relaxed text-white shadow-xl"
+        <div v-if="opened" :id="id" ref="tooltip" role="tooltip" :data-wa-theme="whatsappTheme" class="fixed z-[12000] w-72 max-w-[calc(100vw-24px)] rounded-xl bg-slate-900 px-3.5 py-3 text-xs font-normal leading-relaxed text-white shadow-xl"
           :style="{ left: `${position.left}px`, top: `${position.top}px`, visibility: positioned ? 'visible' : 'hidden' }">
           <p class="whitespace-pre-line">{{ text }}</p>
         </div>
@@ -19,6 +19,8 @@
 <script setup lang="ts">
 import { nextTick, onBeforeUnmount, ref, useId, type Component } from 'vue'
 import { QuestionMarkCircleIcon } from '@heroicons/vue/24/outline'
+import { injectWhatsAppTheme } from '@/composables/useWhatsAppTheme'
+const whatsappTheme = injectWhatsAppTheme()
 const props = defineProps<{ label: string; text: string; icon?: Component; compact?: boolean; buttonClass?: string; action?: boolean }>()
 const emit = defineEmits<{ activate: [] }>()
 const id = useId(), anchor = ref<HTMLElement>(), tooltip = ref<HTMLElement>()

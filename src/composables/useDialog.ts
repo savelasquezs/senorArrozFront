@@ -1,4 +1,5 @@
-import { nextTick, readonly, shallowRef } from 'vue'
+import { nextTick, readonly, shallowRef, type Ref } from 'vue'
+import { injectWhatsAppTheme, type WhatsAppTheme } from './useWhatsAppTheme'
 
 export type DialogTone = 'default' | 'warning' | 'danger'
 
@@ -8,6 +9,7 @@ interface CommonDialogOptions {
   confirmLabel?: string
   cancelLabel?: string
   tone?: DialogTone
+  whatsappTheme?: WhatsAppTheme
 }
 
 export interface ConfirmDialogOptions extends CommonDialogOptions {}
@@ -108,11 +110,13 @@ function cancelDialog() {
   settleDialog(activeEntry.request.type === 'confirm' ? false : null)
 }
 
-export function useDialog() {
+export function useDialog(theme: Readonly<Ref<WhatsAppTheme>> | undefined = injectWhatsAppTheme()) {
   return {
     activeDialog: readonly(activeDialog),
-    confirmDialog,
-    promptDialog,
+    confirmDialog: (options: ConfirmDialogOptions) =>
+      confirmDialog(theme ? { ...options, whatsappTheme: theme.value } : options),
+    promptDialog: (options: PromptDialogOptions) =>
+      promptDialog(theme ? { ...options, whatsappTheme: theme.value } : options),
     resolveDialog,
     cancelDialog,
   }

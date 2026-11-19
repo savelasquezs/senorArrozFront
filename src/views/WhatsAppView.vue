@@ -1,6 +1,20 @@
 <template>
   <div class="contents">
-    <div class="h-full min-h-0 bg-gray-50 flex flex-col">
+    <div class="wa-workspace flex h-full min-h-0 flex-col" :data-wa-theme="whatsappTheme">
+      <header v-if="whatsappStore.enabled" class="wa-module-header">
+        <h1 class="inline-flex items-center gap-1.5 font-semibold"><ChatBubbleLeftRightIcon class="size-4 text-emerald-700" aria-hidden="true" />WhatsApp</h1>
+        <div class="wa-module-actions">
+          <span class="wa-connection" :class="signalRStatusClasses" :title="signalRError || signalRStatusLabel">
+            <span class="size-1.5 rounded-full" :class="signalRDotClass" />{{ signalRStatusLabel }}
+          </span>
+          <span v-if="headerBranchLabel" class="wa-module-branch" :title="headerBranchLabel">{{ headerBranchLabel }}</span>
+          <div class="wa-theme-selector" role="group" aria-label="Tema de WhatsApp">
+            <button type="button" :aria-pressed="whatsappTheme === 'light'" @click="setWhatsAppTheme('light')"><SunIcon class="size-3" aria-hidden="true" />Claro</button>
+            <button type="button" :aria-pressed="whatsappTheme === 'dark'" @click="setWhatsAppTheme('dark')"><MoonIcon class="size-3" aria-hidden="true" />Oscuro</button>
+          </div>
+          <BaseButton variant="ghost" size="xs" :loading="whatsappStore.isLoadingConversations" @click="reloadConversations">Actualizar</BaseButton>
+        </div>
+      </header>
       <div
         v-if="statusLoadError && whatsappStore.status"
         class="flex items-center justify-between gap-3 border-b border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-900"
@@ -48,20 +62,14 @@
 
         <aside class="relative min-h-0 border-r border-gray-200 bg-white flex flex-col" :class="{ 'max-xl:hidden': mobilePane !== 'inbox' }">
           <div role="separator" tabindex="0" aria-label="Ancho de conversaciones" aria-orientation="vertical" :aria-valuenow="leftWidth" class="absolute -right-1 top-0 z-10 hidden h-full w-2 cursor-col-resize touch-none xl:block" @pointerdown="resize($event, 'left')" @keydown.left.prevent="step('left', -20)" @keydown.right.prevent="step('left', 20)" />
-          <div class="shrink-0 space-y-2 border-b border-gray-100 p-3">
-            <div class="flex items-center justify-between gap-2">
-              <h1 class="flex min-w-0 items-center gap-1.5 text-base font-semibold text-gray-900"><ChatBubbleLeftRightIcon class="h-5 w-5 shrink-0 text-emerald-600" />WhatsApp</h1>
-              <span class="inline-flex items-center gap-1 rounded-md px-1.5 py-1 text-[10px] font-medium" :class="signalRStatusClasses" :title="signalRError || signalRStatusLabel">
-                <span class="h-1.5 w-1.5 rounded-full" :class="signalRDotClass" />{{ signalRStatusLabel }}
-              </span>
-              <BaseButton variant="ghost" size="sm" :loading="whatsappStore.isLoadingConversations" @click="reloadConversations">Actualizar</BaseButton>
-            </div>
-            <input v-model="search" type="search" class="w-full rounded-lg border border-gray-300 px-3 py-2 text-xs focus:border-emerald-500 focus:ring-emerald-500"
+          <div class="wa-inbox-header">
+            <h2 class="text-xs font-semibold leading-4">Conversaciones</h2>
+            <input v-model="search" type="search" class="wa-inbox-search" aria-label="Buscar conversaciones"
               placeholder="Buscar teléfono o nombre" @input="onSearchInput" />
-            <div class="relative grid grid-cols-2 gap-2 text-xs">
+            <div class="relative flex flex-wrap gap-1.5">
               <details name="whatsapp-inbox-controls" class="group" @keydown.esc.stop="closeDetailsMenu">
                 <summary class="inbox-control" :class="{ 'border-emerald-300 bg-emerald-50 text-emerald-900': inboxFilterCount }">
-                  <FunnelIcon class="h-4 w-4 shrink-0" aria-hidden="true" /><span>Filtros</span>
+                  <FunnelIcon class="size-3 shrink-0" aria-hidden="true" /><span>Filtros</span>
                   <span v-if="inboxFilterCount" class="rounded-full bg-emerald-700 px-1.5 text-[10px] text-white">{{ inboxFilterCount }}</span>
                   <ChevronDownIcon class="ml-auto h-3 w-3 shrink-0 group-open:rotate-180" aria-hidden="true" />
                 </summary>
@@ -84,7 +92,7 @@
               </details>
               <details name="whatsapp-inbox-controls" class="group" @keydown.esc.stop="closeDetailsMenu">
                 <summary class="inbox-control">
-                  <WrenchScrewdriverIcon class="h-4 w-4 shrink-0" aria-hidden="true" /><span>Herramientas</span>
+                  <WrenchScrewdriverIcon class="size-3 shrink-0" aria-hidden="true" /><span>Herramientas</span>
                   <ChevronDownIcon class="ml-auto h-3 w-3 shrink-0 group-open:rotate-180" aria-hidden="true" />
                 </summary>
                 <div class="inbox-control-panel !p-1.5" role="region" aria-label="Herramientas de la bandeja">
@@ -113,8 +121,8 @@
                 v-for="(conversation, conversationIndex) in conversations"
                 v-memo="[...Object.values(conversation), inboxLabelsByKey, selectedLabel, selectedConversation?.id === conversation.id, conversationIndex === 0 || commercialGroup(conversations[conversationIndex - 1]!) !== commercialGroup(conversation), Math.floor(clockNow / 60_000)]"
                 :key="conversation.id"
-                class="relative w-full border-b border-gray-100 px-3 py-2 text-left hover:bg-gray-50"
-                :class="selectedConversation?.id === conversation.id ? 'bg-emerald-50' : conversation.attentionMode === 'waitingForHuman' ? 'bg-amber-50 ring-1 ring-inset ring-amber-300' : 'bg-white'"
+                class="wa-conversation"
+                :class="{ 'wa-conversation-selected': selectedConversation?.id === conversation.id, 'wa-conversation-waiting': conversation.attentionMode === 'waitingForHuman' }"
               >
                 <button
                   type="button"
@@ -123,41 +131,35 @@
                   @click="selectConversation(conversation)"
                 />
                 <p v-if="conversationIndex === 0 || commercialGroup(conversations[conversationIndex - 1]!) !== commercialGroup(conversation)" class="mb-2 text-[10px] font-semibold uppercase tracking-wide text-gray-500">{{ commercialGroup(conversation) }}</p>
-                <div class="flex items-center justify-between gap-2">
-                  <div class="flex min-w-0 flex-1 items-baseline gap-1.5">
-                    <span class="min-w-0 truncate text-sm font-semibold text-gray-950">{{ conversationTitle(conversation) }}</span>
-                    <span class="shrink-0 text-xs text-gray-300">-</span>
-                    <span class="truncate text-xs font-medium" :class="conversation.phoneNumber ? 'text-gray-500' : 'text-emerald-700'">{{ conversationIdentityLabel(conversation) }}</span>
+                <div class="wa-conversation-top">
+                  <span class="truncate text-xs font-semibold" :title="conversationIdentityLabel(conversation)">{{ conversationTitle(conversation) }}</span>
+                  <div v-if="conversation.labels?.length" class="wa-conversation-tags" data-test="inbox-conversation-labels">
+                    <button v-for="key in conversation.labels.slice(0, 2)" :key="key" type="button" class="wa-tag"
+                      :class="inboxLabelColor(key, inboxLabelsByKey.get(key)?.color)"
+                      :aria-label="inboxLabelName(key)" :title="inboxLabelName(key)" :aria-pressed="selectedLabel === key"
+                      @click="selectedLabel = selectedLabel === key ? '' : key">{{ inboxLabelShort(key) }}</button>
+                    <details v-if="conversation.labels.length > 2" class="wa-extra-tags" name="whatsapp-extra-tags" @keydown.esc.stop="closeDetailsMenu">
+                      <summary class="wa-tag" :aria-label="`${conversation.labels.length - 2} etiquetas adicionales`">+{{ conversation.labels.length - 2 }}</summary>
+                      <div class="wa-tag-menu">
+                        <button v-for="key in conversation.labels.slice(2)" :key="key" type="button" class="wa-tag"
+                          :class="inboxLabelColor(key, inboxLabelsByKey.get(key)?.color)"
+                          :aria-pressed="selectedLabel === key" @click="selectAdditionalLabel(key, $event)">{{ inboxLabelName(key) }}</button>
+                      </div>
+                    </details>
                   </div>
-                  <span v-if="conversation.unreadCount > 0" class="shrink-0 rounded-full bg-emerald-600 px-2 py-0.5 text-xs font-semibold text-white">
-                    {{ conversation.unreadCount }}
-                  </span>
+                  <time class="wa-card-time" :datetime="conversation.lastMessageAt || conversation.createdAt"
+                    :title="formatRelativeConversationTime(conversation.lastMessageAt || conversation.createdAt)">{{ formatInboxTimestamp(conversation.lastMessageAt || conversation.createdAt) }}</time>
                 </div>
-                <span v-if="conversation.labels?.length" class="mt-1.5 flex flex-wrap gap-1.5" data-test="inbox-conversation-labels">
-                  <button
-                    v-for="key in conversation.labels"
-                    :key="key"
-                    type="button"
-                    class="relative z-20 hover:opacity-80 focus-visible:outline focus-visible:outline-offset-2 focus-visible:outline-gray-900"
-                    :class="[inboxLabelClasses(key), { 'ring-2 ring-gray-700 ring-offset-1': selectedLabel === key }]"
-                    :aria-pressed="selectedLabel === key"
-                    @click="selectedLabel = selectedLabel === key ? '' : key"
-                  >
-                    {{ inboxLabelName(key) }}
-                  </button>
-                </span>
-                <div class="mt-1 flex min-w-0 items-baseline gap-2 text-xs">
+                <div class="wa-conversation-preview">
                   <span
                     class="min-w-0 flex-1 truncate"
                     :class="conversation.unreadCount > 0 ? 'font-semibold text-gray-800' : 'font-medium text-gray-600'"
                   >
                     {{ shortConversationPreview(conversation.lastMessagePreview) }}
                   </span>
-                  <span
-                    class="shrink-0 font-medium"
-                    :class="conversation.unreadCount > 0 ? 'text-emerald-700' : 'text-gray-400'"
-                  >
-                    {{ formatRelativeConversationTime(conversation.lastMessageAt || conversation.createdAt) }}
+                  <span v-if="conversation.unreadCount > 0" class="wa-card-unread"
+                    :aria-label="`${conversation.unreadCount} mensajes sin leer`">
+                    {{ conversation.unreadCount }}
                   </span>
                 </div>
                 <div class="mt-1 flex items-center justify-between gap-2">
@@ -199,12 +201,8 @@
                   <span class="chat-action-label">Retomar conversación</span>
                 </BaseButton>
                 <details class="chat-menu relative" name="whatsapp-chat-tools" @keydown.esc.stop="closeDetailsMenu">
-                  <summary class="chat-tool" aria-label="Etiquetas" title="Etiquetas">
-                    <TagIcon class="chat-action-icon h-4 w-4" aria-hidden="true" />
-                    <span class="chat-action-label">Etiquetas</span>
-                    <span v-if="selectedConversation.labels?.length" class="chat-label-count text-[10px] text-emerald-700">{{ selectedConversation.labels.length }}</span>
-                    <span v-for="key in selectedConversation.labels?.slice(0, 2)" :key="key" class="chat-label-chip max-w-24 truncate" :class="inboxLabelClasses(key)">{{ inboxLabelName(key) }}</span>
-                    <span v-if="(selectedConversation.labels?.length ?? 0) > 2" class="chat-label-chip text-[10px] text-emerald-700">+{{ (selectedConversation.labels?.length ?? 0) - 2 }}</span>
+                  <summary class="chat-tool wa-icon-control" aria-label="Etiquetas" title="Etiquetas">
+                    <TagIcon class="size-4" aria-hidden="true" />
                   </summary>
                   <section class="chat-menu-panel absolute right-0 top-full z-20 mt-2 w-80 max-w-[calc(100vw-2rem)] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl" aria-label="Etiquetas de la conversación">
                     <div class="flex items-center justify-between gap-2 border-b border-emerald-100 bg-emerald-50/70 px-3 py-2.5">
@@ -298,7 +296,7 @@
             </div>
           </div>
           <template v-else>
-            <div ref="messagesContainer" data-test="whatsapp-chat-messages" @scroll="trackMessageScroll" class="flex-1 min-h-0 overflow-y-auto px-4 py-4 space-y-3">
+            <div ref="messagesContainer" data-test="whatsapp-chat-messages" @scroll="trackMessageScroll" class="wa-thread flex-1 min-h-0 overflow-y-auto space-y-2 px-3 py-3">
               <p v-if="whatsappStore.isLoadingMessages && !currentMessages.length" role="status" class="text-center text-sm text-gray-500">Cargando mensajes…</p>
               <BaseButton v-if="whatsappStore.messageHistory[selectedConversation.id]?.hasMoreRecent" size="sm" variant="outline" class="mx-auto" @click="showRecentMessages">Volver a los recientes</BaseButton>
               <button v-if="whatsappStore.messageHistory[selectedConversation.id]?.hasMore" type="button"
@@ -307,143 +305,142 @@
                 {{ whatsappStore.olderMessagesLoading[selectedConversation.id] ? 'Cargando…' : 'Cargar mensajes anteriores' }}
               </button>
               <div
-                v-for="message in currentMessages"
+                v-for="(message, messageIndex) in currentMessages"
                 :key="message.id"
                 :data-message-id="message.id"
-                class="group/message flex"
+                class="flex"
                 :class="message.direction === 'outbound' ? 'justify-end' : 'justify-start'"
               >
-                <div
-                  class="relative max-w-[78%] rounded-lg px-3 py-2 shadow-sm"
-                  :class="message.direction === 'outbound' ? 'bg-emerald-600 text-white' : 'bg-white border border-gray-200 text-gray-900'"
-                >
-                  <WhatsAppMessageActions v-if="ownsConversation && !finishingAttention && !message.hiddenSource"
-                    class="wa-message-toolbar" :class="message.direction === 'outbound' ? 'right-2' : 'left-2'"
-                    :can-send="canSend && !!message.whatsAppMessageId && message.status !== 'failed'" :open="reactionPickerId === message.id"
-                    :outbound="message.direction === 'outbound'" :busy="messageActionId === message.id" :current-reaction="message.businessReaction"
-                    @reply="startMessageReply(message)" @toggle="reactionPickerId = reactionPickerId === message.id ? null : message.id"
-                    @react="emoji => reactToMessage(message, emoji)" @hide="hideMessage(message)" />
-                  <p v-if="message.hiddenSource" class="text-sm italic opacity-80">
-                    {{ message.hiddenSource === 'pos' ? 'Mensaje oculto en el POS' : 'Mensaje eliminado desde WhatsApp Business' }}
-                  </p>
-                  <template v-else>
-                    <button v-if="message.replyToWhatsAppMessageId" type="button"
-                      class="mb-2 block w-full rounded-md border-l-[3px] border-emerald-300 bg-black/5 px-2 py-1.5 text-left text-xs hover:bg-black/10"
-                      :disabled="!quotedMessage(message)" @click="focusQuotedMessage(message)">
-                      <span class="block font-semibold">{{ quotedMessage(message)?.direction === 'outbound' ? 'Señor Arroz' : 'Mensaje citado' }}</span>
-                      <span class="block truncate opacity-85">{{ messageSummary(quotedMessage(message)) }}</span>
-                    </button>
-                    <a v-if="message.location" :href="mapLink(message.location)" target="_blank" rel="noopener noreferrer"
-                      class="mb-1 flex max-w-xs items-center gap-2.5 rounded-xl border border-current/15 bg-black/5 p-2.5 transition-colors hover:bg-black/10">
-                      <span class="grid size-9 shrink-0 place-items-center rounded-lg bg-emerald-50 text-emerald-700"><MapPinIcon class="h-5 w-5" aria-hidden="true" /></span>
-                      <span class="min-w-0">
-                        <span class="block text-sm font-semibold">{{ message.location.name || 'Ubicación compartida' }}</span>
-                        <span v-if="message.location.address" class="block break-words text-xs opacity-80">{{ message.location.address }}</span>
-                        <span class="block text-xs font-medium underline">Abrir mapa</span>
-                      </span>
-                    </a>
-                    <div v-else-if="message.contacts?.length" class="space-y-1.5">
-                      <div v-for="(contact, index) in message.contacts" :key="index"
-                        class="flex max-w-xs items-start gap-2.5 rounded-xl border border-current/15 bg-black/5 p-2.5">
-                        <UserCircleIcon class="h-8 w-8 shrink-0 opacity-80" aria-hidden="true" />
-                        <div class="min-w-0">
-                          <p class="break-words text-sm font-semibold">{{ contact.name }}</p>
-                          <a v-for="phone in contact.phones" :key="phone" :href="`tel:${phone.replace(/[^+\d]/g, '')}`"
-                            class="block break-all text-xs underline">{{ phone }}</a>
+                <div class="wa-message-stack" :class="{ 'wa-outbound': message.direction === 'outbound' }">
+                  <div class="wa-bubble" :class="{ 'wa-bubble-tail': endsMessageGroup(message, currentMessages[messageIndex + 1]) }">
+                    <WhatsAppMessageActions v-if="ownsConversation && !finishingAttention && !message.hiddenSource"
+                      :can-send="canSend && !!message.whatsAppMessageId && message.status !== 'failed'" :open="reactionPickerId === message.id"
+                      :outbound="message.direction === 'outbound'" :busy="messageActionId === message.id" :current-reaction="message.businessReaction"
+                      @reply="startMessageReply(message)" @toggle="reactionPickerId = reactionPickerId === message.id ? null : message.id"
+                      @react="emoji => reactToMessage(message, emoji)" @hide="hideMessage(message)" />
+                    <template v-if="!message.hiddenSource">
+                      <button v-if="message.replyToWhatsAppMessageId" type="button"
+                        class="wa-message-quote mb-1 block w-full rounded-md border-l-2 px-2 py-1 text-left text-xs"
+                        :disabled="!quotedMessage(message)" @click="focusQuotedMessage(message)">
+                        <span class="block font-semibold">{{ quotedMessage(message)?.direction === 'outbound' ? 'Señor Arroz' : 'Mensaje citado' }}</span>
+                        <span class="block truncate opacity-85">{{ messageSummary(quotedMessage(message)) }}</span>
+                      </button>
+                      <a v-if="message.location" :href="mapLink(message.location)" target="_blank" rel="noopener noreferrer"
+                        class="mb-1 flex max-w-xs items-center gap-2.5 rounded-xl border border-current/15 bg-black/5 p-2.5 transition-colors hover:bg-black/10">
+                        <span class="grid size-9 shrink-0 place-items-center rounded-lg bg-emerald-50 text-emerald-700"><MapPinIcon class="h-5 w-5" aria-hidden="true" /></span>
+                        <span class="min-w-0">
+                          <span class="block text-sm font-semibold">{{ message.location.name || 'Ubicación compartida' }}</span>
+                          <span v-if="message.location.address" class="block break-words text-xs opacity-80">{{ message.location.address }}</span>
+                          <span class="block text-xs font-medium underline">Abrir mapa</span>
+                        </span>
+                      </a>
+                      <div v-else-if="message.contacts?.length" class="space-y-1.5">
+                        <div v-for="(contact, index) in message.contacts" :key="index"
+                          class="flex max-w-xs items-start gap-2.5 rounded-xl border border-current/15 bg-black/5 p-2.5">
+                          <UserCircleIcon class="h-8 w-8 shrink-0 opacity-80" aria-hidden="true" />
+                          <div class="min-w-0">
+                            <p class="break-words text-sm font-semibold">{{ contact.name }}</p>
+                            <a v-for="phone in contact.phones" :key="phone" :href="`tel:${phone.replace(/[^+\d]/g, '')}`"
+                              class="block break-all text-xs underline">{{ phone }}</a>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  <div v-if="message.mediaUrl" class="mb-2">
-                    <button
-                      v-if="message.type === 'image' || message.type === 'sticker'"
-                      type="button"
-                      class="block max-w-full overflow-hidden rounded-md focus:outline-none focus:ring-2 focus:ring-emerald-300"
-                      title="Ver imagen"
-                      @click="openImagePreview(message)"
-                    >
-                      <img
-                        loading="lazy" decoding="async" width="256" height="192"
-                        :src="message.mediaUrl"
-                        :alt="message.mediaFileName || 'Imagen de WhatsApp'"
-                        class="max-h-80 max-w-full cursor-zoom-in object-contain"
-                      />
-                    </button>
-                    <audio
-                      preload="none"
-                      v-else-if="message.type === 'audio'"
-                      :src="message.mediaUrl"
-                      controls
-                      class="w-72 max-w-full"
-                    />
-                    <video
-                      preload="none"
-                      v-else-if="message.type === 'video'"
-                      :src="message.mediaUrl"
-                      controls
-                      class="max-h-80 max-w-full rounded-md"
-                    />
-                    <a
-                      v-else
-                      :href="message.mediaUrl"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      class="flex items-center gap-2 rounded-md border px-3 py-2 text-sm"
-                      :class="message.direction === 'outbound' ? 'border-emerald-200 bg-emerald-700 text-white' : 'border-gray-200 bg-gray-50 text-gray-800'"
-                    >
-                      <DocumentIcon class="h-5 w-5 shrink-0" />
-                      <span class="min-w-0 flex-1 truncate">{{ message.mediaFileName || 'Abrir archivo' }}</span>
-                      <span v-if="message.mediaFileSize" class="text-xs opacity-80">{{ formatFileSize(message.mediaFileSize) }}</span>
-                    </a>
-                  </div>
-                  <p v-if="message.textBody && !message.location && !message.contacts?.length" class="whitespace-pre-wrap break-words text-sm">{{ message.textBody }}</p>
-                  <p v-else-if="message.type !== 'text' && !message.mediaUrl && !message.location && !message.contacts?.length" class="text-sm opacity-80">
-                    {{ mediaFallbackLabel(message) }}
-                  </p>
-                  <div v-if="productSuggestions.get(message.id)?.length" class="mt-2 flex flex-wrap gap-1.5" aria-label="Sugerencias de productos">
-                    <template v-for="suggestion in productSuggestions.get(message.id)" :key="suggestion.productId ?? suggestion.reply">
-                      <button
-                        v-if="suggestion.kind === 'add'"
-                        type="button"
-                        class="rounded border border-emerald-200 bg-emerald-50 px-2 py-1 text-left text-xs font-semibold text-emerald-800 hover:bg-emerald-100 disabled:opacity-65"
-                        :disabled="isSuggestionApplied(message.id, suggestion) || !suggestion.available || !currentSuggestionState?.canApply || suggestionBranch !== visibleSuggestionBranch"
-                        @click="addProductSuggestion(message.id, suggestion)"
-                      >
-                        {{ isSuggestionApplied(message.id, suggestion) ? 'Agregado' : !suggestionBranch ? 'Elige la sucursal' : suggestion.available ? 'Agregar' : 'Sin disponibilidad' }}
-                        {{ suggestion.quantity }} × {{ suggestion.name }} · $ {{ suggestion.unitPrice?.toLocaleString('es-CO') }}
-                      </button>
-                      <button
-                        v-else-if="suggestion.reply"
-                        type="button"
-                        class="rounded border border-gray-200 px-2 py-1 text-xs font-semibold text-gray-700 hover:bg-gray-100 disabled:opacity-65"
-                        :title="suggestion.reply"
-                        :disabled="!canSend"
-                        @click="draftOrderMessage(message.conversationId, suggestion.reply)"
-                      >
-                        {{ suggestion.kind === 'clarify' ? 'Preparar pregunta' : 'Preparar respuesta' }}
-                      </button>
+                      <div v-if="message.mediaUrl" class="mb-2">
+                        <button
+                          v-if="message.type === 'image' || message.type === 'sticker'"
+                          type="button"
+                          class="block max-w-full overflow-hidden rounded-md focus:outline-none focus:ring-2 focus:ring-emerald-300"
+                          title="Ver imagen"
+                          @click="openImagePreview(message)"
+                        >
+                          <img
+                            loading="lazy" decoding="async" width="256" height="192"
+                            :src="message.mediaUrl"
+                            :alt="message.mediaFileName || 'Imagen de WhatsApp'"
+                            class="max-h-80 max-w-full cursor-zoom-in object-contain"
+                          />
+                        </button>
+                        <audio
+                          preload="none"
+                          v-else-if="message.type === 'audio'"
+                          :src="message.mediaUrl"
+                          controls
+                          class="w-72 max-w-full"
+                        />
+                        <video
+                          preload="none"
+                          v-else-if="message.type === 'video'"
+                          :src="message.mediaUrl"
+                          controls
+                          class="max-h-80 max-w-full rounded-md"
+                        />
+                        <a
+                          v-else
+                          :href="message.mediaUrl"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          class="flex items-center gap-2 rounded-md border px-3 py-2 text-sm"
+                          :class="message.direction === 'outbound' ? 'border-emerald-200 bg-emerald-700 text-white' : 'border-gray-200 bg-gray-50 text-gray-800'"
+                        >
+                          <DocumentIcon class="h-5 w-5 shrink-0" />
+                          <span class="min-w-0 flex-1 truncate">{{ message.mediaFileName || 'Abrir archivo' }}</span>
+                          <span v-if="message.mediaFileSize" class="text-xs opacity-80">{{ formatFileSize(message.mediaFileSize) }}</span>
+                        </a>
+                      </div>
                     </template>
+                    <p class="wa-message-copy">
+                      <span v-if="message.hiddenSource" class="italic opacity-80">{{ message.hiddenSource === 'pos' ? 'Mensaje oculto en el POS' : 'Mensaje eliminado desde WhatsApp Business' }}</span>
+                      <span v-else-if="message.textBody && !message.location && !message.contacts?.length" class="whitespace-pre-wrap">{{ message.textBody }}</span>
+                      <span v-else-if="message.type !== 'text' && !message.mediaUrl && !message.location && !message.contacts?.length" class="opacity-80">{{ mediaFallbackLabel(message) }}</span>
+                      <span class="wa-message-meta">
+                        <span v-if="message.source === 'businessApp'">Celular ·</span><span v-if="message.isHistorical">Historial ·</span>
+                        <time :datetime="message.timestamp">{{ formatTime(message.timestamp) }}</time>
+                        <template v-if="message.direction === 'outbound'">
+                          <ExclamationCircleIcon v-if="message.status === 'failed'" class="size-3 text-red-700" role="img" :aria-label="statusLabel(message.status)" />
+                          <span v-else class="inline-flex" :class="{ 'text-emerald-700': message.status === 'read' }" role="img" :aria-label="statusLabel(message.status)" :title="statusLabel(message.status)">
+                            <CheckIcon class="size-3" aria-hidden="true" />
+                            <CheckIcon v-if="message.status !== 'sent'" class="-ml-2.5 size-3" aria-hidden="true" />
+                          </span>
+                        </template>
+                      </span>
+                    </p>
+                    <div v-if="!message.hiddenSource && (message.customerReaction || message.businessReaction)" class="wa-reactions" aria-label="Reacciones">
+                      <span v-if="message.customerReaction" :key="`customer-${message.customerReaction}`" class="wa-reaction" title="Reacción del cliente">{{ message.customerReaction }}</span>
+                      <span v-if="message.businessReaction" :key="`business-${message.businessReaction}`" class="wa-reaction" title="Reacción de Señor Arroz">{{ message.businessReaction }}</span>
+                    </div>
+                    <div
+                      v-if="!message.hiddenSource && message.direction === 'inbound' && message.aiProcessing"
+                      class="mt-1 flex flex-wrap items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] font-medium"
+                      :class="aiMessageStatusClasses(message.aiProcessing)"
+                      role="status"
+                      :title="aiProcessingReason(message.aiProcessing)"
+                    >
+                      <CpuChipIcon class="size-3 shrink-0" />
+                      <span>{{ message.aiProcessing.title || aiValueLabel(message.aiProcessing.status) }}</span>
+                      <span v-if="message.aiProcessing.willRetry" class="opacity-80">
+                        · intento {{ message.aiProcessing.attempts }}/{{ message.aiProcessing.maxAttempts }}
+                      </span>
+                    </div>
                   </div>
-                  <div v-if="message.customerReaction || message.businessReaction" class="mt-1.5 flex gap-1" aria-label="Reacciones">
-                    <span v-if="message.customerReaction" :key="`customer-${message.customerReaction}`" class="wa-reaction" title="Reacción del cliente">{{ message.customerReaction }}</span>
-                    <span v-if="message.businessReaction" :key="`business-${message.businessReaction}`" class="wa-reaction" title="Reacción de Señor Arroz">{{ message.businessReaction }}</span>
-                  </div>
-                  </template>
-                  <div class="mt-1 flex items-center justify-end gap-2 text-[11px]" :class="message.direction === 'outbound' ? 'text-emerald-50' : 'text-gray-400'">
-                    <span v-if="message.source === 'businessApp'">Celular · </span><span v-if="message.isHistorical">Historial · </span><span>{{ formatTime(message.timestamp) }}</span>
-                    <span v-if="message.direction === 'outbound'">{{ statusLabel(message.status) }}</span>
-                  </div>
-                  <div
-                    v-if="!message.hiddenSource && message.direction === 'inbound' && message.aiProcessing"
-                    class="mt-2 flex flex-wrap items-center gap-1.5 rounded-md px-2 py-1.5 text-[11px] font-medium"
-                    :class="aiMessageStatusClasses(message.aiProcessing)"
-                    role="status"
-                    :title="aiProcessingReason(message.aiProcessing)"
-                  >
-                    <CpuChipIcon class="h-3.5 w-3.5 shrink-0" />
-                    <span>{{ message.aiProcessing.title || aiValueLabel(message.aiProcessing.status) }}</span>
-                    <span v-if="message.aiProcessing.willRetry" class="opacity-80">
-                      · intento {{ message.aiProcessing.attempts }}/{{ message.aiProcessing.maxAttempts }}
-                    </span>
+                  <div v-if="!message.hiddenSource && productSuggestions.get(message.id)?.length" class="wa-suggestions" aria-label="Sugerencias de productos">
+                    <template v-for="suggestion in productSuggestions.get(message.id)" :key="suggestion.productId ?? suggestion.reply">
+                      <div v-if="suggestion.kind === 'add'" class="wa-suggestion">
+                        <span class="flex min-w-0 items-center gap-1" :title="suggestion.name ?? undefined">
+                          <ViewfinderCircleIcon class="size-3.5 shrink-0 text-emerald-700" aria-hidden="true" />
+                          <span class="truncate font-semibold">{{ suggestion.name }}<template v-if="suggestion.unitPrice != null"> · ${{ suggestion.unitPrice.toLocaleString('es-CO') }}</template></span>
+                        </span>
+                        <button type="button"
+                          :disabled="isSuggestionApplied(message.id, suggestion) || !suggestion.available || !currentSuggestionState?.canApply || suggestionBranch !== visibleSuggestionBranch"
+                          @click="addProductSuggestion(message.id, suggestion)">
+                          {{ isSuggestionApplied(message.id, suggestion) ? 'Agregado' : !suggestionBranch ? 'Elige la sucursal' : suggestion.available ? 'Agregar ' + suggestion.quantity : 'Sin disponibilidad' }}
+                        </button>
+                      </div>
+                      <div v-else-if="suggestion.reply" class="wa-suggestion">
+                        <span class="truncate" :title="suggestion.reply">{{ suggestion.name || (suggestion.kind === 'clarify' ? 'Aclarar presentación' : 'Consultar precio') }}</span>
+                        <button type="button" :disabled="!canSend" :title="suggestion.reply"
+                          @click="draftOrderMessage(message.conversationId, suggestion.reply!)">{{ suggestion.kind === 'clarify' ? 'Preparar pregunta' : 'Preparar respuesta' }}</button>
+                      </div>
+                    </template>
                   </div>
                 </div>
               </div>
@@ -458,8 +455,12 @@
               <p v-if="ownsConversation && !serviceWindowOpen" class="mb-2 rounded bg-amber-50 p-2 text-sm text-amber-900">La ventana de atención de 24 horas está cerrada. Usa una plantilla aprobada para iniciar el contacto.</p>
               <p v-else-if="ownsConversation" class="mb-2 text-xs text-gray-500">Ventana de atención hasta {{ new Date(selectedConversation.customerServiceWindowExpiresAt!).toLocaleString('es-CO') }}</p>
               <WhatsAppConversationTemplates v-if="ownsConversation" :key="selectedConversation.id" :conversation-id="selectedConversation.id" />
-              <div class="mb-2 flex flex-wrap items-center gap-2">
-                <span class="text-xs font-medium text-gray-500">Rápidas</span>
+              <button type="button" class="wa-quick-toggle" :aria-expanded="compactQuickReplies" aria-controls="wa-quick-list"
+                @click="compactQuickReplies = !compactQuickReplies">
+                <BoltIcon class="size-3.5" aria-hidden="true" />Rápidas<ChevronDownIcon class="size-3" aria-hidden="true" />
+              </button>
+              <div id="wa-quick-list" class="wa-quick-list mb-1.5 flex flex-wrap items-center gap-1.5" :class="{ 'wa-quick-list-open': compactQuickReplies }">
+                <span class="wa-quick-caption inline-flex items-center gap-1 text-xs font-medium text-gray-500"><BoltIcon class="size-3.5 text-emerald-700" aria-hidden="true" />Rápidas</span>
                 <button v-if="ownsConversation" type="button"
                   class="rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-800 hover:bg-emerald-100 disabled:opacity-50"
                   :disabled="sending || sendingProductChoices || !canSend" @click="openProductChoices">Elegir presentación</button>
@@ -556,6 +557,7 @@
           Pedido
         </button>
 
+        <Transition name="wa-order-panel">
         <aside v-if="selectedConversation" v-show="!contextPanelCollapsed" data-test="whatsapp-order-column" class="relative min-h-0 border-l border-gray-200 bg-white flex flex-col" :class="{ 'max-xl:hidden': mobilePane !== 'order' }">
           <div role="separator" tabindex="0" aria-label="Ancho del pedido" aria-orientation="vertical" :aria-valuenow="rightWidth" class="absolute -left-1 top-0 z-10 hidden h-full w-2 cursor-col-resize touch-none xl:block" @pointerdown="resize($event, 'right')" @keydown.left.prevent="step('right', 20)" @keydown.right.prevent="step('right', -20)" />
           <KeepAlive :key="editorScope" :max="8">
@@ -564,6 +566,7 @@
               @product-suggestion-state="setProductSuggestionState" />
           </KeepAlive>
         </aside>
+        </Transition>
         </div>
       </div>
 
@@ -830,6 +833,7 @@ import { computed, defineAsyncComponent, nextTick, onBeforeUnmount, onMounted, r
 import { useRoute, useRouter } from 'vue-router'
 import {
   ArrowUturnLeftIcon,
+  BoltIcon,
   ChatBubbleLeftRightIcon,
   ChatBubbleOvalLeftEllipsisIcon,
   ChevronDoubleLeftIcon,
@@ -841,6 +845,7 @@ import {
   CpuChipIcon,
   DocumentIcon,
   EllipsisHorizontalIcon,
+  ExclamationCircleIcon,
   ExclamationTriangleIcon,
   FunnelIcon,
   InformationCircleIcon,
@@ -849,9 +854,11 @@ import {
   PaperClipIcon,
   PaperAirplaneIcon,
   PlusIcon,
+  SunIcon,
   TagIcon,
   UserCircleIcon,
   UserPlusIcon,
+  ViewfinderCircleIcon,
   WrenchScrewdriverIcon,
   XMarkIcon,
 } from '@heroicons/vue/24/outline'
@@ -877,6 +884,7 @@ import type { WhatsAppAttentionAction, WhatsAppInboxKey } from '@/types/whatsapp
 import { whatsappApi } from '@/services/MainAPI/whatsappApi'
 import { useToast } from '@/composables/useToast'
 import { useDialog } from '@/composables/useDialog'
+import { useWhatsAppTheme } from '@/composables/useWhatsAppTheme'
 import { useSignalR } from '@/composables/useSignalR'
 import { useNetworkActivityManager } from '@/composables/useNetworkActivityManager'
 import { createWhatsAppRoutingRefresh } from '@/utils/whatsappRoutingRefresh'
@@ -914,11 +922,13 @@ import { buildWhatsAppInboxSections, canReadWhatsAppRouting, whatsappConversatio
 
 const whatsappStore = useWhatsAppStore()
 const authStore = useAuthStore()
+const { theme: whatsappTheme, setTheme: setWhatsAppTheme } = useWhatsAppTheme(() => authStore.user?.id)
+const compactQuickReplies = ref(false)
 const workContext = useBranchContextStore()
 const router = useRouter()
 const route = useRoute()
 const { success, error: showError } = useToast()
-const { confirmDialog } = useDialog()
+const { confirmDialog } = useDialog(whatsappTheme)
 const {
   connectionState,
   error: signalRError,
@@ -1553,6 +1563,13 @@ const branchOptions = computed(() => {
     label: labels.get(id) ?? `Sucursal ${id}`,
   }))
 })
+const headerBranchLabel = computed(() => {
+  if (authStore.isSuperadmin) {
+    if (!selectedBranchId.value) return 'Todas las sucursales'
+    return branchOptions.value.find(branch => branch.id === selectedBranchId.value)?.label
+  }
+  return authStore.user?.branchName
+})
 
 const activeQuickRepliesForConversation = computed(() => {
   if (!selectedConversation.value) return []
@@ -1602,11 +1619,25 @@ function inboxLabelName(key: string) {
     ?? (key.startsWith('branch:') ? `Sucursal ${key.slice('branch:'.length)}` : key)
 }
 
-function inboxLabelClasses(key: string) {
-  return [
-    'rounded-md px-2 py-0.5 text-xs font-bold leading-4',
-    inboxLabelColor(key, inboxLabelsByKey.value.get(key)?.color),
-  ]
+const labelInitials: Record<string, string> = { supplier: 'PR', pending: 'PE', taken: 'TO', payment_pending: 'PP' }
+function inboxLabelShort(key: string) {
+  return labelInitials[key] ?? Array.from(inboxLabelName(key).trim()).slice(0, 2).join('').toLocaleUpperCase('es-CO')
+}
+
+function selectAdditionalLabel(key: string, event: MouseEvent) {
+  const menu = (event.currentTarget as HTMLElement).closest('details')
+  if (menu) {
+    menu.open = false
+    menu.querySelector('summary')?.focus()
+  }
+  selectedLabel.value = selectedLabel.value === key ? '' : key
+}
+
+function endsMessageGroup(message: WhatsAppMessage, next?: WhatsAppMessage) {
+  if (message.hiddenSource) return false
+  return !next || !!next.hiddenSource || next.direction !== message.direction
+    || next.sentByUserId !== message.sentByUserId || next.source !== message.source
+    || parseUtcDate(next.timestamp).toDateString() !== parseUtcDate(message.timestamp).toDateString()
 }
 
 async function loadInboxLabels() {
@@ -2425,6 +2456,15 @@ function shortConversationPreview(value?: string | null) {
   return `${text.slice(0, 30).trimEnd()}.....`
 }
 
+const inboxClock = new Intl.DateTimeFormat('es-CO', { hour: '2-digit', minute: '2-digit', hourCycle: 'h23' })
+const inboxDate = new Intl.DateTimeFormat('es-CO', { day: '2-digit', month: '2-digit' })
+function formatInboxTimestamp(value?: string | null) {
+  if (!value) return ''
+  const date = parseUtcDate(value)
+  if (!Number.isFinite(date.getTime())) return ''
+  return date.toDateString() === new Date(clockNow.value).toDateString() ? inboxClock.format(date) : inboxDate.format(date)
+}
+
 function formatRelativeConversationTime(value?: string | null) {
   if (!value) return ''
   const date = parseUtcDate(value)
@@ -2642,51 +2682,160 @@ watch(() => selectedConversation.value?.id, id => {
 </script>
 
 <style scoped>
-.wa-message-toolbar {
-  position: absolute;
-  z-index: 5;
-  top: -.9rem;
-  transition: opacity 140ms ease;
-}
+.wa-workspace { background: var(--wa-canvas); }
+.wa-workspace :deep(:focus-visible) { outline-color: var(--wa-focus); }
 @media (hover: hover) and (pointer: fine) {
-  .wa-message-toolbar { opacity: 0; pointer-events: none; }
-  .group\/message:hover .wa-message-toolbar, .wa-message-toolbar:focus-within, .wa-message-toolbar.is-open {
-    opacity: 1;
-    pointer-events: auto;
-  }
+  .wa-bubble:hover :deep(.message-actions) { opacity: 1; pointer-events: auto; transform: translateY(-50%); }
 }
+.wa-module-header {
+  display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: .375rem;
+  min-height: 2.75rem; padding: .375rem .625rem; border-bottom: 1px solid var(--wa-line);
+  background: linear-gradient(110deg, var(--wa-header-start), var(--wa-panel) 45%, var(--wa-header-end));
+  font-size: .75rem;
+}
+.wa-module-actions { display: flex; align-items: center; flex-wrap: wrap; gap: .3125rem; min-width: 0; }
+.wa-module-actions > :is(span, button), .wa-theme-selector button {
+  display: inline-flex; align-items: center; gap: .25rem; height: 1.5rem; min-height: 1.5rem;
+  padding: 0 .375rem; white-space: nowrap; border-radius: .375rem; font-size: .6875rem;
+}
+.wa-module-branch { color: var(--wa-focus); background: var(--wa-selected); max-width: 9rem; overflow: hidden; }
+.wa-theme-selector { display: inline-flex; }
+.wa-theme-selector button {
+  border: 1px solid var(--wa-line); border-radius: .375rem 0 0 .375rem; background: var(--wa-panel);
+  transition: background-color 110ms, color 110ms; color: var(--wa-muted); cursor: pointer;
+}
+.wa-theme-selector button + button { margin-left: -1px; border-radius: 0 .375rem .375rem 0; }
+.wa-theme-selector button[aria-pressed="true"] { position: relative; color: var(--wa-focus); background: var(--wa-selected); }
+.wa-inbox-header {
+  display: grid; gap: .3125rem; flex-shrink: 0; padding: .5rem .5rem .375rem; border-bottom: 1px solid var(--wa-line);
+}
+.wa-inbox-search {
+  width: 100%; height: 1.625rem; border: 1px solid var(--wa-input-line); border-radius: .375rem;
+  padding: 0 .4375rem; font-size: .6875rem; background: var(--wa-canvas);
+}
+.wa-inbox-search::placeholder { color: var(--wa-muted); }
+.wa-conversation {
+  position: relative; width: 100%; text-align: left; padding: .375rem .5rem;
+  background: var(--wa-panel); border-bottom: 1px solid var(--wa-line);
+}
+.wa-conversation:hover { background: var(--wa-raised); }
+.wa-conversation:has(.wa-extra-tags[open]) { z-index: 25; }
+.wa-conversation-waiting { box-shadow: inset .1875rem 0 var(--wa-warning); }
+.wa-conversation-selected, .wa-conversation-selected:hover { background: var(--wa-selected); box-shadow: inset .1875rem 0 var(--wa-focus); }
+.wa-conversation-top, .wa-conversation-preview {
+  display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: .3125rem; align-items: center;
+  min-height: 1.25rem;
+}
+.wa-conversation-preview { grid-template-columns: minmax(0, 1fr) auto; font-size: .6875rem; }
+.wa-conversation-tags { position: relative; z-index: 20; display: inline-flex; gap: .1875rem; align-items: center; }
+.wa-tag {
+  display: inline-flex; min-width: 1.1875rem; height: 1.125rem; padding: 0 .1875rem; align-items: center;
+  justify-content: center; border-radius: .25rem; font-size: .625rem; font-weight: 700; cursor: pointer;
+}
+.wa-tag[aria-pressed="true"] { outline: 2px solid var(--wa-focus); outline-offset: 1px; }
+.wa-extra-tags { position: relative; }
+.wa-extra-tags summary { background: var(--wa-raised); color: var(--wa-text); }
+.wa-extra-tags summary::-webkit-details-marker { display: none; }
+.wa-tag-menu {
+  position: absolute; z-index: 1; inset-inline-end: 0; display: grid; gap: .25rem; min-width: 7rem;
+  border-radius: .5rem; padding: .3125rem; background: var(--wa-panel); border: 1px solid var(--wa-line);
+  box-shadow: 0 .375rem 1rem var(--wa-shadow);
+}
+.wa-tag-menu .wa-tag { min-height: 1.5rem; height: auto; padding: .1875rem .3125rem; white-space: nowrap; }
+.wa-card-time { color: var(--wa-muted); font-size: .625rem; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.wa-card-unread {
+  min-width: 1.125rem; height: 1.125rem; display: inline-grid; place-items: center;
+  border-radius: 1rem; padding: 0 .1875rem; background: var(--wa-action); color: var(--wa-on-action);
+  font-size: .625rem; font-weight: 700; font-variant-numeric: tabular-nums;
+}
+.wa-thread { background: radial-gradient(ellipse at top right, var(--wa-selected), transparent 65%), var(--wa-canvas); }
+.wa-message-stack { display: grid; min-width: 0; max-width: min(86%, calc(100% - 5.25rem)); gap: .25rem; }
+.wa-bubble {
+  --bubble-fill: var(--wa-panel); --bubble-line: var(--wa-line);
+  position: relative; justify-self: start; min-width: 0; max-width: 100%; border-radius: .8125rem;
+  border: 1px solid var(--bubble-line); background: var(--bubble-fill); padding: .375rem .5rem;
+  color: var(--wa-text);
+}
+.wa-outbound .wa-bubble { --bubble-fill: var(--wa-outgoing); --bubble-line: var(--wa-outgoing-line); justify-self: end; }
+.wa-bubble:is(:hover,:focus-within,:has(.wa-tools-open)) { z-index: 3; }
+.wa-bubble-tail { border-end-start-radius: .3125rem; }
+.wa-outbound .wa-bubble-tail { border-end-start-radius: .8125rem; border-end-end-radius: .3125rem; }
+.wa-bubble-tail::before, .wa-bubble-tail::after {
+  content: ''; position: absolute; width: 12px; height: 12px; pointer-events: none;
+  clip-path: path("M 12 0 L 12 9 C 8 11 4 12 0 11 C 5 9 7 5 7 2 L 8 0 Z");
+}
+.wa-bubble-tail::before { inset-inline-start: -8px; bottom: -1px; background: var(--bubble-line); }
+.wa-bubble-tail::after { inset-inline-start: -7px; bottom: 0; background: var(--bubble-fill); }
+.wa-outbound .wa-bubble-tail::before, .wa-outbound .wa-bubble-tail::after { inset-inline-start: auto; transform: scaleX(-1); }
+.wa-outbound .wa-bubble-tail::before { inset-inline-end: -8px; }
+.wa-outbound .wa-bubble-tail::after { inset-inline-end: -7px; }
+.wa-message-quote { border-color: var(--wa-focus); background: var(--wa-selected); }
+.wa-message-quote:hover:not(:disabled) { filter: brightness(.96); }
+.wa-message-copy { display: flow-root; color: inherit; overflow-wrap: anywhere; font-size: .8125rem; line-height: 1.4; }
+.wa-message-meta {
+  float: inline-end; display: inline-flex; align-items: center; gap: .1875rem; margin-inline-start: .375rem;
+  padding-top: .1875rem; color: var(--wa-muted); font-size: .625rem; line-height: 1.2; white-space: nowrap;
+}
+.wa-reactions {
+  position: absolute; z-index: 1; inset-inline-end: .375rem; bottom: -.5rem;
+  display: flex; align-items: center; gap: .125rem; pointer-events: none;
+}
+.wa-outbound .wa-reactions { inset-inline-start: .375rem; inset-inline-end: auto; }
 .wa-reaction {
   display: inline-grid;
   place-items: center;
-  min-width: 1.65rem;
-  min-height: 1.45rem;
-  border: 1px solid var(--color-emerald-100);
-  border-radius: .625rem;
-  background: white;
-  padding: 0 .25rem;
-  font-size: .9rem;
-  animation: wa-reaction-in 180ms ease both;
+  min-width: 1.125rem;
+  min-height: 1rem;
+  border: 1px solid var(--wa-line);
+  border-radius: .5rem;
+  background: var(--wa-panel);
+  padding: 0 .125rem;
+  font-size: .6875rem;
+  animation: wa-reaction-in 150ms ease both;
 }
+.wa-suggestions { display: grid; gap: .25rem; min-width: 0; }
+.wa-suggestion {
+  display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: .375rem;
+  min-width: 0; min-height: 1.75rem; padding: .125rem .3125rem; border: 1px solid var(--wa-outgoing-line);
+  border-radius: .4375rem; background: var(--wa-panel); font-size: .6875rem;
+}
+.wa-suggestion button {
+  min-height: 1.375rem; padding: 0 .375rem; border-radius: .3125rem; white-space: nowrap;
+  background: var(--wa-action); color: var(--wa-on-action); font-weight: 650; cursor: pointer;
+}
+.wa-suggestion button:hover:not(:disabled) { background: var(--wa-action-hover); }
+.wa-suggestion button:disabled { opacity: .65; cursor: default; }
+.wa-quick-toggle { display: none; }
+@media (max-width: 767px) {
+  .wa-quick-toggle {
+    display: inline-flex; align-items: center; gap: .25rem; margin-bottom: .25rem;
+    color: var(--wa-focus); min-height: 1.5rem; font-size: .6875rem; font-weight: 600;
+  }
+  .wa-quick-caption, .wa-quick-list:not(.wa-quick-list-open) { display: none; }
+}
+.wa-order-panel-enter-active, .wa-order-panel-leave-active { transition: opacity 220ms, transform 220ms cubic-bezier(.2, 0, .38, .9); }
+.wa-order-panel-enter-from, .wa-order-panel-leave-to { opacity: 0; transform: translateX(.5rem); }
+.wa-order-panel-leave-active { position: absolute; inset: 0 0 0 auto; width: min(100%, var(--order-width)); z-index: 7; pointer-events: none; }
 @keyframes wa-reaction-in {
   from { transform: scale(.75); opacity: 0; }
   to { transform: scale(1); opacity: 1; }
 }
 @media (prefers-reduced-motion: reduce) {
   .wa-reaction { animation: none; }
-  .wa-message-toolbar { transition: none; }
+  .wa-order-panel-enter-active, .wa-order-panel-leave-active, .wa-theme-selector button { transition: none; }
 }
 .inbox-control {
-  display: flex; align-items: center; gap: .375rem; min-height: 2.25rem; padding: .375rem .5rem;
-  border: 1px solid var(--color-slate-200); border-radius: .625rem; cursor: pointer;
-  list-style: none; font-weight: 600; color: var(--color-slate-700);
+  display: inline-flex; align-items: center; gap: .25rem; min-height: 1.5rem; padding: 0 .375rem;
+  border: 1px solid var(--wa-line); border-radius: .375rem; cursor: pointer;
+  list-style: none; font-weight: 600; color: var(--wa-text); font-size: .6875rem; white-space: nowrap;
 }
 .inbox-control::-webkit-details-marker { display: none; }
 .inbox-control:hover, .inbox-tool:hover:not(:disabled) { background: var(--color-slate-50); }
 .inbox-control:focus-visible, .inbox-tool:focus-visible { outline: 2px solid var(--color-emerald-600); outline-offset: 1px; }
 .inbox-control-panel {
   position: absolute; inset-inline: 0; top: 100%; z-index: 30; margin-top: .375rem; padding: .625rem;
-  border: 1px solid var(--color-slate-200); border-radius: .75rem; background: white; color: var(--color-slate-700);
-  box-shadow: 0 8px 24px #0f172a20;
+  border: 1px solid var(--wa-line); border-radius: .75rem; background: var(--wa-panel); color: var(--wa-text);
+  box-shadow: 0 8px 24px var(--wa-shadow);
 }
 .inbox-tool {
   display: flex; align-items: center; gap: .5rem; width: 100%; min-height: 2.25rem; padding: .375rem .5rem;
@@ -2702,16 +2851,13 @@ watch(() => selectedConversation.value?.id, id => {
 .chat-tool:hover { background: var(--color-gray-50); }
 .chat-tool:focus-visible { outline: 2px solid var(--color-emerald-600); outline-offset: 1px; }
 .chat-tool::-webkit-details-marker { display: none; }
-.chat-action-icon, .chat-label-chip { display: none; }
+.chat-action-icon { display: none; }
+.wa-icon-control { width: 1.75rem; justify-content: center; padding: 0; }
 .chat-header :deep(.chat-order-toggle) { width: 1.75rem; height: 1.75rem; }
-@container whatsapp-header (max-width: 46rem) {
+@container whatsapp-header (max-width: 25rem) {
   .chat-header :deep(.chat-save-label) {
     position: absolute; clip-path: inset(50%); width: 1px; height: 1px; overflow: hidden;
   }
-}
-@container whatsapp-header (min-width: 46rem) {
-  .chat-label-chip { display: inline-flex; }
-  .chat-label-count { display: none; }
 }
 @container whatsapp-header (max-width: 35rem) {
   .chat-action-label { display: none; }

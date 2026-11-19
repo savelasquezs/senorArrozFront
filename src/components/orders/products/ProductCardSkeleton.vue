@@ -79,7 +79,7 @@ const cardClasses = computed(() => {
 
 .animate-pulse {
     animation: shimmer 1.5s ease-in-out infinite;
-    background: linear-gradient(90deg, #f3f4f6 25%, #e5e7eb 50%, #f3f4f6 75%);
+    background: linear-gradient(90deg, var(--wa-panel, #f3f4f6) 25%, var(--wa-raised, #e5e7eb) 50%, var(--wa-panel, #f3f4f6) 75%);
     background-size: 200px 100%;
 }
 </style>

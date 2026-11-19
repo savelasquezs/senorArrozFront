@@ -142,7 +142,31 @@ describe('M38-F04 view + real Pinia store integration', () => {
   })
   afterEach(() => {
     for (const wrapper of wrappers.splice(0)) wrapper.unmount()
+    localStorage.removeItem('whatsapp:theme:7')
     disposePinia(pinia); vi.clearAllTimers(); vi.useRealTimers()
+  })
+
+  it('persists the WhatsApp theme per cashier without replacing an open chat or losing its text', async () => {
+    const { wrapper, vm } = mountView(true)
+    await flushPromises()
+    await vm.selectConversation({ ...m.rows[0]!, customerServiceWindowExpiresAt: '2099-01-01T00:00:00Z' })
+    const input = wrapper.get<HTMLTextAreaElement>('textarea[placeholder="Escribe un mensaje"]')
+    await input.setValue('Mensaje en preparación')
+    expect(wrapper.get('[data-wa-theme]').attributes('data-wa-theme')).toBe('light')
+
+    await wrapper.get('[aria-label="Tema de WhatsApp"] button:nth-child(2)').trigger('click')
+    expect(wrapper.get('[data-wa-theme]').attributes('data-wa-theme')).toBe('dark')
+    expect(input.element.value).toBe('Mensaje en preparación')
+    expect(vm.selectedConversation?.id).toBe(1)
+    expect(localStorage.getItem('whatsapp:theme:7')).toBe('dark')
+
+    const operator = useAuthStore().user!
+    useAuthStore().user = { ...operator, id: 8 }
+    await nextTick()
+    expect(wrapper.get('[data-wa-theme]').attributes('data-wa-theme')).toBe('light')
+    useAuthStore().user = operator
+    await nextTick()
+    expect(wrapper.get('[data-wa-theme]').attributes('data-wa-theme')).toBe('dark')
   })
 
   it('keeps the full team counts visible when filtering the paginated list by a label', async () => {
@@ -166,9 +190,11 @@ describe('M38-F04 view + real Pinia store integration', () => {
 
     const labels = wrapper.get('[data-test="inbox-conversation-labels"]')
     expect(wrapper.find('[data-test="whatsapp-chat-header"]').exists()).toBe(false)
-    expect(labels.findAll('button').map(label => label.text())).toEqual([
+    expect(labels.findAll('button').map(label => label.attributes('aria-label') ?? label.text())).toEqual([
       'Proveedor', 'Pendiente', 'Tomado', 'Pendiente de pago', 'Sucursal 2',
     ])
+    expect(labels.findAll('button').slice(0, 2).map(label => label.text())).toEqual(['PR', 'PE'])
+    expect(labels.get('summary').text()).toBe('+3')
     expect(labels.findAll('button').map(label => label.classes().find(name => name.startsWith('bg-')))).toEqual([
       'bg-violet-700', 'bg-amber-300', 'bg-emerald-700', 'bg-rose-700', 'bg-blue-700',
     ])
@@ -186,7 +212,7 @@ describe('M38-F04 view + real Pinia store integration', () => {
     const { wrapper } = mountView(true)
     await flushPromises()
     const supplier = () => wrapper.findAll('[data-test="inbox-conversation-labels"] button')
-      .find(label => label.text() === 'Proveedor')
+      .find(label => label.attributes('aria-label') === 'Proveedor')
 
     expect(supplier()?.exists()).toBe(true)
     await supplier()!.trigger('click')
@@ -431,7 +457,7 @@ describe('M38-F04 view + real Pinia store integration', () => {
     await flushPromises()
     expect(m.confirm).not.toHaveBeenCalled()
     expect(m.api.changeAttention).toHaveBeenCalledExactlyOnceWith(1, 'close', 3, undefined, 'Atención finalizada desde el POS')
-    expect(wrapper.get('[role="tab"][aria-selected="true"]').text()).toBe('Míos')
+    expect(wrapper.get('[role="tab"][aria-selected="true"]').text()).toContain('Míos')
     expect(wrapper.find('button[aria-label^="Abrir chat con Chat 1"]').exists()).toBe(false)
     expect(wrapper.get('button[aria-label^="Abrir chat con Chat 2"]').element).toBe(other)
     expect(wrapper.get('[data-test="whatsapp-chat-messages"]').element).toBe(messages)
@@ -554,7 +580,7 @@ describe('M38-F04 view + real Pinia store integration', () => {
     await vi.advanceTimersByTimeAsync(400)
     await flushPromises()
     expect(vm.selectedConversation?.attentionMode).toBe('waitingForHuman')
-    expect(wrapper.get('[role="tab"][aria-selected="true"]').text()).toBe('Míos')
+    expect(wrapper.get('[role="tab"][aria-selected="true"]').text()).toContain('Míos')
     expect(wrapper.findAll('[role="tab"]').find(tab => tab.text().includes('Libres'))?.text()).toContain('1 sin pedido')
     expect(wrapper.find('button[aria-label^="Abrir chat con Chat 1"]').exists()).toBe(false)
     expect(m.api.getConversations).toHaveBeenCalledTimes(requests)
@@ -666,7 +692,8 @@ describe('M38-F04 view + real Pinia store integration', () => {
     await flushPromises()
     expect(m.api.getProductSuggestions).toHaveBeenCalledWith(1, [90, 91], expect.anything())
     const addButton = wrapper.get('[data-message-id="90"] [aria-label="Sugerencias de productos"] button')
-    expect(addButton.text()).toContain('Agregar 2 × Ropa vieja Súper')
+    expect(addButton.text()).toBe('Agregar 2')
+    expect(wrapper.get('[data-message-id="90"] [aria-label="Sugerencias de productos"]').text()).toContain('Ropa vieja Súper')
     await addButton.trigger('click')
     expect(m.applyProductSuggestion).toHaveBeenCalledExactlyOnceWith(90, add)
     await wrapper.get('[data-message-id="91"] [aria-label="Sugerencias de productos"] button').trigger('click')
