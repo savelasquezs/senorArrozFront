@@ -290,6 +290,29 @@ export interface WhatsAppProductChoiceGroup {
   shortcut?: string | null
 }
 
+export interface WhatsAppProductSuggestion {
+  kind: 'add' | 'reply' | 'clarify'
+  productId: number | null
+  name: string | null
+  quantity: number
+  unitPrice: number | null
+  available: boolean
+  reply: string | null
+}
+
+export interface WhatsAppProductSuggestions {
+  branchId: number
+  messages: { messageId: number; suggestions: WhatsAppProductSuggestion[] }[]
+}
+
+export interface WhatsAppProductSuggestionState {
+  conversationId: number
+  branchId: number | null
+  version: number | null
+  canApply: boolean
+  applied: ReadonlySet<string>
+}
+
 export interface WhatsAppConversationTemplate {
   metaTemplateId: string
   name: string

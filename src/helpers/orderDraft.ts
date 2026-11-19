@@ -1,4 +1,17 @@
-import type { DraftOrder } from '@/types/order'
+import type { DraftOrder, OrderItem, OrderProductAddition } from '@/types/order'
+import { generatePosCreationKey } from '@/utils/posCreationKey'
+
+export function appendOrderProducts(order: DraftOrder, products: (OrderProductAddition & Pick<OrderItem, 'whatsAppSuggestionMessageId'>)[]) {
+    const items: OrderItem[] = products.map(product => ({
+        tempId: generatePosCreationKey(), productId: product.productId, productName: product.productName,
+        productPrice: product.unitPrice, quantity: product.quantity, unitPrice: product.unitPrice,
+        discount: product.discount, notes: product.notes ?? '', freeDeliveryDiscount: 0,
+        subtotal: product.quantity * product.unitPrice - product.discount,
+        ...(product.whatsAppSuggestionMessageId ? { whatsAppSuggestionMessageId: product.whatsAppSuggestionMessageId } : {}),
+    }))
+    order.orderItems.push(...items)
+    return items
+}
 
 export function createOrderDraft(tabId: string, tabName: string, branchId: number | null): DraftOrder {
     return {

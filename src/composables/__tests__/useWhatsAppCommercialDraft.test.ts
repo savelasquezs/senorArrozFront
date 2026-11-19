@@ -6,9 +6,9 @@ import { useWhatsAppCommercialDraft } from '../useWhatsAppCommercialDraft'
 import { useOrdersDraftsStore } from '@/store/ordersDrafts'
 import { useBranchContextStore } from '@/store/branchContext'
 import { createOrderDraft } from '@/helpers/orderDraft'
-import type { WhatsAppCommercialDraft, WhatsAppConversation } from '@/types/whatsapp'
+import type { WhatsAppCommercialDraft, WhatsAppConversation, WhatsAppProductSuggestion } from '@/types/whatsapp'
 
-const api = vi.hoisted(() => ({ getCommercialDraft: vi.fn(), startCommercialDraft: vi.fn(), saveCommercialDraft: vi.fn(), commercialDraftAction: vi.fn(), sendCommercialAddressChoices: vi.fn(), sendCommercialProductChoices: vi.fn() }))
+const api = vi.hoisted(() => ({ getCommercialDraft: vi.fn(), startCommercialDraft: vi.fn(), saveCommercialDraft: vi.fn(), commercialDraftAction: vi.fn(), sendCommercialAddressChoices: vi.fn(), sendCommercialProductChoices: vi.fn(), getProductSuggestions: vi.fn() }))
 vi.mock('@/services/MainAPI/whatsappApi', () => ({ whatsappApi: api }))
 vi.mock('@/store/products', () => ({ useProductsStore: () => ({ catalogProducts: [], ensureCatalogLoaded: vi.fn().mockResolvedValue(undefined) }) }))
 vi.mock('@/store/auth', () => ({ useAuthStore: () => ({ user: { id: 7 }, branchId: 1 }) }))
@@ -45,6 +45,65 @@ describe('shared commercial draft editor', () => {
     wrappers.splice(0).forEach(wrapper => wrapper.unmount())
     await flushPromises()
     vi.useRealTimers()
+  })
+
+  const riceSuggestion: WhatsAppProductSuggestion = { kind: 'add', productId: 31, name: 'Ropa vieja Súper con chicharrón',
+    quantity: 2, unitPrice: 10000, available: true, reply: null }
+  const verifiedSuggestion = (option: WhatsAppProductSuggestion, branchId = 2) => ({
+    data: { branchId, messages: [{ messageId: 90, suggestions: [option] }] },
+  })
+
+  it('starts a first draft and saves a double-clicked suggestion once, retaining the marker on reload', async () => {
+    api.getCommercialDraft.mockResolvedValueOnce({ data: null })
+    api.getProductSuggestions.mockResolvedValue(verifiedSuggestion(riceSuggestion))
+    api.saveCommercialDraft.mockImplementationOnce(async (_id, request) => {
+      const saved = { ...session(8801), order: request.order, editor: request.editor, version: 2 }
+      api.getCommercialDraft.mockResolvedValue({ data: saved })
+      return { data: saved }
+    })
+    const { model } = render(8801)
+    api.startCommercialDraft.mockImplementationOnce(async () => {
+      await model.reconcile(true)
+      return { data: session(8801) }
+    })
+    await model.load()
+    await Promise.all([
+      model.addProductSuggestion(90, riceSuggestion, () => true),
+      model.addProductSuggestion(90, riceSuggestion, () => true),
+    ])
+    expect(api.startCommercialDraft).toHaveBeenCalledTimes(1)
+    expect(api.getProductSuggestions).toHaveBeenCalledExactlyOnceWith(8801, [90])
+    expect(api.saveCommercialDraft).toHaveBeenCalledExactlyOnceWith(8801, expect.objectContaining({
+      order: expect.objectContaining({ branchId: 2, orderDetails: [
+        expect.objectContaining({ productId: 31, quantity: 1 }),
+        expect.objectContaining({ productId: 31, quantity: 2, unitPrice: 10000, whatsAppSuggestionMessageId: 90 }),
+      ] }),
+    }))
+    await model.load(true)
+    await model.addProductSuggestion(90, riceSuggestion, () => true)
+    expect(api.saveCommercialDraft).toHaveBeenCalledTimes(1)
+  })
+
+  it.each([
+    [verifiedSuggestion({ ...riceSuggestion, unitPrice: 11000 }), 'precio cambió'],
+    [verifiedSuggestion({ ...riceSuggestion, available: false }), 'inventario suficiente'],
+    [verifiedSuggestion(riceSuggestion, 1), 'precio cambió'],
+  ])('skips an outdated suggestion before editing the draft', async (response, error) => {
+    const { model } = render(8802)
+    await model.load()
+    api.getProductSuggestions.mockResolvedValue(response)
+    await expect(model.addProductSuggestion(90, riceSuggestion, () => true)).rejects.toThrow(error)
+    expect(model.draft.value?.orderItems).toHaveLength(1)
+    expect(api.saveCommercialDraft).not.toHaveBeenCalled()
+  })
+
+  it('requires a new attempt after a previous order has ended', async () => {
+    api.getCommercialDraft.mockResolvedValue({ data: { ...session(8803), status: 'completed', orderId: 79 } })
+    const { model } = render(8803)
+    await model.load()
+    await model.addProductSuggestion(90, riceSuggestion, () => true)
+    expect(api.startCommercialDraft).not.toHaveBeenCalled()
+    expect(api.getProductSuggestions).not.toHaveBeenCalled()
   })
 
   it('reuses the order editor with explicit draft identity while preserving POS tabs and branch context', async () => {

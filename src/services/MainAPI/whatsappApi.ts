@@ -16,6 +16,7 @@ import type {
   WhatsAppOperationalBranchOption,
   WhatsAppMessage,
   WhatsAppProductChoiceGroup,
+  WhatsAppProductSuggestions,
   WhatsAppOrderDraft,
   WhatsAppQuickReply,
   WhatsAppQuickReplyFilters,
@@ -52,6 +53,9 @@ class WhatsAppApi extends BaseApi {
   }
   saveCommercialDraft(id: number, request: WhatsAppDraftWrite) {
     return this.put<ApiResponse<WhatsAppCommercialDraft>>(`/whatsapp/conversations/${id}/commercial-draft`, request)
+  }
+  getProductSuggestions(id: number, messageIds: number[], signal?: AbortSignal) {
+    return this.post<ApiResponse<WhatsAppProductSuggestions>>(`/whatsapp/conversations/${id}/product-suggestions`, { messageIds }, { signal })
   }
   sendCommercialAddressChoices(id: number, request: WhatsAppDraftWrite) {
     return this.manualPost<WhatsAppMessage[]>(`/whatsapp/conversations/${id}/commercial-draft/address-choices`, request)
