@@ -4,6 +4,7 @@
 			<div
                 v-if="modelValue && active"
 				class="fixed inset-0 flex items-center justify-center"
+				:data-wa-theme="whatsappTheme ?? inheritedTheme"
 				:class="[zClass, mobileFullScreen ? 'p-0 sm:p-4' : 'p-4']"
 			>
 				<!-- Backdrop -->
@@ -59,6 +60,7 @@ let previousBodyOverflow = '';
 <script setup lang="ts">
 import { computed, nextTick, onActivated, onBeforeUnmount, onDeactivated, ref, useId, watch } from 'vue';
 import { XMarkIcon } from '@heroicons/vue/24/outline';
+import { injectWhatsAppTheme, type WhatsAppTheme } from '@/composables/useWhatsAppTheme';
 
 interface Props {
 	modelValue: boolean;
@@ -78,6 +80,7 @@ interface Props {
 	/** Clase adicional para el panel del diálogo. */
 	panelClass?: string;
 	bodyClass?: string;
+	whatsappTheme?: WhatsAppTheme;
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -93,6 +96,7 @@ const emit = defineEmits<{
 }>();
 
 const titleId = useId();
+const inheritedTheme = injectWhatsAppTheme();
 const dialogElement = ref<HTMLElement | null>(null);
 const active = ref(true);
 onActivated(() => { active.value = true; });

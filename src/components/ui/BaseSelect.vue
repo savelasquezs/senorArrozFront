@@ -29,6 +29,7 @@
 			<Teleport :disabled="!teleportDropdown" to="body">
 				<Transition name="dropdown">
 					<div v-if="isOpen" ref="dropdownPanelRef"
+						:data-wa-theme="teleportDropdown ? whatsappTheme : undefined"
 						class="bg-white shadow-lg max-h-60 rounded-md py-1 ring-1 ring-black ring-opacity-5 overflow-auto focus:outline-none"
 						:class="[
 							teleportDropdown ? 'fixed z-[10000]' : inlineDropdown ? 'relative w-full mt-1' : 'absolute z-30 left-0 right-0 w-full mt-1',
@@ -106,6 +107,9 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { CheckIcon, ChevronUpDownIcon, PlusIcon } from '@heroicons/vue/24/outline'
+import { injectWhatsAppTheme } from '@/composables/useWhatsAppTheme'
+
+const whatsappTheme = injectWhatsAppTheme()
 
 interface Option {
 	[key: string]: any

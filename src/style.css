@@ -3,3 +3,121 @@
 :root {
     --order-sidebar-width: clamp(390px, 35vw, 490px);
 }
+
+[data-wa-theme] {
+    --wa-canvas: #f1f4f8;
+    --wa-panel: #ffffff;
+    --wa-raised: #e7edf4;
+    --wa-line: #cdd7e3;
+    --wa-input-line: #8594a8;
+    --wa-text: #182336;
+    --wa-muted: #56687e;
+    --wa-focus: #6036a3;
+    --wa-selected: #eae4fa;
+    --wa-warning: #815200;
+    --wa-action: #087454;
+    --wa-action-hover: #096144;
+    --wa-on-action: #ffffff;
+    --wa-outgoing: #dff3ea;
+    --wa-outgoing-line: #99c7b2;
+    --wa-header-start: #eeebfb;
+    --wa-header-end: #e4f4ed;
+    --wa-shadow: #334d7038;
+    color-scheme: light;
+    color: var(--wa-text);
+}
+
+[data-wa-theme="dark"] {
+    --wa-canvas: #11161e;
+    --wa-panel: #171e28;
+    --wa-raised: #202936;
+    --wa-line: #394657;
+    --wa-input-line: #647589;
+    --wa-text: #f1f5fb;
+    --wa-muted: #a9b6c8;
+    --wa-focus: #c7b6ff;
+    --wa-selected: #302845;
+    --wa-warning: #ffd27a;
+    --wa-action: #63efbb;
+    --wa-action-hover: #9bf8d8;
+    --wa-on-action: #092b21;
+    --wa-outgoing: #14352e;
+    --wa-outgoing-line: #3e7663;
+    --wa-header-start: #24273d;
+    --wa-header-end: #142a23;
+    --wa-shadow: #060b1380;
+    --color-gray-50: var(--wa-canvas);
+    --color-gray-100: var(--wa-line);
+    --color-gray-200: var(--wa-line);
+    --color-gray-300: var(--wa-input-line);
+    --color-gray-400: #9aa9bc;
+    --color-gray-500: var(--wa-muted);
+    --color-gray-600: #c2cede;
+    --color-gray-700: #d3ddec;
+    --color-gray-800: #e2eaf6;
+    --color-gray-900: var(--wa-text);
+    --color-gray-950: var(--wa-text);
+    --color-slate-50: var(--wa-canvas);
+    --color-slate-100: var(--wa-raised);
+    --color-slate-200: var(--wa-line);
+    --color-slate-300: var(--wa-input-line);
+    --color-slate-400: #9aa9bc;
+    --color-slate-500: var(--wa-muted);
+    --color-slate-600: #c2cede;
+    --color-slate-700: #d3ddec;
+    --color-slate-800: #e2eaf6;
+    --color-slate-900: var(--wa-text);
+    --color-slate-950: var(--wa-text);
+    --color-emerald-50: #19362d;
+    --color-emerald-100: #244638;
+    --color-emerald-200: #3e7663;
+    --color-emerald-300: #60a58e;
+    --color-emerald-500: #5bdbab;
+    --color-emerald-600: #64e3b7;
+    --color-emerald-700: #83edc4;
+    --color-emerald-800: #a3f2d0;
+    --color-emerald-900: #b8f6dc;
+    --color-emerald-950: #d1fae9;
+    --color-amber-50: #332717;
+    --color-amber-100: #45341d;
+    --color-amber-200: #73542d;
+    --color-amber-300: #8a6431;
+    --color-amber-600: #f7c476;
+    --color-amber-700: #ffd18c;
+    --color-amber-800: #ffdbac;
+    --color-amber-900: #ffe6c6;
+    --color-amber-950: #fff0d8;
+    --color-red-50: #391f29;
+    --color-red-100: #492831;
+    --color-red-200: #713d4b;
+    --color-red-300: #8d4f5c;
+    --color-red-500: #ff9cae;
+    --color-red-600: #ffa6b2;
+    --color-red-700: #ffb4bf;
+    --color-red-800: #ffcad0;
+    --color-red-900: #ffdee2;
+    --color-blue-50: #1b2c44;
+    --color-blue-100: #273d5b;
+    --color-blue-200: #466c99;
+    --color-blue-600: #92c2ff;
+    --color-blue-700: #a4cbff;
+    --color-blue-800: #c0dbff;
+    --color-blue-900: #d4e6ff;
+    --color-blue-950: #e6f1ff;
+    --color-green-50: var(--color-emerald-50);
+    --color-green-100: var(--color-emerald-100);
+    --color-green-600: var(--color-emerald-600);
+    --color-green-700: var(--color-emerald-700);
+    --color-green-800: var(--color-emerald-800);
+    color-scheme: dark;
+}
+
+:where([data-wa-theme="dark"]) :is(.bg-white, .bg-white\/80, .bg-white\/95),
+:is([data-wa-theme="dark"].bg-white) { background-color: var(--wa-panel); }
+:where([data-wa-theme="dark"]) :is(.bg-gray-100, .bg-gray-200, .bg-slate-200) { background-color: var(--wa-raised); }
+:where([data-wa-theme="dark"]) :is(.bg-emerald-600, .bg-emerald-700, .bg-emerald-800, .bg-green-600) { background-color: #117557; }
+:where([data-wa-theme="dark"]) :is(.hover\:bg-emerald-700, .hover\:bg-emerald-800, .hover\:bg-green-700):hover { background-color: #168363; }
+:where([data-wa-theme="dark"]) :is(.bg-red-600, .bg-red-700, .hover\:bg-red-700:hover) { background-color: #aa374e; }
+:where([data-wa-theme="dark"]) :is(.bg-blue-600, .bg-blue-700, .hover\:bg-blue-700:hover) { background-color: #315c93; }
+:where([data-wa-theme="dark"]) :is(.bg-slate-700, .bg-slate-900, .bg-gray-900),
+:is([data-wa-theme="dark"].bg-slate-900) { background-color: #263244; }

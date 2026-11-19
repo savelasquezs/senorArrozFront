@@ -117,8 +117,8 @@ const handleClick = () => {
 .product-card {
     position: relative;
     padding: 1rem;
-    background: white;
-    border: 1px solid #e5e7eb;
+    background: var(--wa-panel, white);
+    border: 1px solid var(--wa-line, #e5e7eb);
     border-radius: 0.5rem;
     transition: all 0.2s ease;
     cursor: pointer;
@@ -131,9 +131,9 @@ const handleClick = () => {
 
 /* Hover State - Available Products */
 .product-card:hover:not(.disabled) {
-    background: #f0fdf4;
+    background: var(--wa-raised, #f0fdf4);
     /* emerald-50 */
-    border-color: #10b981;
+    border-color: var(--wa-action, #10b981);
     /* emerald-500 */
     transform: translateY(-2px);
     box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
@@ -142,7 +142,7 @@ const handleClick = () => {
 /* Disabled State - Out of Stock */
 .product-card.disabled {
     opacity: 0.6;
-    background: #f9fafb;
+    background: var(--wa-canvas, #f9fafb);
     /* gray-50 */
     border-color: #ef4444;
     /* red-500 */
@@ -151,9 +151,9 @@ const handleClick = () => {
 
 /* Selected State */
 .product-card.selected {
-    background: #d1fae5;
+    background: var(--wa-outgoing, #d1fae5);
     /* emerald-100 */
-    border-color: #059669;
+    border-color: var(--wa-outgoing-line, #059669);
     /* emerald-600 */
     box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.1);
 }
@@ -161,7 +161,7 @@ const handleClick = () => {
 .product-name {
     font-size: 0.875rem;
     font-weight: 500;
-    color: #111827;
+    color: var(--wa-text, #111827);
     margin-bottom: 0.5rem;
     line-height: 1.25rem;
     overflow: hidden;
@@ -175,20 +175,20 @@ const handleClick = () => {
 .product-price {
     font-size: 1rem;
     font-weight: 600;
-    color: #059669;
+    color: var(--wa-action, #059669);
     /* emerald-600 */
     margin-bottom: 0.5rem;
 }
 
 .stock-indicator {
     font-size: 0.75rem;
-    color: #6b7280;
+    color: var(--wa-muted, #6b7280);
 }
 
 .loading-overlay {
     position: absolute;
     inset: 0;
-    background: rgba(255, 255, 255, 0.8);
+    background: color-mix(in srgb, var(--wa-panel, white) 80%, transparent);
     display: flex;
     align-items: center;
     justify-content: center;
