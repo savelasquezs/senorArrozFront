@@ -144,12 +144,15 @@ export interface WhatsAppOrderDraft {
   updatedAt?: string | null
 }
 
+export type WhatsAppQuickReplyMode = 'send' | 'draft' | 'chicharron_quote'
+
 export interface WhatsAppQuickReply {
   id: number
   branchId: number
   branchName?: string | null
   shortcut: string
   messageTemplate: string
+  replyMode?: WhatsAppQuickReplyMode
   isActive: boolean
   usageCount: number
   lastUsedAt?: string | null
@@ -206,7 +209,20 @@ export interface UpsertWhatsAppQuickReply {
   branchId?: number | null
   shortcut: string
   messageTemplate: string
+  replyMode?: WhatsAppQuickReplyMode
   isActive: boolean
+}
+
+export interface WhatsAppQuickReplyPresentation {
+  family: string
+  size: string
+}
+
+export interface WhatsAppQuickReplyPreview {
+  text?: string | null
+  family?: string | null
+  size?: string | null
+  presentations?: WhatsAppQuickReplyPresentation[] | null
 }
 
 export interface WhatsAppQuickReplyFilters {

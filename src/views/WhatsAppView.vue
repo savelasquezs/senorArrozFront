@@ -58,33 +58,46 @@
             </div>
             <input v-model="search" type="search" class="w-full rounded-lg border border-gray-300 px-3 py-2 text-xs focus:border-emerald-500 focus:ring-emerald-500"
               placeholder="Buscar teléfono o nombre" @input="onSearchInput" />
-            <div class="flex items-start gap-2">
-            <details class="min-w-0 flex-1 text-xs text-gray-600">
-              <summary class="cursor-pointer py-1 font-medium">Filtros y herramientas<span v-if="unreadOnly || unroutedOnly || selectedBranchId || selectedLabel" class="ml-1 text-emerald-700"> · activos</span></summary>
-              <div class="mt-2 space-y-2">
-                <select v-if="showBranchFilter" v-model="selectedBranchId" class="w-full rounded-lg border border-gray-300 bg-white px-2 py-1.5 text-xs" @change="reloadConversations">
-                  <option :value="0">Todas las sucursales</option><option v-for="branch in branchOptions" :key="branch.id" :value="branch.id">{{ branch.label }}</option>
-                </select>
-                <div class="flex flex-wrap gap-x-3 gap-y-2">
-                  <label class="inline-flex items-center gap-1.5"><input v-model="unroutedOnly" type="checkbox" @change="reloadConversations" />Sin sede operativa</label>
-                  <label class="inline-flex items-center gap-1.5"><input v-model="unreadOnly" type="checkbox" @change="reloadConversations" />No leídos</label>
+            <div class="relative grid grid-cols-2 gap-2 text-xs">
+              <details name="whatsapp-inbox-controls" class="group" @keydown.esc.stop="closeDetailsMenu">
+                <summary class="inbox-control" :class="{ 'border-emerald-300 bg-emerald-50 text-emerald-900': inboxFilterCount }">
+                  <FunnelIcon class="h-4 w-4 shrink-0" aria-hidden="true" /><span>Filtros</span>
+                  <span v-if="inboxFilterCount" class="rounded-full bg-emerald-700 px-1.5 text-[10px] text-white">{{ inboxFilterCount }}</span>
+                  <ChevronDownIcon class="ml-auto h-3 w-3 shrink-0 group-open:rotate-180" aria-hidden="true" />
+                </summary>
+                <div class="inbox-control-panel space-y-3" role="region" aria-label="Filtros de la bandeja">
+                  <select v-if="showBranchFilter" v-model="selectedBranchId" aria-label="Filtrar por sucursal"
+                    class="w-full rounded-lg border border-slate-300 bg-white px-2 py-1.5" @change="reloadConversations">
+                    <option :value="0">Todas las sucursales</option>
+                    <option v-for="branch in branchOptions" :key="branch.id" :value="branch.id">{{ branch.label }}</option>
+                  </select>
+                  <div class="flex flex-wrap gap-x-3 gap-y-2">
+                    <label class="inline-flex items-center gap-1.5"><input v-model="unroutedOnly" type="checkbox" class="accent-emerald-700" @change="reloadConversations" />Sin sede operativa</label>
+                    <label class="inline-flex items-center gap-1.5"><input v-model="unreadOnly" type="checkbox" class="accent-emerald-700" @change="reloadConversations" />No leídos</label>
+                  </div>
+                  <select v-model="selectedLabel" aria-label="Filtrar por etiqueta" class="w-full rounded-lg border border-slate-300 bg-white px-2 py-1.5">
+                    <option value="">Todas las etiquetas</option>
+                    <option v-for="label in inboxLabels" :key="label.key" :value="label.key">{{ label.name }}</option>
+                  </select>
+                  <BaseButton v-if="inboxFilterCount" variant="ghost" size="sm" @click="resetInboxFilters">Restablecer filtros</BaseButton>
                 </div>
-                <select v-model="selectedLabel" aria-label="Filtrar por etiqueta" class="w-full rounded-lg border border-gray-300 bg-white px-2 py-1.5 text-xs">
-                  <option value="">Todas las etiquetas</option>
-                  <option v-for="label in inboxLabels" :key="label.key" :value="label.key">{{ label.name }}</option>
-                </select>
-                <BaseButton variant="secondary" size="sm" @click="showInboxLabelManager = true">Gestionar etiquetas</BaseButton>
-                <BaseButton v-if="!selectedConversation" variant="secondary" size="sm" @click="openQuickRepliesModal">Respuestas rápidas</BaseButton>
-                <BaseButton variant="secondary" size="sm" @click="showClosedDayReplies = true">Responder por descanso</BaseButton>
-                <button v-if="diagnosticsBranchId" type="button" class="inline-flex max-w-full items-center gap-1.5 rounded-lg border px-2 py-1.5 text-xs font-medium"
-                  :class="aiStatusChipClasses" :title="currentAiDiagnostics?.summary || whatsappStore.aiDiagnosticsError || 'Abrir actividad de la IA'" @click="openAiDiagnostics">
-                  <CpuChipIcon class="h-4 w-4 shrink-0" /><span class="truncate">{{ aiStatusChipLabel }}</span>
-                  <span v-if="currentAiDiagnostics?.pendingCount" class="rounded bg-white/70 px-1">{{ currentAiDiagnostics.pendingCount }}</span>
-                </button>
-              </div>
-            </details>
-            <BaseButton v-if="canResetTaken" variant="ghost" size="sm" class="shrink-0" :loading="resettingTaken"
-              title="Quita las etiquetas de días anteriores en esta bandeja" @click="resetTakenLabels">Limpiar Tomado</BaseButton>
+              </details>
+              <details name="whatsapp-inbox-controls" class="group" @keydown.esc.stop="closeDetailsMenu">
+                <summary class="inbox-control">
+                  <WrenchScrewdriverIcon class="h-4 w-4 shrink-0" aria-hidden="true" /><span>Herramientas</span>
+                  <ChevronDownIcon class="ml-auto h-3 w-3 shrink-0 group-open:rotate-180" aria-hidden="true" />
+                </summary>
+                <div class="inbox-control-panel !p-1.5" role="region" aria-label="Herramientas de la bandeja">
+                  <button v-for="tool in inboxTools" :key="tool.label" type="button" class="inbox-tool"
+                    :disabled="tool.disabled" :title="tool.title" @click="tool.run">
+                    <component :is="tool.icon" class="h-4 w-4 shrink-0 text-slate-500" aria-hidden="true" />
+                    <span>{{ tool.label }}</span>
+                    <span v-if="tool.label === 'Estado de la IA'" class="ml-auto truncate rounded-md border px-1.5 py-0.5 text-[10px]" :class="aiStatusChipClasses">
+                      {{ aiStatusChipLabel }}
+                    </span>
+                  </button>
+                </div>
+              </details>
             </div>
           </div>
           <WhatsAppInboxTabs
@@ -179,7 +192,7 @@
                   <UserPlusIcon class="chat-action-icon h-4 w-4" aria-hidden="true" />
                   <span class="chat-action-label">Tomar conversación</span>
                 </BaseButton>
-                <details class="chat-menu relative" name="whatsapp-chat-tools" @keydown.esc.stop="closeInboxLabelMenu">
+                <details class="chat-menu relative" name="whatsapp-chat-tools" @keydown.esc.stop="closeDetailsMenu">
                   <summary class="chat-tool" aria-label="Etiquetas" title="Etiquetas">
                     <TagIcon class="chat-action-icon h-4 w-4" aria-hidden="true" />
                     <span class="chat-action-label">Etiquetas</span>
@@ -391,7 +404,7 @@
             <BaseButton v-if="newMessageCount" class="mx-auto mb-2" size="sm" variant="outline" @click="showRecentMessages">Nuevos mensajes · {{ newMessageCount }}</BaseButton>
 
             <form class="border-t border-gray-200 bg-white p-3" @submit.prevent="sendMessage">
-              <p v-if="!ownsConversation" class="mb-2 rounded-lg bg-gray-100 p-2 text-sm text-gray-600">Toma la conversación para responder. Si pertenece a otro asesor, puedes consultarla sin modificarla.</p>
+              <p v-if="!ownsConversation && !canTakeAttention" class="mb-2 rounded-lg bg-gray-100 p-2 text-sm text-gray-600">Puedes consultar esta conversación.</p>
               <p v-if="ownsConversation && !serviceWindowOpen" class="mb-2 rounded bg-amber-50 p-2 text-sm text-amber-900">La ventana de atención de 24 horas está cerrada. Usa una plantilla aprobada para iniciar el contacto.</p>
               <p v-else-if="ownsConversation" class="mb-2 text-xs text-gray-500">Ventana de atención hasta {{ new Date(selectedConversation.customerServiceWindowExpiresAt!).toLocaleString('es-CO') }}</p>
               <WhatsAppConversationTemplates v-if="ownsConversation" :key="selectedConversation.id" :conversation-id="selectedConversation.id" />
@@ -405,9 +418,9 @@
                   :key="reply.id"
                   type="button"
                   class="rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-800 hover:bg-emerald-100 disabled:opacity-50"
-                  :disabled="sending || sendingProductChoices || !canSend"
-                  :title="reply.messageTemplate"
-                  @click="sendQuickReply(reply)"
+                  :disabled="sending || sendingProductChoices || preparingQuickReply || !canSend"
+                  :title="quickReplyDescription(reply)"
+                  @click="runSavedQuickReply(reply)"
                 >
                   /{{ reply.shortcut }}
                 </button>
@@ -440,12 +453,16 @@
                   rows="2"
                   maxlength="4096"
                   class="min-h-[44px] flex-1 resize-none rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-emerald-500 focus:ring-emerald-500"
-                  placeholder="Escribe un mensaje"
+                  :placeholder="canTakeAttention ? 'Doble clic para tomar la conversación' : 'Escribe un mensaje'"
+                  :aria-label="canTakeAttention ? 'Doble clic para tomar la conversación' : 'Escribe un mensaje'"
+                  :class="{ 'cursor-pointer bg-slate-50': canTakeAttention }"
                   @keydown.enter.exact.prevent="sendMessage"
                   @keydown.tab="sendUniqueQuickReply"
-                  :disabled="!canSend"
+                  @dblclick="takeFromComposer"
+                  :readonly="canTakeAttention"
+                  :disabled="!canSend && !canTakeAttention"
                 />
-                <BaseButton type="submit" :loading="sending || sendingProductChoices" :disabled="!canSend || (!draft.trim() && !selectedFile)" :icon="PaperAirplaneIcon">
+                <BaseButton type="submit" :loading="sending || sendingProductChoices" :disabled="!canSend || preparingQuickReply || (!draft.trim() && !selectedFile)" :icon="PaperAirplaneIcon">
                   Enviar
                 </BaseButton>
               </div>
@@ -453,13 +470,13 @@
                 v-if="slashQuickReplyMatches.length"
                 class="mt-2 max-h-52 overflow-y-auto rounded-lg border border-gray-200 bg-gray-50 p-2 shadow-sm"
               >
-                <p v-if="uniqueQuickReply" class="px-2 pb-1 text-xs text-gray-500">Tab para enviar</p>
+                <p v-if="uniqueQuickReply" class="px-2 pb-1 text-xs text-gray-500">{{ uniqueQuickReply.saved && quickReplyMode(uniqueQuickReply.saved) !== 'send' ? 'Tab para preparar' : 'Tab para enviar' }}</p>
                 <button
                   v-for="reply in slashQuickReplyMatches"
                   :key="reply.key"
                   type="button"
                   class="flex w-full items-start gap-3 rounded-md px-2 py-1.5 text-left hover:bg-white"
-                  :disabled="sending || sendingProductChoices || !canSend"
+                  :disabled="sending || sendingProductChoices || preparingQuickReply || !canSend"
                   @click="chooseQuickReply(reply)"
                 >
                   <span class="shrink-0 rounded bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-800">/{{ reply.shortcut }}</span>
@@ -517,6 +534,32 @@
 
       <WhatsAppClosedDayReplies v-if="showClosedDayReplies" :key="sessionKey + ':' + selectedBranchId"
         v-model="showClosedDayReplies" :branch-id="selectedBranchId || undefined" @sent="reloadConversations" />
+
+      <BaseDialog :model-value="!!quickReplyChoice" title="Cotizar con y sin chicharrón" size="sm"
+        :dismissible="!preparingQuickReply" @update:model-value="open => { if (!open) clearQuickReplyPreview() }">
+        <form class="space-y-4" @submit.prevent="confirmQuickReplyChoice">
+          <label class="block text-sm font-semibold text-slate-800">
+            Arroz
+            <select v-model="quoteFamily" :disabled="preparingQuickReply" class="mt-1 block w-full rounded-lg border border-slate-300 bg-white px-3 py-2"
+              @change="updateQuoteSize">
+              <option value="">Selecciona un arroz</option>
+              <option v-for="family in quoteFamilies" :key="family" :value="family">{{ family === 'paisa' ? 'Paisa' : 'Ropa Vieja' }}</option>
+            </select>
+          </label>
+          <label class="block text-sm font-semibold text-slate-800">
+            Tamaño
+            <select v-model="quoteSize" :disabled="preparingQuickReply" class="mt-1 block w-full rounded-lg border border-slate-300 bg-white px-3 py-2">
+              <option value="">Selecciona un tamaño</option>
+              <option v-for="size in quoteSizes" :key="size" :value="size">{{ quoteSizeNames[size] }}</option>
+            </select>
+          </label>
+          <p v-if="quickReplyPreviewError" class="text-sm text-rose-700" role="alert">{{ quickReplyPreviewError }}</p>
+          <div class="flex justify-end gap-2">
+            <BaseButton variant="secondary" :disabled="preparingQuickReply" @click="clearQuickReplyPreview">Cancelar</BaseButton>
+            <BaseButton type="submit" :loading="preparingQuickReply" :disabled="!quoteFamily || !quoteSize">Preparar cotización</BaseButton>
+          </div>
+        </form>
+      </BaseDialog>
 
       <BaseDialog v-model="showInboxLabelManager" title="Gestionar etiquetas" :icon="TagIcon" size="sm">
         <div class="space-y-3">
@@ -597,7 +640,7 @@
                     </span>
                     <span class="text-xs text-gray-400">{{ reply.usageCount }} usos</span>
                   </div>
-                  <p class="mt-2 line-clamp-2 text-sm text-gray-700">{{ reply.messageTemplate }}</p>
+                  <p class="mt-2 line-clamp-2 text-sm text-gray-700">{{ quickReplyDescription(reply) }}</p>
                 </div>
                 <div class="flex shrink-0 gap-1">
                   <BaseButton size="sm" variant="ghost" @click="editQuickReply(reply)">Editar</BaseButton>
@@ -637,6 +680,14 @@
             />
 
             <label class="block text-sm font-medium text-gray-700">
+              Al usar el atajo
+              <select v-model="quickReplyForm.replyMode" class="mt-1 block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm">
+                <option value="send">Enviar directamente</option>
+                <option value="draft">Editar antes de enviar</option>
+                <option value="chicharron_quote">Cotizar con y sin chicharrón</option>
+              </select>
+            </label>
+            <label v-if="quickReplyForm.replyMode !== 'chicharron_quote'" class="block text-sm font-medium text-gray-700">
               Mensaje
               <textarea
                 v-model="quickReplyForm.messageTemplate"
@@ -646,8 +697,8 @@
                 placeholder="Hola {{nombre_cliente}}, muy buenos días."
               />
             </label>
-            <p v-pre class="text-xs text-gray-500">
-              Variables disponibles: <span class="font-mono">{{nombre_cliente}}</span>, <span class="font-mono">{{guestName}}</span>, <span class="font-mono">{{telefono}}</span>.
+            <p v-if="quickReplyForm.replyMode !== 'chicharron_quote'" class="text-xs text-gray-500">
+              <span v-pre>Variables disponibles: <code>{{nombre_cliente}}</code>, <code>{{guestName}}</code>, <code>{{telefono}}</code>.</span>
             </p>
 
             <label class="inline-flex items-center gap-2 text-sm text-gray-700">
@@ -722,18 +773,23 @@ import {
   ChatBubbleOvalLeftEllipsisIcon,
   ChevronDoubleLeftIcon,
   ChevronDoubleRightIcon,
+  ChevronDownIcon,
   ArrowPathIcon,
+  BackspaceIcon,
   CheckIcon,
   CpuChipIcon,
   DocumentIcon,
   EllipsisHorizontalIcon,
   ExclamationTriangleIcon,
+  FunnelIcon,
   InformationCircleIcon,
+  MoonIcon,
   PaperClipIcon,
   PaperAirplaneIcon,
   PlusIcon,
   TagIcon,
   UserPlusIcon,
+  WrenchScrewdriverIcon,
   XMarkIcon,
 } from '@heroicons/vue/24/outline'
 import BaseButton from '@/components/ui/BaseButton.vue'
@@ -779,6 +835,8 @@ import type {
   WhatsAppProductSuggestion,
   WhatsAppProductSuggestionState,
   WhatsAppQuickReply,
+  WhatsAppQuickReplyMode,
+  WhatsAppQuickReplyPresentation,
   WhatsAppRealtimeMessagePayload,
 } from '@/types/whatsapp'
 import {
@@ -890,11 +948,23 @@ let productChoicesRequest: { controller: AbortController; promise: Promise<void>
 const editingQuickReply = ref<WhatsAppQuickReply | null>(null)
 const quickReplySaving = ref(false)
 const quickReplyError = ref('')
+type QuickReplyContext = { conversationId: number; session: string; text: string; file: File | null }
+const quickReplyChoice = shallowRef<{ replyId: number; context: QuickReplyContext; presentations: WhatsAppQuickReplyPresentation[] }>()
+const preparingQuickReply = ref(false)
+const quickReplyPreviewError = ref('')
+let quickReplyPreviewRevision = 0
+const quoteFamily = ref('')
+const quoteSize = ref('')
+const quoteSizeNames: Record<string, string> = { personal: 'Personal', duo: 'Dúo', trio: 'Trío', familiar: 'Familiar', super: 'Súper' }
+const quoteFamilies = computed(() => [...new Set(quickReplyChoice.value?.presentations.map(x => x.family))])
+const quoteSizes = computed(() => Object.keys(quoteSizeNames).filter(size =>
+  quickReplyChoice.value?.presentations.some(x => x.size === size && (!quoteFamily.value || x.family === quoteFamily.value))))
 const quickReplyForm = ref({
   id: null as number | null,
   branchId: null as number | null,
   shortcut: '',
   messageTemplate: '',
+  replyMode: 'send' as WhatsAppQuickReplyMode,
   isActive: true,
 })
 const sendError = ref('')
@@ -910,6 +980,27 @@ const sessionKey = computed(() => JSON.stringify([
 const inboxScope = computed(() => JSON.stringify([
   sessionKey.value, selectedBranchId.value, search.value.trim(), unreadOnly.value, activeInbox.value, unroutedOnly.value, selectedLabel.value,
 ]))
+const inboxFilterCount = computed(() => [selectedBranchId.value, unreadOnly.value, unroutedOnly.value, selectedLabel.value].filter(Boolean).length)
+
+function resetInboxFilters() {
+  const labelWasActive = !!selectedLabel.value
+  selectedBranchId.value = 0
+  unreadOnly.value = false
+  unroutedOnly.value = false
+  selectedLabel.value = ''
+  if (!labelWasActive) void reloadConversations()
+}
+
+const inboxTools = computed(() => [
+  { label: 'Limpiar Tomado', icon: BackspaceIcon, run: resetTakenLabels,
+    disabled: !canResetTaken.value || resettingTaken.value,
+    title: canResetTaken.value ? 'Quita las etiquetas de días anteriores en esta bandeja' : 'Selecciona una sucursal o la bandeja sin sede operativa' },
+  { label: 'Gestionar etiquetas', icon: TagIcon, run: () => { showInboxLabelManager.value = true } },
+  { label: 'Respuestas rápidas', icon: ChatBubbleLeftRightIcon, run: openQuickRepliesModal },
+  { label: 'Responder por descanso', icon: MoonIcon, run: () => { showClosedDayReplies.value = true } },
+  ...(diagnosticsBranchId.value ? [{ label: 'Estado de la IA', icon: CpuChipIcon, run: openAiDiagnostics,
+    title: currentAiDiagnostics.value?.summary || whatsappStore.aiDiagnosticsError || 'Abrir actividad de la IA' }] : []),
+])
 
 const currentMessages = computed<WhatsAppMessage[]>(() =>
   selectedConversation.value ? (whatsappStore.messages[selectedConversation.value.id] ?? []) : []
@@ -1078,24 +1169,43 @@ function aiProcessingReason(processing: WhatsAppAiProcessing) {
   return reason ? `${processing.title}: ${reason}` : processing.title
 }
 async function changeAttention(action: WhatsAppAttentionAction) {
-  if (!selectedConversation.value) return
+  const conversation = selectedConversation.value
+  if (!conversation || changingAttention.value) return
+  const conversationId = conversation.id
   try {
     changingAttention.value = true
-    const conversationId = selectedConversation.value.id
-    await whatsappStore.changeAttention(conversationId, action, transferTarget.value || undefined, takeoverReason.value || undefined)
+    const attention = await whatsappStore.changeAttention(conversationId, action, transferTarget.value || undefined, takeoverReason.value || undefined, conversation)
     if (selectedConversation.value?.id !== conversationId) return
+    if (attention && (attention.attentionRevision ?? 0) >= (selectedConversation.value.attentionRevision ?? 0))
+      Object.assign(selectedConversation.value, attention)
     activeInbox.value = action === 'close' ? 'closed' : ['take', 'force-take'].includes(action) ? 'mine' : action === 'transfer' ? 'team' : 'free'
     const refreshed = whatsappStore.conversations.find(x => x.id === conversationId)
     if (refreshed) {
       selectedConversation.value = refreshed
     }
+    if (action === 'take') {
+      await nextTick()
+      if (selectedConversation.value?.id === conversationId && canSend.value) messageInput.value?.focus()
+    }
     await reloadConversations()
     await refreshAiDiagnostics()
   } catch (error: any) {
+    if (selectedConversation.value?.id === conversationId) {
+      const refreshed = whatsappStore.conversations.find(x => x.id === conversationId)
+      if (refreshed && (refreshed.attentionRevision ?? 0) >= (selectedConversation.value.attentionRevision ?? 0))
+        selectedConversation.value = refreshed
+      void reloadConversations()
+    }
     showError('Atención', error.message || 'No se pudo cambiar el estado.')
   } finally {
     changingAttention.value = false
   }
+}
+
+function takeFromComposer(event: MouseEvent) {
+  if (!canTakeAttention.value || changingAttention.value) return
+  event.preventDefault()
+  void changeAttention('take')
 }
 
 async function changeOperationalBranch(event: Event) {
@@ -1308,24 +1418,27 @@ const filteredQuickReplies = computed(() => {
   const value = draft.value.trim()
   if (!value.startsWith('/') || /\s/.test(value) || selectedFile.value) return []
   const query = normalizeQuickReplyShortcut(value)
-  return [
+  const matches = [
     ...catalogQuickReplies.value.map(group => ({
       group, saved: null, key: `catalog-${group.id}`, shortcut: group.shortcut ?? '', preview: group.name,
     })),
     ...activeQuickRepliesForConversation.value.map(saved => ({
-      saved, group: null, key: `saved-${saved.id}`, shortcut: saved.shortcut, preview: saved.messageTemplate,
+      saved, group: null, key: `saved-${saved.id}`, shortcut: saved.shortcut, preview: quickReplyDescription(saved),
     })),
   ].filter(reply => reply.group ? matchesCatalogQuickReply(reply.group, query) : reply.shortcut.includes(query))
+  const exact = matches.find(reply => reply.saved && reply.shortcut === query)
+  return exact ? [exact] : matches
 })
 const slashQuickReplyMatches = computed(() => filteredQuickReplies.value.slice(0, 12))
 const uniqueQuickReply = computed(() => filteredQuickReplies.value.length === 1
   && normalizeQuickReplyShortcut(draft.value) && savedQuickRepliesReady.value && catalogQuickRepliesReady.value
   && !whatsappStore.isLoadingQuickReplies && !loadingProductChoices.value
-  && canSend.value && !sending.value && !sendingProductChoices.value ? filteredQuickReplies.value[0] : undefined)
+  && canSend.value && !sending.value && !sendingProductChoices.value && !preparingQuickReply.value
+  ? filteredQuickReplies.value[0] : undefined)
 
 function chooseQuickReply(reply: (typeof filteredQuickReplies.value)[number]) {
   if (reply.group) return sendCatalogQuickReply(reply.group)
-  if (reply.saved) return sendQuickReply(reply.saved)
+  if (reply.saved) return runSavedQuickReply(reply.saved)
 }
 
 function sendUniqueQuickReply(event: KeyboardEvent) {
@@ -1361,7 +1474,7 @@ function refreshInboxLabelCatalog() {
   void loadInboxLabels().then(scheduleInboxLabelsRefresh).catch(() => {})
 }
 
-function closeInboxLabelMenu(event: KeyboardEvent) {
+function closeDetailsMenu(event: KeyboardEvent) {
   const menu = event.currentTarget as HTMLDetailsElement
   if (!menu.open) return
   menu.open = false
@@ -1652,6 +1765,75 @@ function findQuickReplyCommand(value: string) {
   return activeQuickRepliesForConversation.value.find(reply => reply.shortcut === shortcut) ?? null
 }
 
+function quickReplyMode(reply: WhatsAppQuickReply): WhatsAppQuickReplyMode {
+  return reply.replyMode ?? 'send'
+}
+
+function quickReplyDescription(reply: WhatsAppQuickReply) {
+  return quickReplyMode(reply) === 'chicharron_quote' ? 'Prepara los precios con y sin chicharrón' : reply.messageTemplate
+}
+
+function runSavedQuickReply(reply: WhatsAppQuickReply) {
+  if (!canSend.value || sending.value || sendingProductChoices.value || preparingQuickReply.value || !selectedConversation.value) return
+  if (quickReplyMode(reply) === 'send') return sendQuickReply(reply)
+  return prepareQuickReply(reply.id, {
+    conversationId: selectedConversation.value.id, session: sessionKey.value, text: draft.value, file: selectedFile.value,
+  })
+}
+
+function clearQuickReplyPreview() {
+  quickReplyPreviewRevision++
+  quickReplyChoice.value = undefined
+  preparingQuickReply.value = false
+  quickReplyPreviewError.value = ''
+}
+
+function updateQuoteSize() {
+  if (!quoteSizes.value.includes(quoteSize.value)) quoteSize.value = ''
+}
+
+function confirmQuickReplyChoice() {
+  const choice = quickReplyChoice.value
+  if (!choice || !quoteFamily.value || !quoteSizes.value.includes(quoteSize.value) || preparingQuickReply.value) return
+  void prepareQuickReply(choice.replyId, choice.context, { family: quoteFamily.value, size: quoteSize.value })
+}
+
+async function prepareQuickReply(replyId: number, context: QuickReplyContext, presentation?: WhatsAppQuickReplyPresentation) {
+  const revision = ++quickReplyPreviewRevision
+  const current = () => viewActive && revision === quickReplyPreviewRevision && selectedConversation.value?.id === context.conversationId
+    && sessionKey.value === context.session && canSend.value && draft.value === context.text && selectedFile.value === context.file
+  if (!current()) { clearQuickReplyPreview(); return }
+  preparingQuickReply.value = true
+  quickReplyPreviewError.value = ''
+  sendError.value = ''
+  try {
+    const { data } = await whatsappApi.previewQuickReply(context.conversationId, replyId, presentation)
+    if (!current()) return
+    if (data?.text) {
+      const previous = context.text.trimEnd()
+      const next = previous.trim() && !/^\/\S*$/.test(previous.trim()) ? `${previous}\n\n${data.text}` : data.text
+      if (next.length > 4096) throw new Error('Reduce el texto actual para agregar la respuesta rápida.')
+      clearQuickReplyPreview()
+      draft.value = next
+      await nextTick()
+      if (selectedConversation.value?.id === context.conversationId && canSend.value) messageInput.value?.focus()
+    } else if (data?.presentations?.length) {
+      quickReplyChoice.value = { replyId, context, presentations: data.presentations }
+      quoteFamily.value = data.family ?? ''
+      quoteSize.value = data.size ?? ''
+    } else {
+      throw new Error('No se pudo preparar la respuesta rápida.')
+    }
+  } catch (error) {
+    if (!current()) return
+    const message = error instanceof Error ? error.message : 'No se pudo preparar la respuesta rápida.'
+    if (quickReplyChoice.value) quickReplyPreviewError.value = message
+    else sendError.value = message
+  } finally {
+    if (revision === quickReplyPreviewRevision) preparingQuickReply.value = false
+  }
+}
+
 async function sendQuickReply(reply: WhatsAppQuickReply) {
   if (!canSend.value || sending.value || sendingProductChoices.value) return
   if (!selectedConversation.value) return
@@ -1695,6 +1877,7 @@ function resetQuickReplyForm() {
     branchId: defaultQuickReplyBranchId(),
     shortcut: '',
     messageTemplate: '',
+    replyMode: 'send',
     isActive: true,
   }
 }
@@ -1717,6 +1900,7 @@ function editQuickReply(reply: WhatsAppQuickReply) {
     branchId: reply.branchId,
     shortcut: reply.shortcut,
     messageTemplate: reply.messageTemplate,
+    replyMode: quickReplyMode(reply),
     isActive: reply.isActive,
   }
 }
@@ -1843,23 +2027,28 @@ async function sendProductOptions(groupId: number, group?: WhatsAppProductChoice
 }
 
 async function sendMessage() {
-  if (!canSend.value || sending.value || sendingProductChoices.value) return
+  if (!canSend.value || sending.value || sendingProductChoices.value || preparingQuickReply.value) return
   if (!selectedConversation.value || (!draft.value.trim() && !selectedFile.value)) return
   const textToSend = draft.value.trim()
   if (!selectedFile.value && textToSend.startsWith('/') && !/\s/.test(textToSend)) {
     const conversationId = selectedConversation.value.id
     await productChoicesRequest?.promise.catch(() => {})
     if (selectedConversation.value?.id !== conversationId || draft.value.trim() !== textToSend || !canSend.value) return
-    const group = catalogQuickRepliesByShortcut.value.get(normalizeQuickReplyShortcut(textToSend))
+    const shortcut = normalizeQuickReplyShortcut(textToSend)
+    const quickReply = findQuickReplyCommand(textToSend)
+    if (quickReply) {
+      await runSavedQuickReply(quickReply)
+      return
+    }
+    const group = catalogQuickRepliesByShortcut.value.get(shortcut)
     if (group) {
       await sendCatalogQuickReply(group)
       return
     }
-  }
-  const quickReply = !selectedFile.value ? findQuickReplyCommand(draft.value) : null
-  if (quickReply) {
-    await sendQuickReply(quickReply)
-    return
+    if (shortcut === 'conchi' || filteredQuickReplies.value.length) {
+      sendError.value = 'Elige una respuesta rápida antes de continuar.'
+      return
+    }
   }
 
   try {
@@ -2135,6 +2324,7 @@ watch(inboxScope, () => {
 }, { flush: 'sync' })
 
 watch(sessionKey, () => {
+  clearQuickReplyPreview()
   showClosedDayReplies.value = false
   showQuickRepliesModal.value = false
   showInboxLabelManager.value = false
@@ -2203,6 +2393,7 @@ watch([isPageVisible, isUserActive], ([visible, active], [wasVisible, wasActive]
   }
 })
 watch([activeInbox, selectedLabel], () => { if (whatsappStore.enabled) void reloadConversations() })
+watch([() => selectedConversation.value?.id, canSend], clearQuickReplyPreview, { flush: 'sync' })
 watch([selectedBranchId, unroutedOnly], () => { inboxCounts.value = null })
 watch([activeInbox, selectedBranchId, unroutedOnly, selectedLabel], () => {
   void router.replace({ query: { ...route.query, inbox: activeInbox.value, whatsappBranch: selectedBranchId.value || undefined,
@@ -2229,6 +2420,24 @@ watch(() => selectedConversation.value?.id, id => {
 </script>
 
 <style scoped>
+.inbox-control {
+  display: flex; align-items: center; gap: .375rem; min-height: 2.25rem; padding: .375rem .5rem;
+  border: 1px solid var(--color-slate-200); border-radius: .625rem; cursor: pointer;
+  list-style: none; font-weight: 600; color: var(--color-slate-700);
+}
+.inbox-control::-webkit-details-marker { display: none; }
+.inbox-control:hover, .inbox-tool:hover:not(:disabled) { background: var(--color-slate-50); }
+.inbox-control:focus-visible, .inbox-tool:focus-visible { outline: 2px solid var(--color-emerald-600); outline-offset: 1px; }
+.inbox-control-panel {
+  position: absolute; inset-inline: 0; top: 100%; z-index: 30; margin-top: .375rem; padding: .625rem;
+  border: 1px solid var(--color-slate-200); border-radius: .75rem; background: white; color: var(--color-slate-700);
+  box-shadow: 0 8px 24px #0f172a20;
+}
+.inbox-tool {
+  display: flex; align-items: center; gap: .5rem; width: 100%; min-height: 2.25rem; padding: .375rem .5rem;
+  border-radius: .5rem; cursor: pointer; text-align: left; font-weight: 500;
+}
+.inbox-tool:disabled { cursor: default; opacity: .5; }
 .chat-header { container: whatsapp-header / inline-size; }
 .chat-tool {
   display: inline-flex; align-items: center; gap: .25rem; height: 1.75rem; padding: 0 .375rem;
