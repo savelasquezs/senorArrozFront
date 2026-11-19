@@ -321,7 +321,7 @@ watch([firstWordGroups, isFirstWordGroupTab, () => props.loading], ([groups, gro
     padding: 0.75rem 1rem;
     border: 1px dashed #d1d5db;
     border-radius: 0.75rem;
-    background-color: #f9fafb;
+    background-color: var(--wa-raised, #f9fafb);
 }
 
 .chich-title {
@@ -363,7 +363,7 @@ watch([firstWordGroups, isFirstWordGroupTab, () => props.loading], ([groups, gro
     text-align: left;
     border-radius: 0.75rem;
     border: 1px solid #e5e7eb;
-    background: #fff;
+    background: var(--wa-panel, #fff);
     box-shadow: 0 1px 2px rgb(0 0 0 / 0.05);
     transition: border-color 0.15s, box-shadow 0.15s, background-color 0.15s;
 }
@@ -371,7 +371,7 @@ watch([firstWordGroups, isFirstWordGroupTab, () => props.loading], ([groups, gro
 .first-word-group-btn:hover {
     border-color: #10b981;
     box-shadow: 0 2px 6px rgb(16 185 129 / 0.15);
-    background: #f0fdf4;
+    background: var(--wa-outgoing, #f0fdf4);
 }
 
 .first-word-group-label {

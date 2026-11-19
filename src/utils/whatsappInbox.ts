@@ -30,6 +30,21 @@ export interface WhatsAppInboxSection {
   conversations: WhatsAppConversation[]
 }
 
+export const whatsappInboxLabels: Record<WhatsAppInboxKey, string> = {
+  free: 'Libres', mine: 'Míos', team: 'Equipo', closed: 'Cerrados',
+}
+
+export function whatsappConversationInbox(conversation: WhatsAppConversation, currentUserId: number | undefined): WhatsAppInboxKey {
+  if (conversation.attentionMode === 'closed') return 'closed'
+  if (!conversation.assignedUserId) return 'free'
+  return conversation.assignedUserId === currentUserId ? 'mine' : 'team'
+}
+
+export function compareWhatsAppConversationActivity(a: WhatsAppConversation, b: WhatsAppConversation) {
+  const activity = (conversation: WhatsAppConversation) => Date.parse(conversation.lastMessageAt || conversation.createdAt)
+  return activity(b) - activity(a) || b.id - a.id
+}
+
 export function canReadWhatsAppRouting(
   conversation: Pick<WhatsAppConversation, 'isCentralChannel' | 'operationalBranchId' | 'assignedUserId'>,
   branchId: number, userId: number | undefined, userBranchId: number | undefined, isSuperadmin: boolean,
@@ -46,21 +61,16 @@ export function buildWhatsAppInboxSections(
   _currentBranchId?: number, _isSuperadmin?: boolean,
 ): WhatsAppInboxSection[] {
   const sections: WhatsAppInboxSection[] = [
-    { key: 'free', label: 'Libres', conversations: [] }, { key: 'mine', label: 'Míos', conversations: [] },
-    { key: 'team', label: 'Equipo', conversations: [] }, { key: 'closed', label: 'Cerrados', conversations: [] },
+    { key: 'free', label: whatsappInboxLabels.free, conversations: [] }, { key: 'mine', label: whatsappInboxLabels.mine, conversations: [] },
+    { key: 'team', label: whatsappInboxLabels.team, conversations: [] }, { key: 'closed', label: whatsappInboxLabels.closed, conversations: [] },
   ]
   for (const conversation of conversations) {
     if (!_isSuperadmin && conversation.isCentralChannel && conversation.operationalBranchId
       && conversation.operationalBranchId !== _currentBranchId && conversation.assignedUserId !== currentUserId) continue
-    const key = conversation.attentionMode === 'closed' ? 'closed'
-      : conversation.assignedUserId === currentUserId && currentUserId ? 'mine'
-        : conversation.assignedUserId ? 'team' : 'free'
+    const key = whatsappConversationInbox(conversation, currentUserId)
     sections.find(section => section.key === key)!.conversations.push(conversation)
   }
-  for (const section of sections) section.conversations.sort((a, b) =>
-    commercialPriority(a) - commercialPriority(b)
-      || Number(Boolean(b.needsHumanResponse)) - Number(Boolean(a.needsHumanResponse))
-      || Date.parse(b.lastMessageAt || b.createdAt) - Date.parse(a.lastMessageAt || a.createdAt) || b.id - a.id)
+  for (const section of sections) section.conversations.sort(compareWhatsAppConversationActivity)
   return sections
 }
 

@@ -8,7 +8,7 @@
     </button>
     <Teleport to="body">
       <Transition name="hint">
-        <div v-if="opened" :id="id" ref="tooltip" role="tooltip" :data-wa-theme="whatsappTheme" class="fixed z-[12000] w-72 max-w-[calc(100vw-24px)] rounded-xl bg-slate-900 px-3.5 py-3 text-xs font-normal leading-relaxed text-white shadow-xl"
+        <div v-if="opened" :id="id" ref="tooltip" role="tooltip" :data-wa-theme="whatsappTheme" class="themed-tooltip fixed z-[12000] w-72 max-w-[calc(100vw-24px)] rounded-xl bg-slate-900 px-3.5 py-3 text-xs font-normal leading-relaxed text-white shadow-xl"
           :style="{ left: `${position.left}px`, top: `${position.top}px`, visibility: positioned ? 'visible' : 'hidden' }">
           <p class="whitespace-pre-line">{{ text }}</p>
         </div>
@@ -50,6 +50,11 @@ function hide() {
 onBeforeUnmount(hide)
 </script>
 <style scoped>
+.themed-tooltip[data-wa-theme] {
+  border: 1px solid var(--wa-line);
+  background-color: var(--wa-panel);
+  color: var(--wa-text);
+}
 .hint-enter-active,.hint-leave-active { transition: opacity .16s ease, transform .16s ease; }
 .hint-enter-from,.hint-leave-to { opacity: 0; transform: translateY(3px); }
 @media (prefers-reduced-motion: reduce) { .hint-enter-active,.hint-leave-active { transition: none; } }

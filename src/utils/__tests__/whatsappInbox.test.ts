@@ -19,11 +19,11 @@ function conversation(overrides: Partial<WhatsAppConversation>): WhatsAppConvers
 }
 
 describe('WhatsApp inbox sections', () => {
-  it('places incomplete orders before managed conversations and reopens attention without a new attempt', () => {
+  it('sorts by activity while keeping the commercial status available', () => {
     const managed = conversation({ id: 1, commercialStatus: 'order_taken', commercialOrderId: 91, lastMessageAt: '2026-11-05T15:00:00Z' })
     const pending = conversation({ id: 2, commercialStatus: 'in_progress', lastMessageAt: '2026-11-01T15:00:00Z' })
     const waiting = conversation({ id: 3, commercialStatus: 'waiting_customer', lastMessageAt: '2026-11-02T15:00:00Z' })
-    expect(buildWhatsAppInboxSections([managed, waiting, pending], 7, 1, false)[0].conversations.map(c => c.id)).toEqual([2, 3, 1])
+    expect(buildWhatsAppInboxSections([managed, waiting, pending], 7, 1, false)[0].conversations.map(c => c.id)).toEqual([1, 3, 2])
     expect(commercialGroup(waiting)).toBe('Esperando cliente')
     expect(commercialLabel(managed)).toBe('Pedido tomado · #91')
     managed.needsHumanResponse = true
@@ -48,10 +48,10 @@ describe('WhatsApp inbox sections', () => {
     ])
     expect(whatsappConversationBranchLabel(free)).toContain('Sin asignar')
   })
-  it('prioritizes a required response even after reading an older conversation', () => {
+  it('keeps the most recent conversation above an older one requiring attention', () => {
     const pending = conversation({ id: 1, needsHumanResponse: true, unreadCount: 0, lastMessageAt: '2026-09-12T00:00:00Z' })
     const recent = conversation({ id: 2, lastMessageAt: '2026-09-13T00:00:00Z' })
-    expect(buildWhatsAppInboxSections([recent, pending], 7, 1, false)[0].conversations.map(c => c.id)).toEqual([1, 2])
+    expect(buildWhatsAppInboxSections([recent, pending], 7, 1, false)[0].conversations.map(c => c.id)).toEqual([2, 1])
   })
   it('does not retain a cached inaccessible conversation from another branch', () => {
     const hidden = conversation({ id: 4, operationalBranchId: 2, assignedUserId: 8 })

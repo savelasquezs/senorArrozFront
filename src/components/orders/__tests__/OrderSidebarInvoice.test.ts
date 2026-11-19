@@ -3,6 +3,7 @@ import { reactive } from 'vue'
 import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import OrderSidebar from '../OrderSidebar.vue'
+import BaseTimePicker from '@/components/ui/BaseTimePicker.vue'
 import { electronicInvoicingApi as api } from '@/services/MainAPI/electronicInvoicingApi'
 import { DateTimeService } from '@/services/domain/DateTimeService'
 
@@ -56,7 +57,7 @@ describe('OrderSidebar', () => {
         const wrapper = mount(OrderSidebar, { global: { stubs } })
         expect(wrapper.get('payment-selector-stub').element.closest('details')).toBeNull()
         expect(wrapper.get('[data-test="sidebar-payments"]').find('details').exists()).toBe(false)
-        expect(wrapper.get('[data-test="sidebar-schedule"]').findAll('input[type="time"]')).toHaveLength(2)
+        expect(wrapper.get('[data-test="sidebar-schedule"]').findAllComponents(BaseTimePicker)).toHaveLength(2)
         expect(wrapper.get('[data-test="sidebar-schedule"]').find('input[type="checkbox"]').exists()).toBe(false)
         const footer = wrapper.get('[data-test="sidebar-footer"]')
         expect(footer.text()).toContain('10.000')
@@ -123,13 +124,13 @@ describe('OrderSidebar', () => {
     it('programs on preparation selection, suggests one hour and submits a manually adjusted delivery', async () => {
         harness.store.currentOrder.billingRecipient = null
         const wrapper = mount(OrderSidebar, { global: { stubs } })
-        const [prepare, delivery] = wrapper.findAll('input[type="time"]')
-        await prepare!.setValue('12:15')
+        const [prepare, delivery] = wrapper.findAllComponents(BaseTimePicker)
+        prepare!.vm.$emit('update:modelValue', '12:15')
         await flushPromises()
         expect(harness.store.currentOrder.isLater).toBe(true)
         expect(DateTimeService.dateToLocalHour(harness.store.currentOrder.prepareAt)).toEqual({ hours: 12, minutes: 15, seconds: 0 })
         expect(DateTimeService.dateToLocalHour(harness.store.currentOrder.reservedFor)).toEqual({ hours: 13, minutes: 15, seconds: 0 })
-        await delivery!.setValue('13:45')
+        delivery!.vm.$emit('update:modelValue', '13:45')
         await flushPromises()
         await wrapper.findAll('button').find(button => button.text().includes('Enviar Pedido'))!.trigger('click')
         await flushPromises()
@@ -143,7 +144,7 @@ describe('OrderSidebar', () => {
     it('explains an incomplete schedule and returns to an immediate order when cleared', async () => {
         harness.store.currentOrder.billingRecipient = null
         const wrapper = mount(OrderSidebar, { global: { stubs } })
-        await wrapper.findAll('input[type="time"]')[1]!.setValue('13:00')
+        wrapper.findAllComponents(BaseTimePicker)[1]!.vm.$emit('update:modelValue', '13:00')
         await flushPromises()
         expect(harness.store.currentOrder.isLater).toBe(true)
         expect(wrapper.get('[data-test="sidebar-schedule"] [role="alert"]').text()).toContain('preparación')
@@ -162,16 +163,16 @@ describe('OrderSidebar', () => {
 
     it('restores each draft schedule when changing tabs and keeps cleared hours empty on return', async () => {
         const wrapper = mount(OrderSidebar, { global: { stubs } })
-        await wrapper.findAll('input[type="time"]')[0]!.setValue('12:30')
+        wrapper.findAllComponents(BaseTimePicker)[0]!.vm.$emit('update:modelValue', '12:30')
         await flushPromises()
         const first = harness.store.currentOrder
         const second = { ...first, tabId: 'two', isLater: false, prepareAt: null, reservedFor: null }
         harness.store.currentTabId = 'two'; harness.store.currentOrder = second
         await flushPromises()
-        expect(wrapper.findAll('input[type="time"]').map(input => (input.element as HTMLInputElement).value)).toEqual(['', ''])
+        expect(wrapper.findAllComponents(BaseTimePicker).map(picker => picker.props('modelValue'))).toEqual(['', ''])
         harness.store.currentTabId = 'one'; harness.store.currentOrder = first
         await flushPromises()
-        expect(wrapper.findAll('input[type="time"]').map(input => (input.element as HTMLInputElement).value)).toEqual([
+        expect(wrapper.findAllComponents(BaseTimePicker).map(picker => picker.props('modelValue'))).toEqual([
             '12:30', '13:30',
         ])
         await wrapper.get('[aria-label="Quitar programación"]').trigger('click')
@@ -179,14 +180,14 @@ describe('OrderSidebar', () => {
         await flushPromises()
         harness.store.currentTabId = 'one'; harness.store.currentOrder = first
         await flushPromises()
-        expect(wrapper.findAll('input[type="time"]').map(input => (input.element as HTMLInputElement).value)).toEqual(['', ''])
+        expect(wrapper.findAllComponents(BaseTimePicker).map(picker => picker.props('modelValue'))).toEqual(['', ''])
         expect(first.isLater).toBe(false)
         wrapper.unmount()
     })
 
     it('requires an explicit delivery hour when the one-hour suggestion would leave today', async () => {
         const wrapper = mount(OrderSidebar, { global: { stubs } })
-        await wrapper.findAll('input[type="time"]')[0]!.setValue('23:30')
+        wrapper.findAllComponents(BaseTimePicker)[0]!.vm.$emit('update:modelValue', '23:30')
         await flushPromises()
         expect(harness.store.currentOrder.prepareAt.getTime()).not.toBeNaN()
         expect(harness.store.currentOrder.reservedFor).toBeNull()

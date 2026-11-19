@@ -252,6 +252,7 @@ export interface WhatsAppConversation {
   whatsAppUsername?: string | null
   hasWhatsAppIdentity: boolean
   contactName?: string | null
+  profilePhotoUrl?: string | null
   status: 'open' | 'pending' | 'closed' | 'archived'
   lastMessageAt?: string | null
   lastMessagePreview?: string | null
@@ -278,6 +279,7 @@ export interface WhatsAppOperationalBranchOption { id: number; name: string }
 
 export interface WhatsAppMessage {
   isUpdate?: boolean
+  editedAt?: string | null
   hiddenSource?: 'pos' | 'businessApp' | null
   replyToWhatsAppMessageId?: string | null
   location?: { latitude: number; longitude: number; name?: string | null; address?: string | null } | null
@@ -435,6 +437,13 @@ export interface WhatsAppInboxLabel {
 }
 export type WhatsAppInboxSummary = Record<WhatsAppInboxKey, { pendingOrders: number; unreadConversations: number }>
 export type WhatsAppAttentionAction = 'take' | 'takeover' | 'force-take' | 'release' | 'transfer' | 'return-to-ai' | 'pause-ai' | 'request-human' | 'close' | 'reopen'
+
+export interface WhatsAppCommercialHistoryEntry {
+  id: number
+  orderId: number | null
+  createdAt: string
+  completedAt: string | null
+}
 
 export interface WhatsAppCommercialDraft {
   sessionId: number

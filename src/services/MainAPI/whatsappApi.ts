@@ -1,5 +1,5 @@
 import { generatePosCreationKey } from '@/utils/posCreationKey'
-import type { WhatsAppConversationPage, WhatsAppCommercialDraft, WhatsAppDraftWrite } from '@/types/whatsapp'
+import type { WhatsAppConversationPage, WhatsAppCommercialDraft, WhatsAppCommercialHistoryEntry, WhatsAppDraftWrite } from '@/types/whatsapp'
 import { BaseApi } from './baseApi'
 import type { CoexistenceStatus } from '@/composables/useWhatsAppCoexistence'
 import { resolveWhatsAppOperation } from '@/helpers/whatsappOperation'
@@ -60,6 +60,9 @@ class WhatsAppApi extends BaseApi {
   }
   getCommercialDraft(id: number) {
     return this.get<ApiResponse<WhatsAppCommercialDraft | null>>(`/whatsapp/conversations/${id}/commercial-draft`)
+  }
+  getCommercialHistory(id: number) {
+    return this.get<ApiResponse<WhatsAppCommercialHistoryEntry[]>>(`/whatsapp/conversations/${id}/commercial-history`)
   }
   startCommercialDraft(id: number, request: WhatsAppDraftWrite) {
     return this.post<ApiResponse<WhatsAppCommercialDraft>>(`/whatsapp/conversations/${id}/commercial-draft`, request)

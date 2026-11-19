@@ -164,13 +164,13 @@
                         <div class="grid grid-cols-2 gap-2">
                             <div class="min-w-0">
                                 <label class="mb-1 block text-xs text-gray-600">Preparar</label>
-                                <BaseInput :model-value="formatOrderTime(prepareAtLocal)" type="time" step="60" size="sm"
-                                    aria-label="Hora de preparación" @update:model-value="value => onPrepareAtInput(parseOrderTime(value))" />
+                                <BaseTimePicker :model-value="formatOrderTime(prepareAtLocal)" compact
+                                    label="Hora de preparación" @update:model-value="value => onPrepareAtInput(parseOrderTime(value))" />
                             </div>
                             <div class="min-w-0">
                                 <label class="mb-1 block text-xs text-gray-600">Entregar</label>
-                                <BaseInput :model-value="formatOrderTime(reservedForLocal)" type="time" step="60" size="sm"
-                                    aria-label="Hora de entrega" @update:model-value="value => onReservedForInput(parseOrderTime(value))" />
+                                <BaseTimePicker :model-value="formatOrderTime(reservedForLocal)" compact
+                                    label="Hora de entrega" @update:model-value="value => onReservedForInput(parseOrderTime(value))" />
                             </div>
                         </div>
                         <p v-if="scheduleError" role="alert" class="mt-1 text-xs text-red-700">{{ scheduleError }}</p>
@@ -365,6 +365,7 @@ import BaseInput from '@/components/ui/BaseInput.vue'
 import OrderNoteDialog from './OrderNoteDialog.vue'
 import OrderTabs from '@/components/orders/OrderTabs.vue'
 import OrderItemList from '@/components/orders/OrderItemList.vue'
+import BaseTimePicker from '@/components/ui/BaseTimePicker.vue'
 import CustomerSection from '@/components/customers/CustomerSection.vue'
 import OrderFulfillmentBranchSelector from '@/components/orders/OrderFulfillmentBranchSelector.vue'
 const CustomerDetailModal = defineAsyncComponent(() => import('@/components/customers/CustomerDetailModal.vue'))
@@ -1090,7 +1091,7 @@ watch(
 .sidebar-summary { display: flex; align-items: center; gap: 0.5rem; min-height: 28px; cursor: pointer; list-style: none; font-size: 0.8125rem; font-weight: 500; color: #374151; border-radius: 6px; }
 .sidebar-summary:hover { color: #047857; }
 .sidebar-summary:focus-visible { outline: 2px solid #059669; outline-offset: 3px; }
-.sidebar-schedule :deep(.dp__input), .sidebar-schedule :deep(input[type="time"]) { min-width: 0; min-height: 32px; padding-top: 5px; padding-bottom: 5px; border-color: #e5e7eb; border-radius: 6px; font-size: 12px; }
-@media (pointer: coarse) { .sidebar-schedule :deep(.dp__input), .sidebar-schedule :deep(input[type="time"]) { min-height: 40px; font-size: 16px; } }
+.sidebar-schedule :deep(.dp__input) { min-width: 0; min-height: 32px; padding-block: 5px; border-color: var(--wa-line, #e5e7eb); border-radius: 6px; font-size: 12px; }
+@media (pointer: coarse) { .sidebar-schedule :deep(.dp__input) { min-height: 40px; font-size: 16px; } }
 @media (max-width: 1023px) { .order-sidebar { width: 100%; min-height: 0; flex: 1; } }
 </style>

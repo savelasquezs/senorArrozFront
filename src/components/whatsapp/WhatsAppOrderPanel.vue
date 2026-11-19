@@ -7,7 +7,6 @@
           <option value="in_progress">En proceso</option><option value="waiting_customer">Esperando cliente</option>
         </select>
       </label>
-      <BaseButton v-if="session?.status === 'active'" size="sm" variant="ghost" :disabled="!editable" @click="showCancel = true">Sin venta</BaseButton>
       <BaseButton v-if="session" size="sm" variant="ghost" @click="showNotes = true">Notas internas</BaseButton>
     </Teleport>
     <Teleport v-if="resolvedSaveTarget && active" :to="resolvedSaveTarget">
@@ -24,6 +23,25 @@
         <BaseButton v-if="saveState === 'error'" size="sm" variant="outline" @click="run(flush)">Reintentar guardado</BaseButton>
       </div>
     </div>
+    <div v-if="session" class="order-history flex shrink-0 flex-wrap items-start gap-1.5 border-b border-gray-200 px-2 py-1">
+      <details ref="historyDetails" class="min-w-0 flex-1" @toggle="onHistoryToggle">
+        <summary class="cursor-pointer rounded px-1.5 py-1 text-xs font-semibold text-gray-700 focus-visible:outline-2">Pedidos anteriores</summary>
+        <p v-if="loadingHistory" role="status" class="px-1.5 py-1 text-xs text-gray-500">Cargando pedidos…</p>
+        <p v-else-if="historyError" role="alert" class="px-1.5 py-1 text-xs text-red-700">{{ historyError }}</p>
+        <ul v-else-if="previousOrders.length" class="max-h-28 overflow-y-auto">
+          <li v-for="entry in previousOrders" :key="entry.id">
+            <button type="button" class="flex w-full items-center justify-between gap-2 rounded px-1.5 py-1 text-left text-xs text-gray-700 hover:bg-gray-100"
+              @click="openOrder(entry.orderId)">
+              <span class="font-semibold">Pedido #{{ entry.orderId }}</span>
+              <time :datetime="entry.completedAt || entry.createdAt">{{ historyDate.format(new Date(entry.completedAt || entry.createdAt)) }}</time>
+            </button>
+          </li>
+        </ul>
+        <p v-else class="px-1.5 py-1 text-xs text-gray-500">Aún no hay pedidos confirmados en esta conversación.</p>
+      </details>
+      <BaseButton v-if="session.status === 'active'" size="xs" variant="ghost" :disabled="!editable || finishingAttention || !!session.checkoutId"
+        @click="showCancel = true">Descartar borrador</BaseButton>
+    </div>
     <BaseLoading v-if="loading || !session && syncing" text="Cargando pedido…" />
     <div v-else-if="!session" class="space-y-3 p-4">
       <p v-if="!owned" class="text-sm text-gray-500">Toma la conversación para preparar el pedido.</p>
@@ -34,13 +52,13 @@
       <template v-if="session.orderId">
         <p v-if="session.confirmationStatus" class="text-xs text-gray-600">Confirmación por WhatsApp: {{ session.confirmationStatus }}</p>
         <p v-if="session.confirmationError" class="text-xs text-amber-800">El pedido ya existe. {{ session.confirmationError === 'provider_rejected_retryable' ? 'Puedes reintentar el mensaje.' : 'Revisa el envío antes de repetirlo.' }}</p>
-        <BaseButton variant="outline" @click="openOrder">Gestionar pedido #{{ session.orderId }}</BaseButton>
+        <BaseButton variant="outline" @click="openOrder()">Gestionar pedido #{{ session.orderId }}</BaseButton>
         <BaseButton v-if="session.confirmationStatus === 'failed' && session.confirmationError === 'provider_rejected_retryable'" :disabled="!owned || syncing" variant="outline" @click="run(() => action('retry-message'))">Reintentar mensaje</BaseButton>
       </template>
       <BaseButton :disabled="!owned || syncing || !!session.checkoutId && !session.orderId && session.commercialStatus !== 'no_sale'" @click="showNew = true">Nuevo pedido</BaseButton>
     </div>
     <template v-else>
-      <fieldset :disabled="!editable || finishingAttention" class="min-h-0 min-w-0 w-full flex-1 overflow-hidden border-0 p-0 disabled:opacity-65">
+      <fieldset :disabled="!editable || finishingAttention || discarding" class="min-h-0 min-w-0 w-full flex-1 overflow-hidden border-0 p-0 disabled:opacity-65">
         <OrderSidebar chat-actions :whatsapp-contact="conversation" :can-send-address-choices="canSendChoices && !sendingChoices"
           @send-address-choices="sendChoices" @draft-message="text => emit('draft-message', conversation.id, text)" />
       </fieldset>
@@ -55,9 +73,15 @@
       </template>
     </BaseDialog>
     <BaseDialog v-model="showReload" title="Recargar borrador" size="sm"><p>Se descartarán tus cambios locales sin guardar y se cargará la versión compartida.</p><BaseButton class="mt-3" @click="showReload = false; run(() => load(true))">Descartar cambios y recargar</BaseButton></BaseDialog>
-    <BaseDialog v-model="showCancel" title="Cerrar sin venta" size="sm"><p>El borrador quedará en el historial de esta conversación.</p><BaseButton class="mt-3" @click="showCancel = false; run(() => action('cancel'))">Cerrar sin venta</BaseButton></BaseDialog>
+    <BaseDialog v-model="showCancel" title="Descartar borrador" size="sm">
+      <p class="text-sm text-gray-700">Se cerrará este intento. Los pedidos confirmados seguirán disponibles en el historial.</p>
+      <div class="mt-3 flex flex-wrap justify-end gap-2">
+        <BaseButton variant="secondary" :disabled="discarding" @click="showCancel = false">Seguir editando</BaseButton>
+        <BaseButton variant="danger" :loading="discarding" @click="discardDraft">Descartar borrador</BaseButton>
+      </div>
+    </BaseDialog>
     <BaseDialog v-model="showNew" title="Nuevo pedido" size="sm"><p>Se conservará el intento anterior y se creará una nueva clave de pedido.</p><BaseButton class="mt-3" @click="showNew = false; run(start)">Iniciar nuevo pedido</BaseButton></BaseDialog>
-    <BaseDialog v-model="showOrder" :title="`Pedido #${session?.orderId}`" size="6xl">
+    <BaseDialog v-model="showOrder" :title="`Pedido #${persistedOrder?.id}`" size="6xl">
       <OrderDetailContent v-if="persistedOrder" :flat-order="persistedOrder" />
     </BaseDialog>
   </div>
@@ -72,8 +96,9 @@ import BaseLoading from '@/components/ui/BaseLoading.vue'
 import OrderSidebar from '@/components/orders/OrderSidebar.vue'
 import { useWhatsAppCommercialDraft } from '@/composables/useWhatsAppCommercialDraft'
 import { useOrdersDataStore } from '@/store/ordersData'
+import { whatsappApi } from '@/services/MainAPI/whatsappApi'
 import type { OrderDetailView } from '@/types/order'
-import type { WhatsAppCommercialDraft, WhatsAppConversation, WhatsAppMessage, WhatsAppProductSuggestion, WhatsAppProductSuggestionState } from '@/types/whatsapp'
+import type { WhatsAppCommercialDraft, WhatsAppCommercialHistoryEntry, WhatsAppConversation, WhatsAppMessage, WhatsAppProductSuggestion, WhatsAppProductSuggestionState } from '@/types/whatsapp'
 
 const props = defineProps<{ conversation: WhatsAppConversation; initialDraft?: Promise<WhatsAppCommercialDraft | null | undefined>; controlsTarget?: HTMLElement | null; saveTarget?: HTMLElement | null; canSendChoices?: boolean; finishingAttention?: boolean }>()
 const OrderDetailContent = defineAsyncComponent(() => import('@/components/orders/OrderDetailContent.vue'))
@@ -107,6 +132,11 @@ const productSuggestionState = computed<WhatsAppProductSuggestionState>(() => ({
 watch(productSuggestionState, value => emit('product-suggestion-state', value), { immediate: true })
 const noteText = ref(''), showReload = ref(false), showNew = ref(false), showCancel = ref(false), showOrder = ref(false), showNotes = ref(false)
 const persistedOrder = ref<OrderDetailView | null>(null)
+const history = ref<WhatsAppCommercialHistoryEntry[]>([])
+const historyDetails = ref<HTMLDetailsElement>()
+const loadingHistory = ref(false), historyError = ref(''), discarding = ref(false)
+const previousOrders = computed(() => history.value.filter(entry => entry.orderId))
+const historyDate = new Intl.DateTimeFormat('es-CO', { dateStyle: 'short', timeZone: 'America/Bogota' })
 const sendingChoices = ref(false)
 const saveLabels = { saved: 'Guardado', pending: 'Cambios pendientes', saving: 'Guardando…', conflict: 'Conflicto: revisa la versión compartida', error: 'No se pudo guardar' }
 const resolvedSaveTarget = computed(() => props.saveTarget || props.controlsTarget)
@@ -133,11 +163,36 @@ async function sendChoices() {
   } finally { sendingChoices.value = false }
 }
 async function saveNote() { await run(async () => { await action('note', noteText.value); noteText.value = '' }) }
-async function openOrder() {
-  if (!session.value?.orderId) return
+async function onHistoryToggle(event: Event) {
+  if (!(event.currentTarget as HTMLDetailsElement).open || loadingHistory.value) return
+  loadingHistory.value = true
+  historyError.value = ''
+  try {
+    const response = await whatsappApi.getCommercialHistory(props.conversation.id)
+    history.value = response.data ?? []
+  } catch (cause) {
+    historyError.value = cause instanceof Error ? cause.message : 'No se pudo cargar el historial.'
+  } finally {
+    loadingHistory.value = false
+  }
+}
+async function discardDraft() {
+  if (discarding.value || !editable.value || session.value?.checkoutId) return
+  discarding.value = true
+  await run(async () => {
+    await action('cancel')
+    showCancel.value = false
+    if (historyDetails.value) historyDetails.value.open = true
+  })
+  discarding.value = false
+  if (error.value) showCancel.value = false
+}
+async function openOrder(id: number | null | undefined = session.value?.orderId) {
+  if (!id) return
   await run(async () => {
     const store = useOrdersDataStore()
-    await store.fetchById(session.value!.orderId!)
+    await store.fetchById(id)
+    if (!active.value || store.current?.id !== id) return
     persistedOrder.value = store.current
     showOrder.value = true
   })

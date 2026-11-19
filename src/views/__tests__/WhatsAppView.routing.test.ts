@@ -169,6 +169,45 @@ describe('M38-F04 view + real Pinia store integration', () => {
     expect(wrapper.get('[data-wa-theme]').attributes('data-wa-theme')).toBe('dark')
   })
 
+  it('searches across all four tabs and identifies each result in activity order', async () => {
+    const { wrapper } = mountView(true)
+    await flushPromises()
+    const rows: WhatsAppConversation[] = [
+      { ...conversation(1), lastMessageAt: '2026-11-19T12:00:00Z' },
+      { ...conversation(2), assignedUserId: null, lastMessageAt: '2026-11-19T14:00:00Z' },
+      { ...conversation(3), assignedUserId: 8, lastMessageAt: '2026-11-19T13:00:00Z' },
+      { ...conversation(4), attentionMode: 'closed', lastMessageAt: '2026-11-10T17:00:00Z' },
+    ]
+    m.api.getConversations.mockResolvedValue(reply(rows))
+    await wrapper.get('input[type="search"]').setValue('+57 (300) 000-0000')
+    vi.advanceTimersByTime(350)
+    await flushPromises()
+
+    const filters = m.api.getConversations.mock.lastCall?.[0]
+    expect(filters.search).toBe('+57 (300) 000-0000')
+    expect(filters.inbox).toBeUndefined()
+    expect(wrapper.findAll('.wa-inbox-source').map(badge => badge.text())).toEqual(['Libres', 'Equipo', 'Míos', 'Cerrados'])
+    expect(wrapper.find('[role="tablist"]').exists()).toBe(false)
+  })
+
+  it('exposes the AI states on compact markers outside of the message actions', async () => {
+    const { wrapper, vm } = mountView()
+    await flushPromises()
+    const timestamp = '2026-11-19T12:00:00Z'
+    const messages = ['completed', 'ignored'].map((status, index) => ({
+      id: index + 1, conversationId: 1, direction: 'inbound', type: 'text', textBody: 'Mensaje',
+      timestamp, createdAt: timestamp, status: 'received',
+      aiProcessing: { status, severity: 'neutral', title: index ? 'No se procesó con IA' : 'Procesado con IA' },
+    }))
+    m.api.getMessagesPage.mockResolvedValue(reply({ items: messages, hasMore: false }))
+    await vm.selectConversation(m.rows[0]!)
+    await flushPromises()
+
+    expect(wrapper.findAll('.wa-ai-message-marker').map(marker => marker.attributes('label')))
+      .toEqual(['Procesado con IA', 'No se procesó con IA'])
+    expect(wrapper.find('.wa-bubble .wa-ai-message-marker').exists()).toBe(false)
+  })
+
   it('keeps the full team counts visible when filtering the paginated list by a label', async () => {
     const { wrapper } = mountView(true)
     await flushPromises()

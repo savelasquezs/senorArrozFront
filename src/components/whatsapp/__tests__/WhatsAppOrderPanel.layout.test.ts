@@ -36,7 +36,7 @@ it('keeps conversation controls in the chat header and gives the editor its comp
     BaseDialog: { props: ['modelValue', 'title'], template: '<section v-if="modelValue" role="dialog"><h2>{{ title }}</h2><slot /></section>' },
   } } })
   await flushPromises()
-  expect(target.textContent).toContain('Sin venta')
+  expect(target.textContent).toContain('Notas internas')
   expect(target.textContent).not.toContain('Guardado')
   expect(saveTarget.textContent).toContain('Guardado')
   harness.contexts.get(11).saveState.value = 'error'
@@ -44,23 +44,24 @@ it('keeps conversation controls in the chat header and gives the editor its comp
   expect(saveTarget.querySelector('[role="status"]')?.textContent).toContain('No se pudo guardar')
   expect(wrapper.text()).not.toContain('Línea:')
   expect(wrapper.text()).not.toContain('Prepara:')
-  expect(wrapper.text()).not.toContain('Sin venta')
+  expect(wrapper.text()).toContain('Pedidos anteriores')
+  expect(wrapper.text()).toContain('Descartar borrador')
   expect(wrapper.find('[data-test="existing-order-editor"]').exists()).toBe(true)
   const select = target.querySelector('select')!
   select.value = 'waiting_customer'
   select.dispatchEvent(new Event('change', { bubbles: true }))
   await flushPromises()
   expect(harness.contexts.get(11).commercialStatus.value).toBe('waiting_customer')
-  ;[...target.querySelectorAll('button')].find(button => button.textContent?.trim() === 'Sin venta')!.click()
+  await wrapper.findAll('button').find(button => button.text() === 'Descartar borrador')!.trigger('click')
   await flushPromises()
-  expect(wrapper.text()).toContain('Cerrar sin venta')
+  expect(wrapper.get('[role="dialog"]').text()).toContain('Descartar borrador')
   expect(harness.contexts.get(11).action).not.toHaveBeenCalled()
   current.value = 12
   await flushPromises()
   expect(wrapper.findAll('[role="dialog"]')).toHaveLength(0)
   expect(target.querySelectorAll('select')).toHaveLength(1)
   expect(saveTarget.textContent).toContain('Guardado')
-  expect(target.textContent?.match(/Sin venta/g)).toHaveLength(1)
+  expect(wrapper.findAll('button').filter(button => button.text() === 'Descartar borrador')).toHaveLength(1)
   expect(target.querySelector('select')?.value).toBe('in_progress')
   expect(harness.contexts.get(11).flush).toHaveBeenCalledOnce()
   ;[...target.querySelectorAll('button')].find(button => button.textContent?.trim() === 'Notas internas')!.click()
