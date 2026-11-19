@@ -116,6 +116,31 @@ it('blocks the editor for an observer', async () => {
   expect(api.commercialDraftAction).not.toHaveBeenCalled()
 })
 
+it('opens a legacy first draft automatically only for the person attending', async () => {
+  api.getCommercialDraft.mockResolvedValue({ data: null })
+  api.startCommercialDraft.mockResolvedValue({ data: { ...session(), order: { ...session().order, orderDetails: [] } } })
+  const view = await panel({ assignedUserId: null })
+  expect(api.startCommercialDraft).not.toHaveBeenCalled()
+  expect(view.text()).not.toContain('Iniciar pedido')
+  await view.setProps({ conversation: { ...view.props().conversation, assignedUserId: 7, attentionRevision: 7 } })
+  await flushPromises()
+  expect(api.startCommercialDraft).toHaveBeenCalledExactlyOnceWith(44, { sessionId: 0, expectedVersion: 0, attentionVersion: 7 })
+  expect(editor.currentOrder?.orderItems).toEqual([])
+  expect(view.get('fieldset').attributes('disabled')).toBeUndefined()
+})
+
+it('loads the latest saved draft when taking over and locks it when reassigned', async () => {
+  const view = await panel({ assignedUserId: 8 })
+  shared = { ...shared, version: 4, order: { ...shared.order, orderDetails: [{ productId: 88, quantity: 3, unitPrice: 10000 }] } }
+  await view.setProps({ conversation: { ...view.props().conversation, assignedUserId: 7, attentionRevision: 7 } })
+  await flushPromises()
+  expect(api.startCommercialDraft).not.toHaveBeenCalled()
+  expect(editor.currentOrder?.orderItems[0]?.quantity).toBe(3)
+  expect(view.get('fieldset').attributes('disabled')).toBeUndefined()
+  await view.setProps({ conversation: { ...view.props().conversation, assignedUserId: 8, attentionRevision: 8 } })
+  expect(view.get('fieldset').attributes('disabled')).toBeDefined()
+})
+
 it('starts a new versioned attempt after a confirmed order', async () => {
   shared = { ...shared, status: 'completed', orderId: 501 }
   api.startCommercialDraft.mockResolvedValue({ data: { ...session(), sessionId: 82,

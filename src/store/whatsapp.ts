@@ -226,8 +226,9 @@ export const useWhatsAppStore = defineStore('whatsapp', () => {
       const byId = new Map((more ? conversations.value : []).map(item => [item.id, item]))
       for (const item of res.data.items) byId.set(item.id, item)
       for (const current of conversations.value) {
-        if (messageRevisions.get(current.id) === revisions.get(current.id)) continue
         const pageItem = byId.get(current.id)
+        if (messageRevisions.get(current.id) === revisions.get(current.id)
+          && (!pageItem || (pageItem.attentionRevision ?? 0) >= (current.attentionRevision ?? 0))) continue
         if (selectedFilters?.label && !pageItem) continue
         byId.set(current.id, pageItem?.labels ? { ...current, labels: pageItem.labels } : current)
       }
@@ -377,22 +378,27 @@ export const useWhatsAppStore = defineStore('whatsapp', () => {
   }
 
   async function changeAttention(conversationId: number, action: import('@/types/whatsapp').WhatsAppAttentionAction,
-    targetUserId?: number, reason?: string, selected?: WhatsAppConversation) {
+    targetUserId?: number, reason?: string, selected?: WhatsAppConversation, confirmedVersion?: number) {
     const row = conversations.value.find(x => x.id === conversationId)
     const conversation = selected?.id === conversationId && (selected.attentionRevision ?? 0) > (row?.attentionRevision ?? -1)
       ? selected : row
-    try {
-      const res = await whatsappApi.changeAttention(conversationId, action, conversation?.attentionRevision ?? 0, targetUserId, reason)
-      for (const target of new Set([row, conversation])) {
-        if (target && res.data && (res.data.attentionRevision ?? 0) >= (target.attentionRevision ?? 0)) Object.assign(target, res.data)
+    function apply(attention?: import('@/types/whatsapp').WhatsAppAttention | null) {
+      if (!attention) return
+      const latest = conversations.value.find(x => x.id === conversationId)
+      for (const target of new Set([latest, selected])) {
+        if (target?.id !== conversationId || (attention.attentionRevision ?? 0) < (target.attentionRevision ?? 0)) continue
+        const status = attention.attentionMode === 'closed' ? 'closed' : target.status === 'closed' ? 'open' : target.status
+        Object.assign(target, attention, { status })
       }
+      markMessageChanged(conversationId)
+    }
+    try {
+      const res = await whatsappApi.changeAttention(conversationId, action, confirmedVersion ?? conversation?.attentionRevision ?? 0, targetUserId, reason)
+      apply(res.data)
       return res.data
     } catch (error) {
       const current = await whatsappApi.getAttention(conversationId).catch(() => null)
-      for (const target of new Set([row, conversation])) {
-        if (target && current?.data && (current.data.attentionRevision ?? 0) >= (target.attentionRevision ?? 0))
-          Object.assign(target, current.data)
-      }
+      apply(current?.data)
       throw error
     }
   }
@@ -411,7 +417,7 @@ export const useWhatsAppStore = defineStore('whatsapp', () => {
     markMessageChanged(conversation.id)
     const current = conversations.value.find(x => x.id === conversation.id)
     if (current && (conversation.attentionRevision ?? 0) < (current.attentionRevision ?? 0)) return
-    if (current) Object.assign(current, conversation)
+    if (current) Object.assign(current, conversation, { labels: conversation.labels ?? current.labels })
     else conversations.value.unshift(conversation)
     boundConversations()
   }

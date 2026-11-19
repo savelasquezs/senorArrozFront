@@ -1,6 +1,6 @@
 import { mount, flushPromises } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
-import { defineComponent, h, KeepAlive, onMounted, ref } from 'vue'
+import { defineComponent, h, KeepAlive, nextTick, onMounted, ref } from 'vue'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { useWhatsAppCommercialDraft } from '../useWhatsAppCommercialDraft'
 import { useOrdersDraftsStore } from '@/store/ordersDrafts'
@@ -53,7 +53,7 @@ describe('shared commercial draft editor', () => {
     data: { branchId, messages: [{ messageId: 90, suggestions: [option] }] },
   })
 
-  it('starts a first draft and saves a double-clicked suggestion once, retaining the marker on reload', async () => {
+  it('automatically opens a first draft and saves a double-clicked suggestion once', async () => {
     api.getCommercialDraft.mockResolvedValueOnce({ data: null })
     api.getProductSuggestions.mockResolvedValue(verifiedSuggestion(riceSuggestion))
     api.saveCommercialDraft.mockImplementationOnce(async (_id, request) => {
@@ -67,6 +67,8 @@ describe('shared commercial draft editor', () => {
       return { data: session(8801) }
     })
     await model.load()
+    await flushPromises()
+    expect(model.session.value?.sessionId).toBe(8801)
     await Promise.all([
       model.addProductSuggestion(90, riceSuggestion, () => true),
       model.addProductSuggestion(90, riceSuggestion, () => true),
@@ -298,15 +300,15 @@ describe('shared commercial draft editor', () => {
     await first.model.load()
     first.model.draft.value!.updatedAt = new Date('2030-01-01T00:00:00Z')
     expect(first.model.saveState.value).toBe('saved')
-    first.conversation.value.assignedUserId = 7
-    first.conversation.value.attentionRevision++
     let resolve!: (value: unknown) => void
     api.getCommercialDraft.mockImplementationOnce(() => new Promise(done => { resolve = done }))
-    const pending = first.model.reconcile(true)
+    first.conversation.value.assignedUserId = 7
+    first.conversation.value.attentionRevision++
+    await nextTick()
     expect(first.model.editable.value).toBe(false)
     await expect(first.model.submit(first.model.draft.value!)).rejects.toThrow('Revisa el estado')
     resolve({ data: { ...session(2101), version: 4 } })
-    await pending
+    await flushPromises()
     expect(first.model.editable.value).toBe(true)
     expect(first.model.session.value?.version).toBe(4)
     expect(first.model.draft.value?.branchId).toBe(2)
@@ -353,9 +355,11 @@ describe('shared commercial draft editor', () => {
     expect(first.model.draft.value?.total).toBe(9000)
   })
 
-  it('does not start a sale when opening an informational conversation', async () => {
+  it('does not start a draft when viewing an unassigned informational conversation', async () => {
     api.getCommercialDraft.mockResolvedValueOnce({ data: null })
     const first = render(1401)
+    first.conversation.value.attentionMode = 'waitingForHuman'
+    first.conversation.value.assignedUserId = null
     await first.model.load()
     expect(first.model.session.value).toBeNull()
     expect(first.model.draft.value).toBeNull()

@@ -188,6 +188,13 @@ export function useWhatsAppCommercialDraft(conversation: Ref<WhatsAppConversatio
       commercialStatus: commercialStatus.value, error: error.value, pendingSave })
   }
 
+  async function ensureFirstDraft(value: WhatsAppCommercialDraft | null, attentionVersion: number) {
+    if (value || !owned.value || disposed || auth.user?.id !== userId
+      || attentionVersion !== (conversation.value.attentionRevision ?? 0)) return value
+    const result = await whatsappApi.startCommercialDraft(conversationId, { sessionId: 0, expectedVersion: 0, attentionVersion })
+    return result.data ?? null
+  }
+
   async function load(discard = false) {
     const retained = retainedDrafts.get(cacheKey)
     if (!discard && retained && editor.currentOrder) {
@@ -204,7 +211,7 @@ export function useWhatsAppCommercialDraft(conversation: Ref<WhatsAppConversatio
       }
     }
     const epoch = ++generation
-    const attention = conversation.value.attentionRevision
+    const attention = conversation.value.attentionRevision ?? 0
     loading.value = true
     error.value = ''
     try {
@@ -212,10 +219,11 @@ export function useWhatsAppCommercialDraft(conversation: Ref<WhatsAppConversatio
       initialRead = undefined
       const prefetched = await preload?.catch(() => undefined)
       const result = prefetched === undefined ? await whatsappApi.getCommercialDraft(conversationId) : { data: prefetched }
-      if (epoch === generation && !disposed && auth.user?.id === userId) {
-        await apply(result.data ?? null)
-        reconciledAt = Date.now(); reconciledAttention = attention
-      }
+      if (epoch !== generation || disposed || auth.user?.id !== userId) return
+      const latest = await ensureFirstDraft(result.data ?? null, attention)
+      if (epoch !== generation || disposed || auth.user?.id !== userId) return
+      await apply(latest)
+      reconciledAt = Date.now(); reconciledAttention = attention
     } catch (cause) { error.value = message(cause) }
     finally { if (epoch === generation) finishLoading() }
   }
@@ -332,8 +340,12 @@ export function useWhatsAppCommercialDraft(conversation: Ref<WhatsAppConversatio
   async function flush() {
     clearTimeout(timer)
     if (pendingSave) await pendingSave
-    if (!editable.value || !draft.value || !session.value || snapshot() === savedSnapshot) return
+    if (!editable.value || !draft.value || !session.value) return
     const captured = snapshot()
+    if (captured === savedSnapshot) {
+      saveState.value = 'saved'
+      return
+    }
     const payload = { ...versions(), order: transformDraftToCreateDto(draft.value), editor: JSON.parse(JSON.stringify(draft.value)), commercialStatus: commercialStatus.value }
     saveState.value = 'saving'
     let choiceMerged = false
@@ -382,22 +394,24 @@ export function useWhatsAppCommercialDraft(conversation: Ref<WhatsAppConversatio
   function reconcile(force = false): Promise<void> {
     if (force) syncing.value = true
     if (reconciliation) { queuedReconciliation ||= force; return reconciliation }
-    if (!force && reconciledAt && Date.now() - reconciledAt < 5000 && reconciledAttention === conversation.value.attentionRevision) return Promise.resolve()
+    if (!force && reconciledAt && Date.now() - reconciledAt < 5000 && reconciledAttention === (conversation.value.attentionRevision ?? 0)) return Promise.resolve()
     if (loading.value) { queuedReconciliation ||= force; return Promise.resolve() }
     if (!force && (saveState.value !== 'saved' || snapshot() !== savedSnapshot)) { syncing.value = false; return Promise.resolve() }
     const captured = snapshot(), epoch = generation
-    const attention = conversation.value.attentionRevision
+    const attention = conversation.value.attentionRevision ?? 0
     reconciliation = (async () => {
       try {
         if (pendingSave) await pendingSave.catch(() => {})
         const result = await whatsappApi.getCommercialDraft(conversationId)
         if (disposed || auth.user?.id !== userId || epoch !== generation) return
-        if (attention !== conversation.value.attentionRevision) { queuedReconciliation = true; return }
-        const latest = result.data ?? null, current = session.value
+        if (attention !== (conversation.value.attentionRevision ?? 0)) { queuedReconciliation = true; return }
+        const current = session.value
         if (snapshot() !== captured || snapshot() !== savedSnapshot || saveState.value !== 'saved') {
-          if (force && saveState.value === 'pending') mergeCustomerChoice(latest)
+          if (force && saveState.value === 'pending') mergeCustomerChoice(result.data)
           return
         }
+        const latest = await ensureFirstDraft(result.data ?? null, attention)
+        if (disposed || auth.user?.id !== userId || epoch !== generation || attention !== (conversation.value.attentionRevision ?? 0)) return
         if (latest?.sessionId !== current?.sessionId || latest?.version !== current?.version) {
           loading.value = true
           try { await apply(latest) } finally { loading.value = false }
@@ -407,7 +421,7 @@ export function useWhatsAppCommercialDraft(conversation: Ref<WhatsAppConversatio
         reconciledAt = Date.now(); reconciledAttention = attention
       } finally {
         reconciliation = null
-        if (attention !== conversation.value.attentionRevision) queuedReconciliation = true
+        if (attention !== (conversation.value.attentionRevision ?? 0)) queuedReconciliation = true
         if (queuedReconciliation && !disposed && auth.user?.id === userId) {
           queuedReconciliation = false
           void reconcile(true).catch(cause => { error.value = message(cause) })
@@ -459,6 +473,15 @@ export function useWhatsAppCommercialDraft(conversation: Ref<WhatsAppConversatio
     return { id: session.value!.orderId!, branchId: session.value!.order.branchId } as Order
   }
 
+  watch(owned, isOwner => {
+    if (isOwner) {
+      if (snapshot() !== savedSnapshot && saveState.value !== 'saved') {
+        saveState.value = 'conflict'
+        return
+      }
+      void reconcile(true).catch(cause => { error.value = message(cause) })
+    } else clearTimeout(timer)
+  })
   watch(snapshot, () => {
     if (applying) return
     if (!owned.value && saveState.value === 'saved') { savedSnapshot = snapshot(); return }

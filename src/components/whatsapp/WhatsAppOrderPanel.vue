@@ -24,11 +24,10 @@
         <BaseButton v-if="saveState === 'error'" size="sm" variant="outline" @click="run(flush)">Reintentar guardado</BaseButton>
       </div>
     </div>
-    <BaseLoading v-if="loading" text="Cargando pedido…" />
+    <BaseLoading v-if="loading || !session && syncing" text="Cargando pedido…" />
     <div v-else-if="!session" class="space-y-3 p-4">
-      <p class="text-sm text-gray-500">Sin iniciar. Las consultas informativas no generan un pedido.</p>
-      <BaseButton :disabled="!owned || syncing" @click="run(start)">Iniciar pedido</BaseButton>
-      <p v-if="!owned" class="text-xs text-amber-800">Toma la conversación para editar su pedido.</p>
+      <p v-if="!owned" class="text-sm text-gray-500">Toma la conversación para preparar el pedido.</p>
+      <BaseButton v-else-if="error" size="sm" variant="outline" @click="run(() => load(true))">Reintentar carga</BaseButton>
     </div>
     <div v-else-if="session.status !== 'active'" class="space-y-3 overflow-y-auto p-4">
       <p class="font-semibold text-emerald-800">{{ session.orderId ? `Pedido tomado · #${session.orderId}` : session.checkoutId && session.commercialStatus !== 'no_sale' ? 'Pago en línea pendiente' : 'Sin venta / Cancelado' }}</p>
@@ -41,7 +40,7 @@
       <BaseButton :disabled="!owned || syncing || !!session.checkoutId && !session.orderId && session.commercialStatus !== 'no_sale'" @click="showNew = true">Nuevo pedido</BaseButton>
     </div>
     <template v-else>
-      <fieldset :disabled="!editable" class="min-h-0 min-w-0 w-full flex-1 overflow-hidden border-0 p-0 disabled:opacity-65">
+      <fieldset :disabled="!editable || finishingAttention" class="min-h-0 min-w-0 w-full flex-1 overflow-hidden border-0 p-0 disabled:opacity-65">
         <OrderSidebar chat-actions :can-send-address-choices="canSendChoices && !sendingChoices"
           @send-address-choices="sendChoices" @draft-message="text => emit('draft-message', conversation.id, text)" />
       </fieldset>
@@ -76,7 +75,7 @@ import { useOrdersDataStore } from '@/store/ordersData'
 import type { OrderDetailView } from '@/types/order'
 import type { WhatsAppCommercialDraft, WhatsAppConversation, WhatsAppMessage, WhatsAppProductSuggestion, WhatsAppProductSuggestionState } from '@/types/whatsapp'
 
-const props = defineProps<{ conversation: WhatsAppConversation; initialDraft?: Promise<WhatsAppCommercialDraft | null | undefined>; controlsTarget?: HTMLElement | null; saveTarget?: HTMLElement | null; canSendChoices?: boolean }>()
+const props = defineProps<{ conversation: WhatsAppConversation; initialDraft?: Promise<WhatsAppCommercialDraft | null | undefined>; controlsTarget?: HTMLElement | null; saveTarget?: HTMLElement | null; canSendChoices?: boolean; finishingAttention?: boolean }>()
 const OrderDetailContent = defineAsyncComponent(() => import('@/components/orders/OrderDetailContent.vue'))
 const emit = defineEmits<{
   change: [draft: WhatsAppCommercialDraft]
@@ -85,7 +84,14 @@ const emit = defineEmits<{
   'product-suggestion-state': [state: WhatsAppProductSuggestionState]
 }>()
 const { session, draft, loading, syncing, error, saveState, commercialStatus, editable, owned, load, start, flush, action, refreshStatus, reconcile, sendAddressChoices, sendProductChoices, canApplyProductSuggestion, addProductSuggestion } = useWhatsAppCommercialDraft(toRef(props, 'conversation'), props.initialDraft)
+const hasDraftProducts = computed(() => session.value?.status === 'active' && !!draft.value?.orderItems.length)
 defineExpose({
+  hasDraftProducts,
+  async saveBeforeFinishing() {
+    if (loading.value || syncing.value) throw new Error('Espera a que termine de cargar el pedido.')
+    await flush()
+    if (saveState.value !== 'saved') throw new Error('Guarda o revisa los cambios del borrador antes de continuar.')
+  },
   reconcile: () => run(() => reconcile(true)), sendProductChoices,
   applyProductSuggestion: (messageId: number, suggestion: WhatsAppProductSuggestion) =>
     run(() => addProductSuggestion(messageId, suggestion, () => active.value)),
@@ -94,7 +100,7 @@ const productSuggestionState = computed<WhatsAppProductSuggestionState>(() => ({
   conversationId: props.conversation.id,
   branchId: draft.value?.branchId ?? null,
   version: session.value?.version ?? null,
-  canApply: canApplyProductSuggestion.value,
+  canApply: canApplyProductSuggestion.value && !props.finishingAttention,
   applied: new Set(draft.value?.orderItems.filter(item => item.whatsAppSuggestionMessageId)
     .map(item => `${item.whatsAppSuggestionMessageId}:${item.productId}`)),
 }))

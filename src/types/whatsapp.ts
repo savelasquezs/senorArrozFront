@@ -426,7 +426,7 @@ export interface WhatsAppInboxLabel {
   custom?: boolean
 }
 export type WhatsAppInboxSummary = Record<WhatsAppInboxKey, { pendingOrders: number; unreadConversations: number }>
-export type WhatsAppAttentionAction = 'take' | 'force-take' | 'release' | 'transfer' | 'return-to-ai' | 'pause-ai' | 'request-human' | 'close' | 'reopen'
+export type WhatsAppAttentionAction = 'take' | 'takeover' | 'force-take' | 'release' | 'transfer' | 'return-to-ai' | 'pause-ai' | 'request-human' | 'close' | 'reopen'
 
 export interface WhatsAppCommercialDraft {
   sessionId: number

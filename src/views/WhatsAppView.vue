@@ -192,6 +192,12 @@
                   <UserPlusIcon class="chat-action-icon h-4 w-4" aria-hidden="true" />
                   <span class="chat-action-label">Tomar conversación</span>
                 </BaseButton>
+                <BaseButton v-else-if="canTakeOver" size="xs" variant="outline" aria-label="Retomar conversación"
+                  title="Retomar conversación" class="chat-take whitespace-nowrap" :loading="changingAttention"
+                  :disabled="confirmingTakeover" @click="confirmTakeover">
+                  <UserPlusIcon class="chat-action-icon h-4 w-4" aria-hidden="true" />
+                  <span class="chat-action-label">Retomar conversación</span>
+                </BaseButton>
                 <details class="chat-menu relative" name="whatsapp-chat-tools" @keydown.esc.stop="closeDetailsMenu">
                   <summary class="chat-tool" aria-label="Etiquetas" title="Etiquetas">
                     <TagIcon class="chat-action-icon h-4 w-4" aria-hidden="true" />
@@ -214,6 +220,12 @@
                       :busy="changingInboxLabel || savingInboxLabel" @toggle="setInboxLabel" @edit="openInboxLabelEditor" @remove="removeInboxLabel" />
                   </section>
                 </details>
+                <button v-if="ownsConversation" type="button" class="chat-tool text-emerald-700 disabled:opacity-50"
+                  title="Marcar como atendida" aria-label="Marcar como atendida"
+                  :disabled="changingAttention || confirmingClose || sending || sendingProductChoices"
+                  @click="markConversationAttended">
+                  <CheckIcon class="h-4 w-4" aria-hidden="true" />
+                </button>
                 <details class="chat-menu relative" name="whatsapp-chat-tools" data-test="whatsapp-chat-actions">
                   <summary class="chat-tool" aria-label="Gestionar chat" title="Gestionar chat">
                     <EllipsisHorizontalIcon class="chat-action-icon h-5 w-5" aria-hidden="true" />
@@ -242,10 +254,6 @@
                         </select>
                         <BaseButton size="sm" variant="secondary" :disabled="!transferTarget" :loading="changingAttention" @click="changeAttention('transfer')">Transferir asesor</BaseButton>
                       </template>
-                      <template v-if="canForceTake">
-                        <input v-model="takeoverReason" maxlength="500" placeholder="Motivo de toma forzada" aria-label="Motivo de toma forzada" class="rounded border px-2 py-1 text-sm" />
-                        <BaseButton size="sm" variant="danger" :disabled="!takeoverReason.trim()" :loading="changingAttention" @click="changeAttention('force-take')">Tomar de forma forzada</BaseButton>
-                      </template>
                       <BaseButton v-if="canPauseAi" variant="secondary" size="sm" :loading="changingAttention" @click="changeAttention('pause-ai')">Pausar IA</BaseButton>
                       <BaseButton
                         v-if="canResetTestContext"
@@ -267,7 +275,6 @@
                       >
                         Fallos IA<span v-if="failureActivityCount"> ({{ failureActivityCount }})</span>
                       </BaseButton>
-                      <BaseButton v-if="ownsConversation" variant="danger" size="sm" :loading="changingAttention" @click="changeAttention('close')">Cerrar conversación</BaseButton>
                       <BaseButton v-if="selectedConversation.attentionMode === 'closed'" size="sm" :loading="changingAttention" @click="changeAttention('reopen')">Reabrir conversación</BaseButton>
                   </div>
                 </details>
@@ -291,7 +298,7 @@
             </div>
           </div>
           <template v-else>
-            <div ref="messagesContainer" @scroll="trackMessageScroll" class="flex-1 min-h-0 overflow-y-auto px-4 py-4 space-y-3">
+            <div ref="messagesContainer" data-test="whatsapp-chat-messages" @scroll="trackMessageScroll" class="flex-1 min-h-0 overflow-y-auto px-4 py-4 space-y-3">
               <p v-if="whatsappStore.isLoadingMessages && !currentMessages.length" role="status" class="text-center text-sm text-gray-500">Cargando mensajes…</p>
               <BaseButton v-if="whatsappStore.messageHistory[selectedConversation.id]?.hasMoreRecent" size="sm" variant="outline" class="mx-auto" @click="showRecentMessages">Volver a los recientes</BaseButton>
               <button v-if="whatsappStore.messageHistory[selectedConversation.id]?.hasMore" type="button"
@@ -404,7 +411,9 @@
             <BaseButton v-if="newMessageCount" class="mx-auto mb-2" size="sm" variant="outline" @click="showRecentMessages">Nuevos mensajes · {{ newMessageCount }}</BaseButton>
 
             <form class="border-t border-gray-200 bg-white p-3" @submit.prevent="sendMessage">
-              <p v-if="!ownsConversation && !canTakeAttention" class="mb-2 rounded-lg bg-gray-100 p-2 text-sm text-gray-600">Puedes consultar esta conversación.</p>
+              <p v-if="!ownsConversation && !canTakeAttention" class="mb-2 rounded-lg bg-gray-100 p-2 text-sm text-gray-600">
+                {{ selectedConversation.attentionMode === 'closed' ? 'Conversación atendida.' : 'Puedes consultar esta conversación.' }}
+              </p>
               <p v-if="ownsConversation && !serviceWindowOpen" class="mb-2 rounded bg-amber-50 p-2 text-sm text-amber-900">La ventana de atención de 24 horas está cerrada. Usa una plantilla aprobada para iniciar el contacto.</p>
               <p v-else-if="ownsConversation" class="mb-2 text-xs text-gray-500">Ventana de atención hasta {{ new Date(selectedConversation.customerServiceWindowExpiresAt!).toLocaleString('es-CO') }}</p>
               <WhatsAppConversationTemplates v-if="ownsConversation" :key="selectedConversation.id" :conversation-id="selectedConversation.id" />
@@ -501,7 +510,7 @@
           <div role="separator" tabindex="0" aria-label="Ancho del pedido" aria-orientation="vertical" :aria-valuenow="rightWidth" class="absolute -left-1 top-0 z-10 hidden h-full w-2 cursor-col-resize touch-none xl:block" @pointerdown="resize($event, 'right')" @keydown.left.prevent="step('right', 20)" @keydown.right.prevent="step('right', -20)" />
           <KeepAlive :key="editorScope" :max="8">
             <WhatsAppOrderPanel ref="commercialPanel" :key="`${authStore.user?.id}:${selectedConversation.id}`" :conversation="selectedConversation" :initial-draft="prefetchedDraft" :controls-target="commercialControlsTarget" :save-target="commercialSaveTarget"
-              :can-send-choices="canSend" @change="commercialChanged" @draft-message="draftOrderMessage" @addresses-sent="addressesSent"
+              :can-send-choices="canSend" :finishing-attention="finishingAttention" @change="commercialChanged" @draft-message="draftOrderMessage" @addresses-sent="addressesSent"
               @product-suggestion-state="setProductSuggestionState" />
           </KeepAlive>
         </aside>
@@ -907,7 +916,8 @@ const canResetTaken = computed(() => authStore.isSuperadmin
   : !!authStore.user?.branchId && !unroutedOnly.value)
 let countRequest = 0
 const advisors = ref<{ id: number; name: string }[]>([])
-const transferTarget = ref(0), takeoverReason = ref('')
+const transferTarget = ref(0), confirmingTakeover = ref(false)
+const confirmingClose = ref(false), finishingAttention = ref(false)
 const clockNow = ref(Date.now())
 const windowTimer = window.setInterval(() => { clockNow.value = Date.now() }, 30_000)
 const search = ref('')
@@ -1135,11 +1145,12 @@ const signalRDotClass = computed(() => connectionState.value === 'connected'
 
 const ownsConversation = computed(() => selectedConversation.value?.attentionMode === 'human' && selectedConversation.value.assignedUserId === authStore.user?.id)
 const serviceWindowOpen = computed(() => !!selectedConversation.value?.customerServiceWindowExpiresAt && Date.parse(selectedConversation.value.customerServiceWindowExpiresAt) > clockNow.value)
-const canSend = computed(() => ownsConversation.value && serviceWindowOpen.value)
+const canSend = computed(() => ownsConversation.value && serviceWindowOpen.value && !finishingAttention.value)
 const canTakeAttention = computed(() => !!selectedConversation.value && selectedConversation.value.attentionMode !== 'closed' && !selectedConversation.value.assignedUserId)
 const canReturnToAi = computed(() => ownsConversation.value)
 const canPauseAi = computed(() => selectedConversation.value?.attentionMode === 'ai' && !selectedConversation.value.assignedUserId)
-const canForceTake = computed(() => !!selectedConversation.value?.assignedUserId && !ownsConversation.value && (authStore.isSuperadmin || authStore.isAdmin))
+const canTakeOver = computed(() => selectedConversation.value?.attentionMode === 'human'
+  && !!selectedConversation.value.assignedUserId && !ownsConversation.value)
 const canResetTestContext = computed(() => authStore.isSuperadmin || authStore.isAdmin)
 const canAssignOperationalBranch = computed(() => !!selectedConversation.value?.isCentralChannel && ownsConversation.value)
 const inboxSections = computed(() => buildWhatsAppInboxSections(
@@ -1168,36 +1179,85 @@ function aiProcessingReason(processing: WhatsAppAiProcessing) {
   const reason = processing.technicalDetail || processing.detail
   return reason ? `${processing.title}: ${reason}` : processing.title
 }
-async function changeAttention(action: WhatsAppAttentionAction) {
+async function confirmTakeover() {
+  const conversation = selectedConversation.value
+  if (!conversation || !canTakeOver.value || changingAttention.value || confirmingTakeover.value) return
+  const id = conversation.id
+  const revision = conversation.attentionRevision ?? 0
+  const responsible = conversation.assignedUserName || 'Otro asesor'
+  confirmingTakeover.value = true
+  try {
+    const confirmed = await confirmDialog({
+      title: 'Retomar conversación',
+      message: `${responsible} está a cargo de este chat. Si continúas, quedarás a cargo y conservarás el pedido y los cambios guardados.`,
+      confirmLabel: 'Retomar',
+      tone: 'warning',
+    })
+    if (!confirmed || !viewActive || selectedConversation.value?.id !== id) return
+    await changeAttention('takeover', revision)
+  } finally { confirmingTakeover.value = false }
+}
+
+async function markConversationAttended() {
+  const conversation = selectedConversation.value
+  if (!conversation || !ownsConversation.value || changingAttention.value || confirmingClose.value) return
+  const revision = conversation.attentionRevision ?? 0
+  confirmingClose.value = true
+  try {
+    if (commercialPanel.value?.hasDraftProducts) {
+      const confirmed = await confirmDialog({
+        title: 'Marcar como atendida',
+        message: 'Hay un borrador con productos. Se guardará en esta conversación para que puedas retomarlo.',
+        confirmLabel: 'Cerrar atención',
+        tone: 'warning',
+      })
+      if (!confirmed || !viewActive || selectedConversation.value?.id !== conversation.id) return
+    }
+    await changeAttention('close', revision)
+  } finally { confirmingClose.value = false }
+}
+
+async function changeAttention(action: WhatsAppAttentionAction, confirmedVersion?: number) {
   const conversation = selectedConversation.value
   if (!conversation || changingAttention.value) return
   const conversationId = conversation.id
+  const scope = sessionKey.value
+  const leavingAttention = action === 'close' || action === 'release'
   try {
     changingAttention.value = true
-    const attention = await whatsappStore.changeAttention(conversationId, action, transferTarget.value || undefined, takeoverReason.value || undefined, conversation)
+    finishingAttention.value = leavingAttention
+    if (leavingAttention) await commercialPanel.value?.saveBeforeFinishing()
+    if (!viewActive || scope !== sessionKey.value || selectedConversation.value?.id !== conversationId) return
+    await whatsappStore.changeAttention(conversationId, action, transferTarget.value || undefined,
+      action === 'close' ? 'Atención finalizada desde el POS' : undefined, conversation, confirmedVersion)
+    if (!viewActive || scope !== sessionKey.value) return
+    if (leavingAttention) void refreshInboxTotals().catch(() => {})
     if (selectedConversation.value?.id !== conversationId) return
-    if (attention && (attention.attentionRevision ?? 0) >= (selectedConversation.value.attentionRevision ?? 0))
-      Object.assign(selectedConversation.value, attention)
-    activeInbox.value = action === 'close' ? 'closed' : ['take', 'force-take'].includes(action) ? 'mine' : action === 'transfer' ? 'team' : 'free'
     const refreshed = whatsappStore.conversations.find(x => x.id === conversationId)
-    if (refreshed) {
+    if (refreshed && (refreshed.attentionRevision ?? 0) >= (selectedConversation.value.attentionRevision ?? 0))
       selectedConversation.value = refreshed
-    }
-    if (action === 'take') {
+    if (leavingAttention) return
+    const took = action === 'take' || action === 'takeover'
+    activeInbox.value = took ? 'mine' : action === 'transfer' ? 'team' : 'free'
+    if (took) {
+      contextPanelCollapsed.value = false
       await nextTick()
       if (selectedConversation.value?.id === conversationId && canSend.value) messageInput.value?.focus()
     }
     await reloadConversations()
     await refreshAiDiagnostics()
   } catch (error: any) {
+    if (!viewActive || scope !== sessionKey.value) return
     if (selectedConversation.value?.id === conversationId) {
       const refreshed = whatsappStore.conversations.find(x => x.id === conversationId)
       if (refreshed && (refreshed.attentionRevision ?? 0) >= (selectedConversation.value.attentionRevision ?? 0))
         selectedConversation.value = refreshed
-      void reloadConversations()
+      if (leavingAttention) inboxTotalsRefresh.schedule()
+      else void reloadConversations()
     }
     showError('Atención', error.message || 'No se pudo cambiar el estado.')
   } finally {
+    finishingAttention.value = false
     changingAttention.value = false
   }
 }
@@ -1279,18 +1339,52 @@ async function resetConversationForTesting() {
     resettingConversation.value = false
   }
 }
-function handleAttentionChanged(payload: WhatsAppAttentionChangedPayload) {
-  if (!payload?.conversation?.id) return
-  whatsappStore.applyAttentionChanged(payload.conversation)
-  scheduleInboxLabelsRefresh()
-  if (selectedConversation.value?.id !== payload.conversation.id) return
-  selectedConversation.value = whatsappStore.conversations.find(x => x.id === payload.conversation.id)
-    ?? payload.conversation
-  void commercialPanel.value?.reconcile()
+function isUnassignedAttention(conversation: WhatsAppConversation) {
+  return !conversation.assignedUserId
+    && (conversation.attentionMode === 'closed' || conversation.attentionMode === 'waitingForHuman')
+}
+
+function isStaleAttention(conversation: WhatsAppConversation) {
+  const row = whatsappStore.conversations.find(chat => chat.id === conversation.id)
+  const selected = selectedConversation.value?.id === conversation.id ? selectedConversation.value : null
+  return (conversation.attentionRevision ?? 0) < Math.max(row?.attentionRevision ?? 0, selected?.attentionRevision ?? 0)
+}
+
+function handleAttentionChanged(payload: WhatsAppAttentionChangedPayload, readMissingLabels = true) {
+  if (!payload?.conversation?.id || isStaleAttention(payload.conversation)) return
+  const conversation = payload.conversation
+  const selected = selectedConversation.value?.id === conversation.id ? selectedConversation.value : null
+  const unassigned = isUnassignedAttention(conversation)
+  if (unassigned) {
+    inboxTotalsRefresh.schedule()
+    if (!selected && !whatsappStore.conversations.some(chat => chat.id === conversation.id)
+      && !conversationMatchesCurrentFilters(conversation)) {
+      const destination = conversation.attentionMode === 'closed' ? 'closed' : 'free'
+      if (readMissingLabels && activeInbox.value === destination && selectedLabel.value && !conversation.labels
+        && conversationMatchesCurrentFilters(conversation, '')) {
+        const scope = inboxScope.value
+        void whatsappApi.getConversation(conversation.id).then(({ data }) => {
+          if (viewActive && scope === inboxScope.value && data && !isStaleAttention(data) && conversationMatchesCurrentFilters(data))
+            whatsappStore.applyAttentionChanged(data)
+        }).catch(() => {})
+      }
+      return
+    }
+  } else if (!(selected && finishingAttention.value)) scheduleInboxLabelsRefresh()
+  whatsappStore.applyAttentionChanged(conversation)
+  if (!selected) return
+  selectedConversation.value = whatsappStore.conversations.find(x => x.id === conversation.id) ?? conversation
+  if (!unassigned && !finishingAttention.value) void commercialPanel.value?.reconcile()
 }
 
 function handleConversationRoutingChanged(payload: WhatsAppConversationRoutingChangedPayload) {
   if (!payload?.conversation?.id) return
+  if (payload.conversation.attentionMode && isStaleAttention(payload.conversation)) return
+  if (isUnassignedAttention(payload.conversation)
+    && (payload.previousOperationalBranchId ?? null) === (payload.conversation.operationalBranchId ?? null)) {
+    handleAttentionChanged(payload, false)
+    return
+  }
   if (!payload.conversation.attentionMode) {
     if (canReadWhatsAppRouting(payload.conversation, payload.branchId, authStore.user?.id, authStore.user?.branchId, authStore.isSuperadmin)) {
       void reloadConversations()
@@ -1708,8 +1802,9 @@ async function selectConversationFromRoute() {
   }
 }
 
-function conversationMatchesCurrentFilters(conversation: WhatsAppConversation) {
-  if (selectedLabel.value && !conversation.labels?.includes(selectedLabel.value)) return false
+function conversationMatchesCurrentFilters(conversation: WhatsAppConversation, label = selectedLabel.value) {
+  if (label && !conversation.labels?.includes(label)) return false
+  if (unroutedOnly.value && (!conversation.isCentralChannel || conversation.operationalBranchId)) return false
   if (selectedBranchId.value && (conversation.isCentralChannel
     ? conversation.operationalBranchId !== selectedBranchId.value
     : conversation.branchId !== selectedBranchId.value)) return false
@@ -2413,7 +2508,7 @@ const loadSelectedAdvisors = useDebouncedCallback(async () => {
 }, 200)
 watch(() => selectedConversation.value?.id, id => {
   showProductChoices.value = false
-  advisors.value = []; transferTarget.value = 0; takeoverReason.value = ''
+  advisors.value = []; transferTarget.value = 0
   loadSelectedAdvisors.cancel()
   if (id) loadSelectedAdvisors.schedule()
 })
