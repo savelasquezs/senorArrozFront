@@ -6,16 +6,19 @@
       <EllipsisHorizontalIcon class="size-4" aria-hidden="true" />
     </button>
     <div class="message-actions" role="group" aria-label="Acciones del mensaje">
-      <button v-if="canSend" type="button" class="message-action" title="Responder a este mensaje" aria-label="Responder a este mensaje"
-        :disabled="busy" @click="emit('reply')">
+      <button type="button" class="message-action" :title="sendUnavailableReason || 'Responder a este mensaje'" aria-label="Responder a este mensaje"
+        :aria-description="sendUnavailableReason" :aria-disabled="!canSend || busy" :tabindex="canSend ? 0 : -1"
+        @click="canSend && !busy && emit('reply')">
         <ArrowUturnLeftIcon class="h-3.5 w-3.5" aria-hidden="true" />
       </button>
-      <button v-if="canSend" ref="reactionTrigger" type="button" class="message-action" title="Reaccionar" aria-label="Reaccionar"
-        :aria-expanded="open" :disabled="busy" @click="emit('toggle')">
+      <button ref="reactionTrigger" type="button" class="message-action" :title="sendUnavailableReason || 'Reaccionar'" aria-label="Reaccionar"
+        :aria-description="sendUnavailableReason" :aria-expanded="canSend ? open : undefined" :aria-disabled="!canSend || busy"
+        :tabindex="canSend ? 0 : -1" @click="canSend && !busy && emit('toggle')">
         <FaceSmileIcon class="h-4 w-4" aria-hidden="true" />
       </button>
-      <button type="button" class="message-action hover:text-red-700" title="Ocultar en el POS" aria-label="Ocultar en el POS"
-        :disabled="busy" @click="emit('hide')">
+      <button type="button" class="message-action hover:text-red-700" :title="hideUnavailableReason || 'Ocultar en el POS'" aria-label="Ocultar en el POS"
+        :aria-description="hideUnavailableReason" :aria-disabled="!!hideUnavailableReason || busy" :tabindex="hideUnavailableReason ? -1 : 0"
+        @click="!hideUnavailableReason && !busy && emit('hide')">
         <TrashIcon class="h-3.5 w-3.5" aria-hidden="true" />
       </button>
     </div>
@@ -34,10 +37,13 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import { ArrowUturnLeftIcon, EllipsisHorizontalIcon, FaceSmileIcon, TrashIcon } from '@heroicons/vue/24/outline'
 
-const props = defineProps<{ canSend: boolean; open: boolean; outbound: boolean; busy: boolean; currentReaction?: string | null }>()
+const props = defineProps<{
+  sendUnavailableReason?: string; hideUnavailableReason?: string; open: boolean; outbound: boolean; busy: boolean; currentReaction?: string | null
+}>()
+const canSend = computed(() => !props.sendUnavailableReason)
 const emit = defineEmits<{ reply: []; toggle: []; hide: []; react: [emoji: string] }>()
 const tools = ref<HTMLElement>()
 const touchTrigger = ref<HTMLButtonElement>()
@@ -101,7 +107,7 @@ const choices = [
 }
 .message-action:hover { background: var(--wa-raised); }
 .message-action:focus-visible { outline: 2px solid var(--wa-focus); }
-.message-action:disabled { opacity: .5; }
+.message-action[aria-disabled="true"] { opacity: .55; cursor: not-allowed; }
 .message-action svg { transition: transform 130ms ease; }
 .message-action:is(:hover, :focus-visible) svg { transform: scale(1.16); }
 .reaction-choices {

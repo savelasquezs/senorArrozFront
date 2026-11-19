@@ -65,6 +65,7 @@
           <div class="wa-inbox-header">
             <h2 class="text-xs font-semibold leading-4">Conversaciones</h2>
             <input v-model="search" type="search" class="wa-inbox-search" aria-label="Buscar conversaciones"
+              name="whatsapp-conversation-search" autocomplete="off" spellcheck="false"
               placeholder="Nombre, teléfono o usuario" @input="onSearchInput" />
             <div class="relative flex flex-wrap gap-1.5">
               <details name="whatsapp-inbox-controls" class="group" @keydown.esc.stop="closeDetailsMenu">
@@ -324,8 +325,9 @@
                     :label="message.aiProcessing.title || aiValueLabel(message.aiProcessing.status)"
                     :text="aiMessageTooltip(message.aiProcessing)" />
                   <div class="wa-bubble" :class="{ 'wa-bubble-tail': endsMessageGroup(message, currentMessages[messageIndex + 1]) }">
-                    <WhatsAppMessageActions v-if="ownsConversation && !finishingAttention && !message.hiddenSource"
-                      :can-send="canSend && !!message.whatsAppMessageId && message.status !== 'failed'" :open="reactionPickerId === message.id"
+                    <WhatsAppMessageActions v-if="!message.hiddenSource"
+                      :hide-unavailable-reason="messageOwnershipRestriction"
+                      :send-unavailable-reason="messageActionRestriction(message)" :open="reactionPickerId === message.id"
                       :outbound="message.direction === 'outbound'" :busy="messageActionId === message.id" :current-reaction="message.businessReaction"
                       @reply="startMessageReply(message)" @toggle="reactionPickerId = reactionPickerId === message.id ? null : message.id"
                       @react="emoji => reactToMessage(message, emoji)" @hide="hideMessage(message)" />
@@ -1190,6 +1192,16 @@ const signalRDotClass = computed(() => connectionState.value === 'connected'
 const ownsConversation = computed(() => selectedConversation.value?.attentionMode === 'human' && selectedConversation.value.assignedUserId === authStore.user?.id)
 const serviceWindowOpen = computed(() => !!selectedConversation.value?.customerServiceWindowExpiresAt && Date.parse(selectedConversation.value.customerServiceWindowExpiresAt) > clockNow.value)
 const canSend = computed(() => ownsConversation.value && serviceWindowOpen.value && !finishingAttention.value)
+const messageOwnershipRestriction = computed(() => {
+  if (!ownsConversation.value) return 'Toma la conversación para gestionar el mensaje.'
+  return finishingAttention.value ? 'La atención se está cerrando.' : undefined
+})
+function messageActionRestriction(message: WhatsAppMessage) {
+  if (messageOwnershipRestriction.value) return messageOwnershipRestriction.value
+  if (!serviceWindowOpen.value) return 'La ventana de atención de WhatsApp está cerrada.'
+  if (!message.whatsAppMessageId || message.status === 'failed') return 'Este mensaje aún no está disponible en WhatsApp.'
+  return undefined
+}
 const canTakeAttention = computed(() => !!selectedConversation.value && selectedConversation.value.attentionMode !== 'closed' && !selectedConversation.value.assignedUserId)
 const canReturnToAi = computed(() => ownsConversation.value)
 const canPauseAi = computed(() => selectedConversation.value?.attentionMode === 'ai' && !selectedConversation.value.assignedUserId)
@@ -2656,7 +2668,10 @@ watch([isPageVisible, isUserActive], ([visible, active], [wasVisible, wasActive]
   }
 })
 watch([activeInbox, selectedLabel], () => { if (whatsappStore.enabled) void reloadConversations() })
-watch([() => selectedConversation.value?.id, canSend], clearQuickReplyPreview, { flush: 'sync' })
+watch([() => selectedConversation.value?.id, canSend], () => {
+  clearQuickReplyPreview()
+  reactionPickerId.value = null
+}, { flush: 'sync' })
 watch([selectedBranchId, unroutedOnly], () => { inboxCounts.value = null })
 watch([activeInbox, selectedBranchId, unroutedOnly, selectedLabel], () => {
   void router.replace({ query: { ...route.query, inbox: activeInbox.value, whatsappBranch: selectedBranchId.value || undefined,

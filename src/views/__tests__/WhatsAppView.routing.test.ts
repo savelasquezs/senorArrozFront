@@ -589,6 +589,31 @@ describe('M38-F04 view + real Pinia store integration', () => {
     expect(bubble().element).toBe(element)
   })
 
+  it('keeps all message controls discoverable without allowing an observer to use them', async () => {
+    const chat = { ...conversation(), assignedUserId: 8, customerServiceWindowExpiresAt: '2099-01-01T00:00:00Z' }
+    m.rows = [chat]
+    m.api.getMessagesPage.mockResolvedValue(reply({ items: [{
+      id: 99, conversationId: 1, direction: 'inbound', type: 'text', status: 'received',
+      textBody: 'Un mensaje', whatsAppMessageId: 'wamid.local', timestamp: '2026-11-19T12:00:00Z',
+    }], hasMore: false }))
+    const { wrapper, vm } = mountView()
+    await flushPromises()
+    await vm.selectConversation(chat)
+
+    const controls = wrapper.get('.message-actions').findAll('button')
+    expect(controls.map(button => button.attributes('aria-label')))
+      .toEqual(['Responder a este mensaje', 'Reaccionar', 'Ocultar en el POS'])
+    for (const button of controls) {
+      expect(button.attributes('aria-disabled')).toBe('true')
+      expect(button.attributes('title')).toContain('Toma la conversación')
+      await button.trigger('click')
+    }
+    expect(wrapper.find('[aria-label="Reacciones disponibles"]').exists()).toBe(false)
+    expect(wrapper.find('[aria-label="Quitar cita"]').exists()).toBe(false)
+    expect(m.api.hideMessage).not.toHaveBeenCalled()
+    expect(m.api.reactToMessage).not.toHaveBeenCalled()
+  })
+
   it('keeps a chat open when the draft cannot be saved', async () => {
     m.hasDraftProducts = true
     m.saveBeforeFinishing.mockRejectedValueOnce(new Error('El borrador cambió.'))
