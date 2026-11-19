@@ -261,7 +261,7 @@ describe('M38-F04 view + real Pinia store integration', () => {
     await flushPromises()
     await vm.selectConversation({ ...m.rows[0], customerServiceWindowExpiresAt: '2099-01-01T00:00:00Z' })
     await nextTick()
-    await wrapper.findAll('button').find(item => item.text() === 'Respuestas rápidas')!.trigger('click')
+    await wrapper.get('button[aria-label="Crear o editar respuestas rápidas"]').trigger('click')
     await flushPromises()
     expect(wrapper.get('[aria-label="Respuestas rápidas"]').text()).toContain('/ropaviejacon')
     const composer = wrapper.get<HTMLTextAreaElement>('textarea[placeholder="Escribe un mensaje"]')

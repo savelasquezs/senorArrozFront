@@ -1,4 +1,28 @@
-import type { WhatsAppConversation, WhatsAppInboxKey } from '@/types/whatsapp'
+import type { WhatsAppConversation, WhatsAppInboxKey, WhatsAppInboxLabel, WhatsAppInboxLabelColor } from '@/types/whatsapp'
+
+export const inboxLabelPalette = {
+  violet: { name: 'Morado', style: 'bg-violet-700 text-white' },
+  amber: { name: 'Mostaza', style: 'bg-yellow-700 text-white' },
+  orange: { name: 'Naranja', style: 'bg-orange-700 text-white' },
+  emerald: { name: 'Verde oscuro', style: 'bg-emerald-800 text-white' },
+  blue: { name: 'Azul', style: 'bg-blue-700 text-white' },
+  teal: { name: 'Verde petróleo', style: 'bg-teal-800 text-white' },
+  rose: { name: 'Fucsia', style: 'bg-pink-700 text-white' },
+  slate: { name: 'Gris pizarra', style: 'bg-slate-700 text-white' },
+} satisfies Record<WhatsAppInboxLabelColor, { name: string; style: string }>
+
+export const fixedInboxLabelStyles: Record<string, { name: string; style: string }> = {
+  supplier: { name: 'Proveedor', style: 'bg-violet-700 text-white' },
+  pending: { name: 'Pendiente', style: 'bg-amber-300 text-amber-950' },
+  taken: { name: 'Tomado', style: 'bg-emerald-700 text-white' },
+  payment_pending: { name: 'Pendiente de pago', style: 'bg-rose-700 text-white' },
+}
+
+export function inboxLabelColor(key: string, color?: WhatsAppInboxLabel['color']): string {
+  return (color ? inboxLabelPalette[color]?.style : undefined)
+    ?? fixedInboxLabelStyles[key]?.style
+    ?? inboxLabelPalette[key.startsWith('branch:') ? 'blue' : 'slate'].style
+}
 
 export interface WhatsAppInboxSection {
   key: WhatsAppInboxKey

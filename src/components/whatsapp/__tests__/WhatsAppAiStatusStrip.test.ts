@@ -1,4 +1,4 @@
-import { mount } from '@vue/test-utils'
+import { flushPromises, mount } from '@vue/test-utils'
 import { describe, expect, it } from 'vitest'
 import WhatsAppAiStatusStrip from '@/components/whatsapp/WhatsAppAiStatusStrip.vue'
 import type { WhatsAppAiDiagnostics } from '@/types/whatsapp'
@@ -42,19 +42,36 @@ describe('WhatsAppAiStatusStrip', () => {
       },
     })
 
-    expect(wrapper.text()).toContain('La IA está deshabilitada')
-    expect(wrapper.text()).toContain('Los mensajes quedan pendientes de atención.')
+    expect(wrapper.get('button').attributes('aria-label')).toContain('La IA está deshabilitada')
+    await wrapper.get('button').trigger('focusin')
+    await flushPromises()
+    expect(document.body.querySelector('[role="tooltip"]')?.textContent).toContain('Los mensajes quedan pendientes de atención.')
 
     await wrapper.get('button').trigger('click')
     expect(wrapper.emitted('open')).toHaveLength(1)
+    wrapper.unmount()
   })
 
-  it('shows a diagnostic lookup failure instead of hiding the strip', () => {
+  it('shows a diagnostic lookup failure on the icon', async () => {
     const wrapper = mount(WhatsAppAiStatusStrip, {
       props: { error: 'No se pudo conectar con el servidor.' },
     })
 
-    expect(wrapper.text()).toContain('No se pudo consultar el estado de la IA')
-    expect(wrapper.text()).toContain('No se pudo conectar con el servidor.')
+    expect(wrapper.get('button').attributes('aria-label')).toContain('No se pudo consultar el estado de la IA')
+    await wrapper.get('button').trigger('focusin')
+    await flushPromises()
+    expect(document.body.querySelector('[role="tooltip"]')?.textContent).toContain('No se pudo conectar con el servidor.')
+    wrapper.unmount()
+  })
+
+  it('uses the success color only when the conversation has an AI response', async () => {
+    const wrapper = mount(WhatsAppAiStatusStrip, {
+      props: { diagnostics: { ...diagnostics, isActive: true, agentStatus: 'active', overallStatus: 'healthy', title: 'IA operativa' } },
+    })
+    expect(wrapper.get('button').classes()).not.toContain('text-emerald-800')
+    await wrapper.setProps({ answered: true })
+    expect(wrapper.get('button').attributes('aria-label')).toContain('Respondido por IA')
+    expect(wrapper.get('button').classes()).toContain('text-emerald-800')
+    wrapper.unmount()
   })
 })

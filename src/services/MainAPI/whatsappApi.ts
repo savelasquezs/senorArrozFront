@@ -28,6 +28,7 @@ import type {
   WhatsAppTestConnectionResult,
   WhatsAppUnreadSummary,
   WhatsAppInboxLabel,
+  WhatsAppInboxLabelDefinition,
   WhatsAppInboxSummary,
   SendWhatsAppTemplate,
   TenantAiSetting,
@@ -35,6 +36,16 @@ import type {
   TenantWhatsAppSettings,
   UpdateTenantWhatsAppChannel,
 } from '@/types/whatsapp'
+
+export interface WhatsAppClosedDayPreview {
+  branchId: number
+  branchName: string
+  closedDate: string | null
+  conversationIds: number[]
+  unavailableReason: string | null
+}
+
+export type WhatsAppClosedDayOutcome = 'sent' | 'skipped' | 'failed' | 'review'
 
 export function whatsappWebhookUrl(): string {
   const api = import.meta.env.VITE_API_URL || 'http://localhost:8080/api'
@@ -129,6 +140,18 @@ class WhatsAppApi extends BaseApi {
     return this.get<ApiResponse<WhatsAppInboxLabel[]>>('/whatsapp/labels')
   }
 
+  createInboxLabel(label: WhatsAppInboxLabelDefinition) {
+    return this.post<ApiResponse<WhatsAppInboxLabel>>('/whatsapp/labels', label)
+  }
+
+  updateInboxLabel(key: string, label: WhatsAppInboxLabelDefinition) {
+    return this.put<ApiResponse<WhatsAppInboxLabel>>(`/whatsapp/labels/${encodeURIComponent(key)}`, label)
+  }
+
+  deleteInboxLabel(key: string) {
+    return this.delete<void>(`/whatsapp/labels/${encodeURIComponent(key)}`)
+  }
+
   getInboxSummary(branchId?: number, unroutedOnly = false, signal?: AbortSignal) {
     return this.get<ApiResponse<WhatsAppInboxSummary>>('/whatsapp/inbox-summary', { params: { branchId, unroutedOnly }, signal })
   }
@@ -139,6 +162,15 @@ class WhatsAppApi extends BaseApi {
 
   resetTakenLabels(branchId?: number, unroutedOnly = false) {
     return this.post<ApiResponse<{ clearedBefore: string }>>('/whatsapp/labels/taken/reset', { branchId, unroutedOnly })
+  }
+
+  previewClosedDayReplies(branchId?: number, signal?: AbortSignal) {
+    return this.get<ApiResponse<WhatsAppClosedDayPreview>>('/whatsapp/closed-day-replies', { params: { branchId }, signal })
+  }
+
+  sendClosedDayReply(branchId: number, closedDate: string, conversationId: number, text: string) {
+    return this.post<ApiResponse<WhatsAppClosedDayOutcome>>('/whatsapp/closed-day-replies',
+      { branchId, closedDate, conversationId, text }, { timeout: 45_000 })
   }
 
   getAiDiagnostics(branchId: number, conversationId?: number | null, take = 20): Promise<ApiResponse<WhatsAppAiDiagnostics>> {

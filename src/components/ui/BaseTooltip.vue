@@ -1,9 +1,10 @@
 <template>
   <span ref="anchor" class="inline-flex shrink-0" @mouseenter="show" @mouseleave="hide" @focusin="show" @focusout="hide" @keydown.esc.stop="hide">
-    <button type="button" :aria-label="label" :aria-describedby="opened ? id : undefined" :aria-expanded="opened"
-      class="inline-flex h-8 w-8 items-center justify-center rounded-full text-slate-400 transition-colors hover:bg-slate-100 hover:text-emerald-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
-      @click.stop="show">
-      <QuestionMarkCircleIcon class="h-[18px] w-[18px]" aria-hidden="true" />
+    <button type="button" :aria-label="label" :aria-describedby="opened ? id : undefined" :aria-expanded="action ? undefined : opened"
+      class="inline-flex items-center justify-center rounded-full transition-colors hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
+      :class="[compact ? 'h-7 w-7' : 'h-8 w-8', buttonClass || 'text-slate-400 hover:text-emerald-700']"
+      @click.stop="activate">
+      <component :is="icon || QuestionMarkCircleIcon" class="h-[18px] w-[18px]" aria-hidden="true" />
     </button>
     <Teleport to="body">
       <Transition name="hint">
@@ -16,9 +17,10 @@
   </span>
 </template>
 <script setup lang="ts">
-import { nextTick, onBeforeUnmount, ref, useId } from 'vue'
+import { nextTick, onBeforeUnmount, ref, useId, type Component } from 'vue'
 import { QuestionMarkCircleIcon } from '@heroicons/vue/24/outline'
-defineProps<{ label: string; text: string }>()
+const props = defineProps<{ label: string; text: string; icon?: Component; compact?: boolean; buttonClass?: string; action?: boolean }>()
+const emit = defineEmits<{ activate: [] }>()
 const id = useId(), anchor = ref<HTMLElement>(), tooltip = ref<HTMLElement>()
 const opened = ref(false), positioned = ref(false), position = ref({ left: 0, top: 0 })
 async function show() {
@@ -33,6 +35,11 @@ async function show() {
   window.addEventListener('scroll', hide, true); window.addEventListener('resize', hide)
 }
 function outside(e: PointerEvent) { if (!anchor.value?.contains(e.target as Node)) hide() }
+function activate() {
+  if (!props.action) return show()
+  hide()
+  emit('activate')
+}
 function hide() {
   opened.value = false
   document.removeEventListener('pointerdown', outside)

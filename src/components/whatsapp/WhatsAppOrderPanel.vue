@@ -9,7 +9,13 @@
       </label>
       <BaseButton v-if="session?.status === 'active'" size="sm" variant="ghost" :disabled="!editable" @click="showCancel = true">Sin venta</BaseButton>
       <BaseButton v-if="session" size="sm" variant="ghost" @click="showNotes = true">Notas internas</BaseButton>
-      <p role="status" :class="saveState === 'conflict' || saveState === 'error' ? 'text-red-700' : 'text-gray-500'">{{ syncing ? 'Actualizando pedido…' : saveLabels[saveState] }}</p>
+    </Teleport>
+    <Teleport v-if="resolvedSaveTarget && active" :to="resolvedSaveTarget">
+      <p role="status" :title="saveStatusLabel" class="flex shrink-0 items-center gap-1 whitespace-nowrap px-1"
+        :class="saveStatusColor">
+        <component :is="saveStatusIcon" class="h-4 w-4 shrink-0" :class="{ 'animate-spin': syncing || saveState === 'saving' }" aria-hidden="true" />
+        <span class="chat-save-label max-w-28 truncate">{{ saveStatusLabel }}</span>
+      </p>
     </Teleport>
     <div v-if="error || saveState === 'conflict' || saveState === 'error'" class="shrink-0 space-y-2 border-b p-3 text-xs">
       <p v-if="error" role="alert" class="text-red-700">{{ error }}</p>
@@ -60,6 +66,7 @@
 
 <script setup lang="ts">
 import { computed, defineAsyncComponent, onActivated, onBeforeUnmount, onDeactivated, onMounted, ref, toRef, watch } from 'vue'
+import { ArrowPathIcon, CheckCircleIcon, ClockIcon, ExclamationCircleIcon } from '@heroicons/vue/24/outline'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseDialog from '@/components/ui/BaseDialog.vue'
 import BaseLoading from '@/components/ui/BaseLoading.vue'
@@ -69,7 +76,7 @@ import { useOrdersDataStore } from '@/store/ordersData'
 import type { OrderDetailView } from '@/types/order'
 import type { WhatsAppCommercialDraft, WhatsAppConversation, WhatsAppMessage, WhatsAppProductSuggestion, WhatsAppProductSuggestionState } from '@/types/whatsapp'
 
-const props = defineProps<{ conversation: WhatsAppConversation; initialDraft?: Promise<WhatsAppCommercialDraft | null | undefined>; controlsTarget?: HTMLElement | null; canSendChoices?: boolean }>()
+const props = defineProps<{ conversation: WhatsAppConversation; initialDraft?: Promise<WhatsAppCommercialDraft | null | undefined>; controlsTarget?: HTMLElement | null; saveTarget?: HTMLElement | null; canSendChoices?: boolean }>()
 const OrderDetailContent = defineAsyncComponent(() => import('@/components/orders/OrderDetailContent.vue'))
 const emit = defineEmits<{
   change: [draft: WhatsAppCommercialDraft]
@@ -96,6 +103,17 @@ const noteText = ref(''), showReload = ref(false), showNew = ref(false), showCan
 const persistedOrder = ref<OrderDetailView | null>(null)
 const sendingChoices = ref(false)
 const saveLabels = { saved: 'Guardado', pending: 'Cambios pendientes', saving: 'Guardando…', conflict: 'Conflicto: revisa la versión compartida', error: 'No se pudo guardar' }
+const resolvedSaveTarget = computed(() => props.saveTarget || props.controlsTarget)
+const saveStatusLabel = computed(() => syncing.value ? 'Actualizando pedido…' : saveLabels[saveState.value])
+const saveStatusIcon = computed(() => syncing.value ? ArrowPathIcon : {
+  saved: CheckCircleIcon, pending: ClockIcon, saving: ArrowPathIcon, conflict: ExclamationCircleIcon, error: ExclamationCircleIcon,
+}[saveState.value])
+const saveStatusColor = computed(() => {
+  if (syncing.value) return 'text-slate-500'
+  if (saveState.value === 'saved') return 'text-emerald-700'
+  if (saveState.value === 'conflict' || saveState.value === 'error') return 'text-red-700'
+  return 'text-amber-700'
+})
 async function run(operation: () => Promise<unknown>) {
   try { await operation() } catch (cause) { error.value = cause instanceof Error ? cause.message : 'No se pudo completar la operación.' }
 }

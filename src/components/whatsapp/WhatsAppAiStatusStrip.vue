@@ -1,46 +1,25 @@
 <template>
-  <div
-    v-if="diagnostics || processing || error"
-    class="flex items-start gap-2 border-b px-4 py-2 text-xs"
-    :class="toneClasses.surface"
-    role="status"
-    aria-live="polite"
-  >
-    <CpuChipIcon class="mt-0.5 h-4 w-4 shrink-0" :class="toneClasses.text" />
-    <div class="min-w-0 flex-1 sm:flex sm:items-baseline sm:gap-2">
-      <p class="font-semibold" :class="toneClasses.text">{{ title }}</p>
-      <p v-if="detail" class="mt-0.5 truncate opacity-90 sm:mt-0" :class="toneClasses.text" :title="detail">
-        {{ detail }}
-      </p>
-      <span v-if="visibleProcessing?.willRetry" class="mt-1 inline-flex shrink-0 rounded-full bg-white/70 px-2 py-0.5 font-semibold sm:mt-0">
-        Intento {{ visibleProcessing.attempts }}/{{ visibleProcessing.maxAttempts }}
-      </span>
-    </div>
-    <button
-      type="button"
-      class="shrink-0 font-semibold underline decoration-dotted underline-offset-2"
-      :class="toneClasses.text"
-      @click="$emit('open')"
-    >
-      Ver actividad
-    </button>
-  </div>
+  <BaseTooltip :icon="CpuChipIcon" :label="title + ' · Ver actividad de IA'" :text="description"
+    :button-class="toneClasses.badge" compact action @activate="$emit('open')" />
 </template>
 
 <script setup lang="ts">
 import { computed } from 'vue'
 import { CpuChipIcon } from '@heroicons/vue/24/outline'
+import BaseTooltip from '@/components/ui/BaseTooltip.vue'
 import type { WhatsAppAiDiagnostics, WhatsAppAiProcessing } from '@/types/whatsapp'
 import {
   aiDiagnosticsTone,
   aiProcessingTone,
   aiToneClasses,
+  isAiProcessingPending,
 } from '@/utils/whatsappAiDiagnostics'
 
 const props = defineProps<{
   diagnostics?: WhatsAppAiDiagnostics | null
   processing?: WhatsAppAiProcessing | null
   error?: string | null
+  answered?: boolean
 }>()
 
 defineEmits<{ open: [] }>()
@@ -54,14 +33,23 @@ const visibleProcessing = computed(() => {
 })
 const tone = computed(() => {
   if (props.error) return 'danger' as const
-  if (visibleProcessing.value) return aiProcessingTone(visibleProcessing.value)
-  return aiDiagnosticsTone(props.diagnostics)
+  const status = visibleProcessing.value
+  const diagnostic = aiDiagnosticsTone(props.diagnostics)
+  if (diagnostic === 'danger' || aiProcessingTone(status) === 'danger') return 'danger'
+  if (status && status.status !== 'sent' && isAiProcessingPending(status)) return 'warning'
+  if (props.answered) return 'success'
+  return diagnostic === 'warning' && props.diagnostics?.attentionMode === 'ai' ? 'warning' : 'neutral'
 })
 const toneClasses = computed(() => aiToneClasses[tone.value])
 const title = computed(() =>
-  visibleProcessing.value?.title
-  || props.diagnostics?.title
-  || (props.error ? 'No se pudo consultar el estado de la IA' : 'Estado de IA'),
+  props.error ? 'No se pudo consultar el estado de la IA'
+    : tone.value === 'success' ? 'Respondido por IA'
+      : visibleProcessing.value?.title || props.diagnostics?.title || 'Sin respuesta de IA',
 )
 const detail = computed(() => visibleProcessing.value?.detail || props.diagnostics?.summary || props.error || '')
+const description = computed(() => [
+  title.value, detail.value,
+  props.answered && tone.value !== 'success' ? 'La IA ya respondió en esta conversación.' : '',
+  visibleProcessing.value?.willRetry ? `Intento ${visibleProcessing.value.attempts}/${visibleProcessing.value.maxAttempts}` : '',
+].filter(Boolean).join('\n'))
 </script>
