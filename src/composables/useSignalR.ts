@@ -77,7 +77,7 @@ function createSharedHub(hubUrl: string): SharedSignalRHub {
 
   function scheduleReconnect() {
     if (!shouldReconnect || hub.subscribers === 0 || !isOnline.value || reconnectTimer) return
-    if (whatsappHub && (!getStoredUser() || initialReconnectAttempt >= RECONNECT_DELAYS_MS.length)) return
+    if (whatsappHub && initialReconnectAttempt >= RECONNECT_DELAYS_MS.length) return
     const delay = nextSignalRRetryDelay(initialReconnectAttempt++)
     reconnectTimer = window.setTimeout(() => {
       reconnectTimer = undefined
