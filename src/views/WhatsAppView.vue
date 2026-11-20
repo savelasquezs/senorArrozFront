@@ -424,7 +424,7 @@
                     </div>
                   </div>
                   <div v-if="!message.hiddenSource && productSuggestions.get(message.id)?.length" class="wa-suggestions" aria-label="Sugerencias de productos">
-                    <template v-for="suggestion in productSuggestions.get(message.id)" :key="suggestion.productId ?? suggestion.reply">
+                    <template v-for="suggestion in productSuggestions.get(message.id)" :key="suggestion.kind === 'choices' ? 'choices-' + suggestion.choiceIndex : suggestion.productId ?? suggestion.reply">
                       <div v-if="suggestion.kind === 'add'" class="wa-suggestion">
                         <span class="flex min-w-0 items-center gap-1" :title="suggestion.name ?? undefined">
                           <ViewfinderCircleIcon class="size-3.5 shrink-0 text-emerald-700" aria-hidden="true" />
@@ -434,6 +434,17 @@
                           :disabled="isSuggestionApplied(message.id, suggestion) || !suggestion.available || !currentSuggestionState?.canApply || suggestionBranch !== visibleSuggestionBranch"
                           @click="addProductSuggestion(message.id, suggestion)">
                           {{ isSuggestionApplied(message.id, suggestion) ? 'Agregado' : !suggestionBranch ? 'Elige la sucursal' : suggestion.available ? 'Agregar ' + suggestion.quantity : 'Sin disponibilidad' }}
+                        </button>
+                      </div>
+                      <div v-else-if="suggestion.kind === 'choices'" class="wa-suggestion">
+                        <span class="flex min-w-0 items-center gap-1" :title="suggestion.name ?? undefined">
+                          <ViewfinderCircleIcon class="size-3.5 shrink-0 text-emerald-700" aria-hidden="true" />
+                          <span class="truncate font-semibold">{{ suggestion.quantity > 1 ? suggestion.quantity + ' × ' : '' }}{{ suggestion.name }}</span>
+                        </span>
+                        <button type="button"
+                          :disabled="!canSend || sending || sendingProductChoices || !suggestion.available || !currentSuggestionState?.canApply || suggestionBranch !== visibleSuggestionBranch"
+                          @click="sendSuggestedProductChoices(message.id, suggestion)">
+                          {{ !suggestionBranch ? 'Elige la sucursal' : suggestion.available ? 'Enviar opciones' : 'Sin disponibilidad' }}
                         </button>
                       </div>
                       <div v-else-if="suggestion.reply" class="wa-suggestion">
@@ -880,6 +891,7 @@ import type {
   WhatsAppInboxLabelDefinition,
   WhatsAppInboxSummary,
   WhatsAppProductChoiceGroup,
+  WhatsAppProductChoiceSource,
   WhatsAppProductSuggestion,
   WhatsAppProductSuggestionState,
   WhatsAppQuickReply,
@@ -2199,7 +2211,14 @@ function sendCatalogQuickReply(group: WhatsAppProductChoiceGroup) {
   return sendProductOptions(group.id, group)
 }
 
-async function sendProductOptions(groupId: number, group?: WhatsAppProductChoiceGroup) {
+function sendSuggestedProductChoices(messageId: number, suggestion: WhatsAppProductSuggestion) {
+  if (!suggestion.choiceGroupId || suggestion.choiceIndex == null || !suggestion.productId) return
+  return sendProductOptions(suggestion.choiceGroupId, undefined, {
+    messageId, choiceIndex: suggestion.choiceIndex, productId: suggestion.productId,
+  })
+}
+
+async function sendProductOptions(groupId: number, group?: WhatsAppProductChoiceGroup, source?: WhatsAppProductChoiceSource) {
   const conversationId = selectedConversation.value?.id
   const panel = commercialPanel.value
   if (!conversationId || !panel || !canSend.value || sending.value || sendingProductChoices.value || !groupId) return
@@ -2208,7 +2227,7 @@ async function sendProductOptions(groupId: number, group?: WhatsAppProductChoice
   sendError.value = ''
   const text = draft.value.trim()
   try {
-    const messages = await panel.sendProductChoices(groupId)
+    const messages = source ? await panel.sendProductChoices(groupId, source) : await panel.sendProductChoices(groupId)
     if (group && text.startsWith('/') && !/\s/.test(text) && !selectedFile.value
       && matchesCatalogQuickReply(group, normalizeQuickReplyShortcut(text))) clearSent(conversationId, text, null)
     if (selectedConversation.value?.id === conversationId) showProductChoices.value = false

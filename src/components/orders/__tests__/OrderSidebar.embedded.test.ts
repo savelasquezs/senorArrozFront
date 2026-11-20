@@ -55,3 +55,30 @@ it('uses the existing sidebar, product modal and payment selector on a scoped dr
   expect(wrapper.text()).not.toContain('Regalar domicilio')
   wrapper.unmount()
 })
+
+it('shows the updated reservation schedule when the WhatsApp draft changes in place', async () => {
+  let editor!: ReturnType<typeof provideOrderEditor>
+  const wrapper = mount(defineComponent({ setup() {
+    editor = provideOrderEditor('whatsapp-reservation', vi.fn())
+    const draft = createOrderDraft('reservation', 'WhatsApp', 1)
+    Object.assign(draft, { type: 'reservation', whatsappConversationId: 87,
+      prepareAt: new Date('2026-11-19T17:30:00Z'), reservedFor: new Date('2026-11-19T18:30:00Z') })
+    editor.draftOrders.set(draft.tabId, draft)
+    editor.currentTabId = draft.tabId
+    return () => h(OrderSidebar)
+  } }), { global: { plugins: [pinia], stubs: {
+    CustomerSection: true, BillingRecipientAccess: true, OrderFulfillmentBranchSelector: true,
+    OrderItemList: true, PaymentSelector: true, CustomerDetailModal: true,
+    OrderScheduleFields: { name: 'OrderScheduleFields', props: ['prepareAt', 'reservedFor'], template: '<div />' },
+  } } })
+  await vi.dynamicImportSettled()
+  await flushPromises()
+  const fields = wrapper.getComponent({ name: 'OrderScheduleFields' })
+  expect(fields.props('reservedFor')).toEqual(new Date('2026-11-19T18:30:00Z'))
+  editor.updatePrepareAt(new Date('2026-11-21T17:30:00Z'))
+  editor.updateReservedFor(new Date('2026-11-21T18:30:00Z'))
+  await flushPromises()
+  expect(fields.props('prepareAt')).toEqual(new Date('2026-11-21T17:30:00Z'))
+  expect(fields.props('reservedFor')).toEqual(new Date('2026-11-21T18:30:00Z'))
+  wrapper.unmount()
+})

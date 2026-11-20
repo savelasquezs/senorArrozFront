@@ -10,7 +10,7 @@ import { provideOrderEditor } from './useOrderEditor'
 import { useOrderSubmission } from './useOrderSubmission'
 import { appendOrderProducts, createOrderDraft } from '@/helpers/orderDraft'
 import type { DraftOrder, Order } from '@/types/order'
-import type { WhatsAppCommercialDraft, WhatsAppConversation, WhatsAppProductSuggestion } from '@/types/whatsapp'
+import type { WhatsAppCommercialDraft, WhatsAppConversation, WhatsAppProductChoiceSource, WhatsAppProductSuggestion } from '@/types/whatsapp'
 
 interface RetainedDraft {
   session: WhatsAppCommercialDraft | null
@@ -458,18 +458,32 @@ export function useWhatsAppCommercialDraft(conversation: Ref<WhatsAppConversatio
     return result.data ?? []
   }
 
-  async function sendProductChoices(groupId: number) {
+  async function sendProductChoices(groupId: number, productChoiceSource?: WhatsAppProductChoiceSource) {
     if (!session.value && owned.value) await start()
     if (session.value?.status !== 'active') throw new Error(error.value || 'Inicia un pedido para enviar las presentaciones.')
-    await flush()
-    if (!editable.value || saveState.value !== 'saved') throw new Error('Guarda el borrador antes de enviar las presentaciones.')
-    const result = await whatsappApi.sendCommercialProductChoices(conversationId, groupId, versions())
+    await saveForAction('Guarda el borrador antes de enviar las presentaciones.')
+    const result = await whatsappApi.sendCommercialProductChoices(conversationId, groupId, {
+      ...versions(), ...(productChoiceSource ? { productChoiceSource } : {}),
+    })
     return result.data ?? []
   }
 
-  async function submit(_draft: DraftOrder): Promise<Order> {
+  async function saveForAction(notReady: string) {
+    if (!editable.value) throw new Error(notReady)
+    const attempt = session.value!.sessionId
+    const revision = conversation.value.attentionRevision
+    const expected = snapshot()
+    const sameAttention = () => !disposed && owned.value && revision === conversation.value.attentionRevision
     await flush()
-    if (!editable.value || saveState.value !== 'saved') throw new Error('Revisa el estado de guardado y la atención antes de confirmar.')
+    await settleDraftReconciliation(sameAttention)
+    if (!sameAttention()) throw new Error('La atención de la conversación cambió. Revisa quién está a cargo.')
+    if (session.value?.sessionId !== attempt || session.value.status !== 'active' || snapshot() !== expected)
+      throw new Error('El borrador cambió. Revisa el pedido antes de continuar.')
+    if (!editable.value || saveState.value !== 'saved') throw new Error(notReady)
+  }
+
+  async function submit(_draft: DraftOrder): Promise<Order> {
+    await saveForAction('Revisa el estado de guardado y la atención antes de confirmar.')
     const request = versions()
     try {
       const result = await whatsappApi.commercialDraftAction(conversationId, 'confirm', request)

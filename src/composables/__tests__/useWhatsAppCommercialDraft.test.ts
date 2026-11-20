@@ -328,6 +328,37 @@ describe('shared commercial draft editor', () => {
     expect(api.saveCommercialDraft).toHaveBeenCalledTimes(1)
   })
 
+  it('waits for the save notification to settle before confirming a reservation', async () => {
+    const { model } = render(71871)
+    await model.load()
+    const reservedFor = new Date('2026-11-21T18:30:00Z')
+    let active!: WhatsAppCommercialDraft
+    let completeRead!: () => void
+    api.getCommercialDraft.mockImplementationOnce(() => new Promise(resolve => {
+      completeRead = () => resolve({ data: active })
+    }))
+    api.saveCommercialDraft.mockImplementationOnce(async (_id, request) => {
+      active = { ...session(71871), order: request.order, editor: request.editor, version: 2 }
+      await Promise.resolve()
+      void model.reconcile(true)
+      return { data: active }
+    })
+    api.commercialDraftAction.mockImplementationOnce(async () => ({
+      data: { ...active, version: 3, status: 'completed', orderId: 999 },
+    }))
+    model.draft.value!.type = 'reservation'
+    model.editor.updateReservedFor(reservedFor)
+    const result = model.submit(model.draft.value!)
+    await flushPromises()
+    expect(model.saveState.value).toBe('saved')
+    expect(api.commercialDraftAction).not.toHaveBeenCalled()
+    expect(api.saveCommercialDraft.mock.calls[0]?.[1].order.reservedFor).toEqual(reservedFor)
+    completeRead()
+    await expect(result).resolves.toMatchObject({ id: 999 })
+    expect(api.commercialDraftAction).toHaveBeenCalledExactlyOnceWith(71871, 'confirm',
+      expect.objectContaining({ expectedVersion: 2 }))
+  })
+
   it('clears a failed save after reconnecting and successfully retrying', async () => {
     const first = render(1701)
     await first.model.load()
