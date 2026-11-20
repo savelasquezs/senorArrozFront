@@ -3077,7 +3077,7 @@ watch(() => selectedConversation.value?.id, id => {
   display: flex; align-items: center; justify-content: space-between; gap: .5rem; padding: .375rem .625rem;
   border-top: 1px solid var(--wa-line); background: var(--wa-panel); color: var(--wa-text); font-size: .75rem;
 }
-.wa-thread .wa-forward-row { position: relative; padding-inline-start: 2.5rem; border-radius: .5rem; }
+.wa-thread .wa-message-row.wa-forward-row { position: relative; padding-inline-start: 2.5rem; border-radius: .5rem; }
 .wa-forward-selected { background: var(--wa-selected); }
 .wa-forward-checkbox { position: absolute; inset-inline-start: .375rem; top: .5rem; width: 1rem; height: 1rem; accent-color: var(--wa-focus); }
 .wa-compose-row { display: grid; grid-template-columns: auto auto auto minmax(0, 1fr) auto; align-items: end; gap: .5rem; }

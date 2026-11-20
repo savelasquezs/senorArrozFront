@@ -104,11 +104,12 @@ class WhatsAppApi extends BaseApi {
   checkCoexistence(branchId: number) {
     return this.post<ApiResponse<CoexistenceStatus>>(`/branches/${branchId}/whatsapp-coexistence/check`, {})
   }
-  private manualPost<T>(url: string, payload: unknown, requestId = generatePosCreationKey()): Promise<ApiResponse<T>> {
+  private manualPost<T>(url: string, payload: unknown, requestId = generatePosCreationKey(),
+    timeout = payload instanceof FormData ? 90_000 : 10_000): Promise<ApiResponse<T>> {
     return resolveWhatsAppOperation<T>(
       () => this.post(url, payload, {
         headers: { 'X-WhatsApp-Request-Id': requestId },
-        timeout: payload instanceof FormData ? 90_000 : 10_000,
+        timeout,
       }),
       id => this.get(`/whatsapp/operations/${id}`, { branchScope: 'none' }),
     )
@@ -281,7 +282,7 @@ class WhatsAppApi extends BaseApi {
 
   forwardMessage(destinationId: number, sourceConversationId: number, messageId: number, requestId: string) {
     return this.manualPost<WhatsAppMessage>(`/whatsapp/conversations/${destinationId}/messages/forward`,
-      { sourceConversationId, messageId }, requestId)
+      { sourceConversationId, messageId }, requestId, 90_000)
   }
 
   sendMediaMessage(conversationId: number, file: File, caption?: string, replyToMessageId?: number, asSticker = false): Promise<ApiResponse<WhatsAppMessage>> {
