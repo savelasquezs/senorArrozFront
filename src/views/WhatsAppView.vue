@@ -337,11 +337,12 @@
                         :sticker-action="message.type === 'sticker' && message.direction === 'inbound' && message.mediaUrl
                           ? savedStickerKeys.has(whatsappStickerKey(message)) ? 'remove' : 'save' : undefined"
                         :sticker-busy="!!savingSticker"
+                        :can-copy="!!visibleMessageText(message).trim()"
                         :can-forward="canForwardMessage(message)"
                         :outbound="message.direction === 'outbound'" :busy="messageActionId === message.id" :current-reaction="message.businessReaction"
                         @reply="startMessageReply(message)" @toggle="reactionPickerId = reactionPickerId === message.id ? null : message.id"
                         @react="emoji => reactToMessage(message, emoji)" @hide="hideMessage(message)" @sticker="toggleSavedSticker(message)"
-                        @forward="startForwardSelection(message)" />
+                        @copy="copyMessage(message)" @forward="startForwardSelection(message)" />
                       <div v-if="message.isForwarded && !message.hiddenSource" class="mb-1 flex items-center gap-1 text-xs opacity-75">
                         <ArrowUturnRightIcon class="size-3" aria-hidden="true" /> Reenviado
                       </div>
@@ -412,8 +413,7 @@
                       <component :is="voiceMessageUrl(message) ? WhatsAppVoiceMessage : 'p'"
                         :key="voiceMessageUrl(message)" :src="voiceMessageUrl(message)" class="wa-message-copy">
                         <span v-if="message.hiddenSource" class="italic opacity-80">{{ message.hiddenSource === 'pos' ? 'Mensaje oculto en el POS' : 'Mensaje eliminado desde WhatsApp Business' }}</span>
-                        <span v-else-if="message.textBody && !message.location && !message.contacts?.length && !(message.type === 'sticker' && message.mediaUrl)"
-                          class="whitespace-pre-wrap">{{ message.textBody }}</span>
+                        <span v-else-if="visibleMessageText(message)" class="whitespace-pre-wrap">{{ message.textBody }}</span>
                         <span v-else-if="message.type !== 'text' && !message.mediaUrl && !message.location && !message.contacts?.length" class="opacity-80">{{ mediaFallbackLabel(message) }}</span>
                         <span class="wa-message-meta">
                           <span v-if="message.source === 'businessApp'">Celular ·</span><span v-if="message.isHistorical">Historial ·</span>
@@ -2394,6 +2394,22 @@ function focusQuotedMessage(message: WhatsAppMessage) {
   if (quoted) messagesContainer.value?.querySelector(`[data-message-id="${quoted.id}"]`)?.scrollIntoView({ block: 'center' })
 }
 
+function visibleMessageText(message: WhatsAppMessage) {
+  return message.hiddenSource || message.location || message.contacts?.length || (message.type === 'sticker' && message.mediaUrl)
+    ? '' : message.textBody ?? ''
+}
+
+async function copyMessage(message: WhatsAppMessage) {
+  const text = visibleMessageText(message)
+  if (!text.trim()) return
+  try {
+    await navigator.clipboard.writeText(text)
+    success('Mensaje copiado', 2200)
+  } catch {
+    showError('Copiar mensaje', 'No se pudo copiar al portapapeles.')
+  }
+}
+
 function messageSummary(message?: WhatsAppMessage | null) {
   if (!message) return 'Mensaje anterior'
   if (message.hiddenSource) return 'Mensaje oculto'
@@ -3231,7 +3247,11 @@ watch(() => selectedConversation.value?.id, id => {
 .wa-attachment-remove:hover:not(:disabled) { background: var(--wa-selected); color: var(--wa-text); }
 .wa-attachment-remove:disabled { opacity: .5; }
 .wa-message-row:has(.wa-ai-message-marker) { padding-inline-start: .875rem; }
-.wa-message-stack { position: relative; display: grid; min-width: 0; max-width: min(86%, calc(100% - 6.75rem)); gap: .25rem; }
+.wa-message-stack {
+  position: relative; display: grid; min-width: 0;
+  max-width: min(86%, calc(100% - var(--wa-message-tools-space, 6.75rem))); gap: .25rem;
+}
+.wa-message-stack:has(.message-actions > button:nth-child(5)) { --wa-message-tools-space: 8.25rem; }
 .wa-forward-row .wa-message-stack { max-width: 86%; }
 .wa-ai-message-marker { position: absolute; inset-inline-start: -1.375rem; top: .3125rem; }
 .wa-ai-message-marker :deep(button) {

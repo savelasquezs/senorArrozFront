@@ -839,6 +839,39 @@ describe('M38-F04 view + real Pinia store integration', () => {
     expect(wrapper.find('button[aria-label^="Abrir chat con Chat 1"]').exists()).toBe(true)
   })
 
+  it('copies visible text and captions from the message toolbar even when the chat is read-only', async () => {
+    const chat = { ...conversation(), assignedUserId: 8 }
+    m.rows = [chat]
+    const writeText = vi.fn().mockResolvedValue(undefined)
+    vi.stubGlobal('navigator', { clipboard: { writeText } })
+    const message = {
+      id: 95, conversationId: 1, direction: 'inbound', type: 'text', status: 'received',
+      textBody: '  Hola 🍚\n¿Tienen domicilio?', timestamp: '2026-11-19T12:00:00Z',
+    }
+    m.api.getMessagesPage.mockResolvedValue(reply({
+      items: [
+        message,
+        { ...message, id: 96, direction: 'outbound', type: 'image', status: 'sent',
+          mediaUrl: 'https://example.invalid/carta.jpg', textBody: 'Carta del día' },
+        { ...message, id: 97, hiddenSource: 'pos' },
+        { ...message, id: 98, type: 'image', mediaUrl: 'https://example.invalid/foto.jpg', textBody: undefined },
+      ],
+      hasMore: false,
+      nextCursor: null,
+    }))
+    const { wrapper, vm } = mountView()
+    await flushPromises()
+    await vm.selectConversation(chat)
+    const action = (id: number) => wrapper.find(`[data-message-id="${id}"] button[aria-label="Copiar mensaje"]`)
+    expect(action(97).exists()).toBe(false)
+    expect(action(98).exists()).toBe(false)
+    await action(95).trigger('click')
+    await action(96).trigger('click')
+    expect(writeText.mock.calls).toEqual([[message.textBody], ['Carta del día']])
+    expect(m.success).toHaveBeenCalledWith('Mensaje copiado', 2200)
+    expect(m.api.sendMessage).not.toHaveBeenCalled()
+  })
+
   it('renders shared cards, sends a quoted reply and updates reactions and hidden messages in place', async () => {
     const chat = { ...conversation(), customerServiceWindowExpiresAt: '2099-01-01T00:00:00Z' }
     m.rows = [chat]
@@ -894,8 +927,8 @@ describe('M38-F04 view + real Pinia store integration', () => {
 
     const controls = wrapper.get('.message-actions').findAll('button')
     expect(controls.map(button => button.attributes('aria-label')))
-      .toEqual(['Responder a este mensaje', 'Reaccionar', 'Reenviar mensaje', 'Ocultar en el POS'])
-    for (const button of controls.filter(button => button.attributes('aria-label') !== 'Reenviar mensaje')) {
+      .toEqual(['Responder a este mensaje', 'Reaccionar', 'Copiar mensaje', 'Reenviar mensaje', 'Ocultar en el POS'])
+    for (const button of controls.filter(button => !['Copiar mensaje', 'Reenviar mensaje'].includes(button.attributes('aria-label')))) {
       expect(button.attributes('aria-disabled')).toBe('true')
       expect(button.attributes('title')).toContain('Toma la conversación')
       await button.trigger('click')
