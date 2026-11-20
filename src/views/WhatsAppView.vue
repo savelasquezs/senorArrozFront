@@ -467,6 +467,21 @@
                   </div>
                 </div>
                 </template>
+                <div v-for="outgoing in pendingTextMessages" :key="outgoing.requestId" class="wa-message-row flex justify-end">
+                  <div class="wa-message-stack wa-outbound">
+                    <div class="wa-bubble wa-bubble-tail">
+                      <span class="whitespace-pre-wrap break-words">{{ outgoing.text }}</span>
+                      <span v-if="outgoing.state !== 'failed' && outgoing.state !== 'unknown'" class="wa-message-meta"
+                        role="img" aria-label="En cola" title="En cola"><ClockIcon class="size-3" aria-hidden="true" /></span>
+                      <div v-else class="flex flex-wrap items-center gap-1 text-xs" role="status">
+                        <span :title="outgoing.error">{{ outgoing.state === 'failed' ? (outgoing.error || 'No se pudo enviar') : 'Envío por verificar' }}</span>
+                        <button type="button" class="underline" :disabled="!canSend" @click="textQueue.retry(outgoing)">
+                          {{ outgoing.state === 'failed' ? 'Reintentar' : 'Verificar envío' }}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
                 <div ref="messagesEnd" />
               </div>
             </div>
@@ -906,6 +921,7 @@ import {
   ArrowPathIcon,
   BackspaceIcon,
   CheckIcon,
+  ClockIcon,
   CpuChipIcon,
   DocumentIcon,
   EllipsisHorizontalIcon,
@@ -938,6 +954,7 @@ import WhatsAppInboxLabelList from '@/components/whatsapp/WhatsAppInboxLabelList
 import WhatsAppConversationTemplates from '@/components/whatsapp/WhatsAppConversationTemplates.vue'
 import WhatsAppClosedDayReplies from '@/components/whatsapp/WhatsAppClosedDayReplies.vue'
 import WhatsAppComposerPicker from '@/components/whatsapp/WhatsAppComposerPicker.vue'
+import { useWhatsAppTextQueue } from '@/composables/useWhatsAppTextQueue'
 import WhatsAppForwardDialog from '@/components/whatsapp/WhatsAppForwardDialog.vue'
 import { useWhatsAppStore } from '@/store/whatsapp'
 import { useAuthStore } from '@/store/auth'
@@ -1173,6 +1190,16 @@ const inboxTools = computed(() => [
 const currentMessages = computed<WhatsAppMessage[]>(() =>
   selectedConversation.value ? (whatsappStore.messages[selectedConversation.value.id] ?? []) : []
 )
+const textQueue = useWhatsAppTextQueue(
+  computed(() => authStore.user ? sessionKey.value : ''),
+  id => whatsappStore.messages[id] ?? [],
+  message => whatsappStore.upsertMessage(message.conversationId, message),
+)
+const queuedTextEnabled = computed(() => {
+  const lineId = selectedConversation.value?.branchLineId
+  return !!lineId && whatsappStore.status?.queuedTextLineIds?.includes(lineId) === true
+})
+const pendingTextMessages = computed(() => textQueue.entries.value.filter(item => item.conversationId === selectedConversation.value?.id))
 const previewedContact = computed(() => {
   const selection = contactPreview.value
   if (!selection) return null
@@ -2264,6 +2291,14 @@ async function sendQuickReply(reply: WhatsAppQuickReply) {
   const conversationId = selectedConversation.value?.id
   if (!conversationId || !canSend.value || sending.value || sendingProductChoices.value) return
   const session = sessionKey.value
+  if (queuedTextEnabled.value) {
+    textQueue.enqueue({ conversationId, quickReplyId: reply.id, text: reply.messageTemplate })
+    if (filteredQuickReplies.value.some(match => match.saved?.id === reply.id)) takeDraft()
+    sendError.value = ''
+    messageInput.value?.focus()
+    void scrollToBottom()
+    return
+  }
   const submitted = filteredQuickReplies.value.some(match => match.saved?.id === reply.id) ? takeDraft() : null
   sending.value = true
   sendError.value = ''
@@ -2726,6 +2761,16 @@ async function sendMessage() {
   const replyId = target?.conversationId === conversationId ? target.id : undefined
   const isSameSession = () => viewActive && sessionKey.value === session
   const isSameChat = () => isSameSession() && selectedConversation.value?.id === conversationId
+
+  if (queuedTextEnabled.value && !hasAttachments.value) {
+    textQueue.enqueue({ conversationId, text: textToSend, replyToMessageId: replyId })
+    takeDraft()
+    replyTarget.value = null
+    sendError.value = ''
+    messageInput.value?.focus()
+    void scrollToBottom()
+    return
+  }
 
   sending.value = true
   sendError.value = ''

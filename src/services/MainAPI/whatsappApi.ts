@@ -56,7 +56,10 @@ export function whatsappWebhookUrl(): string {
 
 class WhatsAppApi extends BaseApi {
   protected override handleError(error: any): Error {
-    return Object.assign(super.handleError(error), { status: error.response?.status })
+    return Object.assign(super.handleError(error), {
+      status: error?.response?.status,
+      serverCode: error?.response?.data?.code,
+    })
   }
   getCommercialDraft(id: number) {
     return this.get<ApiResponse<WhatsAppCommercialDraft | null>>(`/whatsapp/conversations/${id}/commercial-draft`)
@@ -112,6 +115,20 @@ class WhatsAppApi extends BaseApi {
         timeout,
       }),
       id => this.get(`/whatsapp/operations/${id}`, { branchScope: 'none' }),
+    )
+  }
+  startQueuedText(conversationId: number, requestId: string, text: string, replyToMessageId?: number, quickReplyId?: number) {
+    const action = quickReplyId ? '/quick-reply' : ''
+    const body = quickReplyId ? { quickReplyId } : { text, replyToMessageId }
+    return this.post<ApiResponse<{ operationId: number; pending: true }>>(
+      `/whatsapp/conversations/${conversationId}/messages${action}?queue=true`, body,
+      { headers: { 'X-WhatsApp-Request-Id': requestId } },
+    )
+  }
+  getQueuedText(requestId: string, operationId?: number) {
+    const target = operationId ?? `request/${requestId}`
+    return this.get<ApiResponse<WhatsAppMessage | { operationId: number; pending: true }>>(
+      `/whatsapp/operations/${target}`, { branchScope: 'none' },
     )
   }
   getTenantSettings(signal?: AbortSignal): Promise<ApiResponse<TenantWhatsAppSettings>> {
