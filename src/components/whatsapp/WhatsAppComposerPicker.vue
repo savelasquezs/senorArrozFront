@@ -9,8 +9,11 @@
       :aria-expanded="mode === 'stickers'" :aria-controls="mode === 'stickers' ? panelId : undefined" @click="toggle('stickers')">
       <Square2StackIcon class="size-4" aria-hidden="true" />
     </button>
+  </div>
+  <Teleport v-if="panelTarget" :to="panelTarget">
     <Transition name="wa-picker">
-      <section v-if="mode" :id="panelId" class="wa-picker-panel" role="dialog" :aria-label="mode === 'emoji' ? 'Emojis' : 'Stickers guardados'">
+      <section v-if="mode" :id="panelId" ref="panel" class="wa-picker-panel" role="dialog" tabindex="-1"
+        :aria-label="mode === 'emoji' ? 'Emojis' : 'Stickers guardados'" @keydown.esc.capture="onEscape">
         <div v-if="mode === 'emoji'">
           <div ref="emojiHost" class="wa-emoji-host" />
           <p v-if="emojiFailed" class="wa-picker-empty" role="alert">No se pudieron cargar los emojis.</p>
@@ -41,7 +44,7 @@
         </template>
       </section>
     </Transition>
-  </div>
+  </Teleport>
 </template>
 
 <script setup lang="ts">
@@ -53,6 +56,7 @@ import type { Picker } from 'emoji-mart'
 
 const props = defineProps<{
   theme: WhatsAppTheme
+  panelTarget?: HTMLElement
   canType: boolean
   canSend: boolean
   stickers: readonly WhatsAppSavedSticker[]
@@ -62,6 +66,7 @@ const emit = defineEmits<{ emoji: [value: string]; sticker: [value: WhatsAppSave
 const panelId = useId()
 const mode = ref<'emoji' | 'stickers' | null>(null)
 const root = ref<HTMLElement>()
+const panel = ref<HTMLElement>()
 const emojiHost = ref<HTMLElement>()
 const emojiTrigger = ref<HTMLButtonElement>()
 const stickerTrigger = ref<HTMLButtonElement>()
@@ -72,7 +77,11 @@ let picker: Picker | undefined
 async function toggle(next: 'emoji' | 'stickers') {
   if (mode.value === next) return close(true)
   mode.value = next
-  if (next !== 'emoji') return
+  if (next === 'stickers') {
+    await nextTick()
+    panel.value?.focus({ preventScroll: true })
+    return
+  }
 
   emojiFailed.value = false
   loadingEmoji.value = true
@@ -117,7 +126,8 @@ function onEscape(event: KeyboardEvent) {
   close(true)
 }
 function onOutsidePointer(event: PointerEvent) {
-  if (mode.value && root.value && !event.composedPath().includes(root.value)) close()
+  if (!mode.value) return
+  if (!event.composedPath().some(target => target === root.value || target === panel.value)) close()
 }
 
 watch(() => props.theme, theme => picker?.update({ theme }))
@@ -145,13 +155,13 @@ onBeforeUnmount(() => {
 }
 .wa-picker-trigger:disabled, .wa-sticker-send:disabled { opacity: .55; cursor: not-allowed; }
 .wa-picker-panel {
-  position: absolute; z-index: 6; inset-inline-start: .75rem; bottom: calc(100% + .375rem);
-  width: min(21rem, calc(100% - 1.5rem)); max-height: min(25rem, 60dvh);
+  position: absolute; z-index: 6; inset-inline-start: .75rem; bottom: .375rem;
+  width: min(21rem, calc(100% - 1.5rem)); max-height: min(25rem, calc(100% - .75rem));
   overflow: auto; border: 1px solid var(--wa-line); border-radius: .875rem;
   background: var(--wa-panel); color: var(--wa-text); box-shadow: 0 .5rem 1.75rem var(--wa-shadow);
 }
 .wa-emoji-host :deep(em-emoji-picker) {
-  display: block; width: 100%; height: min(24rem, 58dvh); --border-radius: .875rem;
+  display: block; width: 100%; height: clamp(0px, calc(100cqh - .75rem - 2px), 24rem); --border-radius: .875rem;
 }
 .wa-picker-header, .wa-picker-header span { display: flex; align-items: center; gap: .375rem; }
 .wa-picker-header { justify-content: space-between; padding: .5rem .625rem; border-bottom: 1px solid var(--wa-line); font-size: .8125rem; font-weight: 600; }

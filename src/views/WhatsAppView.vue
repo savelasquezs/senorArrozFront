@@ -304,175 +304,177 @@
             </div>
           </div>
           <template v-else>
-            <div ref="messagesContainer" data-test="whatsapp-chat-messages" @scroll="trackMessageScroll" class="wa-thread flex-1 min-h-0 overflow-y-auto space-y-2 px-3 py-3">
-              <p v-if="whatsappStore.isLoadingMessages && !currentMessages.length" role="status" class="text-center text-sm text-gray-500">Cargando mensajes…</p>
-              <BaseButton v-if="whatsappStore.messageHistory[selectedConversation.id]?.hasMoreRecent" size="sm" variant="outline" class="mx-auto" @click="showRecentMessages">Volver a los recientes</BaseButton>
-              <button v-if="whatsappStore.messageHistory[selectedConversation.id]?.hasMore" type="button"
-                class="mx-auto block rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm disabled:opacity-50"
-                :disabled="whatsappStore.olderMessagesLoading[selectedConversation.id]" @click="loadOlderMessages">
-                {{ whatsappStore.olderMessagesLoading[selectedConversation.id] ? 'Cargando…' : 'Cargar mensajes anteriores' }}
-              </button>
-              <template v-for="(message, messageIndex) in currentMessages" :key="message.id">
-                <div v-if="messageDates[messageIndex] && messageDates[messageIndex] !== messageDates[messageIndex - 1]" class="wa-day-divider">
-                  <time :datetime="messageDates[messageIndex]">{{ messageDateLabel(messageDates[messageIndex]!, message.timestamp) }}</time>
-                </div>
-              <div
-                :data-message-id="message.id"
-                class="wa-message-row flex"
-                :class="[message.direction === 'outbound' ? 'justify-end' : 'justify-start', { 'wa-forward-row': selectingForward, 'wa-forward-selected': forwardSelection.has(message.id) }]"
-              >
-                <input v-if="selectingForward && canForwardMessage(message)" type="checkbox" class="wa-forward-checkbox"
-                  :aria-label="`Seleccionar mensaje: ${shortConversationPreview(messageSummary(message))}`"
-                  :checked="forwardSelection.has(message.id)" :disabled="forwarding" @change="toggleForwardMessage(message)" />
-                <div class="wa-message-stack" :class="{ 'wa-outbound': message.direction === 'outbound' }">
-                  <BaseTooltip v-if="!message.hiddenSource && message.direction === 'inbound' && message.aiProcessing"
-                    class="wa-ai-message-marker" :data-tone="aiProcessingTone(message.aiProcessing)" :icon="CpuChipIcon" compact
-                    :label="message.aiProcessing.title || aiValueLabel(message.aiProcessing.status)"
-                    :text="aiMessageTooltip(message.aiProcessing)" />
-                  <div class="wa-bubble" :class="{ 'wa-bubble-tail': endsMessageGroup(message, messageIndex) }">
-                    <WhatsAppMessageActions v-if="!message.hiddenSource && !selectingForward"
-                      :hide-unavailable-reason="messageOwnershipRestriction"
-                      :send-unavailable-reason="messageActionRestriction(message)" :open="reactionPickerId === message.id"
-                      :sticker-action="message.type === 'sticker' && message.direction === 'inbound' && message.mediaUrl
-                        ? savedStickerKeys.has(whatsappStickerKey(message)) ? 'remove' : 'save' : undefined"
-                      :sticker-busy="!!savingSticker"
-                      :can-forward="canForwardMessage(message)"
-                      :outbound="message.direction === 'outbound'" :busy="messageActionId === message.id" :current-reaction="message.businessReaction"
-                      @reply="startMessageReply(message)" @toggle="reactionPickerId = reactionPickerId === message.id ? null : message.id"
-                      @react="emoji => reactToMessage(message, emoji)" @hide="hideMessage(message)" @sticker="toggleSavedSticker(message)"
-                      @forward="startForwardSelection(message)" />
-                    <div v-if="message.isForwarded && !message.hiddenSource" class="mb-1 flex items-center gap-1 text-xs opacity-75">
-                      <ArrowUturnRightIcon class="size-3" aria-hidden="true" /> Reenviado
-                    </div>
-                    <template v-if="!message.hiddenSource">
-                      <button v-if="message.replyToWhatsAppMessageId" type="button"
-                        class="wa-message-quote mb-1 block w-full rounded-md border-l-2 px-2 py-1 text-left text-xs"
-                        :disabled="!quotedMessage(message)" @click="focusQuotedMessage(message)">
-                        <span class="block font-semibold">{{ quotedMessage(message)?.direction === 'outbound' ? 'Señor Arroz' : 'Mensaje citado' }}</span>
-                        <span class="block truncate opacity-85">{{ messageSummary(quotedMessage(message)) }}</span>
-                      </button>
-                      <a v-if="message.location" :href="mapLink(message.location)" target="_blank" rel="noopener noreferrer"
-                        class="mb-1 flex max-w-xs items-center gap-2.5 rounded-xl border border-current/15 bg-black/5 p-2.5 transition-colors hover:bg-black/10">
-                        <span class="grid size-9 shrink-0 place-items-center rounded-lg bg-emerald-50 text-emerald-700"><MapPinIcon class="h-5 w-5" aria-hidden="true" /></span>
-                        <span class="min-w-0">
-                          <span class="block text-sm font-semibold">{{ message.location.name || 'Ubicación compartida' }}</span>
-                          <span v-if="message.location.address" class="block break-words text-xs opacity-80">{{ message.location.address }}</span>
-                          <span class="block text-xs font-medium underline">Abrir mapa</span>
-                        </span>
-                      </a>
-                      <div v-else-if="message.contacts?.length" class="space-y-1.5">
-                        <button v-for="(contact, index) in message.contacts" :key="index" type="button" class="wa-shared-contact"
-                          :aria-label="`Ver contacto ${contact.name}`" @click="contactPreview = { messageId: message.id, index }">
-                          <UserCircleIcon class="size-7 shrink-0 opacity-80" aria-hidden="true" />
-                          <span class="min-w-0 text-left">
-                            <span class="block break-words text-sm font-semibold">{{ contact.name }}</span>
-                            <span class="block text-xs opacity-80">{{ contact.phones[0] || 'Ver contacto' }}</span>
-                          </span>
-                          <ChevronRightIcon class="ml-auto size-4 shrink-0 opacity-70" aria-hidden="true" />
-                        </button>
+            <div ref="threadArea" class="wa-thread-area">
+              <div ref="messagesContainer" data-test="whatsapp-chat-messages" @scroll="trackMessageScroll" class="wa-thread flex-1 min-h-0 overflow-y-auto space-y-2 px-3 py-3">
+                <p v-if="whatsappStore.isLoadingMessages && !currentMessages.length" role="status" class="text-center text-sm text-gray-500">Cargando mensajes…</p>
+                <BaseButton v-if="whatsappStore.messageHistory[selectedConversation.id]?.hasMoreRecent" size="sm" variant="outline" class="mx-auto" @click="showRecentMessages">Volver a los recientes</BaseButton>
+                <button v-if="whatsappStore.messageHistory[selectedConversation.id]?.hasMore" type="button"
+                  class="mx-auto block rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm disabled:opacity-50"
+                  :disabled="whatsappStore.olderMessagesLoading[selectedConversation.id]" @click="loadOlderMessages">
+                  {{ whatsappStore.olderMessagesLoading[selectedConversation.id] ? 'Cargando…' : 'Cargar mensajes anteriores' }}
+                </button>
+                <template v-for="(message, messageIndex) in currentMessages" :key="message.id">
+                  <div v-if="messageDates[messageIndex] && messageDates[messageIndex] !== messageDates[messageIndex - 1]" class="wa-day-divider">
+                    <time :datetime="messageDates[messageIndex]">{{ messageDateLabel(messageDates[messageIndex]!, message.timestamp) }}</time>
+                  </div>
+                <div
+                  :data-message-id="message.id"
+                  class="wa-message-row flex"
+                  :class="[message.direction === 'outbound' ? 'justify-end' : 'justify-start', { 'wa-forward-row': selectingForward, 'wa-forward-selected': forwardSelection.has(message.id) }]"
+                >
+                  <input v-if="selectingForward && canForwardMessage(message)" type="checkbox" class="wa-forward-checkbox"
+                    :aria-label="`Seleccionar mensaje: ${shortConversationPreview(messageSummary(message))}`"
+                    :checked="forwardSelection.has(message.id)" :disabled="forwarding" @change="toggleForwardMessage(message)" />
+                  <div class="wa-message-stack" :class="{ 'wa-outbound': message.direction === 'outbound' }">
+                    <BaseTooltip v-if="!message.hiddenSource && message.direction === 'inbound' && message.aiProcessing"
+                      class="wa-ai-message-marker" :data-tone="aiProcessingTone(message.aiProcessing)" :icon="CpuChipIcon" compact
+                      :label="message.aiProcessing.title || aiValueLabel(message.aiProcessing.status)"
+                      :text="aiMessageTooltip(message.aiProcessing)" />
+                    <div class="wa-bubble" :class="{ 'wa-bubble-tail': endsMessageGroup(message, messageIndex) }">
+                      <WhatsAppMessageActions v-if="!message.hiddenSource && !selectingForward"
+                        :hide-unavailable-reason="messageOwnershipRestriction"
+                        :send-unavailable-reason="messageActionRestriction(message)" :open="reactionPickerId === message.id"
+                        :sticker-action="message.type === 'sticker' && message.direction === 'inbound' && message.mediaUrl
+                          ? savedStickerKeys.has(whatsappStickerKey(message)) ? 'remove' : 'save' : undefined"
+                        :sticker-busy="!!savingSticker"
+                        :can-forward="canForwardMessage(message)"
+                        :outbound="message.direction === 'outbound'" :busy="messageActionId === message.id" :current-reaction="message.businessReaction"
+                        @reply="startMessageReply(message)" @toggle="reactionPickerId = reactionPickerId === message.id ? null : message.id"
+                        @react="emoji => reactToMessage(message, emoji)" @hide="hideMessage(message)" @sticker="toggleSavedSticker(message)"
+                        @forward="startForwardSelection(message)" />
+                      <div v-if="message.isForwarded && !message.hiddenSource" class="mb-1 flex items-center gap-1 text-xs opacity-75">
+                        <ArrowUturnRightIcon class="size-3" aria-hidden="true" /> Reenviado
                       </div>
-                      <div v-if="message.mediaUrl" class="mb-2">
-                        <button
-                          v-if="message.type === 'image' || message.type === 'sticker'"
-                          type="button"
-                          class="block max-w-full overflow-hidden rounded-md focus:outline-none focus:ring-2 focus:ring-emerald-300"
-                          title="Ver imagen"
-                          @click="openImagePreview(message)"
-                        >
-                          <img
-                            loading="lazy" decoding="async" :width="message.type === 'sticker' ? 104 : 256"
-                            :height="message.type === 'sticker' ? 104 : 192"
-                            :src="message.mediaUrl"
-                            :alt="message.type === 'sticker' ? 'Sticker de WhatsApp' : message.mediaFileName || 'Imagen de WhatsApp'"
-                            class="max-h-80 max-w-full cursor-zoom-in object-contain"
-                          />
+                      <template v-if="!message.hiddenSource">
+                        <button v-if="message.replyToWhatsAppMessageId" type="button"
+                          class="wa-message-quote mb-1 block w-full rounded-md border-l-2 px-2 py-1 text-left text-xs"
+                          :disabled="!quotedMessage(message)" @click="focusQuotedMessage(message)">
+                          <span class="block font-semibold">{{ quotedMessage(message)?.direction === 'outbound' ? 'Señor Arroz' : 'Mensaje citado' }}</span>
+                          <span class="block truncate opacity-85">{{ messageSummary(quotedMessage(message)) }}</span>
                         </button>
-                        <audio
-                          preload="none"
-                          v-else-if="message.type === 'audio'"
-                          :src="message.mediaUrl"
-                          controls
-                          class="w-72 max-w-full"
-                        />
-                        <video
-                          preload="none"
-                          v-else-if="message.type === 'video'"
-                          :src="message.mediaUrl"
-                          controls
-                          class="max-h-80 max-w-full rounded-md"
-                        />
-                        <a
-                          v-else
-                          :href="message.mediaUrl"
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          class="flex items-center gap-2 rounded-md border px-3 py-2 text-sm"
-                          :class="message.direction === 'outbound' ? 'border-emerald-200 bg-emerald-700 text-white' : 'border-gray-200 bg-gray-50 text-gray-800'"
-                        >
-                          <DocumentIcon class="h-5 w-5 shrink-0" />
-                          <span class="min-w-0 flex-1 truncate">{{ message.mediaFileName || 'Abrir archivo' }}</span>
-                          <span v-if="message.mediaFileSize" class="text-xs opacity-80">{{ formatFileSize(message.mediaFileSize) }}</span>
+                        <a v-if="message.location" :href="mapLink(message.location)" target="_blank" rel="noopener noreferrer"
+                          class="mb-1 flex max-w-xs items-center gap-2.5 rounded-xl border border-current/15 bg-black/5 p-2.5 transition-colors hover:bg-black/10">
+                          <span class="grid size-9 shrink-0 place-items-center rounded-lg bg-emerald-50 text-emerald-700"><MapPinIcon class="h-5 w-5" aria-hidden="true" /></span>
+                          <span class="min-w-0">
+                            <span class="block text-sm font-semibold">{{ message.location.name || 'Ubicación compartida' }}</span>
+                            <span v-if="message.location.address" class="block break-words text-xs opacity-80">{{ message.location.address }}</span>
+                            <span class="block text-xs font-medium underline">Abrir mapa</span>
+                          </span>
                         </a>
+                        <div v-else-if="message.contacts?.length" class="space-y-1.5">
+                          <button v-for="(contact, index) in message.contacts" :key="index" type="button" class="wa-shared-contact"
+                            :aria-label="`Ver contacto ${contact.name}`" @click="contactPreview = { messageId: message.id, index }">
+                            <UserCircleIcon class="size-7 shrink-0 opacity-80" aria-hidden="true" />
+                            <span class="min-w-0 text-left">
+                              <span class="block break-words text-sm font-semibold">{{ contact.name }}</span>
+                              <span class="block text-xs opacity-80">{{ contact.phones[0] || 'Ver contacto' }}</span>
+                            </span>
+                            <ChevronRightIcon class="ml-auto size-4 shrink-0 opacity-70" aria-hidden="true" />
+                          </button>
+                        </div>
+                        <div v-if="message.mediaUrl" class="mb-2">
+                          <button
+                            v-if="message.type === 'image' || message.type === 'sticker'"
+                            type="button"
+                            class="block max-w-full overflow-hidden rounded-md focus:outline-none focus:ring-2 focus:ring-emerald-300"
+                            title="Ver imagen"
+                            @click="openImagePreview(message)"
+                          >
+                            <img
+                              loading="lazy" decoding="async" :width="message.type === 'sticker' ? 104 : 256"
+                              :height="message.type === 'sticker' ? 104 : 192"
+                              :src="message.mediaUrl"
+                              :alt="message.type === 'sticker' ? 'Sticker de WhatsApp' : message.mediaFileName || 'Imagen de WhatsApp'"
+                              class="max-h-80 max-w-full cursor-zoom-in object-contain"
+                            />
+                          </button>
+                          <audio
+                            preload="none"
+                            v-else-if="message.type === 'audio'"
+                            :src="message.mediaUrl"
+                            controls
+                            class="w-72 max-w-full"
+                          />
+                          <video
+                            preload="none"
+                            v-else-if="message.type === 'video'"
+                            :src="message.mediaUrl"
+                            controls
+                            class="max-h-80 max-w-full rounded-md"
+                          />
+                          <a
+                            v-else
+                            :href="message.mediaUrl"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            class="flex items-center gap-2 rounded-md border px-3 py-2 text-sm"
+                            :class="message.direction === 'outbound' ? 'border-emerald-200 bg-emerald-700 text-white' : 'border-gray-200 bg-gray-50 text-gray-800'"
+                          >
+                            <DocumentIcon class="h-5 w-5 shrink-0" />
+                            <span class="min-w-0 flex-1 truncate">{{ message.mediaFileName || 'Abrir archivo' }}</span>
+                            <span v-if="message.mediaFileSize" class="text-xs opacity-80">{{ formatFileSize(message.mediaFileSize) }}</span>
+                          </a>
+                        </div>
+                      </template>
+                      <p class="wa-message-copy">
+                        <span v-if="message.hiddenSource" class="italic opacity-80">{{ message.hiddenSource === 'pos' ? 'Mensaje oculto en el POS' : 'Mensaje eliminado desde WhatsApp Business' }}</span>
+                        <span v-else-if="message.textBody && !message.location && !message.contacts?.length && !(message.type === 'sticker' && message.mediaUrl)"
+                          class="whitespace-pre-wrap">{{ message.textBody }}</span>
+                        <span v-else-if="message.type !== 'text' && !message.mediaUrl && !message.location && !message.contacts?.length" class="opacity-80">{{ mediaFallbackLabel(message) }}</span>
+                        <span class="wa-message-meta">
+                          <span v-if="message.source === 'businessApp'">Celular ·</span><span v-if="message.isHistorical">Historial ·</span>
+                          <span v-if="message.editedAt && !message.hiddenSource">Editado ·</span>
+                          <time :datetime="message.timestamp">{{ formatTime(message.timestamp) }}</time>
+                          <template v-if="message.direction === 'outbound'">
+                            <ExclamationCircleIcon v-if="message.status === 'failed'" class="size-3 text-red-700" role="img" :aria-label="statusLabel(message.status)" />
+                            <span v-else class="inline-flex" :class="{ 'text-emerald-700': message.status === 'read' }" role="img" :aria-label="statusLabel(message.status)" :title="statusLabel(message.status)">
+                              <CheckIcon class="size-3" aria-hidden="true" />
+                              <CheckIcon v-if="message.status !== 'sent'" class="-ml-2.5 size-3" aria-hidden="true" />
+                            </span>
+                          </template>
+                        </span>
+                      </p>
+                      <div v-if="!message.hiddenSource && (message.customerReaction || message.businessReaction)" class="wa-reactions" aria-label="Reacciones">
+                        <span v-if="message.customerReaction" :key="`customer-${message.customerReaction}`" class="wa-reaction" title="Reacción del cliente">{{ message.customerReaction }}</span>
+                        <span v-if="message.businessReaction" :key="`business-${message.businessReaction}`" class="wa-reaction" title="Reacción de Señor Arroz">{{ message.businessReaction }}</span>
                       </div>
-                    </template>
-                    <p class="wa-message-copy">
-                      <span v-if="message.hiddenSource" class="italic opacity-80">{{ message.hiddenSource === 'pos' ? 'Mensaje oculto en el POS' : 'Mensaje eliminado desde WhatsApp Business' }}</span>
-                      <span v-else-if="message.textBody && !message.location && !message.contacts?.length && !(message.type === 'sticker' && message.mediaUrl)"
-                        class="whitespace-pre-wrap">{{ message.textBody }}</span>
-                      <span v-else-if="message.type !== 'text' && !message.mediaUrl && !message.location && !message.contacts?.length" class="opacity-80">{{ mediaFallbackLabel(message) }}</span>
-                      <span class="wa-message-meta">
-                        <span v-if="message.source === 'businessApp'">Celular ·</span><span v-if="message.isHistorical">Historial ·</span>
-                        <span v-if="message.editedAt && !message.hiddenSource">Editado ·</span>
-                        <time :datetime="message.timestamp">{{ formatTime(message.timestamp) }}</time>
-                        <template v-if="message.direction === 'outbound'">
-                          <ExclamationCircleIcon v-if="message.status === 'failed'" class="size-3 text-red-700" role="img" :aria-label="statusLabel(message.status)" />
-                          <span v-else class="inline-flex" :class="{ 'text-emerald-700': message.status === 'read' }" role="img" :aria-label="statusLabel(message.status)" :title="statusLabel(message.status)">
-                            <CheckIcon class="size-3" aria-hidden="true" />
-                            <CheckIcon v-if="message.status !== 'sent'" class="-ml-2.5 size-3" aria-hidden="true" />
+                    </div>
+                    <div v-if="!message.hiddenSource && productSuggestions.get(message.id)?.length" class="wa-suggestions" aria-label="Sugerencias de productos">
+                      <template v-for="suggestion in productSuggestions.get(message.id)" :key="suggestion.kind === 'choices' ? 'choices-' + suggestion.choiceIndex : suggestion.productId ?? suggestion.reply">
+                        <div v-if="suggestion.kind === 'add'" class="wa-suggestion">
+                          <span class="flex min-w-0 items-center gap-1" :title="suggestion.name ?? undefined">
+                            <ViewfinderCircleIcon class="size-3.5 shrink-0 text-emerald-700" aria-hidden="true" />
+                            <span class="truncate font-semibold">{{ suggestion.name }}<template v-if="suggestion.unitPrice != null"> · ${{ suggestion.unitPrice.toLocaleString('es-CO') }}</template></span>
                           </span>
-                        </template>
-                      </span>
-                    </p>
-                    <div v-if="!message.hiddenSource && (message.customerReaction || message.businessReaction)" class="wa-reactions" aria-label="Reacciones">
-                      <span v-if="message.customerReaction" :key="`customer-${message.customerReaction}`" class="wa-reaction" title="Reacción del cliente">{{ message.customerReaction }}</span>
-                      <span v-if="message.businessReaction" :key="`business-${message.businessReaction}`" class="wa-reaction" title="Reacción de Señor Arroz">{{ message.businessReaction }}</span>
+                          <button type="button"
+                            :disabled="isSuggestionApplied(message.id, suggestion) || !suggestion.available || !currentSuggestionState?.canApply || suggestionBranch !== visibleSuggestionBranch"
+                            @click="addProductSuggestion(message.id, suggestion)">
+                            {{ isSuggestionApplied(message.id, suggestion) ? 'Agregado' : !suggestionBranch ? 'Elige la sucursal' : suggestion.available ? 'Agregar ' + suggestion.quantity : 'Sin disponibilidad' }}
+                          </button>
+                        </div>
+                        <div v-else-if="suggestion.kind === 'choices'" class="wa-suggestion">
+                          <span class="flex min-w-0 items-center gap-1" :title="suggestion.name ?? undefined">
+                            <ViewfinderCircleIcon class="size-3.5 shrink-0 text-emerald-700" aria-hidden="true" />
+                            <span class="truncate font-semibold">{{ suggestion.quantity > 1 ? suggestion.quantity + ' × ' : '' }}{{ suggestion.name }}</span>
+                          </span>
+                          <button type="button"
+                            :disabled="!canSend || sending || sendingProductChoices || !suggestion.available || !currentSuggestionState?.canApply || suggestionBranch !== visibleSuggestionBranch"
+                            @click="sendSuggestedProductChoices(message.id, suggestion)">
+                            {{ !suggestionBranch ? 'Elige la sucursal' : suggestion.available ? 'Enviar opciones' : 'Sin disponibilidad' }}
+                          </button>
+                        </div>
+                        <div v-else-if="suggestion.reply" class="wa-suggestion">
+                          <span class="truncate" :title="suggestion.reply">{{ suggestion.name || (suggestion.kind === 'clarify' ? 'Aclarar presentación' : 'Consultar precio') }}</span>
+                          <button type="button" :disabled="!canSend" :title="suggestion.reply"
+                            @click="draftOrderMessage(message.conversationId, suggestion.reply!)">{{ suggestion.kind === 'clarify' ? 'Preparar pregunta' : 'Preparar respuesta' }}</button>
+                        </div>
+                      </template>
                     </div>
                   </div>
-                  <div v-if="!message.hiddenSource && productSuggestions.get(message.id)?.length" class="wa-suggestions" aria-label="Sugerencias de productos">
-                    <template v-for="suggestion in productSuggestions.get(message.id)" :key="suggestion.kind === 'choices' ? 'choices-' + suggestion.choiceIndex : suggestion.productId ?? suggestion.reply">
-                      <div v-if="suggestion.kind === 'add'" class="wa-suggestion">
-                        <span class="flex min-w-0 items-center gap-1" :title="suggestion.name ?? undefined">
-                          <ViewfinderCircleIcon class="size-3.5 shrink-0 text-emerald-700" aria-hidden="true" />
-                          <span class="truncate font-semibold">{{ suggestion.name }}<template v-if="suggestion.unitPrice != null"> · ${{ suggestion.unitPrice.toLocaleString('es-CO') }}</template></span>
-                        </span>
-                        <button type="button"
-                          :disabled="isSuggestionApplied(message.id, suggestion) || !suggestion.available || !currentSuggestionState?.canApply || suggestionBranch !== visibleSuggestionBranch"
-                          @click="addProductSuggestion(message.id, suggestion)">
-                          {{ isSuggestionApplied(message.id, suggestion) ? 'Agregado' : !suggestionBranch ? 'Elige la sucursal' : suggestion.available ? 'Agregar ' + suggestion.quantity : 'Sin disponibilidad' }}
-                        </button>
-                      </div>
-                      <div v-else-if="suggestion.kind === 'choices'" class="wa-suggestion">
-                        <span class="flex min-w-0 items-center gap-1" :title="suggestion.name ?? undefined">
-                          <ViewfinderCircleIcon class="size-3.5 shrink-0 text-emerald-700" aria-hidden="true" />
-                          <span class="truncate font-semibold">{{ suggestion.quantity > 1 ? suggestion.quantity + ' × ' : '' }}{{ suggestion.name }}</span>
-                        </span>
-                        <button type="button"
-                          :disabled="!canSend || sending || sendingProductChoices || !suggestion.available || !currentSuggestionState?.canApply || suggestionBranch !== visibleSuggestionBranch"
-                          @click="sendSuggestedProductChoices(message.id, suggestion)">
-                          {{ !suggestionBranch ? 'Elige la sucursal' : suggestion.available ? 'Enviar opciones' : 'Sin disponibilidad' }}
-                        </button>
-                      </div>
-                      <div v-else-if="suggestion.reply" class="wa-suggestion">
-                        <span class="truncate" :title="suggestion.reply">{{ suggestion.name || (suggestion.kind === 'clarify' ? 'Aclarar presentación' : 'Consultar precio') }}</span>
-                        <button type="button" :disabled="!canSend" :title="suggestion.reply"
-                          @click="draftOrderMessage(message.conversationId, suggestion.reply!)">{{ suggestion.kind === 'clarify' ? 'Preparar pregunta' : 'Preparar respuesta' }}</button>
-                      </div>
-                    </template>
-                  </div>
                 </div>
+                </template>
+                <div ref="messagesEnd" />
               </div>
-              </template>
-              <div ref="messagesEnd" />
             </div>
             <BaseButton v-if="newMessageCount" class="mx-auto mb-2" size="sm" variant="outline" @click="showRecentMessages">Nuevos mensajes · {{ newMessageCount }}</BaseButton>
 
@@ -482,7 +484,7 @@
               <BaseButton type="button" size="sm" variant="primary" :icon="ArrowUturnRightIcon" :disabled="!forwardSelection.size || forwarding"
                 @click="showForwardDialog = true">Elegir chat</BaseButton>
             </div>
-            <form v-else class="wa-composer border-t border-gray-200 bg-white p-3" @submit.prevent="sendMessage"
+            <form v-else class="wa-composer border-t border-gray-200 bg-white p-2" @submit.prevent="sendMessage"
               @dragover="onFileDragOver" @dragleave="onFileDragLeave" @drop="onFileDrop">
               <div v-if="draggingFiles" class="wa-drop-overlay" aria-hidden="true">
                 <PaperClipIcon class="size-5" /> Suelta los archivos para adjuntarlos
@@ -490,9 +492,11 @@
               <p v-if="!ownsConversation && !canTakeAttention" class="mb-2 rounded-lg bg-gray-100 p-2 text-sm text-gray-600">
                 {{ selectedConversation.attentionMode === 'closed' ? 'Conversación atendida.' : 'Puedes consultar esta conversación.' }}
               </p>
-              <p v-if="ownsConversation && !serviceWindowOpen" class="mb-2 rounded bg-amber-50 p-2 text-sm text-amber-900">La ventana de atención de 24 horas está cerrada. Usa una plantilla aprobada para iniciar el contacto.</p>
-              <p v-else-if="ownsConversation" class="mb-2 text-xs text-gray-500">Ventana de atención hasta {{ new Date(selectedConversation.customerServiceWindowExpiresAt!).toLocaleString('es-CO') }}</p>
-              <WhatsAppConversationTemplates v-if="ownsConversation" :key="selectedConversation.id" :conversation-id="selectedConversation.id" />
+              <div v-if="ownsConversation" class="wa-compose-meta mb-1.5 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 text-xs">
+                <p v-if="serviceWindowOpen">Ventana de atención hasta {{ new Date(selectedConversation.customerServiceWindowExpiresAt!).toLocaleString('es-CO') }}</p>
+                <p v-else class="rounded bg-amber-50 px-2 py-1 text-amber-900">La ventana de atención de 24 horas está cerrada. Usa una plantilla aprobada para iniciar el contacto.</p>
+                <WhatsAppConversationTemplates :key="selectedConversation.id" :conversation-id="selectedConversation.id" />
+              </div>
               <button type="button" class="wa-quick-toggle" :aria-expanded="compactQuickReplies" aria-controls="wa-quick-list"
                 @click="compactQuickReplies = !compactQuickReplies">
                 <BoltIcon class="size-3.5" aria-hidden="true" />Rápidas<ChevronDownIcon class="size-3" aria-hidden="true" />
@@ -540,33 +544,40 @@
                 </li>
               </ul>
               <div class="wa-compose-row">
-                <WhatsAppComposerPicker :key="selectedConversation.id" :theme="whatsappTheme"
-                  :can-type="canSend" :can-send="canSendSticker" :stickers="savedStickers" :load-failed="stickerLibraryFailed"
-                  @emoji="insertEmoji" @sticker="sendSavedSticker" @remove="removeSavedSticker" />
-                <BaseButton type="button" variant="secondary" :loading="sendingMenu" :disabled="sending || !canSend" @click="sendMenu">
-                  Enviar carta
-                </BaseButton>
-                <input ref="fileInput" type="file" multiple class="hidden" @change="onFileSelected" />
-                <BaseButton type="button" class="wa-compose-attach" variant="secondary" :icon="PaperClipIcon" title="Adjuntar archivos" :disabled="!canAttach" @click="fileInput?.click()">
-                  Archivos
-                </BaseButton>
-                <textarea
-                  ref="messageInput"
-                  v-model="draft"
-                  rows="2"
-                  maxlength="4096"
-                  class="wa-compose-input min-h-[44px] min-w-0 resize-none rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-emerald-500 focus:ring-emerald-500"
-                  :placeholder="canTakeAttention ? 'Doble clic para tomar la conversación' : 'Escribe un mensaje'"
-                  :aria-label="canTakeAttention ? 'Doble clic para tomar la conversación' : 'Escribe un mensaje'"
-                  :class="{ 'cursor-pointer bg-slate-50': canTakeAttention }"
-                  @keydown.enter.exact.prevent="sendMessage"
-                  @keydown.tab="sendUniqueQuickReply"
-                  @dblclick="takeFromComposer"
-                  @paste="onComposerPaste"
-                  :readonly="canTakeAttention"
-                  :disabled="!canSend && !canTakeAttention"
-                />
-                <BaseButton type="submit" class="wa-compose-send" :loading="sending || sendingProductChoices" :disabled="!canSend || preparingQuickReply || (!draft.trim() && !hasAttachments)" :icon="PaperAirplaneIcon">
+                <div class="wa-compose-tools">
+                  <WhatsAppComposerPicker :key="selectedConversation.id" :theme="whatsappTheme" :panel-target="threadArea"
+                    :can-type="canSend" :can-send="canSendSticker" :stickers="savedStickers" :load-failed="stickerLibraryFailed"
+                    @emoji="insertEmoji" @sticker="sendSavedSticker" @remove="removeSavedSticker" />
+                  <button type="button" class="wa-compose-action" aria-label="Enviar carta" title="Enviar carta"
+                    :aria-busy="sendingMenu" :disabled="sendingMenu || sending || !canSend" @click="sendMenu">
+                    <span aria-hidden="true">🍽️</span>
+                  </button>
+                  <input ref="fileInput" type="file" multiple class="hidden" @change="onFileSelected" />
+                  <button type="button" class="wa-compose-action" aria-label="Adjuntar archivos" title="Adjuntar archivos"
+                    :disabled="!canAttach" @click="fileInput?.click()">
+                    <PaperClipIcon class="size-4" aria-hidden="true" />
+                  </button>
+                </div>
+                <div class="wa-compose-editor">
+                  <div class="wa-compose-sizing" aria-hidden="true">{{ draft }}&#8203;</div>
+                  <textarea
+                    ref="messageInput"
+                    v-model="draft"
+                    rows="1"
+                    maxlength="4096"
+                    class="wa-compose-input"
+                    :placeholder="canTakeAttention ? 'Doble clic para tomar la conversación' : 'Escribe un mensaje'"
+                    :aria-label="canTakeAttention ? 'Doble clic para tomar la conversación' : 'Escribe un mensaje'"
+                    :class="{ 'cursor-pointer': canTakeAttention }"
+                    @keydown.enter.exact.prevent="sendMessage"
+                    @keydown.tab="sendUniqueQuickReply"
+                    @dblclick="takeFromComposer"
+                    @paste="onComposerPaste"
+                    :readonly="canTakeAttention"
+                    :disabled="!canSend && !canTakeAttention"
+                  />
+                </div>
+                <BaseButton type="submit" size="sm" class="wa-compose-send" :loading="sending || sendingProductChoices" :disabled="!canSend || preparingQuickReply || (!draft.trim() && !hasAttachments)" :icon="PaperAirplaneIcon">
                   Enviar
                 </BaseButton>
               </div>
@@ -2601,7 +2612,7 @@ async function sendMenu() {
     sendingMenu.value = true
     sendError.value = ''
     await whatsappStore.sendMenu(selectedConversation.value.id)
-    success('Carta enviada', 3000, 'El cliente recibió el acceso a la carta.')
+    success('Carta enviada', 3000, 'La carta se envió como imagen.')
     await scrollToBottom()
   } catch (error: any) {
     sendError.value = error.message || 'No se pudo enviar la carta.'
@@ -2700,6 +2711,7 @@ async function scrollToBottom() {
   await nextTick()
   if (selectedConversation.value?.id === id && messagesContainer.value) messagesContainer.value.scrollTop = messagesContainer.value.scrollHeight
 }
+const threadArea = ref<HTMLElement>()
 const messagesContainer = ref<HTMLElement>()
 const messageResizeObserver = new ResizeObserver(() => {
   const container = messagesContainer.value
@@ -3059,6 +3071,7 @@ watch(() => selectedConversation.value?.id, id => {
   border-radius: 1rem; padding: 0 .1875rem; background: var(--wa-action); color: var(--wa-on-action);
   font-size: .625rem; font-weight: 700; font-variant-numeric: tabular-nums;
 }
+.wa-thread-area { position: relative; display: flex; flex: 1; flex-direction: column; min-height: 0; container-type: size; }
 .wa-thread { background: radial-gradient(ellipse at top right, var(--wa-selected), transparent 65%), var(--wa-canvas); }
 .wa-day-divider { display: flex; justify-content: center; padding-block: .25rem; }
 .wa-day-divider time {
@@ -3066,6 +3079,8 @@ watch(() => selectedConversation.value?.id, id => {
   background: var(--wa-raised); color: var(--wa-muted); font-size: .6875rem; font-weight: 600;
 }
 .wa-composer { position: relative; container-type: inline-size; }
+.wa-compose-meta { color: var(--wa-muted); }
+.wa-compose-meta :deep(.wa-template-trigger) { margin-inline-start: auto; }
 .wa-shared-contact {
   display: flex; align-items: center; gap: .5rem; width: 100%; max-width: 19rem; min-width: 9rem;
   padding: .375rem .4375rem; border: 1px solid var(--wa-line); border-radius: .625rem;
@@ -3080,12 +3095,45 @@ watch(() => selectedConversation.value?.id, id => {
 .wa-thread .wa-message-row.wa-forward-row { position: relative; padding-inline-start: 2.5rem; border-radius: .5rem; }
 .wa-forward-selected { background: var(--wa-selected); }
 .wa-forward-checkbox { position: absolute; inset-inline-start: .375rem; top: .5rem; width: 1rem; height: 1rem; accent-color: var(--wa-focus); }
-.wa-compose-row { display: grid; grid-template-columns: auto auto auto minmax(0, 1fr) auto; align-items: end; gap: .5rem; }
-@container (max-width: 25rem) {
-  .wa-compose-row { grid-template-columns: auto auto 1fr auto; }
-  .wa-compose-attach { justify-self: start; }
-  .wa-compose-input { grid-column: 1 / -2; grid-row: 2; }
-  .wa-compose-send { grid-column: -2; grid-row: 2; }
+.wa-compose-row {
+  display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: end; gap: .375rem;
+  border: 1px solid var(--wa-input-line); border-radius: .75rem; padding: .25rem;
+  background: var(--wa-canvas); color: var(--wa-text);
+}
+.wa-compose-row:focus-within { border-color: var(--wa-focus); box-shadow: 0 0 0 1px var(--wa-focus); }
+.wa-compose-tools { display: flex; align-items: center; gap: .125rem; }
+.wa-compose-action {
+  display: grid; width: 2rem; height: 2rem; place-items: center; border-radius: .375rem;
+  color: var(--wa-muted); font-size: 1rem; line-height: 1;
+  transition: background-color 120ms, color 120ms;
+}
+.wa-compose-action:hover:not(:disabled) { background: var(--wa-selected); color: var(--wa-focus); }
+.wa-compose-action:focus-visible { outline: 2px solid var(--wa-focus); outline-offset: 1px; }
+.wa-compose-action:disabled { opacity: .55; cursor: not-allowed; }
+.wa-compose-editor { display: grid; min-width: 0; }
+.wa-compose-input, .wa-compose-sizing {
+  grid-area: 1 / 1; min-width: 0; width: 100%; min-height: 2rem;
+  max-height: clamp(2rem, 28dvh, 9rem); padding: .375rem .25rem;
+  font-size: .875rem; line-height: 1.25rem; overflow-wrap: anywhere;
+}
+.wa-compose-sizing { visibility: hidden; white-space: pre-wrap; overflow: hidden; }
+.wa-compose-input {
+  field-sizing: content; resize: none; outline: none; background: transparent;
+  color: inherit; overflow-y: auto; overscroll-behavior: contain;
+}
+.wa-compose-input::placeholder { color: var(--wa-muted); }
+.wa-compose-send { min-height: 2rem; }
+@supports (field-sizing: content) {
+  .wa-compose-sizing { display: none; }
+}
+@container (max-width: 22.5rem) {
+  .wa-compose-row { grid-template-columns: minmax(0, 1fr) auto; row-gap: .125rem; }
+  .wa-compose-editor { grid-column: 1 / -1; grid-row: 1; }
+  .wa-compose-tools { grid-row: 2; }
+  .wa-compose-send { grid-column: 2; grid-row: 2; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .wa-compose-action { transition: none; }
 }
 .wa-drop-overlay {
   position: absolute; z-index: 2; inset: .25rem; display: flex; align-items: center; justify-content: center;

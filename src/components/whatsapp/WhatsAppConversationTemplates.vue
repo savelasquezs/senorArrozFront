@@ -1,5 +1,5 @@
 <template>
-  <button type="button" class="mb-2 text-sm font-semibold text-emerald-700 underline" @click="load">Plantillas aprobadas de esta línea</button>
+  <button type="button" class="wa-template-trigger text-xs font-semibold text-emerald-700 underline" @click="load">Plantillas aprobadas de esta línea</button>
   <BaseDialog v-model="open" title="Enviar plantilla" size="md">
     <p class="mb-3 text-sm text-gray-600">Se enviará desde el mismo número de esta conversación.</p>
     <p v-if="loading" class="text-sm">Consultando plantillas en Meta…</p>
