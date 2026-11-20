@@ -317,13 +317,21 @@ export interface WhatsAppProductChoiceGroup {
 }
 
 export interface WhatsAppProductSuggestion {
-  kind: 'add' | 'reply' | 'clarify'
+  kind: 'add' | 'reply' | 'clarify' | 'choices'
   productId: number | null
   name: string | null
   quantity: number
   unitPrice: number | null
   available: boolean
   reply: string | null
+  choiceGroupId?: number | null
+  choiceIndex?: number | null
+}
+
+export interface WhatsAppProductChoiceSource {
+  messageId: number
+  choiceIndex: number
+  productId: number
 }
 
 export interface WhatsAppProductSuggestions {
@@ -462,6 +470,7 @@ export interface WhatsAppCommercialDraft {
 }
 export interface WhatsAppDraftWrite {
   sessionId: number; expectedVersion: number; attentionVersion: number
+  productChoiceSource?: WhatsAppProductChoiceSource
   order?: import('./order').CreateOrderDto
   editor?: import('./order').DraftOrder
   commercialStatus?: string

@@ -10,7 +10,8 @@ export function useWhatsAppProductSuggestions(
 ) {
   const result = shallowRef<WhatsAppProductSuggestions | null>(null)
   const recent = computed(() => messages.value
-    .filter(message => message.direction === 'inbound' && message.type === 'text' && !message.isHistorical && message.textBody?.trim())
+    .filter(message => message.direction === 'inbound' && message.type === 'text' && !message.isHistorical
+      && !message.hiddenSource && !message.draftProductApplied && message.textBody?.trim())
     .slice(-10))
   const signature = computed(() => JSON.stringify(recent.value.map(message => [message.id, message.textBody])))
   const byMessage = computed(() => new Map(result.value?.messages.map(row => [row.messageId, row.suggestions])))

@@ -425,8 +425,8 @@ function saveDraftNotes(notes: string) {
 const prepareAtLocal = ref<LocalHour | null>(null)
 const reservedForLocal = ref<LocalHour | null>(null)
 // reservation: fecha común y horas de preparación/entrega
-const prepareAtDateLocal = ref<Date | null>(null)
-const reservedForDateLocal = ref<Date | null>(null)
+const prepareAtDateLocal = computed(() => currentOrder.value?.prepareAt ? new Date(currentOrder.value.prepareAt) : null)
+const reservedForDateLocal = computed(() => currentOrder.value?.reservedFor ? new Date(currentOrder.value.reservedFor) : null)
 
 const showDuplicateOrderConfirmDialog = ref(false)
 const pendingDuplicateConfirmOrder = ref<DraftOrder | null>(null)
@@ -730,8 +730,6 @@ function clearSchedule() {
 
 function updateReservationSchedule(schedule: { prepareAt: Date | null; reservedFor: Date | null }) {
     if (!currentTabId.value) return
-    prepareAtDateLocal.value = schedule.prepareAt
-    reservedForDateLocal.value = schedule.reservedFor
     ordersStore.updatePrepareAt(schedule.prepareAt)
     ordersStore.updateReservedFor(schedule.reservedFor)
 }
@@ -970,14 +968,7 @@ const handleSubmitOrder = async () => {
 
     const tabToClose = currentTabId.value
     if (scheduleError.value) { showError('Horarios', scheduleError.value); return }
-    if (currentOrder.value.type === 'reservation') {
-        if (reservedForDateLocal.value) {
-            currentOrder.value.reservedFor = reservedForDateLocal.value
-        }
-        if (prepareAtDateLocal.value) {
-            currentOrder.value.prepareAt = prepareAtDateLocal.value
-        }
-    } else if (currentOrder.value.isLater) {
+    if (currentOrder.value.type !== 'reservation' && currentOrder.value.isLater) {
         currentOrder.value.prepareAt = DateTimeService.localHourToDate(prepareAtLocal.value!)
         currentOrder.value.reservedFor = DateTimeService.localHourToDate(reservedForLocal.value!)
     }
@@ -1050,17 +1041,9 @@ watch(
         if (!order) {
             prepareAtLocal.value = null
             reservedForLocal.value = null
-            prepareAtDateLocal.value = null
-            reservedForDateLocal.value = null
             return
         }
         if (order.type === 'reservation') {
-            prepareAtDateLocal.value = order.prepareAt
-                ? (order.prepareAt instanceof Date ? order.prepareAt : new Date(order.prepareAt))
-                : null
-            reservedForDateLocal.value = order.reservedFor
-                ? (order.reservedFor instanceof Date ? order.reservedFor : new Date(order.reservedFor))
-                : null
             prepareAtLocal.value = null
             reservedForLocal.value = null
         } else {
@@ -1076,8 +1059,6 @@ watch(
             } else {
                 reservedForLocal.value = null
             }
-            prepareAtDateLocal.value = null
-            reservedForDateLocal.value = null
         }
     },
     { immediate: true }

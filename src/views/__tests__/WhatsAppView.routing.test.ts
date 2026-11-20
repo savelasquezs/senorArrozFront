@@ -744,23 +744,32 @@ describe('M38-F04 view + real Pinia store integration', () => {
       { ...inbound, id: 91, textBody: '¿Cuánto cuesta el paisa dúo?' },
       { ...inbound, id: 92, isHistorical: true, textBody: 'ropa vieja' },
       { ...inbound, id: 93, direction: 'outbound', textBody: 'paisa dúo' },
+      { ...inbound, id: 94, textBody: 'ropa vieja para tres' },
+      { ...inbound, id: 95, textBody: 'Producto elegido: Arroz ropa vieja Trío', draftProductApplied: true },
     ], nextCursor: null, hasMore: false }))
     const add = { kind: 'add', productId: 5, name: 'Ropa vieja Súper', quantity: 2, unitPrice: 66000, available: true, reply: null }
     m.api.getProductSuggestions.mockResolvedValue(reply({ branchId: 1, messages: [
       { messageId: 90, suggestions: [add] },
       { messageId: 91, suggestions: [{ kind: 'reply', productId: 8, reply: 'Paisa Dúo cuesta $ 31.000.' }] },
+      { messageId: 94, suggestions: [{ kind: 'choices', productId: 40, choiceGroupId: 4, choiceIndex: 0,
+        name: 'Ropa Vieja · Trío', quantity: 1, available: true }] },
     ] }))
+    m.sendProductChoices.mockResolvedValueOnce([])
     const { wrapper, vm } = mountView()
     await flushPromises()
     await vm.selectConversation({ ...m.rows[0], customerServiceWindowExpiresAt: '2099-01-01T00:00:00Z' })
     await flushPromises()
-    expect(m.api.getProductSuggestions).toHaveBeenCalledWith(1, [90, 91], expect.anything())
+    expect(m.api.getProductSuggestions).toHaveBeenCalledWith(1, [90, 91, 94], expect.anything())
     const addButton = wrapper.get('[data-message-id="90"] [aria-label="Sugerencias de productos"] button')
     expect(addButton.text()).toBe('Agregar 2')
     expect(wrapper.get('[data-message-id="90"] [aria-label="Sugerencias de productos"]').text()).toContain('Ropa vieja Súper')
     await addButton.trigger('click')
     expect(m.applyProductSuggestion).toHaveBeenCalledExactlyOnceWith(90, add)
     await wrapper.get('[data-message-id="91"] [aria-label="Sugerencias de productos"] button').trigger('click')
+    const choices = wrapper.get('[data-message-id="94"] [aria-label="Sugerencias de productos"] button')
+    expect(choices.text()).toBe('Enviar opciones')
+    await choices.trigger('click')
+    expect(m.sendProductChoices).toHaveBeenCalledExactlyOnceWith(4, { messageId: 94, choiceIndex: 0, productId: 40 })
     expect(wrapper.get<HTMLTextAreaElement>('textarea[placeholder="Escribe un mensaje"]').element.value)
       .toBe('Paisa Dúo cuesta $ 31.000.')
     expect(m.api.sendMessage).not.toHaveBeenCalled()
