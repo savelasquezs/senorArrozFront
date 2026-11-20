@@ -319,20 +319,31 @@
               <div
                 :data-message-id="message.id"
                 class="wa-message-row flex"
-                :class="message.direction === 'outbound' ? 'justify-end' : 'justify-start'"
+                :class="[message.direction === 'outbound' ? 'justify-end' : 'justify-start', { 'wa-forward-row': selectingForward, 'wa-forward-selected': forwardSelection.has(message.id) }]"
               >
+                <input v-if="selectingForward && canForwardMessage(message)" type="checkbox" class="wa-forward-checkbox"
+                  :aria-label="`Seleccionar mensaje: ${shortConversationPreview(messageSummary(message))}`"
+                  :checked="forwardSelection.has(message.id)" :disabled="forwarding" @change="toggleForwardMessage(message)" />
                 <div class="wa-message-stack" :class="{ 'wa-outbound': message.direction === 'outbound' }">
                   <BaseTooltip v-if="!message.hiddenSource && message.direction === 'inbound' && message.aiProcessing"
                     class="wa-ai-message-marker" :data-tone="aiProcessingTone(message.aiProcessing)" :icon="CpuChipIcon" compact
                     :label="message.aiProcessing.title || aiValueLabel(message.aiProcessing.status)"
                     :text="aiMessageTooltip(message.aiProcessing)" />
                   <div class="wa-bubble" :class="{ 'wa-bubble-tail': endsMessageGroup(message, messageIndex) }">
-                    <WhatsAppMessageActions v-if="!message.hiddenSource"
+                    <WhatsAppMessageActions v-if="!message.hiddenSource && !selectingForward"
                       :hide-unavailable-reason="messageOwnershipRestriction"
                       :send-unavailable-reason="messageActionRestriction(message)" :open="reactionPickerId === message.id"
+                      :sticker-action="message.type === 'sticker' && message.direction === 'inbound' && message.mediaUrl
+                        ? savedStickerKeys.has(whatsappStickerKey(message)) ? 'remove' : 'save' : undefined"
+                      :sticker-busy="!!savingSticker"
+                      :can-forward="canForwardMessage(message)"
                       :outbound="message.direction === 'outbound'" :busy="messageActionId === message.id" :current-reaction="message.businessReaction"
                       @reply="startMessageReply(message)" @toggle="reactionPickerId = reactionPickerId === message.id ? null : message.id"
-                      @react="emoji => reactToMessage(message, emoji)" @hide="hideMessage(message)" />
+                      @react="emoji => reactToMessage(message, emoji)" @hide="hideMessage(message)" @sticker="toggleSavedSticker(message)"
+                      @forward="startForwardSelection(message)" />
+                    <div v-if="message.isForwarded && !message.hiddenSource" class="mb-1 flex items-center gap-1 text-xs opacity-75">
+                      <ArrowUturnRightIcon class="size-3" aria-hidden="true" /> Reenviado
+                    </div>
                     <template v-if="!message.hiddenSource">
                       <button v-if="message.replyToWhatsAppMessageId" type="button"
                         class="wa-message-quote mb-1 block w-full rounded-md border-l-2 px-2 py-1 text-left text-xs"
@@ -350,15 +361,15 @@
                         </span>
                       </a>
                       <div v-else-if="message.contacts?.length" class="space-y-1.5">
-                        <div v-for="(contact, index) in message.contacts" :key="index"
-                          class="flex max-w-xs items-start gap-2.5 rounded-xl border border-current/15 bg-black/5 p-2.5">
-                          <UserCircleIcon class="h-8 w-8 shrink-0 opacity-80" aria-hidden="true" />
-                          <div class="min-w-0">
-                            <p class="break-words text-sm font-semibold">{{ contact.name }}</p>
-                            <a v-for="phone in contact.phones" :key="phone" :href="`tel:${phone.replace(/[^+\d]/g, '')}`"
-                              class="block break-all text-xs underline">{{ phone }}</a>
-                          </div>
-                        </div>
+                        <button v-for="(contact, index) in message.contacts" :key="index" type="button" class="wa-shared-contact"
+                          :aria-label="`Ver contacto ${contact.name}`" @click="contactPreview = { messageId: message.id, index }">
+                          <UserCircleIcon class="size-7 shrink-0 opacity-80" aria-hidden="true" />
+                          <span class="min-w-0 text-left">
+                            <span class="block break-words text-sm font-semibold">{{ contact.name }}</span>
+                            <span class="block text-xs opacity-80">{{ contact.phones[0] || 'Ver contacto' }}</span>
+                          </span>
+                          <ChevronRightIcon class="ml-auto size-4 shrink-0 opacity-70" aria-hidden="true" />
+                        </button>
                       </div>
                       <div v-if="message.mediaUrl" class="mb-2">
                         <button
@@ -369,9 +380,10 @@
                           @click="openImagePreview(message)"
                         >
                           <img
-                            loading="lazy" decoding="async" width="256" height="192"
+                            loading="lazy" decoding="async" :width="message.type === 'sticker' ? 104 : 256"
+                            :height="message.type === 'sticker' ? 104 : 192"
                             :src="message.mediaUrl"
-                            :alt="message.mediaFileName || 'Imagen de WhatsApp'"
+                            :alt="message.type === 'sticker' ? 'Sticker de WhatsApp' : message.mediaFileName || 'Imagen de WhatsApp'"
                             class="max-h-80 max-w-full cursor-zoom-in object-contain"
                           />
                         </button>
@@ -405,7 +417,8 @@
                     </template>
                     <p class="wa-message-copy">
                       <span v-if="message.hiddenSource" class="italic opacity-80">{{ message.hiddenSource === 'pos' ? 'Mensaje oculto en el POS' : 'Mensaje eliminado desde WhatsApp Business' }}</span>
-                      <span v-else-if="message.textBody && !message.location && !message.contacts?.length" class="whitespace-pre-wrap">{{ message.textBody }}</span>
+                      <span v-else-if="message.textBody && !message.location && !message.contacts?.length && !(message.type === 'sticker' && message.mediaUrl)"
+                        class="whitespace-pre-wrap">{{ message.textBody }}</span>
                       <span v-else-if="message.type !== 'text' && !message.mediaUrl && !message.location && !message.contacts?.length" class="opacity-80">{{ mediaFallbackLabel(message) }}</span>
                       <span class="wa-message-meta">
                         <span v-if="message.source === 'businessApp'">Celular ·</span><span v-if="message.isHistorical">Historial ·</span>
@@ -463,7 +476,13 @@
             </div>
             <BaseButton v-if="newMessageCount" class="mx-auto mb-2" size="sm" variant="outline" @click="showRecentMessages">Nuevos mensajes · {{ newMessageCount }}</BaseButton>
 
-            <form class="wa-composer border-t border-gray-200 bg-white p-3" @submit.prevent="sendMessage"
+            <div v-if="selectingForward" class="wa-forward-toolbar">
+              <BaseButton type="button" variant="ghost" size="sm" :disabled="forwarding" @click="resetForwardSelection">Cancelar</BaseButton>
+              <span aria-live="polite">{{ forwardSelection.size === 1 ? '1 mensaje seleccionado' : `${forwardSelection.size} mensajes seleccionados` }}</span>
+              <BaseButton type="button" size="sm" variant="primary" :icon="ArrowUturnRightIcon" :disabled="!forwardSelection.size || forwarding"
+                @click="showForwardDialog = true">Elegir chat</BaseButton>
+            </div>
+            <form v-else class="wa-composer border-t border-gray-200 bg-white p-3" @submit.prevent="sendMessage"
               @dragover="onFileDragOver" @dragleave="onFileDragLeave" @drop="onFileDrop">
               <div v-if="draggingFiles" class="wa-drop-overlay" aria-hidden="true">
                 <PaperClipIcon class="size-5" /> Suelta los archivos para adjuntarlos
@@ -520,12 +539,15 @@
                   </button>
                 </li>
               </ul>
-              <div class="flex items-end gap-2">
+              <div class="wa-compose-row">
+                <WhatsAppComposerPicker :key="selectedConversation.id" :theme="whatsappTheme"
+                  :can-type="canSend" :can-send="canSendSticker" :stickers="savedStickers" :load-failed="stickerLibraryFailed"
+                  @emoji="insertEmoji" @sticker="sendSavedSticker" @remove="removeSavedSticker" />
                 <BaseButton type="button" variant="secondary" :loading="sendingMenu" :disabled="sending || !canSend" @click="sendMenu">
                   Enviar carta
                 </BaseButton>
                 <input ref="fileInput" type="file" multiple class="hidden" @change="onFileSelected" />
-                <BaseButton type="button" variant="secondary" :icon="PaperClipIcon" title="Adjuntar archivos" :disabled="!canAttach" @click="fileInput?.click()">
+                <BaseButton type="button" class="wa-compose-attach" variant="secondary" :icon="PaperClipIcon" title="Adjuntar archivos" :disabled="!canAttach" @click="fileInput?.click()">
                   Archivos
                 </BaseButton>
                 <textarea
@@ -533,7 +555,7 @@
                   v-model="draft"
                   rows="2"
                   maxlength="4096"
-                  class="min-h-[44px] flex-1 resize-none rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-emerald-500 focus:ring-emerald-500"
+                  class="wa-compose-input min-h-[44px] min-w-0 resize-none rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-emerald-500 focus:ring-emerald-500"
                   :placeholder="canTakeAttention ? 'Doble clic para tomar la conversación' : 'Escribe un mensaje'"
                   :aria-label="canTakeAttention ? 'Doble clic para tomar la conversación' : 'Escribe un mensaje'"
                   :class="{ 'cursor-pointer bg-slate-50': canTakeAttention }"
@@ -544,7 +566,7 @@
                   :readonly="canTakeAttention"
                   :disabled="!canSend && !canTakeAttention"
                 />
-                <BaseButton type="submit" :loading="sending || sendingProductChoices" :disabled="!canSend || preparingQuickReply || (!draft.trim() && !hasAttachments)" :icon="PaperAirplaneIcon">
+                <BaseButton type="submit" class="wa-compose-send" :loading="sending || sendingProductChoices" :disabled="!canSend || preparingQuickReply || (!draft.trim() && !hasAttachments)" :icon="PaperAirplaneIcon">
                   Enviar
                 </BaseButton>
               </div>
@@ -814,13 +836,33 @@
         <img v-if="imagePreview" :src="imagePreview.url" :alt="imagePreview.label" referrerpolicy="no-referrer"
           class="mx-auto max-h-[72vh] max-w-full rounded-lg object-contain" />
       </BaseDialog>
+      <BaseDialog :model-value="!!previewedContact" :title="previewedContact?.name" size="sm" :icon="UserCircleIcon"
+        @update:model-value="visible => !visible && (contactPreview = null)">
+        <dl v-if="contactDetails.length" class="divide-y divide-gray-200">
+          <div v-for="detail in contactDetails" :key="detail.label" class="py-2.5 first:pt-0 last:pb-0">
+            <dt class="text-xs font-semibold text-gray-600">{{ detail.label }}</dt>
+            <dd class="mt-0.5 space-y-1 text-sm text-gray-900">
+              <div v-for="value in detail.values" :key="value" class="break-words">
+                <a v-if="detail.label === 'Teléfono' && contactPhoneLink(value)" :href="contactPhoneLink(value)"
+                  class="font-medium text-emerald-700 underline underline-offset-2">{{ value }}</a>
+                <span v-else>{{ value }}</span>
+              </div>
+            </dd>
+          </div>
+        </dl>
+        <p v-else-if="previewedContact" class="text-sm text-gray-600">La tarjeta solo contiene el nombre.</p>
+      </BaseDialog>
+      <WhatsAppForwardDialog v-if="showForwardDialog && selectedConversation" v-model="showForwardDialog"
+        :source-id="selectedConversation.id" :user-id="authStore.user?.id" :count="forwardSelection.size" :sending="forwarding"
+        :error="forwardError" @forward="forwardSelectedMessages" />
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { useResizableColumns } from '@/composables/useResizableColumns'
-import { commercialGroup, commercialLabel, fixedInboxLabelStyles, inboxLabelColor, inboxLabelPalette } from '@/utils/whatsappInbox'
+import { commercialGroup, commercialLabel, conversationTitle, fixedInboxLabelStyles, inboxLabelColor, inboxLabelPalette } from '@/utils/whatsappInbox'
+import { generatePosCreationKey } from '@/utils/posCreationKey'
 
 import WhatsAppOrderPanel from '@/components/whatsapp/WhatsAppOrderPanel.vue'
 import WhatsAppMessageActions from '@/components/whatsapp/WhatsAppMessageActions.vue'
@@ -830,7 +872,9 @@ import type { WhatsAppCommercialDraft } from '@/types/whatsapp'
 import { computed, defineAsyncComponent, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
+  ChevronRightIcon,
   ArrowUturnLeftIcon,
+  ArrowUturnRightIcon,
   BoltIcon,
   ChatBubbleLeftRightIcon,
   ChatBubbleOvalLeftEllipsisIcon,
@@ -871,10 +915,13 @@ import WhatsAppInboxTabs from '@/components/whatsapp/WhatsAppInboxTabs.vue'
 import WhatsAppInboxLabelList from '@/components/whatsapp/WhatsAppInboxLabelList.vue'
 import WhatsAppConversationTemplates from '@/components/whatsapp/WhatsAppConversationTemplates.vue'
 import WhatsAppClosedDayReplies from '@/components/whatsapp/WhatsAppClosedDayReplies.vue'
+import WhatsAppComposerPicker from '@/components/whatsapp/WhatsAppComposerPicker.vue'
+import WhatsAppForwardDialog from '@/components/whatsapp/WhatsAppForwardDialog.vue'
 import { useWhatsAppStore } from '@/store/whatsapp'
 import { useAuthStore } from '@/store/auth'
 import { useBranchContextStore } from '@/store/branchContext'
 import { useWhatsAppComposer } from '@/composables/useWhatsAppComposer'
+import { useWhatsAppSavedStickers, whatsappStickerKey, type WhatsAppSavedSticker } from '@/composables/useWhatsAppSavedStickers'
 import { useWhatsAppProductSuggestions } from '@/composables/useWhatsAppProductSuggestions'
 import { useDebouncedCallback } from '@/composables/useDebouncedCallback'
 import { formatMessageTime as formatTime } from '@/composables/useFormatting'
@@ -991,6 +1038,8 @@ const loadedSearch = ref('')
 const unreadOnly = ref(false)
 const { draft, attachments, addFiles, removeAttachment, clearSent, resetComposer } =
   useWhatsAppComposer(computed(() => selectedConversation.value?.id ?? null))
+const { stickers: savedStickers, savedKeys: savedStickerKeys, saving: savingSticker, loadFailed: stickerLibraryFailed,
+  save: saveSticker, remove: removeSticker } = useWhatsAppSavedStickers(computed(() => authStore.user?.id))
 const hasAttachments = computed(() => attachments.value.length > 0)
 const draggingFiles = ref(false)
 const messageInput = ref<HTMLTextAreaElement | null>(null)
@@ -1052,6 +1101,13 @@ const quickReplyForm = ref({
 const sendError = ref('')
 const messagesEnd = ref<HTMLElement | null>(null)
 const imagePreview = ref<{ url: string; label: string } | null>(null)
+const contactPreview = ref<{ messageId: number; index: number } | null>(null)
+const selectingForward = ref(false)
+const forwardSelection = ref(new Map<number, number>())
+const showForwardDialog = ref(false)
+const forwarding = ref(false)
+const forwardError = ref('')
+const forwardRequests = new Map<string, string>()
 const showAiDiagnosticsDialog = ref(false)
 let searchTimeout: number | undefined
 let aiDiagnosticsPollingId: number | undefined
@@ -1087,6 +1143,29 @@ const inboxTools = computed(() => [
 const currentMessages = computed<WhatsAppMessage[]>(() =>
   selectedConversation.value ? (whatsappStore.messages[selectedConversation.value.id] ?? []) : []
 )
+const previewedContact = computed(() => {
+  const selection = contactPreview.value
+  if (!selection) return null
+  const message = currentMessages.value.find(item => item.id === selection.messageId && !item.hiddenSource)
+  return message?.contacts?.[selection.index] ?? null
+})
+const contactDetails = computed(() => {
+  const contact = previewedContact.value
+  if (!contact) return []
+  return [
+    { label: 'Teléfono', values: contact.phones },
+    { label: 'Correo', values: contact.emails ?? [] },
+    { label: 'Empresa', values: contact.organization ? [contact.organization] : [] },
+    { label: 'Dirección', values: contact.addresses ?? [] },
+    { label: 'Sitio web', values: contact.websites ?? [] },
+    { label: 'Cumpleaños', values: contact.birthday ? [contact.birthday] : [] },
+    { label: 'Identificador de WhatsApp', values: contact.whatsAppIds ?? [] },
+  ].filter(detail => detail.values.length)
+})
+
+function contactPhoneLink(value: string) {
+  return /^\+?[\d(). -]+$/.test(value) && /\d/.test(value) ? `tel:${value.replace(/[^+\d]/g, '')}` : undefined
+}
 const messageDates = computed(() => currentMessages.value.map(message => {
   const timestamp = parseUtcDate(message.timestamp)
   return Number.isFinite(timestamp.getTime()) ? calendar.formatYmd(timestamp) : undefined
@@ -1231,6 +1310,7 @@ const ownsConversation = computed(() => selectedConversation.value?.attentionMod
 const serviceWindowOpen = computed(() => !!selectedConversation.value?.customerServiceWindowExpiresAt && Date.parse(selectedConversation.value.customerServiceWindowExpiresAt) > clockNow.value)
 const canSend = computed(() => ownsConversation.value && serviceWindowOpen.value && !finishingAttention.value)
 const canAttach = computed(() => canSend.value && !sending.value)
+const canSendSticker = computed(() => canAttach.value && !sendingMenu.value && !sendingProductChoices.value && !preparingQuickReply.value)
 const messageOwnershipRestriction = computed(() => {
   if (!ownsConversation.value) return 'Toma la conversación para gestionar el mensaje.'
   return finishingAttention.value ? 'La atención se está cerrando.' : undefined
@@ -2289,6 +2369,67 @@ function messageSummary(message?: WhatsAppMessage | null) {
     || message.mediaFileName || mediaFallbackLabel(message)
 }
 
+function canForwardMessage(message: WhatsAppMessage) {
+  if (message.hiddenSource || message.status === 'failed') return false
+  if (message.type === 'contacts') return !!message.contacts?.length
+  if (message.type === 'location') return !!message.location
+  return message.type === 'text' ? !!message.textBody?.trim() : !!message.mediaUrl
+}
+
+function toggleForwardMessage(message: WhatsAppMessage) {
+  if (forwarding.value || !canForwardMessage(message)) return
+  if (forwardSelection.value.has(message.id)) forwardSelection.value.delete(message.id)
+  else forwardSelection.value.set(message.id, parseUtcDate(message.timestamp).getTime())
+}
+
+function startForwardSelection(message: WhatsAppMessage) {
+  if (!canForwardMessage(message)) return
+  selectingForward.value = true
+  toggleForwardMessage(message)
+}
+
+function resetForwardSelection() {
+  showForwardDialog.value = selectingForward.value = false
+  forwardSelection.value.clear()
+  forwardRequests.clear()
+  forwardError.value = ''
+}
+
+async function forwardSelectedMessages(destinationId: number) {
+  const sourceId = selectedConversation.value?.id
+  if (!sourceId || destinationId === sourceId || forwarding.value || !forwardSelection.value.size) return
+  const items = [...forwardSelection.value].sort(([leftId, leftTime], [rightId, rightTime]) => leftTime - rightTime || leftId - rightId)
+  const session = sessionKey.value
+  const current = () => viewActive && sessionKey.value === session && selectedConversation.value?.id === sourceId
+  let sent = 0
+  let key = ''
+  forwarding.value = true
+  forwardError.value = ''
+  try {
+    for (const [messageId] of items) {
+      if (!current()) return
+      key = `${destinationId}:${messageId}`
+      const requestId = forwardRequests.get(key) ?? generatePosCreationKey()
+      forwardRequests.set(key, requestId)
+      await whatsappApi.forwardMessage(destinationId, sourceId, messageId, requestId)
+      if (!current()) return
+      forwardRequests.delete(key)
+      forwardSelection.value.delete(messageId)
+      sent++
+    }
+    resetForwardSelection()
+    success(sent === 1 ? 'Mensaje reenviado' : `${sent} mensajes reenviados`, 2500)
+  } catch (cause) {
+    if (!current()) return
+    const status = cause instanceof Error && 'status' in cause ? Number(cause.status) : 0
+    if ([400, 403, 404, 422].includes(status)) forwardRequests.delete(key)
+    const reason = cause instanceof Error ? cause.message : 'No se pudo reenviar el mensaje.'
+    forwardError.value = sent ? `Se reenviaron ${sent} de ${items.length}. ${reason}` : reason
+  } finally {
+    forwarding.value = false
+  }
+}
+
 function mapLink(location: NonNullable<WhatsAppMessage['location']>) {
   return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${location.latitude},${location.longitude}`)}`
 }
@@ -2330,6 +2471,61 @@ async function hideMessage(message: WhatsAppMessage) {
   } catch (cause) {
     showError('Ocultar mensaje', cause instanceof Error ? cause.message : 'No se pudo ocultar el mensaje.')
   } finally { messageActionId.value = null }
+}
+
+async function insertEmoji(emoji: string) {
+  const input = messageInput.value
+  if (!input || !canSend.value) return
+  const { selectionStart, selectionEnd, maxLength } = input
+  const next = draft.value.slice(0, selectionStart) + emoji + draft.value.slice(selectionEnd)
+  if (next.length > maxLength) return
+
+  draft.value = next
+  await nextTick()
+  if (input !== messageInput.value) return
+  const cursor = selectionStart + emoji.length
+  input.focus()
+  input.setSelectionRange(cursor, cursor)
+}
+
+async function toggleSavedSticker(message: WhatsAppMessage) {
+  if (message.type !== 'sticker' || message.direction !== 'inbound' || !message.mediaUrl || message.hiddenSource) return
+  const key = whatsappStickerKey(message)
+  if (savedStickerKeys.value.has(key)) return removeSavedSticker(key)
+  try {
+    if (await saveSticker(message)) success('Sticker guardado', 2200)
+  } catch {
+    showError('Stickers', 'No se pudo guardar este sticker.')
+  }
+}
+
+async function removeSavedSticker(key: string) {
+  try {
+    await removeSticker(key)
+  } catch {
+    showError('Stickers', 'No se pudo quitar el sticker.')
+  }
+}
+
+async function sendSavedSticker(sticker: WhatsAppSavedSticker) {
+  const conversation = selectedConversation.value
+  if (!conversation || !canSendSticker.value || sticker.userId !== authStore.user?.id) return
+  const session = sessionKey.value
+  const target = replyTarget.value
+  const replyId = target?.conversationId === conversation.id ? target.id : undefined
+  const current = () => viewActive && sessionKey.value === session && selectedConversation.value?.id === conversation.id
+  sending.value = true
+  sendError.value = ''
+  try {
+    await whatsappStore.sendMediaMessage(conversation.id, new File([sticker.blob], 'sticker.webp', { type: 'image/webp' }), undefined, replyId, true)
+    if (!current()) return
+    if (replyTarget.value === target) replyTarget.value = null
+    await scrollToBottom()
+  } catch (cause) {
+    if (current()) sendError.value = cause instanceof Error ? cause.message : 'No se pudo enviar el sticker.'
+  } finally {
+    sending.value = false
+  }
 }
 
 async function sendMessage() {
@@ -2542,10 +2738,6 @@ async function loadOlderMessages() {
   } catch (error: any) {
     if (selectedConversation.value?.id === id) showError('Mensajes', error.message || 'No se pudo cargar el historial.')
   }
-}
-
-function conversationTitle(conversation: WhatsAppConversation) {
-  return conversation.contactName || conversation.customerName || conversation.whatsAppUsername || conversation.phoneNumber || 'Usuario de WhatsApp'
 }
 
 function formatPhone(phone?: string | null) {
@@ -2783,6 +2975,8 @@ const loadSelectedAdvisors = useDebouncedCallback(async () => {
 }, 200)
 watch(() => selectedConversation.value?.id, id => {
   replyTarget.value = null
+  contactPreview.value = null
+  resetForwardSelection()
   sendError.value = ''
   draggingFiles.value = false
   reactionPickerId.value = null
@@ -2871,7 +3065,28 @@ watch(() => selectedConversation.value?.id, id => {
   padding: .1875rem .5625rem; border: 1px solid var(--wa-line); border-radius: .5rem;
   background: var(--wa-raised); color: var(--wa-muted); font-size: .6875rem; font-weight: 600;
 }
-.wa-composer { position: relative; }
+.wa-composer { position: relative; container-type: inline-size; }
+.wa-shared-contact {
+  display: flex; align-items: center; gap: .5rem; width: 100%; max-width: 19rem; min-width: 9rem;
+  padding: .375rem .4375rem; border: 1px solid var(--wa-line); border-radius: .625rem;
+  background: var(--wa-panel); color: var(--wa-text); transition: background-color 120ms;
+}
+.wa-shared-contact:hover { background: var(--wa-raised); }
+.wa-shared-contact:focus-visible { outline: 2px solid var(--wa-focus); }
+.wa-forward-toolbar {
+  display: flex; align-items: center; justify-content: space-between; gap: .5rem; padding: .375rem .625rem;
+  border-top: 1px solid var(--wa-line); background: var(--wa-panel); color: var(--wa-text); font-size: .75rem;
+}
+.wa-thread .wa-forward-row { position: relative; padding-inline-start: 2.5rem; border-radius: .5rem; }
+.wa-forward-selected { background: var(--wa-selected); }
+.wa-forward-checkbox { position: absolute; inset-inline-start: .375rem; top: .5rem; width: 1rem; height: 1rem; accent-color: var(--wa-focus); }
+.wa-compose-row { display: grid; grid-template-columns: auto auto auto minmax(0, 1fr) auto; align-items: end; gap: .5rem; }
+@container (max-width: 25rem) {
+  .wa-compose-row { grid-template-columns: auto auto 1fr auto; }
+  .wa-compose-attach { justify-self: start; }
+  .wa-compose-input { grid-column: 1 / -2; grid-row: 2; }
+  .wa-compose-send { grid-column: -2; grid-row: 2; }
+}
 .wa-drop-overlay {
   position: absolute; z-index: 2; inset: .25rem; display: flex; align-items: center; justify-content: center;
   gap: .5rem; border: 2px dashed var(--wa-focus); border-radius: .5rem; pointer-events: none;

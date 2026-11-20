@@ -2,7 +2,7 @@ import { defineStore } from 'pinia'
 import { computed, ref, watch } from 'vue'
 import { useAuthStore } from '@/store/auth'
 import { whatsappApi } from '@/services/MainAPI/whatsappApi'
-import { compareWhatsAppConversationActivity } from '@/utils/whatsappInbox'
+import { compareWhatsAppConversationActivity, mediaPreviewLabel } from '@/utils/whatsappInbox'
 import type {
   WhatsAppConversation,
   WhatsAppConversationFilters,
@@ -454,8 +454,9 @@ export const useWhatsAppStore = defineStore('whatsapp', () => {
     return message
   }
 
-  async function sendMediaMessage(conversationId: number, file: File, caption?: string, replyToMessageId?: number) {
-    const res = replyToMessageId ? await whatsappApi.sendMediaMessage(conversationId, file, caption, replyToMessageId)
+  async function sendMediaMessage(conversationId: number, file: File, caption?: string, replyToMessageId?: number, asSticker = false) {
+    const res = asSticker ? await whatsappApi.sendMediaMessage(conversationId, file, undefined, replyToMessageId, true)
+      : replyToMessageId ? await whatsappApi.sendMediaMessage(conversationId, file, caption, replyToMessageId)
       : await whatsappApi.sendMediaMessage(conversationId, file, caption)
     const message = res.data
     if (message) {
@@ -516,20 +517,6 @@ export const useWhatsAppStore = defineStore('whatsapp', () => {
   async function deleteQuickReply(id: number) {
     await whatsappApi.deleteQuickReply(id)
     quickReplies.value = quickReplies.value.filter(x => x.id !== id)
-  }
-
-  function mediaPreviewLabel(type: WhatsAppMessage['type']) {
-    const labels: Record<WhatsAppMessage['type'], string> = {
-      text: '',
-      image: 'Imagen',
-      audio: 'Audio',
-      video: 'Video',
-      document: 'Documento',
-      sticker: 'Sticker',
-      location: 'Ubicación compartida',
-      contacts: 'Contacto compartido',
-    }
-    return labels[type] || 'Archivo'
   }
 
   function upsertMessage(conversationId: number, message: WhatsAppMessage) {

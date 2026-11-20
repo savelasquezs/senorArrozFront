@@ -16,6 +16,15 @@
         :tabindex="canSend ? 0 : -1" @click="canSend && !busy && emit('toggle')">
         <FaceSmileIcon class="h-4 w-4" aria-hidden="true" />
       </button>
+      <button v-if="stickerAction" type="button" class="message-action"
+        :title="stickerLabel" :aria-label="stickerLabel" :aria-pressed="stickerAction === 'remove'"
+        :disabled="stickerBusy" @click="emit('sticker')">
+        <component :is="stickerAction === 'remove' ? FilledStarIcon : StarIcon" class="size-3.5" aria-hidden="true" />
+      </button>
+      <button v-if="canForward" type="button" class="message-action" title="Reenviar mensaje" aria-label="Reenviar mensaje"
+        :disabled="busy" @click="emit('forward')">
+        <ArrowUturnRightIcon class="size-3.5" aria-hidden="true" />
+      </button>
       <button type="button" class="message-action hover:text-red-700" :title="hideUnavailableReason || 'Ocultar en el POS'" aria-label="Ocultar en el POS"
         :aria-description="hideUnavailableReason" :aria-disabled="!!hideUnavailableReason || busy" :tabindex="hideUnavailableReason ? -1 : 0"
         @click="!hideUnavailableReason && !busy && emit('hide')">
@@ -38,13 +47,16 @@
 
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import { ArrowUturnLeftIcon, EllipsisHorizontalIcon, FaceSmileIcon, TrashIcon } from '@heroicons/vue/24/outline'
+import { ArrowUturnLeftIcon, ArrowUturnRightIcon, EllipsisHorizontalIcon, FaceSmileIcon, StarIcon, TrashIcon } from '@heroicons/vue/24/outline'
+import { StarIcon as FilledStarIcon } from '@heroicons/vue/24/solid'
 
 const props = defineProps<{
   sendUnavailableReason?: string; hideUnavailableReason?: string; open: boolean; outbound: boolean; busy: boolean; currentReaction?: string | null
+  stickerAction?: 'save' | 'remove'; stickerBusy?: boolean; canForward?: boolean
 }>()
 const canSend = computed(() => !props.sendUnavailableReason)
-const emit = defineEmits<{ reply: []; toggle: []; hide: []; react: [emoji: string] }>()
+const stickerLabel = computed(() => props.stickerAction === 'remove' ? 'Quitar sticker de guardados' : 'Guardar sticker')
+const emit = defineEmits<{ reply: []; toggle: []; hide: []; react: [emoji: string]; sticker: []; forward: [] }>()
 const tools = ref<HTMLElement>()
 const touchTrigger = ref<HTMLButtonElement>()
 const reactionTrigger = ref<HTMLButtonElement>()
@@ -106,6 +118,8 @@ const choices = [
   border-radius: .375rem;
 }
 .message-action:hover { background: var(--wa-raised); }
+.message-action[aria-pressed="true"] { color: var(--wa-warning); }
+.message-action:disabled { opacity: .55; cursor: wait; }
 .message-action:focus-visible { outline: 2px solid var(--wa-focus); }
 .message-action[aria-disabled="true"] { opacity: .55; cursor: not-allowed; }
 .message-action svg { transition: transform 130ms ease; }
