@@ -15,7 +15,7 @@ const m = vi.hoisted(() => ({
   api: { getStatus: vi.fn(), getConversations: vi.fn(), getConversation: vi.fn(), getUnreadSummary: vi.fn(), getOperationalBranches: vi.fn(),
     getInboxLabels: vi.fn(), getInboxSummary: vi.fn(), setInboxLabel: vi.fn(),
     getQuickReplies: vi.fn(), createQuickReply: vi.fn(), updateQuickReply: vi.fn(), getMessagesPage: vi.fn(), getOrderDraft: vi.fn(), updateOperationalBranch: vi.fn(), linkConversationCustomer: vi.fn(),
-    sendMessage: vi.fn(), sendQuickReply: vi.fn(), previewQuickReply: vi.fn(), changeAttention: vi.fn(), getAttention: vi.fn(),
+    sendMessage: vi.fn(), sendMediaMessage: vi.fn(), sendQuickReply: vi.fn(), previewQuickReply: vi.fn(), changeAttention: vi.fn(), getAttention: vi.fn(),
     reactToMessage: vi.fn(), hideMessage: vi.fn(),
     getCommercialProductGroups: vi.fn(), getProductSuggestions: vi.fn() },
   customer: { getCustomerById: vi.fn(), getCustomerAddresses: vi.fn() },
@@ -112,6 +112,15 @@ function inputEvent(value = '2') {
   return { input, event: { target: input } as unknown as Event }
 }
 
+function pasteFiles(input: HTMLTextAreaElement, files: File[]) {
+  const event = new Event('paste', { bubbles: true, cancelable: true })
+  Object.defineProperty(event, 'clipboardData', { value: {
+    files: [], items: files.map(file => ({ kind: 'file', getAsFile: () => file })),
+  } })
+  input.dispatchEvent(event)
+  return event
+}
+
 describe('M38-F04 view + real Pinia store integration', () => {
   beforeEach(() => {
     vi.clearAllMocks()
@@ -144,6 +153,80 @@ describe('M38-F04 view + real Pinia store integration', () => {
     for (const wrapper of wrappers.splice(0)) wrapper.unmount()
     localStorage.removeItem('whatsapp:theme:7')
     disposePinia(pinia); vi.clearAllTimers(); vi.useRealTimers()
+  })
+
+  it('queues multiple selected, pasted and dropped files, with independent removal', async () => {
+    const { vm, wrapper } = mountView()
+    await flushPromises()
+    await vm.selectConversation({ ...m.rows[0]!, customerServiceWindowExpiresAt: '2099-01-01T00:00:00Z' })
+    const picker = wrapper.get<HTMLInputElement>('input[type="file"]')
+    const composer = wrapper.get<HTMLTextAreaElement>('textarea[placeholder="Escribe un mensaje"]')
+    expect(picker.element.multiple).toBe(true)
+    Object.defineProperty(picker.element, 'files', { value: [new File(['1'], 'uno.jpg'), new File(['2'], 'dos.jpg')] })
+    await picker.trigger('change')
+    await composer.setValue('Mi texto')
+    const paste = pasteFiles(composer.element, [new File(['3'], 'captura.png'), new File(['4'], 'segunda.png')])
+    expect(paste.defaultPrevented).toBe(true)
+    const form = wrapper.get('form.wa-composer')
+    const dataTransfer = { types: ['Files'], files: [new File(['5'], 'factura.pdf'), new File(['6'], 'cuenta.pdf')] }
+    await form.trigger('dragover', { dataTransfer })
+    expect(form.text()).toContain('Suelta los archivos')
+    await form.trigger('drop', { dataTransfer })
+    expect(form.text()).not.toContain('Suelta los archivos')
+    const list = wrapper.get('[aria-label="Archivos adjuntos"]')
+    expect(list.findAll('li')).toHaveLength(6)
+    await list.get('button[aria-label="Quitar dos.jpg"]').trigger('click')
+    expect(list.findAll('li')).toHaveLength(5)
+    expect(composer.element.value).toBe('Mi texto')
+  })
+
+  it('retries the remaining attachments in order without resending a delivered caption or file', async () => {
+    const { vm, wrapper } = mountView()
+    await flushPromises()
+    await vm.selectConversation({ ...m.rows[0]!, customerServiceWindowExpiresAt: '2099-01-01T00:00:00Z' })
+    const composer = wrapper.get<HTMLTextAreaElement>('textarea[placeholder="Escribe un mensaje"]')
+    const files = ['foto.png', 'recibo.pdf', 'carta.pdf'].map(name => new File(['body'], name))
+    await composer.setValue('Envío de prueba')
+    pasteFiles(composer.element, files)
+    await nextTick()
+    m.api.sendMediaMessage.mockResolvedValueOnce(reply(null)).mockRejectedValueOnce(new Error('Archivo temporalmente rechazado.'))
+    const form = wrapper.get('form.wa-composer')
+    await form.trigger('submit')
+    await flushPromises()
+    expect(m.api.sendMediaMessage.mock.calls).toEqual([[1, files[0], 'Envío de prueba'], [1, files[1], undefined]])
+    expect(wrapper.get('[role="alert"]').text()).toContain('recibo.pdf')
+    expect(wrapper.get('[aria-label="Archivos adjuntos"]').text()).not.toContain('foto.png')
+    expect(composer.element.value).toBe('')
+    m.api.sendMediaMessage.mockResolvedValue(reply(null))
+    await form.trigger('submit')
+    await flushPromises()
+    expect(m.api.sendMediaMessage.mock.calls.slice(2)).toEqual([[1, files[1], ''], [1, files[2], undefined]])
+    expect(wrapper.find('[aria-label="Archivos adjuntos"]').exists()).toBe(false)
+    expect(m.api.sendMessage).not.toHaveBeenCalled()
+  })
+
+  it('uses Colombia calendar days and keeps a single divider when loading older messages of the same day', async () => {
+    vi.useRealTimers()
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-11-20T05:03:00Z'))
+    const inbound = { conversationId: 1, direction: 'inbound', type: 'text', textBody: 'Prueba', status: 'received' }
+    m.api.getMessagesPage.mockResolvedValueOnce(reply({ items: [
+      { ...inbound, id: 92, timestamp: '2026-11-20T04:59:00' },
+      { ...inbound, id: 93, timestamp: '2026-11-20T05:00:00Z' },
+      { ...inbound, id: 94, timestamp: '2026-11-20T05:01:00Z' },
+    ], nextCursor: 'old', hasMore: true })).mockResolvedValueOnce(reply({ items: [
+      { ...inbound, id: 90, timestamp: '2026-11-18T21:00:00Z' },
+      { ...inbound, id: 91, timestamp: '2026-11-19T15:00:00Z' },
+    ], nextCursor: null, hasMore: false }))
+    const { vm, wrapper } = mountView()
+    await flushPromises()
+    await vm.selectConversation(m.rows[0]!)
+    await flushPromises()
+    const days = () => wrapper.findAll('.wa-day-divider time').map(time => time.text())
+    expect(days()).toEqual(['Ayer', 'Hoy'])
+    await wrapper.findAll('button').find(button => button.text() === 'Cargar mensajes anteriores')!.trigger('click')
+    await flushPromises()
+    expect(days()).toEqual(['18 de noviembre de 2026', 'Ayer', 'Hoy'])
   })
 
   it('persists the WhatsApp theme per cashier without replacing an open chat or losing its text', async () => {
