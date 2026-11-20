@@ -312,9 +312,11 @@
                 :disabled="whatsappStore.olderMessagesLoading[selectedConversation.id]" @click="loadOlderMessages">
                 {{ whatsappStore.olderMessagesLoading[selectedConversation.id] ? 'Cargando…' : 'Cargar mensajes anteriores' }}
               </button>
+              <template v-for="(message, messageIndex) in currentMessages" :key="message.id">
+                <div v-if="messageDates[messageIndex] && messageDates[messageIndex] !== messageDates[messageIndex - 1]" class="wa-day-divider">
+                  <time :datetime="messageDates[messageIndex]">{{ messageDateLabel(messageDates[messageIndex]!, message.timestamp) }}</time>
+                </div>
               <div
-                v-for="(message, messageIndex) in currentMessages"
-                :key="message.id"
                 :data-message-id="message.id"
                 class="wa-message-row flex"
                 :class="message.direction === 'outbound' ? 'justify-end' : 'justify-start'"
@@ -324,7 +326,7 @@
                     class="wa-ai-message-marker" :data-tone="aiProcessingTone(message.aiProcessing)" :icon="CpuChipIcon" compact
                     :label="message.aiProcessing.title || aiValueLabel(message.aiProcessing.status)"
                     :text="aiMessageTooltip(message.aiProcessing)" />
-                  <div class="wa-bubble" :class="{ 'wa-bubble-tail': endsMessageGroup(message, currentMessages[messageIndex + 1]) }">
+                  <div class="wa-bubble" :class="{ 'wa-bubble-tail': endsMessageGroup(message, messageIndex) }">
                     <WhatsAppMessageActions v-if="!message.hiddenSource"
                       :hide-unavailable-reason="messageOwnershipRestriction"
                       :send-unavailable-reason="messageActionRestriction(message)" :open="reactionPickerId === message.id"
@@ -456,11 +458,16 @@
                   </div>
                 </div>
               </div>
+              </template>
               <div ref="messagesEnd" />
             </div>
             <BaseButton v-if="newMessageCount" class="mx-auto mb-2" size="sm" variant="outline" @click="showRecentMessages">Nuevos mensajes · {{ newMessageCount }}</BaseButton>
 
-            <form class="border-t border-gray-200 bg-white p-3" @submit.prevent="sendMessage">
+            <form class="wa-composer border-t border-gray-200 bg-white p-3" @submit.prevent="sendMessage"
+              @dragover="onFileDragOver" @dragleave="onFileDragLeave" @drop="onFileDrop">
+              <div v-if="draggingFiles" class="wa-drop-overlay" aria-hidden="true">
+                <PaperClipIcon class="size-5" /> Suelta los archivos para adjuntarlos
+              </div>
               <p v-if="!ownsConversation && !canTakeAttention" class="mb-2 rounded-lg bg-gray-100 p-2 text-sm text-gray-600">
                 {{ selectedConversation.attentionMode === 'closed' ? 'Conversación atendida.' : 'Puedes consultar esta conversación.' }}
               </p>
@@ -502,22 +509,24 @@
                 <button type="button" class="grid size-7 shrink-0 place-items-center rounded-md hover:bg-emerald-100"
                   aria-label="Quitar cita" title="Quitar cita" @click="replyTarget = null"><XMarkIcon class="h-4 w-4" aria-hidden="true" /></button>
               </div>
-              <div v-if="selectedFile" class="mb-2 flex items-center justify-between gap-3 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-900">
-                <div class="min-w-0">
-                  <p class="truncate font-medium">{{ selectedFile.name }}</p>
-                  <p class="text-xs text-emerald-700">{{ selectedFile.type || 'Archivo' }} · {{ formatFileSize(selectedFile.size) }}</p>
-                </div>
-                <button type="button" class="rounded-full p-1 hover:bg-emerald-100" title="Quitar archivo" @click="clearSelectedFile">
-                  <XMarkIcon class="h-4 w-4" />
-                </button>
-              </div>
+              <ul v-if="hasAttachments" aria-label="Archivos adjuntos" class="wa-attachments">
+                <li v-for="{ id, file } in attachments" :key="id" class="wa-attachment">
+                  <PaperClipIcon class="size-3.5 shrink-0" aria-hidden="true" />
+                  <span class="truncate font-medium" :title="file.name">{{ file.name }}</span>
+                  <span class="wa-attachment-size shrink-0">{{ formatFileSize(file.size) }}</span>
+                  <button type="button" class="wa-attachment-remove" :aria-label="`Quitar ${file.name}`" :disabled="sending"
+                    @click="removeAttachment(id)">
+                    <XMarkIcon class="size-3.5" aria-hidden="true" />
+                  </button>
+                </li>
+              </ul>
               <div class="flex items-end gap-2">
                 <BaseButton type="button" variant="secondary" :loading="sendingMenu" :disabled="sending || !canSend" @click="sendMenu">
                   Enviar carta
                 </BaseButton>
-                <input ref="fileInput" type="file" class="hidden" @change="onFileSelected" />
-                <BaseButton type="button" variant="secondary" :icon="PaperClipIcon" title="Adjuntar archivo" @click="openFilePicker">
-                  Archivo
+                <input ref="fileInput" type="file" multiple class="hidden" @change="onFileSelected" />
+                <BaseButton type="button" variant="secondary" :icon="PaperClipIcon" title="Adjuntar archivos" :disabled="!canAttach" @click="fileInput?.click()">
+                  Archivos
                 </BaseButton>
                 <textarea
                   ref="messageInput"
@@ -531,10 +540,11 @@
                   @keydown.enter.exact.prevent="sendMessage"
                   @keydown.tab="sendUniqueQuickReply"
                   @dblclick="takeFromComposer"
+                  @paste="onComposerPaste"
                   :readonly="canTakeAttention"
                   :disabled="!canSend && !canTakeAttention"
                 />
-                <BaseButton type="submit" :loading="sending || sendingProductChoices" :disabled="!canSend || preparingQuickReply || (!draft.trim() && !selectedFile)" :icon="PaperAirplaneIcon">
+                <BaseButton type="submit" :loading="sending || sendingProductChoices" :disabled="!canSend || preparingQuickReply || (!draft.trim() && !hasAttachments)" :icon="PaperAirplaneIcon">
                   Enviar
                 </BaseButton>
               </div>
@@ -555,7 +565,7 @@
                   <span class="min-w-0 flex-1 truncate text-xs text-gray-600">{{ reply.preview }}</span>
                 </button>
               </div>
-              <p v-if="sendError" class="mt-2 text-sm text-red-600">{{ sendError }}</p>
+              <p v-if="sendError" role="alert" class="mt-2 text-sm text-red-600">{{ sendError }}</p>
             </form>
           </template>
         </section>
@@ -876,6 +886,7 @@ import { useWhatsAppTheme } from '@/composables/useWhatsAppTheme'
 import { useSignalR } from '@/composables/useSignalR'
 import { useNetworkActivityManager } from '@/composables/useNetworkActivityManager'
 import { createWhatsAppRoutingRefresh } from '@/utils/whatsappRoutingRefresh'
+import { defaultBusinessCalendar as calendar } from '@/utils/datetime'
 import type { RefreshContext } from '@/utils/serialRefresh'
 import { WHATSAPP_SIGNALR_HUB_URL } from '@/config/signalr'
 import type {
@@ -978,7 +989,10 @@ const search = ref('')
 const searchTerm = computed(() => search.value.trim())
 const loadedSearch = ref('')
 const unreadOnly = ref(false)
-const { draft, selectedFile, clearSent } = useWhatsAppComposer(computed(() => selectedConversation.value?.id ?? null))
+const { draft, attachments, addFiles, removeAttachment, clearSent, resetComposer } =
+  useWhatsAppComposer(computed(() => selectedConversation.value?.id ?? null))
+const hasAttachments = computed(() => attachments.value.length > 0)
+const draggingFiles = ref(false)
 const messageInput = ref<HTMLTextAreaElement | null>(null)
 const fileInput = ref<HTMLInputElement | null>(null)
 const sending = ref(false)
@@ -1016,7 +1030,7 @@ let productChoicesRequest: { controller: AbortController; promise: Promise<void>
 const editingQuickReply = ref<WhatsAppQuickReply | null>(null)
 const quickReplySaving = ref(false)
 const quickReplyError = ref('')
-type QuickReplyContext = { conversationId: number; session: string; text: string; file: File | null }
+type QuickReplyContext = { conversationId: number; session: string; text: string; attachments: typeof attachments.value }
 const quickReplyChoice = shallowRef<{ replyId: number; context: QuickReplyContext; presentations: WhatsAppQuickReplyPresentation[] }>()
 const preparingQuickReply = ref(false)
 const quickReplyPreviewError = ref('')
@@ -1073,6 +1087,18 @@ const inboxTools = computed(() => [
 const currentMessages = computed<WhatsAppMessage[]>(() =>
   selectedConversation.value ? (whatsappStore.messages[selectedConversation.value.id] ?? []) : []
 )
+const messageDates = computed(() => currentMessages.value.map(message => {
+  const timestamp = parseUtcDate(message.timestamp)
+  return Number.isFinite(timestamp.getTime()) ? calendar.formatYmd(timestamp) : undefined
+}))
+const todayInChat = computed(() => calendar.todayYmd(clockNow.value))
+const yesterdayInChat = computed(() => calendar.formatYmd(calendar.addZonedDays(clockNow.value, -1)))
+
+function messageDateLabel(date: string, timestamp: string) {
+  if (date === todayInChat.value) return 'Hoy'
+  if (date === yesterdayInChat.value) return 'Ayer'
+  return calendar.formatDateLong(parseUtcDate(timestamp))
+}
 const panelSuggestionState = shallowRef<WhatsAppProductSuggestionState | null>(null)
 const currentSuggestionState = computed(() => panelSuggestionState.value?.conversationId === selectedConversation.value?.id
   ? panelSuggestionState.value : null)
@@ -1204,6 +1230,7 @@ const signalRDotClass = computed(() => connectionState.value === 'connected'
 const ownsConversation = computed(() => selectedConversation.value?.attentionMode === 'human' && selectedConversation.value.assignedUserId === authStore.user?.id)
 const serviceWindowOpen = computed(() => !!selectedConversation.value?.customerServiceWindowExpiresAt && Date.parse(selectedConversation.value.customerServiceWindowExpiresAt) > clockNow.value)
 const canSend = computed(() => ownsConversation.value && serviceWindowOpen.value && !finishingAttention.value)
+const canAttach = computed(() => canSend.value && !sending.value)
 const messageOwnershipRestriction = computed(() => {
   if (!ownsConversation.value) return 'Toma la conversación para gestionar el mensaje.'
   return finishingAttention.value ? 'La atención se está cerrando.' : undefined
@@ -1587,7 +1614,7 @@ const topQuickReplies = computed(() => activeQuickRepliesForConversation.value.s
 
 const filteredQuickReplies = computed(() => {
   const value = draft.value.trim()
-  if (replyTarget.value || !value.startsWith('/') || /\s/.test(value) || selectedFile.value) return []
+  if (replyTarget.value || !value.startsWith('/') || /\s/.test(value) || hasAttachments.value) return []
   const query = normalizeQuickReplyShortcut(value)
   const matches = [
     ...catalogQuickReplies.value.map(group => ({
@@ -1637,11 +1664,12 @@ function selectAdditionalLabel(key: string, event: MouseEvent) {
   selectedLabel.value = selectedLabel.value === key ? '' : key
 }
 
-function endsMessageGroup(message: WhatsAppMessage, next?: WhatsAppMessage) {
+function endsMessageGroup(message: WhatsAppMessage, index: number) {
   if (message.hiddenSource) return false
+  const next = currentMessages.value[index + 1]
   return !next || !!next.hiddenSource || next.direction !== message.direction
     || next.sentByUserId !== message.sentByUserId || next.source !== message.source
-    || parseUtcDate(next.timestamp).toDateString() !== parseUtcDate(message.timestamp).toDateString()
+    || messageDates.value[index] !== messageDates.value[index + 1]
 }
 
 async function loadInboxLabels() {
@@ -1987,7 +2015,7 @@ function runSavedQuickReply(reply: WhatsAppQuickReply) {
   if (!canSend.value || sending.value || sendingProductChoices.value || preparingQuickReply.value || !selectedConversation.value) return
   if (quickReplyMode(reply) === 'send') return sendQuickReply(reply)
   return prepareQuickReply(reply.id, {
-    conversationId: selectedConversation.value.id, session: sessionKey.value, text: draft.value, file: selectedFile.value,
+    conversationId: selectedConversation.value.id, session: sessionKey.value, text: draft.value, attachments: attachments.value,
   })
 }
 
@@ -2011,7 +2039,7 @@ function confirmQuickReplyChoice() {
 async function prepareQuickReply(replyId: number, context: QuickReplyContext, presentation?: WhatsAppQuickReplyPresentation) {
   const revision = ++quickReplyPreviewRevision
   const current = () => viewActive && revision === quickReplyPreviewRevision && selectedConversation.value?.id === context.conversationId
-    && sessionKey.value === context.session && canSend.value && draft.value === context.text && selectedFile.value === context.file
+    && sessionKey.value === context.session && canSend.value && draft.value === context.text && attachments.value === context.attachments
   if (!current()) { clearQuickReplyPreview(); return }
   preparingQuickReply.value = true
   quickReplyPreviewError.value = ''
@@ -2050,9 +2078,11 @@ async function sendQuickReply(reply: WhatsAppQuickReply) {
   try {
     sending.value = true
     sendError.value = ''
-    const conversationId = selectedConversation.value.id, text = draft.value.trim(), file = selectedFile.value
+    const conversationId = selectedConversation.value.id
+    const text = hasAttachments.value ? undefined : draft.value.trim()
+    const session = sessionKey.value
     await whatsappStore.sendQuickReply(conversationId, reply.id)
-    clearSent(conversationId, text, file)
+    if (sessionKey.value === session) clearSent(conversationId, text)
     if (selectedConversation.value?.id === conversationId) await scrollToBottom()
   } catch (error: any) {
     sendError.value = error.message || 'No se pudo enviar la respuesta rápida.'
@@ -2228,8 +2258,8 @@ async function sendProductOptions(groupId: number, group?: WhatsAppProductChoice
   const text = draft.value.trim()
   try {
     const messages = source ? await panel.sendProductChoices(groupId, source) : await panel.sendProductChoices(groupId)
-    if (group && text.startsWith('/') && !/\s/.test(text) && !selectedFile.value
-      && matchesCatalogQuickReply(group, normalizeQuickReplyShortcut(text))) clearSent(conversationId, text, null)
+    if (group && text.startsWith('/') && !/\s/.test(text) && !hasAttachments.value
+      && matchesCatalogQuickReply(group, normalizeQuickReplyShortcut(text))) clearSent(conversationId, text)
     if (selectedConversation.value?.id === conversationId) showProductChoices.value = false
     await choiceMessagesSent(conversationId, messages, 'Opciones de producto enviadas')
   } catch (error) {
@@ -2304,12 +2334,13 @@ async function hideMessage(message: WhatsAppMessage) {
 
 async function sendMessage() {
   if (!canSend.value || sending.value || sendingProductChoices.value || preparingQuickReply.value) return
-  if (!selectedConversation.value || (!draft.value.trim() && !selectedFile.value)) return
+  if (!selectedConversation.value || (!draft.value.trim() && !hasAttachments.value)) return
   const textToSend = draft.value.trim()
-  if (!replyTarget.value && !selectedFile.value && textToSend.startsWith('/') && !/\s/.test(textToSend)) {
+  if (!replyTarget.value && !hasAttachments.value && textToSend.startsWith('/') && !/\s/.test(textToSend)) {
     const conversationId = selectedConversation.value.id
     await productChoicesRequest?.promise.catch(() => {})
     if (selectedConversation.value?.id !== conversationId || draft.value.trim() !== textToSend || !canSend.value) return
+    if (sending.value || sendingProductChoices.value || preparingQuickReply.value || hasAttachments.value || replyTarget.value) return
     const shortcut = normalizeQuickReplyShortcut(textToSend)
     const quickReply = findQuickReplyCommand(textToSend)
     if (quickReply) {
@@ -2327,19 +2358,41 @@ async function sendMessage() {
     }
   }
 
+  const conversationId = selectedConversation.value.id
+  const session = sessionKey.value
+  const target = replyTarget.value
+  const replyId = target?.conversationId === conversationId ? target.id : undefined
+  const batch = attachments.value
+  const isSameSession = () => viewActive && sessionKey.value === session
+  const isSameChat = () => isSameSession() && selectedConversation.value?.id === conversationId
+  function applySent(text?: string, attachmentId?: number) {
+    if (!isSameSession()) return
+    clearSent(conversationId, text, attachmentId)
+    if (text !== undefined && isSameChat() && replyTarget.value === target) replyTarget.value = null
+  }
+
+  sending.value = true
+  sendError.value = ''
+  let sendingFileName: string | undefined
   try {
-    sending.value = true
-    sendError.value = ''
-    const text = draft.value.trim(), conversationId = selectedConversation.value.id, file = selectedFile.value
-    const target = replyTarget.value
-    const replyId = target?.conversationId === conversationId ? target.id : undefined
-    if (file) await whatsappStore.sendMediaMessage(conversationId, file, text, replyId)
-    else await whatsappStore.sendMessage(conversationId, text, replyId)
-    if (replyTarget.value === target) replyTarget.value = null
-    clearSent(conversationId, text, file)
-    await scrollToBottom()
-  } catch (error: any) {
-    sendError.value = error.message || 'No se pudo enviar el mensaje.'
+    if (batch.length) {
+      for (const [index, attachment] of batch.entries()) {
+        if (!isSameSession()) return
+        sendingFileName = attachment.file.name
+        const caption = index === 0 ? textToSend : undefined
+        await whatsappStore.sendMediaMessage(conversationId, attachment.file, caption, index === 0 ? replyId : undefined)
+        applySent(caption, attachment.id)
+      }
+    } else {
+      await whatsappStore.sendMessage(conversationId, textToSend, replyId)
+      applySent(textToSend)
+    }
+    if (isSameChat()) await scrollToBottom()
+  } catch (error) {
+    if (isSameChat()) {
+      const message = error instanceof Error && error.message ? error.message : 'No se pudo completar el envío.'
+      sendError.value = sendingFileName ? `No se pudo enviar «${sendingFileName}». ${message}` : message
+    }
   } finally {
     sending.value = false
   }
@@ -2362,18 +2415,39 @@ async function sendMenu() {
   }
 }
 
-function openFilePicker() {
-  fileInput.value?.click()
-}
-
 function onFileSelected(event: Event) {
   const input = event.target as HTMLInputElement
-  selectedFile.value = input.files?.[0] ?? null
+  if (canAttach.value && input.files) addFiles(Array.from(input.files))
+  input.value = ''
 }
 
-function clearSelectedFile() {
-  selectedFile.value = null
-  if (fileInput.value) fileInput.value.value = ''
+function onComposerPaste(event: ClipboardEvent) {
+  const clipboard = event.clipboardData
+  if (!clipboard) return
+  const files = clipboard.files.length ? Array.from(clipboard.files) : Array.from(clipboard.items)
+    .flatMap(item => item.kind === 'file' ? item.getAsFile() ?? [] : [])
+  if (!files.length) return
+  event.preventDefault()
+  if (canAttach.value) addFiles(files)
+}
+
+function onFileDragOver(event: DragEvent) {
+  if (!event.dataTransfer?.types.includes('Files')) return
+  event.preventDefault()
+  event.dataTransfer.dropEffect = canAttach.value ? 'copy' : 'none'
+  draggingFiles.value = canAttach.value
+}
+
+function onFileDragLeave(event: DragEvent) {
+  const zone = event.currentTarget as HTMLElement
+  if (!(event.relatedTarget instanceof Node) || !zone.contains(event.relatedTarget)) draggingFiles.value = false
+}
+
+function onFileDrop(event: DragEvent) {
+  draggingFiles.value = false
+  if (!event.dataTransfer || !event.dataTransfer.files.length && !event.dataTransfer.types.includes('Files')) return
+  event.preventDefault()
+  if (canAttach.value) addFiles(Array.from(event.dataTransfer.files))
 }
 
 function openImagePreview(message: WhatsAppMessage) {
@@ -2636,8 +2710,7 @@ watch(sessionKey, () => {
   catalogQuickRepliesReady.value = false
   savedQuickRepliesReady.value = false
   selectedConversation.value = null
-  draft.value = ''
-  clearSelectedFile()
+  resetComposer()
   changingOperationalBranch.value = false
   if (viewActive && authStore.user) void retryWhatsAppStatus()
 }, { flush: 'sync' })
@@ -2710,6 +2783,8 @@ const loadSelectedAdvisors = useDebouncedCallback(async () => {
 }, 200)
 watch(() => selectedConversation.value?.id, id => {
   replyTarget.value = null
+  sendError.value = ''
+  draggingFiles.value = false
   reactionPickerId.value = null
   showProductChoices.value = false
   advisors.value = []; transferTarget.value = 0
@@ -2791,6 +2866,33 @@ watch(() => selectedConversation.value?.id, id => {
   font-size: .625rem; font-weight: 700; font-variant-numeric: tabular-nums;
 }
 .wa-thread { background: radial-gradient(ellipse at top right, var(--wa-selected), transparent 65%), var(--wa-canvas); }
+.wa-day-divider { display: flex; justify-content: center; padding-block: .25rem; }
+.wa-day-divider time {
+  padding: .1875rem .5625rem; border: 1px solid var(--wa-line); border-radius: .5rem;
+  background: var(--wa-raised); color: var(--wa-muted); font-size: .6875rem; font-weight: 600;
+}
+.wa-composer { position: relative; }
+.wa-drop-overlay {
+  position: absolute; z-index: 2; inset: .25rem; display: flex; align-items: center; justify-content: center;
+  gap: .5rem; border: 2px dashed var(--wa-focus); border-radius: .5rem; pointer-events: none;
+  background: var(--wa-panel); color: var(--wa-focus); font-size: .8125rem; font-weight: 600;
+}
+.wa-attachments {
+  display: flex; flex-wrap: wrap; gap: .375rem; max-height: 6.5rem;
+  overflow-y: auto; margin-bottom: .5rem; padding: .125rem;
+}
+.wa-attachment {
+  display: flex; align-items: center; gap: .25rem; min-width: 0; max-width: 100%;
+  padding: .125rem .1875rem .125rem .4375rem; border: 1px solid var(--wa-line); border-radius: .4375rem;
+  background: var(--wa-raised); color: var(--wa-text); font-size: .6875rem;
+}
+.wa-attachment-size { color: var(--wa-muted); }
+.wa-attachment-remove {
+  display: grid; place-items: center; flex-shrink: 0; width: 1.5rem; height: 1.5rem;
+  border-radius: .375rem; color: var(--wa-muted);
+}
+.wa-attachment-remove:hover:not(:disabled) { background: var(--wa-selected); color: var(--wa-text); }
+.wa-attachment-remove:disabled { opacity: .5; }
 .wa-message-row:has(.wa-ai-message-marker) { padding-inline-start: .875rem; }
 .wa-message-stack { position: relative; display: grid; min-width: 0; max-width: min(86%, calc(100% - 5.25rem)); gap: .25rem; }
 .wa-ai-message-marker { position: absolute; inset-inline-start: -1.375rem; top: .3125rem; }
