@@ -16,24 +16,31 @@ describe('WhatsApp composer isolation', () => {
     expect(composer.attachments.value.map(item => item.file)).toEqual([file, document])
     id.value = 2; expect(composer.draft.value).toBe('Pedido dos'); scope.stop()
   })
-  it('a late send cannot erase the text or attachment of another conversation', () => {
+  it('detaches the submitted text and files from the next conversation draft', () => {
     const scope = effectScope(), id = ref<number | null>(1)
     const composer = scope.run(() => useWhatsAppComposer(id))!
     composer.draft.value = 'Enviado'
     const first = new File(['first'], 'foto.png'), pending = new File(['pending'], 'recibo.pdf')
-    composer.addFiles([first, pending]); const sent = composer.attachments.value[0]!
+    composer.addFiles([first, pending]); const submitted = composer.takeDraft()
     id.value = 2; composer.draft.value = 'Nuevo'; composer.addFiles([first])
-    composer.clearSent(1, 'Enviado', sent.id)
     expect(composer.draft.value).toBe('Nuevo')
     expect(composer.attachments.value.map(item => item.file)).toEqual([first])
+    expect(submitted.text).toBe('Enviado')
+    expect(submitted.attachments.map(item => item.file)).toEqual([first, pending])
     id.value = 1
     expect(composer.draft.value).toBe('')
-    expect(composer.attachments.value.map(item => item.file)).toEqual([pending]); scope.stop()
+    expect(composer.attachments.value).toEqual([]); scope.stop()
   })
   it('keeps a newer draft typed while a previous send was pending', () => {
     const scope = effectScope(), id = ref<number | null>(1)
     const composer = scope.run(() => useWhatsAppComposer(id))!
-    composer.draft.value = 'Mensaje nuevo'; composer.clearSent(1, 'Mensaje anterior')
-    expect(composer.draft.value).toBe('Mensaje nuevo'); scope.stop()
+    composer.draft.value = 'Mensaje anterior'
+    const submitted = composer.takeDraft()
+    composer.draft.value = 'Mensaje nuevo'
+    expect(composer.restoreDraft(submitted)).toBe(false)
+    expect(composer.draft.value).toBe('Mensaje nuevo')
+    composer.draft.value = ''
+    expect(composer.restoreDraft(submitted)).toBe(true)
+    expect(composer.draft.value).toBe('Mensaje anterior'); scope.stop()
   })
 })

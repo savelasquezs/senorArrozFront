@@ -517,6 +517,19 @@
                   <PlusIcon class="h-4 w-4" aria-hidden="true" />
                 </button>
               </div>
+              <div v-for="failure in currentComposerFailures" :key="failure.id" class="wa-compose-failure">
+                <div class="min-w-0 flex-1">
+                  <p class="font-semibold" role="status">{{ failure.message }}</p>
+                  <p class="truncate" :title="composerFailurePreview(failure)">{{ composerFailurePreview(failure) }}</p>
+                </div>
+                <BaseButton type="button" size="xs" variant="outline" :disabled="!canRecoverComposerDraft"
+                  @click="recoverComposerFailure(failure)">Recuperar borrador</BaseButton>
+                <button type="button" class="grid size-7 shrink-0 place-items-center rounded-md"
+                  aria-label="Descartar borrador recuperable" title="Descartar borrador recuperable"
+                  @click="removeComposerFailure(failure)">
+                  <XMarkIcon class="size-4" aria-hidden="true" />
+                </button>
+              </div>
               <div v-if="replyTarget" class="mb-2 flex items-center gap-2 rounded-lg border-l-[3px] border-emerald-500 bg-emerald-50 px-2.5 py-1.5 text-xs text-emerald-950">
                 <ArrowUturnLeftIcon class="h-4 w-4 shrink-0 text-emerald-700" aria-hidden="true" />
                 <div class="min-w-0 flex-1">
@@ -563,7 +576,7 @@
                     :placeholder="canTakeAttention ? 'Doble clic para tomar la conversación' : 'Escribe un mensaje'"
                     :aria-label="canTakeAttention ? 'Doble clic para tomar la conversación' : 'Escribe un mensaje'"
                     :class="{ 'cursor-pointer': canTakeAttention }"
-                    @keydown.enter.exact.prevent="sendMessage"
+                    @keydown.enter.exact="onComposerEnter"
                     @keydown.tab="sendUniqueQuickReply"
                     @dblclick="takeFromComposer"
                     @paste="onComposerPaste"
@@ -926,7 +939,7 @@ import WhatsAppForwardDialog from '@/components/whatsapp/WhatsAppForwardDialog.v
 import { useWhatsAppStore } from '@/store/whatsapp'
 import { useAuthStore } from '@/store/auth'
 import { useBranchContextStore } from '@/store/branchContext'
-import { useWhatsAppComposer } from '@/composables/useWhatsAppComposer'
+import { useWhatsAppComposer, type WhatsAppComposerDraft } from '@/composables/useWhatsAppComposer'
 import { useWhatsAppSavedStickers, whatsappStickerKey, type WhatsAppSavedSticker } from '@/composables/useWhatsAppSavedStickers'
 import { useWhatsAppProductSuggestions } from '@/composables/useWhatsAppProductSuggestions'
 import { useDebouncedCallback } from '@/composables/useDebouncedCallback'
@@ -1042,7 +1055,7 @@ const search = ref('')
 const searchTerm = computed(() => search.value.trim())
 const loadedSearch = ref('')
 const unreadOnly = ref(false)
-const { draft, attachments, addFiles, removeAttachment, clearSent, resetComposer } =
+const { draft, attachments, addFiles, removeAttachment, takeDraft, restoreDraft, resetComposer } =
   useWhatsAppComposer(computed(() => selectedConversation.value?.id ?? null))
 const { stickers: savedStickers, savedKeys: savedStickerKeys, saving: savingSticker, loadFailed: stickerLibraryFailed,
   save: saveSticker, remove: removeSticker } = useWhatsAppSavedStickers(computed(() => authStore.user?.id))
@@ -1052,6 +1065,11 @@ const messageInput = ref<HTMLTextAreaElement | null>(null)
 const fileInput = ref<HTMLInputElement | null>(null)
 const sending = ref(false)
 const replyTarget = ref<WhatsAppMessage | null>(null)
+type ComposerFailure = { id: number; conversationId: number; draft: WhatsAppComposerDraft; quote: WhatsAppMessage | null; message: string }
+const composerFailures = shallowRef<ComposerFailure[]>([])
+let nextComposerFailureId = 0
+const currentComposerFailures = computed(() => composerFailures.value.filter(failure => failure.conversationId === selectedConversation.value?.id))
+const canRecoverComposerDraft = computed(() => !draft.value && !hasAttachments.value && !replyTarget.value)
 const reactionPickerId = ref<number | null>(null), messageActionId = ref<number | null>(null)
 const sendingMenu = ref(false)
 const changingAttention = ref(false)
@@ -2159,22 +2177,25 @@ async function prepareQuickReply(replyId: number, context: QuickReplyContext, pr
 }
 
 async function sendQuickReply(reply: WhatsAppQuickReply) {
-  if (!canSend.value || sending.value || sendingProductChoices.value) return
-  if (!selectedConversation.value) return
+  const conversationId = selectedConversation.value?.id
+  if (!conversationId || !canSend.value || sending.value || sendingProductChoices.value) return
+  const session = sessionKey.value
+  const submitted = filteredQuickReplies.value.some(match => match.saved?.id === reply.id) ? takeDraft() : null
+  sending.value = true
+  sendError.value = ''
   try {
-    sending.value = true
-    sendError.value = ''
-    const conversationId = selectedConversation.value.id
-    const text = hasAttachments.value ? undefined : draft.value.trim()
-    const session = sessionKey.value
     await whatsappStore.sendQuickReply(conversationId, reply.id)
-    if (sessionKey.value === session) clearSent(conversationId, text)
-    if (selectedConversation.value?.id === conversationId) await scrollToBottom()
-  } catch (error: any) {
-    sendError.value = error.message || 'No se pudo enviar la respuesta rápida.'
+  } catch (error) {
+    if (viewActive && sessionKey.value === session) {
+      const message = error instanceof Error ? error.message : 'No se pudo enviar la respuesta rápida.'
+      if (submitted) preserveComposerFailure(conversationId, submitted, message)
+      else if (selectedConversation.value?.id === conversationId) sendError.value = message
+    }
+    return
   } finally {
     sending.value = false
   }
+  if (viewActive && sessionKey.value === session && selectedConversation.value?.id === conversationId) await scrollToBottom()
 }
 
 function defaultQuickReplyBranchId() {
@@ -2341,22 +2362,27 @@ async function sendProductOptions(groupId: number, group?: WhatsAppProductChoice
   sendingProductChoices.value = true
   productChoicesError.value = ''
   sendError.value = ''
-  const text = draft.value.trim()
+  const session = sessionKey.value
+  const submitted = group && filteredQuickReplies.value.some(match => match.group?.id === group.id) ? takeDraft() : null
+  let messages: WhatsAppMessage[]
   try {
-    const messages = source ? await panel.sendProductChoices(groupId, source) : await panel.sendProductChoices(groupId)
-    if (group && text.startsWith('/') && !/\s/.test(text) && !hasAttachments.value
-      && matchesCatalogQuickReply(group, normalizeQuickReplyShortcut(text))) clearSent(conversationId, text)
-    if (selectedConversation.value?.id === conversationId) showProductChoices.value = false
-    await choiceMessagesSent(conversationId, messages, 'Opciones de producto enviadas')
+    messages = source ? await panel.sendProductChoices(groupId, source) : await panel.sendProductChoices(groupId)
   } catch (error) {
-    if (selectedConversation.value?.id === conversationId) {
+    if (viewActive && sessionKey.value === session) {
       const failure = error instanceof Error ? error.message : 'No se pudieron enviar las presentaciones.'
-      if (showProductChoices.value) productChoicesError.value = failure
-      else sendError.value = failure
+      if (submitted) preserveComposerFailure(conversationId, submitted, failure)
+      if (selectedConversation.value?.id === conversationId) {
+        if (showProductChoices.value) productChoicesError.value = failure
+        else if (!submitted) sendError.value = failure
+      }
     }
+    return
   } finally {
     sendingProductChoices.value = false
   }
+  if (!viewActive || sessionKey.value !== session) return
+  if (selectedConversation.value?.id === conversationId) showProductChoices.value = false
+  await choiceMessagesSent(conversationId, messages, 'Opciones de producto enviadas')
 }
 
 function quotedMessage(message: WhatsAppMessage) {
@@ -2534,6 +2560,40 @@ async function sendSavedSticker(sticker: WhatsAppSavedSticker) {
   }
 }
 
+function onComposerEnter(event: KeyboardEvent) {
+  if (event.isComposing || event.keyCode === 229) return
+  event.preventDefault()
+  if (!event.repeat) void sendMessage()
+}
+
+function composerFailurePreview(failure: ComposerFailure) {
+  return failure.draft.text.trim() || failure.draft.attachments.map(attachment => attachment.file.name).join(', ')
+}
+
+function restoreComposerFailure(failure: ComposerFailure) {
+  if (selectedConversation.value?.id !== failure.conversationId || !canRecoverComposerDraft.value || !restoreDraft(failure.draft)) return false
+  const quote = failure.quote
+  if (quote && !currentMessages.value.some(message => message.id === quote.id && message.hiddenSource)) replyTarget.value = quote
+  return true
+}
+
+function removeComposerFailure(failure: ComposerFailure) {
+  composerFailures.value = composerFailures.value.filter(candidate => candidate.id !== failure.id)
+}
+
+function recoverComposerFailure(failure: ComposerFailure) {
+  if (!restoreComposerFailure(failure)) return
+  sendError.value = failure.message
+  removeComposerFailure(failure)
+  messageInput.value?.focus()
+}
+
+function preserveComposerFailure(conversationId: number, submitted: WhatsAppComposerDraft, message: string, quote: WhatsAppMessage | null = null) {
+  const failure = { id: ++nextComposerFailureId, conversationId, draft: submitted, quote, message }
+  if (restoreComposerFailure(failure)) sendError.value = message
+  else composerFailures.value = [...composerFailures.value, failure]
+}
+
 async function sendMessage() {
   if (!canSend.value || sending.value || sendingProductChoices.value || preparingQuickReply.value) return
   if (!selectedConversation.value || (!draft.value.trim() && !hasAttachments.value)) return
@@ -2564,40 +2624,39 @@ async function sendMessage() {
   const session = sessionKey.value
   const target = replyTarget.value
   const replyId = target?.conversationId === conversationId ? target.id : undefined
-  const batch = attachments.value
   const isSameSession = () => viewActive && sessionKey.value === session
   const isSameChat = () => isSameSession() && selectedConversation.value?.id === conversationId
-  function applySent(text?: string, attachmentId?: number) {
-    if (!isSameSession()) return
-    clearSent(conversationId, text, attachmentId)
-    if (text !== undefined && isSameChat() && replyTarget.value === target) replyTarget.value = null
-  }
 
   sending.value = true
   sendError.value = ''
-  let sendingFileName: string | undefined
+  const submitted = takeDraft()
+  const batch = submitted.attachments
+  replyTarget.value = null
+  messageInput.value?.focus()
+  let delivered = 0
   try {
     if (batch.length) {
       for (const [index, attachment] of batch.entries()) {
         if (!isSameSession()) return
-        sendingFileName = attachment.file.name
         const caption = index === 0 ? textToSend : undefined
         await whatsappStore.sendMediaMessage(conversationId, attachment.file, caption, index === 0 ? replyId : undefined)
-        applySent(caption, attachment.id)
+        delivered++
       }
     } else {
       await whatsappStore.sendMessage(conversationId, textToSend, replyId)
-      applySent(textToSend)
     }
-    if (isSameChat()) await scrollToBottom()
   } catch (error) {
-    if (isSameChat()) {
+    if (isSameSession()) {
       const message = error instanceof Error && error.message ? error.message : 'No se pudo completar el envío.'
-      sendError.value = sendingFileName ? `No se pudo enviar «${sendingFileName}». ${message}` : message
+      const file = batch[delivered]?.file
+      preserveComposerFailure(conversationId, { text: delivered ? '' : submitted.text, attachments: batch.slice(delivered) },
+        file ? `No se pudo enviar «${file.name}». ${message}` : message, !delivered && replyId ? target : null)
     }
+    return
   } finally {
     sending.value = false
   }
+  if (isSameChat()) await scrollToBottom()
 }
 
 async function sendMenu() {
@@ -2914,6 +2973,7 @@ watch(sessionKey, () => {
   savedQuickRepliesReady.value = false
   selectedConversation.value = null
   resetComposer()
+  composerFailures.value = []
   changingOperationalBranch.value = false
   if (viewActive && authStore.user) void retryWhatsAppStatus()
 }, { flush: 'sync' })
@@ -3079,6 +3139,13 @@ watch(() => selectedConversation.value?.id, id => {
 }
 .wa-composer { position: relative; container-type: inline-size; }
 .wa-compose-meta { color: var(--wa-muted); }
+.wa-compose-failure {
+  display: flex; align-items: center; gap: .375rem; margin-bottom: .375rem;
+  border: 1px solid var(--wa-line); border-radius: .5rem; padding: .375rem .5rem;
+  background: var(--wa-raised); color: var(--wa-text); font-size: .75rem;
+}
+.wa-compose-failure [role="status"] { color: var(--wa-warning); overflow-wrap: anywhere; }
+.wa-compose-failure > button:last-child:hover { background: var(--wa-selected); }
 .wa-compose-meta :deep(.wa-template-trigger) { margin-inline-start: auto; }
 .wa-shared-contact {
   display: flex; align-items: center; gap: .5rem; width: 100%; max-width: 19rem; min-width: 9rem;
