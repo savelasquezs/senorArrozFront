@@ -864,7 +864,7 @@
         <p v-else-if="previewedContact" class="text-sm text-gray-600">La tarjeta solo contiene el nombre.</p>
       </BaseDialog>
       <WhatsAppForwardDialog v-if="showForwardDialog && selectedConversation" v-model="showForwardDialog"
-        :source-id="selectedConversation.id" :user-id="authStore.user?.id" :count="forwardSelection.size" :sending="forwarding"
+        :source-id="selectedConversation.id" :count="forwardSelection.size" :sending="forwarding"
         :error="forwardError" @forward="forwardSelectedMessages" />
     </div>
   </div>
