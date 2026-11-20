@@ -131,8 +131,9 @@ export async function getValidAccessToken(): Promise<string | null> {
     const expiresAt = readTokenExpiration(token)
     if (!token || !expiresAt) return token
 
-    if (expiresAt - Math.floor(Date.now() / 1000) <= TOKEN_REFRESH_LEEWAY_SECONDS) {
-        return (await refreshAccessToken()) ?? token
+    const secondsRemaining = expiresAt - Math.floor(Date.now() / 1000)
+    if (secondsRemaining <= TOKEN_REFRESH_LEEWAY_SECONDS) {
+        return (await refreshAccessToken()) ?? (expiresAt > Math.floor(Date.now() / 1000) ? token : null)
     }
 
     return token

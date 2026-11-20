@@ -1,6 +1,6 @@
 import { onMounted, onUnmounted, ref, shallowRef, watch, type Ref, type ShallowRef } from 'vue'
 import * as signalR from '@microsoft/signalr'
-import { getValidAccessToken, getStoredUser } from '@/services/auth/authSession'
+import { getValidAccessToken, getStoredUser, refreshAccessToken } from '@/services/auth/authSession'
 import { getSelectedBranchIdForRequest } from '@/services/branchContextSession'
 import { useNetworkActivityManager } from '@/composables/useNetworkActivityManager'
 
@@ -40,6 +40,8 @@ function createSharedHub(hubUrl: string): SharedSignalRHub {
   let reconnectTimer: number | undefined
   let shouldReconnect = true
   let initialReconnectAttempt = 0
+  let renewedAfterRejection = false
+  const whatsappHub = hubUrl.includes('/hubs/whatsapp')
 
   const hub: SharedSignalRHub = {
     connection,
@@ -75,6 +77,7 @@ function createSharedHub(hubUrl: string): SharedSignalRHub {
 
   function scheduleReconnect() {
     if (!shouldReconnect || hub.subscribers === 0 || !isOnline.value || reconnectTimer) return
+    if (whatsappHub && initialReconnectAttempt >= RECONNECT_DELAYS_MS.length) return
     const delay = nextSignalRRetryDelay(initialReconnectAttempt++)
     reconnectTimer = window.setTimeout(() => {
       reconnectTimer = undefined
@@ -90,12 +93,18 @@ function createSharedHub(hubUrl: string): SharedSignalRHub {
     connectionState.value = 'connecting'
     error.value = null
     try {
+      if (whatsappHub && !(await getValidAccessToken())) {
+        connectionState.value = 'error'
+        error.value = 'La sesión de WhatsApp no está disponible.'
+        return
+      }
       connection.value = new signalR.HubConnectionBuilder()
         .withUrl(scopedHubUrl(), {
           accessTokenFactory: async () => (await getValidAccessToken()) || '',
         })
         .withAutomaticReconnect({
-          nextRetryDelayInMilliseconds: context => nextSignalRRetryDelay(context.previousRetryCount),
+          nextRetryDelayInMilliseconds: context => whatsappHub && context.previousRetryCount >= RECONNECT_DELAYS_MS.length
+            ? null : nextSignalRRetryDelay(context.previousRetryCount),
         })
         .configureLogging(signalR.LogLevel.Information)
         .build()
@@ -118,6 +127,8 @@ function createSharedHub(hubUrl: string): SharedSignalRHub {
         scheduleReconnect()
       })
       await connection.value.start()
+      renewedAfterRejection = false
+      initialReconnectAttempt = 0
       isConnected.value = true
       connectionState.value = 'connected'
       error.value = null
@@ -133,6 +144,10 @@ function createSharedHub(hubUrl: string): SharedSignalRHub {
       error.value = connectError.message || 'Error al conectar'
       connectionState.value = 'error'
       isConnected.value = false
+      if (whatsappHub && !renewedAfterRejection && /\b401\b/.test(String(connectError?.statusCode ?? connectError?.message))) {
+        renewedAfterRejection = true
+        if (!(await refreshAccessToken())) return
+      }
       scheduleReconnect()
     } finally {
       isConnecting = false
@@ -158,6 +173,7 @@ function createSharedHub(hubUrl: string): SharedSignalRHub {
     if (reconnectTimer) window.clearTimeout(reconnectTimer)
     reconnectTimer = undefined
     initialReconnectAttempt = 0
+    renewedAfterRejection = false
     void connect()
   }
 

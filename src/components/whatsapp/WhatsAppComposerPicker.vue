@@ -62,7 +62,7 @@ const props = defineProps<{
   stickers: readonly WhatsAppSavedSticker[]
   loadFailed: boolean
 }>()
-const emit = defineEmits<{ emoji: [value: string]; sticker: [value: WhatsAppSavedSticker]; remove: [key: string] }>()
+const emit = defineEmits<{ emoji: [value: string]; sticker: [value: WhatsAppSavedSticker]; remove: [key: string]; open: [] }>()
 const panelId = useId()
 const mode = ref<'emoji' | 'stickers' | null>(null)
 const root = ref<HTMLElement>()
@@ -76,6 +76,7 @@ let picker: Picker | undefined
 
 async function toggle(next: 'emoji' | 'stickers') {
   if (mode.value === next) return close(true)
+  emit('open')
   mode.value = next
   if (next === 'stickers') {
     await nextTick()
@@ -113,6 +114,7 @@ function close(restoreFocus = false) {
   mode.value = null
   picker = undefined
 }
+defineExpose({ close })
 
 function selectSticker(sticker: WhatsAppSavedSticker) {
   if (!props.canSend) return

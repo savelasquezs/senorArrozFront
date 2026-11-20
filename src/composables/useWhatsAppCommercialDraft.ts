@@ -479,7 +479,8 @@ export function useWhatsAppCommercialDraft(conversation: Ref<WhatsAppConversatio
     if (!sameAttention()) throw new Error('La atención de la conversación cambió. Revisa quién está a cargo.')
     if (session.value?.sessionId !== attempt || session.value.status !== 'active' || snapshot() !== expected)
       throw new Error('El borrador cambió. Revisa el pedido antes de continuar.')
-    if (!editable.value || saveState.value !== 'saved') throw new Error(notReady)
+    if (!editable.value || saveState.value !== 'saved')
+      throw new Error(saveState.value === 'error' && error.value ? error.value : notReady)
   }
 
   async function submit(_draft: DraftOrder): Promise<Order> {
