@@ -372,7 +372,7 @@
                             <ChevronRightIcon class="ml-auto size-4 shrink-0 opacity-70" aria-hidden="true" />
                           </button>
                         </div>
-                        <div v-if="message.mediaUrl" class="mb-2">
+                        <div v-if="message.mediaUrl && message.type !== 'audio'" class="mb-2">
                           <button
                             v-if="message.type === 'image' || message.type === 'sticker'"
                             type="button"
@@ -388,13 +388,6 @@
                               class="max-h-80 max-w-full cursor-zoom-in object-contain"
                             />
                           </button>
-                          <audio
-                            preload="none"
-                            v-else-if="message.type === 'audio'"
-                            :src="message.mediaUrl"
-                            controls
-                            class="w-72 max-w-full"
-                          />
                           <video
                             preload="none"
                             v-else-if="message.type === 'video'"
@@ -416,7 +409,8 @@
                           </a>
                         </div>
                       </template>
-                      <p class="wa-message-copy">
+                      <component :is="voiceMessageUrl(message) ? WhatsAppVoiceMessage : 'p'"
+                        :key="voiceMessageUrl(message)" :src="voiceMessageUrl(message)" class="wa-message-copy">
                         <span v-if="message.hiddenSource" class="italic opacity-80">{{ message.hiddenSource === 'pos' ? 'Mensaje oculto en el POS' : 'Mensaje eliminado desde WhatsApp Business' }}</span>
                         <span v-else-if="message.textBody && !message.location && !message.contacts?.length && !(message.type === 'sticker' && message.mediaUrl)"
                           class="whitespace-pre-wrap">{{ message.textBody }}</span>
@@ -433,7 +427,7 @@
                             </span>
                           </template>
                         </span>
-                      </p>
+                      </component>
                       <div v-if="!message.hiddenSource && (message.customerReaction || message.businessReaction)" class="wa-reactions" aria-label="Reacciones">
                         <span v-if="message.customerReaction" :key="`customer-${message.customerReaction}`" class="wa-reaction" title="Reacción del cliente">{{ message.customerReaction }}</span>
                         <span v-if="message.businessReaction" :key="`business-${message.businessReaction}`" class="wa-reaction" title="Reacción de Señor Arroz">{{ message.businessReaction }}</span>
@@ -877,6 +871,7 @@ import { generatePosCreationKey } from '@/utils/posCreationKey'
 
 import WhatsAppOrderPanel from '@/components/whatsapp/WhatsAppOrderPanel.vue'
 import WhatsAppMessageActions from '@/components/whatsapp/WhatsAppMessageActions.vue'
+import WhatsAppVoiceMessage from '@/components/whatsapp/WhatsAppVoiceMessage.vue'
 import WhatsAppContactAvatar from '@/components/whatsapp/WhatsAppContactAvatar.vue'
 import type { WhatsAppCommercialDraft } from '@/types/whatsapp'
 
@@ -2840,6 +2835,10 @@ function formatFileSize(bytes: number) {
     unitIndex++
   }
   return `${value >= 10 || unitIndex === 0 ? Math.round(value) : value.toFixed(1)} ${units[unitIndex]}`
+}
+
+function voiceMessageUrl(message: WhatsAppMessage) {
+  return message.type === 'audio' && !message.hiddenSource ? message.mediaUrl || undefined : undefined
 }
 
 function mediaFallbackLabel(message: WhatsAppMessage) {
