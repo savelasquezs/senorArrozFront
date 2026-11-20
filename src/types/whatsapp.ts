@@ -43,6 +43,7 @@ export interface WhatsAppTestConnectionResult {
 }
 
 export interface WhatsAppStatus {
+  queuedTextLineIds?: number[]
   enabled: boolean
   branchIds: number[]
 }
@@ -232,6 +233,7 @@ export interface WhatsAppQuickReplyFilters {
 }
 
 export interface WhatsAppConversation {
+  branchLineId?: number | null
   labels?: string[]
   commercialStatus?: string
   commercialOrderId?: number | null
@@ -289,6 +291,7 @@ export interface WhatsAppMessageContact {
 }
 
 export interface WhatsAppMessage {
+  clientRequestId?: string | null
   isUpdate?: boolean
   isForwarded?: boolean
   editedAt?: string | null

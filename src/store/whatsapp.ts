@@ -25,6 +25,8 @@ import {
   upsertAiProcessing,
 } from '@/utils/whatsappAiDiagnostics'
 
+const outgoingProgress: Partial<Record<WhatsAppMessage['status'], number>> = { sent: 1, delivered: 2, read: 3 }
+
 export const useWhatsAppStore = defineStore('whatsapp', () => {
   const status = ref<WhatsAppStatus | null>(null)
   const unreadSummary = ref<WhatsAppUnreadSummary>({ totalUnread: 0, unreadConversations: 0, latestMessageAt: null })
@@ -529,6 +531,9 @@ export const useWhatsAppStore = defineStore('whatsapp', () => {
       : { ...message, aiProcessing: knownProcessing }
     const existing = messages.value[conversationId] ?? []
     const index = existing.findIndex(x => x.id === enrichedMessage.id)
+    const previous = existing[index]
+    if (previous?.direction === 'outbound' && (outgoingProgress[previous.status] ?? 0) > (outgoingProgress[enrichedMessage.status] ?? 0)
+      && enrichedMessage.status !== 'failed') enrichedMessage.status = previous.status
     const updated = index >= 0
       ? existing.map(x => x.id === enrichedMessage.id ? enrichedMessage : x)
       : [...existing, enrichedMessage]

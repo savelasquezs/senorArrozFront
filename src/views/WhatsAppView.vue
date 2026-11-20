@@ -467,6 +467,21 @@
                   </div>
                 </div>
                 </template>
+                <div v-for="outgoing in pendingTextMessages" :key="outgoing.requestId" class="wa-message-row flex justify-end">
+                  <div class="wa-message-stack wa-outbound">
+                    <div class="wa-bubble wa-bubble-tail">
+                      <span class="whitespace-pre-wrap break-words">{{ outgoing.text }}</span>
+                      <span v-if="outgoing.state !== 'failed' && outgoing.state !== 'unknown'" class="wa-message-meta"
+                        role="img" aria-label="En cola" title="En cola"><ClockIcon class="size-3" aria-hidden="true" /></span>
+                      <div v-else class="flex flex-wrap items-center gap-1 text-xs" role="status">
+                        <span :title="outgoing.error">{{ outgoing.state === 'failed' ? (outgoing.error || 'No se pudo enviar') : 'Envío por verificar' }}</span>
+                        <button type="button" class="underline" :disabled="!canSend" @click="textQueue.retry(outgoing)">
+                          {{ outgoing.state === 'failed' ? 'Reintentar' : 'Verificar envío' }}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
                 <div ref="messagesEnd" />
               </div>
             </div>
@@ -555,6 +570,7 @@
                 <div class="wa-compose-tools">
                   <WhatsAppComposerPicker :key="selectedConversation.id" ref="composerPicker" :theme="whatsappTheme" :panel-target="threadArea"
                     :can-type="canSend" :can-send="canSendSticker" :stickers="savedStickers" :load-failed="stickerLibraryFailed"
+                    @open="closeWorkspaceMenus()"
                     @emoji="insertEmoji" @sticker="sendSavedSticker" @remove="removeSavedSticker" />
                   <button type="button" class="wa-compose-action" aria-label="Enviar carta" title="Enviar carta"
                     :aria-busy="sendingMenu" :disabled="sendingMenu || sending || !canSend" @click="sendMenu">
@@ -570,7 +586,6 @@
                   <div class="wa-compose-sizing" aria-hidden="true">{{ draft }}&#8203;</div>
                   <textarea
                     ref="messageInput"
-                    @open="closeWorkspaceMenus()"
                     v-model="draft"
                     rows="1"
                     maxlength="4096"
@@ -580,6 +595,7 @@
                     :class="{ 'cursor-pointer': canTakeAttention && !composingDuringTake }"
                     @keydown.enter.exact="onComposerEnter"
                     @keydown.tab="sendUniqueQuickReply"
+                    @mousedown="preventClaimSelection"
                     @dblclick="takeFromComposer"
                     @paste="onComposerPaste"
                     :readonly="canTakeAttention && !composingDuringTake"
@@ -595,7 +611,6 @@
                 class="wa-quick-suggestions mt-2 max-h-52 overflow-y-auto rounded-lg border p-2 shadow-sm"
               >
                 <p v-if="uniqueQuickReply" class="wa-quick-hint px-2 pb-1 text-xs">{{ uniqueQuickReply.saved && quickReplyMode(uniqueQuickReply.saved) !== 'send' ? 'Tab para preparar' : 'Tab para enviar' }}</p>
-                    @mousedown="preventClaimSelection"
                 <button
                   v-for="reply in slashQuickReplyMatches"
                   :key="reply.key"
@@ -906,6 +921,7 @@ import {
   ArrowPathIcon,
   BackspaceIcon,
   CheckIcon,
+  ClockIcon,
   CpuChipIcon,
   DocumentIcon,
   EllipsisHorizontalIcon,
@@ -938,6 +954,7 @@ import WhatsAppInboxLabelList from '@/components/whatsapp/WhatsAppInboxLabelList
 import WhatsAppConversationTemplates from '@/components/whatsapp/WhatsAppConversationTemplates.vue'
 import WhatsAppClosedDayReplies from '@/components/whatsapp/WhatsAppClosedDayReplies.vue'
 import WhatsAppComposerPicker from '@/components/whatsapp/WhatsAppComposerPicker.vue'
+import { useWhatsAppTextQueue } from '@/composables/useWhatsAppTextQueue'
 import WhatsAppForwardDialog from '@/components/whatsapp/WhatsAppForwardDialog.vue'
 import { useWhatsAppStore } from '@/store/whatsapp'
 import { useAuthStore } from '@/store/auth'
@@ -1065,6 +1082,8 @@ const { stickers: savedStickers, savedKeys: savedStickerKeys, saving: savingStic
 const hasAttachments = computed(() => attachments.value.length > 0)
 const draggingFiles = ref(false)
 const messageInput = ref<HTMLTextAreaElement | null>(null)
+const workspace = ref<HTMLElement | null>(null)
+const composerPicker = ref<InstanceType<typeof WhatsAppComposerPicker> | null>(null)
 const fileInput = ref<HTMLInputElement | null>(null)
 const sending = ref(false)
 const replyTarget = ref<WhatsAppMessage | null>(null)
@@ -1076,14 +1095,13 @@ const canRecoverComposerDraft = computed(() => !draft.value && !hasAttachments.v
 const reactionPickerId = ref<number | null>(null), messageActionId = ref<number | null>(null)
 const sendingMenu = ref(false)
 const changingAttention = ref(false)
+const claimingConversationId = ref<number | null>(null)
 const changingOperationalBranch = ref(false)
 const resettingConversation = ref(false)
 const contextPanelCollapsed = ref(false)
 const mobilePane = ref<'inbox' | 'chat' | 'order'>('inbox')
 const columnsContainer = ref<HTMLElement>()
 const { leftWidth, rightWidth, resize, step } = useResizableColumns(columnsContainer)
-const workspace = ref<HTMLElement | null>(null)
-const composerPicker = ref<InstanceType<typeof WhatsAppComposerPicker> | null>(null)
 const showQuickRepliesModal = ref(false)
 const showClosedDayReplies = ref(false)
 const showProductChoices = ref(false)
@@ -1095,7 +1113,6 @@ const productChoiceGroups = ref<WhatsAppProductChoiceGroup[]>([])
 const savedQuickRepliesReady = ref(false)
 const catalogQuickRepliesReady = ref(false)
 const riceChoiceGroups = computed(() => productChoiceGroups.value.filter(group => group.isRice))
-const claimingConversationId = ref<number | null>(null)
 const additionChoiceGroups = computed(() => productChoiceGroups.value.filter(group => !group.isRice))
 const catalogQuickRepliesByShortcut = computed(() => {
   const groups = new Map<string, WhatsAppProductChoiceGroup>()
@@ -1173,6 +1190,16 @@ const inboxTools = computed(() => [
 const currentMessages = computed<WhatsAppMessage[]>(() =>
   selectedConversation.value ? (whatsappStore.messages[selectedConversation.value.id] ?? []) : []
 )
+const textQueue = useWhatsAppTextQueue(
+  computed(() => authStore.user ? sessionKey.value : ''),
+  id => whatsappStore.messages[id] ?? [],
+  message => whatsappStore.upsertMessage(message.conversationId, message),
+)
+const queuedTextEnabled = computed(() => {
+  const lineId = selectedConversation.value?.branchLineId
+  return !!lineId && whatsappStore.status?.queuedTextLineIds?.includes(lineId) === true
+})
+const pendingTextMessages = computed(() => textQueue.entries.value.filter(item => item.conversationId === selectedConversation.value?.id))
 const previewedContact = computed(() => {
   const selection = contactPreview.value
   if (!selection) return null
@@ -1352,6 +1379,11 @@ function messageActionRestriction(message: WhatsAppMessage) {
   return undefined
 }
 const canTakeAttention = computed(() => !!selectedConversation.value && selectedConversation.value.attentionMode !== 'closed' && !selectedConversation.value.assignedUserId)
+const composingDuringTake = computed(() => !!selectedConversation.value && serviceWindowOpen.value
+  && claimingConversationId.value === selectedConversation.value.id && !canSend.value
+  && !selectedConversation.value.assignedUserId)
+const composerPlaceholder = computed(() => canTakeAttention.value && !composingDuringTake.value
+  ? 'Doble clic para tomar la conversación' : 'Escribe un mensaje')
 const canReturnToAi = computed(() => ownsConversation.value)
 const canPauseAi = computed(() => selectedConversation.value?.attentionMode === 'ai' && !selectedConversation.value.assignedUserId)
 const canTakeOver = computed(() => selectedConversation.value?.attentionMode === 'human'
@@ -1379,11 +1411,6 @@ function isFailureActivity(processing: WhatsAppAiProcessing) {
   return status === 'failed'
     || status === 'transferredtohuman'
     || (status === 'ignored' && normalizedAiValue(processing.severity) !== 'neutral')
-const composingDuringTake = computed(() => !!selectedConversation.value && serviceWindowOpen.value
-  && claimingConversationId.value === selectedConversation.value.id && !canSend.value
-  && !selectedConversation.value.assignedUserId)
-const composerPlaceholder = computed(() => canTakeAttention.value && !composingDuringTake.value
-  ? 'Doble clic para tomar la conversación' : 'Escribe un mensaje')
     || processing.willRetry
 }
 function aiProcessingReason(processing: WhatsAppAiProcessing) {
@@ -1434,9 +1461,18 @@ async function changeAttention(action: WhatsAppAttentionAction, confirmedVersion
   const conversationId = conversation.id
   const scope = sessionKey.value
   const leavingAttention = action === 'close' || action === 'release'
+  const initialFocus = document.activeElement
   try {
     changingAttention.value = true
     finishingAttention.value = leavingAttention
+    if (action === 'take') {
+      claimingConversationId.value = conversationId
+      if (serviceWindowOpen.value) {
+        await nextTick()
+        if (selectedConversation.value?.id === conversationId
+          && (document.activeElement === initialFocus || document.activeElement === messageInput.value)) focusClaimComposer()
+      }
+    }
     if (leavingAttention) await commercialPanel.value?.saveBeforeFinishing()
     if (!viewActive || scope !== sessionKey.value || selectedConversation.value?.id !== conversationId) return
     await whatsappStore.changeAttention(conversationId, action, transferTarget.value || undefined,
@@ -1462,22 +1498,14 @@ async function changeAttention(action: WhatsAppAttentionAction, confirmedVersion
     if (!viewActive || scope !== sessionKey.value) return
     if (selectedConversation.value?.id === conversationId) {
       const refreshed = whatsappStore.conversations.find(x => x.id === conversationId)
-  const initialFocus = document.activeElement
       if (refreshed && (refreshed.attentionRevision ?? 0) >= (selectedConversation.value.attentionRevision ?? 0))
         selectedConversation.value = refreshed
       if (leavingAttention) inboxTotalsRefresh.schedule()
-    if (action === 'take') {
-      claimingConversationId.value = conversationId
-      if (serviceWindowOpen.value) {
-        await nextTick()
-        if (selectedConversation.value?.id === conversationId
-          && (document.activeElement === initialFocus || document.activeElement === messageInput.value)) focusClaimComposer()
-      }
-    }
       else void reloadConversations()
     }
     showError('Atención', error.message || 'No se pudo cambiar el estado.')
   } finally {
+    if (claimingConversationId.value === conversationId) claimingConversationId.value = null
     finishingAttention.value = false
     changingAttention.value = false
   }
@@ -1487,6 +1515,19 @@ function takeFromComposer(event: MouseEvent) {
   if (!canTakeAttention.value || changingAttention.value) return
   event.preventDefault()
   void changeAttention('take')
+}
+
+function preventClaimSelection(event: MouseEvent) {
+  if (canTakeAttention.value && !composingDuringTake.value && event.detail > 1) event.preventDefault()
+}
+
+function focusClaimComposer() {
+  const input = messageInput.value
+  if (!input) return
+  const selection = window.getSelection()
+  if (selection?.anchorNode && input.closest('.wa-compose-row')?.contains(selection.anchorNode)) selection.removeAllRanges()
+  input.focus({ preventScroll: true })
+  input.setSelectionRange(input.value.length, input.value.length)
 }
 
 async function changeOperationalBranch(event: Event) {
@@ -1505,7 +1546,6 @@ async function changeOperationalBranch(event: Event) {
   changingOperationalBranch.value = true
   try {
     if (previousBranchId && branchId) {
-    if (claimingConversationId.value === conversationId) claimingConversationId.value = null
       const confirmed = await confirmDialog({
         title: 'Transferir conversación',
         message: 'La conversación cambiará de sucursal y se liberará el asesor asignado. ¿Deseas continuar?',
@@ -1517,19 +1557,6 @@ async function changeOperationalBranch(event: Event) {
         return
       }
       if (!stillSelected() || selectedConversation.value?.operationalBranchId !== previousBranchId) return
-function preventClaimSelection(event: MouseEvent) {
-  if (canTakeAttention.value && !composingDuringTake.value && event.detail > 1) event.preventDefault()
-}
-
-function focusClaimComposer() {
-  const input = messageInput.value
-  if (!input) return
-  const selection = window.getSelection()
-  if (selection?.anchorNode && input.closest('.wa-compose-row')?.contains(selection.anchorNode)) selection.removeAllRanges()
-  input.focus({ preventScroll: true })
-  input.setSelectionRange(input.value.length, input.value.length)
-}
-
     }
     const updated = await whatsappStore.updateOperationalBranch(conversation.id, branchId)
     if (!updated || !current()) return
@@ -1833,33 +1860,6 @@ function closeDetailsMenu(event: KeyboardEvent) {
   menu.querySelector('summary')?.focus()
 }
 
-function openInboxLabelEditor(label?: WhatsAppInboxLabel) {
-  editingInboxLabelKey.value = label?.key ?? ''
-  inboxLabelDraft.value = { name: label?.name ?? '', color: label?.color ?? 'violet' }
-  inboxLabelEditorError.value = ''
-  showInboxLabelEditor.value = true
-}
-
-async function saveInboxLabel() {
-  if (savingInboxLabel.value || !inboxLabelDraft.value.name.trim()) return
-  const scope = sessionKey.value
-  const key = editingInboxLabelKey.value
-  const definition = { ...inboxLabelDraft.value, name: inboxLabelDraft.value.name.trim() }
-  savingInboxLabel.value = true
-  inboxLabelEditorError.value = ''
-  try {
-    const response = key ? await whatsappApi.updateInboxLabel(key, definition) : await whatsappApi.createInboxLabel(definition)
-    if (!viewActive || scope !== sessionKey.value) return
-    if (response.data) {
-      const label = response.data
-      inboxLabels.value = [...inboxLabels.value.filter(item => item.key !== label.key), label]
-    }
-    showInboxLabelEditor.value = false
-    refreshInboxLabelCatalog()
-  } catch (error) {
-    if (viewActive && scope === sessionKey.value)
-      inboxLabelEditorError.value = error instanceof Error ? error.message : 'No se pudo guardar la etiqueta.'
-  } finally {
 function closeWorkspaceMenus(keep?: HTMLDetailsElement, path: EventTarget[] = []) {
   workspace.value?.querySelectorAll<HTMLDetailsElement>('details[name^="whatsapp-"][open]').forEach(menu => {
     if (menu !== keep && !path.includes(menu)) menu.open = false
@@ -1909,6 +1909,33 @@ function recoverReloadDraft(conversationId: number) {
   } catch {}
 }
 
+function openInboxLabelEditor(label?: WhatsAppInboxLabel) {
+  editingInboxLabelKey.value = label?.key ?? ''
+  inboxLabelDraft.value = { name: label?.name ?? '', color: label?.color ?? 'violet' }
+  inboxLabelEditorError.value = ''
+  showInboxLabelEditor.value = true
+}
+
+async function saveInboxLabel() {
+  if (savingInboxLabel.value || !inboxLabelDraft.value.name.trim()) return
+  const scope = sessionKey.value
+  const key = editingInboxLabelKey.value
+  const definition = { ...inboxLabelDraft.value, name: inboxLabelDraft.value.name.trim() }
+  savingInboxLabel.value = true
+  inboxLabelEditorError.value = ''
+  try {
+    const response = key ? await whatsappApi.updateInboxLabel(key, definition) : await whatsappApi.createInboxLabel(definition)
+    if (!viewActive || scope !== sessionKey.value) return
+    if (response.data) {
+      const label = response.data
+      inboxLabels.value = [...inboxLabels.value.filter(item => item.key !== label.key), label]
+    }
+    showInboxLabelEditor.value = false
+    refreshInboxLabelCatalog()
+  } catch (error) {
+    if (viewActive && scope === sessionKey.value)
+      inboxLabelEditorError.value = error instanceof Error ? error.message : 'No se pudo guardar la etiqueta.'
+  } finally {
     if (scope === sessionKey.value) savingInboxLabel.value = false
   }
 }
@@ -2264,6 +2291,14 @@ async function sendQuickReply(reply: WhatsAppQuickReply) {
   const conversationId = selectedConversation.value?.id
   if (!conversationId || !canSend.value || sending.value || sendingProductChoices.value) return
   const session = sessionKey.value
+  if (queuedTextEnabled.value) {
+    textQueue.enqueue({ conversationId, quickReplyId: reply.id, text: reply.messageTemplate })
+    if (filteredQuickReplies.value.some(match => match.saved?.id === reply.id)) takeDraft()
+    sendError.value = ''
+    messageInput.value?.focus()
+    void scrollToBottom()
+    return
+  }
   const submitted = filteredQuickReplies.value.some(match => match.saved?.id === reply.id) ? takeDraft() : null
   sending.value = true
   sendError.value = ''
@@ -2727,6 +2762,16 @@ async function sendMessage() {
   const isSameSession = () => viewActive && sessionKey.value === session
   const isSameChat = () => isSameSession() && selectedConversation.value?.id === conversationId
 
+  if (queuedTextEnabled.value && !hasAttachments.value) {
+    textQueue.enqueue({ conversationId, text: textToSend, replyToMessageId: replyId })
+    takeDraft()
+    replyTarget.value = null
+    sendError.value = ''
+    messageInput.value?.focus()
+    void scrollToBottom()
+    return
+  }
+
   sending.value = true
   sendError.value = ''
   const submitted = takeDraft()
@@ -3015,6 +3060,8 @@ function mediaFallbackLabel(message: WhatsAppMessage) {
 }
 
 onMounted(async () => {
+  document.addEventListener('pointerdown', dismissWorkspaceMenus, true)
+  window.addEventListener('beforeunload', rememberDraftOnReload)
   const id = Number(route.query.conversationId)
   if (Number.isInteger(id) && id > 0) initialDraft.value = { id, scope: editorScope.value,
     request: whatsappApi.getCommercialDraft(id).then(response => response.data ?? null).catch(() => undefined) }
@@ -3029,6 +3076,8 @@ onMounted(async () => {
 })
 
 onBeforeUnmount(() => {
+  document.removeEventListener('pointerdown', dismissWorkspaceMenus, true)
+  window.removeEventListener('beforeunload', rememberDraftOnReload)
   viewActive = false
   productChoicesRequest?.controller.abort()
   routingRefresh.dispose()
@@ -3060,8 +3109,6 @@ watch(sessionKey, () => {
   showInboxLabelManager.value = false
   showInboxLabelEditor.value = false
   savingInboxLabel.value = false
-  document.addEventListener('pointerdown', dismissWorkspaceMenus, true)
-  window.addEventListener('beforeunload', rememberDraftOnReload)
   changingInboxLabel.value = false
   inboxTotalsRefresh.cancel()
   inboxLabelsRefresh.cancel()
@@ -3076,8 +3123,6 @@ watch(sessionKey, () => {
   selectedConversation.value = null
   resetComposer()
   composerFailures.value = []
-  document.removeEventListener('pointerdown', dismissWorkspaceMenus, true)
-  window.removeEventListener('beforeunload', rememberDraftOnReload)
   changingOperationalBranch.value = false
   if (viewActive && authStore.user) void retryWhatsAppStatus()
 }, { flush: 'sync' })
@@ -3149,6 +3194,7 @@ const loadSelectedAdvisors = useDebouncedCallback(async () => {
   } catch {}
 }, 200)
 watch(() => selectedConversation.value?.id, id => {
+  closeWorkspaceMenus()
   replyTarget.value = null
   contactPreview.value = null
   resetForwardSelection()
@@ -3197,7 +3243,6 @@ watch(() => selectedConversation.value?.id, id => {
 .wa-theme-selector button[aria-pressed="true"] { position: relative; color: var(--wa-focus); background: var(--wa-selected); }
 .wa-inbox-header {
   display: grid; gap: .3125rem; flex-shrink: 0; padding: .5rem .5rem .375rem; border-bottom: 1px solid var(--wa-line);
-  closeWorkspaceMenus()
 }
 .wa-inbox-search {
   width: 100%; height: 1.625rem; border: 1px solid var(--wa-input-line); border-radius: .375rem;
@@ -3283,6 +3328,7 @@ watch(() => selectedConversation.value?.id, id => {
   background: var(--wa-canvas); color: var(--wa-text);
 }
 .wa-compose-row:focus-within { border-color: var(--wa-focus); box-shadow: 0 0 0 1px var(--wa-focus); }
+.wa-compose-awaiting-take { user-select: none; }
 .wa-compose-tools { display: flex; align-items: center; gap: .125rem; }
 .wa-compose-action {
   display: grid; width: 2rem; height: 2rem; place-items: center; border-radius: .375rem;
@@ -3328,7 +3374,6 @@ watch(() => selectedConversation.value?.id, id => {
 }
 .wa-attachment {
   display: flex; align-items: center; gap: .25rem; min-width: 0; max-width: 100%;
-.wa-compose-awaiting-take { user-select: none; }
   padding: .125rem .1875rem .125rem .4375rem; border: 1px solid var(--wa-line); border-radius: .4375rem;
   background: var(--wa-raised); color: var(--wa-text); font-size: .6875rem;
 }
