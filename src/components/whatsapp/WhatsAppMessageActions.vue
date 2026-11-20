@@ -16,6 +16,10 @@
         :tabindex="canSend ? 0 : -1" @click="canSend && !busy && emit('toggle')">
         <FaceSmileIcon class="h-4 w-4" aria-hidden="true" />
       </button>
+      <button v-if="canCopy" type="button" class="message-action" title="Copiar mensaje" aria-label="Copiar mensaje"
+        @click="emit('copy')">
+        <ClipboardDocumentIcon class="size-3.5" aria-hidden="true" />
+      </button>
       <button v-if="stickerAction" type="button" class="message-action"
         :title="stickerLabel" :aria-label="stickerLabel" :aria-pressed="stickerAction === 'remove'"
         :disabled="stickerBusy" @click="emit('sticker')">
@@ -47,16 +51,16 @@
 
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import { ArrowUturnLeftIcon, ArrowUturnRightIcon, EllipsisHorizontalIcon, FaceSmileIcon, StarIcon, TrashIcon } from '@heroicons/vue/24/outline'
+import { ArrowUturnLeftIcon, ArrowUturnRightIcon, ClipboardDocumentIcon, EllipsisHorizontalIcon, FaceSmileIcon, StarIcon, TrashIcon } from '@heroicons/vue/24/outline'
 import { StarIcon as FilledStarIcon } from '@heroicons/vue/24/solid'
 
 const props = defineProps<{
   sendUnavailableReason?: string; hideUnavailableReason?: string; open: boolean; outbound: boolean; busy: boolean; currentReaction?: string | null
-  stickerAction?: 'save' | 'remove'; stickerBusy?: boolean; canForward?: boolean
+  stickerAction?: 'save' | 'remove'; stickerBusy?: boolean; canForward?: boolean; canCopy?: boolean
 }>()
 const canSend = computed(() => !props.sendUnavailableReason)
 const stickerLabel = computed(() => props.stickerAction === 'remove' ? 'Quitar sticker de guardados' : 'Guardar sticker')
-const emit = defineEmits<{ reply: []; toggle: []; hide: []; react: [emoji: string]; sticker: []; forward: [] }>()
+const emit = defineEmits<{ reply: []; toggle: []; hide: []; react: [emoji: string]; sticker: []; forward: []; copy: [] }>()
 const tools = ref<HTMLElement>()
 const touchTrigger = ref<HTMLButtonElement>()
 const reactionTrigger = ref<HTMLButtonElement>()
