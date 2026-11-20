@@ -2,7 +2,9 @@ import { createPinia, disposePinia, setActivePinia, type Pinia } from 'pinia'
 import { nextTick, type Ref } from 'vue'
 import { flushPromises, shallowMount, type VueWrapper } from '@vue/test-utils'
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest'
-import type { WhatsAppCommercialDraft, WhatsAppConversation } from '@/types/whatsapp'
+import { IDBFactory } from 'fake-indexeddb'
+import { Blob as NodeBlob } from 'node:buffer'
+import type { WhatsAppCommercialDraft, WhatsAppConversation, WhatsAppMessage } from '@/types/whatsapp'
 import type { User } from '@/types/auth'
 
 const m = vi.hoisted(() => ({
@@ -16,7 +18,7 @@ const m = vi.hoisted(() => ({
     getInboxLabels: vi.fn(), getInboxSummary: vi.fn(), setInboxLabel: vi.fn(),
     getQuickReplies: vi.fn(), createQuickReply: vi.fn(), updateQuickReply: vi.fn(), getMessagesPage: vi.fn(), getOrderDraft: vi.fn(), updateOperationalBranch: vi.fn(), linkConversationCustomer: vi.fn(),
     sendMessage: vi.fn(), sendMediaMessage: vi.fn(), sendQuickReply: vi.fn(), previewQuickReply: vi.fn(), changeAttention: vi.fn(), getAttention: vi.fn(),
-    reactToMessage: vi.fn(), hideMessage: vi.fn(),
+    reactToMessage: vi.fn(), hideMessage: vi.fn(), downloadSticker: vi.fn(), forwardMessage: vi.fn(),
     getCommercialProductGroups: vi.fn(), getProductSuggestions: vi.fn() },
   customer: { getCustomerById: vi.fn(), getCustomerAddresses: vi.fn() },
 }))
@@ -57,6 +59,8 @@ vi.mock('@/composables/useResizableColumns', async () => {
 vi.mock('@/composables/useToast', () => ({ useToast: () => ({ success: m.success, error: m.error }) }))
 vi.mock('@/composables/useDialog', () => ({ useDialog: () => ({ confirmDialog: m.confirm }) }))
 import WhatsAppView from '../WhatsAppView.vue'
+import WhatsAppComposerPicker from '@/components/whatsapp/WhatsAppComposerPicker.vue'
+import WhatsAppForwardDialog from '@/components/whatsapp/WhatsAppForwardDialog.vue'
 import WhatsAppOrderPanel from '@/components/whatsapp/WhatsAppOrderPanel.vue'
 import { useWhatsAppStore } from '@/store/whatsapp'
 import { useAuthStore } from '@/store/auth'
@@ -151,8 +155,107 @@ describe('M38-F04 view + real Pinia store integration', () => {
   })
   afterEach(() => {
     for (const wrapper of wrappers.splice(0)) wrapper.unmount()
+    vi.unstubAllGlobals()
     localStorage.removeItem('whatsapp:theme:7')
     disposePinia(pinia); vi.clearAllTimers(); vi.useRealTimers()
+  })
+
+  it('inserts an emoji where the cashier selected text while leaving the message unsent', async () => {
+    const { vm, wrapper } = mountView()
+    await flushPromises()
+    await vm.selectConversation({ ...m.rows[0]!, customerServiceWindowExpiresAt: '2099-01-01T00:00:00Z' })
+    const input = wrapper.get<HTMLTextAreaElement>('textarea[placeholder="Escribe un mensaje"]')
+    await input.setValue('Hola arroz')
+    input.element.setSelectionRange(5, 10)
+    wrapper.getComponent(WhatsAppComposerPicker).vm.$emit('emoji', '🍚')
+    await nextTick()
+    expect(input.element.value).toBe('Hola 🍚')
+    expect(m.api.sendMessage).not.toHaveBeenCalled()
+  })
+
+  it('saves a received sticker, reloads it, and sends it as a sticker without clearing the draft', async () => {
+    vi.stubGlobal('indexedDB', new IDBFactory())
+    const blob = new NodeBlob(['test'], { type: 'image/webp' })
+    m.api.downloadSticker.mockResolvedValue(blob)
+    const chat = { ...m.rows[0]!, customerServiceWindowExpiresAt: '2099-01-01T00:00:00Z' }
+    const inbound = {
+      id: 51, conversationId: chat.id, direction: 'inbound', type: 'sticker', textBody: '',
+      timestamp: '2026-11-20T17:00:00Z', mediaUrl: 'https://example.invalid/sticker.webp', mediaSha256: 'sticker-1',
+    } as WhatsAppMessage
+    m.api.getMessagesPage.mockResolvedValue(reply({ items: [inbound], nextCursor: null, hasMore: false }))
+    m.api.sendMediaMessage.mockResolvedValue(reply({ ...inbound, id: 52, direction: 'outbound', status: 'sent' }))
+    const first = mountView()
+    await flushPromises()
+    await first.vm.selectConversation(chat)
+    await first.wrapper.get('button[aria-label="Guardar sticker"]').trigger('click')
+    await vi.waitFor(() => expect(first.wrapper.find('button[aria-label="Quitar sticker de guardados"]').exists()).toBe(true))
+    expect(m.api.downloadSticker).toHaveBeenCalledWith(chat.id, inbound.id)
+    unmount(first.wrapper)
+
+    const reopened = mountView()
+    await flushPromises()
+    await reopened.vm.selectConversation(chat)
+    const picker = reopened.wrapper.getComponent(WhatsAppComposerPicker)
+    await vi.waitFor(() => expect(picker.props('stickers')).toHaveLength(1))
+    const input = reopened.wrapper.get<HTMLTextAreaElement>('textarea[placeholder="Escribe un mensaje"]')
+    await input.setValue('Borrador pendiente')
+    picker.vm.$emit('sticker', picker.props('stickers')[0]!)
+    await flushPromises()
+    expect(m.api.sendMediaMessage).toHaveBeenCalledWith(chat.id, expect.objectContaining({ name: 'sticker.webp', type: 'image/webp' }), undefined, undefined, true)
+    expect(input.element.value).toBe('Borrador pendiente')
+    useAuthStore().user = { ...useAuthStore().user!, id: 8 }
+    await flushPromises()
+    await reopened.vm.selectConversation(chat)
+    await vi.waitFor(() => expect(reopened.wrapper.findComponent(WhatsAppComposerPicker).props('stickers')).toHaveLength(0))
+  })
+
+  it('opens each shared contact with the information received and explains name-only cards', async () => {
+    const { vm, wrapper } = mountView()
+    m.api.getMessagesPage.mockResolvedValue(reply({ items: [{
+      id: 60, conversationId: 1, direction: 'inbound', type: 'contacts', textBody: '',
+      timestamp: '2026-11-20T17:00:00Z',
+      contacts: [{ name: 'César', phones: ['+57 300 000 0101'], emails: ['cesar@example.invalid'], organization: 'Comercio' },
+        { name: 'Contacto de prueba', phones: [] }],
+    }], nextCursor: null, hasMore: false }))
+    await flushPromises()
+    await vm.selectConversation(m.rows[0]!)
+    await wrapper.get('button[aria-label="Ver contacto César"]').trigger('click')
+    const details = wrapper.get('[aria-label="César"]')
+    expect(details.get('a[href="tel:+573000000101"]').text()).toBe('+57 300 000 0101')
+    expect(details.text()).toContain('cesar@example.invalid')
+    expect(details.text()).toContain('Comercio')
+    await wrapper.get('button[aria-label="Ver contacto Contacto de prueba"]').trigger('click')
+    expect(wrapper.get('[aria-label="Contacto de prueba"]').text()).toContain('La tarjeta solo contiene el nombre.')
+    await vm.selectConversation(m.rows[1]!)
+    expect(wrapper.find('[aria-label="Contacto de prueba"]').exists()).toBe(false)
+  })
+
+  it('forwards selected messages in chat order and retries only the unconfirmed message with the same request ID', async () => {
+    const message = {
+      conversationId: 1, direction: 'inbound', type: 'text', status: 'received',
+    }
+    m.api.getMessagesPage.mockResolvedValue(reply({ items: [
+      { ...message, id: 61, textBody: 'Primero', timestamp: '2026-11-20T17:00:00Z' },
+      { ...message, id: 62, textBody: 'Segundo', timestamp: '2026-11-20T17:01:00Z' },
+    ], nextCursor: null, hasMore: false }))
+    m.api.forwardMessage.mockResolvedValueOnce(reply(null)).mockRejectedValueOnce(new Error('Envío pendiente')).mockResolvedValueOnce(reply(null))
+    const { vm, wrapper } = mountView()
+    await flushPromises()
+    await vm.selectConversation(m.rows[0]!)
+    await wrapper.get('[data-message-id="62"] button[aria-label="Reenviar mensaje"]').trigger('click')
+    await wrapper.get<HTMLInputElement>('[data-message-id="61"] input[type="checkbox"]').setValue(true)
+    expect(wrapper.text()).toContain('2 mensajes seleccionados')
+    await wrapper.findAll('button').find(button => button.text() === 'Elegir chat')!.trigger('click')
+    const dialog = wrapper.getComponent(WhatsAppForwardDialog)
+    dialog.vm.$emit('forward', 2)
+    await flushPromises()
+    expect(m.api.forwardMessage.mock.calls.map(([target, source, id]) => [target, source, id])).toEqual([[2, 1, 61], [2, 1, 62]])
+    expect(dialog.props('count')).toBe(1)
+    expect(dialog.props('error')).toContain('Se reenviaron 1 de 2.')
+    dialog.vm.$emit('forward', 2)
+    await flushPromises()
+    expect(m.api.forwardMessage.mock.calls[2]).toEqual(m.api.forwardMessage.mock.calls[1])
+    expect(wrapper.findComponent(WhatsAppForwardDialog).exists()).toBe(false)
   })
 
   it('queues multiple selected, pasted and dropped files, with independent removal', async () => {
@@ -644,6 +747,7 @@ describe('M38-F04 view + real Pinia store integration', () => {
     await flushPromises()
     await vm.selectConversation(chat)
     expect(wrapper.get('a[href*="maps/search"]').attributes('href')).toContain('6.2%2C-75.5')
+    await wrapper.get('button[aria-label="Ver contacto Contacto de prueba"]').trigger('click')
     expect(wrapper.get('a[href="tel:+573001234567"]').text()).toBe('+57 300 123 4567')
     const bubble = () => wrapper.get('[data-message-id="98"]')
     const element = bubble().element
@@ -672,7 +776,7 @@ describe('M38-F04 view + real Pinia store integration', () => {
     expect(bubble().element).toBe(element)
   })
 
-  it('keeps all message controls discoverable without allowing an observer to use them', async () => {
+  it('keeps message controls discoverable and permits observers to select a forwardable message', async () => {
     const chat = { ...conversation(), assignedUserId: 8, customerServiceWindowExpiresAt: '2099-01-01T00:00:00Z' }
     m.rows = [chat]
     m.api.getMessagesPage.mockResolvedValue(reply({ items: [{
@@ -685,8 +789,8 @@ describe('M38-F04 view + real Pinia store integration', () => {
 
     const controls = wrapper.get('.message-actions').findAll('button')
     expect(controls.map(button => button.attributes('aria-label')))
-      .toEqual(['Responder a este mensaje', 'Reaccionar', 'Ocultar en el POS'])
-    for (const button of controls) {
+      .toEqual(['Responder a este mensaje', 'Reaccionar', 'Reenviar mensaje', 'Ocultar en el POS'])
+    for (const button of controls.filter(button => button.attributes('aria-label') !== 'Reenviar mensaje')) {
       expect(button.attributes('aria-disabled')).toBe('true')
       expect(button.attributes('title')).toContain('Toma la conversación')
       await button.trigger('click')
@@ -695,6 +799,8 @@ describe('M38-F04 view + real Pinia store integration', () => {
     expect(wrapper.find('[aria-label="Quitar cita"]').exists()).toBe(false)
     expect(m.api.hideMessage).not.toHaveBeenCalled()
     expect(m.api.reactToMessage).not.toHaveBeenCalled()
+    await wrapper.get('button[aria-label="Reenviar mensaje"]').trigger('click')
+    expect(wrapper.text()).toContain('1 mensaje seleccionado')
   })
 
   it('keeps a chat open when the draft cannot be saved', async () => {

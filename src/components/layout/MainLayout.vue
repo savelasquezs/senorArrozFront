@@ -54,6 +54,7 @@
 import { ref, computed, nextTick, onBeforeUnmount, onMounted, watch } from 'vue';
 import { RouterView, useRoute, useRouter } from 'vue-router';
 import { getRouteViewKey } from '@/utils/routeViewKey';
+import { mediaPreviewLabel } from '@/utils/whatsappInbox';
 import { useAuthStore } from '@/store/auth';
 import { useWhatsAppStore } from '@/store/whatsapp';
 import { useBranchContextStore } from '@/store/branchContext';
@@ -215,11 +216,12 @@ async function refreshWhatsAppUnreadSummary(options?: { notifyNewMessages?: bool
 
 		if (!options?.notifyNewMessages || !hasNewUnread) return;
 
-		await playWhatsAppMessageSound();
+		void playWhatsAppMessageSound().catch(() => {});
 		if (permission.value === 'granted') {
-			notify('Nuevo mensaje de WhatsApp', {
+			notify('Conversaciones sin leer en WhatsApp', {
 				body: `${summary.unreadConversations} conversación(es) sin leer`,
 				tag: `whatsapp-${currentLatest}`,
+				onClick: () => void router.push({ name: 'WhatsApp' }),
 			});
 		}
 	} catch (error) {
@@ -227,23 +229,28 @@ async function refreshWhatsAppUnreadSummary(options?: { notifyNewMessages?: bool
 	}
 }
 
-async function handleWhatsAppRealtimeMessage(payload: WhatsAppRealtimeMessagePayload) {
+function handleWhatsAppRealtimeMessage(payload: WhatsAppRealtimeMessagePayload) {
 	if (!authStore.isAuthenticated || !canTakeOrders.value || !payload?.message?.id) return;
-	if (payload.message.direction !== 'inbound') return;
-
-	previousWhatsAppLatestMessageAt = payload.message.timestamp;
-	whatsAppSummaryInitialized = true;
+	const { message, conversation } = payload;
+	if (message.direction !== 'inbound') return;
 
 	if (!isWhatsAppPage.value) {
 		whatsappStore.applyRealtimeMessage(payload, null);
 	}
+	if (message.isUpdate || message.isHistorical || message.hiddenSource) return;
+	previousWhatsAppLatestMessageAt = message.timestamp;
+	whatsAppSummaryInitialized = true;
 
-	await playWhatsAppMessageSound();
+	void playWhatsAppMessageSound().catch(() => {});
 	if (permission.value === 'granted') {
-		const name = payload.conversation?.contactName || payload.conversation?.customerName || payload.conversation?.whatsAppUsername || payload.conversation?.phoneNumber || 'WhatsApp';
-		notify('Nuevo mensaje de WhatsApp', {
-			body: String(name),
-			tag: `whatsapp-${payload.message.id}`,
+		const name = conversation?.contactName || conversation?.customerName || conversation?.whatsAppUsername || conversation?.phoneNumber;
+		const text = message.textBody?.replace(/\s+/g, ' ').trim();
+		const characters = Array.from(text || (message.type === 'text' ? 'Mensaje recibido' : mediaPreviewLabel(message.type)));
+		const body = characters.length > 120 ? `${characters.slice(0, 119).join('').trimEnd()}…` : characters.join('');
+		notify(name ? `WhatsApp · ${name}` : 'Nuevo mensaje de WhatsApp', {
+			body,
+			tag: `whatsapp-${message.id}`,
+			onClick: () => void router.push({ name: 'WhatsApp', query: { conversationId: message.conversationId } }),
 		});
 	}
 }

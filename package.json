@@ -15,6 +15,7 @@
   },
   "dependencies": {
     "@date-fns/tz": "^1.4.1",
+    "@emoji-mart/data": "1.2.1",
     "@googlemaps/js-api-loader": "2.0.2",
     "@heroicons/vue": "^2.2.0",
     "@microsoft/signalr": "^9.0.6",
@@ -23,6 +24,7 @@
     "axios": "^1.12.1",
     "chart.js": "^4.5.1",
     "date-fns": "^4.1.0",
+    "emoji-mart": "5.6.0",
     "pinia": "^3.0.3",
     "qrcode.vue": "^3.6.0",
     "sortablejs": "1.15.6",
@@ -39,6 +41,7 @@
     "@vitest/ui": "^4.1.11",
     "@vue/test-utils": "^2.4.6",
     "@vue/tsconfig": "^0.7.0",
+    "fake-indexeddb": "6.2.5",
     "happy-dom": "^20.11.6",
     "jsdom": "^27.0.0",
     "typescript": "~5.8.3",

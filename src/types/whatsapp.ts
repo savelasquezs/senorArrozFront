@@ -277,13 +277,25 @@ export interface WhatsAppAttentionChangedPayload { branchId: number; conversatio
 export interface WhatsAppConversationRoutingChangedPayload { branchId: number; previousOperationalBranchId?: number | null; conversation: WhatsAppConversation }
 export interface WhatsAppOperationalBranchOption { id: number; name: string }
 
+export interface WhatsAppMessageContact {
+  name: string
+  phones: string[]
+  emails?: string[] | null
+  addresses?: string[] | null
+  websites?: string[] | null
+  organization?: string | null
+  birthday?: string | null
+  whatsAppIds?: string[] | null
+}
+
 export interface WhatsAppMessage {
   isUpdate?: boolean
+  isForwarded?: boolean
   editedAt?: string | null
   hiddenSource?: 'pos' | 'businessApp' | null
   replyToWhatsAppMessageId?: string | null
   location?: { latitude: number; longitude: number; name?: string | null; address?: string | null } | null
-  contacts?: Array<{ name: string; phones: string[] }> | null
+  contacts?: WhatsAppMessageContact[] | null
   customerReaction?: string | null
   businessReaction?: string | null
   draftAddressApplied?: boolean

@@ -13,7 +13,7 @@ export function useNotifications() {
         return result
     }
 
-    const notify = (title: string, options?: { body?: string; tag?: string; icon?: string }) => {
+    const notify = (title: string, options?: { body?: string; tag?: string; icon?: string; onClick?: () => void }) => {
         if (!isSupported.value || permission.value !== 'granted') return
 
         const n = new Notification(title, {
@@ -25,6 +25,7 @@ export function useNotifications() {
         n.onclick = () => {
             window.focus()
             n.close()
+            options?.onClick?.()
         }
     }
 

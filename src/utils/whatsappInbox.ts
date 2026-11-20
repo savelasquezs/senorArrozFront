@@ -1,4 +1,4 @@
-import type { WhatsAppConversation, WhatsAppInboxKey, WhatsAppInboxLabel, WhatsAppInboxLabelColor } from '@/types/whatsapp'
+import type { WhatsAppConversation, WhatsAppInboxKey, WhatsAppInboxLabel, WhatsAppInboxLabelColor, WhatsAppMessage } from '@/types/whatsapp'
 
 export const inboxLabelPalette = {
   violet: { name: 'Morado', style: 'bg-violet-700 text-white' },
@@ -45,6 +45,20 @@ export function compareWhatsAppConversationActivity(a: WhatsAppConversation, b: 
   return activity(b) - activity(a) || b.id - a.id
 }
 
+export function mediaPreviewLabel(type: WhatsAppMessage['type']) {
+  const labels: Record<WhatsAppMessage['type'], string> = {
+    text: '',
+    image: 'Imagen',
+    audio: 'Audio',
+    video: 'Video',
+    document: 'Documento',
+    sticker: 'Sticker',
+    location: 'Ubicación compartida',
+    contacts: 'Contacto compartido',
+  }
+  return labels[type] || 'Archivo'
+}
+
 export function canReadWhatsAppRouting(
   conversation: Pick<WhatsAppConversation, 'isCentralChannel' | 'operationalBranchId' | 'assignedUserId'>,
   branchId: number, userId: number | undefined, userBranchId: number | undefined, isSuperadmin: boolean,
@@ -78,6 +92,10 @@ export function whatsappConversationBranchLabel(conversation: WhatsAppConversati
   if (conversation.isCentralChannel)
     return conversation.operationalBranchName || 'Sin asignar'
   return conversation.branchName || 'Sucursal sin nombre'
+}
+
+export function conversationTitle(conversation: WhatsAppConversation) {
+  return conversation.contactName || conversation.customerName || conversation.whatsAppUsername || conversation.phoneNumber || 'Usuario de WhatsApp'
 }
 
 function commercialPriority(conversation: WhatsAppConversation) {

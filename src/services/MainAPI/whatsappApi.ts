@@ -104,12 +104,12 @@ class WhatsAppApi extends BaseApi {
   checkCoexistence(branchId: number) {
     return this.post<ApiResponse<CoexistenceStatus>>(`/branches/${branchId}/whatsapp-coexistence/check`, {})
   }
-  private manualPost<T>(url: string, payload: unknown): Promise<ApiResponse<T>> {
-    const requestId = generatePosCreationKey()
+  private manualPost<T>(url: string, payload: unknown, requestId = generatePosCreationKey(),
+    timeout = payload instanceof FormData ? 90_000 : 10_000): Promise<ApiResponse<T>> {
     return resolveWhatsAppOperation<T>(
       () => this.post(url, payload, {
         headers: { 'X-WhatsApp-Request-Id': requestId },
-        timeout: payload instanceof FormData ? 90_000 : 10_000,
+        timeout,
       }),
       id => this.get(`/whatsapp/operations/${id}`, { branchScope: 'none' }),
     )
@@ -276,11 +276,21 @@ class WhatsAppApi extends BaseApi {
     return this.manualPost<WhatsAppMessage>(`/whatsapp/conversations/${conversationId}/messages/quick-reply`, { quickReplyId })
   }
 
-  sendMediaMessage(conversationId: number, file: File, caption?: string, replyToMessageId?: number): Promise<ApiResponse<WhatsAppMessage>> {
+  downloadSticker(conversationId: number, messageId: number): Promise<Blob> {
+    return this.get<Blob>(`/whatsapp/conversations/${conversationId}/messages/${messageId}/sticker`, { responseType: 'blob' })
+  }
+
+  forwardMessage(destinationId: number, sourceConversationId: number, messageId: number, requestId: string) {
+    return this.manualPost<WhatsAppMessage>(`/whatsapp/conversations/${destinationId}/messages/forward`,
+      { sourceConversationId, messageId }, requestId, 90_000)
+  }
+
+  sendMediaMessage(conversationId: number, file: File, caption?: string, replyToMessageId?: number, asSticker = false): Promise<ApiResponse<WhatsAppMessage>> {
     const fd = new FormData()
     fd.append('file', file)
     if (caption?.trim()) fd.append('caption', caption.trim())
     if (replyToMessageId) fd.append('replyToMessageId', String(replyToMessageId))
+    if (asSticker) fd.append('asSticker', 'true')
     return this.manualPost<WhatsAppMessage>(`/whatsapp/conversations/${conversationId}/messages/media`, fd)
   }
 
