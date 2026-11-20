@@ -3,7 +3,7 @@
         :close-on-backdrop="false" :initial-focus="`#${inputId}`" @update:model-value="emit('update:modelValue', $event)">
         <label :for="inputId" class="mb-2 block text-sm font-medium text-gray-700">{{ label }}</label>
         <textarea :id="inputId" v-model="draft" rows="9"
-            class="block min-h-52 max-h-[50dvh] w-full resize-y rounded-xl border border-gray-300 bg-gray-50/60 p-4 text-base leading-relaxed text-gray-900 outline-none transition focus:border-emerald-500 focus:bg-white focus:ring-2 focus:ring-emerald-100 disabled:opacity-60"
+            class="block min-h-52 max-h-[50dvh] w-full resize-y rounded-xl border border-gray-300 bg-gray-50/60 p-4 text-base leading-relaxed text-gray-900 outline-none transition placeholder:text-gray-500 focus:border-emerald-500 focus:bg-gray-50 focus:ring-2 focus:ring-emerald-100 disabled:opacity-60"
             placeholder="Escribe las indicaciones…" :disabled="saving || disabled" :aria-invalid="!!saveError" />
         <p v-if="disabled && !saving" role="alert" class="mt-3 text-sm text-amber-800">El pedido cambió o ya no permite editar. Cierra este editor y actualiza el pedido antes de guardar.</p>
         <p v-if="saveError" role="alert" class="mt-3 text-sm text-red-600">{{ saveError }}</p>
