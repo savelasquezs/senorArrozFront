@@ -319,19 +319,19 @@ watch([firstWordGroups, isFirstWordGroupTab, () => props.loading], ([groups, gro
     align-items: center;
     justify-content: space-between;
     padding: 0.75rem 1rem;
-    border: 1px dashed #d1d5db;
+    border: 1px dashed var(--wa-line, #d1d5db);
     border-radius: 0.75rem;
     background-color: var(--wa-raised, #f9fafb);
 }
 
 .chich-title {
     font-weight: 600;
-    color: #065f46;
+    color: var(--wa-action, #065f46);
 }
 
 .chich-count {
     font-size: 0.875rem;
-    color: #065f46;
+    color: var(--wa-action, #065f46);
     font-weight: 500;
 }
 
@@ -345,11 +345,11 @@ watch([firstWordGroups, isFirstWordGroupTab, () => props.loading], ([groups, gro
     gap: 0.375rem;
     font-size: 0.875rem;
     font-weight: 500;
-    color: #047857;
+    color: var(--wa-action, #047857);
 }
 
 .first-word-back-btn:hover {
-    color: #065f46;
+    color: var(--wa-action-hover, #065f46);
 }
 
 .first-word-group-btn {
@@ -362,27 +362,33 @@ watch([firstWordGroups, isFirstWordGroupTab, () => props.loading], ([groups, gro
     padding: 0.75rem 1rem;
     text-align: left;
     border-radius: 0.75rem;
-    border: 1px solid #e5e7eb;
+    border: 1px solid var(--wa-line, #e5e7eb);
     background: var(--wa-panel, #fff);
     box-shadow: 0 1px 2px rgb(0 0 0 / 0.05);
     transition: border-color 0.15s, box-shadow 0.15s, background-color 0.15s;
 }
 
 .first-word-group-btn:hover {
-    border-color: #10b981;
+    border-color: var(--wa-action, #10b981);
     box-shadow: 0 2px 6px rgb(16 185 129 / 0.15);
     background: var(--wa-outgoing, #f0fdf4);
 }
 
+.first-word-group-btn:focus-visible,
+.first-word-back-btn:focus-visible {
+    outline: 2px solid var(--wa-focus, #047857);
+    outline-offset: 2px;
+}
+
 .first-word-group-label {
     font-weight: 600;
-    color: #111827;
+    color: var(--wa-text, #111827);
     font-size: 0.9375rem;
 }
 
 .first-word-group-count {
     font-size: 0.8125rem;
-    color: #6b7280;
+    color: var(--wa-muted, #6b7280);
 }
 
 /* Responsive adjustments */
