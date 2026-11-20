@@ -23,7 +23,7 @@
     <p v-if="error || loadError" role="alert" class="mt-2 text-sm text-red-600">{{ error || loadError }}</p>
     <template #footer>
       <BaseButton variant="secondary" :disabled="sending" @click="emit('update:modelValue', false)">Volver</BaseButton>
-      <BaseButton variant="primary" :loading="sending" :disabled="!target || !count" @click="confirm">
+      <BaseButton variant="primary" :loading="sending" :disabled="!target || !count" @click="submitForward">
         {{ count === 1 ? 'Reenviar mensaje' : `Reenviar ${count} mensajes` }}
       </BaseButton>
     </template>
@@ -82,7 +82,7 @@ async function load(append: boolean) {
   }
 }
 
-function confirm() {
+function submitForward() {
   if (!props.sending && target.value && destinations.value.some(chat => chat.id === target.value)) emit('forward', target.value)
 }
 
