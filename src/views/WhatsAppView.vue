@@ -590,19 +590,19 @@
               </div>
               <div
                 v-if="slashQuickReplyMatches.length"
-                class="mt-2 max-h-52 overflow-y-auto rounded-lg border border-gray-200 bg-gray-50 p-2 shadow-sm"
+                class="wa-quick-suggestions mt-2 max-h-52 overflow-y-auto rounded-lg border p-2 shadow-sm"
               >
-                <p v-if="uniqueQuickReply" class="px-2 pb-1 text-xs text-gray-500">{{ uniqueQuickReply.saved && quickReplyMode(uniqueQuickReply.saved) !== 'send' ? 'Tab para preparar' : 'Tab para enviar' }}</p>
+                <p v-if="uniqueQuickReply" class="wa-quick-hint px-2 pb-1 text-xs">{{ uniqueQuickReply.saved && quickReplyMode(uniqueQuickReply.saved) !== 'send' ? 'Tab para preparar' : 'Tab para enviar' }}</p>
                 <button
                   v-for="reply in slashQuickReplyMatches"
                   :key="reply.key"
                   type="button"
-                  class="flex w-full items-start gap-3 rounded-md px-2 py-1.5 text-left hover:bg-white"
+                  class="wa-quick-suggestion flex w-full items-start gap-3 rounded-md px-2 py-1.5 text-left"
                   :disabled="sending || sendingProductChoices || preparingQuickReply || !canSend"
                   @click="chooseQuickReply(reply)"
                 >
                   <span class="shrink-0 rounded bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-800">/{{ reply.shortcut }}</span>
-                  <span class="min-w-0 flex-1 truncate text-xs text-gray-600">{{ reply.preview }}</span>
+                  <span class="min-w-0 flex-1 truncate text-xs">{{ reply.preview }}</span>
                 </button>
               </div>
               <p v-if="sendError" role="alert" class="mt-2 text-sm text-red-600">{{ sendError }}</p>
@@ -664,7 +664,7 @@
         <form class="space-y-4" @submit.prevent="confirmQuickReplyChoice">
           <label class="block text-sm font-semibold text-slate-800">
             Arroz
-            <select v-model="quoteFamily" :disabled="preparingQuickReply" class="mt-1 block w-full rounded-lg border border-slate-300 bg-white px-3 py-2"
+            <select v-model="quoteFamily" :disabled="preparingQuickReply" class="wa-quick-field mt-1 block w-full rounded-lg border px-3 py-2"
               @change="updateQuoteSize">
               <option value="">Selecciona un arroz</option>
               <option v-for="family in quoteFamilies" :key="family" :value="family">{{ family === 'paisa' ? 'Paisa' : 'Ropa Vieja' }}</option>
@@ -672,12 +672,12 @@
           </label>
           <label class="block text-sm font-semibold text-slate-800">
             Tamaño
-            <select v-model="quoteSize" :disabled="preparingQuickReply" class="mt-1 block w-full rounded-lg border border-slate-300 bg-white px-3 py-2">
+            <select v-model="quoteSize" :disabled="preparingQuickReply" class="wa-quick-field mt-1 block w-full rounded-lg border px-3 py-2">
               <option value="">Selecciona un tamaño</option>
               <option v-for="size in quoteSizes" :key="size" :value="size">{{ quoteSizeNames[size] }}</option>
             </select>
           </label>
-          <p v-if="quickReplyPreviewError" class="text-sm text-rose-700" role="alert">{{ quickReplyPreviewError }}</p>
+          <p v-if="quickReplyPreviewError" class="text-sm text-red-700" role="alert">{{ quickReplyPreviewError }}</p>
           <div class="flex justify-end gap-2">
             <BaseButton variant="secondary" :disabled="preparingQuickReply" @click="clearQuickReplyPreview">Cancelar</BaseButton>
             <BaseButton type="submit" :loading="preparingQuickReply" :disabled="!quoteFamily || !quoteSize">Preparar cotización</BaseButton>
@@ -789,7 +789,7 @@
               Sucursal
               <select
                 v-model.number="quickReplyForm.branchId"
-                class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-emerald-500 focus:ring-emerald-500"
+                class="wa-quick-field mt-1 w-full rounded-lg border px-3 py-2 text-sm"
               >
                 <option v-for="branch in branchOptions" :key="branch.id" :value="branch.id">{{ branch.label }}</option>
               </select>
@@ -805,7 +805,7 @@
 
             <label class="block text-sm font-medium text-gray-700">
               Al usar el atajo
-              <select v-model="quickReplyForm.replyMode" class="mt-1 block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm">
+              <select v-model="quickReplyForm.replyMode" class="wa-quick-field mt-1 block w-full rounded-lg border px-3 py-2 text-sm">
                 <option value="send">Enviar directamente</option>
                 <option value="draft">Editar antes de enviar</option>
                 <option value="chicharron_quote">Cotizar con y sin chicharrón</option>
@@ -817,7 +817,7 @@
                 v-model="quickReplyForm.messageTemplate"
                 rows="6"
                 maxlength="4096"
-                class="mt-1 w-full resize-none rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-emerald-500 focus:ring-emerald-500"
+                class="wa-quick-field mt-1 w-full resize-none rounded-lg border px-3 py-2 text-sm"
                 placeholder="Hola {{nombre_cliente}}, muy buenos días."
               />
             </label>
@@ -3139,6 +3139,14 @@ watch(() => selectedConversation.value?.id, id => {
 }
 .wa-composer { position: relative; container-type: inline-size; }
 .wa-compose-meta { color: var(--wa-muted); }
+.wa-quick-suggestions { border-color: var(--wa-line); background: var(--wa-canvas); }
+.wa-quick-hint { color: var(--wa-muted); }
+.wa-quick-suggestion, .wa-quick-field { color: var(--wa-text); }
+.wa-quick-suggestion:hover:not(:disabled), .wa-quick-suggestion:focus-visible { background: var(--wa-raised); }
+.wa-quick-suggestion:focus-visible { outline: 2px solid var(--wa-focus); outline-offset: -2px; }
+.wa-quick-field { border-color: var(--wa-input-line); background: var(--wa-panel); }
+.wa-quick-field::placeholder { color: var(--wa-muted); }
+.wa-quick-field:focus-visible { outline: 2px solid var(--wa-focus); outline-offset: 1px; }
 .wa-compose-failure {
   display: flex; align-items: center; gap: .375rem; margin-bottom: .375rem;
   border: 1px solid var(--wa-line); border-radius: .5rem; padding: .375rem .5rem;
