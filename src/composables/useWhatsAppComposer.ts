@@ -1,11 +1,12 @@
 import { ref, shallowRef, watch, type Ref } from 'vue'
 
 type Attachment = { id: number; file: File }
+export type WhatsAppComposerDraft = { text: string; attachments: readonly Attachment[] }
 
 export function useWhatsAppComposer(conversationId: Readonly<Ref<number | null>>) {
   const draft = ref('')
   const attachments = shallowRef<readonly Attachment[]>([])
-  const drafts = new Map<number, { text: string; attachments: readonly Attachment[] }>()
+  const drafts = new Map<number, WhatsAppComposerDraft>()
   let nextAttachmentId = 0
   watch(conversationId, (id, previous) => {
     if (previous) drafts.set(previous, { text: draft.value, attachments: attachments.value })
@@ -23,17 +24,18 @@ export function useWhatsAppComposer(conversationId: Readonly<Ref<number | null>>
     attachments.value = attachments.value.filter(attachment => attachment.id !== attachmentId)
   }
 
-  function clearSent(id: number, text?: string, attachmentId?: number) {
-    if (conversationId.value === id) {
-      if (text !== undefined && draft.value.trim() === text) draft.value = ''
-      if (attachmentId !== undefined) removeAttachment(attachmentId)
-      return
-    }
-    const saved = drafts.get(id)
-    if (!saved) return
-    if (text !== undefined && saved.text.trim() === text) saved.text = ''
-    if (attachmentId !== undefined) saved.attachments = saved.attachments.filter(attachment => attachment.id !== attachmentId)
-    if (!saved.text && !saved.attachments.length) drafts.delete(id)
+  function takeDraft(): WhatsAppComposerDraft {
+    const submitted = { text: draft.value, attachments: attachments.value }
+    draft.value = ''
+    attachments.value = []
+    return submitted
+  }
+
+  function restoreDraft(submitted: WhatsAppComposerDraft) {
+    if (draft.value || attachments.value.length) return false
+    draft.value = submitted.text
+    attachments.value = submitted.attachments
+    return true
   }
 
   function resetComposer() {
@@ -42,5 +44,5 @@ export function useWhatsAppComposer(conversationId: Readonly<Ref<number | null>>
     attachments.value = []
   }
 
-  return { draft, attachments, addFiles, removeAttachment, clearSent, resetComposer }
+  return { draft, attachments, addFiles, removeAttachment, takeDraft, restoreDraft, resetComposer }
 }
