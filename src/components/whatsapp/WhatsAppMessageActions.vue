@@ -50,7 +50,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, watchEffect } from 'vue'
 import { ArrowUturnLeftIcon, ArrowUturnRightIcon, ClipboardDocumentIcon, EllipsisHorizontalIcon, FaceSmileIcon, StarIcon, TrashIcon } from '@heroicons/vue/24/outline'
 import { StarIcon as FilledStarIcon } from '@heroicons/vue/24/solid'
 
@@ -65,6 +65,15 @@ const tools = ref<HTMLElement>()
 const touchTrigger = ref<HTMLButtonElement>()
 const reactionTrigger = ref<HTMLButtonElement>()
 const touchOpen = ref(false)
+
+watchEffect(onCleanup => {
+  if (!touchOpen.value) return
+  const closeOnPointer = (event: PointerEvent) => {
+    if (tools.value && !event.composedPath().includes(tools.value)) touchOpen.value = false
+  }
+  document.addEventListener('pointerdown', closeOnPointer, true)
+  onCleanup(() => document.removeEventListener('pointerdown', closeOnPointer, true))
+})
 
 function closeMenu() {
   if (props.open) {
