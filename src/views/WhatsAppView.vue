@@ -3109,7 +3109,8 @@ watch(() => selectedConversation.value?.id, id => {
 .wa-attachment-remove:hover:not(:disabled) { background: var(--wa-selected); color: var(--wa-text); }
 .wa-attachment-remove:disabled { opacity: .5; }
 .wa-message-row:has(.wa-ai-message-marker) { padding-inline-start: .875rem; }
-.wa-message-stack { position: relative; display: grid; min-width: 0; max-width: min(86%, calc(100% - 5.25rem)); gap: .25rem; }
+.wa-message-stack { position: relative; display: grid; min-width: 0; max-width: min(86%, calc(100% - 6.75rem)); gap: .25rem; }
+.wa-forward-row .wa-message-stack { max-width: 86%; }
 .wa-ai-message-marker { position: absolute; inset-inline-start: -1.375rem; top: .3125rem; }
 .wa-ai-message-marker :deep(button) {
   width: 1.125rem; height: 1.125rem; color: var(--wa-muted);
