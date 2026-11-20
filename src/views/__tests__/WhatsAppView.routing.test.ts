@@ -62,6 +62,7 @@ import WhatsAppView from '../WhatsAppView.vue'
 import WhatsAppComposerPicker from '@/components/whatsapp/WhatsAppComposerPicker.vue'
 import WhatsAppForwardDialog from '@/components/whatsapp/WhatsAppForwardDialog.vue'
 import WhatsAppOrderPanel from '@/components/whatsapp/WhatsAppOrderPanel.vue'
+import WhatsAppVoiceMessage from '@/components/whatsapp/WhatsAppVoiceMessage.vue'
 import { useWhatsAppStore } from '@/store/whatsapp'
 import { useAuthStore } from '@/store/auth'
 
@@ -171,6 +172,26 @@ describe('M38-F04 view + real Pinia store integration', () => {
     await nextTick()
     expect(input.element.value).toBe('Hola 🍚')
     expect(m.api.sendMessage).not.toHaveBeenCalled()
+  })
+
+  it('renders the voice player only for visible audio with a source', async () => {
+    const chat = m.rows[0]!
+    const voice = {
+      id: 50, conversationId: chat.id, direction: 'inbound', type: 'audio',
+      timestamp: '2026-11-20T17:00:00Z', mediaUrl: 'https://example.invalid/voice.ogg',
+    } as WhatsAppMessage
+    m.api.getMessagesPage.mockResolvedValue(reply({
+      items: [voice, { ...voice, id: 51, hiddenSource: 'pos' }, { ...voice, id: 52, mediaUrl: null }],
+      nextCursor: null, hasMore: false,
+    }))
+    const { vm, wrapper } = mountView()
+    await flushPromises()
+    await vm.selectConversation(chat)
+
+    expect(wrapper.findAllComponents(WhatsAppVoiceMessage)).toHaveLength(1)
+    expect(wrapper.getComponent(WhatsAppVoiceMessage).props('src')).toBe(voice.mediaUrl)
+    expect(wrapper.get('[data-message-id="51"]').text()).toContain('Mensaje oculto en el POS')
+    expect(wrapper.get('[data-message-id="52"]').text()).toContain('Audio sin vista previa')
   })
 
   it('saves a received sticker, reloads it, and sends it as a sticker without clearing the draft', async () => {
