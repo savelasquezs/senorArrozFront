@@ -12,6 +12,8 @@ export function useOrderStatusChange() {
     // Estado compartido
     const pendingStatusChange = ref<OrderStatus | null>(null)
     const showAssignDeliveryModal = ref(false)
+    // Prevent overlapping mutations on the same order from repeated status clicks.
+    const inFlightOrderIds = new Set<number>()
 
     /**
      * Valida y ejecuta el cambio de estado
@@ -22,6 +24,8 @@ export function useOrderStatusChange() {
         newStatus: OrderStatus,
         onSuccess?: (updatedOrder: Order) => void
     ): Promise<boolean> => {
+        if (inFlightOrderIds.has(order.id)) return false
+
         // ✅ Validar permisos
         if (!permissions.canChangeStatus(order, newStatus)) {
             error('Sin permisos', 'No tienes permiso para cambiar el estado')
@@ -54,6 +58,10 @@ export function useOrderStatusChange() {
         onSuccess?: (updatedOrder: Order) => void,
         snapshot?: OrderMutationSnapshot
     ): Promise<void> => {
+        // Progress-bar clicks and delivery-assignment callbacks share this path.
+        // Other orders can still update while this request is outstanding.
+        if (inFlightOrderIds.has(orderId)) return
+        inFlightOrderIds.add(orderId)
         try {
             const updatedOrder = await orderApi.updateStatus(orderId, newStatus, undefined, snapshot)
             const orderAny = updatedOrder as any
@@ -73,6 +81,8 @@ export function useOrderStatusChange() {
             }
         } catch (err: any) {
             error('Error al cambiar estado', err.message)
+        } finally {
+            inFlightOrderIds.delete(orderId)
         }
     }
 
