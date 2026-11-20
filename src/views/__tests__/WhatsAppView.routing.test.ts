@@ -230,6 +230,32 @@ describe('M38-F04 view + real Pinia store integration', () => {
     expect(wrapper.find('[aria-label="Contacto de prueba"]').exists()).toBe(false)
   })
 
+  it('offers free and team chats for forwarding while filtering the source, expired and closed chats', async () => {
+    const openWindow = '2099-01-01T00:00:00Z'
+    m.rows = [
+      { ...conversation(1), customerServiceWindowExpiresAt: openWindow },
+      { ...conversation(2), assignedUserId: undefined, attentionMode: 'waitingForHuman', customerServiceWindowExpiresAt: openWindow },
+      { ...conversation(3), assignedUserId: 8, customerServiceWindowExpiresAt: openWindow },
+      { ...conversation(4), customerServiceWindowExpiresAt: '2000-01-01T00:00:00Z' },
+      { ...conversation(5), attentionMode: 'closed', status: 'closed', customerServiceWindowExpiresAt: openWindow },
+    ]
+    const dialog = shallowMount(WhatsAppForwardDialog, {
+      props: { modelValue: true, sourceId: 1, count: 1, sending: false, error: '' },
+      global: { stubs: {
+        BaseDialog: { template: '<div><slot /><slot name="footer" /></div>' },
+        BaseButton: { template: '<button><slot /></button>' },
+      } },
+    })
+    wrappers.push(dialog)
+    await flushPromises()
+    expect(m.api.getConversations.mock.calls[0]?.[0]).toEqual({ search: undefined })
+    const destinations = dialog.get('[aria-label="Chats de destino"]').findAll('button')
+    expect(destinations.map(button => button.get('span.block').text())).toEqual(['Chat 2', 'Chat 3'])
+    await destinations[1]!.trigger('click')
+    await dialog.findAll('button').find(button => button.text() === 'Reenviar mensaje')!.trigger('click')
+    expect(dialog.emitted('forward')).toEqual([[3]])
+  })
+
   it('forwards selected messages in chat order and retries only the unconfirmed message with the same request ID', async () => {
     const message = {
       conversationId: 1, direction: 'inbound', type: 'text', status: 'received',

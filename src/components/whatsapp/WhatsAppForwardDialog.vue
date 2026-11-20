@@ -1,7 +1,7 @@
 <template>
   <BaseDialog :model-value="modelValue" title="Reenviar mensajes" size="md" :dismissible="!sending"
     :close-on-backdrop="false" :initial-focus="`#${searchId}`" @update:model-value="emit('update:modelValue', $event)">
-    <label :for="searchId" class="mb-1 block text-xs font-medium text-gray-700">Elige un chat a tu cargo con ventana abierta</label>
+    <label :for="searchId" class="mb-1 block text-xs font-medium text-gray-700">Elige un chat con ventana de atención abierta</label>
     <input :id="searchId" v-model="search" type="search" class="w-full rounded-lg border border-gray-300 bg-gray-50 px-3 py-2 text-sm"
       placeholder="Nombre, teléfono o usuario" :disabled="sending" />
     <div class="mt-3 space-y-1" role="group" aria-label="Chats de destino">
@@ -43,7 +43,6 @@ import { conversationTitle } from '@/utils/whatsappInbox'
 const props = defineProps<{
   modelValue: boolean
   sourceId: number
-  userId: number | undefined
   count: number
   sending: boolean
   error: string
@@ -67,12 +66,13 @@ async function load(append: boolean) {
   loadError.value = ''
   try {
     const query = search.value.trim()
-    const { data } = await whatsappApi.getConversationPage({ inbox: 'mine', search: query || undefined },
+    const { data } = await whatsappApi.getConversationPage({ search: query || undefined },
       control.signal, append ? cursor.value ?? undefined : undefined)
     if (control.signal.aborted) return
     const now = Date.now()
-    const eligible = data.items.filter(chat => chat.id !== props.sourceId && chat.assignedUserId === props.userId
-      && chat.attentionMode === 'human' && Date.parse(chat.customerServiceWindowExpiresAt ?? '') > now)
+    const eligible = data.items.filter(chat => chat.id !== props.sourceId && chat.attentionMode !== 'closed'
+      && chat.status !== 'closed' && chat.status !== 'archived'
+      && Date.parse(chat.customerServiceWindowExpiresAt ?? '') > now)
     destinations.value = append ? [...destinations.value, ...eligible] : eligible
     cursor.value = data.nextCursor
   } catch {
