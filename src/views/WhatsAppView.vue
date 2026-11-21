@@ -64,9 +64,15 @@
           <div role="separator" tabindex="0" aria-label="Ancho de conversaciones" aria-orientation="vertical" :aria-valuenow="leftWidth" class="absolute -right-1 top-0 z-10 hidden h-full w-2 cursor-col-resize touch-none xl:block" @pointerdown="resize($event, 'left')" @keydown.left.prevent="step('left', -20)" @keydown.right.prevent="step('left', 20)" />
           <div class="wa-inbox-header">
             <h2 class="text-xs font-semibold leading-4">Conversaciones</h2>
-            <input v-model="search" type="search" class="wa-inbox-search" aria-label="Buscar conversaciones"
-              name="whatsapp-conversation-search" autocomplete="off" spellcheck="false"
-              placeholder="Nombre, teléfono o usuario" @input="onSearchInput" />
+            <div class="flex items-center gap-1.5">
+              <input v-model="search" type="search" class="wa-inbox-search min-w-0" aria-label="Buscar conversaciones"
+                name="whatsapp-conversation-search" autocomplete="off" spellcheck="false"
+                placeholder="Nombre, teléfono o usuario" @input="onSearchInput" />
+              <button type="button" class="wa-start-chat" title="Nueva conversación" aria-label="Nueva conversación" aria-haspopup="dialog"
+                @click="showConversationStarter = true">
+                <UserPlusIcon class="size-4" aria-hidden="true" />
+              </button>
+            </div>
             <div class="relative flex flex-wrap gap-1.5">
               <details name="whatsapp-inbox-controls" class="group" @toggle="onDetailsToggle" @keydown.esc.stop="closeDetailsMenu">
                 <summary class="inbox-control" :class="{ 'border-emerald-300 bg-emerald-50 text-emerald-900': inboxFilterCount }">
@@ -888,6 +894,8 @@
         </dl>
         <p v-else-if="previewedContact" class="text-sm text-gray-600">La tarjeta solo contiene el nombre.</p>
       </BaseDialog>
+      <WhatsAppConversationStarter v-if="showConversationStarter" v-model="showConversationStarter" :key="sessionKey"
+        :branches="conversationStarterBranches" :initial-branch-id="conversationStarterBranchId" @complete="openStartedConversation" />
       <WhatsAppForwardDialog v-if="showForwardDialog && selectedConversation" v-model="showForwardDialog"
         :source-id="selectedConversation.id" :count="forwardSelection.size" :sending="forwarding"
         :error="forwardError" @forward="forwardSelectedMessages" />
@@ -904,6 +912,7 @@ import WhatsAppOrderPanel from '@/components/whatsapp/WhatsAppOrderPanel.vue'
 import WhatsAppMessageActions from '@/components/whatsapp/WhatsAppMessageActions.vue'
 import WhatsAppVoiceMessage from '@/components/whatsapp/WhatsAppVoiceMessage.vue'
 import WhatsAppContactAvatar from '@/components/whatsapp/WhatsAppContactAvatar.vue'
+import WhatsAppConversationStarter from '@/components/whatsapp/WhatsAppConversationStarter.vue'
 import type { WhatsAppCommercialDraft } from '@/types/whatsapp'
 
 import { computed, defineAsyncComponent, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue'
@@ -1050,6 +1059,7 @@ const customInboxLabels = computed(() => inboxLabels.value.filter(label => label
 const changingInboxLabel = ref(false)
 const savingInboxLabel = ref(false)
 const showInboxLabelManager = ref(false)
+const showConversationStarter = ref(false)
 const showInboxLabelEditor = ref(false)
 const editingInboxLabelKey = ref('')
 const inboxLabelDraft = ref<WhatsAppInboxLabelDefinition>({ name: '', color: 'violet' })
@@ -1760,6 +1770,16 @@ const branchOptions = computed(() => {
     label: labels.get(id) ?? `Sucursal ${id}`,
   }))
 })
+const conversationStarterBranches = computed(() => {
+  const user = authStore.user
+  if (!authStore.isSuperadmin) return user?.branchId ? [{ id: user.branchId, label: user.branchName }] : []
+  const branches = new Map(branchOptions.value.map(branch => [branch.id, branch.label]))
+  for (const branch of whatsappStore.operationalBranches) branches.set(branch.id, branch.name)
+  return [...branches].map(([id, label]) => ({ id, label }))
+})
+const conversationStarterBranchId = computed(() => conversationStarterBranches.value.find(branch =>
+  branch.id === (selectedBranchId.value || workContext.selectedBranchId || authStore.user?.branchId))?.id
+  ?? conversationStarterBranches.value[0]?.id ?? 0)
 const headerBranchLabel = computed(() => {
   if (authStore.isSuperadmin) {
     if (!selectedBranchId.value) return 'Todas las sucursales'
@@ -2122,6 +2142,20 @@ async function selectConversation(conversation: WhatsAppConversation) {
   await whatsappStore.fetchMessages(conversation.id, false, false, true).catch(() => {})
   inboxTotalsRefresh.schedule()
   if (selection === conversationSelection) await scrollToBottom()
+}
+
+async function openStartedConversation(id: number, sent: boolean) {
+  const scope = sessionKey.value
+  const conversation = await whatsappStore.fetchConversation(id).catch(() => null)
+  if (!viewActive || sessionKey.value !== scope) return
+  if (!conversation) {
+    showError('Conversación', sent ? 'El envío se registró. Actualiza la bandeja para abrir el chat.' : 'Actualiza la bandeja para abrir el chat existente.')
+    return
+  }
+  activeInbox.value = conversation.attentionMode === 'closed' ? 'closed'
+    : conversation.assignedUserId === authStore.user?.id ? 'mine' : conversation.assignedUserId ? 'team' : 'free'
+  if (!sent) success('Conversación abierta', 2600, 'El número ya tiene un chat. Toma la atención para enviarle una plantilla.')
+  await selectConversation(conversation)
 }
 
 async function selectConversationFromRoute() {
@@ -3249,6 +3283,13 @@ watch(() => selectedConversation.value?.id, id => {
   padding: 0 .4375rem; font-size: .6875rem; background: var(--wa-canvas);
 }
 .wa-inbox-search::placeholder { color: var(--wa-muted); }
+.wa-start-chat {
+  display: grid; place-items: center; flex: none; width: 1.625rem; height: 1.625rem;
+  border: 1px solid var(--wa-line); border-radius: .375rem; color: var(--wa-action);
+  background: var(--wa-panel); cursor: pointer; transition: background-color 120ms, color 120ms;
+}
+.wa-start-chat:hover { background: var(--wa-action); color: var(--wa-on-action); }
+.wa-start-chat:focus-visible { outline: 2px solid var(--wa-focus); outline-offset: 2px; }
 .wa-conversation {
   position: relative; width: 100%; text-align: left; padding: .375rem .5rem;
   background: var(--wa-panel); border-bottom: 1px solid var(--wa-line);

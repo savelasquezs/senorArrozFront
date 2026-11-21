@@ -13,6 +13,9 @@ import type {
   WhatsAppAiUsageFilters,
   WhatsAppConversation,
   WhatsAppConversationFilters,
+  WhatsAppConversationStartOptions,
+  WhatsAppConversationStartRequest,
+  WhatsAppConversationStartResult,
   WhatsAppOperationalBranchOption,
   WhatsAppMessage,
   WhatsAppProductChoiceGroup,
@@ -60,6 +63,14 @@ class WhatsAppApi extends BaseApi {
       status: error?.response?.status,
       serverCode: error?.response?.data?.code,
     })
+  }
+  getConversationStartOptions(branchId: number, signal?: AbortSignal) {
+    return this.get<ApiResponse<WhatsAppConversationStartOptions>>('/whatsapp/conversations/start/options', {
+      params: { branchId }, signal,
+    })
+  }
+  startConversation(payload: WhatsAppConversationStartRequest, requestId: string) {
+    return this.manualPost<WhatsAppConversationStartResult>('/whatsapp/conversations/start', payload, requestId)
   }
   getCommercialDraft(id: number) {
     return this.get<ApiResponse<WhatsAppCommercialDraft | null>>(`/whatsapp/conversations/${id}/commercial-draft`)

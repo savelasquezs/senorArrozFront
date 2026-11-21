@@ -6,15 +6,16 @@
 		</label>
 
 		<div class="relative" ref="triggerWrapRef">
-			<button type="button" :id="id" @click="toggleDropdown" @keydown.enter.space.prevent="toggleDropdown"
+			<button type="button" :id="id" @click="toggleDropdown" @keydown.enter.space.prevent="activateOption"
 				@keydown.escape="closeDropdown" @keydown.up.prevent="highlightPrevious"
-				@keydown.down.prevent="highlightNext" @keydown.enter.prevent="selectHighlighted"
+				@keydown.down.prevent="openOrHighlight"
 				class="relative w-full text-left bg-white border rounded-md shadow-sm cursor-pointer focus:outline-none focus:ring-1 focus:border-green-500 focus:ring-green-500"
 				:class="[
 					triggerSizeClass,
 					error ? 'border-red-300' : 'border-gray-300',
 					disabled ? 'bg-gray-50 cursor-not-allowed' : 'hover:border-gray-400',
-				]" :disabled="disabled" :aria-expanded="isOpen" :aria-haspopup="true">
+				]" :disabled="disabled" :aria-expanded="isOpen" aria-haspopup="listbox"
+				:aria-controls="isOpen ? `${id}-options` : undefined">
 				<span class="flex items-center min-h-[1.25rem]">
 					<slot name="icon" />
 					<span class="block truncate" :class="[{ 'text-gray-500': !hasSelection }, textSizeClass]">
@@ -45,8 +46,10 @@
 								@keydown.enter.prevent="selectHighlighted" @keydown.escape="closeDropdown" />
 						</div>
 
-						<div v-if="filteredOptions.length > 0">
+						<div :id="`${id}-options`" role="listbox" :aria-labelledby="id"
+							:aria-multiselectable="multiple || undefined">
 							<div v-for="(option, index) in filteredOptions" :key="option[valueKey]"
+								role="option" :aria-selected="isSelected(option)"
 								@click="selectOption(option)" @mouseenter="highlightedIndex = index"
 								class="relative cursor-pointer select-none hover:bg-gray-50" :class="[
 									optionRowClass,
@@ -68,32 +71,32 @@
 									{{ option.description }}
 								</span>
 							</div>
-						</div>
 
-						<div v-if="showCreateOption" @click="handleCreateOption"
-							@mouseenter="highlightedIndex = filteredOptions.length"
-							class="relative cursor-pointer select-none hover:bg-blue-50 border-t border-gray-200"
-							:class="[optionRowClass, {
-								'bg-blue-50 text-blue-700': highlightedIndex === filteredOptions.length,
-							}]">
-							<div class="flex items-center">
-								<PlusIcon class="text-blue-600 shrink-0" :class="size === 'sm' ? 'w-3.5 h-3.5 mr-1.5' : 'w-4 h-4 mr-2'" />
-								<span class="font-medium text-blue-600" :class="size === 'sm' ? 'text-xs' : 'text-sm'">
-									Crear "{{ searchQuery }}"
-								</span>
+							<div v-if="showCreateOption" role="option" :aria-selected="false" @click="handleCreateOption"
+								@mouseenter="highlightedIndex = filteredOptions.length"
+								class="relative cursor-pointer select-none hover:bg-blue-50 border-t border-gray-200"
+								:class="[optionRowClass, {
+									'bg-blue-50 text-blue-700': highlightedIndex === filteredOptions.length,
+								}]">
+								<div class="flex items-center">
+									<PlusIcon class="text-blue-600 shrink-0" :class="size === 'sm' ? 'w-3.5 h-3.5 mr-1.5' : 'w-4 h-4 mr-2'" />
+									<span class="font-medium text-blue-600" :class="size === 'sm' ? 'text-xs' : 'text-sm'">
+										Crear "{{ searchQuery }}"
+									</span>
+								</div>
+								<div class="text-blue-500 mt-0.5" :class="size === 'sm' ? 'text-[10px]' : 'text-xs'">
+									Haz clic para crear una nueva opción
+								</div>
 							</div>
-							<div class="text-blue-500 mt-0.5" :class="size === 'sm' ? 'text-[10px]' : 'text-xs'">
-								Haz clic para crear una nueva opción
-							</div>
-						</div>
 
-						<div v-else-if="filteredOptions.length === 0"
-							class="relative cursor-default select-none text-gray-500" :class="optionRowClass">
-							{{
-								searchQuery
-									? 'No se encontraron resultados'
-									: 'No hay opciones disponibles'
-							}}
+							<div v-else-if="filteredOptions.length === 0"
+								class="relative cursor-default select-none text-gray-500" :class="optionRowClass">
+								{{
+									searchQuery
+										? 'No se encontraron resultados'
+										: 'No hay opciones disponibles'
+								}}
+							</div>
 						</div>
 					</div>
 				</Transition>
@@ -272,6 +275,20 @@ function closeDropdown() {
 	highlightedIndex.value = -1
 }
 
+function activateOption() {
+	if (isOpen.value && highlightedIndex.value >= 0) selectHighlighted()
+	else toggleDropdown()
+}
+
+async function openOrHighlight() {
+	if (!isOpen.value) {
+		toggleDropdown()
+		await nextTick()
+		if (highlightedIndex.value >= 0) return
+	}
+	highlightNext()
+}
+
 function selectOption(option: Option) {
 	if (!props.multiple) {
 		emit('update:modelValue', option[props.valueKey])
@@ -322,6 +339,7 @@ function handleCreateOption() {
 }
 
 function handleClickOutside(event: Event) {
+	if (!isOpen.value) return
 	const t = event.target as Node
 	if (selectRef.value?.contains(t)) return
 	if (dropdownPanelRef.value?.contains(t)) return
@@ -352,11 +370,11 @@ watch(
 )
 
 onMounted(() => {
-	document.addEventListener('click', handleClickOutside)
+	document.addEventListener('click', handleClickOutside, true)
 })
 
 onUnmounted(() => {
-	document.removeEventListener('click', handleClickOutside)
+	document.removeEventListener('click', handleClickOutside, true)
 	window.removeEventListener('scroll', onScrollOrResize, true)
 	window.removeEventListener('resize', onScrollOrResize)
 })

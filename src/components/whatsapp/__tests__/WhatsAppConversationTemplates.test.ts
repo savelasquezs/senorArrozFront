@@ -17,7 +17,9 @@ async function setup() {
     stubs: { BaseDialog: { props: ['modelValue'], template: '<div v-if="modelValue"><slot /></div>' } },
   } })
   await wrapper.get('button').trigger('click'); await flushPromises()
-  await wrapper.get('select').setValue('retomar:es'); await wrapper.get('input').setValue('Cliente')
+  await wrapper.get('button[aria-haspopup]').trigger('click')
+  await wrapper.get('[role="option"]').trigger('click')
+  await wrapper.get('input').setValue('Cliente')
   return wrapper
 }
 describe('Conversation templates', () => {
