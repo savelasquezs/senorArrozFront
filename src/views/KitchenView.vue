@@ -76,6 +76,7 @@
 
             <div v-else-if="activeTab === 'ready'">
                 <ReadyOrdersTable :orders="readyOrders" :order-items-map="orderItemsMap"
+                    :reprinting-order-ids="reprintingOrderIds"
                     :can-return-to-preparation="authStore.isAdmin || authStore.isSuperadmin"
                     @reprint="handleReprint" @return-to-preparation="handleReturnToPreparation" />
             </div>
@@ -321,6 +322,18 @@ const activeOrders = computed(() => {
 })
 
 const readyOrders = computed(() => allOrders.value.filter(o => o.status === 'ready'))
+
+// A print enqueue is not idempotent on the server. Suppress repeated clicks only
+// while the same branch/order request is outstanding; allow deliberate later reprints.
+const reprintPendingKeys = ref<Set<string>>(new Set())
+const reprintingOrderIds = computed(() => {
+    const prefix = `${kitchenBranchId.value}:`
+    return new Set(
+        [...reprintPendingKeys.value]
+            .filter(key => key.startsWith(prefix))
+            .map(key => Number(key.slice(prefix.length))),
+    )
+})
 const hourlySummary = computed(() =>
     buildKitchenHourlySummary(summaryOrders.value, orderItemsMap.value, summaryDate.value),
 )
@@ -825,6 +838,9 @@ const handleReprint = async (orderId: number) => {
         error('Sin sucursal', 'Tu usuario no tiene sucursal asignada.')
         return
     }
+    const key = `${branchId}:${orderId}`
+    if (reprintPendingKeys.value.has(key)) return
+    reprintPendingKeys.value = new Set([...reprintPendingKeys.value, key])
     try {
         const res = await printJobsApi.enqueueKitchenJob(branchId, [orderId])
         if (!res.isSuccess) {
@@ -835,6 +851,10 @@ const handleReprint = async (orderId: number) => {
     } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : 'No se pudo encolar la reimpresión.'
         error('Reimpresión', msg)
+    } finally {
+        const pending = new Set(reprintPendingKeys.value)
+        pending.delete(key)
+        reprintPendingKeys.value = pending
     }
 }
 
