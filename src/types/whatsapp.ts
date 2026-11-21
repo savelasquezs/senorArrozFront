@@ -183,6 +183,39 @@ export interface WhatsAppTemplateFilters {
   search?: string
 }
 
+export type WhatsAppConversationStartKind = 'menu' | 'catalog' | 'payment'
+
+export interface WhatsAppConversationStartOptions {
+  branchId: number
+  branchName: string
+  senderId: string
+  displayPhoneNumber: string
+  account: string | null
+  holder: string | null
+  templates: {
+    key: WhatsAppConversationStartKind
+    name: string
+    status: string
+    body: string | null
+    unavailableReason: string | null
+  }[]
+}
+
+export interface WhatsAppConversationStartRequest {
+  branchId: number
+  senderId: string
+  phone: string
+  template: WhatsAppConversationStartKind
+  requestedByCustomer: boolean
+  orderId?: number
+  amount?: number
+}
+
+export interface WhatsAppConversationStartResult {
+  conversationId: number
+  sent: boolean
+}
+
 export interface WhatsAppTemplateSyncResult {
   synced: number
   created: number
