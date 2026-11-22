@@ -42,10 +42,24 @@ describe('open order in the WhatsApp tab', () => {
         const launch = createWhatsAppOrderLauncher()(scope, 25, orderUrl, () => true)
         await vi.advanceTimersByTimeAsync(250)
 
-        expect(await launch).toBe(true)
+        expect(await launch).toBe('reused')
         expect(recent).toHaveBeenCalledExactlyOnceWith(25)
         expect(first).not.toHaveBeenCalled()
         expect(other).not.toHaveBeenCalled()
+        expect(popup).not.toHaveBeenCalled()
+    })
+
+    it('reuses the tab even when the browser refuses to focus it', async () => {
+        const receiveOrder = vi.fn()
+        vi.mocked(window.focus).mockImplementation(() => { throw new DOMException('Focus denied', 'InvalidAccessError') })
+        listeners.push(listenForWhatsAppOrders(() => scope, receiveOrder))
+        const popup = vi.spyOn(window, 'open')
+
+        const launch = createWhatsAppOrderLauncher()(scope, 25, orderUrl, () => true)
+        await vi.advanceTimersByTimeAsync(250)
+
+        expect(await launch).toBe('reused')
+        expect(receiveOrder).toHaveBeenCalledExactlyOnceWith(25)
         expect(popup).not.toHaveBeenCalled()
     })
 
@@ -56,11 +70,11 @@ describe('open order in the WhatsApp tab', () => {
         const launch = createWhatsAppOrderLauncher()
         const first = launch(scope, 25, orderUrl, () => true)
         await vi.advanceTimersByTimeAsync(250)
-        expect(await first).toBe(false)
+        expect(await first).toBe('blocked')
 
         const retry = launch(scope, 25, orderUrl, () => true)
         expect(popup).toHaveBeenCalledTimes(2)
-        expect(await retry).toBe(true)
+        expect(await retry).toBe('opened')
         expect(replace).toHaveBeenCalledExactlyOnceWith(orderUrl)
     })
 })

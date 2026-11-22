@@ -826,7 +826,7 @@ function handleTrackOrder(order: OrderListItem) {
     showTrackingDialog.value = true
 }
 
-const { success, error } = useToast()
+const { success, error, info } = useToast()
 const launchWhatsApp = createWhatsAppOrderLauncher()
 const whatsAppTabScope = computed(() => whatsAppOrderTabScope(authStore.user, workspaceBranchId.value))
 
@@ -834,8 +834,9 @@ async function handleOpenWhatsApp(orderId: number) {
     const scope = whatsAppTabScope.value
     if (!scope) return
     const url = router.resolve({ name: 'WhatsApp', query: { orderId: String(orderId) } }).href
-    const opened = await launchWhatsApp(scope, orderId, url, () => route.name === 'OrdersList' && whatsAppTabScope.value === scope)
-    if (!opened) error('No se pudo abrir WhatsApp', 'Permite las pestañas emergentes y vuelve a pulsar el ícono.')
+    const result = await launchWhatsApp(scope, orderId, url, () => route.name === 'OrdersList' && whatsAppTabScope.value === scope)
+    if (result === 'reused') info('Pedido en WhatsApp', `Continúa con el pedido #${orderId} en la pestaña de WhatsApp que ya tienes abierta.`)
+    if (result === 'blocked') error('No se pudo abrir WhatsApp', 'Permite las pestañas emergentes y vuelve a pulsar el ícono.')
 }
 const { formatCurrency } = useFormatting()
 
