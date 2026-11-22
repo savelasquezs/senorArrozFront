@@ -126,12 +126,37 @@ function hasPermission(roles: string[], item?: NavItem) {
 }
 const unreadBadgeText = computed(() => whatsappStore.unreadTotal > 99 ? '99+' : String(whatsappStore.unreadTotal));
 function loadWhatsAppStatus() { if (authStore.isAuthenticated && office.includes(authStore.userRole || '')) void whatsappStore.ensureStatus(); }
+let integrationGeneration = 0, integrationBranchId: number | null = null;
+let integrationInFlight: { branchId: number; promise: Promise<void> } | null = null;
 async function loadIntegrationStatus() {
-  if (!authStore.isAuthenticated || !office.includes(authStore.userRole || '')) return;
-  const id = authStore.isSuperadmin ? branchContext.selectedBranchId : authStore.user?.branchId;
-  if (!id) { rappiConnection.value = null; return; }
-  try { const result = await integrationApi.getOperationalStatus(id); rappiConnection.value = result.data.rappi ?? null; rappiPending.value = result.data.pending; }
-  catch { rappiConnection.value = null; rappiPending.value = 0; }
+  const id = authStore.isAuthenticated && office.includes(authStore.userRole || '')
+    ? (authStore.isSuperadmin ? branchContext.selectedBranchId : authStore.user?.branchId) : null;
+  if (!id) {
+    integrationGeneration++; integrationBranchId = null; integrationInFlight = null;
+    rappiConnection.value = null; rappiPending.value = 0;
+    return;
+  }
+  if (id !== integrationBranchId) {
+    integrationBranchId = id;
+    rappiConnection.value = null; rappiPending.value = 0;
+  }
+  // Mount, branch changes and the interval may overlap: share one GET per branch.
+  if (integrationInFlight?.branchId === id) return integrationInFlight.promise;
+  const generation = ++integrationGeneration;
+  const request = (async () => {
+    try {
+      const result = await integrationApi.getOperationalStatus(id);
+      if (generation !== integrationGeneration) return;
+      rappiConnection.value = result.data.rappi ?? null;
+      rappiPending.value = result.data.pending;
+    } catch {
+      if (generation !== integrationGeneration) return;
+      rappiConnection.value = null; rappiPending.value = 0;
+    }
+  })();
+  integrationInFlight = { branchId: id, promise: request };
+  try { await request; }
+  finally { if (integrationInFlight?.promise === request) integrationInFlight = null; }
 }
 let integrationTimer: ReturnType<typeof setInterval> | undefined;
 onMounted(() => {
@@ -140,7 +165,7 @@ onMounted(() => {
     if (document.visibilityState !== 'hidden' && navigator.onLine) void loadIntegrationStatus();
   }, 60_000);
 });
-onBeforeUnmount(() => clearInterval(integrationTimer));
+onBeforeUnmount(() => { integrationGeneration++; clearInterval(integrationTimer); });
 watch(() => authStore.isAuthenticated, loadWhatsAppStatus);
 watch(() => [authStore.isAuthenticated, branchContext.revision], () => void loadIntegrationStatus());
 watch(() => route.path, path => {
