@@ -52,7 +52,7 @@
       <template v-if="session.orderId">
         <p v-if="session.confirmationStatus" class="text-xs text-gray-600">Confirmación por WhatsApp: {{ session.confirmationStatus }}</p>
         <p v-if="session.confirmationError" class="text-xs text-amber-800">El pedido ya existe. {{ session.confirmationError === 'provider_rejected_retryable' ? 'Puedes reintentar el mensaje.' : 'Revisa el envío antes de repetirlo.' }}</p>
-        <BaseButton variant="outline" @click="openOrder()">Gestionar pedido #{{ session.orderId }}</BaseButton>
+        <WhatsAppOrderQuickActions :key="session.orderId" :order-id="session.orderId" :active="active" @manage="openOrder()" />
         <BaseButton v-if="session.confirmationStatus === 'failed' && session.confirmationError === 'provider_rejected_retryable'" :disabled="!owned || syncing" variant="outline" @click="run(() => action('retry-message'))">Reintentar mensaje</BaseButton>
       </template>
       <BaseButton :disabled="!owned || syncing || !!session.checkoutId && !session.orderId && session.commercialStatus !== 'no_sale'" @click="showNew = true">Nuevo pedido</BaseButton>
@@ -94,6 +94,7 @@ import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseDialog from '@/components/ui/BaseDialog.vue'
 import BaseLoading from '@/components/ui/BaseLoading.vue'
 import OrderSidebar from '@/components/orders/OrderSidebar.vue'
+import WhatsAppOrderQuickActions from '@/components/whatsapp/WhatsAppOrderQuickActions.vue'
 import { useWhatsAppCommercialDraft } from '@/composables/useWhatsAppCommercialDraft'
 import { useOrdersDataStore } from '@/store/ordersData'
 import { whatsappApi } from '@/services/MainAPI/whatsappApi'

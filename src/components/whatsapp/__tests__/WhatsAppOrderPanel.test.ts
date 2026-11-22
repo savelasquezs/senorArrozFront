@@ -75,7 +75,10 @@ async function panel(overrides: Partial<WhatsAppConversation> = {}) {
       conversation: { id: 44, branchId: 9, isCentralChannel: true, operationalBranchId: 2,
         attentionMode: 'human', assignedUserId: 7, attentionRevision: 6, ...overrides } as WhatsAppConversation,
     },
-    global: { plugins: [pinia], stubs: { OrderSidebar: Editor, BaseDialog: Dialog, OrderDetailContent: true } },
+    global: { plugins: [pinia], stubs: { OrderSidebar: Editor, BaseDialog: Dialog, OrderDetailContent: true,
+      WhatsAppOrderQuickActions: { props: ['orderId', 'active'], emits: ['manage'],
+        template: '<button @click="$emit(\'manage\')">Gestionar pedido #{{ orderId }}</button>' },
+    } },
   })
   wrapper = mounted
   await flushPromises()
@@ -182,6 +185,14 @@ it('starts a new versioned attempt after a confirmed order', async () => {
   await click('Iniciar nuevo pedido')
   expect(api.startCommercialDraft).toHaveBeenCalledWith(44, { sessionId: 81, expectedVersion: 3, attentionVersion: 6 })
   expect(editor.currentOrder?.orderItems).toEqual([])
+})
+
+it('keeps opening the confirmed order from the quick actions component', async () => {
+  shared = { ...shared, status: 'completed', orderId: 501 }
+  await panel()
+  await click('Gestionar pedido #501')
+  expect(details.fetchById).toHaveBeenCalledExactlyOnceWith(501)
+  expect(wrapper!.find('[role="dialog"]').exists()).toBe(true)
 })
 
 it('requires an explicit destination on an unrouted central conversation', async () => {
