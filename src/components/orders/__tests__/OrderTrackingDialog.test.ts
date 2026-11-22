@@ -8,19 +8,27 @@ const visible = ref(true)
 const online = ref(true)
 vi.mock('@/services/MainAPI/orderManagementApi', () => ({ orderManagementApi: { tracking: mocks.tracking } }))
 vi.mock('@/services/MainAPI/orderApi', () => ({ orderApi: { fetchDetail: mocks.detail } }))
+vi.mock('@/store/auth', () => ({ useAuthStore: () => ({ user: { id: 71 } }) }))
 vi.mock('@/composables/useOrderManagementUpdates', () => ({ useOrderManagementUpdates: () => ({ isPageVisible: visible, isOnline: online }) }))
 const row = { id: 20, branchId: 2, branchName: 'Manrique', managementVersion: 7, status: 'on_the_way', type: 'delivery' } as OrderListItem
 const snapshot = { orderId: 20, managementVersion: 7, status: 'on_the_way', deliveryManId: 80, deliveryManName: 'Remoto', deliveryRouteId: 30,
     location: { latitude: 6.2, longitude: -75.5, recordedAt: '2026-10-12T17:00:00Z', isFresh: true } }
 let wrapper: VueWrapper
 const mountDialog = () => wrapper = shallowMount(OrderTrackingDialog, { props: { modelValue: true, order: row }, global: { stubs: {
-    BaseDialog: { template: '<section><slot /></section>' },
+    BaseDialog: { props: ['whatsappTheme'], template: '<section :data-wa-theme="whatsappTheme"><slot /></section>' },
     BaseButton: { template: '<button><slot /></button>' },
     DeliveryMapAsync: { props: ['orders', 'deliverymanLocations'], template: '<div data-test="map" :data-drivers="Object.keys(deliverymanLocations).join()" />' },
 } } })
 beforeEach(() => { vi.useFakeTimers(); visible.value = true; online.value = true; mocks.tracking.mockResolvedValue(snapshot) })
-afterEach(() => { wrapper?.unmount(); vi.useRealTimers() })
+afterEach(() => { wrapper?.unmount(); localStorage.removeItem('whatsapp:theme:71'); vi.useRealTimers() })
 describe('resource-scoped remote tracking', () => {
+    it('uses the saved WhatsApp theme outside of WhatsApp and reports a missing driver', async () => {
+        localStorage.setItem('whatsapp:theme:71', 'dark')
+        mocks.tracking.mockResolvedValue({ ...snapshot, location: null })
+        mountDialog(); await flushPromises()
+        expect(wrapper.get('[data-wa-theme]').attributes('data-wa-theme')).toBe('dark')
+        expect(wrapper.text()).toContain('Sin ubicación del domiciliario')
+    })
     it('queries only the selected order and labels stale GPS truthfully', async () => {
         mocks.tracking.mockResolvedValue({ ...snapshot, location: { ...snapshot.location, isFresh: false } })
         mountDialog(); await flushPromises()
@@ -49,7 +57,7 @@ describe('resource-scoped remote tracking', () => {
         mocks.tracking.mockRejectedValue(new Error('Sin acceso'))
         await vi.advanceTimersByTimeAsync(30_000)
         expect(wrapper.get('[role="alert"]').text()).toBe('Sin acceso')
-        expect(wrapper.text()).not.toContain('Ubicación reciente:')
+        expect(wrapper.text()).not.toContain('Ubicación reciente del domiciliario')
     })
     it('ignores replies after closing and makes no further polls', async () => {
         let finish!: (data: any) => void

@@ -1,13 +1,13 @@
 <template>
-    <div class="w-full">
+    <div class="w-full" :class="{ 'delivery-tracking-map': trackFocusedOrder }">
         <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 mb-2">
             <BaseButton class="w-full sm:w-auto" size="sm" variant="outline" @click="openInGoogleMaps"
-                :disabled="orders.length === 0">
+                :disabled="trackFocusedOrder ? !trackingHasDestination : orders.length === 0">
                 Abrir en Google Maps
             </BaseButton>
 
             <!-- Indicadores de conductores -->
-            <template v-if="deliverymanLocations && totalDriverCount > 0">
+            <template v-if="!trackFocusedOrder && deliverymanLocations && totalDriverCount > 0">
                 <div v-for="(loc, driverId) in deliverymanLocations" :key="driverId"
                     class="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border"
                     :class="Date.now() - loc.updatedAt.getTime() < 30_000
@@ -24,7 +24,10 @@
 
         <!-- Mapa + panel lateral (pedidos / productos del domiciliario seleccionado) -->
         <div class="relative w-full">
-            <div ref="mapContainer" class="w-full rounded-lg border border-gray-200"
+            <p v-if="mapLoadError" role="alert" class="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+                No se pudo cargar el mapa. Cierra el seguimiento y vuelve a abrirlo para reintentar.
+            </p>
+            <div v-show="!mapLoadError" ref="mapContainer" class="delivery-map-canvas w-full rounded-lg border border-gray-200"
                 :style="{ height: mapHeight }"></div>
 
             <aside v-if="selectedDriverId != null"
@@ -90,6 +93,7 @@ import type { GeoLocation } from '@/composables/useGeolocation'
 import { currentRouteIdForDriver } from '@/utils/deliveryMapRoutes'
 import { buildDeliveryInquiryMessage, deliveryAddressText } from '@/utils/deliveryInquiryMessage'
 import { useToast } from '@/composables/useToast'
+import type { WhatsAppTheme } from '@/composables/useWhatsAppTheme'
 import { ClipboardDocumentIcon } from '@heroicons/vue/24/outline'
 
 // =========================
@@ -110,6 +114,8 @@ interface Props {
     deliverymanLocations?: Record<number, DriverLocation>
     /** Pedido que debe quedar centrado al abrir el mapa desde el listado. */
     focusOrderId?: number | null
+    trackFocusedOrder?: boolean
+    whatsappTheme?: WhatsAppTheme
 }
 const props = defineProps<Props>()
 const emit = defineEmits<{
@@ -123,7 +129,10 @@ const { success, error, warning } = useToast()
 // 🔹 Refs y variables
 // =========================
 const mapContainer = ref<HTMLDivElement | null>(null)
+const mapLoadError = ref(false)
+const trackingHasDestination = ref(false)
 let map: google.maps.Map | null = null
+let advancedMarker: typeof google.maps.marker.AdvancedMarkerElement | null = null
 let markers: (google.maps.marker.AdvancedMarkerElement | google.maps.Marker)[] = []
 const orderMarkers = new Map<number, google.maps.marker.AdvancedMarkerElement | google.maps.Marker>()
 const orderInfoWindows = new Map<number, google.maps.InfoWindow>()
@@ -131,9 +140,9 @@ const driverMarkers = new Map<number, google.maps.marker.AdvancedMarkerElement |
 /** Raíz DOM del pin (Advanced Marker) para actualizar texto sin recrear el marcador. */
 const driverMarkerRoots = new Map<number, HTMLElement>()
 let routePolyline: google.maps.Polyline | null = null
-const extraCoordsByOrderId = new Map<number, GeoLocation>()
+const extraCoordsByAddress = new Map<string, GeoLocation>()
 
-const mapHeight = computed(() => '70vh')
+const mapHeight = computed(() => props.trackFocusedOrder ? 'clamp(16rem, 57dvh, 36rem)' : '70vh')
 const geocoder = ref<google.maps.Geocoder | null>(null)
 
 // ─── Driver location display ──────────────────────────────────────────────────
@@ -271,7 +280,9 @@ watch(
         if (sid != null && (!locs || !locs[sid])) closeDriverPanel()
         const n = locs ? Object.keys(locs).length : 0
         updateDriverMarkers(locs)
-        if (props.orders.length === 0 && n > 0 && prevDriverLocationCount === 0) {
+        if (props.trackFocusedOrder) {
+            void tryFocusOrder()
+        } else if (props.orders.length === 0 && n > 0 && prevDriverLocationCount === 0) {
             fitMapToDriverLocations(locs!)
         }
         prevDriverLocationCount = n
@@ -343,7 +354,7 @@ function createDriverPinRoot(driverId: number, loc: DriverLocation): HTMLElement
     label.textContent = displayName.length > 18 ? displayName.slice(0, 17) + '…' : displayName
     label.title = loc.name ?? `Domiciliario #${driverId}`
     label.style.cssText =
-        'margin-top:2px;max-width:112px;padding:1px 6px;font-size:10px;font-weight:600;line-height:1.2;color:#111827;background:rgba(255,255,255,.95);border-radius:4px;box-shadow:0 1px 3px rgba(0,0,0,.2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;'
+        'margin-top:2px;max-width:112px;padding:1px 6px;font-size:10px;font-weight:600;line-height:1.2;color:var(--wa-text,#111827);background:var(--wa-panel,rgba(255,255,255,.95));border-radius:4px;box-shadow:0 1px 3px rgba(0,0,0,.2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;'
 
     wrap.appendChild(icon)
     wrap.appendChild(badge)
@@ -366,7 +377,6 @@ function createDriverPinRoot(driverId: number, loc: DriverLocation): HTMLElement
 
 function updateDriverMarkers(locs: Record<number, DriverLocation> | undefined) {
     if (!map) return
-    const AdvancedMarkerElement = (window as any)._AdvancedMarkerElement
     const currentIds = new Set(Object.keys(locs ?? {}).map(Number))
 
     for (const [id, marker] of driverMarkers) {
@@ -407,10 +417,10 @@ function updateDriverMarkers(locs: Record<number, DriverLocation> | undefined) {
         }
 
         let marker: google.maps.marker.AdvancedMarkerElement | google.maps.Marker
-        if (AdvancedMarkerElement) {
+        if (advancedMarker) {
             const root = createDriverPinRoot(id, loc)
             driverMarkerRoots.set(id, root)
-            marker = new AdvancedMarkerElement({
+            marker = new advancedMarker({
                 position,
                 map,
                 title: stableTitle,
@@ -448,41 +458,30 @@ onMounted(async () => {
     const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY
     const mapId = import.meta.env.VITE_GOOGLE_MAPS_MAP_ID
 
-    setOptions({
-        key: apiKey,
-        ...(mapId && { mapIds: [mapId] }), // Include Map ID if available
-    })
+    try {
+        setOptions({ key: apiKey, ...(mapId && { mapIds: [mapId] }) })
+        const [{ Map }, , { AdvancedMarkerElement }, { Geocoder }] = await Promise.all([
+            importLibrary('maps'), importLibrary('geometry'), importLibrary('marker'), importLibrary('geocoding'),
+        ])
+        if (!mapContainer.value) return
 
-    // Importar módulos modernos
-    const [
-        { Map },
-        ,
-        { AdvancedMarkerElement },
-        { Geocoder }
-    ] = await Promise.all([
-        importLibrary('maps'),
-        importLibrary('geometry'),
-        importLibrary('marker'),
-        importLibrary('geocoding'),
-    ])
-
-    // Crear mapa
-    if (!mapId) {
-        console.warn('⚠️ Falta VITE_GOOGLE_MAPS_MAP_ID. Los Advanced Markers no funcionarán.')
+        map = new Map(mapContainer.value, {
+            center: { lat: 6.2442, lng: -75.5812 },
+            zoom: 13,
+            mapTypeControl: false,
+            fullscreenControl: false,
+            streetViewControl: false,
+            ...(mapId && { mapId }),
+            ...(props.whatsappTheme && { colorScheme: props.whatsappTheme === 'dark' ? 'DARK' : 'LIGHT' }),
+            ...(props.trackFocusedOrder && { maxZoom: 18 }),
+        })
+        advancedMarker = mapId ? AdvancedMarkerElement : null
+        geocoder.value = new Geocoder()
+        if (!props.trackFocusedOrder) RouteOptimizationService.initialize(map)
+    } catch {
+        mapLoadError.value = true
+        return
     }
-
-    map = new Map(mapContainer.value as HTMLElement, {
-        center: { lat: 6.2442, lng: -75.5812 },
-        zoom: 13,
-        mapTypeControl: false,
-        fullscreenControl: false,
-        streetViewControl: false,
-        ...(mapId && { mapId }), // Only include mapId if it's defined
-    })
-
-        ; (window as any)._AdvancedMarkerElement = mapId ? AdvancedMarkerElement : null
-    geocoder.value = new Geocoder()
-    RouteOptimizationService.initialize(map)
     loadMarkers()
 
     // Si ya hay ubicaciones al montar, colocar marcadores y encuadrar (vista solo domiciliarios)
@@ -506,6 +505,8 @@ onUnmounted(() => {
     }
     driverMarkers.clear()
     driverMarkerRoots.clear()
+    routePolyline?.setMap(null)
+    map = null
 })
 
 // =========================
@@ -517,7 +518,9 @@ watch(
     () => {
         focusRequestVersion += 1
         focusedOrderId = null
+        focusedTrackingPoints = ''
         focusWarningOrderId = null
+        trackingHasDestination.value = false
         if (props.focusOrderId == null) return
         void tryFocusOrder()
     },
@@ -527,10 +530,11 @@ watch(
 // 🔹 Funciones de mapa
 // =========================
 const getOrderCoords = (order: DeliveryMapOrder): GeoLocation | null => {
-    if (typeof order.latitude === 'number' && typeof order.longitude === 'number') {
+    if (typeof order.latitude === 'number' && Math.abs(order.latitude) <= 90
+        && typeof order.longitude === 'number' && Math.abs(order.longitude) <= 180) {
         return { lat: order.latitude, lng: order.longitude }
     }
-    return extraCoordsByOrderId.get(order.id) ?? null
+    return order.addressDescription ? extraCoordsByAddress.get(order.addressDescription) ?? null : null
 }
 
 const clearMarkers = () => {
@@ -569,7 +573,7 @@ function createOrderMarkerContent(order: DeliveryMapOrder): HTMLElement {
 
     const label = document.createElement('div')
     label.className = 'order-marker-label'
-    label.style.cssText = 'margin-top:2px;max-width:180px;padding:2px 7px;border-radius:4px;background:rgba(255,255,255,.96);color:#111827;font-size:10px;font-weight:600;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;box-shadow:0 1px 4px rgba(0,0,0,.25);'
+    label.style.cssText = 'margin-top:2px;max-width:180px;padding:2px 7px;border-radius:4px;background:var(--wa-panel,rgba(255,255,255,.96));color:var(--wa-text,#111827);font-size:10px;font-weight:600;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;box-shadow:0 1px 4px rgba(0,0,0,.25);'
     label.textContent = `#${order.id} · ${orderCustomerName(order)}`
     label.title = label.textContent
 
@@ -617,15 +621,14 @@ function createOrderInfoContent(order: DeliveryMapOrder, coords: GeoLocation): H
 const addOrderMarker = (order: DeliveryMapOrder, coords: GeoLocation) => {
     if (!map || orderMarkers.has(order.id)) return
 
-    const AdvancedMarkerElement = (window as any)._AdvancedMarkerElement
     const infoWindow = new google.maps.InfoWindow({
         content: createOrderInfoContent(order, coords),
     })
     const title = `Pedido #${order.id} — ${orderCustomerName(order)}`
 
     let marker: google.maps.marker.AdvancedMarkerElement | google.maps.Marker
-    if (AdvancedMarkerElement) {
-        marker = new AdvancedMarkerElement({
+    if (advancedMarker) {
+        marker = new advancedMarker({
             position: coords,
             map,
             title,
@@ -639,7 +642,7 @@ const addOrderMarker = (order: DeliveryMapOrder, coords: GeoLocation) => {
             title,
             label: {
                 text: `#${order.id} · ${orderCustomerName(order)}`,
-                color: '#065f46',
+                color: props.whatsappTheme === 'dark' ? '#a3f2d0' : '#065f46',
                 fontSize: '10px',
                 fontWeight: '600',
             },
@@ -652,22 +655,24 @@ const addOrderMarker = (order: DeliveryMapOrder, coords: GeoLocation) => {
     orderInfoWindows.set(order.id, infoWindow)
 }
 
-const orderGeocodePromises = new Map<number, Promise<GeoLocation | null>>()
+const orderGeocodePromises = new Map<string, Promise<GeoLocation | null>>()
 
 function resolveOrderCoords(order: DeliveryMapOrder): Promise<GeoLocation | null> {
     const existing = getOrderCoords(order)
     if (existing) return Promise.resolve(existing)
-    if (!order.addressDescription || !geocoder.value) return Promise.resolve(null)
-    const pending = orderGeocodePromises.get(order.id)
+    const address = order.addressDescription
+    const service = geocoder.value
+    if (!address || !service) return Promise.resolve(null)
+    const pending = orderGeocodePromises.get(address)
     if (pending) return pending
 
     const request = (async (): Promise<GeoLocation | null> => {
         try {
-            const { results } = await geocoder.value!.geocode({ address: order.addressDescription! })
+            const { results } = await service.geocode({ address })
             if (results.length > 0 && results[0].geometry?.location) {
                 const loc = results[0].geometry.location
                 const coords = { lat: loc.lat(), lng: loc.lng() }
-                extraCoordsByOrderId.set(order.id, coords)
+                extraCoordsByAddress.set(address, coords)
                 return coords
             }
         } catch (geocodeError) {
@@ -675,15 +680,33 @@ function resolveOrderCoords(order: DeliveryMapOrder): Promise<GeoLocation | null
         }
         return null
     })().finally(() => {
-        orderGeocodePromises.delete(order.id)
+        orderGeocodePromises.delete(address)
     })
-    orderGeocodePromises.set(order.id, request)
+    orderGeocodePromises.set(address, request)
     return request
 }
 
 let focusedOrderId: number | null = null
 let focusWarningOrderId: number | null = null
 let focusRequestVersion = 0
+let focusedTrackingPoints = ''
+
+function fitTrackedOrder(map: google.maps.Map, order: DeliveryMapOrder, destination: GeoLocation | null) {
+    const driver = order.deliveryManId == null ? undefined : props.deliverymanLocations?.[order.deliveryManId]
+    const points = JSON.stringify([order.id, destination, driver ? order.deliveryManId : null, driver?.deliveryRouteId])
+    if (focusedTrackingPoints === points) return
+    focusedTrackingPoints = points
+
+    if (destination && driver && (destination.lat !== driver.lat || destination.lng !== driver.lng)) {
+        const bounds = new google.maps.LatLngBounds()
+        bounds.extend(destination)
+        bounds.extend({ lat: driver.lat, lng: driver.lng })
+        map.fitBounds(bounds, { top: 56, right: 56, bottom: 56, left: 56 })
+    } else if (destination || driver) {
+        map.setCenter(destination ?? { lat: driver!.lat, lng: driver!.lng })
+        map.setZoom(destination ? 17 : 15)
+    }
+}
 
 async function tryFocusOrder(): Promise<void> {
     const orderId = props.focusOrderId
@@ -691,20 +714,30 @@ async function tryFocusOrder(): Promise<void> {
     const order = props.orders.find((item) => item.id === orderId)
     if (!order) return
 
-    const requestVersion = focusRequestVersion
+    const requestVersion = ++focusRequestVersion
     const coords = await resolveOrderCoords(order)
-    if (requestVersion !== focusRequestVersion || props.focusOrderId !== orderId) return
+    if (!map || requestVersion !== focusRequestVersion || props.focusOrderId !== orderId) return
+    if (props.trackFocusedOrder) {
+        trackingHasDestination.value = coords !== null
+        fitTrackedOrder(map, order, coords)
+    }
     if (!coords) {
         if (focusWarningOrderId !== orderId) {
             const message = `El pedido #${orderId} no tiene una ubicación que pueda mostrarse.`
             focusWarningOrderId = orderId
-            warning('Ubicación no disponible', message)
+            if (!props.trackFocusedOrder) warning('Ubicación no disponible', message)
             emit('focus-unavailable', message)
         }
         return
     }
 
     addOrderMarker(order, coords)
+    if (props.trackFocusedOrder) {
+        if (focusedOrderId !== orderId || focusWarningOrderId === orderId) emit('focus-completed', orderId)
+        focusedOrderId = orderId
+        focusWarningOrderId = null
+        return
+    }
     const marker = orderMarkers.get(orderId)
     const infoWindow = orderInfoWindows.get(orderId)
     if (!marker || !infoWindow) return
@@ -808,6 +841,11 @@ const openInGoogleMaps = () => {
 </script>
 
 <style scoped>
+.delivery-tracking-map .delivery-map-canvas { background: var(--wa-canvas); }
+.delivery-tracking-map :deep(.gm-style-iw-c),
+.delivery-tracking-map :deep(.gm-style-iw-tc::after) { background: var(--wa-panel); color: var(--wa-text); }
+.delivery-tracking-map :deep(.gm-style-iw-c .gm-ui-hover-effect > span) { background-color: var(--wa-text); }
+
 .contextual-hover-action {
     opacity: 1;
 }

@@ -310,13 +310,14 @@ describe('OrderDetailContent presentation and reservation delivery fee', () => {
         wrapper.unmount()
     })
 
-    it('offers tracking inside More actions only while a delivery is on the way', async () => {
+    it('offers a direct tracking button only while a delivery is on the way', async () => {
         deps.store.current = fixture({ type: 'delivery', status: 'on_the_way' })
         const wrapper = mountDetail()
         await flushPromises()
         const header = wrapper.get('section[aria-label="Resumen del pedido"]')
-        const tracking = header.get('details').findAll('button').find(button => button.text() === 'Ver ubicación')!
-        expect(tracking).toBeDefined()
+        const tracking = header.get('button[aria-haspopup="dialog"]')
+        expect(tracking.text()).toBe('Ver ubicación')
+        expect(tracking.element.closest('details')).toBeNull()
         await tracking.trigger('click')
         expect(wrapper.findComponent({ name: 'OrderTrackingDialog' }).exists()).toBe(true)
         expect(deps.update).not.toHaveBeenCalled()

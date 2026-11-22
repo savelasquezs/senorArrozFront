@@ -65,13 +65,15 @@ import { whatsappApi } from '@/services/MainAPI/whatsappApi'
 import type { WhatsAppConversationStartKind, WhatsAppConversationStartOptions, WhatsAppConversationStartRequest } from '@/types/whatsapp'
 import { generatePosCreationKey } from '@/utils/posCreationKey'
 
-const props = defineProps<{ modelValue: boolean; branches: { id: number; label: string }[]; initialBranchId: number }>()
+const props = defineProps<{
+  modelValue: boolean; branches: { id: number; label: string }[]; initialBranchId: number; initialPhone?: string;
+}>()
 const emit = defineEmits<{ 'update:modelValue': [visible: boolean]; complete: [id: number, sent: boolean] }>()
 const labels: Record<WhatsAppConversationStartKind, string> = {
   menu: 'Carta en PDF', catalog: 'Catálogo de WhatsApp', payment: 'Pago por Bancolombia',
 }
 const branchId = ref(props.initialBranchId)
-const phone = ref('')
+const phone = ref(props.initialPhone ?? '')
 const selection = ref<WhatsAppConversationStartKind | ''>('')
 const requested = ref(false)
 const orderId = ref<number | ''>('')
