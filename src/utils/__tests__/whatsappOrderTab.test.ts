@@ -52,20 +52,22 @@ describe('open order in the WhatsApp tab', () => {
         expect(popup).not.toHaveBeenCalled()
     })
 
-    it('opens in the current tab when focus is blocked and ignores later focus', async () => {
+    it('leaves Orders open and delivers once in the background when focus is blocked', async () => {
         const receiveOrder = vi.fn()
         vi.mocked(document.hasFocus).mockReturnValue(false)
         vi.mocked(window.focus).mockImplementation(() => { throw new DOMException('Focus denied', 'InvalidAccessError') })
         listeners.push(listenForWhatsAppOrders(() => scope, receiveOrder))
         const popup = vi.spyOn(window, 'open')
+        const post = vi.spyOn(window, 'postMessage')
 
         const launch = createWhatsAppOrderLauncher()(scope, 25, orderUrl, () => true)
-        await vi.advanceTimersByTimeAsync(700)
+        await vi.advanceTimersByTimeAsync(1100)
 
-        expect(await launch).toBe('navigate')
+        expect(await launch).toBe('background')
+        expect(post).toHaveBeenCalledExactlyOnceWith({ type: 'senor-arroz:focus-whatsapp-tab' }, window.location.origin)
         vi.mocked(document.hasFocus).mockReturnValue(true)
         window.dispatchEvent(new Event('focus'))
-        expect(receiveOrder).not.toHaveBeenCalled()
+        expect(receiveOrder).toHaveBeenCalledExactlyOnceWith(25)
         expect(popup).not.toHaveBeenCalled()
     })
 
@@ -107,29 +109,35 @@ describe('open order in the WhatsApp tab', () => {
         expect(popup).toHaveBeenCalledTimes(1)
     })
 
-    it('navigates in the current tab if the browser blocks a new tab', async () => {
+    it('leaves Orders open if the browser blocks a new tab', async () => {
         const popup = vi.spyOn(window, 'open').mockReturnValue(null)
         const launch = createWhatsAppOrderLauncher()(scope, 25, orderUrl, () => true)
         await vi.advanceTimersByTimeAsync(250)
 
-        expect(await launch).toBe('navigate')
+        expect(await launch).toBe('blocked')
         expect(popup).toHaveBeenCalledTimes(1)
     })
 
-    it('opens in the current tab when the existing WhatsApp tab still runs the previous build', async () => {
+    it('delivers the order to an existing WhatsApp tab that only supports background delivery', async () => {
         const olderTab = new TestBroadcastChannel('senor-arroz:whatsapp-order')
         listeners.push(() => olderTab.close())
-        const receive = vi.fn(({ data }: { data: { type: string; scope: string; requestId: string } }) => {
-            if (data.type === 'discover') olderTab.postMessage({ ...data, type: 'offer', tabId: 'older-tab', lastFocused: Date.now() })
-        })
-        olderTab.onmessage = event => receive(event as Parameters<typeof receive>[0])
+        const receivedOrders = vi.fn()
+        olderTab.onmessage = ({ data }) => {
+            const message = data as { type: string; scope: string; requestId: string; orderId?: number }
+            if (message.type === 'discover') {
+                olderTab.postMessage({ ...message, type: 'offer', tabId: 'older-tab', lastFocused: Date.now() })
+            } else if (message.type === 'open') {
+                receivedOrders(message.orderId)
+                olderTab.postMessage({ ...message, type: 'accepted', tabId: 'older-tab' })
+            }
+        }
         const popup = vi.spyOn(window, 'open')
 
         const launch = createWhatsAppOrderLauncher()(scope, 25, orderUrl, () => true)
         await vi.advanceTimersByTimeAsync(250)
 
-        expect(await launch).toBe('navigate')
-        expect(receive).toHaveBeenCalledExactlyOnceWith({ data: expect.objectContaining({ type: 'discover' }) })
+        expect(await launch).toBe('background')
+        expect(receivedOrders).toHaveBeenCalledExactlyOnceWith(25)
         expect(popup).not.toHaveBeenCalled()
     })
 })
