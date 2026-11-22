@@ -323,6 +323,7 @@ export interface OrderListItem {
     customerName: string | null
     customerPhone: string | null
     customerWhatsAppUsername?: string | null
+    hasWhatsAppConversation?: boolean
     addressId: number | null
     addressDescription: string | null
     /** Referencia / apto / info adicional de la dirección (API: addressAdditionalInfo) */

@@ -154,6 +154,7 @@
                                 <OrdersTable :orders="displayedOrders" :loading="loading" :sort-by="sortBy"
                                     :sort-order="sortOrder" :quick-banks="quickBanks"
                                     :use-order-tracking="remoteBranchId != null" :detail-query="detailQuery" @track-order="handleTrackOrder"
+                                    use-whats-app-contact @open-whatsapp="handleOpenWhatsApp"
                                     enable-paid-in-store-quick-action enable-app-settle-quick-action
                                     @edit-customer="handleEditCustomer" @edit-address="handleEditAddress"
                                     @change-status="handleChangeStatus" @assign-delivery="handleAssignDelivery"
@@ -182,6 +183,7 @@
                                     <OrdersTable :orders="block.orders" :loading="loading" :sort-by="sortBy"
                                         :sort-order="sortOrder" :quick-banks="quickBanks"
                                     :use-order-tracking="remoteBranchId != null" :detail-query="detailQuery" @track-order="handleTrackOrder"
+                                        use-whats-app-contact @open-whatsapp="handleOpenWhatsApp"
                                         enable-paid-in-store-quick-action enable-app-settle-quick-action
                                         @edit-customer="handleEditCustomer" @edit-address="handleEditAddress"
                                         @change-status="handleChangeStatus" @assign-delivery="handleAssignDelivery"
@@ -640,6 +642,7 @@ import { deliverymenFromCompleteOrderPage } from '@/helpers/orderDeliverymenOpti
 import { useDebouncedCallback } from '@/composables/useDebouncedCallback'
 import { useOrderPermissions } from '@/composables/useOrderPermissions'
 import { useToast } from '@/composables/useToast'
+import { createWhatsAppOrderLauncher, whatsAppOrderTabScope } from '@/utils/whatsappOrderTab'
 import { getOrderStatusDisplayName, getOrderTypeDisplayName, useFormatting } from '@/composables/useFormatting'
 import { orderCashToCollect, sumPaymentsAmounts } from '@/utils/orderCashToCollect'
 import { defaultBusinessCalendar, todayYmd } from '@/utils/datetime'
@@ -824,6 +827,16 @@ function handleTrackOrder(order: OrderListItem) {
 }
 
 const { success, error } = useToast()
+const launchWhatsApp = createWhatsAppOrderLauncher()
+const whatsAppTabScope = computed(() => whatsAppOrderTabScope(authStore.user, workspaceBranchId.value))
+
+async function handleOpenWhatsApp(orderId: number) {
+    const scope = whatsAppTabScope.value
+    if (!scope) return
+    const url = router.resolve({ name: 'WhatsApp', query: { orderId: String(orderId) } }).href
+    const opened = await launchWhatsApp(scope, orderId, url, () => route.name === 'OrdersList' && whatsAppTabScope.value === scope)
+    if (!opened) error('No se pudo abrir WhatsApp', 'Permite las pestañas emergentes y vuelve a pulsar el ícono.')
+}
 const { formatCurrency } = useFormatting()
 
 // Estado

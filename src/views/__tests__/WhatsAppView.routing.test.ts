@@ -15,7 +15,7 @@ const m = vi.hoisted(() => ({
   confirm: vi.fn(), success: vi.fn(), error: vi.fn(), reconcile: vi.fn(), sendProductChoices: vi.fn(), applyProductSuggestion: vi.fn(),
   hasDraftProducts: false, saveBeforeFinishing: vi.fn(),
   api: { getStatus: vi.fn(), getConversations: vi.fn(), getConversation: vi.fn(), getUnreadSummary: vi.fn(), getOperationalBranches: vi.fn(),
-    getConversationStartOptions: vi.fn(), startConversation: vi.fn(),
+    getConversationStartOptions: vi.fn(), startConversation: vi.fn(), getOrderConversation: vi.fn(),
     getInboxLabels: vi.fn(), getInboxSummary: vi.fn(), setInboxLabel: vi.fn(),
     getQuickReplies: vi.fn(), createQuickReply: vi.fn(), updateQuickReply: vi.fn(), getMessagesPage: vi.fn(), getOrderDraft: vi.fn(), updateOperationalBranch: vi.fn(), linkConversationCustomer: vi.fn(),
     sendMessage: vi.fn(), sendMediaMessage: vi.fn(), sendQuickReply: vi.fn(), previewQuickReply: vi.fn(), changeAttention: vi.fn(), getAttention: vi.fn(),
@@ -41,7 +41,7 @@ vi.mock('@/store/auth', async () => {
 })
 vi.mock('vue-router', async () => {
   const original = await vi.importActual<typeof import('vue-router')>('vue-router')
-  const { reactive } = await import('vue'); m.route = reactive({ query: {} as Record<string, string> })
+  const { reactive } = await import('vue'); m.route = reactive({ name: 'WhatsApp', query: {} as Record<string, string> })
   return { ...original, useRoute: () => m.route,
     useRouter: () => ({ replace: async (target: { query: Record<string, string> }) => { m.route.query = target.query }, push: vi.fn() }) }
 })
@@ -205,6 +205,31 @@ describe('M38-F04 view + real Pinia store integration', () => {
       branchId: 1, senderId: 'line', phone: '300 123 4567', template: 'menu', requestedByCustomer: true,
     }, expect.any(String))
     expect(vm.selectedConversation?.id).toBe(25)
+  })
+
+  it('opens the exact chat resolved for a routed order', async () => {
+    m.route.query = { orderId: '25' }
+    m.api.getOrderConversation.mockResolvedValue(reply({ kind: 'existing', conversationId: 90 }))
+    m.api.getConversation.mockResolvedValue(reply(conversation(90)))
+    const { vm } = mountView()
+    await flushPromises()
+
+    expect(m.api.getOrderConversation).toHaveBeenCalledExactlyOnceWith(25, expect.any(AbortSignal))
+    expect(vm.selectedConversation?.id).toBe(90)
+    expect(m.route.query.orderId).toBeUndefined()
+    expect(m.api.startConversation).not.toHaveBeenCalled()
+  })
+
+  it('prefills the order phone on the enabled line with no message sent', async () => {
+    m.route.query = { orderId: '25' }
+    m.api.getOrderConversation.mockResolvedValue(reply({ kind: 'start', phone: '+573000123456', branchId: 2 }))
+    m.api.getConversationStartOptions.mockResolvedValue(reply({ branchId: 2, branchName: 'Dos', senderId: 'line', templates: [] }))
+    const { wrapper } = mountView()
+    await flushPromises()
+
+    expect(wrapper.get<HTMLInputElement>('input[type="tel"]').element.value).toBe('+573000123456')
+    expect(m.api.getConversationStartOptions).toHaveBeenCalledExactlyOnceWith(2, expect.any(AbortSignal))
+    expect(m.api.startConversation).not.toHaveBeenCalled()
   })
 
   it('renders the voice player only for visible audio with a source', async () => {

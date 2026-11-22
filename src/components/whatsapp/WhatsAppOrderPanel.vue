@@ -82,7 +82,7 @@
     </BaseDialog>
     <BaseDialog v-model="showNew" title="Nuevo pedido" size="sm"><p>Se conservará el intento anterior y se creará una nueva clave de pedido.</p><BaseButton class="mt-3" @click="showNew = false; run(start)">Iniciar nuevo pedido</BaseButton></BaseDialog>
     <BaseDialog v-model="showOrder" :title="`Pedido #${persistedOrder?.id}`" size="6xl">
-      <OrderDetailContent v-if="persistedOrder" :flat-order="persistedOrder" />
+      <OrderDetailContent v-if="persistedOrder" :flat-order="persistedOrder" nested />
     </BaseDialog>
   </div>
 </template>

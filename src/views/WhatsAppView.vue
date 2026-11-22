@@ -69,7 +69,7 @@
                 name="whatsapp-conversation-search" autocomplete="off" spellcheck="false"
                 placeholder="Nombre, teléfono o usuario" @input="onSearchInput" />
               <button type="button" class="wa-start-chat" title="Nueva conversación" aria-label="Nueva conversación" aria-haspopup="dialog"
-                @click="showConversationStarter = true">
+                @click="openConversationStarter()">
                 <UserPlusIcon class="size-4" aria-hidden="true" />
               </button>
             </div>
@@ -895,7 +895,8 @@
         <p v-else-if="previewedContact" class="text-sm text-gray-600">La tarjeta solo contiene el nombre.</p>
       </BaseDialog>
       <WhatsAppConversationStarter v-if="showConversationStarter" v-model="showConversationStarter" :key="sessionKey"
-        :branches="conversationStarterBranches" :initial-branch-id="conversationStarterBranchId" @complete="openStartedConversation" />
+        :branches="conversationStarterBranches" :initial-branch-id="orderStarter?.branchId ?? conversationStarterBranchId"
+        :initial-phone="orderStarter?.phone" @complete="openStartedConversation" />
       <WhatsAppForwardDialog v-if="showForwardDialog && selectedConversation" v-model="showForwardDialog"
         :source-id="selectedConversation.id" :count="forwardSelection.size" :sending="forwarding"
         :error="forwardError" @forward="forwardSelectedMessages" />
@@ -907,6 +908,7 @@
 import { useResizableColumns } from '@/composables/useResizableColumns'
 import { commercialGroup, commercialLabel, conversationTitle, fixedInboxLabelStyles, inboxLabelColor, inboxLabelPalette } from '@/utils/whatsappInbox'
 import { generatePosCreationKey } from '@/utils/posCreationKey'
+import { listenForWhatsAppOrders, whatsAppOrderTabScope } from '@/utils/whatsappOrderTab'
 
 import WhatsAppOrderPanel from '@/components/whatsapp/WhatsAppOrderPanel.vue'
 import WhatsAppMessageActions from '@/components/whatsapp/WhatsAppMessageActions.vue'
@@ -1060,6 +1062,11 @@ const changingInboxLabel = ref(false)
 const savingInboxLabel = ref(false)
 const showInboxLabelManager = ref(false)
 const showConversationStarter = ref(false)
+const orderStarter = ref<{ branchId: number; phone: string }>()
+const pendingTabOrderId = ref<number>()
+const whatsAppTabScope = computed(() => whatsAppOrderTabScope(authStore.user, workContext.selectedBranchId))
+let stopListeningForOrders: (() => void) | undefined
+let orderConversationRequest: AbortController | undefined
 const showInboxLabelEditor = ref(false)
 const editingInboxLabelKey = ref('')
 const inboxLabelDraft = ref<WhatsAppInboxLabelDefinition>({ name: '', color: 'violet' })
@@ -1775,6 +1782,11 @@ const conversationStarterBranches = computed(() => {
   if (!authStore.isSuperadmin) return user?.branchId ? [{ id: user.branchId, label: user.branchName }] : []
   const branches = new Map(branchOptions.value.map(branch => [branch.id, branch.label]))
   for (const branch of whatsappStore.operationalBranches) branches.set(branch.id, branch.name)
+  if (orderStarter.value && !branches.has(orderStarter.value.branchId)) {
+    const branch = workContext.selectedBranch
+    branches.set(orderStarter.value.branchId, branch?.id === orderStarter.value.branchId
+      ? branch.name : user?.branchName || `Sucursal ${orderStarter.value.branchId}`)
+  }
   return [...branches].map(([id, label]) => ({ id, label }))
 })
 const conversationStarterBranchId = computed(() => conversationStarterBranches.value.find(branch =>
@@ -2152,10 +2164,52 @@ async function openStartedConversation(id: number, sent: boolean) {
     showError('Conversación', sent ? 'El envío se registró. Actualiza la bandeja para abrir el chat.' : 'Actualiza la bandeja para abrir el chat existente.')
     return
   }
+  if (!sent) success('Conversación abierta', 2600, 'El número ya tiene un chat. Toma la atención para enviarle una plantilla.')
+  await openConversationInInbox(conversation)
+}
+
+function openConversationInInbox(conversation: WhatsAppConversation) {
   activeInbox.value = conversation.attentionMode === 'closed' ? 'closed'
     : conversation.assignedUserId === authStore.user?.id ? 'mine' : conversation.assignedUserId ? 'team' : 'free'
-  if (!sent) success('Conversación abierta', 2600, 'El número ya tiene un chat. Toma la atención para enviarle una plantilla.')
-  await selectConversation(conversation)
+  return selectConversation(conversation)
+}
+
+function openConversationStarter(prefill?: { branchId: number; phone: string }) {
+  orderStarter.value = prefill
+  showConversationStarter.value = true
+}
+
+async function openOrderConversation(orderId: number) {
+  if (showConversationStarter.value) {
+    showError('Conversación del pedido', 'Cierra la conversación nueva antes de abrir otro pedido.')
+    return
+  }
+  orderConversationRequest?.abort()
+  const request = new AbortController()
+  orderConversationRequest = request
+  const scope = whatsAppTabScope.value
+  const selection = conversationSelection
+  const current = () => viewActive && !request.signal.aborted && scope === whatsAppTabScope.value
+    && selection === conversationSelection && !showConversationStarter.value
+  try {
+    const response = await whatsappApi.getOrderConversation(orderId, request.signal)
+    if (!current()) return
+    const destination = response.data
+    if (destination?.kind === 'existing') {
+      const chat = await whatsappStore.fetchConversation(destination.conversationId)
+      if (!current()) return
+      if (!chat) throw new Error('La conversación del pedido ya no está disponible.')
+      await openConversationInInbox(chat)
+    } else if (destination?.kind === 'start') {
+      openConversationStarter(destination)
+    } else {
+      showError('Conversación del pedido', response.message || 'El pedido no tiene una conversación disponible.')
+    }
+  } catch (error) {
+    if (current()) showError('Conversación del pedido', error instanceof Error ? error.message : 'No se pudo abrir WhatsApp.')
+  } finally {
+    if (orderConversationRequest === request) orderConversationRequest = undefined
+  }
 }
 
 async function selectConversationFromRoute() {
@@ -2168,11 +2222,7 @@ async function selectConversationFromRoute() {
     catch { return }
     if (Number(route.query.conversationId) !== id || selection !== conversationSelection) return
   }
-  if (conversation) activeInbox.value = conversation.attentionMode === 'closed' ? 'closed'
-    : conversation.assignedUserId === authStore.user?.id ? 'mine' : conversation.assignedUserId ? 'team' : 'free'
-  if (conversation) {
-    await selectConversation(conversation)
-  }
+  if (conversation) await openConversationInInbox(conversation)
 }
 
 function conversationMatchesCurrentFilters(conversation: WhatsAppConversation, label = selectedLabel.value, confirmedSearchMatch = false) {
@@ -3094,6 +3144,10 @@ function mediaFallbackLabel(message: WhatsAppMessage) {
 }
 
 onMounted(async () => {
+  stopListeningForOrders = listenForWhatsAppOrders(
+    () => route.name === 'WhatsApp' ? whatsAppTabScope.value : null,
+    orderId => { pendingTabOrderId.value = orderId },
+  )
   document.addEventListener('pointerdown', dismissWorkspaceMenus, true)
   window.addEventListener('beforeunload', rememberDraftOnReload)
   const id = Number(route.query.conversationId)
@@ -3110,6 +3164,8 @@ onMounted(async () => {
 })
 
 onBeforeUnmount(() => {
+  stopListeningForOrders?.()
+  orderConversationRequest?.abort()
   document.removeEventListener('pointerdown', dismissWorkspaceMenus, true)
   window.removeEventListener('beforeunload', rememberDraftOnReload)
   viewActive = false
@@ -3135,6 +3191,30 @@ watch(inboxScope, () => {
   conversationsGeneration++
   inboxError.value = ''
 }, { flush: 'sync' })
+
+watch(whatsAppTabScope, () => {
+  orderConversationRequest?.abort()
+  pendingTabOrderId.value = undefined
+  if (orderStarter.value) showConversationStarter.value = false
+  orderStarter.value = undefined
+}, { flush: 'sync' })
+
+watch(showConversationStarter, open => { if (!open) orderStarter.value = undefined })
+
+let handledOrderQuery: typeof route.query.orderId
+watch([loadingStatus, () => route.query.orderId, pendingTabOrderId], ([loading, value, tabOrderId]) => {
+  if (loading || route.name !== 'WhatsApp') return
+  const hasNewOrderQuery = value !== undefined && value !== handledOrderQuery
+  handledOrderQuery = value
+  const orderId = tabOrderId ?? (hasNewOrderQuery && typeof value === 'string' ? Number(value) : 0)
+  if (hasNewOrderQuery) {
+    const query = { ...route.query }
+    delete query.orderId
+    void router.replace({ query })
+  }
+  if (tabOrderId !== undefined) pendingTabOrderId.value = undefined
+  if (Number.isSafeInteger(orderId) && orderId > 0) void openOrderConversation(orderId)
+})
 
 watch(sessionKey, () => {
   clearQuickReplyPreview()

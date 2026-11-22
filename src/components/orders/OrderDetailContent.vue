@@ -13,7 +13,7 @@
             {{ operationOptionsError }}
             <BaseButton size="sm" variant="ghost" @click="loadOperationOptions">Reintentar</BaseButton>
         </div>
-        <OrderTrackingDialog v-if="showTracking" v-model="showTracking" :order="order" />
+        <OrderTrackingDialog v-if="showTracking" v-model="showTracking" :order="order" :nested="nested" />
 
 		<div v-if="order.inventoryIssue" class="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-800">
 			Alerta de inventario: {{ order.inventoryIssue }}
@@ -63,13 +63,13 @@
 						Ticket domicilio
 					</BaseButton>
 				</div>
-                <details v-if="permissions.canCancel(order) || canTransferBranch || canManageInvoices || canViewTracking" class="relative">
+                <BaseButton v-if="canViewTracking" variant="outline" size="sm" aria-haspopup="dialog" @click="showTracking = true">
+                    <MapPinIcon class="mr-1 size-4" aria-hidden="true" />
+                    Ver ubicación
+                </BaseButton>
+                <details v-if="permissions.canCancel(order) || canTransferBranch || canManageInvoices" class="relative">
                     <summary class="cursor-pointer rounded-lg px-3 py-2 text-sm hover:bg-gray-50">Más acciones</summary>
                     <div class="absolute right-0 z-20 mt-1 flex flex-col items-stretch whitespace-nowrap rounded-lg border border-gray-200 bg-white p-1 shadow-lg">
-                        <button v-if="canViewTracking" type="button" @click="showTracking = true"
-                            class="flex w-full items-center justify-end gap-3 rounded-lg px-3 py-2 text-right text-sm font-normal text-gray-700 transition-colors hover:bg-gray-100 hover:text-gray-900 focus-visible:bg-gray-100 focus-visible:outline-emerald-600">
-                            <span>Ver ubicación</span><MapPinIcon class="h-4 w-4 shrink-0" aria-hidden="true" />
-                        </button>
                         <OrderElectronicInvoicing v-if="canManageInvoices" :order-id="order.id" :customer-id="order.customerId" :status="order.status" :order="order" :stale="staleSnapshot" />
                         <button v-if="canTransferBranch" type="button" @click="showTransferBranchDialog = true"
                             class="flex w-full items-center justify-end gap-3 rounded-lg px-3 py-2 text-right text-sm font-normal text-gray-700 transition-colors hover:bg-gray-100 hover:text-gray-900 focus-visible:bg-gray-100 focus-visible:outline-emerald-600">
@@ -850,6 +850,7 @@ const customerError = ref<string | null>(null);
 
 const props = defineProps<{
 	flatOrder: OrderListItem;
+    nested?: boolean;
 }>();
 
 const emit = defineEmits<{

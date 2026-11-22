@@ -185,6 +185,11 @@ export interface WhatsAppTemplateFilters {
 
 export type WhatsAppConversationStartKind = 'menu' | 'catalog' | 'payment'
 
+export type WhatsAppOrderConversation =
+  | { kind: 'existing'; conversationId: number }
+  | { kind: 'start'; phone: string; branchId: number }
+  | { kind: 'ambiguous' | 'unavailable' }
+
 export interface WhatsAppConversationStartOptions {
   branchId: number
   branchName: string

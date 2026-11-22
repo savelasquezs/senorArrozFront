@@ -17,6 +17,7 @@ import type {
   WhatsAppConversationStartRequest,
   WhatsAppConversationStartResult,
   WhatsAppOperationalBranchOption,
+  WhatsAppOrderConversation,
   WhatsAppMessage,
   WhatsAppProductChoiceGroup,
   WhatsAppProductSuggestions,
@@ -68,6 +69,9 @@ class WhatsAppApi extends BaseApi {
     return this.get<ApiResponse<WhatsAppConversationStartOptions>>('/whatsapp/conversations/start/options', {
       params: { branchId }, signal,
     })
+  }
+  getOrderConversation(orderId: number, signal: AbortSignal) {
+    return this.get<ApiResponse<WhatsAppOrderConversation>>(`/whatsapp/orders/${orderId}/conversation`, { signal })
   }
   startConversation(payload: WhatsAppConversationStartRequest, requestId: string) {
     return this.manualPost<WhatsAppConversationStartResult>('/whatsapp/conversations/start', payload, requestId)
