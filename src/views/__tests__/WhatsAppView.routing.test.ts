@@ -90,8 +90,8 @@ interface View {
 }
 let pinia: Pinia
 const wrappers: VueWrapper[] = []
-function mountView(realTabs = false) {
-  const wrapper = shallowMount(WhatsAppView, { global: { plugins: [pinia], stubs: {
+function mountView(realTabs = false, attachTo?: HTMLElement) {
+  const wrapper = shallowMount(WhatsAppView, { attachTo, global: { plugins: [pinia], stubs: {
     BaseButton: { props: ['loading', 'disabled'], template: '<button :disabled="loading || disabled"><slot /></button>' },
     KeepAlive: { template: '<slot />' },
     WhatsAppInboxTabs: !realTabs,
@@ -207,17 +207,38 @@ describe('M38-F04 view + real Pinia store integration', () => {
     expect(vm.selectedConversation?.id).toBe(25)
   })
 
-  it('opens the exact chat resolved for a routed order', async () => {
+  it('opens the exact chat and focuses its editable composer while messages load', async () => {
     m.route.query = { orderId: '25' }
     m.api.getOrderConversation.mockResolvedValue(reply({ kind: 'existing', conversationId: 90 }))
-    m.api.getConversation.mockResolvedValue(reply(conversation(90)))
-    const { vm } = mountView()
+    m.api.getConversation.mockResolvedValue(reply({ ...conversation(90), customerServiceWindowExpiresAt: '2099-01-01T00:00:00Z' }))
+    const messages = deferred<{ data: { items: WhatsAppMessage[]; nextCursor: null; hasMore: false } }>()
+    m.api.getMessagesPage.mockReturnValue(messages.promise)
+    const { vm, wrapper } = mountView(false, document.body)
     await flushPromises()
 
     expect(m.api.getOrderConversation).toHaveBeenCalledExactlyOnceWith(25, expect.any(AbortSignal))
     expect(vm.selectedConversation?.id).toBe(90)
+    const input = wrapper.get<HTMLTextAreaElement>('textarea[placeholder="Escribe un mensaje"]')
+    expect(document.activeElement).toBe(input.element)
+    await input.setValue('Hola')
+    messages.resolve(reply({ items: [], nextCursor: null, hasMore: false }))
+    await flushPromises()
+    expect(input.element.value).toBe('Hola')
     expect(m.route.query.orderId).toBeUndefined()
     expect(m.api.startConversation).not.toHaveBeenCalled()
+    expect(m.api.sendMessage).not.toHaveBeenCalled()
+  })
+
+  it('respects the sending restriction when opening a chat from an order', async () => {
+    m.route.query = { orderId: '25' }
+    m.api.getOrderConversation.mockResolvedValue(reply({ kind: 'existing', conversationId: 90 }))
+    m.api.getConversation.mockResolvedValue(reply(conversation(90)))
+    const { wrapper } = mountView(false, document.body)
+    await flushPromises()
+
+    const input = wrapper.get<HTMLTextAreaElement>('textarea[placeholder="Escribe un mensaje"]').element
+    expect(input.disabled).toBe(true)
+    expect(document.activeElement).not.toBe(input)
   })
 
   it('prefills the order phone on the enabled line with no message sent', async () => {

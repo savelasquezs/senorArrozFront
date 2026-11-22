@@ -1487,7 +1487,7 @@ async function changeAttention(action: WhatsAppAttentionAction, confirmedVersion
       if (serviceWindowOpen.value) {
         await nextTick()
         if (selectedConversation.value?.id === conversationId
-          && (document.activeElement === initialFocus || document.activeElement === messageInput.value)) focusClaimComposer()
+          && (document.activeElement === initialFocus || document.activeElement === messageInput.value)) focusComposerInput()
       }
     }
     if (leavingAttention) await commercialPanel.value?.saveBeforeFinishing()
@@ -1507,7 +1507,7 @@ async function changeAttention(action: WhatsAppAttentionAction, confirmedVersion
       contextPanelCollapsed.value = false
       await nextTick()
       if (action === 'takeover' && selectedConversation.value?.id === conversationId && canSend.value
-        && (document.activeElement === initialFocus || document.activeElement === document.body)) focusClaimComposer()
+        && (document.activeElement === initialFocus || document.activeElement === document.body)) focusComposerInput()
     }
     await reloadConversations()
     await refreshAiDiagnostics()
@@ -1538,7 +1538,7 @@ function preventClaimSelection(event: MouseEvent) {
   if (canTakeAttention.value && !composingDuringTake.value && event.detail > 1) event.preventDefault()
 }
 
-function focusClaimComposer() {
+function focusComposerInput() {
   const input = messageInput.value
   if (!input) return
   const selection = window.getSelection()
@@ -2142,7 +2142,7 @@ async function loadMoreConversations() {
     showError('Conversaciones', error.message || 'No se pudo cargar la siguiente página.')
   }
 }
-async function selectConversation(conversation: WhatsAppConversation) {
+async function selectConversation(conversation: WhatsAppConversation, focusInput = false) {
   if (!viewActive) return
   mobilePane.value = 'chat'
   const selection = ++conversationSelection
@@ -2151,7 +2151,12 @@ async function selectConversation(conversation: WhatsAppConversation) {
   selectedConversation.value = conversation
   selectionRoute.cancel()
   if (route.query.conversationId !== String(conversation.id)) selectionRoute.schedule()
-  await whatsappStore.fetchMessages(conversation.id, false, false, true).catch(() => {})
+  const messages = whatsappStore.fetchMessages(conversation.id, false, false, true).catch(() => {})
+  if (focusInput) {
+    await nextTick()
+    if (viewActive && selection === conversationSelection && canSend.value) focusComposerInput()
+  }
+  await messages
   inboxTotalsRefresh.schedule()
   if (selection === conversationSelection) await scrollToBottom()
 }
@@ -2168,10 +2173,10 @@ async function openStartedConversation(id: number, sent: boolean) {
   await openConversationInInbox(conversation)
 }
 
-function openConversationInInbox(conversation: WhatsAppConversation) {
+function openConversationInInbox(conversation: WhatsAppConversation, focusInput = false) {
   activeInbox.value = conversation.attentionMode === 'closed' ? 'closed'
     : conversation.assignedUserId === authStore.user?.id ? 'mine' : conversation.assignedUserId ? 'team' : 'free'
-  return selectConversation(conversation)
+  return selectConversation(conversation, focusInput)
 }
 
 function openConversationStarter(prefill?: { branchId: number; phone: string }) {
@@ -2199,7 +2204,7 @@ async function openOrderConversation(orderId: number) {
       const chat = await whatsappStore.fetchConversation(destination.conversationId)
       if (!current()) return
       if (!chat) throw new Error('La conversación del pedido ya no está disponible.')
-      await openConversationInInbox(chat)
+      await openConversationInInbox(chat, true)
     } else if (destination?.kind === 'start') {
       openConversationStarter(destination)
     } else {
