@@ -1,0 +1,14 @@
+{
+  "manifest_version": 3,
+  "name": "Señor Arroz · Pestaña de WhatsApp",
+  "version": "1.0.0",
+  "description": "Activa la pestaña de WhatsApp de Señor Arroz al abrir un pedido.",
+  "background": { "service_worker": "background.js" },
+  "content_scripts": [
+    {
+      "matches": ["https://senorarroz.up.railway.app/*"],
+      "js": ["whatsapp-tab.js"],
+      "run_at": "document_start"
+    }
+  ]
+}

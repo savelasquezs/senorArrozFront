@@ -4,7 +4,7 @@ import { generatePosCreationKey } from '@/utils/posCreationKey'
 const channelName = 'senor-arroz:whatsapp-order'
 const tabNamePrefix = 'senor-arroz:whatsapp:'
 const discoveryMs = 200
-const activationMs = 350
+const activationMs = 700
 const acknowledgementMs = 100
 
 type TabRequest = { scope: string; requestId: string }
@@ -16,8 +16,8 @@ type TabMessage =
     | (OrderIntent & { type: 'activate' | 'open' })
     | (TabRequest & { type: 'accepted'; tabId: string })
 
-type Handoff = 'reused' | 'unfocused' | 'absent'
-type WhatsAppOrderLaunch = 'reused' | 'opened' | 'navigate' | 'ignored'
+type Handoff = 'reused' | 'background' | 'absent'
+type WhatsAppOrderLaunch = 'reused' | 'background' | 'opened' | 'blocked' | 'ignored'
 
 export function whatsAppOrderTabScope(user: User | null, branchId?: number | null): string | null {
     return user ? JSON.stringify([user.id, user.role, user.accountType, branchId ?? user.branchId]) : null
@@ -76,12 +76,15 @@ export function listenForWhatsAppOrders(getScope: () => string | null, open: (or
         } else if ((data.type === 'activate' || data.type === 'open') && data.tabId === tabId && Date.now() < data.expiresAt
             && Number.isSafeInteger(data.orderId) && data.orderId > 0) {
             if (data.type === 'open') {
-                // Orders tabs still running the previous build use the original handoff.
+                activation = undefined
                 accept(data)
                 tryFocus(window)
             } else {
                 activation = data
-                if (!isForeground()) tryFocus(window)
+                if (!isForeground()) {
+                    window.postMessage({ type: 'senor-arroz:focus-whatsapp-tab' }, window.location.origin)
+                    tryFocus(window)
+                }
                 acceptWhenFocused()
             }
         }
@@ -98,27 +101,33 @@ function handOffOrder(channel: BroadcastChannel, scope: string, orderId: number,
     const requestId = generatePosCreationKey()
     return new Promise<Handoff>(resolve => {
         let bestOffer: TabOffer | undefined
-        let foundTab = false
         let chosenTab: string | undefined
         let deliveryTimer: number | undefined
+        let deliveringInBackground = false
         channel.onmessage = ({ data }: MessageEvent<TabMessage>) => {
             if (data?.scope !== scope || data.requestId !== requestId) return
-            if (data.type === 'offer' && typeof data.tabId === 'string' && Number.isFinite(data.lastFocused)) {
-                foundTab = true
-                if (data.activation && (!bestOffer || data.lastFocused > bestOffer.lastFocused)) bestOffer = data
-            }
+            if (data.type === 'offer' && typeof data.tabId === 'string' && Number.isFinite(data.lastFocused)
+                && (!bestOffer || data.lastFocused > bestOffer.lastFocused)) bestOffer = data
             if (data.type === 'accepted' && chosenTab === data.tabId) {
                 window.clearTimeout(deliveryTimer)
-                resolve('reused')
+                resolve(deliveringInBackground ? 'background' : 'reused')
             }
         }
         window.setTimeout(() => {
-            if (!bestOffer || !isCurrent()) { resolve(foundTab ? 'unfocused' : 'absent'); return }
+            if (!bestOffer || !isCurrent()) { resolve('absent'); return }
             chosenTab = bestOffer.tabId
+            const order = { scope, requestId, tabId: chosenTab, orderId }
+            function deliverInBackground() {
+                if (!isCurrent()) { resolve('absent'); return }
+                deliveringInBackground = true
+                channel.postMessage({ type: 'open', ...order, expiresAt: Date.now() + discoveryMs } satisfies TabMessage)
+                deliveryTimer = window.setTimeout(() => resolve('absent'), discoveryMs + acknowledgementMs)
+            }
+
+            if (!bestOffer.activation) { deliverInBackground(); return }
             focusOpenedTab(bestOffer.tabName)
-            channel.postMessage({ type: 'activate', scope, requestId, tabId: chosenTab, orderId,
-                expiresAt: Date.now() + activationMs } satisfies TabMessage)
-            deliveryTimer = window.setTimeout(() => resolve('unfocused'), activationMs + acknowledgementMs)
+            channel.postMessage({ type: 'activate', ...order, expiresAt: Date.now() + activationMs } satisfies TabMessage)
+            deliveryTimer = window.setTimeout(deliverInBackground, activationMs + acknowledgementMs)
         }, discoveryMs)
         channel.postMessage({ type: 'discover', scope, requestId } satisfies TabMessage)
     }).finally(() => channel.close())
@@ -146,10 +155,9 @@ export function createWhatsAppOrderLauncher() {
                 if (openedTab && openedTab.name === tabName && !openedTab.tab.closed) tryFocus(openedTab.tab)
             }) : 'absent'
             if (!isCurrent()) return 'ignored'
-            if (handoff === 'reused') return 'reused'
-            if (handoff === 'unfocused') return 'navigate'
+            if (handoff !== 'absent') return handoff
             openedTab = openWhatsAppTab(url)
-            return openedTab ? 'opened' : 'navigate'
+            return openedTab ? 'opened' : 'blocked'
         } finally {
             pending = false
         }

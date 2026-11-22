@@ -826,7 +826,7 @@ function handleTrackOrder(order: OrderListItem) {
     showTrackingDialog.value = true
 }
 
-const { success, error } = useToast()
+const { success, error, info } = useToast()
 const launchWhatsApp = createWhatsAppOrderLauncher()
 const whatsAppTabScope = computed(() => whatsAppOrderTabScope(authStore.user, workspaceBranchId.value))
 
@@ -836,7 +836,8 @@ async function handleOpenWhatsApp(orderId: number) {
     const destination = { name: 'WhatsApp', query: { orderId: String(orderId) } }
     const result = await launchWhatsApp(scope, orderId, router.resolve(destination).href,
         () => route.name === 'OrdersList' && whatsAppTabScope.value === scope)
-    if (result === 'navigate') await router.push(destination)
+    if (result === 'background') info('Pedido en WhatsApp', 'Para cambiar de pestaña automáticamente, verifica que la extensión de Señor Arroz esté activa.')
+    if (result === 'blocked') error('No se pudo abrir WhatsApp', 'El navegador bloqueó la apertura de una pestaña nueva.')
 }
 const { formatCurrency } = useFormatting()
 
