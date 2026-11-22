@@ -12,6 +12,8 @@ type TabMessage = { scope: string; requestId: string } & (
     | { type: 'accepted'; tabId: string }
 )
 
+type WhatsAppOrderLaunch = 'reused' | 'opened' | 'blocked' | 'ignored'
+
 export function whatsAppOrderTabScope(user: User | null, branchId?: number | null): string | null {
     return user ? JSON.stringify([user.id, user.role, user.accountType, branchId ?? user.branchId]) : null
 }
@@ -36,11 +38,12 @@ export function listenForWhatsAppOrders(getScope: () => string | null, open: (or
             channel.postMessage({ type: 'offer', scope, requestId: data.requestId, tabId, lastFocused } satisfies TabMessage)
         } else if (data.type === 'open' && data.tabId === tabId && Date.now() <= data.expiresAt
             && Number.isSafeInteger(data.orderId) && data.orderId > 0) {
+            if (lastRequest !== data.requestId) {
+                lastRequest = data.requestId
+                open(data.orderId)
+                try { window.focus() } catch { /* Some browsers restrict focus from a background tab. */ }
+            }
             channel.postMessage({ type: 'accepted', scope, requestId: data.requestId, tabId } satisfies TabMessage)
-            if (lastRequest === data.requestId) return
-            lastRequest = data.requestId
-            window.focus()
-            open(data.orderId)
         }
     }
     return () => {
@@ -86,17 +89,21 @@ function openWhatsAppTab(url: string): boolean {
 export function createWhatsAppOrderLauncher() {
     let pending = false
     let blockedScope: string | undefined
-    return async (scope: string, orderId: number, url: string, isCurrent: () => boolean) => {
-        if (pending) return true
+    return async (scope: string, orderId: number, url: string, isCurrent: () => boolean): Promise<WhatsAppOrderLaunch> => {
+        if (pending) return 'ignored'
         pending = true
         try {
             // Retain the gesture on a retry if the first browser refused to open after discovery.
             const channel = blockedScope === scope ? null : connect()
-            if (channel && await handOffOrder(channel, scope, orderId)) return true
-            if (!isCurrent()) return true
+            const reused = channel && await handOffOrder(channel, scope, orderId)
+            if (!isCurrent()) return 'ignored'
+            if (reused) {
+                blockedScope = undefined
+                return 'reused'
+            }
             const opened = openWhatsAppTab(url)
             blockedScope = opened ? undefined : scope
-            return opened
+            return opened ? 'opened' : 'blocked'
         } finally {
             pending = false
         }
