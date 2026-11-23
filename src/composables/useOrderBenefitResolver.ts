@@ -92,7 +92,8 @@ const loadLoyaltyCycle = async (branchId: number) => {
             cycleByBranch.set(branchId, steps)
             return steps
         } catch {
-            cycleByBranch.set(branchId, [])
+            // Do not cache a transient failure as a valid empty loyalty cycle.
+            // The next resolution must be able to retry the authorized endpoint.
             return []
         } finally {
             cycleInFlight.delete(branchId)
