@@ -4,6 +4,7 @@
     <BaseCard>
       <BranchWhatsAppSettingsForm :branch-id="branchId" @saved="handleWhatsAppSettingsSaved" />
     </BaseCard>
+    <BranchDeliveryWorkPhones :key="branchId" :branch-id="branchId" />
 
     <BaseCard>
       <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -31,6 +32,7 @@ import WhatsAppCoexistencePanel from '@/components/whatsapp/WhatsAppCoexistenceP
 import BaseButton from '@/components/ui/BaseButton.vue'
 import BranchAiSettingsForm from '@/components/branches/BranchAiSettingsForm.vue'
 import BranchWhatsAppSettingsForm from '@/components/whatsapp/BranchWhatsAppSettingsForm.vue'
+import BranchDeliveryWorkPhones from '@/components/whatsapp/BranchDeliveryWorkPhones.vue'
 import WhatsAppNotificationSoundSettings from '@/components/whatsapp/WhatsAppNotificationSoundSettings.vue'
 import { useWhatsAppStore } from '@/store/whatsapp'
 import { DocumentTextIcon } from '@heroicons/vue/24/outline'

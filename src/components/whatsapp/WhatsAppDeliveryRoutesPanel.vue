@@ -28,7 +28,7 @@ import { useOrderManagementUpdates } from '@/composables/useOrderManagementUpdat
 import { whatsappApi } from '@/services/MainAPI/whatsappApi'
 import type { WhatsAppRecentDeliveryRoute } from '@/types/whatsapp'
 
-const props = defineProps<{ conversationId: number }>()
+const props = defineProps<{ conversationId: number; expectedDeliverymanId?: number }>()
 const emit = defineEmits<{ manage: [orderId: number]; 'contact-customer': [orderId: number] }>()
 const routes = ref<WhatsAppRecentDeliveryRoute[]>([])
 const error = ref('')
@@ -52,7 +52,7 @@ watch(() => [props.conversationId, revision.value] as const, async ([id], previo
   error.value = ''
   loading.value = true
   try {
-    const response = await whatsappApi.getConversationDeliveryRoutes(id, request.signal)
+    const response = await whatsappApi.getConversationDeliveryRoutes(id, request.signal, props.expectedDeliverymanId)
     if (!request.signal.aborted) routes.value = response.data ?? []
   } catch (cause) {
     if (!request.signal.aborted) error.value = cause instanceof Error ? cause.message : 'No se pudieron consultar las rutas.'
