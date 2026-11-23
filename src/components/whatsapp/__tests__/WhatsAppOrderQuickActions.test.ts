@@ -58,11 +58,12 @@ beforeEach(() => {
 })
 afterEach(() => { wrapper?.unmount(); wrapper = undefined; document.body.innerHTML = ''; vi.useRealTimers() })
 
-async function render(dark = false) {
+async function render(dark = false, routeId?: number) {
   wrapper = mount(defineComponent({ props: ['active', 'orderId'], setup(props) {
     const { setTheme } = useWhatsAppTheme(() => 7)
     if (dark) setTheme('dark')
-    return () => h(WhatsAppOrderQuickActions, { orderId: props.orderId, active: props.active })
+    return () => h(WhatsAppOrderQuickActions, { orderId: props.orderId, active: props.active, routeId,
+      initialStatus: routeId == null ? undefined : 'on_the_way' })
   } }), { props: { active: true, orderId: 501 }, attachTo: document.body, global: { plugins: [pinia], stubs: { BaseDialog: dialog,
     OrderTrackingDialog: { props: ['modelValue', 'order'], template: '<div v-if="modelValue" data-test="tracking">{{ order.id }}</div>' } } } })
   await flushPromises()
@@ -88,6 +89,21 @@ it('shows the live status and keeps the main button opening the order detail', a
   expect(view.text()).toContain('Tomado')
   await click('Gestionar pedido #501')
   expect(view.emitted('manage')).toHaveLength(1)
+  expect(region()).toBeNull()
+})
+
+it('uses route status before opening and only loads bank actions on demand', async () => {
+  current.status = 'on_the_way'
+  current.deliveryRouteId = 99
+  const view = await render(false, 17)
+  expect(view.text()).toContain('En camino')
+  expect(api.fetchDetail).not.toHaveBeenCalled()
+  expect(api.options).not.toHaveBeenCalled()
+  await open()
+  expect(api.options).toHaveBeenCalledExactlyOnceWith(501)
+  expect(region()!.textContent).not.toContain('Ver ubicación')
+  await click('Hablar con el cliente')
+  expect(view.emitted('contact-customer')).toHaveLength(1)
   expect(region()).toBeNull()
 })
 

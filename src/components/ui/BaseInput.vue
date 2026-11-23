@@ -13,7 +13,7 @@
 				:invalid="!!error" :with-date="type === 'datetime-local'" :compact="size === 'sm'" />
 			<input v-else :id="inputId" :type="type" v-model="inputValue" :placeholder="placeholder" :required="required" :aria-label="ariaLabel"
 				:disabled="disabled" :class="inputClasses" @blur="onBlur" @focus="onFocus" :minlength="minlength"
-				:maxlength="maxlength" :min="min" :max="max" :step="step" @keyup.enter="onEnter" />
+				:maxlength="maxlength" :min="min" :max="max" :step="step" :inputmode="inputmode" @keyup.enter="onEnter" />
 			<div v-if="$slots.icon"
 				class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
 				<slot name="icon" />
@@ -57,6 +57,7 @@ interface Props {
 	min?: number;
 	max?: number;
 	step?: number | string;
+	inputmode?: 'none' | 'text' | 'decimal' | 'numeric' | 'tel' | 'search' | 'email' | 'url';
 }
 
 const props = withDefaults(defineProps<Props>(), {

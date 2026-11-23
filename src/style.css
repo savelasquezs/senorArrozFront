@@ -87,6 +87,12 @@
     --color-amber-800: #ffdbac;
     --color-amber-900: #ffe6c6;
     --color-amber-950: #fff0d8;
+    --color-yellow-100: #3e361c;
+    --color-yellow-200: #706033;
+    --color-yellow-800: #ffe28f;
+    --color-orange-100: #492e21;
+    --color-orange-200: #7e5138;
+    --color-orange-800: #ffd0aa;
     --color-red-50: #391f29;
     --color-red-100: #492831;
     --color-red-200: #713d4b;
@@ -104,6 +110,9 @@
     --color-blue-800: #c0dbff;
     --color-blue-900: #d4e6ff;
     --color-blue-950: #e6f1ff;
+    --color-purple-100: #3b294e;
+    --color-purple-200: #664783;
+    --color-purple-800: #e5caff;
     --color-violet-100: #352947;
     --color-violet-700: #d5bfff;
     --color-indigo-100: #2c3150;

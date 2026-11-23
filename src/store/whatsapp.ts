@@ -436,8 +436,8 @@ export const useWhatsAppStore = defineStore('whatsapp', () => {
     for (const message of sent) upsertMessage(conversationId, message)
   }
 
-  async function sendQuickReply(conversationId: number, quickReplyId: number) {
-    const res = await whatsappApi.sendQuickReply(conversationId, quickReplyId)
+  async function sendQuickReply(conversationId: number, quickReplyId: number, replyToMessageId?: number) {
+    const res = await whatsappApi.sendQuickReply(conversationId, quickReplyId, replyToMessageId)
     const message = res.data
     if (message) {
       upsertMessage(conversationId, message)

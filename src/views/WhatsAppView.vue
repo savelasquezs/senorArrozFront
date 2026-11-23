@@ -54,7 +54,7 @@
         <nav class="flex shrink-0 gap-2 border-b bg-white px-3 py-2 xl:hidden" aria-label="Vista de atención">
           <BaseButton size="sm" variant="outline" @click="mobilePane = 'inbox'">Conversaciones</BaseButton>
           <BaseButton size="sm" variant="outline" :disabled="!selectedConversation" @click="mobilePane = 'chat'">Chat</BaseButton>
-          <BaseButton size="sm" variant="outline" :disabled="!selectedConversation" @click="mobilePane = 'order'; contextPanelCollapsed = false">Pedido</BaseButton>
+          <BaseButton size="sm" variant="outline" :disabled="!selectedConversation" @click="mobilePane = 'order'; contextPanelCollapsed = false">{{ operationalContact ? 'Herramientas' : 'Pedido' }}</BaseButton>
         </nav>
         <div ref="columnsContainer" class="whatsapp-columns relative grid min-h-0 flex-1 grid-cols-1"
           :class="{ 'with-order': selectedConversation && !contextPanelCollapsed }"
@@ -143,6 +143,8 @@
                     <WhatsAppContactAvatar :name="conversationTitle(conversation)" :url="conversation.profilePhotoUrl"
                       @open="url => openContactPhoto(conversation, url)" />
                     <span class="truncate text-xs font-semibold" :title="conversationIdentityLabel(conversation)">{{ conversationTitle(conversation) }}</span>
+                    <span v-if="conversation.operationalContact && !(conversation.operationalContact.kind === 'supplier' && conversation.labels?.includes('supplier'))"
+                      class="wa-tag shrink-0 font-semibold">{{ operationalContactLabel(conversation) }}</span>
                   </div>
                   <div v-if="conversation.labels?.length" class="wa-conversation-tags" data-test="inbox-conversation-labels">
                     <button v-for="key in conversation.labels.slice(0, 2)" :key="key" type="button" class="wa-tag"
@@ -197,6 +199,7 @@
                 <p class="truncate whitespace-nowrap text-sm font-semibold text-gray-900" :class="{ 'max-w-[55%]': chatIdentity }" :title="conversationTitle(selectedConversation)">
                   {{ conversationTitle(selectedConversation) }}
                 </p>
+                <span v-if="operationalContact" class="wa-tag shrink-0 font-semibold">{{ operationalContactLabel(selectedConversation) }}</span>
                 <p v-if="chatIdentity" class="chat-identity truncate whitespace-nowrap text-xs text-gray-500" :title="chatIdentity">
                   {{ chatIdentity }}
                 </p>
@@ -532,10 +535,10 @@
                 >
                   /{{ reply.shortcut }}
                 </button>
-                <button type="button" aria-label="Crear o editar respuestas rápidas" title="Crear o editar respuestas rápidas"
-                  class="inline-flex h-7 w-7 items-center justify-center rounded-full border border-emerald-300 text-emerald-800 hover:bg-emerald-50 focus-visible:outline-emerald-600"
+                <button type="button" aria-label="Ver todas las respuestas rápidas"
+                  class="inline-flex h-7 items-center gap-1 rounded-full border border-emerald-300 px-2.5 text-xs font-semibold text-emerald-800 hover:bg-emerald-50 focus-visible:outline-emerald-600"
                   @click="openQuickRepliesModal">
-                  <PlusIcon class="h-4 w-4" aria-hidden="true" />
+                  Ver todas
                 </button>
               </div>
               <div v-for="failure in currentComposerFailures" :key="failure.id" class="wa-compose-failure">
@@ -640,14 +643,23 @@
           class="absolute right-0 top-1/2 z-10 -translate-y-1/2 rounded-l-lg border border-emerald-200 bg-emerald-600 px-3 py-4 text-sm font-medium text-white shadow-lg hover:bg-emerald-700"
           @click="contextPanelCollapsed = false; mobilePane = 'order'"
         >
-          Pedido
+          {{ operationalContact ? 'Herramientas' : 'Pedido' }}
         </button>
 
         <Transition name="wa-order-panel">
         <aside v-if="selectedConversation" v-show="!contextPanelCollapsed" data-test="whatsapp-order-column" class="relative min-h-0 border-l border-gray-200 bg-white flex flex-col" :class="{ 'max-xl:hidden': mobilePane !== 'order' }">
           <div role="separator" tabindex="0" aria-label="Ancho del pedido" aria-orientation="vertical" :aria-valuenow="rightWidth" class="absolute -left-1 top-0 z-10 hidden h-full w-2 cursor-col-resize touch-none xl:block" @pointerdown="resize($event, 'right')" @keydown.left.prevent="step('right', 20)" @keydown.right.prevent="step('right', -20)" />
+          <div v-if="operationalContact" class="flex shrink-0 flex-wrap items-center gap-2 border-b border-gray-200 p-3">
+            <BaseButton v-if="operationalContact.kind === 'supplier'" size="sm" @click="openSupplierOrder">Hacer pedido</BaseButton>
+            <BaseButton v-else-if="showingCustomerOrder" size="sm" variant="outline" @click="showingCustomerOrder = false">Ver rutas</BaseButton>
+            <BaseButton v-if="!showingCustomerOrder" size="sm" variant="outline" @click="showingCustomerOrder = true">Tomar pedido de cliente</BaseButton>
+          </div>
+          <WhatsAppDeliveryRoutesPanel v-if="operationalContact?.kind === 'deliveryman' && !showingCustomerOrder && !contextPanelCollapsed"
+            :conversation-id="selectedConversation.id" :key="`${sessionKey}:${selectedConversation.id}`"
+            @manage="manageDeliveryOrder" @contact-customer="openOrderConversation" />
           <KeepAlive :key="editorScope" :max="8">
-            <WhatsAppOrderPanel ref="commercialPanel" :key="`${authStore.user?.id}:${selectedConversation.id}`" :conversation="selectedConversation" :initial-draft="prefetchedDraft" :controls-target="commercialControlsTarget" :save-target="commercialSaveTarget"
+            <WhatsAppOrderPanel v-show="!operationalContact || showingCustomerOrder" ref="commercialPanel" :key="`${authStore.user?.id}:${selectedConversation.id}`" :conversation="selectedConversation" :initial-draft="prefetchedDraft"
+              :controls-target="!operationalContact || showingCustomerOrder ? commercialControlsTarget : null" :save-target="!operationalContact || showingCustomerOrder ? commercialSaveTarget : null"
               :can-send-choices="canSend" :finishing-attention="finishingAttention" @change="commercialChanged" @draft-message="draftOrderMessage" @addresses-sent="addressesSent"
               @product-suggestion-state="setProductSuggestionState" />
           </KeepAlive>
@@ -764,13 +776,16 @@
                 Actualizar
               </BaseButton>
             </div>
+            <p v-if="selectedConversation && !canSend" class="border-b border-gray-100 px-3 py-2 text-xs text-gray-600">
+              {{ !serviceWindowOpen ? 'La ventana de atención está cerrada. Usa una plantilla aprobada.' : 'Toma la conversación para usar una respuesta rápida.' }}
+            </p>
             <div class="max-h-[420px] overflow-y-auto divide-y divide-gray-100">
               <div v-if="catalogQuickReplies.length" class="space-y-2 px-3 py-3">
                 <h3 class="text-sm font-semibold text-gray-800">Catálogo</h3>
                 <div v-for="group in catalogQuickReplies" :key="group.id" class="flex items-center gap-2">
                   <span class="rounded bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-800">/{{ group.shortcut }}</span>
                   <span class="min-w-0 flex-1 text-sm text-gray-700">{{ group.name }}</span>
-                  <BaseButton v-if="canSend" size="sm" variant="ghost" :disabled="sending || sendingProductChoices"
+                  <BaseButton v-if="canSend && !replyTarget" size="sm" variant="ghost" :disabled="sending || sendingProductChoices"
                     @click="sendCatalogQuickReply(group)">Enviar</BaseButton>
                 </div>
               </div>
@@ -791,6 +806,9 @@
                   <p class="mt-2 line-clamp-2 text-sm text-gray-700">{{ quickReplyDescription(reply) }}</p>
                 </div>
                 <div class="flex shrink-0 gap-1">
+                  <BaseButton v-if="reply.isActive && reply.branchId === quickReplyBranchId" size="sm" variant="outline"
+                    :disabled="!canSend || sending || sendingProductChoices || preparingQuickReply"
+                    @click="useQuickReplyFromLibrary(reply)">Usar</BaseButton>
                   <BaseButton size="sm" variant="ghost" @click="editQuickReply(reply)">Editar</BaseButton>
                   <BaseButton size="sm" variant="danger" @click="removeQuickReply(reply)">Eliminar</BaseButton>
                 </div>
@@ -897,6 +915,11 @@
       <WhatsAppConversationStarter v-if="showConversationStarter" v-model="showConversationStarter" :key="sessionKey"
         :branches="conversationStarterBranches" :initial-branch-id="orderStarter?.branchId ?? conversationStarterBranchId"
         :initial-phone="orderStarter?.phone" @complete="openStartedConversation" />
+      <WhatsAppSupplierOrderDialog v-if="showSupplierOrder && selectedConversation && operationalContact?.kind === 'supplier'"
+        :key="`${sessionKey}:${selectedConversation.id}`" :conversation-id="selectedConversation.id" :supplier-name="operationalContact.name"
+        :can-insert="canSend && !sending && !sendingProductChoices && !preparingQuickReply && !selectingForward"
+        :window-open="serviceWindowOpen" :composer-error="supplierComposerError"
+        @close="showSupplierOrder = false" @prepare="draftSupplierOrder" />
       <WhatsAppForwardDialog v-if="showForwardDialog && selectedConversation" v-model="showForwardDialog"
         :source-id="selectedConversation.id" :count="forwardSelection.size" :sending="forwarding"
         :error="forwardError" @forward="forwardSelectedMessages" />
@@ -906,11 +929,13 @@
 
 <script setup lang="ts">
 import { useResizableColumns } from '@/composables/useResizableColumns'
-import { commercialGroup, commercialLabel, conversationTitle, fixedInboxLabelStyles, inboxLabelColor, inboxLabelPalette } from '@/utils/whatsappInbox'
+import { commercialGroup, commercialLabel, conversationTitle, fixedInboxLabelStyles, inboxLabelColor, inboxLabelPalette, operationalContactLabel } from '@/utils/whatsappInbox'
 import { generatePosCreationKey } from '@/utils/posCreationKey'
 import { listenForWhatsAppOrders, whatsAppOrderTabScope } from '@/utils/whatsappOrderTab'
 
 import WhatsAppOrderPanel from '@/components/whatsapp/WhatsAppOrderPanel.vue'
+import WhatsAppDeliveryRoutesPanel from '@/components/whatsapp/WhatsAppDeliveryRoutesPanel.vue'
+import WhatsAppSupplierOrderDialog from '@/components/whatsapp/WhatsAppSupplierOrderDialog.vue'
 import WhatsAppMessageActions from '@/components/whatsapp/WhatsAppMessageActions.vue'
 import WhatsAppVoiceMessage from '@/components/whatsapp/WhatsAppVoiceMessage.vue'
 import WhatsAppContactAvatar from '@/components/whatsapp/WhatsAppContactAvatar.vue'
@@ -1116,6 +1141,16 @@ const claimingConversationId = ref<number | null>(null)
 const changingOperationalBranch = ref(false)
 const resettingConversation = ref(false)
 const contextPanelCollapsed = ref(false)
+const operationalContact = computed(() => selectedConversation.value?.operationalContact)
+const showingCustomerOrder = ref(false)
+const showSupplierOrder = ref(false)
+const supplierComposerError = ref('')
+watch(() => [selectedConversation.value?.id, operationalContact.value?.kind, operationalContact.value?.name,
+  selectedConversation.value?.phoneNumber] as const, (current, previous) => {
+  if (current.every((value, index) => value === previous[index])) return
+  showingCustomerOrder.value = false
+  showSupplierOrder.value = false
+}, { flush: 'sync' })
 const mobilePane = ref<'inbox' | 'chat' | 'order'>('inbox')
 const columnsContainer = ref<HTMLElement>()
 const { leftWidth, rightWidth, resize, step } = useResizableColumns(columnsContainer)
@@ -1143,7 +1178,7 @@ let productChoicesRequest: { controller: AbortController; promise: Promise<void>
 const editingQuickReply = ref<WhatsAppQuickReply | null>(null)
 const quickReplySaving = ref(false)
 const quickReplyError = ref('')
-type QuickReplyContext = { conversationId: number; session: string; text: string; attachments: typeof attachments.value }
+type QuickReplyContext = { conversationId: number; session: string; text: string; attachments: typeof attachments.value; replyId?: number }
 const quickReplyChoice = shallowRef<{ replyId: number; context: QuickReplyContext; presentations: WhatsAppQuickReplyPresentation[] }>()
 const preparingQuickReply = ref(false)
 const quickReplyPreviewError = ref('')
@@ -1401,7 +1436,7 @@ const composingDuringTake = computed(() => !!selectedConversation.value && servi
   && !selectedConversation.value.assignedUserId)
 const composerPlaceholder = computed(() => canTakeAttention.value && !composingDuringTake.value
   ? 'Doble clic para tomar la conversación' : 'Escribe un mensaje')
-const canReturnToAi = computed(() => ownsConversation.value)
+const canReturnToAi = computed(() => ownsConversation.value && !operationalContact.value)
 const canPauseAi = computed(() => selectedConversation.value?.attentionMode === 'ai' && !selectedConversation.value.assignedUserId)
 const canTakeOver = computed(() => selectedConversation.value?.attentionMode === 'human'
   && !!selectedConversation.value.assignedUserId && !ownsConversation.value)
@@ -1800,11 +1835,14 @@ const headerBranchLabel = computed(() => {
   return authStore.user?.branchName
 })
 
+const quickReplyBranchId = computed(() => selectedConversation.value?.isCentralChannel
+  ? workContext.selectedBranchId ?? authStore.user?.branchId
+  : selectedConversation.value?.branchId)
 const activeQuickRepliesForConversation = computed(() => {
-  if (!selectedConversation.value) return []
+  if (!quickReplyBranchId.value) return []
   return whatsappStore.quickReplies
-    .filter(reply => reply.isActive && reply.branchId === selectedConversation.value?.branchId
-      && !catalogQuickRepliesByShortcut.value.has(reply.shortcut))
+    .filter(reply => reply.isActive && reply.branchId === quickReplyBranchId.value
+      && (replyTarget.value || !catalogQuickRepliesByShortcut.value.has(reply.shortcut)))
     .sort((a, b) => b.usageCount - a.usageCount || a.shortcut.localeCompare(b.shortcut))
 })
 
@@ -1812,10 +1850,10 @@ const topQuickReplies = computed(() => activeQuickRepliesForConversation.value.s
 
 const filteredQuickReplies = computed(() => {
   const value = draft.value.trim()
-  if (replyTarget.value || !value.startsWith('/') || /\s/.test(value) || hasAttachments.value) return []
+  if (!value.startsWith('/') || /\s/.test(value) || hasAttachments.value) return []
   const query = normalizeQuickReplyShortcut(value)
   const matches = [
-    ...catalogQuickReplies.value.map(group => ({
+    ...(replyTarget.value ? [] : catalogQuickReplies.value).map(group => ({
       group, saved: null, key: `catalog-${group.id}`, shortcut: group.shortcut ?? '', preview: group.name,
     })),
     ...activeQuickRepliesForConversation.value.map(saved => ({
@@ -1827,8 +1865,8 @@ const filteredQuickReplies = computed(() => {
 })
 const slashQuickReplyMatches = computed(() => filteredQuickReplies.value.slice(0, 12))
 const uniqueQuickReply = computed(() => filteredQuickReplies.value.length === 1
-  && normalizeQuickReplyShortcut(draft.value) && savedQuickRepliesReady.value && catalogQuickRepliesReady.value
-  && !whatsappStore.isLoadingQuickReplies && !loadingProductChoices.value
+  && normalizeQuickReplyShortcut(draft.value) && savedQuickRepliesReady.value && !whatsappStore.isLoadingQuickReplies
+  && (replyTarget.value || catalogQuickRepliesReady.value && !loadingProductChoices.value)
   && canSend.value && !sending.value && !sendingProductChoices.value && !preparingQuickReply.value
   ? filteredQuickReplies.value[0] : undefined)
 
@@ -2217,6 +2255,17 @@ async function openOrderConversation(orderId: number) {
   }
 }
 
+async function manageDeliveryOrder(orderId: number) {
+  const selection = conversationSelection
+  try {
+    await commercialPanel.value?.showManagedOrder(orderId)
+  } catch (error) {
+    if (viewActive && selection === conversationSelection) {
+      showError('Gestionar pedido', error instanceof Error ? error.message : 'No se pudo consultar el pedido.')
+    }
+  }
+}
+
 async function selectConversationFromRoute() {
   const id = Number(route.query.conversationId || 0)
   const selection = conversationSelection
@@ -2319,7 +2368,8 @@ function runSavedQuickReply(reply: WhatsAppQuickReply) {
   if (!canSend.value || sending.value || sendingProductChoices.value || preparingQuickReply.value || !selectedConversation.value) return
   if (quickReplyMode(reply) === 'send') return sendQuickReply(reply)
   return prepareQuickReply(reply.id, {
-    conversationId: selectedConversation.value.id, session: sessionKey.value, text: draft.value, attachments: attachments.value,
+    conversationId: selectedConversation.value.id, session: sessionKey.value, text: draft.value,
+    attachments: attachments.value, replyId: replyTarget.value?.id,
   })
 }
 
@@ -2344,6 +2394,7 @@ async function prepareQuickReply(replyId: number, context: QuickReplyContext, pr
   const revision = ++quickReplyPreviewRevision
   const current = () => viewActive && revision === quickReplyPreviewRevision && selectedConversation.value?.id === context.conversationId
     && sessionKey.value === context.session && canSend.value && draft.value === context.text && attachments.value === context.attachments
+    && replyTarget.value?.id === context.replyId
   if (!current()) { clearQuickReplyPreview(); return }
   preparingQuickReply.value = true
   quickReplyPreviewError.value = ''
@@ -2380,9 +2431,11 @@ async function sendQuickReply(reply: WhatsAppQuickReply) {
   const conversationId = selectedConversation.value?.id
   if (!conversationId || !canSend.value || sending.value || sendingProductChoices.value) return
   const session = sessionKey.value
+  const target = replyTarget.value?.conversationId === conversationId ? replyTarget.value : null
   if (queuedTextEnabled.value) {
-    textQueue.enqueue({ conversationId, quickReplyId: reply.id, text: reply.messageTemplate })
+    textQueue.enqueue({ conversationId, quickReplyId: reply.id, text: reply.messageTemplate, replyToMessageId: target?.id })
     if (filteredQuickReplies.value.some(match => match.saved?.id === reply.id)) takeDraft()
+    if (target) replyTarget.value = null
     sendError.value = ''
     messageInput.value?.focus()
     void scrollToBottom()
@@ -2392,7 +2445,7 @@ async function sendQuickReply(reply: WhatsAppQuickReply) {
   sending.value = true
   sendError.value = ''
   try {
-    await whatsappStore.sendQuickReply(conversationId, reply.id)
+    await whatsappStore.sendQuickReply(conversationId, reply.id, target?.id)
   } catch (error) {
     if (viewActive && sessionKey.value === session) {
       const message = error instanceof Error ? error.message : 'No se pudo enviar la respuesta rápida.'
@@ -2403,11 +2456,14 @@ async function sendQuickReply(reply: WhatsAppQuickReply) {
   } finally {
     sending.value = false
   }
-  if (viewActive && sessionKey.value === session && selectedConversation.value?.id === conversationId) await scrollToBottom()
+  if (viewActive && sessionKey.value === session && selectedConversation.value?.id === conversationId) {
+    if (target && replyTarget.value?.id === target.id) replyTarget.value = null
+    await scrollToBottom()
+  }
 }
 
 function defaultQuickReplyBranchId() {
-  return selectedConversation.value?.branchId
+  return quickReplyBranchId.value
     || selectedBranchId.value
     || whatsappStore.enabledBranchIds[0]
     || null
@@ -2445,6 +2501,12 @@ async function openQuickRepliesModal() {
   } catch (error: any) {
     quickReplyError.value = error.message || 'No se pudieron cargar las respuestas rápidas.'
   }
+}
+
+function useQuickReplyFromLibrary(reply: WhatsAppQuickReply) {
+  if (!canSend.value || sending.value || sendingProductChoices.value || preparingQuickReply.value) return
+  showQuickRepliesModal.value = false
+  void runSavedQuickReply(reply)
 }
 
 function editQuickReply(reply: WhatsAppQuickReply) {
@@ -2493,20 +2555,42 @@ async function removeQuickReply(reply: WhatsAppQuickReply) {
 }
 
 async function draftOrderMessage(conversationId: number, text: string) {
-  if (selectedConversation.value?.id !== conversationId || !ownsConversation.value) return
+  if (selectedConversation.value?.id !== conversationId || !ownsConversation.value) return false
   mobilePane.value = 'chat'
   const existing = draft.value.trimEnd()
   if (!existing.endsWith(text)) {
     const next = existing.trim() ? `${existing}\n\n${text}` : text
     if (next.length > 4096) {
       sendError.value = 'Reduce el texto actual para agregar el mensaje del pedido.'
-      return
+      return false
     }
     draft.value = next
   }
   sendError.value = ''
   await nextTick()
   if (selectedConversation.value?.id === conversationId) messageInput.value?.focus()
+  return true
+}
+
+function openSupplierOrder() {
+  supplierComposerError.value = ''
+  showSupplierOrder.value = true
+}
+
+async function draftSupplierOrder(conversationId: number, text: string) {
+  if (!showSupplierOrder.value || operationalContact.value?.kind !== 'supplier'
+    || selectedConversation.value?.id !== conversationId || !canSend.value
+    || sending.value || sendingProductChoices.value || preparingQuickReply.value || selectingForward.value) return
+  const selection = conversationSelection
+  const inserted = await draftOrderMessage(conversationId, text)
+  if (selection !== conversationSelection) return
+  if (!inserted) {
+    supplierComposerError.value = sendError.value || 'No se pudo preparar el mensaje desde este chat.'
+    return
+  }
+  showSupplierOrder.value = false
+  await nextTick()
+  if (selection === conversationSelection && canSend.value) messageInput.value?.focus()
 }
 
 async function addressesSent(conversationId: number, messages: WhatsAppMessage[]) {
@@ -2822,18 +2906,20 @@ async function sendMessage() {
   if (!canSend.value || sending.value || sendingProductChoices.value || preparingQuickReply.value) return
   if (!selectedConversation.value || (!draft.value.trim() && !hasAttachments.value)) return
   const textToSend = draft.value.trim()
-  if (!replyTarget.value && !hasAttachments.value && textToSend.startsWith('/') && !/\s/.test(textToSend)) {
+  if (!hasAttachments.value && textToSend.startsWith('/') && !/\s/.test(textToSend)) {
     const conversationId = selectedConversation.value.id
-    await productChoicesRequest?.promise.catch(() => {})
-    if (selectedConversation.value?.id !== conversationId || draft.value.trim() !== textToSend || !canSend.value) return
-    if (sending.value || sendingProductChoices.value || preparingQuickReply.value || hasAttachments.value || replyTarget.value) return
+    const replyId = replyTarget.value?.id
+    if (replyId == null) await productChoicesRequest?.promise.catch(() => {})
+    if (selectedConversation.value?.id !== conversationId || draft.value.trim() !== textToSend || !canSend.value
+      || replyTarget.value?.id !== replyId) return
+    if (sending.value || sendingProductChoices.value || preparingQuickReply.value || hasAttachments.value) return
     const shortcut = normalizeQuickReplyShortcut(textToSend)
     const quickReply = findQuickReplyCommand(textToSend)
     if (quickReply) {
       await runSavedQuickReply(quickReply)
       return
     }
-    const group = catalogQuickRepliesByShortcut.value.get(shortcut)
+    const group = replyId == null ? catalogQuickRepliesByShortcut.value.get(shortcut) : undefined
     if (group) {
       await sendCatalogQuickReply(group)
       return
@@ -3291,7 +3377,7 @@ watch([isPageVisible, isUserActive], ([visible, active], [wasVisible, wasActive]
   }
 })
 watch([activeInbox, selectedLabel], () => { if (whatsappStore.enabled) void reloadConversations() })
-watch([() => selectedConversation.value?.id, canSend], () => {
+watch([() => selectedConversation.value?.id, canSend, () => replyTarget.value?.id], () => {
   clearQuickReplyPreview()
   reactionPickerId.value = null
 }, { flush: 'sync' })

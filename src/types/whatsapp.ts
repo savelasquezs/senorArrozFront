@@ -1,3 +1,5 @@
+import type { OrderStatus } from '@/types/order'
+
 export type WhatsAppSettingStatus =
   | 'not_configured'
   | 'configured_inactive'
@@ -270,7 +272,20 @@ export interface WhatsAppQuickReplyFilters {
   search?: string
 }
 
+export interface WhatsAppOperationalContact {
+  kind: 'deliveryman' | 'supplier'
+  name: string
+}
+
+export interface WhatsAppRecentDeliveryRoute {
+  id: number
+  isCurrent: boolean
+  at: string
+  orders: { orderId: number; stopSequence: number; status: OrderStatus }[]
+}
+
 export interface WhatsAppConversation {
+  operationalContact?: WhatsAppOperationalContact | null
   branchLineId?: number | null
   labels?: string[]
   commercialStatus?: string

@@ -15,7 +15,7 @@ const api = vi.hoisted(() => ({
   getCommercialDraft: vi.fn(), startCommercialDraft: vi.fn(), saveCommercialDraft: vi.fn(),
   commercialDraftAction: vi.fn(), getCommercialHistory: vi.fn(),
 }))
-const details = vi.hoisted(() => ({ fetchById: vi.fn(), current: null as { id: number } | null }))
+const details = vi.hoisted(() => ({ fetchDetail: vi.fn() }))
 const customer = vi.hoisted(() => ({ getCustomerById: vi.fn(), getCustomerAddresses: vi.fn() }))
 vi.mock('@/services/MainAPI/whatsappApi', () => ({ whatsappApi: api }))
 vi.mock('@/services/MainAPI/customerApi', () => ({ customerApi: customer }))
@@ -23,7 +23,7 @@ vi.mock('@/store/banks', () => ({ useBanksStore: () => ({ ensureListLoaded: vi.f
 vi.mock('@/store/apps', () => ({ useAppsStore: () => ({ ensureListLoaded: vi.fn(), options: [] }) }))
 vi.mock('@/store/branchPosSettings', () => ({ useBranchPosSettingsStore: () => ({ ensureForBranch: vi.fn(), maxFreeDeliveryDiscount: 0 }) }))
 vi.mock('@/store/products', () => ({ useProductsStore: () => ({ ensureCatalogLoaded: vi.fn(), catalogProducts: [] }) }))
-vi.mock('@/store/ordersData', () => ({ useOrdersDataStore: () => details }))
+vi.mock('@/services/MainAPI/orderApi', () => ({ orderApi: details }))
 
 const Editor = defineComponent({ setup() {
   editor = useOrderEditorStore()
@@ -56,8 +56,7 @@ beforeEach(() => {
   api.getCommercialDraft.mockImplementation(async () => ({ data: shared }))
   api.saveCommercialDraft.mockResolvedValue({ data: { ...shared, version: 4 } })
   api.getCommercialHistory.mockResolvedValue({ data: [] })
-  details.current = null
-  details.fetchById.mockImplementation(async (id: number) => { details.current = { id } })
+  details.fetchDetail.mockImplementation(async (id: number) => ({ id }))
   api.commercialDraftAction.mockImplementation(async (_id, action) => {
     shared = { ...shared, status: 'completed', orderId: 501, confirmationStatus: action === 'retry-message' ? 'sent' : null }
     return { data: shared }
@@ -137,7 +136,7 @@ it('opens a previous order and discards only the active attempt when explicitly 
   await flushPromises()
   await row.get('li button').trigger('click')
   await flushPromises()
-  expect(details.fetchById).toHaveBeenCalledExactlyOnceWith(501)
+  expect(details.fetchDetail).toHaveBeenCalledExactlyOnceWith(501)
   expect(editor.currentOrder?.orderItems[0]?.quantity).toBe(2)
   expect(api.commercialDraftAction).not.toHaveBeenCalled()
 
@@ -191,7 +190,7 @@ it('keeps opening the confirmed order from the quick actions component', async (
   shared = { ...shared, status: 'completed', orderId: 501 }
   await panel()
   await click('Gestionar pedido #501')
-  expect(details.fetchById).toHaveBeenCalledExactlyOnceWith(501)
+  expect(details.fetchDetail).toHaveBeenCalledExactlyOnceWith(501)
   expect(wrapper!.find('[role="dialog"]').exists()).toBe(true)
 })
 

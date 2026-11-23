@@ -35,8 +35,8 @@ class ExpenseApi extends BaseApi {
     }
 
     // 2. Obtener todos los gastos (sin paginación, para selectores)
-    async getAllExpenses(): Promise<ApiResponse<Expense[]>> {
-        return this.get<ApiResponse<Expense[]>>('/expenses/all');
+    async getAllExpenses(signal?: AbortSignal): Promise<ApiResponse<Expense[]>> {
+        return this.get<ApiResponse<Expense[]>>('/expenses/all', { signal });
     }
 
     // 3. Obtener gasto por ID

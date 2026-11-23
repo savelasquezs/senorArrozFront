@@ -8,6 +8,7 @@
                 <BaseButton size="sm" variant="outline" :loading="loading" :disabled="!isOnline" @click="refresh">Actualizar</BaseButton>
             </div>
             <p v-if="failure" role="alert" class="text-sm text-red-700">{{ failure }}</p>
+            <p v-else-if="routeChanged" class="text-sm text-amber-700">El pedido cambió de ruta.</p>
             <p v-else-if="snapshot?.location" class="text-xs text-gray-600">
                 {{ snapshot.location.isFresh ? 'Ubicación reciente del domiciliario' : 'Última ubicación conocida; no es una posición en vivo' }}:
                 {{ formatDateTime(snapshot.location.recordedAt) }}
@@ -40,7 +41,7 @@ import type { OrderTracking } from '@/types/orderManagement'
 import type { DriverLocation } from '@/components/delivery/DeliveryMap.vue'
 
 const DeliveryMapAsync = defineAsyncComponent(() => import('@/components/delivery/DeliveryMap.vue'))
-const props = defineProps<{ modelValue: boolean; order: OrderListItem; nested?: boolean }>()
+const props = defineProps<{ modelValue: boolean; order: OrderListItem; nested?: boolean; expectedRouteId?: number }>()
 const emit = defineEmits<{ 'update:modelValue': [open: boolean] }>()
 const { formatDateTime } = useFormatting()
 const auth = useAuthStore()
@@ -69,9 +70,11 @@ const displayedOrder = computed<OrderListItem>(() => ({
     } : {}),
 }))
 const statusLabel = computed(() => getOrderStatusDisplayName(snapshot.value?.status ?? props.order.status))
+const routeChanged = computed(() => snapshot.value != null && props.expectedRouteId != null
+    && snapshot.value.deliveryRouteId !== props.expectedRouteId)
 const locations = computed<Record<number, DriverLocation>>(() => {
     const tracking = snapshot.value
-    if (!tracking?.location || tracking.status !== 'on_the_way' || tracking.deliveryManId == null) return {}
+    if (routeChanged.value || !tracking?.location || tracking.status !== 'on_the_way' || tracking.deliveryManId == null) return {}
     return { [tracking.deliveryManId]: {
         lat: tracking.location.latitude, lng: tracking.location.longitude,
         updatedAt: new Date(tracking.location.recordedAt), name: tracking.deliveryManName ?? undefined,
