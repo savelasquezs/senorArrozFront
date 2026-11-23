@@ -139,6 +139,11 @@ export const useOrdersDataStore = defineStore('ordersData', () => {
         }
     }
 
+    const setCurrent = (detail: OrderDetailView) => {
+        detailRequest++
+        current.value = detail
+    }
+
     const clear = () => {
         detailRequest++
         current.value = null
@@ -222,6 +227,7 @@ export const useOrdersDataStore = defineStore('ordersData', () => {
         fetchById,
         update,
         updateCurrent,
+        setCurrent,
         updateStatus,
         remove,
         clear,

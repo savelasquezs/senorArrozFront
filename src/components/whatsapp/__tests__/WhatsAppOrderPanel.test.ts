@@ -6,9 +6,11 @@ import WhatsAppOrderPanel from '../WhatsAppOrderPanel.vue'
 import { useOrderEditorStore } from '@/composables/useOrderEditor'
 import { useOrderSubmission } from '@/composables/useOrderSubmission'
 import { useOrdersDraftsStore } from '@/store/ordersDrafts'
+import { useOrdersDataStore } from '@/store/ordersData'
 import { useAuthStore } from '@/store/auth'
 import { createOrderDraft } from '@/helpers/orderDraft'
 import type { WhatsAppCommercialDraft, WhatsAppConversation } from '@/types/whatsapp'
+import type { OrderDetailView } from '@/types/order'
 import { UserRole } from '@/types/auth'
 
 const api = vi.hoisted(() => ({
@@ -137,6 +139,7 @@ it('opens a previous order and discards only the active attempt when explicitly 
   await row.get('li button').trigger('click')
   await flushPromises()
   expect(details.fetchDetail).toHaveBeenCalledExactlyOnceWith(501)
+  expect(useOrdersDataStore().current?.id).toBe(501)
   expect(editor.currentOrder?.orderItems[0]?.quantity).toBe(2)
   expect(api.commercialDraftAction).not.toHaveBeenCalled()
 
@@ -186,11 +189,14 @@ it('starts a new versioned attempt after a confirmed order', async () => {
   expect(editor.currentOrder?.orderItems).toEqual([])
 })
 
-it('keeps opening the confirmed order from the quick actions component', async () => {
+it('opens the confirmed order even after another order was loaded', async () => {
   shared = { ...shared, status: 'completed', orderId: 501 }
+  const orders = useOrdersDataStore()
+  orders.setCurrent({ id: 502 } as OrderDetailView)
   await panel()
   await click('Gestionar pedido #501')
   expect(details.fetchDetail).toHaveBeenCalledExactlyOnceWith(501)
+  expect(orders.current?.id).toBe(501)
   expect(wrapper!.find('[role="dialog"]').exists()).toBe(true)
 })
 

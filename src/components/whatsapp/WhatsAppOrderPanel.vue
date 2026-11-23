@@ -18,6 +18,8 @@
     </Teleport>
     <div v-if="error || saveState === 'conflict' || saveState === 'error'" class="shrink-0 space-y-2 border-b p-3 text-xs">
       <p v-if="error" role="alert" class="text-red-700">{{ error }}</p>
+      <BaseButton v-if="unlinkedAddressCustomer" size="sm" variant="outline"
+        @click="emit('link-address-customer', unlinkedAddressCustomer)">Vincular cliente al chat</BaseButton>
       <div v-if="saveState === 'conflict' || saveState === 'error'" class="flex gap-2">
         <BaseButton size="sm" variant="outline" @click="showReload = true">Recargar y revisar</BaseButton>
         <BaseButton v-if="saveState === 'error'" size="sm" variant="outline" @click="run(flush)">Reintentar guardado</BaseButton>
@@ -100,19 +102,23 @@ import WhatsAppOrderQuickActions from '@/components/whatsapp/WhatsAppOrderQuickA
 import { useWhatsAppCommercialDraft } from '@/composables/useWhatsAppCommercialDraft'
 import { orderApi } from '@/services/MainAPI/orderApi'
 import { whatsappApi } from '@/services/MainAPI/whatsappApi'
+import { useOrdersDataStore } from '@/store/ordersData'
 import type { OrderDetailView } from '@/types/order'
+import type { Customer } from '@/types/customer'
 import type { WhatsAppCommercialDraft, WhatsAppCommercialHistoryEntry, WhatsAppConversation, WhatsAppMessage, WhatsAppProductSuggestion, WhatsAppProductSuggestionState } from '@/types/whatsapp'
 
 const props = defineProps<{ conversation: WhatsAppConversation; initialDraft?: Promise<WhatsAppCommercialDraft | null | undefined>; controlsTarget?: HTMLElement | null; saveTarget?: HTMLElement | null; canSendChoices?: boolean; finishingAttention?: boolean }>()
 const OrderDetailContent = defineAsyncComponent(() => import('@/components/orders/OrderDetailContent.vue'))
+const ordersDataStore = useOrdersDataStore()
 const emit = defineEmits<{
   change: [draft: WhatsAppCommercialDraft]
   'draft-message': [conversationId: number, text: string]
   'contact-deliveryman': [orderId: number, action: 'open' | 'share']
   'addresses-sent': [conversationId: number, messages: WhatsAppMessage[]]
+  'link-address-customer': [customer: Customer]
   'product-suggestion-state': [state: WhatsAppProductSuggestionState]
 }>()
-const { session, draft, loading, syncing, error, saveState, commercialStatus, editable, owned, load, start, flush, action, refreshStatus, reconcile, sendAddressChoices, sendProductChoices, canApplyProductSuggestion, addProductSuggestion } = useWhatsAppCommercialDraft(toRef(props, 'conversation'), props.initialDraft)
+const { editor, session, draft, loading, syncing, error, saveState, commercialStatus, editable, owned, load, start, flush, action, refreshStatus, reconcile, sendAddressChoices, sendProductChoices, canApplyProductSuggestion, addProductSuggestion } = useWhatsAppCommercialDraft(toRef(props, 'conversation'), props.initialDraft)
 const hasDraftProducts = computed(() => session.value?.status === 'active' && !!draft.value?.orderItems.length)
 defineExpose({
   hasDraftProducts,
@@ -144,6 +150,16 @@ const loadingHistory = ref(false), historyError = ref(''), discarding = ref(fals
 const previousOrders = computed(() => history.value.filter(entry => entry.orderId))
 const historyDate = new Intl.DateTimeFormat('es-CO', { dateStyle: 'short', timeZone: 'America/Bogota' })
 const sendingChoices = ref(false)
+const addressLinkRequired = ref(false)
+const unlinkedAddressCustomer = computed(() => addressLinkRequired.value && editable.value
+  && props.conversation.customerId !== draft.value?.customerId
+  ? editor.customers.find(customer => customer.id === draft.value?.customerId) : undefined)
+watch(() => [props.conversation.customerId, draft.value?.customerId], ([linked, selected]) => {
+  if (addressLinkRequired.value && linked && linked === selected) {
+    addressLinkRequired.value = false
+    error.value = ''
+  }
+})
 const saveLabels = { saved: 'Guardado', pending: 'Cambios pendientes', saving: 'Guardando…', conflict: 'Conflicto: revisa la versión compartida', error: 'No se pudo guardar' }
 const resolvedSaveTarget = computed(() => props.saveTarget || props.controlsTarget)
 const saveStatusLabel = computed(() => syncing.value ? 'Actualizando pedido…' : saveLabels[saveState.value])
@@ -163,9 +179,13 @@ async function sendChoices() {
   if (!props.canSendChoices || !editable.value || sendingChoices.value) return
   sendingChoices.value = true
   error.value = ''
+  addressLinkRequired.value = false
   const id = props.conversation.id
   try {
-    await run(async () => emit('addresses-sent', id, await sendAddressChoices()))
+    emit('addresses-sent', id, await sendAddressChoices())
+  } catch (cause) {
+    error.value = cause instanceof Error ? cause.message : 'No se pudieron enviar las direcciones.'
+    addressLinkRequired.value = true
   } finally { sendingChoices.value = false }
 }
 async function saveNote() { await run(async () => { await action('note', noteText.value); noteText.value = '' }) }
@@ -200,6 +220,7 @@ async function showManagedOrder(id: number) {
   const request = ++orderDetailRequest
   const order = await orderApi.fetchDetail(id)
   if (!active.value || request !== orderDetailRequest || order.id !== id) return
+  ordersDataStore.setCurrent(order)
   persistedOrder.value = order
   showOrder.value = true
 }
@@ -231,5 +252,8 @@ onDeactivated(() => {
   showReload.value = false; showNew.value = false; showCancel.value = false; showOrder.value = false; showNotes.value = false
   void run(flush)
 })
-onBeforeUnmount(() => clearInterval(statusTimer))
+onBeforeUnmount(() => {
+  active.value = false
+  clearInterval(statusTimer)
+})
 </script>

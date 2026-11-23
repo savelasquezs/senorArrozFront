@@ -1503,25 +1503,27 @@ async function confirmEditPaidInStoreDetail() {
 	}
 }
 
-// Sincronizar order del store
-const ordersDataStoreCurrent = computed(() => ordersDataStore.current);
+const ordersDataStoreCurrent = computed(() =>
+    ordersDataStore.current?.id === props.flatOrder.id ? ordersDataStore.current : null,
+);
 watch(
 	ordersDataStoreCurrent,
 	(newOrder) => {
-		if (newOrder) {
-            if (order.value?.id !== newOrder.id) detailEditor.value = null;
-			order.value = newOrder;
-			editableGuestName.value = newOrder.guestName || '';
-            if (detailEditor.value !== 'schedule') {
-                editableReservedForDate.value = parseOrderDate(newOrder.reservedFor);
-                editablePrepareAtDate.value = parseOrderDate(newOrder.prepareAt);
-            }
-			// Cargar cliente completo si hay customerId
-			if (newOrder.customerId) {
-				loadCustomer(newOrder.customerId);
-			} else {
-				customer.value = null;
-			}
+		if (!newOrder) {
+			order.value = null;
+			return;
+		}
+		if (order.value?.id !== newOrder.id) detailEditor.value = null;
+		order.value = newOrder;
+		editableGuestName.value = newOrder.guestName || '';
+		if (detailEditor.value !== 'schedule') {
+			editableReservedForDate.value = parseOrderDate(newOrder.reservedFor);
+			editablePrepareAtDate.value = parseOrderDate(newOrder.prepareAt);
+		}
+		if (newOrder.customerId) {
+			void loadCustomer(newOrder.customerId);
+		} else {
+			customer.value = null;
 		}
 	},
 	{ immediate: true },
