@@ -185,7 +185,7 @@ export interface WhatsAppTemplateFilters {
   search?: string
 }
 
-export type WhatsAppConversationStartKind = 'menu' | 'catalog' | 'payment'
+export type WhatsAppConversationStartKind = 'menu' | 'catalog' | 'payment' | 'delivery_update'
 
 export type WhatsAppOrderConversation =
   | { kind: 'existing'; conversationId: number }
@@ -216,6 +216,7 @@ export interface WhatsAppConversationStartRequest {
   templateName?: string
   requestedByCustomer: boolean
   amount?: number
+  deliveryUpdate?: string
 }
 
 export interface WhatsAppConversationStartResult {

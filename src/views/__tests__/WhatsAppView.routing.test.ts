@@ -317,6 +317,35 @@ describe('M38-F04 view + real Pinia store integration', () => {
     }, expect.any(String))
   })
 
+  it('lets the advisor start a conversation with the courier update template', async () => {
+    m.api.getConversationStartOptions.mockResolvedValue(reply({
+      branchId: 1, branchName: 'Santander', senderId: 'line',
+      templates: [{
+        key: 'delivery_update', name: 'novedad_entrega_domiciliario', status: 'APPROVED',
+        body: 'El domiciliario nos informa que {{1}}. Quedamos atentos.', unavailableReason: null,
+      }],
+    }))
+    m.api.startConversation.mockResolvedValue(reply({ conversationId: 25, sent: true }))
+    m.api.getConversation.mockResolvedValue(reply(conversation(25)))
+    const { wrapper } = mountView()
+    await flushPromises()
+    await wrapper.get('[aria-label="Nueva conversación"]').trigger('click')
+    await flushPromises()
+    await wrapper.get('input[type="tel"]').setValue('300 123 4567')
+    await wrapper.get('input[value="delivery_update"]').setValue(true)
+    const form = wrapper.get('form')
+    await form.get('input[type="checkbox"]').setValue(true)
+    expect(form.get<HTMLButtonElement>('button[type="submit"]').element.disabled).toBe(true)
+    await form.get('input[placeholder="Ej. ya llegó y está intentando contactarte"]').setValue('  hay mucho tráfico  ')
+    expect(form.text()).toContain('El domiciliario nos informa que hay mucho tráfico. Quedamos atentos.')
+    await form.trigger('submit')
+    await flushPromises()
+    expect(m.api.startConversation).toHaveBeenCalledExactlyOnceWith({
+      branchId: 1, senderId: 'line', phone: '300 123 4567', template: 'delivery_update',
+      templateName: 'novedad_entrega_domiciliario', requestedByCustomer: true, deliveryUpdate: 'hay mucho tráfico',
+    }, expect.any(String))
+  })
+
   it('opens the exact chat and focuses its editable composer while messages load', async () => {
     m.route.query = { orderId: '25' }
     m.api.getOrderConversation.mockResolvedValue(reply({ kind: 'existing', conversationId: 90 }))
