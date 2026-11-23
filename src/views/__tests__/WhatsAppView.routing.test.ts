@@ -15,7 +15,7 @@ const m = vi.hoisted(() => ({
   confirm: vi.fn(), success: vi.fn(), error: vi.fn(), reconcile: vi.fn(), sendProductChoices: vi.fn(), applyProductSuggestion: vi.fn(),
   hasDraftProducts: false, saveBeforeFinishing: vi.fn(),
   api: { getStatus: vi.fn(), getConversations: vi.fn(), getConversation: vi.fn(), getUnreadSummary: vi.fn(), getOperationalBranches: vi.fn(),
-    getConversationStartOptions: vi.fn(), startConversation: vi.fn(), getOrderConversation: vi.fn(),
+    getConversationStartOptions: vi.fn(), startConversation: vi.fn(), getOrderConversation: vi.fn(), getOrderDeliverymanContact: vi.fn(),
     getInboxLabels: vi.fn(), getInboxSummary: vi.fn(), setInboxLabel: vi.fn(),
     getQuickReplies: vi.fn(), createQuickReply: vi.fn(), updateQuickReply: vi.fn(), getMessagesPage: vi.fn(), getOrderDraft: vi.fn(), updateOperationalBranch: vi.fn(), linkConversationCustomer: vi.fn(),
     sendMessage: vi.fn(), sendMediaMessage: vi.fn(), sendQuickReply: vi.fn(), previewQuickReply: vi.fn(), changeAttention: vi.fn(), getAttention: vi.fn(),
@@ -163,6 +163,69 @@ describe('M38-F04 view + real Pinia store integration', () => {
     vi.unstubAllGlobals()
     localStorage.removeItem('whatsapp:theme:7')
     disposePinia(pinia); vi.clearAllTimers(); vi.useRealTimers()
+  })
+
+  it('switches quick contacts across all inboxes and restores the selected tab', async () => {
+    m.route.query = { inbox: 'mine' }
+    const customerChat = conversation()
+    const deliveryChat: WhatsAppConversation = { ...conversation(2), assignedUserId: null, attentionMode: 'closed',
+      operationalContact: { kind: 'deliveryman', name: 'Ana Reparto' }, matchesContactQuickFilter: true }
+    const supplierChat: WhatsAppConversation = { ...conversation(3), assignedUserId: 8,
+      operationalContact: { kind: 'supplier', name: 'Molino Alba' }, matchesContactQuickFilter: true }
+    m.api.getConversations.mockImplementation(async filters => reply(filters.deliverymenAssignedToday ? [deliveryChat]
+      : filters.suppliersOnly ? [supplierChat] : [customerChat]))
+    const { wrapper } = mountView(true)
+    await flushPromises()
+    const drivers = wrapper.get('button[aria-label="Domiciliarios con pedidos de hoy"]')
+    const suppliers = wrapper.get('button[aria-label="Proveedores"]')
+    await drivers.trigger('click')
+    await flushPromises()
+    expect(m.api.getConversations).toHaveBeenLastCalledWith(expect.objectContaining({ inbox: undefined, deliverymenAssignedToday: true }), expect.any(AbortSignal))
+    expect(wrapper.text()).toContain('Ana Reparto')
+    expect(wrapper.text()).toContain('Cerrados')
+    expect(wrapper.find('[role="tablist"]').exists()).toBe(false)
+    await suppliers.trigger('click')
+    await flushPromises()
+    expect(drivers.attributes('aria-pressed')).toBe('false')
+    expect(suppliers.attributes('aria-pressed')).toBe('true')
+    expect(wrapper.text()).toContain('Molino Alba')
+    expect(wrapper.text()).not.toContain('Ana Reparto')
+    await suppliers.trigger('click')
+    await flushPromises()
+    expect(wrapper.get('[role="tab"][aria-selected="true"]').text()).toContain('Míos')
+  })
+
+  it('opens the deliveryman chat or prepares the contact only in the current customer composer', async () => {
+    const source = { ...m.rows[0]!, customerServiceWindowExpiresAt: '2099-01-01T00:00:00Z' }
+    const courier = { ...m.rows[1]!, operationalContact: { kind: 'deliveryman' as const, name: 'Ana' } }
+    const link = 'Puedes contactar a Ana en https://wa.me/573010000020'
+    m.rows = [source, courier]
+    m.api.getConversation.mockResolvedValue(reply(courier))
+    m.api.getOrderDeliverymanContact.mockResolvedValue(reply({ conversationId: courier.id, shareText: link }))
+    const { vm, wrapper } = mountView()
+    await flushPromises()
+    await vm.selectConversation(source)
+    const input = () => wrapper.get<HTMLTextAreaElement>('textarea[placeholder="Escribe un mensaje"]')
+    const panel = () => wrapper.getComponent(WhatsAppOrderPanel)
+    await input().setValue('Tu pedido ya va en camino.')
+    panel().vm.$emit('contact-deliveryman', 501, 'share')
+    await flushPromises()
+    expect(input().element.value).toBe(`Tu pedido ya va en camino.\n\n${link}`)
+    expect(m.api.sendMessage).not.toHaveBeenCalled()
+    expect(m.api.getOrderDeliverymanContact).toHaveBeenCalledWith(501, source.id, expect.any(AbortSignal))
+
+    const pending = deferred<ReturnType<typeof reply<{ shareText: string }>>>()
+    m.api.getOrderDeliverymanContact.mockReturnValueOnce(pending.promise)
+    panel().vm.$emit('contact-deliveryman', 501, 'share')
+    await vm.selectConversation(courier)
+    pending.resolve(reply({ shareText: 'Texto de otro chat' }))
+    await flushPromises()
+    expect(input().element.value).not.toContain('Texto de otro chat')
+
+    await vm.selectConversation(source)
+    panel().vm.$emit('contact-deliveryman', 501, 'open')
+    await flushPromises()
+    expect(vm.selectedConversation?.id).toBe(courier.id)
   })
 
   it('inserts an emoji where the cashier selected text while leaving the message unsent', async () => {

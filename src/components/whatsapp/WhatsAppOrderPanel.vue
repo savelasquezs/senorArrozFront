@@ -52,7 +52,9 @@
       <template v-if="session.orderId">
         <p v-if="session.confirmationStatus" class="text-xs text-gray-600">Confirmación por WhatsApp: {{ session.confirmationStatus }}</p>
         <p v-if="session.confirmationError" class="text-xs text-amber-800">El pedido ya existe. {{ session.confirmationError === 'provider_rejected_retryable' ? 'Puedes reintentar el mensaje.' : 'Revisa el envío antes de repetirlo.' }}</p>
-        <WhatsAppOrderQuickActions :key="session.orderId" :order-id="session.orderId" :active="active" @manage="openOrder()" />
+        <WhatsAppOrderQuickActions :key="session.orderId" :order-id="session.orderId" :active="active"
+          show-deliveryman-contact :can-share-deliveryman-contact="canSendChoices"
+          @manage="openOrder()" @contact-deliveryman="emit('contact-deliveryman', session.orderId, $event)" />
         <BaseButton v-if="session.confirmationStatus === 'failed' && session.confirmationError === 'provider_rejected_retryable'" :disabled="!owned || syncing" variant="outline" @click="run(() => action('retry-message'))">Reintentar mensaje</BaseButton>
       </template>
       <BaseButton :disabled="!owned || syncing || !!session.checkoutId && !session.orderId && session.commercialStatus !== 'no_sale'" @click="showNew = true">Nuevo pedido</BaseButton>
@@ -106,6 +108,7 @@ const OrderDetailContent = defineAsyncComponent(() => import('@/components/order
 const emit = defineEmits<{
   change: [draft: WhatsAppCommercialDraft]
   'draft-message': [conversationId: number, text: string]
+  'contact-deliveryman': [orderId: number, action: 'open' | 'share']
   'addresses-sent': [conversationId: number, messages: WhatsAppMessage[]]
   'product-suggestion-state': [state: WhatsAppProductSuggestionState]
 }>()

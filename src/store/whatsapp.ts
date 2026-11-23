@@ -232,8 +232,10 @@ export const useWhatsAppStore = defineStore('whatsapp', () => {
         const pageItem = byId.get(current.id)
         if (messageRevisions.get(current.id) === revisions.get(current.id)
           && (!pageItem || (pageItem.attentionRevision ?? 0) >= (current.attentionRevision ?? 0))) continue
-        if ((selectedFilters?.label || selectedFilters?.search) && !pageItem) continue
-        byId.set(current.id, pageItem?.labels ? { ...current, labels: pageItem.labels } : current)
+        if ((selectedFilters?.label || selectedFilters?.search || selectedFilters?.deliverymenAssignedToday || selectedFilters?.suppliersOnly) && !pageItem) continue
+        byId.set(current.id, pageItem ? {
+          ...current, labels: pageItem.labels ?? current.labels, matchesContactQuickFilter: pageItem.matchesContactQuickFilter,
+        } : current)
       }
       conversations.value = [...byId.values()]
       boundConversations(more)

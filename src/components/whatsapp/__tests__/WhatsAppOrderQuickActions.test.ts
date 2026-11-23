@@ -58,11 +58,12 @@ beforeEach(() => {
 })
 afterEach(() => { wrapper?.unmount(); wrapper = undefined; document.body.innerHTML = ''; vi.useRealTimers() })
 
-async function render(dark = false, routeId?: number) {
+async function render(dark = false, routeId?: number, showDeliverymanContact = false, canShareDeliverymanContact = false) {
   wrapper = mount(defineComponent({ props: ['active', 'orderId'], setup(props) {
     const { setTheme } = useWhatsAppTheme(() => 7)
     if (dark) setTheme('dark')
     return () => h(WhatsAppOrderQuickActions, { orderId: props.orderId, active: props.active, routeId,
+      showDeliverymanContact, canShareDeliverymanContact,
       initialStatus: routeId == null ? undefined : 'on_the_way' })
   } }), { props: { active: true, orderId: 501 }, attachTo: document.body, global: { plugins: [pinia], stubs: { BaseDialog: dialog,
     OrderTrackingDialog: { props: ['modelValue', 'order'], template: '<div v-if="modelValue" data-test="tracking">{{ order.id }}</div>' } } } })
@@ -90,6 +91,30 @@ it('shows the live status and keeps the main button opening the order detail', a
   await click('Gestionar pedido #501')
   expect(view.emitted('manage')).toHaveLength(1)
   expect(region()).toBeNull()
+})
+
+it.each([false, true])('gates preparing the contact and hides both actions after delivery (write=%s)', async canWrite => {
+  current.status = 'on_the_way'
+  current.deliveryManId = 12
+  const view = await render(true, undefined, true, canWrite)
+  await open()
+  const share = () => buttons().find(button => button.textContent?.trim() === 'Enviar contacto del domiciliario')
+  expect(share()?.disabled).toBe(!canWrite)
+  expect(region()?.getAttribute('data-wa-theme')).toBe('dark')
+  if (canWrite) {
+    await click('Enviar contacto del domiciliario')
+    expect(view.emitted('contact-deliveryman')).toEqual([['share']])
+    await open()
+  }
+  await click('Hablar con el domiciliario')
+  expect(view.emitted('contact-deliveryman')?.at(-1)).toEqual(['open'])
+  current.status = 'delivered'
+  current.managementVersion!++
+  events.changed({ orderId: 501, managementVersion: current.managementVersion })
+  await flushPromises()
+  await open()
+  expect(region()?.textContent).not.toContain('Hablar con el domiciliario')
+  expect(share()).toBeUndefined()
 })
 
 it('uses route status before opening and only loads bank actions on demand', async () => {

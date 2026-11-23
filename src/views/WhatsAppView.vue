@@ -113,6 +113,16 @@
                   </button>
                 </div>
               </details>
+              <button type="button" class="inbox-control" aria-label="Domiciliarios con pedidos de hoy"
+                title="Domiciliarios con pedidos de hoy" :aria-pressed="quickContactFilter === 'deliverymen'"
+                @click="toggleQuickContactFilter('deliverymen')">
+                <TruckIcon class="size-3.5" aria-hidden="true" />
+              </button>
+              <button type="button" class="inbox-control" aria-label="Proveedores"
+                title="Proveedores" :aria-pressed="quickContactFilter === 'suppliers'"
+                @click="toggleQuickContactFilter('suppliers')">
+                <BuildingStorefrontIcon class="size-3.5" aria-hidden="true" />
+              </button>
             </div>
           </div>
           <WhatsAppInboxTabs
@@ -120,14 +130,14 @@
             :sections="inboxSections"
             :counts="inboxCounts"
             :selected-conversation-id="selectedConversation?.id"
-            :loading="whatsappStore.isLoadingConversations || (searchTerm !== loadedSearch && !inboxError)"
-            :search-all="!!searchTerm"
+            :loading="whatsappStore.isLoadingConversations || ((searchTerm !== loadedSearch || quickContactFilter !== loadedQuickContactFilter) && !inboxError)"
+            :search-all="showAllInbox"
             :is-superadmin="authStore.isSuperadmin"
           >
             <template #default="{ conversations }">
               <div
                 v-for="conversation in conversations"
-                v-memo="[...Object.values(conversation), inboxLabelsByKey, selectedLabel, selectedConversation?.id === conversation.id, !!searchTerm, authStore.user?.id, Math.floor(clockNow / 60_000)]"
+                v-memo="[...Object.values(conversation), inboxLabelsByKey, selectedLabel, selectedConversation?.id === conversation.id, showAllInbox, authStore.user?.id, Math.floor(clockNow / 60_000)]"
                 :key="conversation.id"
                 class="wa-conversation"
                 :class="{ 'wa-conversation-selected': selectedConversation?.id === conversation.id, 'wa-conversation-waiting': conversation.attentionMode === 'waitingForHuman' }"
@@ -177,13 +187,13 @@
                 </div>
                 <div class="mt-1 flex items-center justify-between gap-2">
                   <span class="rounded-full px-2 py-0.5 text-[10px] font-semibold" :class="attentionBadgeClass(conversation.attentionMode)" :title="attentionTooltip(conversation)">{{ attentionLabel(conversation) }}</span>
-                  <span v-if="searchTerm" class="wa-inbox-source">{{ whatsappInboxLabels[whatsappConversationInbox(conversation, authStore.user?.id)] }}</span>
+                  <span v-if="showAllInbox" class="wa-inbox-source">{{ whatsappInboxLabels[whatsappConversationInbox(conversation, authStore.user?.id)] }}</span>
                   <span class="min-w-0 truncate text-[10px] font-medium text-gray-500" :title="commercialGroup(conversation)">{{ commercialLabel(conversation) }} · {{ whatsappConversationBranchLabel(conversation) }}</span>
                 </div>
               </div>
             </template>
           </WhatsAppInboxTabs>
-          <div v-if="searchTerm === loadedSearch && (whatsappStore.hasMoreConversations || whatsappStore.conversationWindowed)" class="flex shrink-0 flex-wrap gap-2 border-t p-2">
+          <div v-if="searchTerm === loadedSearch && quickContactFilter === loadedQuickContactFilter && (whatsappStore.hasMoreConversations || whatsappStore.conversationWindowed)" class="flex shrink-0 flex-wrap gap-2 border-t p-2">
             <BaseButton v-if="whatsappStore.hasMoreConversations" size="sm" variant="outline" :loading="whatsappStore.isLoadingConversations" @click="loadMoreConversations">Cargar más conversaciones</BaseButton>
             <BaseButton v-if="whatsappStore.conversationWindowed" size="sm" variant="ghost" @click="reloadConversations">Volver al inicio</BaseButton>
           </div>
@@ -663,6 +673,7 @@
             <WhatsAppOrderPanel v-show="!operationalContact || showingCustomerOrder" ref="commercialPanel" :key="`${authStore.user?.id}:${selectedConversation.id}`" :conversation="selectedConversation" :initial-draft="prefetchedDraft"
               :controls-target="!operationalContact || showingCustomerOrder ? commercialControlsTarget : null" :save-target="!operationalContact || showingCustomerOrder ? commercialSaveTarget : null"
               :can-send-choices="canSend" :finishing-attention="finishingAttention" @change="commercialChanged" @draft-message="draftOrderMessage" @addresses-sent="addressesSent"
+              @contact-deliveryman="openOrderDeliverymanContact"
               @product-suggestion-state="setProductSuggestionState" />
           </KeepAlive>
         </aside>
@@ -952,6 +963,7 @@ import {
   ArrowUturnLeftIcon,
   ArrowUturnRightIcon,
   BoltIcon,
+  BuildingStorefrontIcon,
   ChatBubbleLeftRightIcon,
   ChatBubbleOvalLeftEllipsisIcon,
   ChevronDoubleLeftIcon,
@@ -975,6 +987,7 @@ import {
   PlusIcon,
   SunIcon,
   TagIcon,
+  TruckIcon,
   UserCircleIcon,
   UserPlusIcon,
   ViewfinderCircleIcon,
@@ -1002,6 +1015,7 @@ import { useWhatsAppComposer, type WhatsAppComposerDraft } from '@/composables/u
 import { useWhatsAppSavedStickers, whatsappStickerKey, type WhatsAppSavedSticker } from '@/composables/useWhatsAppSavedStickers'
 import { useWhatsAppProductSuggestions } from '@/composables/useWhatsAppProductSuggestions'
 import { useDebouncedCallback } from '@/composables/useDebouncedCallback'
+import { useOrderManagementUpdates } from '@/composables/useOrderManagementUpdates'
 import { formatMessageTime as formatTime } from '@/composables/useFormatting'
 import type { WhatsAppAttentionAction, WhatsAppInboxKey } from '@/types/whatsapp'
 import { whatsappApi } from '@/services/MainAPI/whatsappApi'
@@ -1119,6 +1133,11 @@ const windowTimer = window.setInterval(() => { clockNow.value = Date.now() }, 30
 const search = ref('')
 const searchTerm = computed(() => search.value.trim())
 const loadedSearch = ref('')
+type QuickContactFilter = '' | 'deliverymen' | 'suppliers'
+const quickContactFilter = ref<QuickContactFilter>('')
+const loadedQuickContactFilter = ref<QuickContactFilter>('')
+const showAllInbox = computed(() => !!searchTerm.value || !!quickContactFilter.value)
+const inboxDayKey = computed(() => Math.floor((clockNow.value - 5 * 3_600_000) / 86_400_000))
 const unreadOnly = ref(false)
 const { draft, attachments, addFiles, removeAttachment, takeDraft, restoreDraft, resetComposer } =
   useWhatsAppComposer(computed(() => selectedConversation.value?.id ?? null))
@@ -1218,17 +1237,24 @@ const sessionKey = computed(() => JSON.stringify([
   authStore.user?.id, authStore.user?.role, authStore.user?.branchId, authStore.user?.accountType,
 ]))
 const inboxScope = computed(() => JSON.stringify([
-  sessionKey.value, selectedBranchId.value, search.value.trim(), unreadOnly.value, activeInbox.value, unroutedOnly.value, selectedLabel.value,
+  sessionKey.value, selectedBranchId.value, search.value.trim(), unreadOnly.value,
+  showAllInbox.value ? null : activeInbox.value, unroutedOnly.value, selectedLabel.value, quickContactFilter.value,
+  quickContactFilter.value === 'deliverymen' ? inboxDayKey.value : null,
 ]))
-const inboxFilterCount = computed(() => [selectedBranchId.value, unreadOnly.value, unroutedOnly.value, selectedLabel.value].filter(Boolean).length)
+const inboxFilterCount = computed(() => [selectedBranchId.value, unreadOnly.value, unroutedOnly.value, selectedLabel.value, quickContactFilter.value].filter(Boolean).length)
+
+function toggleQuickContactFilter(filter: Exclude<QuickContactFilter, ''>) {
+  quickContactFilter.value = quickContactFilter.value === filter ? '' : filter
+}
 
 function resetInboxFilters() {
-  const labelWasActive = !!selectedLabel.value
+  const watchedFilterWasActive = !!selectedLabel.value || !!quickContactFilter.value
   selectedBranchId.value = 0
   unreadOnly.value = false
   unroutedOnly.value = false
   selectedLabel.value = ''
-  if (!labelWasActive) void reloadConversations()
+  quickContactFilter.value = ''
+  if (!watchedFilterWasActive) void reloadConversations()
 }
 
 const inboxTools = computed(() => [
@@ -1450,8 +1476,9 @@ const canTakeOver = computed(() => selectedConversation.value?.attentionMode ===
 const canResetTestContext = computed(() => authStore.isSuperadmin || authStore.isAdmin)
 const canAssignOperationalBranch = computed(() => !!selectedConversation.value?.isCentralChannel && ownsConversation.value)
 const inboxSections = computed(() => buildWhatsAppInboxSections(
-  searchTerm.value !== loadedSearch.value ? [] : selectedLabel.value
-    ? whatsappStore.conversations.filter(chat => chat.labels?.includes(selectedLabel.value)) : whatsappStore.conversations,
+  searchTerm.value !== loadedSearch.value || quickContactFilter.value !== loadedQuickContactFilter.value
+    ? [] : whatsappStore.conversations.filter(chat =>
+      (!quickContactFilter.value || chat.matchesContactQuickFilter) && (!selectedLabel.value || chat.labels?.includes(selectedLabel.value))),
   authStore.user?.id,
   authStore.user?.branchId,
   authStore.isSuperadmin,
@@ -2067,6 +2094,12 @@ function scheduleInboxLabelsRefresh() {
   inboxLabelsRefresh.schedule()
 }
 
+function refreshQuickContactFilter() {
+  if (quickContactFilter.value) scheduleInboxLabelsRefresh()
+}
+
+useOrderManagementUpdates(refreshQuickContactFilter, refreshQuickContactFilter, refreshQuickContactFilter)
+
 async function setInboxLabel(key: string, event: Event) {
   const input = event.target as HTMLInputElement
   const chat = selectedConversation.value
@@ -2105,6 +2138,7 @@ async function readConversations(context: RefreshContext) {
   if (!viewActive || !whatsappStore.enabled) return
   const generation = ++conversationsGeneration
   const requestedSearch = searchTerm.value
+  const requestedContactFilter = quickContactFilter.value
   const previousSelected = selectedConversation.value
   const initialSelection = !previousSelected && route.query.conversationId
     ? selectConversationFromRoute() : Promise.resolve()
@@ -2112,12 +2146,17 @@ async function readConversations(context: RefreshContext) {
     branchId: selectedBranchId.value || undefined,
     search: requestedSearch || undefined,
     unreadOnly: unreadOnly.value || undefined,
-    inbox: requestedSearch ? undefined : activeInbox.value,
+    inbox: requestedSearch || requestedContactFilter ? undefined : activeInbox.value,
     unroutedOnly: unroutedOnly.value || undefined,
     label: selectedLabel.value || undefined,
+    ...(requestedContactFilter === 'deliverymen' ? { deliverymenAssignedToday: true } : {}),
+    ...(requestedContactFilter === 'suppliers' ? { suppliersOnly: true } : {}),
   }, context.signal), whatsappStore.fetchUnreadSummary(), refreshInboxTotals(context.signal), initialSelection])
   if (!viewActive || !context.isCurrent() || generation !== conversationsGeneration) return
-  if (results[0]?.status === 'fulfilled') loadedSearch.value = requestedSearch
+  if (results[0]?.status === 'fulfilled') {
+    loadedSearch.value = requestedSearch
+    loadedQuickContactFilter.value = requestedContactFilter
+  }
   if (previousSelected && selectedConversation.value?.id === previousSelected.id) {
     const refreshed = whatsappStore.conversations.find(c => c.id === previousSelected.id)
     if (refreshed) selectedConversation.value = refreshed
@@ -2272,6 +2311,39 @@ async function openOrderConversation(orderId: number) {
   }
 }
 
+async function openOrderDeliverymanContact(orderId: number, action: 'open' | 'share') {
+  const sourceId = selectedConversation.value?.id
+  if (!sourceId || showConversationStarter.value || (action === 'share' && !canSend.value)) return
+  orderConversationRequest?.abort()
+  const request = new AbortController()
+  orderConversationRequest = request
+  const scope = whatsAppTabScope.value
+  const selection = conversationSelection
+  const current = () => viewActive && !request.signal.aborted && scope === whatsAppTabScope.value
+    && selection === conversationSelection && selectedConversation.value?.id === sourceId
+  const title = action === 'open' ? 'Hablar con el domiciliario' : 'Enviar contacto del domiciliario'
+  try {
+    const { data } = await whatsappApi.getOrderDeliverymanContact(orderId, sourceId, request.signal)
+    if (!current()) return
+    if (action === 'share') {
+      if (!canSend.value) return
+      if (!data?.shareText) throw new Error(data?.shareUnavailableReason || 'El contacto no está disponible.')
+      await draftOrderMessage(sourceId, data.shareText)
+      return
+    }
+    if (!data?.conversationId) throw new Error(data?.chatUnavailableReason || 'La conversación no está disponible.')
+    const chat = await whatsappStore.fetchConversation(data.conversationId)
+    if (!current()) return
+    if (!chat) throw new Error('La conversación del domiciliario ya no está disponible.')
+    if (quickContactFilter.value) await selectConversation(chat, true)
+    else await openConversationInInbox(chat, true)
+  } catch (error) {
+    if (current()) showError(title, error instanceof Error ? error.message : 'El contacto no está disponible.')
+  } finally {
+    if (orderConversationRequest === request) orderConversationRequest = undefined
+  }
+}
+
 async function manageDeliveryOrder(orderId: number) {
   const selection = conversationSelection
   try {
@@ -2332,6 +2404,8 @@ async function handleRealtimeMessage(payload: WhatsAppRealtimeMessagePayload) {
     return
   }
   inboxTotalsRefresh.schedule()
+  if (quickContactFilter.value && payload.conversation.operationalContact?.kind)
+    refreshQuickContactFilter()
 
   const activeConversationId = selectedConversation.value?.id ?? null
   const isActiveConversation = activeConversationId === payload.conversation.id
@@ -3397,7 +3471,9 @@ watch([isPageVisible, isUserActive], ([visible, active], [wasVisible, wasActive]
     void refreshAiDiagnostics()
   }
 })
-watch([activeInbox, selectedLabel], () => { if (whatsappStore.enabled) void reloadConversations() })
+watch([() => quickContactFilter.value ? null : activeInbox.value, selectedLabel, quickContactFilter], () => {
+  if (whatsappStore.enabled) void reloadConversations()
+})
 watch([() => selectedConversation.value?.id, canSend, () => replyTarget.value?.id], () => {
   clearQuickReplyPreview()
   reactionPickerId.value = null
@@ -3407,7 +3483,7 @@ watch([activeInbox, selectedBranchId, unroutedOnly, selectedLabel], () => {
   void router.replace({ query: { ...route.query, inbox: activeInbox.value, whatsappBranch: selectedBranchId.value || undefined,
     unrouted: unroutedOnly.value ? 'true' : undefined, label: selectedLabel.value || undefined } })
 })
-watch(() => Math.floor((clockNow.value - 5 * 3_600_000) / 86_400_000), scheduleInboxLabelsRefresh)
+watch(inboxDayKey, scheduleInboxLabelsRefresh)
 watch(() => Math.floor(clockNow.value / 60_000), () => {
   if (isPageVisible.value && isUserActive.value) inboxTotalsRefresh.schedule()
 })
@@ -3721,6 +3797,7 @@ watch(() => selectedConversation.value?.id, id => {
 }
 .inbox-control::-webkit-details-marker { display: none; }
 .inbox-control:hover, .inbox-tool:hover:not(:disabled) { background: var(--color-slate-50); }
+.inbox-control[aria-pressed="true"] { color: var(--wa-focus); background: var(--wa-selected); border-color: var(--wa-focus); }
 .inbox-control:focus-visible, .inbox-tool:focus-visible { outline: 2px solid var(--color-emerald-600); outline-offset: 1px; }
 .inbox-control-panel {
   position: absolute; inset-inline: 0; top: 100%; z-index: 30; margin-top: .375rem; padding: .625rem;
