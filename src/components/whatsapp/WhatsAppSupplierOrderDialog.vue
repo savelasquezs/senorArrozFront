@@ -44,6 +44,12 @@
       </label>
     </form>
     <div v-else class="space-y-2">
+      <div class="flex flex-wrap items-center justify-between gap-2">
+        <p class="text-sm text-gray-600">{{ windowOpen ? 'Ventana de atención abierta.' : 'Ventana de 24 horas cerrada.' }}</p>
+        <BaseButton v-if="windowOpen" variant="ghost" size="sm" :disabled="sendingTemplate" @click="preferTemplate = !preferTemplate">
+          {{ preferTemplate ? 'Usar texto del chat' : 'Usar plantilla de proveedor' }}
+        </BaseButton>
+      </div>
       <label v-if="usingTemplate" class="block text-sm font-medium">
         Entrega para
         <BaseInput v-model="delivery" :maxlength="160" :disabled="sendingTemplate" aria-label="Entrega para" />
@@ -52,12 +58,15 @@
         Vista previa
         <textarea ref="previewInput" :value="activePreview" readonly rows="9" class="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 font-normal" />
       </label>
-      <p v-if="loadingTemplate && requiresTemplate" class="text-sm text-gray-600" role="status">Consultando la plantilla de pedido…</p>
-      <p v-else-if="usingTemplate && templatePreview.length > 1024" class="text-sm text-red-700">Acorta el pedido para enviarlo como plantilla.</p>
-      <p v-else-if="!usingTemplate && !windowOpen" class="text-sm text-gray-600">
-        {{ templateBranchName ? 'La plantilla de pedido no está disponible en esta línea. Puedes copiar el pedido.' : 'Toma la conversación y verifica su sucursal para enviar la plantilla.' }}
+      <p v-if="loadingTemplate && templateMode" class="text-sm text-gray-600" role="status">Consultando la plantilla de pedido…</p>
+      <p v-else-if="templateMode && templateError" class="text-sm text-red-700" role="alert">
+        {{ templateError }} <button type="button" class="underline" @click="loadTemplate">Reintentar</button>
       </p>
-      <p v-else-if="windowOpen && !canInsert" class="text-sm text-gray-600">Toma la conversación para colocar el pedido en el chat.</p>
+      <p v-else-if="usingTemplate && templatePreview.length > 1024" class="text-sm text-red-700">Acorta el pedido para enviarlo como plantilla.</p>
+      <p v-else-if="templateMode && !usingTemplate" class="text-sm text-gray-600">La plantilla de pedido no está disponible en esta línea.</p>
+      <p v-else-if="usingTemplate && !templateBranchName" class="text-sm text-gray-600">Selecciona una sucursal de trabajo para completar la plantilla.</p>
+      <p v-if="usingTemplate && !canWriteTemplate" class="text-sm text-gray-600">La conversación está a cargo de otro asesor o ya no está disponible.</p>
+      <p v-else-if="!templateMode && !canInsert" class="text-sm text-gray-600">Puedes usar la plantilla de proveedor para enviar el pedido desde aquí.</p>
       <p v-if="copied" role="status" class="text-sm text-emerald-700">Mensaje copiado.</p>
     </div>
     <p v-if="formError || composerError" role="alert" class="mt-3 text-sm text-red-700">{{ formError || composerError }}</p>
@@ -65,8 +74,8 @@
       <template v-if="preview">
         <BaseButton variant="secondary" :disabled="sendingTemplate" @click="edit">Editar artículos</BaseButton>
         <BaseButton variant="outline" :disabled="!canCopy" @click="copy">Copiar mensaje</BaseButton>
-        <BaseButton v-if="canInsert" :disabled="sendingTemplate" @click="emit('prepare', conversationId, preview)">Pasar al chat</BaseButton>
-        <BaseButton v-if="usingTemplate" :disabled="!canSendTemplate"
+        <BaseButton v-if="!templateMode && canInsert" :disabled="sendingTemplate" @click="emit('prepare', conversationId, preview)">Pasar al chat</BaseButton>
+        <BaseButton v-if="templateMode" :disabled="!canSendTemplate"
           :loading="sendingTemplate" @click="sendTemplate">Enviar plantilla</BaseButton>
       </template>
       <BaseButton v-else type="submit" form="whatsapp-supplier-order">Preparar mensaje</BaseButton>
@@ -97,6 +106,7 @@ const props = defineProps<{
   windowOpen: boolean
   composerError: string
   templateBranchName?: string
+  canWriteTemplate: boolean
 }>()
 const emit = defineEmits<{
   close: []
@@ -119,8 +129,10 @@ const catalogOptions = computed(() => {
 })
 const note = ref('')
 const preview = ref('')
+const preferTemplate = ref(props.windowOpen && props.canWriteTemplate && !props.canInsert)
 const templateBody = ref('')
 const templateProducts = ref('')
+const templateError = ref('')
 const delivery = ref('')
 const loadingTemplate = ref(false)
 const sendingTemplate = ref(false)
@@ -128,12 +140,12 @@ const templateParameters = computed(() => [
   templateProducts.value, props.templateBranchName?.trim() ?? '', delivery.value.trim(),
 ])
 const templatePreview = computed(() => templateBody.value.replace(/\{\{\s*(\d+)\s*\}\}/g,
-  (_, index) => templateParameters.value[Number(index) - 1] || '«entrega»'))
-const requiresTemplate = computed(() => !props.windowOpen && !!props.templateBranchName)
-const usingTemplate = computed(() => requiresTemplate.value && !!templateBody.value)
+  (_, index) => templateParameters.value[Number(index) - 1] || (index === '2' ? '«sucursal»' : '«entrega»')))
+const templateMode = computed(() => !props.windowOpen || preferTemplate.value)
+const usingTemplate = computed(() => templateMode.value && !!templateBody.value)
 const activePreview = computed(() => usingTemplate.value ? templatePreview.value : preview.value)
 const canCopy = computed(() => !sendingTemplate.value && (!usingTemplate.value || !!delivery.value.trim()))
-const canSendTemplate = computed(() => usingTemplate.value && !sendingTemplate.value
+const canSendTemplate = computed(() => usingTemplate.value && props.canWriteTemplate && !sendingTemplate.value
   && templateParameters.value.every(Boolean) && templatePreview.value.length <= 1024)
 let sendRequest: { parameters: string; key: string } | undefined
 let disposed = false
@@ -218,14 +230,14 @@ function prepare() {
 
 async function loadTemplate() {
   loadingTemplate.value = true
+  templateError.value = ''
   try {
     const response = await whatsappApi.getConversationTemplates(props.conversationId)
     const template = response.data?.find(item => item.name === supplierOrderTemplateName
       && item.language === supplierOrderTemplateLanguage)
     if (!disposed && template) templateBody.value = whatsappTemplateBody(template.componentsJson)
   } catch (cause) {
-    if (!disposed && requiresTemplate.value && preview.value)
-      formError.value = cause instanceof Error ? cause.message : 'No se pudo consultar la plantilla.'
+    if (!disposed) templateError.value = cause instanceof Error ? cause.message : 'No se pudo consultar la plantilla.'
   } finally {
     loadingTemplate.value = false
   }
@@ -271,7 +283,7 @@ async function copy() {
   }
 }
 
-watch([preview, requiresTemplate], ([text, needsTemplate]) => {
+watch([preview, templateMode], ([text, needsTemplate]) => {
   if (text && needsTemplate && !templateBody.value && !loadingTemplate.value) void loadTemplate()
 })
 onMounted(load)
