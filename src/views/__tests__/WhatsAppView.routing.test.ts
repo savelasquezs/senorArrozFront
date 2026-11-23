@@ -745,7 +745,7 @@ describe('M38-F04 view + real Pinia store integration', () => {
     await flushPromises()
     await vm.selectConversation({ ...m.rows[0], customerServiceWindowExpiresAt: '2099-01-01T00:00:00Z' })
     await nextTick()
-    await wrapper.get('button[aria-label="Crear o editar respuestas rápidas"]').trigger('click')
+    await wrapper.get('button[aria-label="Ver todas las respuestas rápidas"]').trigger('click')
     await flushPromises()
     expect(wrapper.get('[aria-label="Respuestas rápidas"]').text()).toContain('/ropaviejacon')
     const composer = wrapper.get<HTMLTextAreaElement>('textarea[placeholder="Escribe un mensaje"]')
@@ -810,12 +810,37 @@ describe('M38-F04 view + real Pinia store integration', () => {
     expect(m.api.sendQuickReply).not.toHaveBeenCalled()
     await composer.setValue('/hora')
     await composer.trigger('keydown', { key: 'Tab' })
-    expect(m.api.sendQuickReply).toHaveBeenCalledExactlyOnceWith(1, 12)
+    expect(m.api.sendQuickReply).toHaveBeenCalledExactlyOnceWith(1, 12, undefined)
     expect(composer.element.value).toBe('')
     await composer.setValue('Te confirmo enseguida.')
     pending.resolve(reply(null))
     await flushPromises()
     expect(composer.element.value).toBe('Te confirmo enseguida.')
+  })
+
+  it('lets a cashier use a saved reply from their branch while quoting a message on a central chat', async () => {
+    useAuthStore().user!.role = 'Cashier'
+    useAuthStore().user!.branchId = 2
+    const chat: WhatsAppConversation = { ...m.rows[0]!, operationalBranchId: 2, customerServiceWindowExpiresAt: '2099-01-01T00:00:00Z' }
+    m.rows = [chat]
+    m.api.getQuickReplies.mockResolvedValue(reply([
+      { id: 12, branchId: 2, shortcut: 'recibido', messageTemplate: 'Listo, recibido.', isActive: true, usageCount: 0 },
+    ]))
+    const inbound: WhatsAppMessage = { id: 44, conversationId: 1, whatsAppMessageId: 'wamid.demo',
+      direction: 'inbound', type: 'text', textBody: '¿Recibieron el pedido?', status: 'received',
+      timestamp: '2026-11-15T12:01:00Z', createdAt: '2026-11-15T12:01:00Z' }
+    m.api.getMessagesPage.mockResolvedValue(reply({ items: [inbound], nextCursor: null, hasMore: false }))
+    m.api.sendQuickReply.mockResolvedValue(reply(null))
+    const { vm, wrapper } = mountView()
+    await flushPromises()
+    await vm.selectConversation(chat)
+    await wrapper.get('button[aria-label="Responder a este mensaje"]').trigger('click')
+    await wrapper.get('button[aria-label="Ver todas las respuestas rápidas"]').trigger('click')
+    await flushPromises()
+    await wrapper.findAll('button').find(button => button.text() === 'Usar')!.trigger('click')
+    await flushPromises()
+    expect(m.api.sendQuickReply).toHaveBeenCalledExactlyOnceWith(1, 12, 44)
+    expect(wrapper.find('button[aria-label="Quitar cita"]').exists()).toBe(false)
   })
 
   it('takes a free conversation from the read-only composer exactly once', async () => {

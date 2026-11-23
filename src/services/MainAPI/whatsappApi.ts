@@ -142,7 +142,7 @@ class WhatsAppApi extends BaseApi {
   }
   startQueuedText(conversationId: number, requestId: string, text: string, replyToMessageId?: number, quickReplyId?: number) {
     const action = quickReplyId ? '/quick-reply' : ''
-    const body = quickReplyId ? { quickReplyId } : { text, replyToMessageId }
+    const body = quickReplyId ? { quickReplyId, replyToMessageId } : { text, replyToMessageId }
     return this.post<ApiResponse<{ operationId: number; pending: true }>>(
       `/whatsapp/conversations/${conversationId}/messages${action}?queue=true`, body,
       { headers: { 'X-WhatsApp-Request-Id': requestId } },
@@ -312,8 +312,8 @@ class WhatsAppApi extends BaseApi {
     return this.manualPost<WhatsAppMessage>(`/whatsapp/conversations/${conversationId}/messages/menu`, {})
   }
 
-  sendQuickReply(conversationId: number, quickReplyId: number): Promise<ApiResponse<WhatsAppMessage>> {
-    return this.manualPost<WhatsAppMessage>(`/whatsapp/conversations/${conversationId}/messages/quick-reply`, { quickReplyId })
+  sendQuickReply(conversationId: number, quickReplyId: number, replyToMessageId?: number): Promise<ApiResponse<WhatsAppMessage>> {
+    return this.manualPost<WhatsAppMessage>(`/whatsapp/conversations/${conversationId}/messages/quick-reply`, { quickReplyId, replyToMessageId })
   }
 
   downloadSticker(conversationId: number, messageId: number): Promise<Blob> {

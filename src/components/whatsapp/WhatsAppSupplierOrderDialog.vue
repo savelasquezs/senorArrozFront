@@ -7,21 +7,37 @@
         {{ loadError }} <button type="button" class="underline" @click="load">Reintentar</button>
       </p>
       <p v-else-if="!favorites.length" class="text-sm text-gray-500">Este proveedor todavía no tiene artículos frecuentes.</p>
-      <div v-for="line in favorites" :key="line.id" class="grid gap-2 border-b border-gray-200 pb-2 sm:grid-cols-[1fr_7rem_1fr] sm:items-center">
-        <p class="text-sm font-medium">{{ line.name }} <span class="text-xs font-normal text-gray-500">· {{ line.unit }}</span></p>
+      <div v-for="line in [...favorites, ...catalogLines]" :key="line.id" class="grid gap-2 border-b border-gray-200 pb-2 sm:grid-cols-[1fr_7rem_1fr] sm:items-center">
+        <div>
+          <p class="text-sm font-medium">{{ line.name }} <span class="text-xs font-normal text-gray-500">· {{ line.unit }}</span></p>
+          <button v-if="line.custom" type="button" class="text-xs text-gray-600 underline" @click="removeCatalogLine(line.id)">Quitar artículo</button>
+        </div>
         <BaseInput v-model="line.quantity" size="sm" inputmode="decimal" placeholder="Cantidad"
           :aria-label="`Cantidad de ${line.name}`" :maxlength="24" />
         <BaseInput v-model="line.note" size="sm" placeholder="Nota opcional" :aria-label="`Nota de ${line.name}`" :maxlength="240" />
       </div>
+      <div class="flex flex-wrap gap-2">
+        <BaseButton type="button" variant="outline" size="sm" :aria-expanded="showCatalog" @click="toggleCatalog">
+          {{ showCatalog ? 'Ocultar catálogo' : 'Ver todos' }}
+        </BaseButton>
+        <BaseButton type="button" variant="outline" size="sm" @click="addLine">Agregar artículo manual</BaseButton>
+      </div>
+      <div v-if="showCatalog">
+        <p v-if="loadingCatalog" role="status" class="text-sm text-gray-500">Consultando el catálogo de Gastos…</p>
+        <p v-else-if="catalogError" role="alert" class="text-sm text-red-700">
+          {{ catalogError }} <button type="button" class="underline" @click="loadCatalog">Reintentar</button>
+        </p>
+        <BaseSelect v-else :model-value="null" :options="catalogOptions" label="Artículo del catálogo"
+          placeholder="Buscar y agregar un artículo" inline-dropdown @update:model-value="addCatalogLine" />
+      </div>
       <fieldset v-for="(line, index) in extra" :key="line.id" class="grid gap-2 rounded-lg border border-gray-200 p-2 sm:grid-cols-3">
-        <legend class="px-1 text-xs font-medium">Artículo extra {{ index + 1 }}</legend>
+        <legend class="px-1 text-xs font-medium">Artículo manual {{ index + 1 }}</legend>
         <BaseInput v-model="line.name" size="sm" label="Artículo" :maxlength="160" />
         <BaseInput v-model="line.quantity" size="sm" inputmode="decimal" label="Cantidad" :maxlength="24" />
         <BaseInput v-model="line.unit" size="sm" label="Unidad" :maxlength="50" />
         <BaseInput v-model="line.note" size="sm" label="Nota opcional" class="sm:col-span-2" :maxlength="240" />
         <BaseButton type="button" variant="ghost" size="xs" class="self-end" @click="extra.splice(index, 1)">Quitar artículo</BaseButton>
       </fieldset>
-      <BaseButton type="button" variant="outline" size="sm" @click="addLine">Agregar artículo</BaseButton>
       <label class="block text-sm font-medium">
         Nota del pedido
         <textarea v-model="note" rows="2" maxlength="1000" class="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 font-normal" />
@@ -49,12 +65,15 @@
 </template>
 
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseDialog from '@/components/ui/BaseDialog.vue'
 import BaseInput from '@/components/ui/BaseInput.vue'
+import BaseSelect from '@/components/ui/BaseSelect.vue'
 import { supplierOrderMessage, type SupplierOrderLine } from '@/helpers/whatsappSupplierOrder'
+import { expenseApi } from '@/services/MainAPI/expenseApi'
 import { whatsappApi } from '@/services/MainAPI/whatsappApi'
+import type { Expense } from '@/types/expense'
 
 const props = defineProps<{
   conversationId: number
@@ -65,6 +84,16 @@ const props = defineProps<{
 }>()
 const emit = defineEmits<{ close: []; prepare: [conversationId: number, message: string] }>()
 const favorites = ref<(SupplierOrderLine & { id: number })[]>([])
+const catalogLines = ref<(SupplierOrderLine & { id: number })[]>([])
+const catalog = ref<Expense[] | null>(null)
+const showCatalog = ref(false)
+const loadingCatalog = ref(false)
+const catalogError = ref('')
+const catalogOptions = computed(() => {
+  const used = new Set([...favorites.value, ...catalogLines.value].map(item => item.id))
+  return (catalog.value ?? []).filter(item => !used.has(item.id))
+    .map(item => ({ id: item.id, name: `${item.name} · ${item.unitDisplay}`, description: item.categoryName }))
+})
 const extra = ref<(SupplierOrderLine & { id: number })[]>([])
 const note = ref('')
 const preview = ref('')
@@ -75,6 +104,7 @@ const formError = ref('')
 const loadError = ref('')
 const units: Record<string, string> = { Unit: 'und.', Kilo: 'kg', Package: 'paq.', Pound: 'lb', Gallon: 'gal' }
 let request: AbortController | undefined
+let catalogRequest: AbortController | undefined
 let nextId = 0
 
 async function load() {
@@ -85,14 +115,50 @@ async function load() {
   try {
     const response = await whatsappApi.getConversationSupplierItems(props.conversationId, controller.signal)
     if (controller.signal.aborted) return
+    const added = new Map(catalogLines.value.map(line => [line.id, line]))
     favorites.value = (response.data ?? []).map(item => ({
-      id: item.expenseId, name: item.expenseName, unit: units[item.expenseUnit] ?? item.expenseUnit, quantity: '', note: '',
+      id: item.expenseId, name: item.expenseName, unit: units[item.expenseUnit] ?? item.expenseUnit,
+      quantity: added.get(item.expenseId)?.quantity ?? '', note: added.get(item.expenseId)?.note ?? '',
     }))
+    const favoriteIds = new Set(favorites.value.map(line => line.id))
+    catalogLines.value = catalogLines.value.filter(line => !favoriteIds.has(line.id))
   } catch (cause) {
     if (!controller.signal.aborted) loadError.value = cause instanceof Error ? cause.message : 'No se pudieron consultar los artículos.'
   } finally {
     if (!controller.signal.aborted) loading.value = false
   }
+}
+
+function toggleCatalog() {
+  showCatalog.value = !showCatalog.value
+  if (showCatalog.value && !catalog.value && !loadingCatalog.value) void loadCatalog()
+}
+
+async function loadCatalog() {
+  const controller = catalogRequest = new AbortController()
+  loadingCatalog.value = true
+  catalogError.value = ''
+  try {
+    const response = await expenseApi.getAllExpenses(controller.signal)
+    if (controller.signal.aborted) return
+    if (!response.isSuccess) throw new Error(response.message || 'No se pudo consultar el catálogo de Gastos.')
+    catalog.value = response.data ?? []
+  } catch (cause) {
+    if (!controller.signal.aborted) catalogError.value = cause instanceof Error ? cause.message : 'No se pudo consultar el catálogo de Gastos.'
+  } finally {
+    if (!controller.signal.aborted) loadingCatalog.value = false
+  }
+}
+
+function addCatalogLine(id: number) {
+  if (!catalogOptions.value.some(option => option.id === id)) return
+  const item = catalog.value?.find(item => item.id === id)
+  if (!item) return
+  catalogLines.value.push({ id, name: item.name, unit: units[item.unit] ?? item.unitDisplay, quantity: '', note: '', custom: true })
+}
+
+function removeCatalogLine(id: number) {
+  catalogLines.value = catalogLines.value.filter(line => line.id !== id)
 }
 
 function addLine() {
@@ -102,7 +168,7 @@ function addLine() {
 function prepare() {
   formError.value = ''
   try {
-    preview.value = supplierOrderMessage([...favorites.value, ...extra.value], note.value)
+    preview.value = supplierOrderMessage([...favorites.value, ...catalogLines.value, ...extra.value], note.value)
   } catch (cause) {
     formError.value = cause instanceof Error ? cause.message : 'No se pudo preparar el pedido.'
   }
@@ -127,5 +193,8 @@ async function copy() {
 }
 
 onMounted(load)
-onBeforeUnmount(() => request?.abort())
+onBeforeUnmount(() => {
+  request?.abort()
+  catalogRequest?.abort()
+})
 </script>

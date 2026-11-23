@@ -1,10 +1,13 @@
 import { flushPromises, mount } from '@vue/test-utils'
 import { beforeEach, expect, it, vi } from 'vitest'
 import WhatsAppSupplierOrderDialog from '../WhatsAppSupplierOrderDialog.vue'
+import BaseSelect from '@/components/ui/BaseSelect.vue'
 import { supplierOrderMessage } from '@/helpers/whatsappSupplierOrder'
 
 const api = vi.hoisted(() => ({ getConversationSupplierItems: vi.fn() }))
+const expenses = vi.hoisted(() => ({ getAllExpenses: vi.fn() }))
 vi.mock('@/services/MainAPI/whatsappApi', () => ({ whatsappApi: api }))
+vi.mock('@/services/MainAPI/expenseApi', () => ({ expenseApi: expenses }))
 
 const props = { conversationId: 14, supplierName: 'Molino', canInsert: false, windowOpen: false, composerError: '' }
 const stubs = {
@@ -14,6 +17,7 @@ const copy = vi.fn()
 
 beforeEach(() => {
   api.getConversationSupplierItems.mockReset()
+  expenses.getAllExpenses.mockReset()
   copy.mockReset().mockResolvedValue(undefined)
   vi.stubGlobal('navigator', { ...globalThis.navigator, clipboard: { writeText: copy } })
 })
@@ -46,7 +50,7 @@ it('emits the draft for its own chat with a free item when the supplier has no h
   const view = mount(WhatsAppSupplierOrderDialog, { props: { ...props, canInsert: true, windowOpen: true }, global: { stubs } })
   try {
     await flushPromises()
-    await view.findAll('button').find(button => button.text() === 'Agregar artículo')!.trigger('click')
+    await view.findAll('button').find(button => button.text() === 'Agregar artículo manual')!.trigger('click')
     const [name, quantity, unit] = view.findAll('fieldset input')
     await name!.setValue('Aceite')
     await quantity!.setValue('1.75')
@@ -54,6 +58,32 @@ it('emits the draft for its own chat with a free item when the supplier has no h
     await view.get('form').trigger('submit')
     await view.findAll('button').find(button => button.text() === 'Pasar al chat')!.trigger('click')
     expect(view.emitted('prepare')).toEqual([[14, expect.stringContaining('1,75 litros — Aceite')]])
+  } finally {
+    view.unmount()
+    vi.unstubAllGlobals()
+  }
+})
+
+it('loads the full expense catalog on demand and keeps the selected unit in the order', async () => {
+  api.getConversationSupplierItems.mockResolvedValue({ data: [{ expenseId: 4, expenseName: 'Arroz', expenseUnit: 'Kilo' }] })
+  expenses.getAllExpenses.mockResolvedValue({ isSuccess: true, data: [
+    { id: 4, name: 'Arroz', unit: 'Kilo', unitDisplay: 'Kilo' },
+    { id: 8, name: 'Sal', unit: 'Pound', unitDisplay: 'Libra', categoryName: 'Insumos' },
+  ] })
+  const view = mount(WhatsAppSupplierOrderDialog, { props, global: { stubs } })
+  try {
+    await flushPromises()
+    expect(expenses.getAllExpenses).not.toHaveBeenCalled()
+    await view.findAll('button').find(button => button.text() === 'Ver todos')!.trigger('click')
+    await flushPromises()
+    const selector = view.getComponent(BaseSelect)
+    expect(selector.props('options')).toEqual([{ id: 8, name: 'Sal · Libra', description: 'Insumos' }])
+    selector.vm.$emit('update:modelValue', 8)
+    await flushPromises()
+    expect(selector.props('options')).toEqual([])
+    await view.get('input[aria-label="Cantidad de Sal"]').setValue('2')
+    await view.get('form').trigger('submit')
+    expect(view.get('textarea').element.value).toContain('2 lb — Sal')
   } finally {
     view.unmount()
     vi.unstubAllGlobals()
