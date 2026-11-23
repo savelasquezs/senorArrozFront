@@ -96,7 +96,7 @@ import BaseLoading from '@/components/ui/BaseLoading.vue'
 import OrderSidebar from '@/components/orders/OrderSidebar.vue'
 import WhatsAppOrderQuickActions from '@/components/whatsapp/WhatsAppOrderQuickActions.vue'
 import { useWhatsAppCommercialDraft } from '@/composables/useWhatsAppCommercialDraft'
-import { useOrdersDataStore } from '@/store/ordersData'
+import { orderApi } from '@/services/MainAPI/orderApi'
 import { whatsappApi } from '@/services/MainAPI/whatsappApi'
 import type { OrderDetailView } from '@/types/order'
 import type { WhatsAppCommercialDraft, WhatsAppCommercialHistoryEntry, WhatsAppConversation, WhatsAppMessage, WhatsAppProductSuggestion, WhatsAppProductSuggestionState } from '@/types/whatsapp'
@@ -113,6 +113,7 @@ const { session, draft, loading, syncing, error, saveState, commercialStatus, ed
 const hasDraftProducts = computed(() => session.value?.status === 'active' && !!draft.value?.orderItems.length)
 defineExpose({
   hasDraftProducts,
+  showManagedOrder,
   async saveBeforeFinishing() {
     if (loading.value || syncing.value) throw new Error('Espera a que termine de cargar el pedido.')
     await flush()
@@ -133,6 +134,7 @@ const productSuggestionState = computed<WhatsAppProductSuggestionState>(() => ({
 watch(productSuggestionState, value => emit('product-suggestion-state', value), { immediate: true })
 const noteText = ref(''), showReload = ref(false), showNew = ref(false), showCancel = ref(false), showOrder = ref(false), showNotes = ref(false)
 const persistedOrder = ref<OrderDetailView | null>(null)
+let orderDetailRequest = 0
 const history = ref<WhatsAppCommercialHistoryEntry[]>([])
 const historyDetails = ref<HTMLDetailsElement>()
 const loadingHistory = ref(false), historyError = ref(''), discarding = ref(false)
@@ -189,14 +191,14 @@ async function discardDraft() {
   if (error.value) showCancel.value = false
 }
 async function openOrder(id: number | null | undefined = session.value?.orderId) {
-  if (!id) return
-  await run(async () => {
-    const store = useOrdersDataStore()
-    await store.fetchById(id)
-    if (!active.value || store.current?.id !== id) return
-    persistedOrder.value = store.current
-    showOrder.value = true
-  })
+  if (id) await run(() => showManagedOrder(id))
+}
+async function showManagedOrder(id: number) {
+  const request = ++orderDetailRequest
+  const order = await orderApi.fetchDetail(id)
+  if (!active.value || request !== orderDetailRequest || order.id !== id) return
+  persistedOrder.value = order
+  showOrder.value = true
 }
 let statusTimer: ReturnType<typeof setInterval> | undefined
 let statusRunning = false
@@ -222,6 +224,7 @@ onActivated(() => {
 })
 onDeactivated(() => {
   active.value = false
+  orderDetailRequest++
   showReload.value = false; showNew.value = false; showCancel.value = false; showOrder.value = false; showNotes.value = false
   void run(flush)
 })

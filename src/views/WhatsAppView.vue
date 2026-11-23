@@ -54,7 +54,7 @@
         <nav class="flex shrink-0 gap-2 border-b bg-white px-3 py-2 xl:hidden" aria-label="Vista de atención">
           <BaseButton size="sm" variant="outline" @click="mobilePane = 'inbox'">Conversaciones</BaseButton>
           <BaseButton size="sm" variant="outline" :disabled="!selectedConversation" @click="mobilePane = 'chat'">Chat</BaseButton>
-          <BaseButton size="sm" variant="outline" :disabled="!selectedConversation" @click="mobilePane = 'order'; contextPanelCollapsed = false">Pedido</BaseButton>
+          <BaseButton size="sm" variant="outline" :disabled="!selectedConversation" @click="mobilePane = 'order'; contextPanelCollapsed = false">{{ operationalContact ? 'Herramientas' : 'Pedido' }}</BaseButton>
         </nav>
         <div ref="columnsContainer" class="whatsapp-columns relative grid min-h-0 flex-1 grid-cols-1"
           :class="{ 'with-order': selectedConversation && !contextPanelCollapsed }"
@@ -143,6 +143,8 @@
                     <WhatsAppContactAvatar :name="conversationTitle(conversation)" :url="conversation.profilePhotoUrl"
                       @open="url => openContactPhoto(conversation, url)" />
                     <span class="truncate text-xs font-semibold" :title="conversationIdentityLabel(conversation)">{{ conversationTitle(conversation) }}</span>
+                    <span v-if="conversation.operationalContact && !(conversation.operationalContact.kind === 'supplier' && conversation.labels?.includes('supplier'))"
+                      class="wa-tag shrink-0 font-semibold">{{ operationalContactLabel(conversation) }}</span>
                   </div>
                   <div v-if="conversation.labels?.length" class="wa-conversation-tags" data-test="inbox-conversation-labels">
                     <button v-for="key in conversation.labels.slice(0, 2)" :key="key" type="button" class="wa-tag"
@@ -197,6 +199,7 @@
                 <p class="truncate whitespace-nowrap text-sm font-semibold text-gray-900" :class="{ 'max-w-[55%]': chatIdentity }" :title="conversationTitle(selectedConversation)">
                   {{ conversationTitle(selectedConversation) }}
                 </p>
+                <span v-if="operationalContact" class="wa-tag shrink-0 font-semibold">{{ operationalContactLabel(selectedConversation) }}</span>
                 <p v-if="chatIdentity" class="chat-identity truncate whitespace-nowrap text-xs text-gray-500" :title="chatIdentity">
                   {{ chatIdentity }}
                 </p>
@@ -640,14 +643,23 @@
           class="absolute right-0 top-1/2 z-10 -translate-y-1/2 rounded-l-lg border border-emerald-200 bg-emerald-600 px-3 py-4 text-sm font-medium text-white shadow-lg hover:bg-emerald-700"
           @click="contextPanelCollapsed = false; mobilePane = 'order'"
         >
-          Pedido
+          {{ operationalContact ? 'Herramientas' : 'Pedido' }}
         </button>
 
         <Transition name="wa-order-panel">
         <aside v-if="selectedConversation" v-show="!contextPanelCollapsed" data-test="whatsapp-order-column" class="relative min-h-0 border-l border-gray-200 bg-white flex flex-col" :class="{ 'max-xl:hidden': mobilePane !== 'order' }">
           <div role="separator" tabindex="0" aria-label="Ancho del pedido" aria-orientation="vertical" :aria-valuenow="rightWidth" class="absolute -left-1 top-0 z-10 hidden h-full w-2 cursor-col-resize touch-none xl:block" @pointerdown="resize($event, 'right')" @keydown.left.prevent="step('right', 20)" @keydown.right.prevent="step('right', -20)" />
+          <div v-if="operationalContact" class="flex shrink-0 flex-wrap items-center gap-2 border-b border-gray-200 p-3">
+            <BaseButton v-if="operationalContact.kind === 'supplier'" size="sm" @click="openSupplierOrder">Hacer pedido</BaseButton>
+            <BaseButton v-else-if="showingCustomerOrder" size="sm" variant="outline" @click="showingCustomerOrder = false">Ver rutas</BaseButton>
+            <BaseButton v-if="!showingCustomerOrder" size="sm" variant="outline" @click="showingCustomerOrder = true">Tomar pedido de cliente</BaseButton>
+          </div>
+          <WhatsAppDeliveryRoutesPanel v-if="operationalContact?.kind === 'deliveryman' && !showingCustomerOrder && !contextPanelCollapsed"
+            :conversation-id="selectedConversation.id" :key="`${sessionKey}:${selectedConversation.id}`"
+            @manage="manageDeliveryOrder" @contact-customer="openOrderConversation" />
           <KeepAlive :key="editorScope" :max="8">
-            <WhatsAppOrderPanel ref="commercialPanel" :key="`${authStore.user?.id}:${selectedConversation.id}`" :conversation="selectedConversation" :initial-draft="prefetchedDraft" :controls-target="commercialControlsTarget" :save-target="commercialSaveTarget"
+            <WhatsAppOrderPanel v-show="!operationalContact || showingCustomerOrder" ref="commercialPanel" :key="`${authStore.user?.id}:${selectedConversation.id}`" :conversation="selectedConversation" :initial-draft="prefetchedDraft"
+              :controls-target="!operationalContact || showingCustomerOrder ? commercialControlsTarget : null" :save-target="!operationalContact || showingCustomerOrder ? commercialSaveTarget : null"
               :can-send-choices="canSend" :finishing-attention="finishingAttention" @change="commercialChanged" @draft-message="draftOrderMessage" @addresses-sent="addressesSent"
               @product-suggestion-state="setProductSuggestionState" />
           </KeepAlive>
@@ -897,6 +909,11 @@
       <WhatsAppConversationStarter v-if="showConversationStarter" v-model="showConversationStarter" :key="sessionKey"
         :branches="conversationStarterBranches" :initial-branch-id="orderStarter?.branchId ?? conversationStarterBranchId"
         :initial-phone="orderStarter?.phone" @complete="openStartedConversation" />
+      <WhatsAppSupplierOrderDialog v-if="showSupplierOrder && selectedConversation && operationalContact?.kind === 'supplier'"
+        :key="`${sessionKey}:${selectedConversation.id}`" :conversation-id="selectedConversation.id" :supplier-name="operationalContact.name"
+        :can-insert="canSend && !sending && !sendingProductChoices && !preparingQuickReply && !selectingForward"
+        :window-open="serviceWindowOpen" :composer-error="supplierComposerError"
+        @close="showSupplierOrder = false" @prepare="draftSupplierOrder" />
       <WhatsAppForwardDialog v-if="showForwardDialog && selectedConversation" v-model="showForwardDialog"
         :source-id="selectedConversation.id" :count="forwardSelection.size" :sending="forwarding"
         :error="forwardError" @forward="forwardSelectedMessages" />
@@ -906,11 +923,13 @@
 
 <script setup lang="ts">
 import { useResizableColumns } from '@/composables/useResizableColumns'
-import { commercialGroup, commercialLabel, conversationTitle, fixedInboxLabelStyles, inboxLabelColor, inboxLabelPalette } from '@/utils/whatsappInbox'
+import { commercialGroup, commercialLabel, conversationTitle, fixedInboxLabelStyles, inboxLabelColor, inboxLabelPalette, operationalContactLabel } from '@/utils/whatsappInbox'
 import { generatePosCreationKey } from '@/utils/posCreationKey'
 import { listenForWhatsAppOrders, whatsAppOrderTabScope } from '@/utils/whatsappOrderTab'
 
 import WhatsAppOrderPanel from '@/components/whatsapp/WhatsAppOrderPanel.vue'
+import WhatsAppDeliveryRoutesPanel from '@/components/whatsapp/WhatsAppDeliveryRoutesPanel.vue'
+import WhatsAppSupplierOrderDialog from '@/components/whatsapp/WhatsAppSupplierOrderDialog.vue'
 import WhatsAppMessageActions from '@/components/whatsapp/WhatsAppMessageActions.vue'
 import WhatsAppVoiceMessage from '@/components/whatsapp/WhatsAppVoiceMessage.vue'
 import WhatsAppContactAvatar from '@/components/whatsapp/WhatsAppContactAvatar.vue'
@@ -1116,6 +1135,16 @@ const claimingConversationId = ref<number | null>(null)
 const changingOperationalBranch = ref(false)
 const resettingConversation = ref(false)
 const contextPanelCollapsed = ref(false)
+const operationalContact = computed(() => selectedConversation.value?.operationalContact)
+const showingCustomerOrder = ref(false)
+const showSupplierOrder = ref(false)
+const supplierComposerError = ref('')
+watch(() => [selectedConversation.value?.id, operationalContact.value?.kind, operationalContact.value?.name,
+  selectedConversation.value?.phoneNumber] as const, (current, previous) => {
+  if (current.every((value, index) => value === previous[index])) return
+  showingCustomerOrder.value = false
+  showSupplierOrder.value = false
+}, { flush: 'sync' })
 const mobilePane = ref<'inbox' | 'chat' | 'order'>('inbox')
 const columnsContainer = ref<HTMLElement>()
 const { leftWidth, rightWidth, resize, step } = useResizableColumns(columnsContainer)
@@ -1401,7 +1430,7 @@ const composingDuringTake = computed(() => !!selectedConversation.value && servi
   && !selectedConversation.value.assignedUserId)
 const composerPlaceholder = computed(() => canTakeAttention.value && !composingDuringTake.value
   ? 'Doble clic para tomar la conversación' : 'Escribe un mensaje')
-const canReturnToAi = computed(() => ownsConversation.value)
+const canReturnToAi = computed(() => ownsConversation.value && !operationalContact.value)
 const canPauseAi = computed(() => selectedConversation.value?.attentionMode === 'ai' && !selectedConversation.value.assignedUserId)
 const canTakeOver = computed(() => selectedConversation.value?.attentionMode === 'human'
   && !!selectedConversation.value.assignedUserId && !ownsConversation.value)
@@ -2217,6 +2246,17 @@ async function openOrderConversation(orderId: number) {
   }
 }
 
+async function manageDeliveryOrder(orderId: number) {
+  const selection = conversationSelection
+  try {
+    await commercialPanel.value?.showManagedOrder(orderId)
+  } catch (error) {
+    if (viewActive && selection === conversationSelection) {
+      showError('Gestionar pedido', error instanceof Error ? error.message : 'No se pudo consultar el pedido.')
+    }
+  }
+}
+
 async function selectConversationFromRoute() {
   const id = Number(route.query.conversationId || 0)
   const selection = conversationSelection
@@ -2493,20 +2533,42 @@ async function removeQuickReply(reply: WhatsAppQuickReply) {
 }
 
 async function draftOrderMessage(conversationId: number, text: string) {
-  if (selectedConversation.value?.id !== conversationId || !ownsConversation.value) return
+  if (selectedConversation.value?.id !== conversationId || !ownsConversation.value) return false
   mobilePane.value = 'chat'
   const existing = draft.value.trimEnd()
   if (!existing.endsWith(text)) {
     const next = existing.trim() ? `${existing}\n\n${text}` : text
     if (next.length > 4096) {
       sendError.value = 'Reduce el texto actual para agregar el mensaje del pedido.'
-      return
+      return false
     }
     draft.value = next
   }
   sendError.value = ''
   await nextTick()
   if (selectedConversation.value?.id === conversationId) messageInput.value?.focus()
+  return true
+}
+
+function openSupplierOrder() {
+  supplierComposerError.value = ''
+  showSupplierOrder.value = true
+}
+
+async function draftSupplierOrder(conversationId: number, text: string) {
+  if (!showSupplierOrder.value || operationalContact.value?.kind !== 'supplier'
+    || selectedConversation.value?.id !== conversationId || !canSend.value
+    || sending.value || sendingProductChoices.value || preparingQuickReply.value || selectingForward.value) return
+  const selection = conversationSelection
+  const inserted = await draftOrderMessage(conversationId, text)
+  if (selection !== conversationSelection) return
+  if (!inserted) {
+    supplierComposerError.value = sendError.value || 'No se pudo preparar el mensaje desde este chat.'
+    return
+  }
+  showSupplierOrder.value = false
+  await nextTick()
+  if (selection === conversationSelection && canSend.value) messageInput.value?.focus()
 }
 
 async function addressesSent(conversationId: number, messages: WhatsAppMessage[]) {

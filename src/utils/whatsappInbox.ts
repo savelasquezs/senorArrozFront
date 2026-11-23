@@ -95,7 +95,12 @@ export function whatsappConversationBranchLabel(conversation: WhatsAppConversati
 }
 
 export function conversationTitle(conversation: WhatsAppConversation) {
-  return conversation.contactName || conversation.customerName || conversation.whatsAppUsername || conversation.phoneNumber || 'Usuario de WhatsApp'
+  return conversation.operationalContact?.name || conversation.contactName || conversation.customerName || conversation.whatsAppUsername || conversation.phoneNumber || 'Usuario de WhatsApp'
+}
+
+export function operationalContactLabel(conversation: WhatsAppConversation) {
+  const kind = conversation.operationalContact?.kind
+  return kind === 'deliveryman' ? 'Domiciliario' : kind === 'supplier' ? 'Proveedor' : ''
 }
 
 function commercialPriority(conversation: WhatsAppConversation) {

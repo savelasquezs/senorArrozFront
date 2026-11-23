@@ -63,6 +63,8 @@ import WhatsAppView from '../WhatsAppView.vue'
 import WhatsAppComposerPicker from '@/components/whatsapp/WhatsAppComposerPicker.vue'
 import WhatsAppForwardDialog from '@/components/whatsapp/WhatsAppForwardDialog.vue'
 import WhatsAppOrderPanel from '@/components/whatsapp/WhatsAppOrderPanel.vue'
+import WhatsAppDeliveryRoutesPanel from '@/components/whatsapp/WhatsAppDeliveryRoutesPanel.vue'
+import WhatsAppSupplierOrderDialog from '@/components/whatsapp/WhatsAppSupplierOrderDialog.vue'
 import WhatsAppVoiceMessage from '@/components/whatsapp/WhatsAppVoiceMessage.vue'
 import { useWhatsAppStore } from '@/store/whatsapp'
 import { useAuthStore } from '@/store/auth'
@@ -174,6 +176,51 @@ describe('M38-F04 view + real Pinia store integration', () => {
     await nextTick()
     expect(input.element.value).toBe('Hola 🍚')
     expect(m.api.sendMessage).not.toHaveBeenCalled()
+  })
+
+  it('keeps supplier procurement and customer sales in the same chat without crossing composer drafts', async () => {
+    const first: WhatsAppConversation = { ...m.rows[0]!, customerServiceWindowExpiresAt: '2099-01-01T00:00:00Z',
+      operationalContact: { kind: 'supplier', name: 'Molino' } }
+    const second: WhatsAppConversation = { ...first, id: 2, operationalContact: { kind: 'supplier', name: 'Bodega' } }
+    m.rows = [first, second]
+    const { vm, wrapper } = mountView()
+    await flushPromises()
+    await vm.selectConversation(first)
+    expect(wrapper.get('[data-test="whatsapp-chat-header"]').text()).toContain('Proveedor')
+    const button = (label: string) => wrapper.findAll('button').find(item => item.text() === label)!
+    await button('Tomar pedido de cliente').trigger('click')
+    expect(wrapper.getComponent(WhatsAppOrderPanel).isVisible()).toBe(true)
+
+    const input = () => wrapper.get<HTMLTextAreaElement>('textarea[placeholder="Escribe un mensaje"]')
+    await input().setValue('Hola, confirmo la entrega.')
+    await button('Hacer pedido').trigger('click')
+    wrapper.getComponent(WhatsAppSupplierOrderDialog).vm.$emit('prepare', 1, 'Debe llegar el martes.')
+    await flushPromises()
+    expect(input().element.value).toBe('Hola, confirmo la entrega.\n\nDebe llegar el martes.')
+    expect(m.api.sendMessage).not.toHaveBeenCalled()
+
+    await vm.selectConversation(second)
+    await button('Hacer pedido').trigger('click')
+    wrapper.getComponent(WhatsAppSupplierOrderDialog).vm.$emit('prepare', 1, 'Texto de otro proveedor')
+    await flushPromises()
+    expect(input().element.value).toBe('')
+    expect(wrapper.findComponent(WhatsAppSupplierOrderDialog).exists()).toBe(true)
+  })
+
+  it('opens a customer from a delivery route through the existing WhatsApp order resolver', async () => {
+    const deliveryman: WhatsAppConversation = { ...m.rows[0]!, operationalContact: { kind: 'deliveryman', name: 'Dom' } }
+    const customer = m.rows[1]!
+    m.rows = [deliveryman, customer]
+    m.api.getOrderConversation.mockResolvedValue(reply({ kind: 'existing', conversationId: customer.id }))
+    m.api.getConversation.mockResolvedValue(reply(customer))
+    const { vm, wrapper } = mountView()
+    await flushPromises()
+    await vm.selectConversation(deliveryman)
+    expect(wrapper.get('[data-test="whatsapp-chat-header"]').text()).toContain('Domiciliario')
+    wrapper.getComponent(WhatsAppDeliveryRoutesPanel).vm.$emit('contact-customer', 501)
+    await flushPromises()
+    expect(m.api.getOrderConversation).toHaveBeenCalledExactlyOnceWith(501, expect.any(AbortSignal))
+    expect(vm.selectedConversation?.id).toBe(customer.id)
   })
 
   it('starts a WhatsApp chat from the inbox using the approved branch template', async () => {

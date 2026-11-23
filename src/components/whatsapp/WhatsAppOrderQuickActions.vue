@@ -1,7 +1,7 @@
 <template>
   <div class="inline-flex max-w-full flex-col items-start gap-2" :data-wa-theme="theme">
-    <OrderStatusBadge v-if="order" :status="order.status" :display-name="getOrderStatusDisplayName(order.status)"
-      :status-time="order.statusTimes?.[order.status]" />
+    <OrderStatusBadge v-if="displayStatus" :status="displayStatus" :display-name="getOrderStatusDisplayName(displayStatus)"
+      :status-time="order?.statusTimes?.[displayStatus]" />
     <span v-else role="status" class="text-xs text-gray-500">{{ loading ? 'Consultando estado…' : 'Estado no disponible' }}</span>
     <div ref="anchor" data-test="order-actions-trigger" class="inline-flex max-w-full" @mouseenter="openPopover" @mouseleave="scheduleClose" @focusout="onFocusOut">
       <BaseButton variant="outline" class="rounded-r-none" @click="manage" @keydown.down.prevent="openAndFocus">
@@ -45,10 +45,13 @@
               </button>
             </div>
           </fieldset>
-          <button v-if="canTrack" type="button" class="quick-action mt-2 border-t border-gray-200 pt-2 text-emerald-700" @click="track">
+          <button v-if="canTrack && (routeId == null || order.deliveryRouteId === routeId)" type="button" class="quick-action mt-2 border-t border-gray-200 pt-2 text-emerald-700" @click="track">
             <MapPinIcon class="size-4" aria-hidden="true" />Ver ubicación
           </button>
         </template>
+        <button v-if="routeId != null" type="button" class="quick-action mt-2 border-t border-gray-200 pt-2 text-emerald-700" @click="contactCustomer">
+          <ChatBubbleLeftRightIcon class="size-4" aria-hidden="true" />Hablar con el cliente
+        </button>
       </section>
     </Teleport>
     <BaseDialog v-model="showEdit" title="Editar monto — pago bancario" size="sm" :dismissible="!busy">
@@ -72,13 +75,13 @@
         <BaseButton variant="danger" :disabled="disabled" :loading="busy" @click="saveRemove">Eliminar</BaseButton>
       </template>
     </BaseDialog>
-    <OrderTrackingDialog v-if="showTracking && order" v-model="showTracking" :order="order" />
+    <OrderTrackingDialog v-if="showTracking && order" v-model="showTracking" :order="order" :expected-route-id="routeId" />
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed, defineAsyncComponent, nextTick, onActivated, onBeforeUnmount, onDeactivated, onMounted, ref, toRef, useId, watch } from 'vue'
-import { BanknotesIcon, ChevronDownIcon, MapPinIcon, XMarkIcon } from '@heroicons/vue/24/outline'
+import { BanknotesIcon, ChatBubbleLeftRightIcon, ChevronDownIcon, MapPinIcon, XMarkIcon } from '@heroicons/vue/24/outline'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseDialog from '@/components/ui/BaseDialog.vue'
 import BaseInput from '@/components/ui/BaseInput.vue'
@@ -88,15 +91,18 @@ import { getOrderStatusDisplayName, useFormatting } from '@/composables/useForma
 import { injectWhatsAppTheme } from '@/composables/useWhatsAppTheme'
 import { useWhatsAppOrderActions } from '@/composables/useWhatsAppOrderActions'
 import { orderCashToCollect } from '@/utils/orderCashToCollect'
-import type { OrderBankPaymentDetail, OrderDetailView } from '@/types/order'
+import type { OrderBankPaymentDetail, OrderDetailView, OrderStatus } from '@/types/order'
 
-const props = withDefaults(defineProps<{ orderId: number; active?: boolean }>(), { active: true })
-const emit = defineEmits<{ manage: [] }>()
+const props = withDefaults(defineProps<{ orderId: number; active?: boolean; initialStatus?: OrderStatus; routeId?: number }>(), { active: true })
+const emit = defineEmits<{ manage: []; 'contact-customer': [] }>()
 const OrderTrackingDialog = defineAsyncComponent(() => import('@/components/orders/OrderTrackingDialog.vue'))
 const activated = ref(true)
 const enabled = computed(() => props.active && activated.value)
+const loadOnDemand = ref(false)
+const loadEnabled = computed(() => enabled.value && (props.initialStatus == null || loadOnDemand.value))
 const { order, loading, busy, error, disabled, remaining, quickBanks, canAdd, canTrack, canEdit, canVerify, canUnverify,
-  refresh, transfer, edit, remove, verify } = useWhatsAppOrderActions(toRef(props, 'orderId'), enabled)
+  refresh, transfer, edit, remove, verify } = useWhatsAppOrderActions(toRef(props, 'orderId'), loadEnabled)
+const displayStatus = computed(() => order.value?.status ?? props.initialStatus)
 const theme = injectWhatsAppTheme() ?? ref('light')
 const { formatCurrency } = useFormatting()
 const popoverId = useId()
@@ -139,6 +145,7 @@ function scheduleClose() {
 function onFocusOut(event: FocusEvent) { if (!inside(event.relatedTarget)) scheduleClose() }
 function openPopover() {
   if (!enabled.value || showEdit.value || showRemove.value || showTracking.value) return
+  loadOnDemand.value = true
   cancelClose(); open.value = true
   place(); void nextTick(place)
 }
@@ -149,6 +156,7 @@ async function openAndFocus() {
   popover.value?.querySelector<HTMLButtonElement>('button')?.focus()
 }
 function manage() { close(); emit('manage') }
+function contactCustomer() { close(); emit('contact-customer') }
 function track() { close(); showTracking.value = true }
 function beginEdit(payment: OrderBankPaymentDetail) {
   if (disabled.value || !order.value || !canEdit(payment)) return
