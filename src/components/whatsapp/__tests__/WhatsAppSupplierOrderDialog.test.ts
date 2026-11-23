@@ -57,10 +57,10 @@ it('emits the draft for its own chat with a free item when the supplier has no h
     expect(controls.indexOf(name.element)).toBeLessThan(controls.indexOf(addButton.element))
     await name.setValue('Aceite')
     await view.get('input[aria-label="Cantidad de Aceite"]').setValue('1.75')
-    await view.get('input[aria-label="Unidad del artículo manual"]').setValue('litros')
+    expect(view.find('input[aria-label="Unidad del artículo manual"]').exists()).toBe(false)
     await view.get('form').trigger('submit')
     await view.findAll('button').find(button => button.text() === 'Pasar al chat')!.trigger('click')
-    expect(view.emitted('prepare')).toEqual([[14, expect.stringContaining('1,75 litros — Aceite')]])
+    expect(view.emitted('prepare')).toEqual([[14, expect.stringContaining('1,75 — Aceite')]])
   } finally {
     view.unmount()
     vi.unstubAllGlobals()

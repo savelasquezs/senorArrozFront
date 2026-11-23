@@ -10,10 +10,8 @@
       <div v-for="line in lines" :key="line.manual ? `manual-${line.id}` : line.id"
         class="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_1.75rem] items-center gap-2 border-b border-gray-200 pb-2 sm:grid-cols-[minmax(0,1.5fr)_7rem_minmax(0,1fr)_1.75rem]">
         <div class="col-span-2 min-w-0 sm:col-span-1">
-          <div v-if="line.manual" class="grid grid-cols-[minmax(0,1fr)_minmax(4.75rem,0.55fr)] gap-2">
-            <BaseInput v-model="line.name" size="sm" placeholder="Artículo" aria-label="Nombre del artículo manual" :maxlength="160" />
-            <BaseInput v-model="line.unit" size="sm" placeholder="Unidad" aria-label="Unidad del artículo manual" :maxlength="50" />
-          </div>
+          <BaseInput v-if="line.manual" v-model="line.name" size="sm" placeholder="Artículo"
+            aria-label="Nombre del artículo manual" :maxlength="160" />
           <p v-else class="text-sm font-medium">{{ line.name }} <span class="text-xs font-normal text-gray-500">· {{ line.unit }}</span></p>
         </div>
         <BaseInput v-model="line.quantity" class="col-start-1 row-start-2 min-w-0 sm:col-start-2 sm:row-start-1"
@@ -168,7 +166,7 @@ function removeLine(line: OrderLine) {
 }
 
 function addLine() {
-  extra.value.push({ id: ++nextId, name: '', quantity: '', unit: '', note: '', custom: true, manual: true })
+  extra.value.push({ id: ++nextId, name: '', quantity: '', note: '', custom: true, manual: true })
 }
 
 function prepare() {
