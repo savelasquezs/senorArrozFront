@@ -213,6 +213,7 @@ export interface WhatsAppConversationStartRequest {
   senderId: string
   phone: string
   template: WhatsAppConversationStartKind
+  templateName?: string
   requestedByCustomer: boolean
   amount?: number
 }
