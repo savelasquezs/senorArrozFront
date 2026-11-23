@@ -20,7 +20,7 @@
             :class="{ 'starter-template-selected': selection === template.key }">
             <input v-model="selection" type="radio" :value="template.key" :disabled="!!template.unavailableReason" />
             <span class="flex-1">
-              <span class="block font-medium">{{ labels[template.key] }}</span>
+              <span class="block font-medium">{{ template.name === menuImageTemplate ? 'Carta como imagen' : labels[template.key] }}</span>
               <span v-if="template.unavailableReason" class="starter-secondary block">{{ template.unavailableReason }}</span>
             </span>
           </label>
@@ -31,7 +31,9 @@
         <div v-if="preview" class="starter-preview">
           <p>{{ preview }}</p>
           <span v-if="selection === 'menu'" class="mt-2 inline-flex items-center gap-1.5 text-xs font-semibold">
-            <DocumentIcon class="size-4" aria-hidden="true" /> Carta de {{ options.branchName }} · PDF
+            <PhotoIcon v-if="menuIsImage" class="size-4" aria-hidden="true" />
+            <DocumentIcon v-else class="size-4" aria-hidden="true" />
+            Carta de {{ options.branchName }} · {{ menuIsImage ? 'Imagen' : 'PDF' }}
           </span>
         </div>
         <label v-if="selectedTemplate" class="flex items-start gap-2 text-sm">
@@ -52,7 +54,7 @@
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
-import { DocumentIcon, UserPlusIcon } from '@heroicons/vue/24/outline'
+import { DocumentIcon, PhotoIcon, UserPlusIcon } from '@heroicons/vue/24/outline'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseDialog from '@/components/ui/BaseDialog.vue'
 import BaseSelect from '@/components/ui/BaseSelect.vue'
@@ -64,6 +66,7 @@ const props = defineProps<{
   modelValue: boolean; branches: { id: number; label: string }[]; initialBranchId: number; initialPhone?: string;
 }>()
 const emit = defineEmits<{ 'update:modelValue': [visible: boolean]; complete: [id: number, sent: boolean] }>()
+const menuImageTemplate = 'carta_imagen_solicitada'
 const labels: Record<WhatsAppConversationStartKind, string> = {
   menu: 'Carta en PDF', catalog: 'Catálogo de WhatsApp', payment: 'Pago por Bancolombia',
 }
@@ -81,6 +84,7 @@ let controller: AbortController | undefined
 let request: { body: string; key: string } | undefined
 let disposed = false
 const selectedTemplate = computed(() => options.value?.templates.find(template => template.key === selection.value && !template.unavailableReason))
+const menuIsImage = computed(() => selectedTemplate.value?.name === menuImageTemplate)
 const validAmount = computed(() => typeof amount.value === 'number' && Number.isInteger(amount.value)
   && amount.value > 0 && amount.value <= maxAmount)
 const canSend = computed(() => !!selectedTemplate.value && !!phone.value && requested.value && !loading.value && !sending.value
@@ -119,10 +123,10 @@ async function loadOptions() {
 }
 
 async function send() {
-  if (!canSend.value || !options.value || !selection.value) return
+  if (!canSend.value || !options.value || !selectedTemplate.value || !selection.value) return
   const payload: WhatsAppConversationStartRequest = {
     branchId: options.value.branchId, senderId: options.value.senderId, phone: phone.value,
-    template: selection.value, requestedByCustomer: requested.value,
+    template: selection.value, templateName: selectedTemplate.value.name, requestedByCustomer: requested.value,
     ...(selection.value === 'payment' ? { amount: Number(amount.value) } : {}),
   }
   const body = JSON.stringify(payload)

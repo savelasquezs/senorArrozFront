@@ -256,7 +256,7 @@ describe('M38-F04 view + real Pinia store integration', () => {
     m.api.getConversationStartOptions.mockResolvedValue(reply({
       branchId: 1, branchName: 'Santander', senderId: 'line', displayPhoneNumber: '+57 300 000 0000',
       templates: [
-        { key: 'menu', name: 'carta_solicitada', status: 'APPROVED', body: 'Carta de {{1}}.', unavailableReason: null },
+        { key: 'menu', name: 'carta_imagen_solicitada', status: 'APPROVED', body: 'Te compartimos la carta.', unavailableReason: null },
         { key: 'payment', name: 'pago_pedido_bancolombia', status: 'PENDING', unavailableReason: 'En revisión en Meta.' },
       ],
     }))
@@ -270,14 +270,16 @@ describe('M38-F04 view + real Pinia store integration', () => {
     expect(wrapper.get<HTMLInputElement>('input[value="payment"]').element.disabled).toBe(true)
     await wrapper.get('input[type="tel"]').setValue('300 123 4567')
     await wrapper.get('input[value="menu"]').setValue(true)
-    expect(wrapper.text()).toContain('Carta de Santander.')
+    expect(wrapper.text()).toContain('Carta como imagen')
+    expect(wrapper.text()).toContain('Te compartimos la carta.')
+    expect(wrapper.text()).toMatch(/Carta de Santander\s*· Imagen/)
     const send = wrapper.get<HTMLButtonElement>('button[type="submit"]')
     expect(send.element.disabled).toBe(true)
     await wrapper.get('form').get('input[type="checkbox"]').setValue(true)
     await wrapper.get('form').trigger('submit')
     await flushPromises()
     expect(m.api.startConversation).toHaveBeenCalledWith({
-      branchId: 1, senderId: 'line', phone: '300 123 4567', template: 'menu', requestedByCustomer: true,
+      branchId: 1, senderId: 'line', phone: '300 123 4567', template: 'menu', templateName: 'carta_imagen_solicitada', requestedByCustomer: true,
     }, expect.any(String))
     expect(vm.selectedConversation?.id).toBe(25)
   })
@@ -311,7 +313,7 @@ describe('M38-F04 view + real Pinia store integration', () => {
     await flushPromises()
 
     expect(m.api.startConversation).toHaveBeenCalledExactlyOnceWith({
-      branchId: 1, senderId: 'line', phone: '300 123 4567', template: 'payment', requestedByCustomer: true, amount: 42000,
+      branchId: 1, senderId: 'line', phone: '300 123 4567', template: 'payment', templateName: 'pago_pedido_bancolombia', requestedByCustomer: true, amount: 42000,
     }, expect.any(String))
   })
 
