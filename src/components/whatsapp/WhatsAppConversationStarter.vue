@@ -28,6 +28,10 @@
         <label v-if="selection === 'payment'" class="starter-field">Total a pagar (COP)
           <input v-model.number="amount" type="number" inputmode="numeric" min="1" :max="maxAmount" step="1" required :disabled="sending" />
         </label>
+        <label v-if="selection === 'delivery_update'" class="starter-field">Novedad del domiciliario
+          <input v-model="deliveryUpdate" type="text" maxlength="1024" required
+            placeholder="Ej. ya llegó y está intentando contactarte" :disabled="sending" />
+        </label>
         <div v-if="preview" class="starter-preview">
           <p>{{ preview }}</p>
           <span v-if="selection === 'menu'" class="mt-2 inline-flex items-center gap-1.5 text-xs font-semibold">
@@ -38,7 +42,9 @@
         </div>
         <label v-if="selectedTemplate" class="flex items-start gap-2 text-sm">
           <input v-model="requested" type="checkbox" class="mt-1" required :disabled="sending" />
-          El cliente solicitó recibir este mensaje por WhatsApp.
+          {{ selection === 'delivery_update'
+            ? 'El cliente autorizó recibir avisos de su pedido por WhatsApp.'
+            : 'El cliente solicitó recibir este mensaje por WhatsApp.' }}
         </label>
       </div>
 
@@ -69,6 +75,7 @@ const emit = defineEmits<{ 'update:modelValue': [visible: boolean]; complete: [i
 const menuImageTemplate = 'carta_imagen_solicitada'
 const labels: Record<WhatsAppConversationStartKind, string> = {
   menu: 'Carta en PDF', catalog: 'Catálogo de WhatsApp', payment: 'Pago por Bancolombia',
+  delivery_update: 'Novedad del domiciliario',
 }
 const branchId = ref(props.initialBranchId)
 const phone = ref(props.initialPhone ?? '')
@@ -76,6 +83,8 @@ const selection = ref<WhatsAppConversationStartKind | ''>('')
 const requested = ref(false)
 const maxAmount = 2_147_483_647
 const amount = ref<number | ''>('')
+const deliveryUpdate = ref('')
+const normalizedDeliveryUpdate = computed(() => deliveryUpdate.value.trim().replace(/\s+/g, ' '))
 const options = ref<WhatsAppConversationStartOptions | null>(null)
 const loading = ref(false)
 const sending = ref(false)
@@ -87,17 +96,23 @@ const selectedTemplate = computed(() => options.value?.templates.find(template =
 const menuIsImage = computed(() => selectedTemplate.value?.name === menuImageTemplate)
 const validAmount = computed(() => typeof amount.value === 'number' && Number.isInteger(amount.value)
   && amount.value > 0 && amount.value <= maxAmount)
-const canSend = computed(() => !!selectedTemplate.value && !!phone.value && requested.value && !loading.value && !sending.value
-  && (selection.value !== 'payment' || validAmount.value))
-
 const preview = computed(() => {
   if (!options.value || !selectedTemplate.value?.body) return ''
-  const values = selection.value === 'payment'
-    ? [options.value.account?.trim(), options.value.holder?.trim(),
+  let values: (string | undefined)[]
+  if (selection.value === 'payment') {
+    values = [options.value.account?.trim(), options.value.holder?.trim(),
       validAmount.value ? `$${amount.value.toLocaleString('es-CO')} COP` : '«total»']
-    : [options.value.branchName]
+  } else if (selection.value === 'delivery_update') {
+    values = [normalizedDeliveryUpdate.value || '«novedad»']
+  } else {
+    values = [options.value.branchName]
+  }
   return selectedTemplate.value.body.replace(/\{\{\s*(\d+)\s*\}\}/g, (_, index) => values[Number(index) - 1] ?? '')
 })
+
+const canSend = computed(() => !!selectedTemplate.value && !!phone.value && requested.value && !loading.value && !sending.value
+  && (selection.value !== 'payment' || validAmount.value)
+  && (selection.value !== 'delivery_update' || (!!normalizedDeliveryUpdate.value && preview.value.length <= 1024)))
 
 async function loadOptions() {
   controller?.abort()
@@ -128,6 +143,7 @@ async function send() {
     branchId: options.value.branchId, senderId: options.value.senderId, phone: phone.value,
     template: selection.value, templateName: selectedTemplate.value.name, requestedByCustomer: requested.value,
     ...(selection.value === 'payment' ? { amount: Number(amount.value) } : {}),
+    ...(selection.value === 'delivery_update' ? { deliveryUpdate: normalizedDeliveryUpdate.value } : {}),
   }
   const body = JSON.stringify(payload)
   if (request?.body !== body) request = { body, key: generatePosCreationKey() }
