@@ -44,20 +44,17 @@
       </label>
     </form>
     <div v-else class="space-y-2">
+      <label v-if="usingTemplate" class="block text-sm font-medium">
+        Entrega para
+        <BaseInput v-model="delivery" :maxlength="160" :disabled="sendingTemplate" aria-label="Entrega para" />
+      </label>
       <label class="block text-sm font-medium">
         Vista previa
-        <textarea ref="previewInput" :value="preview" readonly rows="9" class="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 font-normal" />
+        <textarea ref="previewInput" :value="activePreview" readonly rows="9" class="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 font-normal" />
       </label>
-      <p v-if="loadingTemplate" class="text-sm text-gray-600" role="status">Consultando la plantilla de pedido…</p>
-      <template v-if="templateBody && templateBranchName">
-        <label class="block text-sm font-medium">
-          Entrega para
-          <BaseInput v-model="delivery" :maxlength="160" :disabled="sendingTemplate" aria-label="Entrega para" />
-        </label>
-        <p class="whitespace-pre-wrap rounded-md border border-gray-200 p-3 text-sm">{{ templatePreview }}</p>
-        <p v-if="templatePreview.length > 1024" class="text-sm text-red-700">Acorta el pedido para enviarlo como plantilla.</p>
-      </template>
-      <p v-else-if="!loadingTemplate && !windowOpen" class="text-sm text-gray-600">
+      <p v-if="loadingTemplate && requiresTemplate" class="text-sm text-gray-600" role="status">Consultando la plantilla de pedido…</p>
+      <p v-else-if="usingTemplate && templatePreview.length > 1024" class="text-sm text-red-700">Acorta el pedido para enviarlo como plantilla.</p>
+      <p v-else-if="!usingTemplate && !windowOpen" class="text-sm text-gray-600">
         {{ templateBranchName ? 'La plantilla de pedido no está disponible en esta línea. Puedes copiar el pedido.' : 'Toma la conversación y verifica su sucursal para enviar la plantilla.' }}
       </p>
       <p v-else-if="windowOpen && !canInsert" class="text-sm text-gray-600">Toma la conversación para colocar el pedido en el chat.</p>
@@ -67,9 +64,9 @@
     <template #footer>
       <template v-if="preview">
         <BaseButton variant="secondary" :disabled="sendingTemplate" @click="edit">Editar artículos</BaseButton>
-        <BaseButton variant="outline" :disabled="sendingTemplate" @click="copy">Copiar mensaje</BaseButton>
+        <BaseButton variant="outline" :disabled="!canCopy" @click="copy">Copiar mensaje</BaseButton>
         <BaseButton v-if="canInsert" :disabled="sendingTemplate" @click="emit('prepare', conversationId, preview)">Pasar al chat</BaseButton>
-        <BaseButton v-if="templateBody && templateBranchName" :disabled="!canSendTemplate"
+        <BaseButton v-if="usingTemplate" :disabled="!canSendTemplate"
           :loading="sendingTemplate" @click="sendTemplate">Enviar plantilla</BaseButton>
       </template>
       <BaseButton v-else type="submit" form="whatsapp-supplier-order">Preparar mensaje</BaseButton>
@@ -78,7 +75,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { XMarkIcon } from '@heroicons/vue/24/outline'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseDialog from '@/components/ui/BaseDialog.vue'
@@ -132,7 +129,11 @@ const templateParameters = computed(() => [
 ])
 const templatePreview = computed(() => templateBody.value.replace(/\{\{\s*(\d+)\s*\}\}/g,
   (_, index) => templateParameters.value[Number(index) - 1] || '«entrega»'))
-const canSendTemplate = computed(() => !!templateBody.value && !sendingTemplate.value
+const requiresTemplate = computed(() => !props.windowOpen && !!props.templateBranchName)
+const usingTemplate = computed(() => requiresTemplate.value && !!templateBody.value)
+const activePreview = computed(() => usingTemplate.value ? templatePreview.value : preview.value)
+const canCopy = computed(() => !sendingTemplate.value && (!usingTemplate.value || !!delivery.value.trim()))
+const canSendTemplate = computed(() => usingTemplate.value && !sendingTemplate.value
   && templateParameters.value.every(Boolean) && templatePreview.value.length <= 1024)
 let sendRequest: { parameters: string; key: string } | undefined
 let disposed = false
@@ -210,7 +211,6 @@ function prepare() {
   try {
     preview.value = supplierOrderMessage(lines.value, note.value)
     templateProducts.value = supplierOrderTemplateProducts(lines.value, note.value)
-    if (props.templateBranchName && !templateBody.value && !loadingTemplate.value) void loadTemplate()
   } catch (cause) {
     formError.value = cause instanceof Error ? cause.message : 'No se pudo preparar el pedido.'
   }
@@ -224,7 +224,8 @@ async function loadTemplate() {
       && item.language === supplierOrderTemplateLanguage)
     if (!disposed && template) templateBody.value = whatsappTemplateBody(template.componentsJson)
   } catch (cause) {
-    if (!disposed) formError.value = cause instanceof Error ? cause.message : 'No se pudo consultar la plantilla.'
+    if (!disposed && requiresTemplate.value && preview.value)
+      formError.value = cause instanceof Error ? cause.message : 'No se pudo consultar la plantilla.'
   } finally {
     loadingTemplate.value = false
   }
@@ -258,9 +259,10 @@ function edit() {
 }
 
 async function copy() {
+  if (!canCopy.value) return
   formError.value = ''
   try {
-    await navigator.clipboard.writeText(preview.value)
+    await navigator.clipboard.writeText(activePreview.value)
     copied.value = true
   } catch {
     previewInput.value?.focus()
@@ -269,6 +271,9 @@ async function copy() {
   }
 }
 
+watch([preview, requiresTemplate], ([text, needsTemplate]) => {
+  if (text && needsTemplate && !templateBody.value && !loadingTemplate.value) void loadTemplate()
+})
 onMounted(load)
 onBeforeUnmount(() => {
   disposed = true

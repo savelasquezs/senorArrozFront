@@ -49,7 +49,7 @@ it('loads favorite articles and prepares a copyable draft when the window is clo
 
 it('emits the draft for its own chat with a free item when the supplier has no history', async () => {
   api.getConversationSupplierItems.mockResolvedValue({ data: [] })
-  const view = mount(WhatsAppSupplierOrderDialog, { props: { ...props, canInsert: true, windowOpen: true }, global: { stubs } })
+  const view = mount(WhatsAppSupplierOrderDialog, { props: { ...props, canInsert: true, windowOpen: true, templateBranchName: 'Santander' }, global: { stubs } })
   try {
     await flushPromises()
     await view.findAll('button').find(button => button.text() === 'Agregar artículo manual')!.trigger('click')
@@ -63,6 +63,8 @@ it('emits the draft for its own chat with a free item when the supplier has no h
     await view.get('form').trigger('submit')
     await view.findAll('button').find(button => button.text() === 'Pasar al chat')!.trigger('click')
     expect(view.emitted('prepare')).toEqual([[14, expect.stringContaining('1,75 — Aceite')]])
+    expect(api.getConversationTemplates).not.toHaveBeenCalled()
+    expect(view.text()).not.toContain('Enviar plantilla')
   } finally {
     view.unmount()
     vi.unstubAllGlobals()
@@ -113,7 +115,9 @@ it('fills the template with selected items and the chat branch, and sends after 
     const send = view.findAll('button').find(button => button.text() === 'Enviar plantilla')!
     expect(send.attributes('disabled')).toBeDefined()
     await view.get('input[aria-label="Entrega para"]').setValue('mañana después de las 10 a. m.')
-    expect(view.text()).toContain('3 kg — Arroz. Sucursal Santander.')
+    expect(view.get('textarea').element.value).toContain('3 kg — Arroz. Sucursal Santander.')
+    expect(view.findAll('textarea')).toHaveLength(1)
+    expect(view.text()).not.toContain('Pasar al chat')
     await send.trigger('click')
     await flushPromises()
     expect(api.sendConversationTemplate).toHaveBeenCalledExactlyOnceWith(14, 'pedido_a_proveedor', 'es_CO',
