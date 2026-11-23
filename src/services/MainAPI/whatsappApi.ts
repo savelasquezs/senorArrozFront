@@ -285,8 +285,9 @@ class WhatsAppApi extends BaseApi {
   getConversationTemplates(conversationId: number) {
     return this.get<ApiResponse<import('@/types/whatsapp').WhatsAppConversationTemplate[]>>(`/whatsapp/conversations/${conversationId}/templates`)
   }
-  sendConversationTemplate(conversationId: number, templateName: string, language: string, parameters: string[]) {
-    return this.manualPost<WhatsAppMessage>(`/whatsapp/conversations/${conversationId}/messages/template`, { templateName, language, parameters })
+  sendConversationTemplate(conversationId: number, templateName: string, language: string, parameters: string[], requestId?: string) {
+    return this.manualPost<WhatsAppMessage>(`/whatsapp/conversations/${conversationId}/messages/template`,
+      { templateName, language, parameters }, requestId)
   }
 
   resetConversationForTesting(conversationId: number): Promise<ApiResponse<WhatsAppConversation>> {

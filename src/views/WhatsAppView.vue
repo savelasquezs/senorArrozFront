@@ -513,7 +513,8 @@
               <div v-if="ownsConversation" class="wa-compose-meta mb-1.5 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 text-xs">
                 <p v-if="serviceWindowOpen">Ventana de atención hasta {{ new Date(selectedConversation.customerServiceWindowExpiresAt!).toLocaleString('es-CO') }}</p>
                 <p v-else class="rounded bg-amber-50 px-2 py-1 text-amber-900">La ventana de atención de 24 horas está cerrada. Usa una plantilla aprobada para iniciar el contacto.</p>
-                <WhatsAppConversationTemplates :key="selectedConversation.id" :conversation-id="selectedConversation.id" />
+                <WhatsAppConversationTemplates :key="selectedConversation.id" :conversation-id="selectedConversation.id"
+                  :branch-name="templateBranchName" />
               </div>
               <button type="button" class="wa-quick-toggle" :aria-expanded="compactQuickReplies" aria-controls="wa-quick-list"
                 @click="compactQuickReplies = !compactQuickReplies">
@@ -919,7 +920,8 @@
         :key="`${sessionKey}:${selectedConversation.id}`" :conversation-id="selectedConversation.id" :supplier-name="operationalContact.name"
         :can-insert="canSend && !sending && !sendingProductChoices && !preparingQuickReply && !selectingForward"
         :window-open="serviceWindowOpen" :composer-error="supplierComposerError"
-        @close="showSupplierOrder = false" @prepare="draftSupplierOrder" />
+        :template-branch-name="ownsConversation && !finishingAttention ? templateBranchName : undefined"
+        @close="showSupplierOrder = false" @prepare="draftSupplierOrder" @sent="whatsappStore.upsertMessage" />
       <WhatsAppForwardDialog v-if="showForwardDialog && selectedConversation" v-model="showForwardDialog"
         :source-id="selectedConversation.id" :count="forwardSelection.size" :sending="forwarding"
         :error="forwardError" @forward="forwardSelectedMessages" />
@@ -1416,6 +1418,10 @@ const signalRDotClass = computed(() => connectionState.value === 'connected'
     : 'bg-red-500')
 
 const ownsConversation = computed(() => selectedConversation.value?.attentionMode === 'human' && selectedConversation.value.assignedUserId === authStore.user?.id)
+const templateBranchName = computed(() => {
+  const conversation = selectedConversation.value
+  return (conversation?.isCentralChannel ? conversation.operationalBranchName : conversation?.branchName) || undefined
+})
 const serviceWindowOpen = computed(() => !!selectedConversation.value?.customerServiceWindowExpiresAt && Date.parse(selectedConversation.value.customerServiceWindowExpiresAt) > clockNow.value)
 const canSend = computed(() => ownsConversation.value && serviceWindowOpen.value && !finishingAttention.value)
 const canAttach = computed(() => canSend.value && !sending.value)

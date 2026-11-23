@@ -254,6 +254,39 @@ describe('M38-F04 view + real Pinia store integration', () => {
     expect(vm.selectedConversation?.id).toBe(25)
   })
 
+  it('starts a payment conversation using branch bank details and a manual amount only', async () => {
+    m.api.getConversationStartOptions.mockResolvedValue(reply({
+      branchId: 1, branchName: 'Santander', senderId: 'line', account: '00012345678', holder: 'Señor Arroz',
+      templates: [{
+        key: 'payment', name: 'pago_pedido_bancolombia', status: 'APPROVED',
+        body: 'Cuenta Bancolombia número {{1}} a nombre de {{2}}. El total a pagar es de {{3}}. Muchas gracias.',
+        unavailableReason: null,
+      }],
+    }))
+    m.api.startConversation.mockResolvedValue(reply({ conversationId: 25, sent: true }))
+    m.api.getConversation.mockResolvedValue(reply(conversation(25)))
+    const { wrapper } = mountView()
+    await flushPromises()
+    await wrapper.get('[aria-label="Nueva conversación"]').trigger('click')
+    await flushPromises()
+    await wrapper.get('input[type="tel"]').setValue('300 123 4567')
+    await wrapper.get('input[value="payment"]').setValue(true)
+    const form = wrapper.get('form')
+    const send = form.get<HTMLButtonElement>('button[type="submit"]')
+    await form.get('input[type="checkbox"]').setValue(true)
+    expect(send.element.disabled).toBe(true)
+    expect(form.findAll('input[type="number"]')).toHaveLength(1)
+    await form.get('input[type="number"]').setValue(42000)
+    expect(form.text()).toContain('Cuenta Bancolombia número 00012345678 a nombre de Señor Arroz.')
+    expect(form.text()).toContain('El total a pagar es de $42.000 COP.')
+    await form.trigger('submit')
+    await flushPromises()
+
+    expect(m.api.startConversation).toHaveBeenCalledExactlyOnceWith({
+      branchId: 1, senderId: 'line', phone: '300 123 4567', template: 'payment', requestedByCustomer: true, amount: 42000,
+    }, expect.any(String))
+  })
+
   it('opens the exact chat and focuses its editable composer while messages load', async () => {
     m.route.query = { orderId: '25' }
     m.api.getOrderConversation.mockResolvedValue(reply({ kind: 'existing', conversationId: 90 }))

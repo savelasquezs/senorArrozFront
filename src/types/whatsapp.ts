@@ -214,7 +214,6 @@ export interface WhatsAppConversationStartRequest {
   phone: string
   template: WhatsAppConversationStartKind
   requestedByCustomer: boolean
-  orderId?: number
   amount?: number
 }
 

@@ -4,7 +4,7 @@ import WhatsAppSupplierOrderDialog from '../WhatsAppSupplierOrderDialog.vue'
 import BaseSelect from '@/components/ui/BaseSelect.vue'
 import { supplierOrderMessage } from '@/helpers/whatsappSupplierOrder'
 
-const api = vi.hoisted(() => ({ getConversationSupplierItems: vi.fn() }))
+const api = vi.hoisted(() => ({ getConversationSupplierItems: vi.fn(), getConversationTemplates: vi.fn(), sendConversationTemplate: vi.fn() }))
 const expenses = vi.hoisted(() => ({ getAllExpenses: vi.fn() }))
 vi.mock('@/services/MainAPI/whatsappApi', () => ({ whatsappApi: api }))
 vi.mock('@/services/MainAPI/expenseApi', () => ({ expenseApi: expenses }))
@@ -17,6 +17,8 @@ const copy = vi.fn()
 
 beforeEach(() => {
   api.getConversationSupplierItems.mockReset()
+  api.getConversationTemplates.mockReset()
+  api.sendConversationTemplate.mockReset()
   expenses.getAllExpenses.mockReset()
   copy.mockReset().mockResolvedValue(undefined)
   vi.stubGlobal('navigator', { ...globalThis.navigator, clipboard: { writeText: copy } })
@@ -87,6 +89,36 @@ it('loads the full expense catalog on demand and keeps the selected unit in the 
     await view.get('input[aria-label="Cantidad de Sal"]').setValue('2')
     await view.get('form').trigger('submit')
     expect(view.get('textarea').element.value).toContain('2 lb — Sal')
+  } finally {
+    view.unmount()
+    vi.unstubAllGlobals()
+  }
+})
+
+it('fills the template with selected items and the chat branch, and sends after entering delivery', async () => {
+  api.getConversationSupplierItems.mockResolvedValue({ data: [{ expenseId: 4, expenseName: 'Arroz', expenseUnit: 'Kilo' }] })
+  api.getConversationTemplates.mockResolvedValue({ data: [{
+    name: 'pedido_a_proveedor', language: 'es_CO',
+    componentsJson: JSON.stringify([{ type: 'BODY', text: 'Hola, para encargar. {{1}}. Sucursal {{2}}. Entrega para {{3}}. Gracias.' }]),
+  }] })
+  api.sendConversationTemplate.mockResolvedValue({ data: { id: 25 } })
+  const view = mount(WhatsAppSupplierOrderDialog, {
+    props: { ...props, templateBranchName: 'Santander' }, global: { stubs },
+  })
+  try {
+    await flushPromises()
+    await view.get('input[aria-label="Cantidad de Arroz"]').setValue('3')
+    await view.get('form').trigger('submit')
+    await flushPromises()
+    const send = view.findAll('button').find(button => button.text() === 'Enviar plantilla')!
+    expect(send.attributes('disabled')).toBeDefined()
+    await view.get('input[aria-label="Entrega para"]').setValue('mañana después de las 10 a. m.')
+    expect(view.text()).toContain('3 kg — Arroz. Sucursal Santander.')
+    await send.trigger('click')
+    await flushPromises()
+    expect(api.sendConversationTemplate).toHaveBeenCalledExactlyOnceWith(14, 'pedido_a_proveedor', 'es_CO',
+      ['3 kg — Arroz', 'Santander', 'mañana después de las 10 a. m.'], expect.any(String))
+    expect(view.emitted('sent')).toEqual([[14, { id: 25 }]])
   } finally {
     view.unmount()
     vi.unstubAllGlobals()

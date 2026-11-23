@@ -115,3 +115,12 @@ export function commercialLabel(conversation: WhatsAppConversation): string {
   const labels: Record<string, string> = { not_started: 'Sin iniciar', in_progress: 'En proceso', waiting_customer: 'Esperando cliente', order_taken: 'Pedido tomado', no_sale: 'Sin venta / Cancelado' }
   return `${labels[conversation.commercialStatus || 'not_started'] || 'Sin iniciar'}${conversation.commercialOrderId ? ` · #${conversation.commercialOrderId}` : ''}`
 }
+
+export function whatsappTemplateBody(componentsJson: string) {
+  try {
+    const components = JSON.parse(componentsJson) as { type: string; text?: string }[]
+    return components.find(component => component.type.toUpperCase() === 'BODY')?.text ?? ''
+  } catch {
+    return ''
+  }
+}
