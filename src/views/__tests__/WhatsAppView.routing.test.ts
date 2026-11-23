@@ -818,7 +818,7 @@ describe('M38-F04 view + real Pinia store integration', () => {
     expect(composer.element.value).toBe('Te confirmo enseguida.')
   })
 
-  it('lets a cashier use a saved reply from their branch while quoting a message on a central chat', async () => {
+  it.each(['library', 'suggestion', 'Enter', 'Tab'])('lets a cashier quote a message using %s', async (method) => {
     useAuthStore().user!.role = 'Cashier'
     useAuthStore().user!.branchId = 2
     const chat: WhatsAppConversation = { ...m.rows[0]!, operationalBranchId: 2, customerServiceWindowExpiresAt: '2099-01-01T00:00:00Z' }
@@ -835,9 +835,18 @@ describe('M38-F04 view + real Pinia store integration', () => {
     await flushPromises()
     await vm.selectConversation(chat)
     await wrapper.get('button[aria-label="Responder a este mensaje"]').trigger('click')
-    await wrapper.get('button[aria-label="Ver todas las respuestas rápidas"]').trigger('click')
-    await flushPromises()
-    await wrapper.findAll('button').find(button => button.text() === 'Usar')!.trigger('click')
+    if (method === 'library') {
+      await wrapper.get('button[aria-label="Ver todas las respuestas rápidas"]').trigger('click')
+      await flushPromises()
+      await wrapper.findAll('button').find(button => button.text() === 'Usar')!.trigger('click')
+    } else {
+      const composer = wrapper.get('textarea[placeholder="Escribe un mensaje"]')
+      await composer.setValue(method === 'Enter' ? '/recibido' : method === 'Tab' ? '/reci' : '/')
+      const suggestion = wrapper.get('.wa-quick-suggestion')
+      expect(suggestion.text()).toContain('/recibido')
+      if (method === 'suggestion') await suggestion.trigger('click')
+      else await composer.trigger('keydown', { key: method })
+    }
     await flushPromises()
     expect(m.api.sendQuickReply).toHaveBeenCalledExactlyOnceWith(1, 12, 44)
     expect(wrapper.find('button[aria-label="Quitar cita"]').exists()).toBe(false)
