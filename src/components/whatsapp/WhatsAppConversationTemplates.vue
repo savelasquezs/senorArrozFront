@@ -6,12 +6,13 @@
     <p v-else-if="!templates.length && !error" class="text-sm">No hay plantillas disponibles para este chat.</p>
     <form v-else-if="templates.length" class="space-y-3" @submit.prevent="send">
       <BaseSelect v-model="selection" label="Plantilla" placeholder="Seleccionar…" :options="templateOptions"
-        :disabled="sending" :searchable="templates.length > 7" inline-dropdown @update:model-value="parameters = []" />
+        :disabled="sending" :searchable="templates.length > 7" inline-dropdown @update:model-value="resetParameters" />
       <p v-if="selected" class="whitespace-pre-wrap rounded-md border border-gray-200 bg-gray-50 p-3 text-sm">{{ body }}</p>
-      <label v-for="index in parameterCount" :key="index" class="block text-sm">Valor {{ index }}
+      <label v-for="index in parameterCount" :key="index" class="block text-sm">
+        {{ isSupplierOrder ? supplierLabels[index - 1] || `Valor ${index}` : `Valor ${index}` }}
         <input v-model="parameters[index - 1]" required maxlength="1024"
           class="mt-1 w-full rounded-md border border-gray-300 bg-gray-50 p-2 focus-visible:outline-2 focus-visible:outline-emerald-600"
-          :disabled="sending" />
+          :readonly="isSupplierOrder && index === 2 && !!branchName" :disabled="sending" />
       </label>
       <BaseButton type="submit" :loading="sending" :disabled="!selected || parameters.filter(p => p?.trim()).length !== parameterCount">Enviar plantilla</BaseButton>
     </form>
@@ -26,8 +27,11 @@ import BaseSelect from '@/components/ui/BaseSelect.vue'
 import { whatsappApi } from '@/services/MainAPI/whatsappApi'
 import { useWhatsAppStore } from '@/store/whatsapp'
 import type { WhatsAppConversationTemplate } from '@/types/whatsapp'
+import { supplierOrderTemplateLanguage, supplierOrderTemplateName } from '@/helpers/whatsappSupplierOrder'
+import { whatsappTemplateBody } from '@/utils/whatsappInbox'
 
-const props = defineProps<{ conversationId: number }>()
+const props = defineProps<{ conversationId: number; branchName?: string }>()
+const supplierLabels = ['Productos', 'Sucursal', 'Entrega para']
 const store = useWhatsAppStore()
 const open = ref(false), loading = ref(false), sending = ref(false), error = ref('')
 const selection = ref<string | null>(null)
@@ -39,13 +43,13 @@ const templateOptions = computed(() => templates.value.map(template => ({
   id: key(template), name: `${template.name} · ${template.language}`,
 })))
 const selected = computed(() => templates.value.find(t => key(t) === selection.value))
-const body = computed(() => {
-  try {
-    const components = JSON.parse(selected.value?.componentsJson ?? '[]') as { type: string; text?: string }[]
-    return components.find(c => c.type.toUpperCase() === 'BODY')?.text ?? selected.value?.name ?? ''
-  } catch { return selected.value?.name ?? '' }
-})
+const isSupplierOrder = computed(() => selected.value?.name === supplierOrderTemplateName
+  && selected.value.language === supplierOrderTemplateLanguage)
+const body = computed(() => whatsappTemplateBody(selected.value?.componentsJson ?? '[]') || selected.value?.name || '')
 const parameterCount = computed(() => Math.max(0, ...[...body.value.matchAll(/\{\{\s*(\d+)\s*\}\}/g)].map(match => Number(match[1]))))
+function resetParameters() {
+  parameters.value = isSupplierOrder.value && props.branchName ? ['', props.branchName, ''] : []
+}
 async function load() {
   if (loading.value || sending.value) return
   open.value = true; loading.value = true; error.value = ''
@@ -58,7 +62,9 @@ async function send() {
   const id = props.conversationId, template = selected.value
   sending.value = true; error.value = ''
   try {
-    const response = await whatsappApi.sendConversationTemplate(id, template.name, template.language, [...parameters.value])
+    const values = parameters.value.map(value => value.trim())
+    if (isSupplierOrder.value && props.branchName) values[1] = props.branchName
+    const response = await whatsappApi.sendConversationTemplate(id, template.name, template.language, values)
     if (response.data && !disposed) store.upsertMessage(id, response.data)
     open.value = false
   } catch (failure: any) { error.value = failure.message || 'No se pudo confirmar el envío. Revisa el chat antes de repetirlo.' }

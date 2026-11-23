@@ -6,7 +6,10 @@ export interface SupplierOrderLine {
   custom?: boolean
 }
 
-export function supplierOrderMessage(lines: readonly SupplierOrderLine[], note: string) {
+export const supplierOrderTemplateName = 'pedido_a_proveedor'
+export const supplierOrderTemplateLanguage = 'es_CO'
+
+function supplierOrderItems(lines: readonly SupplierOrderLine[]) {
   const requested: string[] = []
   for (const line of lines) {
     const name = line.name.trim()
@@ -20,9 +23,18 @@ export function supplierOrderMessage(lines: readonly SupplierOrderLine[], note: 
       throw new Error('Cada artículo solicitado debe tener nombre y una cantidad positiva.')
     }
     const displayQuantity = cleanQuantity.replace('.', ',').replace(/^,/, '0,')
-    requested.push(`• ${displayQuantity}${unit ? ` ${unit}` : ''} — ${name}${lineNote ? ` (${lineNote})` : ''}`)
+    requested.push(`${displayQuantity}${unit ? ` ${unit}` : ''} — ${name}${lineNote ? ` (${lineNote})` : ''}`)
   }
   if (!requested.length) throw new Error('Indica la cantidad de al menos un artículo.')
+  return requested
+}
+
+export function supplierOrderTemplateProducts(lines: readonly SupplierOrderLine[], note: string) {
+  return [...supplierOrderItems(lines), note].map(value => value.replace(/\s+/g, ' ').trim()).filter(Boolean).join(' · ')
+}
+
+export function supplierOrderMessage(lines: readonly SupplierOrderLine[], note: string) {
+  const requested = supplierOrderItems(lines).map(item => `• ${item}`)
   const message = ['Hola, queremos hacer un pedido.', requested.join('\n'), note.trim(), 'Gracias.']
     .filter(Boolean).join('\n\n')
   if (message.length > 4096) throw new Error('Acorta el pedido para que quepa en un mensaje de WhatsApp.')

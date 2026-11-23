@@ -1,5 +1,5 @@
 <template>
-  <BaseDialog :model-value="true" :title="`Hacer pedido a ${supplierName}`" size="xl" scroll-body
+  <BaseDialog :model-value="true" :title="`Hacer pedido a ${supplierName}`" size="xl" scroll-body :dismissible="!sendingTemplate"
     @update:model-value="emit('close')">
     <form v-if="!preview" id="whatsapp-supplier-order" class="space-y-3" @submit.prevent="prepare">
       <p v-if="loading" role="status" class="text-sm text-gray-500">Consultando artículos frecuentes…</p>
@@ -48,16 +48,29 @@
         Vista previa
         <textarea ref="previewInput" :value="preview" readonly rows="9" class="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 font-normal" />
       </label>
-      <p v-if="!windowOpen" class="text-sm text-gray-600">La ventana de atención está cerrada. Puedes copiar el pedido y revisar las plantillas del chat.</p>
-      <p v-else-if="!canInsert" class="text-sm text-gray-600">Toma la conversación para colocar el pedido en el chat.</p>
+      <p v-if="loadingTemplate" class="text-sm text-gray-600" role="status">Consultando la plantilla de pedido…</p>
+      <template v-if="templateBody && templateBranchName">
+        <label class="block text-sm font-medium">
+          Entrega para
+          <BaseInput v-model="delivery" :maxlength="160" :disabled="sendingTemplate" aria-label="Entrega para" />
+        </label>
+        <p class="whitespace-pre-wrap rounded-md border border-gray-200 p-3 text-sm">{{ templatePreview }}</p>
+        <p v-if="templatePreview.length > 1024" class="text-sm text-red-700">Acorta el pedido para enviarlo como plantilla.</p>
+      </template>
+      <p v-else-if="!loadingTemplate && !windowOpen" class="text-sm text-gray-600">
+        {{ templateBranchName ? 'La plantilla de pedido no está disponible en esta línea. Puedes copiar el pedido.' : 'Toma la conversación y verifica su sucursal para enviar la plantilla.' }}
+      </p>
+      <p v-else-if="windowOpen && !canInsert" class="text-sm text-gray-600">Toma la conversación para colocar el pedido en el chat.</p>
       <p v-if="copied" role="status" class="text-sm text-emerald-700">Mensaje copiado.</p>
     </div>
     <p v-if="formError || composerError" role="alert" class="mt-3 text-sm text-red-700">{{ formError || composerError }}</p>
     <template #footer>
       <template v-if="preview">
-        <BaseButton variant="secondary" @click="edit">Editar artículos</BaseButton>
-        <BaseButton variant="outline" @click="copy">Copiar mensaje</BaseButton>
-        <BaseButton v-if="canInsert" @click="emit('prepare', conversationId, preview)">Pasar al chat</BaseButton>
+        <BaseButton variant="secondary" :disabled="sendingTemplate" @click="edit">Editar artículos</BaseButton>
+        <BaseButton variant="outline" :disabled="sendingTemplate" @click="copy">Copiar mensaje</BaseButton>
+        <BaseButton v-if="canInsert" :disabled="sendingTemplate" @click="emit('prepare', conversationId, preview)">Pasar al chat</BaseButton>
+        <BaseButton v-if="templateBody && templateBranchName" :disabled="!canSendTemplate"
+          :loading="sendingTemplate" @click="sendTemplate">Enviar plantilla</BaseButton>
       </template>
       <BaseButton v-else type="submit" form="whatsapp-supplier-order">Preparar mensaje</BaseButton>
     </template>
@@ -71,10 +84,14 @@ import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseDialog from '@/components/ui/BaseDialog.vue'
 import BaseInput from '@/components/ui/BaseInput.vue'
 import BaseSelect from '@/components/ui/BaseSelect.vue'
-import { supplierOrderMessage, type SupplierOrderLine } from '@/helpers/whatsappSupplierOrder'
+import { supplierOrderMessage, supplierOrderTemplateLanguage, supplierOrderTemplateName, supplierOrderTemplateProducts,
+  type SupplierOrderLine } from '@/helpers/whatsappSupplierOrder'
 import { expenseApi } from '@/services/MainAPI/expenseApi'
 import { whatsappApi } from '@/services/MainAPI/whatsappApi'
 import type { Expense } from '@/types/expense'
+import type { WhatsAppMessage } from '@/types/whatsapp'
+import { generatePosCreationKey } from '@/utils/posCreationKey'
+import { whatsappTemplateBody } from '@/utils/whatsappInbox'
 
 const props = defineProps<{
   conversationId: number
@@ -82,8 +99,13 @@ const props = defineProps<{
   canInsert: boolean
   windowOpen: boolean
   composerError: string
+  templateBranchName?: string
 }>()
-const emit = defineEmits<{ close: []; prepare: [conversationId: number, message: string] }>()
+const emit = defineEmits<{
+  close: []
+  prepare: [conversationId: number, message: string]
+  sent: [conversationId: number, message: WhatsAppMessage]
+}>()
 type OrderLine = SupplierOrderLine & { id: number; manual?: boolean }
 const favorites = ref<OrderLine[]>([])
 const catalogLines = ref<OrderLine[]>([])
@@ -100,6 +122,20 @@ const catalogOptions = computed(() => {
 })
 const note = ref('')
 const preview = ref('')
+const templateBody = ref('')
+const templateProducts = ref('')
+const delivery = ref('')
+const loadingTemplate = ref(false)
+const sendingTemplate = ref(false)
+const templateParameters = computed(() => [
+  templateProducts.value, props.templateBranchName?.trim() ?? '', delivery.value.trim(),
+])
+const templatePreview = computed(() => templateBody.value.replace(/\{\{\s*(\d+)\s*\}\}/g,
+  (_, index) => templateParameters.value[Number(index) - 1] || '«entrega»'))
+const canSendTemplate = computed(() => !!templateBody.value && !sendingTemplate.value
+  && templateParameters.value.every(Boolean) && templatePreview.value.length <= 1024)
+let sendRequest: { parameters: string; key: string } | undefined
+let disposed = false
 const previewInput = ref<HTMLTextAreaElement>()
 const loading = ref(false)
 const copied = ref(false)
@@ -173,8 +209,45 @@ function prepare() {
   formError.value = ''
   try {
     preview.value = supplierOrderMessage(lines.value, note.value)
+    templateProducts.value = supplierOrderTemplateProducts(lines.value, note.value)
+    if (props.templateBranchName && !templateBody.value && !loadingTemplate.value) void loadTemplate()
   } catch (cause) {
     formError.value = cause instanceof Error ? cause.message : 'No se pudo preparar el pedido.'
+  }
+}
+
+async function loadTemplate() {
+  loadingTemplate.value = true
+  try {
+    const response = await whatsappApi.getConversationTemplates(props.conversationId)
+    const template = response.data?.find(item => item.name === supplierOrderTemplateName
+      && item.language === supplierOrderTemplateLanguage)
+    if (!disposed && template) templateBody.value = whatsappTemplateBody(template.componentsJson)
+  } catch (cause) {
+    if (!disposed) formError.value = cause instanceof Error ? cause.message : 'No se pudo consultar la plantilla.'
+  } finally {
+    loadingTemplate.value = false
+  }
+}
+
+async function sendTemplate() {
+  if (!canSendTemplate.value) return
+  sendingTemplate.value = true
+  formError.value = ''
+  const parameters = templateParameters.value
+  const payload = JSON.stringify(parameters)
+  if (sendRequest?.parameters !== payload) sendRequest = { parameters: payload, key: generatePosCreationKey() }
+  try {
+    const response = await whatsappApi.sendConversationTemplate(props.conversationId,
+      supplierOrderTemplateName, supplierOrderTemplateLanguage, parameters, sendRequest.key)
+    if (disposed) return
+    if (!response.data) throw new Error('No se pudo confirmar el envío. Revisa el chat antes de repetirlo.')
+    emit('sent', props.conversationId, response.data)
+    emit('close')
+  } catch (cause) {
+    if (!disposed) formError.value = cause instanceof Error ? cause.message : 'No se pudo confirmar el envío.'
+  } finally {
+    sendingTemplate.value = false
   }
 }
 
@@ -198,6 +271,7 @@ async function copy() {
 
 onMounted(load)
 onBeforeUnmount(() => {
+  disposed = true
   request?.abort()
   catalogRequest?.abort()
 })

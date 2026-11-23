@@ -25,14 +25,9 @@
             </span>
           </label>
         </fieldset>
-        <div v-if="selection === 'payment'" class="grid gap-3 sm:grid-cols-2">
-          <label class="starter-field">Número de pedido
-            <input v-model.number="orderId" type="number" inputmode="numeric" min="1" max="2147483647" step="1" required :disabled="sending" />
-          </label>
-          <label class="starter-field">Saldo pendiente (COP)
-            <input v-model.number="amount" type="number" inputmode="numeric" min="1" max="2147483647" step="1" required :disabled="sending" />
-          </label>
-        </div>
+        <label v-if="selection === 'payment'" class="starter-field">Total a pagar (COP)
+          <input v-model.number="amount" type="number" inputmode="numeric" min="1" :max="maxAmount" step="1" required :disabled="sending" />
+        </label>
         <div v-if="preview" class="starter-preview">
           <p>{{ preview }}</p>
           <span v-if="selection === 'menu'" class="mt-2 inline-flex items-center gap-1.5 text-xs font-semibold">
@@ -76,7 +71,7 @@ const branchId = ref(props.initialBranchId)
 const phone = ref(props.initialPhone ?? '')
 const selection = ref<WhatsAppConversationStartKind | ''>('')
 const requested = ref(false)
-const orderId = ref<number | ''>('')
+const maxAmount = 2_147_483_647
 const amount = ref<number | ''>('')
 const options = ref<WhatsAppConversationStartOptions | null>(null)
 const loading = ref(false)
@@ -86,14 +81,17 @@ let controller: AbortController | undefined
 let request: { body: string; key: string } | undefined
 let disposed = false
 const selectedTemplate = computed(() => options.value?.templates.find(template => template.key === selection.value && !template.unavailableReason))
+const validAmount = computed(() => typeof amount.value === 'number' && Number.isInteger(amount.value)
+  && amount.value > 0 && amount.value <= maxAmount)
 const canSend = computed(() => !!selectedTemplate.value && !!phone.value && requested.value && !loading.value && !sending.value
-  && (selection.value !== 'payment' || (Number.isInteger(orderId.value) && Number(orderId.value) > 0
-    && Number.isInteger(amount.value) && Number(amount.value) > 0)))
+  && (selection.value !== 'payment' || validAmount.value))
 
 const preview = computed(() => {
   if (!options.value || !selectedTemplate.value?.body) return ''
-  const values = [options.value.branchName, orderId.value ? `#${orderId.value}` : '«pedido»',
-    amount.value ? `$${amount.value.toLocaleString('es-CO')} COP` : '«saldo»', options.value.account, options.value.holder]
+  const values = selection.value === 'payment'
+    ? [options.value.account?.trim(), options.value.holder?.trim(),
+      validAmount.value ? `$${amount.value.toLocaleString('es-CO')} COP` : '«total»']
+    : [options.value.branchName]
   return selectedTemplate.value.body.replace(/\{\{\s*(\d+)\s*\}\}/g, (_, index) => values[Number(index) - 1] ?? '')
 })
 
@@ -125,7 +123,7 @@ async function send() {
   const payload: WhatsAppConversationStartRequest = {
     branchId: options.value.branchId, senderId: options.value.senderId, phone: phone.value,
     template: selection.value, requestedByCustomer: requested.value,
-    ...(selection.value === 'payment' ? { orderId: Number(orderId.value), amount: Number(amount.value) } : {}),
+    ...(selection.value === 'payment' ? { amount: Number(amount.value) } : {}),
   }
   const body = JSON.stringify(payload)
   if (request?.body !== body) request = { body, key: generatePosCreationKey() }
