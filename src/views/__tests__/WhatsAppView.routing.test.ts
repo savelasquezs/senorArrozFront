@@ -6,6 +6,7 @@ import { IDBFactory } from 'fake-indexeddb'
 import { Blob as NodeBlob } from 'node:buffer'
 import type { WhatsAppCommercialDraft, WhatsAppConversation, WhatsAppMessage } from '@/types/whatsapp'
 import type { User } from '@/types/auth'
+import type { Customer } from '@/types/customer'
 
 const m = vi.hoisted(() => ({
   state: null as unknown as Ref<string>,
@@ -301,6 +302,27 @@ describe('M38-F04 view + real Pinia store integration', () => {
 
     await vm.selectConversation({ ...supplier, attentionMode: 'human', assignedUserId: 8 })
     expect(wrapper.findComponent(WhatsAppConversationTemplates).exists()).toBe(false)
+  })
+
+  it('links the selected order customer only after explicit confirmation', async () => {
+    const chat = { ...m.rows[0]!, customerId: null, attentionRevision: 4 }
+    const customer = { id: 12, name: 'Cliente Demo', phone1: '+57 300 000 0000' } as Customer
+    m.rows = [chat]
+    m.api.linkConversationCustomer.mockResolvedValue(reply({ ...chat, customerId: customer.id }))
+    const { vm, wrapper } = mountView()
+    await flushPromises()
+    await vm.selectConversation(chat)
+    const panel = wrapper.getComponent(WhatsAppOrderPanel)
+    m.confirm.mockResolvedValueOnce(false)
+    panel.vm.$emit('link-address-customer', customer)
+    await flushPromises()
+    expect(m.api.linkConversationCustomer).not.toHaveBeenCalled()
+
+    panel.vm.$emit('link-address-customer', customer)
+    await flushPromises()
+    expect(m.api.linkConversationCustomer).toHaveBeenCalledExactlyOnceWith(chat.id, customer.id,
+      { phoneNumber: '3000000000', expectedAttentionVersion: 4 })
+    expect(vm.selectedConversation?.customerId).toBe(customer.id)
   })
 
   it('opens a customer from a delivery route through the existing WhatsApp order resolver', async () => {

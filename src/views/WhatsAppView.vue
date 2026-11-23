@@ -677,6 +677,7 @@
             <WhatsAppOrderPanel v-show="!operationalContact || showingCustomerOrder" ref="commercialPanel" :key="`${authStore.user?.id}:${selectedConversation.id}`" :conversation="selectedConversation" :initial-draft="prefetchedDraft"
               :controls-target="!operationalContact || showingCustomerOrder ? commercialControlsTarget : null" :save-target="!operationalContact || showingCustomerOrder ? commercialSaveTarget : null"
               :can-send-choices="canSend" :finishing-attention="finishingAttention" @change="commercialChanged" @draft-message="draftOrderMessage" @addresses-sent="addressesSent"
+              @link-address-customer="linkAddressCustomer"
               @contact-deliveryman="openOrderDeliverymanContact"
               @product-suggestion-state="setProductSuggestionState" />
           </KeepAlive>
@@ -1062,7 +1063,8 @@ import {
 } from '@/utils/whatsappAiDiagnostics'
 import { matchesWhatsAppUsername } from '@/utils/whatsappIdentity'
 import { buildWhatsAppInboxSections, canReadWhatsAppRouting, whatsappConversationBranchLabel, whatsappConversationInbox, whatsappInboxLabels } from '@/utils/whatsappInbox'
-import { normalizePhoneForSearch } from '@/utils/phoneInput'
+import { isLikelyPhoneNumber, normalizePhoneForSearch } from '@/utils/phoneInput'
+import type { Customer } from '@/types/customer'
 
 const whatsappStore = useWhatsAppStore()
 const authStore = useAuthStore()
@@ -2736,6 +2738,35 @@ async function refreshTemplateAttention(conversationId: number) {
 
 async function addressesSent(conversationId: number, messages: WhatsAppMessage[]) {
   await choiceMessagesSent(conversationId, messages, 'Opciones de dirección enviadas')
+}
+
+async function linkAddressCustomer(customer: Customer) {
+  const chat = selectedConversation.value
+  if (!chat || !ownsConversation.value || finishingAttention.value) return
+  const selection = conversationSelection
+  const confirmed = await confirmDialog({
+    title: 'Vincular cliente al chat',
+    message: `Confirma que este chat corresponde a ${customer.name} antes de compartir sus direcciones.`,
+    confirmLabel: 'Vincular cliente',
+  })
+  if (!confirmed || !viewActive || selection !== conversationSelection || !ownsConversation.value
+    || chat.attentionRevision !== selectedConversation.value?.attentionRevision) return
+  const phone = [customer.phone1, customer.phone2].find(value => value && isLikelyPhoneNumber(value))
+  try {
+    const response = await whatsappApi.linkConversationCustomer(chat.id, customer.id, {
+      phoneNumber: phone ? normalizePhoneForSearch(phone) : undefined,
+      expectedAttentionVersion: chat.attentionRevision ?? 0,
+    })
+    const updated = response.data
+    if (updated?.id === chat.id && viewActive && selection === conversationSelection && !isStaleAttention(updated)) {
+      whatsappStore.applyAttentionChanged(updated)
+      selectedConversation.value = whatsappStore.conversations.find(item => item.id === chat.id) ?? updated
+    }
+  } catch (cause) {
+    if (viewActive && selection === conversationSelection) {
+      showError('Vincular cliente', cause instanceof Error ? cause.message : 'No se pudo vincular al cliente.')
+    }
+  }
 }
 
 async function choiceMessagesSent(conversationId: number, messages: WhatsAppMessage[], notice: string) {

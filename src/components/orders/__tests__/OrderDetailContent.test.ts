@@ -29,9 +29,9 @@ function fixture(overrides = {}): OrderDetailView {
     } as unknown as OrderDetailView
 }
 
-function mountDetail() {
+function mountDetail(flatOrder: OrderDetailView = deps.store.current) {
     return shallowMount(OrderDetailContent, {
-        props: { flatOrder: deps.store.current },
+        props: { flatOrder },
         global: { stubs: { OrderNoteDialog: false, OrderDetailProductsList: false, OrderDeliveryFeeEditor: false, BaseButton: false, BaseInput: false, BaseDialog: false, teleport: true } },
     })
 }
@@ -49,6 +49,21 @@ describe('OrderDetailContent presentation and reservation delivery fee', () => {
         vi.spyOn(orderApi, 'fetchDetail').mockResolvedValue(fixture())
     })
     afterEach(() => vi.restoreAllMocks())
+
+    it('only renders the order requested by the container', async () => {
+        const requested = fixture()
+        deps.store.current = fixture({ id: 82 })
+        const wrapper = mountDetail(requested)
+        await flushPromises()
+        expect(wrapper.find('[aria-label="Resumen del pedido"]').exists()).toBe(false)
+        deps.store.current = requested
+        await flushPromises()
+        expect(wrapper.get('h1').text()).toBe('#81')
+        deps.store.current = fixture({ id: 82 })
+        await flushPromises()
+        expect(wrapper.find('[aria-label="Resumen del pedido"]').exists()).toBe(false)
+        wrapper.unmount()
+    })
 
     it.each(['Admin', 'Cashier'])('%s adds a gift from the shared catalog to an order that has never received one', async role => {
         deps.role = role
