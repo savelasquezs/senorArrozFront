@@ -274,6 +274,24 @@ export interface WhatsAppQuickReplyFilters {
 export interface WhatsAppOperationalContact {
   kind: 'deliveryman' | 'supplier'
   name: string
+  isSharedPhone?: boolean
+  deliverymanId?: number | null
+}
+
+export interface DeliveryWorkPhone {
+  id: number
+  phone: string
+  workSessionId: number | null
+}
+
+export interface DeliveryWorkPhoneSettings {
+  phones: DeliveryWorkPhone[]
+  devices: {
+    workSessionId: number
+    description?: string | null
+    deliverymanName: string
+    lastCommunicationAt: string
+  }[]
 }
 
 export interface WhatsAppRecentDeliveryRoute {

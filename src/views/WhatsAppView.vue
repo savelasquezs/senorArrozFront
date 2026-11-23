@@ -143,7 +143,7 @@
                     <WhatsAppContactAvatar :name="conversationTitle(conversation)" :url="conversation.profilePhotoUrl"
                       @open="url => openContactPhoto(conversation, url)" />
                     <span class="truncate text-xs font-semibold" :title="conversationIdentityLabel(conversation)">{{ conversationTitle(conversation) }}</span>
-                    <span v-if="conversation.operationalContact && !(conversation.operationalContact.kind === 'supplier' && conversation.labels?.includes('supplier'))"
+                    <span v-if="conversation.operationalContact && !conversation.operationalContact.isSharedPhone && !(conversation.operationalContact.kind === 'supplier' && conversation.labels?.includes('supplier'))"
                       class="wa-tag shrink-0 font-semibold">{{ operationalContactLabel(conversation) }}</span>
                   </div>
                   <div v-if="conversation.labels?.length" class="wa-conversation-tags" data-test="inbox-conversation-labels">
@@ -199,7 +199,7 @@
                 <p class="truncate whitespace-nowrap text-sm font-semibold text-gray-900" :class="{ 'max-w-[55%]': chatIdentity }" :title="conversationTitle(selectedConversation)">
                   {{ conversationTitle(selectedConversation) }}
                 </p>
-                <span v-if="operationalContact" class="wa-tag shrink-0 font-semibold">{{ operationalContactLabel(selectedConversation) }}</span>
+                <span v-if="operationalContact && !operationalContact.isSharedPhone" class="wa-tag shrink-0 font-semibold">{{ operationalContactLabel(selectedConversation) }}</span>
                 <p v-if="chatIdentity" class="chat-identity truncate whitespace-nowrap text-xs text-gray-500" :title="chatIdentity">
                   {{ chatIdentity }}
                 </p>
@@ -656,7 +656,8 @@
             <BaseButton v-if="!showingCustomerOrder" size="sm" variant="outline" @click="showingCustomerOrder = true">Tomar pedido de cliente</BaseButton>
           </div>
           <WhatsAppDeliveryRoutesPanel v-if="operationalContact?.kind === 'deliveryman' && !showingCustomerOrder && !contextPanelCollapsed"
-            :conversation-id="selectedConversation.id" :key="`${sessionKey}:${selectedConversation.id}`"
+            :conversation-id="selectedConversation.id" :key="`${sessionKey}:${selectedConversation.id}:${operationalContact.isSharedPhone ? operationalContact.deliverymanId ?? '' : ''}`"
+            :expected-deliveryman-id="operationalContact.isSharedPhone ? operationalContact.deliverymanId ?? 0 : undefined"
             @manage="manageDeliveryOrder" @contact-customer="openOrderConversation" />
           <KeepAlive :key="editorScope" :max="8">
             <WhatsAppOrderPanel v-show="!operationalContact || showingCustomerOrder" ref="commercialPanel" :key="`${authStore.user?.id}:${selectedConversation.id}`" :conversation="selectedConversation" :initial-draft="prefetchedDraft"
@@ -2196,6 +2197,16 @@ async function selectConversation(conversation: WhatsAppConversation, focusInput
   selectionRoute.cancel()
   if (route.query.conversationId !== String(conversation.id)) selectionRoute.schedule()
   const messages = whatsappStore.fetchMessages(conversation.id, false, false, true).catch(() => {})
+  if (conversation.operationalContact?.isSharedPhone) {
+    const opened = selectedConversation.value
+    const contact = opened.operationalContact
+    void whatsappApi.getConversation(conversation.id).then(({ data }) => {
+      if (!data || !viewActive || selection !== conversationSelection || selectedConversation.value !== opened
+        || opened.operationalContact !== contact || isStaleAttention(data)) return
+      whatsappStore.applyAttentionChanged(data)
+      selectedConversation.value = whatsappStore.conversations.find(c => c.id === conversation.id) ?? data
+    }).catch(() => {})
+  }
   if (focusInput) {
     await nextTick()
     if (viewActive && selection === conversationSelection && canSend.value) focusComposerInput()
@@ -2328,7 +2339,11 @@ async function handleRealtimeMessage(payload: WhatsAppRealtimeMessagePayload) {
     && whatsappStore.conversations.some(row => row.id === payload.conversation.id)
   if (searchTerm.value && !confirmedSearchMatch) {
     onSearchInput()
-    if (isActiveConversation) whatsappStore.upsertMessage(payload.conversation.id, payload.message)
+    if (isActiveConversation) {
+      whatsappStore.upsertMessage(payload.conversation.id, payload.message)
+      if (selectedConversation.value && payload.conversation.operationalContact?.isSharedPhone)
+        selectedConversation.value.operationalContact = payload.conversation.operationalContact
+    }
     return
   }
   if (!isActiveConversation && !conversationMatchesCurrentFilters(payload.conversation, selectedLabel.value, confirmedSearchMatch)) return

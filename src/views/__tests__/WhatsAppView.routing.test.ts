@@ -223,6 +223,34 @@ describe('M38-F04 view + real Pinia store integration', () => {
     expect(vm.selectedConversation?.id).toBe(customer.id)
   })
 
+  it('shows only the courier name and reloads routes when a shared phone changes hands', async () => {
+    const chat: WhatsAppConversation = {
+      ...m.rows[0]!,
+      contactName: 'Celular del local',
+      operationalContact: { kind: 'deliveryman', name: 'Ana', isSharedPhone: true, deliverymanId: 20 },
+    }
+    m.rows = [chat]
+    m.api.getConversation.mockResolvedValue(reply(chat))
+    const { vm, wrapper } = mountView()
+    await flushPromises()
+    await vm.selectConversation(chat)
+    await flushPromises()
+    const heading = () => wrapper.get('[data-test="whatsapp-chat-header"]').text()
+    expect(heading()).toContain('Ana')
+    expect(heading()).not.toMatch(/Domiciliario|Celular del local|En uso|Último uso/)
+    const routes = wrapper.getComponent(WhatsAppDeliveryRoutesPanel).vm
+
+    m.handlers.get('WhatsAppMessageCreated')?.({
+      conversation: { ...chat, operationalContact: { kind: 'deliveryman', name: 'Luis', isSharedPhone: true, deliverymanId: 21 } },
+      message: { id: 501, conversationId: chat.id, direction: 'inbound', type: 'text', textBody: 'Hola', timestamp: '2026-11-15T15:00:00Z' },
+    })
+    await flushPromises()
+    expect(heading()).toContain('Luis')
+    expect(heading()).not.toContain('Ana')
+    expect(wrapper.getComponent(WhatsAppDeliveryRoutesPanel).vm).not.toBe(routes)
+    expect(wrapper.getComponent(WhatsAppDeliveryRoutesPanel).props('expectedDeliverymanId')).toBe(21)
+  })
+
   it('starts a WhatsApp chat from the inbox using the approved branch template', async () => {
     const opened = conversation(25)
     m.api.getConversationStartOptions.mockResolvedValue(reply({

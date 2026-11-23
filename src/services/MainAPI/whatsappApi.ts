@@ -6,6 +6,7 @@ import { resolveWhatsAppOperation } from '@/helpers/whatsappOperation'
 import type { ApiResponse } from '@/types/common'
 import type { SupplierExpenseSuggestion } from '@/types/expense'
 import type {
+  DeliveryWorkPhoneSettings,
   UpsertWhatsAppBranchSetting,
   UpsertWhatsAppQuickReply,
   WhatsAppBranchSetting,
@@ -67,6 +68,15 @@ class WhatsAppApi extends BaseApi {
       serverCode: error?.response?.data?.code,
     })
   }
+  getDeliveryWorkPhones(branchId: number, signal?: AbortSignal) {
+    return this.get<ApiResponse<DeliveryWorkPhoneSettings>>(`/branches/${branchId}/whatsapp-settings/delivery-phones`, { signal })
+  }
+  saveDeliveryWorkPhone(branchId: number, phone: string, workSessionId: number) {
+    return this.put<void>(`/branches/${branchId}/whatsapp-settings/delivery-phones`, { phone, workSessionId })
+  }
+  removeDeliveryWorkPhone(branchId: number, id: number) {
+    return this.delete<void>(`/branches/${branchId}/whatsapp-settings/delivery-phones/${id}`)
+  }
   getConversationStartOptions(branchId: number, signal?: AbortSignal) {
     return this.get<ApiResponse<WhatsAppConversationStartOptions>>('/whatsapp/conversations/start/options', {
       params: { branchId }, signal,
@@ -75,8 +85,10 @@ class WhatsAppApi extends BaseApi {
   getOrderConversation(orderId: number, signal: AbortSignal) {
     return this.get<ApiResponse<WhatsAppOrderConversation>>(`/whatsapp/orders/${orderId}/conversation`, { signal })
   }
-  getConversationDeliveryRoutes(id: number, signal: AbortSignal) {
-    return this.get<ApiResponse<WhatsAppRecentDeliveryRoute[]>>(`/whatsapp/conversations/${id}/delivery-routes`, { signal })
+  getConversationDeliveryRoutes(id: number, signal: AbortSignal, expectedDeliverymanId?: number) {
+    return this.get<ApiResponse<WhatsAppRecentDeliveryRoute[]>>(`/whatsapp/conversations/${id}/delivery-routes`, {
+      signal, params: { expectedDeliverymanId },
+    })
   }
   getConversationSupplierItems(id: number, signal: AbortSignal) {
     return this.get<ApiResponse<SupplierExpenseSuggestion[]>>(`/whatsapp/conversations/${id}/supplier-items`, { signal })
