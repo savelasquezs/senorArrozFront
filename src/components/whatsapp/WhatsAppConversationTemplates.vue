@@ -31,6 +31,7 @@ import { supplierOrderTemplateLanguage, supplierOrderTemplateName } from '@/help
 import { whatsappTemplateBody } from '@/utils/whatsappInbox'
 
 const props = defineProps<{ conversationId: number; branchName?: string }>()
+const emit = defineEmits<{ sent: [conversationId: number] }>()
 const supplierLabels = ['Productos', 'Sucursal', 'Entrega para']
 const store = useWhatsAppStore()
 const open = ref(false), loading = ref(false), sending = ref(false), error = ref('')
@@ -65,7 +66,10 @@ async function send() {
     const values = parameters.value.map(value => value.trim())
     if (isSupplierOrder.value && props.branchName) values[1] = props.branchName
     const response = await whatsappApi.sendConversationTemplate(id, template.name, template.language, values)
-    if (response.data && !disposed) store.upsertMessage(id, response.data)
+    if (response.data && !disposed) {
+      store.upsertMessage(id, response.data)
+      emit('sent', id)
+    }
     open.value = false
   } catch (failure: any) { error.value = failure.message || 'No se pudo confirmar el envío. Revisa el chat antes de repetirlo.' }
   finally { sending.value = false }

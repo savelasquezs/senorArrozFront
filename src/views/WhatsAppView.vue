@@ -123,6 +123,10 @@
                 @click="toggleQuickContactFilter('suppliers')">
                 <BuildingStorefrontIcon class="size-3.5" aria-hidden="true" />
               </button>
+              <button v-if="inboxFilterCount" type="button" class="inbox-control" aria-label="Restablecer filtros"
+                title="Restablecer filtros" @click="resetInboxFilters">
+                <XMarkIcon class="size-3.5" aria-hidden="true" />
+              </button>
             </div>
           </div>
           <WhatsAppInboxTabs
@@ -520,11 +524,11 @@
               <p v-if="!ownsConversation && !canTakeAttention" class="mb-2 rounded-lg bg-gray-100 p-2 text-sm text-gray-600">
                 {{ selectedConversation.attentionMode === 'closed' ? 'Conversación atendida.' : 'Puedes consultar esta conversación.' }}
               </p>
-              <div v-if="ownsConversation" class="wa-compose-meta mb-1.5 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 text-xs">
+              <div v-if="canSendConversationTemplate" class="wa-compose-meta mb-1.5 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 text-xs">
                 <p v-if="serviceWindowOpen">Ventana de atención hasta {{ new Date(selectedConversation.customerServiceWindowExpiresAt!).toLocaleString('es-CO') }}</p>
                 <p v-else class="rounded bg-amber-50 px-2 py-1 text-amber-900">La ventana de atención de 24 horas está cerrada. Usa una plantilla aprobada para iniciar el contacto.</p>
-                <WhatsAppConversationTemplates :key="selectedConversation.id" :conversation-id="selectedConversation.id"
-                  :branch-name="templateBranchName" />
+                <WhatsAppConversationTemplates :key="`${sessionKey}:${selectedConversation.id}`" :conversation-id="selectedConversation.id"
+                  :branch-name="supplierOrderBranchName" @sent="refreshTemplateAttention" />
               </div>
               <button type="button" class="wa-quick-toggle" :aria-expanded="compactQuickReplies" aria-controls="wa-quick-list"
                 @click="compactQuickReplies = !compactQuickReplies">
@@ -932,8 +936,8 @@
         :key="`${sessionKey}:${selectedConversation.id}`" :conversation-id="selectedConversation.id" :supplier-name="operationalContact.name"
         :can-insert="canSend && !sending && !sendingProductChoices && !preparingQuickReply && !selectingForward"
         :window-open="serviceWindowOpen" :composer-error="supplierComposerError"
-        :template-branch-name="ownsConversation && !finishingAttention ? templateBranchName : undefined"
-        @close="showSupplierOrder = false" @prepare="draftSupplierOrder" @sent="whatsappStore.upsertMessage" />
+        :template-branch-name="supplierOrderBranchName" :can-write-template="canSendConversationTemplate"
+        @close="showSupplierOrder = false" @prepare="draftSupplierOrder" @sent="supplierTemplateSent" />
       <WhatsAppForwardDialog v-if="showForwardDialog && selectedConversation" v-model="showForwardDialog"
         :source-id="selectedConversation.id" :count="forwardSelection.size" :sending="forwarding"
         :error="forwardError" @forward="forwardSelectedMessages" />
@@ -1445,9 +1449,22 @@ const signalRDotClass = computed(() => connectionState.value === 'connected'
     : 'bg-red-500')
 
 const ownsConversation = computed(() => selectedConversation.value?.attentionMode === 'human' && selectedConversation.value.assignedUserId === authStore.user?.id)
+const canSendConversationTemplate = computed(() => {
+  const chat = selectedConversation.value
+  return !!chat && chat.status !== 'archived' && !finishingAttention.value
+    && (chat.assignedUserId == null || chat.assignedUserId === authStore.user?.id)
+})
 const templateBranchName = computed(() => {
   const conversation = selectedConversation.value
   return (conversation?.isCentralChannel ? conversation.operationalBranchName : conversation?.branchName) || undefined
+})
+const supplierOrderBranchName = computed(() => {
+  const conversation = selectedConversation.value
+  if (templateBranchName.value || !conversation?.isCentralChannel) return templateBranchName.value
+  const branchId = conversation.operationalBranchId ?? workContext.selectedBranchId ?? authStore.user?.branchId
+  return whatsappStore.operationalBranches.find(branch => branch.id === branchId)?.name
+    || (workContext.selectedBranch?.id === branchId ? workContext.selectedBranch?.name : undefined)
+    || (authStore.user?.branchId === branchId ? authStore.user?.branchName : undefined)
 })
 const serviceWindowOpen = computed(() => !!selectedConversation.value?.customerServiceWindowExpiresAt && Date.parse(selectedConversation.value.customerServiceWindowExpiresAt) > clockNow.value)
 const canSend = computed(() => ownsConversation.value && serviceWindowOpen.value && !finishingAttention.value)
@@ -1483,7 +1500,16 @@ const inboxSections = computed(() => buildWhatsAppInboxSections(
   authStore.user?.branchId,
   authStore.isSuperadmin,
 ))
-function attentionLabel(conversation: WhatsAppConversation) { if (conversation.attentionMode === 'human' && !conversation.assignedUserId) return 'Sin responsable'; const labels: Record<WhatsAppAttentionMode, string> = { ai: 'Atendida por IA', human: 'Atendida por una persona', waitingForHuman: 'Esperando asesor', paused: 'IA pausada', closed: 'Conversación cerrada' }; const label = labels[conversation.attentionMode] || labels.human; return conversation.attentionMode === 'human' && conversation.assignedUserName ? `${label}: ${conversation.assignedUserName}` : label }
+function attentionLabel(conversation: WhatsAppConversation) {
+  if (conversation.attentionMode === 'human') {
+    if (!conversation.assignedUserId) return 'Sin responsable'
+    return conversation.assignedUserName ? `Atendido por: ${conversation.assignedUserName}` : 'Atendido'
+  }
+  const labels: Record<Exclude<WhatsAppAttentionMode, 'human'>, string> = {
+    ai: 'Atendida por IA', waitingForHuman: 'Esperando asesor', paused: 'IA pausada', closed: 'Conversación cerrada',
+  }
+  return labels[conversation.attentionMode] || 'Atendido'
+}
 function attentionBadgeClass(mode: WhatsAppAttentionMode) { return { ai: 'bg-violet-100 text-violet-700', human: 'bg-blue-100 text-blue-700', waitingForHuman: 'bg-amber-200 text-amber-900', paused: 'bg-gray-200 text-gray-700', closed: 'bg-red-100 text-red-700' }[mode] }
 function attentionTooltip(conversation: WhatsAppConversation) {
   if (conversation.attentionMode !== 'waitingForHuman') return attentionLabel(conversation)
@@ -2686,6 +2712,26 @@ async function draftSupplierOrder(conversationId: number, text: string) {
   showSupplierOrder.value = false
   await nextTick()
   if (selection === conversationSelection && canSend.value) messageInput.value?.focus()
+}
+
+function supplierTemplateSent(conversationId: number, message: WhatsAppMessage) {
+  whatsappStore.upsertMessage(conversationId, message)
+  void refreshTemplateAttention(conversationId)
+}
+
+async function refreshTemplateAttention(conversationId: number) {
+  if (selectedConversation.value?.id !== conversationId) return
+  const selection = conversationSelection
+  const wasAssigned = ownsConversation.value
+  try {
+    const chat = await whatsappStore.fetchConversation(conversationId)
+    if (!chat || !viewActive || selection !== conversationSelection
+      || selectedConversation.value?.id !== conversationId) return
+    selectedConversation.value = chat
+    if (!wasAssigned && ownsConversation.value) activeInbox.value = 'mine'
+  } catch {
+    void reloadConversations()
+  }
 }
 
 async function addressesSent(conversationId: number, messages: WhatsAppMessage[]) {

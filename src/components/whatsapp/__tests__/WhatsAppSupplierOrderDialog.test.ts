@@ -9,7 +9,7 @@ const expenses = vi.hoisted(() => ({ getAllExpenses: vi.fn() }))
 vi.mock('@/services/MainAPI/whatsappApi', () => ({ whatsappApi: api }))
 vi.mock('@/services/MainAPI/expenseApi', () => ({ expenseApi: expenses }))
 
-const props = { conversationId: 14, supplierName: 'Molino', canInsert: false, windowOpen: false, composerError: '' }
+const props = { conversationId: 14, supplierName: 'Molino', canInsert: false, canWriteTemplate: false, windowOpen: false, composerError: '' }
 const stubs = {
   BaseDialog: { template: '<section role="dialog"><slot /><slot name="footer" /></section>' },
 }
@@ -17,7 +17,7 @@ const copy = vi.fn()
 
 beforeEach(() => {
   api.getConversationSupplierItems.mockReset()
-  api.getConversationTemplates.mockReset()
+  api.getConversationTemplates.mockReset().mockResolvedValue({ data: [] })
   api.sendConversationTemplate.mockReset()
   expenses.getAllExpenses.mockReset()
   copy.mockReset().mockResolvedValue(undefined)
@@ -97,7 +97,7 @@ it('loads the full expense catalog on demand and keeps the selected unit in the 
   }
 })
 
-it('fills the template with selected items and the chat branch, and sends after entering delivery', async () => {
+it('sends the approved template from a free chat after entering delivery', async () => {
   api.getConversationSupplierItems.mockResolvedValue({ data: [{ expenseId: 4, expenseName: 'Arroz', expenseUnit: 'Kilo' }] })
   api.getConversationTemplates.mockResolvedValue({ data: [{
     name: 'pedido_a_proveedor', language: 'es_CO',
@@ -105,7 +105,7 @@ it('fills the template with selected items and the chat branch, and sends after 
   }] })
   api.sendConversationTemplate.mockResolvedValue({ data: { id: 25 } })
   const view = mount(WhatsAppSupplierOrderDialog, {
-    props: { ...props, templateBranchName: 'Santander' }, global: { stubs },
+    props: { ...props, canWriteTemplate: true, templateBranchName: 'Santander' }, global: { stubs },
   })
   try {
     await flushPromises()
@@ -115,6 +115,7 @@ it('fills the template with selected items and the chat branch, and sends after 
     const send = view.findAll('button').find(button => button.text() === 'Enviar plantilla')!
     expect(send.attributes('disabled')).toBeDefined()
     await view.get('input[aria-label="Entrega para"]').setValue('mañana después de las 10 a. m.')
+    expect(api.sendConversationTemplate).not.toHaveBeenCalled()
     expect(view.get('textarea').element.value).toContain('3 kg — Arroz. Sucursal Santander.')
     expect(view.findAll('textarea')).toHaveLength(1)
     expect(view.text()).not.toContain('Pasar al chat')
@@ -123,6 +124,37 @@ it('fills the template with selected items and the chat branch, and sends after 
     expect(api.sendConversationTemplate).toHaveBeenCalledExactlyOnceWith(14, 'pedido_a_proveedor', 'es_CO',
       ['3 kg — Arroz', 'Santander', 'mañana después de las 10 a. m.'], expect.any(String))
     expect(view.emitted('sent')).toEqual([[14, { id: 25 }]])
+  } finally {
+    view.unmount()
+    vi.unstubAllGlobals()
+  }
+})
+
+it('lets the advisor select or leave template mode while the window is open', async () => {
+  api.getConversationSupplierItems.mockResolvedValue({ data: [{ expenseId: 4, expenseName: 'Arroz', expenseUnit: 'Kilo' }] })
+  api.getConversationTemplates.mockResolvedValue({ data: [{
+    name: 'pedido_a_proveedor', language: 'es_CO',
+    componentsJson: JSON.stringify([{ type: 'BODY', text: 'Pedido {{1}} · {{2}} · {{3}}' }]),
+  }] })
+  const view = mount(WhatsAppSupplierOrderDialog, {
+    props: { ...props, canInsert: true, canWriteTemplate: true, windowOpen: true, templateBranchName: 'Santander' },
+    global: { stubs },
+  })
+  try {
+    await flushPromises()
+    await view.get('input[aria-label="Cantidad de Arroz"]').setValue('3')
+    await view.get('form').trigger('submit')
+    expect(api.getConversationTemplates).not.toHaveBeenCalled()
+    expect(view.text()).toContain('Pasar al chat')
+    await view.findAll('button').find(button => button.text() === 'Usar plantilla de proveedor')!.trigger('click')
+    await flushPromises()
+    expect(api.getConversationTemplates).toHaveBeenCalledExactlyOnceWith(14)
+    expect(view.text()).toContain('Enviar plantilla')
+    expect(view.text()).not.toContain('Pasar al chat')
+    await view.findAll('button').find(button => button.text() === 'Usar texto del chat')!.trigger('click')
+    expect(view.text()).toContain('Pasar al chat')
+    expect(view.get('textarea').element.value).toContain('3 kg — Arroz')
+    expect(api.sendConversationTemplate).not.toHaveBeenCalled()
   } finally {
     view.unmount()
     vi.unstubAllGlobals()

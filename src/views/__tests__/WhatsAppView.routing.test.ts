@@ -65,6 +65,7 @@ import WhatsAppForwardDialog from '@/components/whatsapp/WhatsAppForwardDialog.v
 import WhatsAppOrderPanel from '@/components/whatsapp/WhatsAppOrderPanel.vue'
 import WhatsAppDeliveryRoutesPanel from '@/components/whatsapp/WhatsAppDeliveryRoutesPanel.vue'
 import WhatsAppSupplierOrderDialog from '@/components/whatsapp/WhatsAppSupplierOrderDialog.vue'
+import WhatsAppConversationTemplates from '@/components/whatsapp/WhatsAppConversationTemplates.vue'
 import WhatsAppVoiceMessage from '@/components/whatsapp/WhatsAppVoiceMessage.vue'
 import { useWhatsAppStore } from '@/store/whatsapp'
 import { useAuthStore } from '@/store/auth'
@@ -167,7 +168,7 @@ describe('M38-F04 view + real Pinia store integration', () => {
 
   it('switches quick contacts across all inboxes and restores the selected tab', async () => {
     m.route.query = { inbox: 'mine' }
-    const customerChat = conversation()
+    const customerChat = { ...conversation(), assignedUserName: 'Asesor Demo' }
     const deliveryChat: WhatsAppConversation = { ...conversation(2), assignedUserId: null, attentionMode: 'closed',
       operationalContact: { kind: 'deliveryman', name: 'Ana Reparto' }, matchesContactQuickFilter: true }
     const supplierChat: WhatsAppConversation = { ...conversation(3), assignedUserId: 8,
@@ -178,6 +179,9 @@ describe('M38-F04 view + real Pinia store integration', () => {
     await flushPromises()
     const drivers = wrapper.get('button[aria-label="Domiciliarios con pedidos de hoy"]')
     const suppliers = wrapper.get('button[aria-label="Proveedores"]')
+    const resetFilters = () => wrapper.find('button[aria-label="Restablecer filtros"]')
+    expect(resetFilters().exists()).toBe(false)
+    expect(wrapper.text()).toContain('Atendido por: Asesor Demo')
     await drivers.trigger('click')
     await flushPromises()
     expect(m.api.getConversations).toHaveBeenLastCalledWith(expect.objectContaining({ inbox: undefined, deliverymenAssignedToday: true }), expect.any(AbortSignal))
@@ -190,8 +194,11 @@ describe('M38-F04 view + real Pinia store integration', () => {
     expect(suppliers.attributes('aria-pressed')).toBe('true')
     expect(wrapper.text()).toContain('Molino Alba')
     expect(wrapper.text()).not.toContain('Ana Reparto')
-    await suppliers.trigger('click')
+    await wrapper.get('select[aria-label="Filtrar por etiqueta"]').setValue('supplier')
+    await resetFilters().trigger('click')
     await flushPromises()
+    expect(resetFilters().exists()).toBe(false)
+    expect(m.api.getConversations).toHaveBeenLastCalledWith(expect.objectContaining({ label: undefined, inbox: 'mine' }), expect.any(AbortSignal))
     expect(wrapper.get('[role="tab"][aria-selected="true"]').text()).toContain('Míos')
   })
 
@@ -268,6 +275,32 @@ describe('M38-F04 view + real Pinia store integration', () => {
     await flushPromises()
     expect(input().element.value).toBe('')
     expect(wrapper.findComponent(WhatsAppSupplierOrderDialog).exists()).toBe(true)
+  })
+
+  it('offers both template entry points for a free supplier and refreshes the automatic assignment', async () => {
+    const supplier: WhatsAppConversation = { ...m.rows[0]!, attentionMode: 'waitingForHuman', assignedUserId: null,
+      customerServiceWindowExpiresAt: '2000-01-01T00:00:00Z', operationalBranchId: null, operationalBranchName: undefined,
+      operationalContact: { kind: 'supplier', name: 'Molino' } }
+    m.rows = [supplier]
+    const { vm, wrapper } = mountView()
+    await flushPromises()
+    await vm.selectConversation(supplier)
+    expect(wrapper.findComponent(WhatsAppConversationTemplates).exists()).toBe(true)
+
+    await wrapper.findAll('button').find(item => item.text() === 'Hacer pedido')!.trigger('click')
+    const dialog = wrapper.getComponent(WhatsAppSupplierOrderDialog)
+    expect(dialog.props()).toMatchObject({ canInsert: false, canWriteTemplate: true, templateBranchName: 'Uno', windowOpen: false })
+
+    const assigned: WhatsAppConversation = { ...supplier, assignedUserId: 7, attentionMode: 'human', attentionRevision: 1 }
+    m.rows = [assigned]
+    m.api.getConversation.mockResolvedValue(reply(assigned))
+    dialog.vm.$emit('sent', supplier.id, { id: 25, conversationId: supplier.id, direction: 'Outbound', timestamp: '2026-11-23T12:00:00Z' } as WhatsAppMessage)
+    await flushPromises()
+    expect(vm.selectedConversation?.assignedUserId).toBe(7)
+    expect(m.api.changeAttention).not.toHaveBeenCalled()
+
+    await vm.selectConversation({ ...supplier, attentionMode: 'human', assignedUserId: 8 })
+    expect(wrapper.findComponent(WhatsAppConversationTemplates).exists()).toBe(false)
   })
 
   it('opens a customer from a delivery route through the existing WhatsApp order resolver', async () => {
