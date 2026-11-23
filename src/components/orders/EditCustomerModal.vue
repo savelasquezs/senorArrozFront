@@ -213,14 +213,22 @@ const hasReservationAssociatedPayments = computed(() =>
     ((props.order.reservationDeposits?.length ?? 0) > 0 || (props.order.bankPayments?.length ?? 0) > 0)
 )
 
-async function hydrateCustomerWithAddresses(customer: Customer): Promise<void> {
+// Invalidate pending profile/address responses when the modal closes or a different
+// customer is selected. The shared customer store can be updated by other screens.
+let customerLoadVersion = 0
+const isCurrentCustomerLoad = (version: number, customerId: number) =>
+    props.open && version === customerLoadVersion && selectedCustomerId.value === customerId
+
+async function hydrateCustomerWithAddresses(customer: Customer, version: number): Promise<void> {
     try {
         await customersStore.fetchAddresses(customer.id)
+        if (!isCurrentCustomerLoad(version, customer.id)) return
         displayCustomer.value = {
             ...customer,
             addresses: [...customersStore.addresses],
         }
     } catch (e: unknown) {
+        if (!isCurrentCustomerLoad(version, customer.id)) return
         const msg = e instanceof Error ? e.message : String(e)
         showError('Direcciones', msg || 'No se pudieron cargar las direcciones')
         displayCustomer.value = { ...customer, addresses: customer.addresses ?? [] }
@@ -228,23 +236,31 @@ async function hydrateCustomerWithAddresses(customer: Customer): Promise<void> {
 }
 
 async function loadCustomerProfileForModal() {
-    selectedCustomerId.value = props.order.customerId ?? null
+    const version = ++customerLoadVersion
+    const customerId = props.order.customerId
+    selectedCustomerId.value = customerId ?? null
     selectedAddressId.value = props.order.addressId ?? null
     selectedGuestName.value = props.order.guestName || props.order.customerName || null
+    displayCustomer.value = null
 
-    if (!props.order.customerId) {
-        displayCustomer.value = null
-        return
-    }
+    if (!customerId) return
     try {
-        await customersStore.fetchById(props.order.customerId)
+        await customersStore.fetchById(customerId)
+        if (!isCurrentCustomerLoad(version, customerId)) return
         const c = customersStore.current
-        if (!c) {
+        if (!c || c.id !== customerId) {
             displayCustomer.value = null
             return
         }
-        await hydrateCustomerWithAddresses(c)
+        // GET /customers/{id} includes addresses, even when the valid list is [].
+        // Only incomplete legacy payloads need the separate addresses GET.
+        if (Array.isArray(c.addresses)) {
+            displayCustomer.value = c
+            return
+        }
+        await hydrateCustomerWithAddresses(c, version)
     } catch (e: unknown) {
+        if (!isCurrentCustomerLoad(version, customerId)) return
         const msg = e instanceof Error ? e.message : String(e)
         showError('Cliente', msg || 'No se pudo cargar el cliente')
         displayCustomer.value = null
@@ -258,6 +274,8 @@ watch(
             deliveryFee.value = props.order.deliveryFee ?? 0
             resetManualEdit()
             void loadCustomerProfileForModal()
+        } else {
+            ++customerLoadVersion
         }
     },
     { immediate: true }
@@ -265,6 +283,7 @@ watch(
 
 // Métodos
 const handleCustomerSelected = async (customer: Customer | null) => {
+    const version = ++customerLoadVersion
     selectedCustomerId.value = customer?.id ?? null
 
     if (customer && customer.name && !selectedGuestName.value?.trim()) {
@@ -279,7 +298,7 @@ const handleCustomerSelected = async (customer: Customer | null) => {
         return
     }
 
-    await hydrateCustomerWithAddresses(customer)
+    await hydrateCustomerWithAddresses(customer, version)
 }
 
 const handleAddressSelected = (address: CustomerAddress | null | undefined) => {
