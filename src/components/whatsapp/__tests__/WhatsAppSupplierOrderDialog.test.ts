@@ -51,10 +51,13 @@ it('emits the draft for its own chat with a free item when the supplier has no h
   try {
     await flushPromises()
     await view.findAll('button').find(button => button.text() === 'Agregar artículo manual')!.trigger('click')
-    const [name, quantity, unit] = view.findAll('fieldset input')
-    await name!.setValue('Aceite')
-    await quantity!.setValue('1.75')
-    await unit!.setValue('litros')
+    const name = view.get('input[aria-label="Nombre del artículo manual"]')
+    const addButton = view.findAll('button').find(button => button.text() === 'Agregar artículo manual')!
+    const controls = view.get('form').findAll('input, button').map(control => control.element)
+    expect(controls.indexOf(name.element)).toBeLessThan(controls.indexOf(addButton.element))
+    await name.setValue('Aceite')
+    await view.get('input[aria-label="Cantidad de Aceite"]').setValue('1.75')
+    await view.get('input[aria-label="Unidad del artículo manual"]').setValue('litros')
     await view.get('form').trigger('submit')
     await view.findAll('button').find(button => button.text() === 'Pasar al chat')!.trigger('click')
     expect(view.emitted('prepare')).toEqual([[14, expect.stringContaining('1,75 litros — Aceite')]])

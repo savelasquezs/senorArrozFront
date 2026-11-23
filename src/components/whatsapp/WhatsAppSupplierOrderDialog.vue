@@ -7,14 +7,24 @@
         {{ loadError }} <button type="button" class="underline" @click="load">Reintentar</button>
       </p>
       <p v-else-if="!favorites.length" class="text-sm text-gray-500">Este proveedor todavía no tiene artículos frecuentes.</p>
-      <div v-for="line in [...favorites, ...catalogLines]" :key="line.id" class="grid gap-2 border-b border-gray-200 pb-2 sm:grid-cols-[1fr_7rem_1fr] sm:items-center">
-        <div>
-          <p class="text-sm font-medium">{{ line.name }} <span class="text-xs font-normal text-gray-500">· {{ line.unit }}</span></p>
-          <button v-if="line.custom" type="button" class="text-xs text-gray-600 underline" @click="removeCatalogLine(line.id)">Quitar artículo</button>
+      <div v-for="line in lines" :key="line.manual ? `manual-${line.id}` : line.id"
+        class="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_1.75rem] items-center gap-2 border-b border-gray-200 pb-2 sm:grid-cols-[minmax(0,1.5fr)_7rem_minmax(0,1fr)_1.75rem]">
+        <div class="col-span-2 min-w-0 sm:col-span-1">
+          <div v-if="line.manual" class="grid grid-cols-[minmax(0,1fr)_minmax(4.75rem,0.55fr)] gap-2">
+            <BaseInput v-model="line.name" size="sm" placeholder="Artículo" aria-label="Nombre del artículo manual" :maxlength="160" />
+            <BaseInput v-model="line.unit" size="sm" placeholder="Unidad" aria-label="Unidad del artículo manual" :maxlength="50" />
+          </div>
+          <p v-else class="text-sm font-medium">{{ line.name }} <span class="text-xs font-normal text-gray-500">· {{ line.unit }}</span></p>
         </div>
-        <BaseInput v-model="line.quantity" size="sm" inputmode="decimal" placeholder="Cantidad"
-          :aria-label="`Cantidad de ${line.name}`" :maxlength="24" />
-        <BaseInput v-model="line.note" size="sm" placeholder="Nota opcional" :aria-label="`Nota de ${line.name}`" :maxlength="240" />
+        <BaseInput v-model="line.quantity" class="col-start-1 row-start-2 min-w-0 sm:col-start-2 sm:row-start-1"
+          size="sm" inputmode="decimal" placeholder="Cantidad" :aria-label="`Cantidad de ${line.name || 'artículo manual'}`" :maxlength="24" />
+        <BaseInput v-model="line.note" class="col-start-2 row-start-2 min-w-0 sm:col-start-3 sm:row-start-1"
+          size="sm" placeholder="Nota opcional" :aria-label="`Nota de ${line.name || 'artículo manual'}`" :maxlength="240" />
+        <button v-if="line.custom" type="button" :aria-label="`Quitar ${line.name || 'artículo manual'}`" title="Quitar artículo"
+          class="col-start-3 row-start-1 flex size-7 items-center justify-center rounded text-gray-600 hover:bg-gray-100 focus-visible:outline-emerald-600 sm:col-start-4"
+          @click="removeLine(line)">
+          <XMarkIcon class="size-4" aria-hidden="true" />
+        </button>
       </div>
       <div class="flex flex-wrap gap-2">
         <BaseButton type="button" variant="outline" size="sm" :aria-expanded="showCatalog" @click="toggleCatalog">
@@ -30,14 +40,6 @@
         <BaseSelect v-else :model-value="null" :options="catalogOptions" label="Artículo del catálogo"
           placeholder="Buscar y agregar un artículo" inline-dropdown @update:model-value="addCatalogLine" />
       </div>
-      <fieldset v-for="(line, index) in extra" :key="line.id" class="grid gap-2 rounded-lg border border-gray-200 p-2 sm:grid-cols-3">
-        <legend class="px-1 text-xs font-medium">Artículo manual {{ index + 1 }}</legend>
-        <BaseInput v-model="line.name" size="sm" label="Artículo" :maxlength="160" />
-        <BaseInput v-model="line.quantity" size="sm" inputmode="decimal" label="Cantidad" :maxlength="24" />
-        <BaseInput v-model="line.unit" size="sm" label="Unidad" :maxlength="50" />
-        <BaseInput v-model="line.note" size="sm" label="Nota opcional" class="sm:col-span-2" :maxlength="240" />
-        <BaseButton type="button" variant="ghost" size="xs" class="self-end" @click="extra.splice(index, 1)">Quitar artículo</BaseButton>
-      </fieldset>
       <label class="block text-sm font-medium">
         Nota del pedido
         <textarea v-model="note" rows="2" maxlength="1000" class="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 font-normal" />
@@ -66,6 +68,7 @@
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { XMarkIcon } from '@heroicons/vue/24/outline'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseDialog from '@/components/ui/BaseDialog.vue'
 import BaseInput from '@/components/ui/BaseInput.vue'
@@ -83,8 +86,11 @@ const props = defineProps<{
   composerError: string
 }>()
 const emit = defineEmits<{ close: []; prepare: [conversationId: number, message: string] }>()
-const favorites = ref<(SupplierOrderLine & { id: number })[]>([])
-const catalogLines = ref<(SupplierOrderLine & { id: number })[]>([])
+type OrderLine = SupplierOrderLine & { id: number; manual?: boolean }
+const favorites = ref<OrderLine[]>([])
+const catalogLines = ref<OrderLine[]>([])
+const extra = ref<OrderLine[]>([])
+const lines = computed(() => [...favorites.value, ...catalogLines.value, ...extra.value])
 const catalog = ref<Expense[] | null>(null)
 const showCatalog = ref(false)
 const loadingCatalog = ref(false)
@@ -94,7 +100,6 @@ const catalogOptions = computed(() => {
   return (catalog.value ?? []).filter(item => !used.has(item.id))
     .map(item => ({ id: item.id, name: `${item.name} · ${item.unitDisplay}`, description: item.categoryName }))
 })
-const extra = ref<(SupplierOrderLine & { id: number })[]>([])
 const note = ref('')
 const preview = ref('')
 const previewInput = ref<HTMLTextAreaElement>()
@@ -157,18 +162,19 @@ function addCatalogLine(id: number) {
   catalogLines.value.push({ id, name: item.name, unit: units[item.unit] ?? item.unitDisplay, quantity: '', note: '', custom: true })
 }
 
-function removeCatalogLine(id: number) {
-  catalogLines.value = catalogLines.value.filter(line => line.id !== id)
+function removeLine(line: OrderLine) {
+  const group = line.manual ? extra : catalogLines
+  group.value = group.value.filter(item => item.id !== line.id)
 }
 
 function addLine() {
-  extra.value.push({ id: ++nextId, name: '', quantity: '', unit: '', note: '', custom: true })
+  extra.value.push({ id: ++nextId, name: '', quantity: '', unit: '', note: '', custom: true, manual: true })
 }
 
 function prepare() {
   formError.value = ''
   try {
-    preview.value = supplierOrderMessage([...favorites.value, ...catalogLines.value, ...extra.value], note.value)
+    preview.value = supplierOrderMessage(lines.value, note.value)
   } catch (cause) {
     formError.value = cause instanceof Error ? cause.message : 'No se pudo preparar el pedido.'
   }
