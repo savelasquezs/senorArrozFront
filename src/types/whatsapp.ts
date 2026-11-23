@@ -192,6 +192,13 @@ export type WhatsAppOrderConversation =
   | { kind: 'start'; phone: string; branchId: number }
   | { kind: 'ambiguous' | 'unavailable' }
 
+export interface WhatsAppDeliverymanContact {
+  conversationId?: number | null
+  shareText?: string | null
+  chatUnavailableReason?: string | null
+  shareUnavailableReason?: string | null
+}
+
 export interface WhatsAppConversationStartOptions {
   branchId: number
   branchName: string
@@ -304,6 +311,7 @@ export interface WhatsAppRecentDeliveryRoute {
 }
 
 export interface WhatsAppConversation {
+  matchesContactQuickFilter?: boolean
   operationalContact?: WhatsAppOperationalContact | null
   branchLineId?: number | null
   labels?: string[]
@@ -444,6 +452,8 @@ export interface WhatsAppConversationTemplate {
 }
 
 export interface WhatsAppConversationFilters {
+  deliverymenAssignedToday?: boolean
+  suppliersOnly?: boolean
   label?: string
   inbox?: WhatsAppInboxKey
   unroutedOnly?: boolean

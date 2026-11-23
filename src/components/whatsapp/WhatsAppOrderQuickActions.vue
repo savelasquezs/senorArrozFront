@@ -48,6 +48,16 @@
           <button v-if="canTrack && (routeId == null || order.deliveryRouteId === routeId)" type="button" class="quick-action mt-2 border-t border-gray-200 pt-2 text-emerald-700" @click="track">
             <MapPinIcon class="size-4" aria-hidden="true" />Ver ubicación
           </button>
+          <div v-if="showDeliverymanContact && order.status === 'on_the_way' && order.deliveryManId" class="mt-2 space-y-1 border-t border-gray-200 pt-2">
+            <button type="button" class="quick-action text-emerald-700" @click="contactDeliveryman('open')">
+              <ChatBubbleLeftRightIcon class="size-4" aria-hidden="true" />Hablar con el domiciliario
+            </button>
+            <button type="button" class="quick-action text-emerald-700 disabled:opacity-60" :disabled="!canShareDeliverymanContact"
+              :title="canShareDeliverymanContact ? undefined : 'Requiere atención asignada y una ventana de atención abierta'"
+              @click="contactDeliveryman('share')">
+              <IdentificationIcon class="size-4" aria-hidden="true" />Enviar contacto del domiciliario
+            </button>
+          </div>
         </template>
         <button v-if="routeId != null" type="button" class="quick-action mt-2 border-t border-gray-200 pt-2 text-emerald-700" @click="contactCustomer">
           <ChatBubbleLeftRightIcon class="size-4" aria-hidden="true" />Hablar con el cliente
@@ -81,7 +91,7 @@
 
 <script setup lang="ts">
 import { computed, defineAsyncComponent, nextTick, onActivated, onBeforeUnmount, onDeactivated, onMounted, ref, toRef, useId, watch } from 'vue'
-import { BanknotesIcon, ChatBubbleLeftRightIcon, ChevronDownIcon, MapPinIcon, XMarkIcon } from '@heroicons/vue/24/outline'
+import { BanknotesIcon, ChatBubbleLeftRightIcon, ChevronDownIcon, IdentificationIcon, MapPinIcon, XMarkIcon } from '@heroicons/vue/24/outline'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseDialog from '@/components/ui/BaseDialog.vue'
 import BaseInput from '@/components/ui/BaseInput.vue'
@@ -93,8 +103,11 @@ import { useWhatsAppOrderActions } from '@/composables/useWhatsAppOrderActions'
 import { orderCashToCollect } from '@/utils/orderCashToCollect'
 import type { OrderBankPaymentDetail, OrderDetailView, OrderStatus } from '@/types/order'
 
-const props = withDefaults(defineProps<{ orderId: number; active?: boolean; initialStatus?: OrderStatus; routeId?: number }>(), { active: true })
-const emit = defineEmits<{ manage: []; 'contact-customer': [] }>()
+const props = withDefaults(defineProps<{
+  orderId: number; active?: boolean; initialStatus?: OrderStatus; routeId?: number
+  showDeliverymanContact?: boolean; canShareDeliverymanContact?: boolean
+}>(), { active: true })
+const emit = defineEmits<{ manage: []; 'contact-customer': []; 'contact-deliveryman': [action: 'open' | 'share'] }>()
 const OrderTrackingDialog = defineAsyncComponent(() => import('@/components/orders/OrderTrackingDialog.vue'))
 const activated = ref(true)
 const enabled = computed(() => props.active && activated.value)
@@ -157,6 +170,7 @@ async function openAndFocus() {
 }
 function manage() { close(); emit('manage') }
 function contactCustomer() { close(); emit('contact-customer') }
+function contactDeliveryman(action: 'open' | 'share') { close(); emit('contact-deliveryman', action) }
 function track() { close(); showTracking.value = true }
 function beginEdit(payment: OrderBankPaymentDetail) {
   if (disabled.value || !order.value || !canEdit(payment)) return

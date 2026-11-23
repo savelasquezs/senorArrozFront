@@ -20,6 +20,7 @@ import type {
   WhatsAppConversationStartResult,
   WhatsAppOperationalBranchOption,
   WhatsAppOrderConversation,
+  WhatsAppDeliverymanContact,
   WhatsAppRecentDeliveryRoute,
   WhatsAppMessage,
   WhatsAppProductChoiceGroup,
@@ -84,6 +85,11 @@ class WhatsAppApi extends BaseApi {
   }
   getOrderConversation(orderId: number, signal: AbortSignal) {
     return this.get<ApiResponse<WhatsAppOrderConversation>>(`/whatsapp/orders/${orderId}/conversation`, { signal })
+  }
+  getOrderDeliverymanContact(orderId: number, conversationId: number, signal: AbortSignal) {
+    return this.get<ApiResponse<WhatsAppDeliverymanContact>>(`/whatsapp/orders/${orderId}/deliveryman-contact`, {
+      params: { conversationId }, signal,
+    })
   }
   getConversationDeliveryRoutes(id: number, signal: AbortSignal, expectedDeliverymanId?: number) {
     return this.get<ApiResponse<WhatsAppRecentDeliveryRoute[]>>(`/whatsapp/conversations/${id}/delivery-routes`, {
